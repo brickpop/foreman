@@ -1,0 +1,28 @@
+spec = "0.1"
+
+# Entry kinds: `spec` (product knowledge under product/), `task` (backlog cards), `note` (anything else)
+types = ["spec", "task", "note"]
+
+# Files that are NOT wiki entries (excluded from index and check; globs supported)
+ignore = []
+
+# Entries that stay indexed and queryable but are kept out of `wiki orphans` (globs supported)
+ignore_orphans = ["backlog/**"]
+
+[[tool.wikiview.board]]
+id      = "backlog"
+path    = "/backlog"
+name    = "Backlog"
+where   = ["type=task"]
+status  = "status"
+columns = ["todo", "in-progress", "blocked", "done"]
+lane    = "priority"
+lanes   = ["high", "medium", "low"]
+
+[[tool.wikiview.board]]
+id      = "product"
+path    = "/product"
+name    = "Build progress"
+where   = ["type=spec"]
+status  = "status"
+columns = ["planned", "partial", "built"]

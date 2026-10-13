@@ -1,0 +1,47 @@
+---
+type: spec
+status: planned
+tags: [feature, ui, teams]
+---
+
+# Team page
+
+One [team definition](../models/team-definition.md): where it is deployed, its members, its playbook and its file. Teams are reusable: one definition, any number of [deployments](../models/deployment.md).
+
+## Header
+
+Padding `40px 48px 0`.
+
+- H1 with the team name and, beside it, the kind label (14px `--tx4`): `Architect`, `Build`, `Challenge` (or `Custom`).
+- Subline: `Deployed on N project(s)`, or `Not deployed`.
+- Buttons: outline **`Hire`** (the [Chief of Staff](./chief-of-staff.md) hire flow, this team preset) and primary **`Deploy to a project`** ([Deploy a team](./deploy-team.md), this team preset).
+- Tabs, styled like the project tabs, no badges: `Deployments · Members · Playbook · File`.
+
+## Deployments
+
+Padding `24px 48px 64px`, max 920px. One card per deployment (padding `16px 20px`):
+
+- The project name (600 15px; opens the project's [Wiki reader](./wiki-reader.md)), the goal (`--tx2`), and `N working` plus ` · M waiting on you` when the deployment has open requests ([Requests](./requests.md)).
+- A raised **`Sessions`** button ([Sessions](./sessions.md) on this deployment) and a **`Stop`** button.
+- **Stop** ends that deployment only: its sessions terminate; sandboxes and worktrees stay on disk; other deployments of the team keep running ([Agent runtime](../architecture/agent-runtime.md)). A toast confirms. Whether Stop asks for confirmation, and what happens to the deployment's open requests and pipeline items, is open in [Deployment](../models/deployment.md#open-questions).
+- **Empty**: `Not deployed anywhere. Deploy it to a project to start sessions.`
+
+## Members
+
+Padding `20px 48px 64px`. One row per agent (grid `auto 1fr auto`, padding `14px 6px`), lead first; a click opens the [Agent page](./agent-page.md).
+
+- Avatar 38.
+- `<Name> · <Role> · <Harness label>` (the suffix 400 `--tx4`), then the personality (13.5px `--tx3`, ellipsis).
+- Right: for each deployment, a 7px status dot and the project id ([Instance](../models/instance.md)).
+
+## Playbook
+
+Padding `28px 48px 64px`, max 760px.
+
+- Intro: "The playbook is part of the team definition, so every deployment uses the same one. It's added to each member's session prompt. Each project's own gates and checks apply on top."
+- Steps: grid `28px 110px 1fr`: the number (Mono `--tx4`), who (600), the text. Role keys resolve to the member's name (`lead` → "Mara"); `ceo` → "You"; other keys are shown capitalized ("Members").
+- "Escalate": one line per rule, the condition (`--tx2`) and the target (500); `ceo` shows as "You" in `--accTx`.
+
+## File
+
+Padding `28px 48px 64px`, max 860px. The path `~/agents-ws/.foreman/teams/<id>.yaml` and the file's actual content in a read-only `<pre>`, exactly as on disk ([Team definition](../models/team-definition.md)).

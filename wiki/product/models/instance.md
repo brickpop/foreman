@@ -14,7 +14,7 @@ Table `instances`.
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| `id` | String | yes | | `agent@project`, unique | See [Team definition](./team-definition.md#open-questions) on collisions |
+| `id` | String | yes | | `agent@project`, unique | Can't collide: agent ids are unique across the workspace ([Team definition](./team-definition.md#schema)) |
 | `deployment_id` | String → Deployment | yes | | | |
 | `agent_id` | String | yes | | an agent of the deployment's team | |
 | `status` | String | yes | `starting` | enum below | |
@@ -22,7 +22,8 @@ Table `instances`.
 | `pid` | Number | | | | Harness process id (inside the container, or the container's) |
 | `pty_id` | String | | | | Handle of the attached terminal in the session runner (e.g. container id) |
 | `sandbox_path` | String | yes | | | `<project>/.sandboxes/<agent>/` |
-| `harness` | String | yes | the soul's harness | enum as in [Agent soul](./agent-soul.md) | Harness actually running (may differ from the soul after a switch) |
+| `harness` | String | yes | the soul's harness | enum as in [Agent soul](./agent-soul.md) | Harness actually running: differs from the soul after a "Switch harness", an override that lasts until the instance is next restarted from the team file ([Agent soul](./agent-soul.md#harness-override)) |
+| `harness_session_id` | String | | | | The harness's own session id, for native resume on restart ([Agent runtime](../architecture/agent-runtime.md#restarts)) |
 | `started_at` | Timestamp | | | | |
 | `last_output_at` | Timestamp | | | | Drives the "stuck" blocked request (no output for N min, default 20) |
 | `restarts` | Number | yes | `0` | ≥ 0 | |
@@ -31,17 +32,17 @@ Table `instances`.
 
 | Status | Meaning | Color ([Design system](../design/design-system.md)) |
 |---|---|---|
-| `queued` | Waiting for a free slot (max running sessions reached) | not defined yet |
-| `starting` | Container, sandbox and harness being set up | violet (`--acp`) |
+| `queued` | Waiting for a free slot (max running sessions reached) | grey dashed outline (`--tx4`) |
+| `starting` | Container, sandbox and harness being set up | violet (`--team`) |
 | `running` | Working | green (`--ok`) |
-| `idle` | Waiting at its prompt with nothing assigned | grey (`--tx4`) |
-| `awaiting` | Has an open request to the CEO | amber (`--acc`) |
-| `done` | Handed off, nothing assigned | blue (`--info`) |
+| `idle` | Waiting at its prompt with nothing assigned (and not right after a handoff) | grey (`--tx4`) |
+| `awaiting` | Waits on an open blocking approval from the CEO ([Request](./request.md#invariants)) | amber (`--acc`) |
+| `done` | Just handed off, nothing assigned yet. Lasts until the next input or card assignment, then becomes `idle` (or `running`) | blue (`--info`) |
 | `stopped` | Exited, crashed, rate-limited, or its deployment was stopped | red (`--err`) |
 
 ## Logs
 
-The raw PTY byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It serves scrollback replay in the browser terminal ([Persistence](../architecture/persistence.md)).
+The raw PTY byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It serves scrollback replay in the browser terminal. Logs rotate at a size cap ([Persistence](../architecture/persistence.md#session-logs)).
 
 ## Invariants
 
@@ -49,7 +50,3 @@ The raw PTY byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<proje
 - An instance in `awaiting` has at least one open blocking request.
 - A crash, exit or rate limit sets `stopped` and raises a blocked [request](../features/requests.md).
 - Instances survive UI disconnects.
-
-## Open questions
-
-1. **`done` vs `idle`.** Both mean "nothing assigned"; what tells them apart, and does `done` revert to `idle`? Recommendation: `done` right after a handoff until the next input or card assignment, then `idle`.

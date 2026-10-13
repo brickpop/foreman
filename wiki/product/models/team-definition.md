@@ -13,7 +13,7 @@ tags: [model, teams, agents, config]
 ```yaml
 team: atlas
 name: Atlas
-kind: build                # architect | build | challenge | custom
+purpose: Builds features end to end, tested and reviewed.   # optional, one line
 lead: mara
 agents:
   mara:
@@ -52,23 +52,37 @@ escalate:
 |---|---|---|---|---|---|
 | `team` | String | yes | | slug; equals the file name | Team id |
 | `name` | String | yes | | | Display name |
-| `kind` | String | yes | | enum: `architect`, `build`, `challenge`, `custom` | Labels: Architect, Build, Challenge, Custom. Picks the default roster when created by the CoS |
+| `purpose` | String | | | one line | What the team is for, shown under its name on the [Team page](../features/team-page.md). Free text; there are no team kinds |
 | `lead` | String | yes | | an id in `agents` | The team lead: the CEO's default contact, the only member who can call `open_pr` |
-| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are unique within a team (see open questions) |
-| `playbook` | Array of single-key maps `{roleKey: text}` | | `[]` | | Ordered steps. Role keys: `lead`, `members`, `ceo`, or a role (`scrum_master`, `qa`, `architect`, `reviewer`, `engineer`). Rendered with keys resolved to member names, `ceo` → "You" |
-| `escalate` | Array of `{when, to}` | | `[]` | `to`: a role key or `ceo` | Escalation table. Project gates ([Project config](./project-config.md)) apply on top |
+| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across the workspace** (the slug of the display name, which is workspace-unique too), so the instance id `agent@project`, the sandbox path and `wt/<agent>/…` branches can never collide when two teams share a project |
+| `playbook` | Array of single-key maps `{who: text}` | | `[]` | | Ordered steps. `who` as in [Playbook and escalation](#playbook-and-escalation) |
+| `escalate` | Array of `{when, to}` | | `[]` | `to`: a `who` ([Playbook and escalation](#playbook-and-escalation)) | Escalation table. Project gates ([Project config](./project-config.md)) apply on top |
 
-## Default rosters
+## Playbook and escalation
 
-Used by the CoS "Create a team" flow.
+A playbook step and an escalation's `to` name **who** with one of:
 
-| Kind | Roster |
-|---|---|
-| Architect | Team Lead, Architect, Reviewer, Scrum Master |
-| Build | Team Lead, Engineer ×2, QA, Scrum Master |
-| Challenge | Team Lead, QA ×2, Reviewer |
+| `who` | Means | Rendered as |
+|---|---|---|
+| `lead` | The team lead | The lead's name ("Mara") |
+| `members` | Every member except the lead | "Members" |
+| `ceo` | The CEO | "You" on the [Team page](../features/team-page.md), `CEO` in the [session prompt](../architecture/session-prompt.md) |
+| A role name in snake_case (`scrum_master`, `qa`, `engineer`, …) | The member(s) with that role | Their names |
+| An agent id (`tove`) | That agent | Its name |
 
-The first roster entry (Team Lead) becomes `lead`.
+Anything else (a typo, `scrum master` with a space, a role nobody on the team has) is shown as written and flagged with a warning on the Team page; it is not an error, so a half-edited file still loads.
+
+## Example teams
+
+There are no templates and no team kinds. The [Chief of Staff](../features/chief-of-staff.md) drafts every team definition from the purpose the CEO describes, using a few **example team files shipped with Foreman** as references (read-only, never deployed):
+
+| Example | Purpose | Roster |
+|---|---|---|
+| Architect | Designs: ADRs, spikes, reviews of designs | Team Lead, Architect, Reviewer, Scrum Master |
+| Build | Builds features end to end, tested | Team Lead, Engineer ×2, QA, Scrum Master |
+| Challenge | Tries to break what others built | Team Lead, QA ×2, Reviewer |
+
+Each example carries a full roster with job descriptions, a playbook and an escalation table, so the CoS adapts real material rather than filling blanks.
 
 ## Invariants
 
@@ -76,12 +90,9 @@ The first roster entry (Team Lead) becomes `lead`.
 - Agent display names are unique across the workspace, so @-mentions and avatars stay unambiguous.
 - `command` is non-empty when `harness: custom`.
 - A team file never carries secrets or deployment state.
+- Agent ids are unique across the workspace, not just within the team.
+- An agent can't be removed, and a team file can't be deleted, while it is deployed: stop the deployments first. Removing an undeployed agent removes its soul and keeps its sandboxes on disk.
 
-## Open questions
+## Writes
 
-1. **Agent id collisions across teams.** Agent ids are unique only within a team, but the instance id `agent@project`, the sandbox path `<project>/.sandboxes/<agent>/` and the branch `wt/<agent>/<card>` are per project ([Instance](./instance.md), [Sandboxes and git policy](../architecture/sandboxes-and-git.md)). Two teams deployed on one project with a shared agent id collide on all three. Options: make agent ids workspace-unique (the slug of the already workspace-unique display name); or qualify everything with the team (`agent.team@project`, `.sandboxes/<team>/<agent>/`, `wt/<team>/<agent>/<card>`). Recommendation: workspace-unique ids; it removes the collision everywhere without longer names.
-2. **Concurrent edits and comment-preserving writes.** The UI, the CoS and the CEO's editor can write the same YAML at once, and a UI edit must not reformat a hand-edited file. Recommendation: every UI write carries the version it read (content hash) and is refused on mismatch, like wiki writes; writes edit the YAML node tree (keeping comments and key order) rather than re-marshalling a struct.
-3. **Versioning team files** (PRD §16.6). If `.foreman/teams` is a git repo, should UI edits commit automatically? Options: no git involvement; auto-commit each save; commit on a debounce. Recommendation: no automatic commits in v1; Foreman only writes files and the CEO versions the folder themselves (the Chief of Staff's edits arrive as reviews anyway).
-4. **Playbook role keys.** The PRD uses snake_case (`scrum_master`); the prototype renders `scrum master` and has no `name:` or `look:` keys. The spec follows the PRD; confirm the role-key vocabulary, and whether a key naming an absent role is an error or rendered capitalised (prototype: "Members").
-5. **Removing an agent or a team.** Not specified: what happens to running instances, sandboxes and open requests when an agent is removed from a team, or a deployed team's file is deleted. Recommendation: refuse while deployed; otherwise remove the soul and keep sandboxes on disk.
-6. **Kind `custom`.** In the PRD but nowhere in the prototype's flows or the Chief of Staff templates. Options: a template that starts with an empty roster except the lead; no template at all, `custom` only for teams written or edited by hand (shown as "Custom" on the [Team page](../features/team-page.md)). Recommendations differ: lead-only roster (from the model) vs hand-written only (from the Team page).
+The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Writes edit the YAML node tree, keeping the CEO's comments and key order, rather than re-marshalling a struct ([Persistence](../architecture/persistence.md#team-file-writes)). Foreman never commits team files: it only writes them, and the CEO versions `.foreman/teams/` themselves if they want to (the Chief of Staff's edits arrive as reviews anyway).

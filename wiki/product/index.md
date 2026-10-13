@@ -20,8 +20,9 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Deployment](./models/deployment.md)
   - [Instance](./models/instance.md)
   - [Request](./models/request.md)
-  - [ACP message](./models/acp-message.md)
-  - [Pipeline item](./models/pipeline-item.md)
+  - [Team message](./models/team-message.md)
+  - [Work item](./models/work-item.md): an agent's branch on its way to the lead
+  - [Pull request](./models/pull-request.md): the lead's proposal to merge into `main`
   - [UI state](./models/ui-state.md): read markers and UI preferences
 
 ## Features
@@ -53,7 +54,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
 - [Session runner](./architecture/session-runner.md): where harness processes run (Podman, PTY)
 - [Harness adapters](./architecture/harness-adapters.md)
 - [Sandboxes and git policy](./architecture/sandboxes-and-git.md)
-- [ACP](./architecture/acp.md): the agent tools and message delivery
+- [Team tools](./architecture/team-tools.md): the agent tools and message delivery
 - [Session prompt](./architecture/session-prompt.md)
 - [Forge adapters](./architecture/forge-adapters.md)
 - [Wiki engine](./architecture/wiki-engine.md)

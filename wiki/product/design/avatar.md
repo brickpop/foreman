@@ -6,7 +6,7 @@ tags: [design, ui, agents]
 
 # Avatar
 
-Every agent has a generated face, drawn as a small SVG from the `look` of its [agent soul](../models/agent-soul.md). The same face appears everywhere the agent does: tabs, cards, rows, the agent page. An optional corner **dot** shows the instance status and an optional **ring** highlights it. Reference: `Avatar.dc.html` in the [prototype](./prototype/foreman-prototype.dc.html) folder.
+Every agent has a generated face, drawn as a small SVG from the `look` of its [agent soul](../models/agent-soul.md). The same face appears everywhere the agent does: tabs, panels, rows, the agent page. An optional corner **dot** shows the instance status and an optional **ring** highlights it. Reference: `Avatar.dc.html` in the [prototype](./prototype/foreman-prototype.dc.html) folder.
 
 ## Inputs
 
@@ -60,6 +60,8 @@ A `size × size` box (inline-block, never shrinks) holding an SVG with `viewBox=
 
 ## Ring and dot
 
+One meaning per mark: the **dot is the instance status**, everywhere a status is shown; the **ring is a "needs you" highlight** only (amber, on the requesting agent in request panels). The ring never encodes status.
+
 - **Ring**: an overlay with the avatar's radius and `box-shadow: inset 0 0 0 max(1.5, size/15)px <ring>` (one decimal).
 - **Dot**: a circle at `right: -3px; bottom: -3px`, diameter `max(7, round(size × 0.32))px`, background `<dot>`, `box-shadow: 0 0 0 2px <dotBorder>`. The dot color is the instance status color ([Design system](./design-system.md#status-colors)).
 
@@ -68,10 +70,10 @@ A `size × size` box (inline-block, never shrinks) holding an SVG with `viewBox=
 | Size | Where | Decoration |
 |---|---|---|
 | 20 | Board card assignee | none |
-| 24 | Agent tab (Sessions), Changes request card | dot on tabs (`dotBorder --side`) |
+| 24 | Agent tab (Sessions), Changes request panel | dot on tabs (`dotBorder --side`) |
 | 26 | Pane header, In-flight row | dot on pane header (`dotBorder --term`) |
 | 28 | Team rosters in lists | none, tooltip `<Name> · <Role>` |
-| 32 | Home request card; project settings member rows | amber ring on Home; dot on settings rows (`dotBorder --panel`) |
+| 32 | Home request panel; project settings member rows | amber ring on Home; dot on settings rows (`dotBorder --panel`) |
 | 38 | Team Members tab | none |
 | 72 | Agent page header | none |
 
@@ -80,7 +82,3 @@ Elsewhere, status is a separate 7–8px dot next to text, not on the avatar.
 ## Chief of Staff
 
 The [Chief of Staff](../features/chief-of-staff.md) is shown as a 22–28px amber tile with a "C" (`--acc` background, `--accInk` letter), not a face. When a CoS request appears in a request list, it uses a fixed face: background `#E8A33D`, skin `#E2AE85`, bald, glasses, no beard.
-
-## Open questions
-
-1. **Ring vs dot.** The PRD says "a status ring or corner dot shows the instance state". The prototype uses the dot for status and the amber ring only to highlight the requesting agent on Home. Options: dot = status, ring = "needs you" highlight only (prototype); ring = status everywhere. Recommendation: the prototype's split; it keeps one meaning per mark.

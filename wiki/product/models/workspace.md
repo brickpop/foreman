@@ -17,10 +17,22 @@ The root folder Foreman runs on (e.g. `~/agents-ws`). It holds Foreman's own dat
 | **Team definitions** | `~/agents-ws/.foreman/teams/<team>.yaml` | The UI (Foreman owns these files), the Chief of Staff, or the editor | Editable in the UI. Changes write to the file and apply to every running instance on its next turn. See [Team definition](./team-definition.md). |
 | **Workspace settings** | `~/agents-ws/.foreman/settings.yaml` (local, not shared) | The UI | Editable in the UI. See [Workspace settings](./workspace-settings.md). |
 | **Secrets** | OS keychain, or `~/agents-ws/.foreman/secrets` with 0600 permissions | The UI | Write-only fields. Never written into project folders. See [Secrets](./secrets.md). |
-| **Runtime state** | `~/agents-ws/.foreman/state.db` (SQLite) | Foreman | Deployments, instances, requests, ACP messages, pipeline items, read markers, UI prefs. See [Persistence](../architecture/persistence.md). |
+| **Runtime state** | `~/agents-ws/.foreman/state.db` (SQLite) | Foreman | Deployments, instances, requests, team messages, work items, pull requests, read markers, UI prefs. See [Persistence](../architecture/persistence.md). |
 | **Session logs** | `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log` | Foreman | Raw PTY byte stream for replay and scrollback. |
 
 The file watcher reloads config and wiki changes within about 1 second and pushes them to clients ([API](../architecture/api.md)).
+
+## Starting Foreman
+
+```
+foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
+```
+
+- The workspace is the folder given as argument, or the current folder.
+- If it has no `.foreman/` yet, Foreman asks once: `~/agents-ws isn't a Foreman workspace yet. Create .foreman/ here? [y/N]`. Anything but `y` exits without touching the disk. `--yes` answers yes (for scripts). This keeps a wrong folder (the home directory, a repo) from becoming a workspace by accident.
+- On every start Foreman prints the URL with the [access token](../architecture/security.md#access-token) and opens it in the default browser; `--no-open` only prints it.
+- `--port` sets the UI port (default `8888`); the interface it binds to follows the `listen` [setting](./workspace-settings.md).
+- `--new-token` replaces the access token before starting, which logs every browser out.
 
 ## Layout
 

@@ -26,17 +26,17 @@ A centered grid (gap 32). Tree closed: one column `minmax(0, 760px)`. Tree open:
 
 ## File tree
 
-Sticky (top 16px). The bundle's folders and entries; `index.md` first.
+Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` first, then subfolders, then entries, alphabetically. Folders are collapsed except those on the path to the current entry; a click on the chevron expands one.
 
 - Indentation: `10 + 14 × depth` px left padding; padding `5px 10px`; 13.5px; ellipsis on overflow.
 - Folders: 500, `--tx2`; clickable only when the folder has an `index.md` (it opens). Entries: 400, `--tx3`. The current entry: `--raised`, `--tx`.
-- A 6px amber **changed dot** on entries changed since last viewed ([UI state](../models/ui-state.md)).
+- A 6px amber **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").
 
 ## Article
 
 Max width 720px, gap 14. Opens `index.md` by default.
 
-1. **"On this page"** (12px `--tx4` label): the entry's H2 headings (13px `--tx3`), each smooth-scrolling to its heading (24px offset). Shown only when there are H2s; bottom border.
+1. **"On this page"** (12px `--tx4` label): the entry's H2 and H3 headings (13px `--tx3`, H3 indented 12px), each smooth-scrolling to its heading (24px offset). Shown only when there are any; bottom border.
 2. **Frontmatter chips**: one `key: value` chip per field; empty values hidden.
 3. **Body** rendered from Markdown:
 
@@ -44,6 +44,7 @@ Max width 720px, gap 14. Opens `index.md` by default.
 |---|---|
 | H1 | Page title (30px) |
 | H2 | 18px / 600, anchor target |
+| H3 | 15.5px / 600, anchor target (new: the prototype rendered no H3) |
 | Paragraph | 15.5px / 1.65 / `--tx2`, with inline emphasis, code and links |
 | List item | `–` bullet in `--tx4` in an 18px gutter |
 | Link to another entry | Opens it in the reader (`--accTx`). External links open in a new tab |
@@ -58,10 +59,3 @@ Max width 720px, gap 14. Opens `index.md` by default.
 - **Ticking a checkbox** writes that one character to the file atomically, guarded by the entry's version; on conflict the box reverts and an error toast explains it ([API](../architecture/api.md), `PUT /api/wiki/:project/checkbox/:path`).
 - **File changes** (agents or the CEO's editor) appear within about 1 s ([Persistence](../architecture/persistence.md)): the open entry re-renders, and changed entries get their dot.
 - Prose is read-only. The only writes are a checkbox tick here and a card move on the [Board](./board.md).
-
-## Open questions
-
-1. **Tree shape.** The prototype hard-codes three folders (`adr/`, `backlog/`, `standups/`) at one level. Options: the full bundle tree at any depth, sorted `index.md` first then folders then entries alphabetically; a depth limit. Recommendation: full tree, folders collapsed except the one holding the current entry.
-2. **"On this page" depth.** Only H2 is listed. Options: H2 only; H2 and H3. Recommendation: H2 and H3 (indented), since agent-written ADRs often use H3.
-
-What "changed since you last looked" means is owned by [UI state](../models/ui-state.md#open-questions).

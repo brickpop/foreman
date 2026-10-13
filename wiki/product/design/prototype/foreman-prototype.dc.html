@@ -1,0 +1,1557 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0E0F11;--side:#0B0C0E;--panel:#131518;--raised:#1B1E22;--hover:#17191C;--term:#08090A;--line:#1F2227;--line2:#2C3036;--line3:#3A3F46;--tx:#E6E3DC;--tx2:#C9C6BF;--tx3:#9A9CA3;--tx4:#80838A;--acc:#E8A33D;--accTx:#E8A33D;--accInk:#17130B;--accSoft:#1A1610;--accLine:#3A3020;--ok:#6FCF8E;--info:#7AA7E8;--acp:#B79CF0;--err:#E5675A;--ask:#F2BE6B;--shadow:0 16px 40px rgba(0,0,0,.55);}
+html[data-theme="light"]{--bg:#F5F3EE;--side:#EDEAE3;--panel:#FFFFFF;--raised:#EEEBE4;--hover:#E6E2DA;--term:#FBFAF7;--line:#E0DCD3;--line2:#CFCAC0;--line3:#B5AFA3;--tx:#1B1A17;--tx2:#3F3D38;--tx3:#5F5D57;--tx4:#75726B;--acc:#E8A33D;--accTx:#8A5200;--accInk:#17130B;--accSoft:#FBF1DF;--accLine:#EBCF9E;--ok:#23824A;--info:#2B66B5;--acp:#7445C2;--err:#B8352A;--ask:#8A5200;--shadow:0 16px 40px rgba(40,30,10,.18);}
+html,body{margin:0;background:var(--bg);color:var(--tx);}
+a{color:var(--accTx);text-decoration:none;}
+a:hover{text-decoration:underline;}
+::selection{background:rgba(232,163,61,.35);}
+*::-webkit-scrollbar{width:10px;height:10px;}
+*::-webkit-scrollbar-thumb{background:var(--line2);border-radius:8px;border:2px solid var(--bg);}
+</style>
+</helmet>
+<div style="display:grid;grid-template-columns:220px minmax(0,1fr);height:100vh;background:var(--bg);color:var(--tx);font-family:'Geist',system-ui,sans-serif;font-size:14px;">
+
+  <aside style="border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--side);">
+    <div style="padding:20px 18px 16px;display:flex;align-items:center;gap:9px;">
+      <div style="width:22px;height:22px;border-radius:5px;background:var(--acc);color:var(--accInk);display:grid;place-items:center;font:700 12px 'Geist Mono',monospace;">F</div>
+      <div style="font-weight:600;font-size:15px;letter-spacing:-0.01em;">Foreman</div>
+    </div>
+    <div style="flex:1;overflow:auto;display:flex;flex-direction:column;gap:18px;padding:0 10px 12px;">
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <sc-for list="{{ nav }}" as="n" hint-placeholder-count="3">
+          <div onClick="{{ n.onClick }}" style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:6px;cursor:pointer;background:{{ n.bg }};color:{{ n.color }};font-weight:500;" style-hover="background:var(--hover);">
+            <span>{{ n.label }}</span>
+            <sc-if value="{{ n.hasBadge }}" hint-placeholder-val="{{ false }}">
+              <span style="background:var(--acc);color:var(--accInk);font:600 11px 'Geist Mono',monospace;padding:1px 7px;border-radius:10px;">{{ n.badge }}</span>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <div style="padding:4px 10px 6px;font-size:12px;color:var(--tx4);font-weight:500;">Projects</div>
+        <sc-if value="{{ projSecOpen }}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{ railProjects }}" as="p" hint-placeholder-count="3">
+            <div onClick="{{ p.open }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;background:{{ p.bg }};color:{{ p.color }};font-size:13.5px;" style-hover="background:var(--hover);">
+              <span>{{ p.name }}</span>
+              <sc-if value="{{ p.needs }}" hint-placeholder-val="{{ false }}"><span style="width:7px;height:7px;border-radius:50%;background:var(--acc);"></span></sc-if>
+            </div>
+          </sc-for>
+          <div onClick="{{ newProject }}" style="padding:6px 10px;border-radius:6px;color:var(--tx4);font-size:13px;cursor:pointer;" style-hover="color:var(--tx);background:var(--hover);">+ New project</div>
+        </sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <div style="padding:4px 10px 6px;font-size:12px;color:var(--tx4);font-weight:500;">Teams</div>
+        <sc-if value="{{ teamSecOpen }}" hint-placeholder-val="{{ true }}">
+          <sc-for list="{{ railTeams }}" as="t" hint-placeholder-count="3">
+            <div onClick="{{ t.open }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 10px;border-radius:6px;cursor:pointer;background:{{ t.bg }};color:{{ t.color }};font-size:13.5px;" style-hover="background:var(--hover);">
+              <span>{{ t.name }}</span>
+              <span style="font-size:12px;color:var(--tx4);">{{ t.where }}</span>
+            </div>
+          </sc-for>
+          <div onClick="{{ newTeam }}" style="padding:6px 10px;border-radius:6px;color:var(--tx4);font-size:13px;cursor:pointer;" style-hover="color:var(--tx);background:var(--hover);">+ New team</div>
+        </sc-if>
+      </div>
+    </div>
+    <div style="padding:12px 10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px;">
+      <div onClick="{{ openCos }}" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--accLine);background:var(--accSoft);margin-bottom:6px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:var(--acc);color:var(--accInk);display:grid;place-items:center;font-weight:700;font-size:12px;">C</div>
+        <div style="display:flex;flex-direction:column;">
+          <span style="font-weight:600;font-size:13px;">Chief of Staff</span>
+          <span style="font-size:11.5px;color:var(--tx3);">Hire, set up, anything else</span>
+        </div>
+      </div>
+      <div onClick="{{ openSettings }}" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13px;color:{{ settingsColor }};background:{{ settingsBg }};padding:7px 10px;border-radius:6px;" style-hover="background:var(--hover);">
+        <span>Settings</span><span style="font:400 11.5px 'Geist Mono',monospace;color:var(--tx4);">localhost:7420</span>
+      </div>
+    </div>
+  </aside>
+
+  <main style="min-width:0;min-height:0;overflow:auto;display:flex;flex-direction:column;">
+
+    <sc-if value="{{ isHome }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:48px 48px 64px;display:flex;flex-direction:column;gap:40px;max-width:920px;width:100%;box-sizing:border-box;">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.02em;">{{ homeTitle }}</h1>
+          <div style="color:var(--tx3);font-size:15px;">{{ homeSub }}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <sc-for list="{{ inbox }}" as="a" hint-placeholder-count="3">
+            <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;">
+              <div style="display:flex;gap:12px;align-items:center;">
+                <dc-import name="Avatar" size="32" color="{{ a.color }}" face="{{ a.face }}" ring="var(--acc)" hint-size="32px,32px"></dc-import>
+                <span style="font-weight:600;">{{ a.who }}</span>
+                <span style="color:var(--tx4);font-size:13px;">{{ a.context }}</span>
+                <span style="flex:1;"></span>
+                <span style="font:600 10.5px 'Geist Mono',monospace;letter-spacing:.05em;text-transform:uppercase;color:{{ a.kindColor }};border:1px solid {{ a.kindColor }};border-radius:4px;padding:1px 6px;white-space:nowrap;">{{ a.kindLabel }}</span>
+              </div>
+              <div style="font-size:16px;line-height:1.5;text-wrap:pretty;">{{ a.text }}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <sc-for list="{{ a.opts }}" as="o" hint-placeholder-count="2">
+                  <button onClick="{{ o.onClick }}" style="background:{{ o.bg }};border:1px solid {{ o.border }};color:{{ o.color }};border-radius:7px;padding:7px 14px;font:{{ o.weight }} 13.5px 'Geist',sans-serif;cursor:pointer;">{{ o.label }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ noInbox }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:28px;border:1px dashed var(--line2);border-radius:12px;color:var(--tx3);text-align:center;">Nothing needs you. You'll get a browser notification when something does.</div>
+          </sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;">
+          <div style="font-size:13px;color:var(--tx4);font-weight:500;padding-bottom:8px;">Projects</div>
+          <sc-for list="{{ projectRows }}" as="p" hint-placeholder-count="3">
+            <div onClick="{{ p.open }}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:14px 4px;border-top:1px solid var(--line);cursor:pointer;" style-hover="background:var(--hover);">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0;">
+                <span style="font-weight:600;font-size:15px;">{{ p.name }}</span>
+                <span style="color:var(--tx3);font-size:13.5px;">{{ p.line }}</span>
+              </div>
+              <span style="font-size:13px;color:{{ p.stateColor }};">{{ p.state }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isProject }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 48px 0;display:flex;flex-direction:column;gap:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.02em;">{{ proj.name }}</h1>
+            <div style="color:var(--tx3);font-size:15px;">{{ proj.desc }}</div>
+          </div>
+          <span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx4);">{{ proj.path }}</span>
+        </div>
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--line);">
+          <sc-for list="{{ projTabs }}" as="tb" hint-placeholder-count="4">
+            <div onClick="{{ tb.onClick }}" style="display:flex;gap:6px;align-items:center;padding:9px 14px;cursor:pointer;font-weight:500;color:{{ tb.color }};border-bottom:2px solid {{ tb.line }};margin-bottom:-1px;">
+              <span>{{ tb.label }}</span>
+              <sc-if value="{{ tb.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="background:var(--acc);color:var(--accInk);font:600 10.5px 'Geist Mono',monospace;padding:1px 6px;border-radius:9px;">{{ tb.badge }}</span></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <sc-if value="{{ tabOverview }}" hint-placeholder-val="{{ true }}">
+        <div style="display:grid;grid-template-columns:{{ readerCols }};justify-content:center;gap:32px;padding:24px 32px 64px;align-items:start;">
+          <sc-if value="{{ treeOpen }}" hint-placeholder-val="{{ false }}"><nav style="display:flex;flex-direction:column;gap:1px;position:sticky;top:16px;min-width:0;">
+            <sc-for list="{{ wikiTree }}" as="w" hint-placeholder-count="8">
+              <div onClick="{{ w.open }}" style="display:flex;align-items:center;gap:8px;padding:5px 10px 5px {{ w.indent }};border-radius:6px;font-size:13.5px;font-weight:{{ w.weight }};color:{{ w.color }};background:{{ w.bg }};cursor:{{ w.cursor }};" style-hover="background:var(--hover);">
+                <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ w.label }}</span>
+                <sc-if value="{{ w.changed }}" hint-placeholder-val="{{ false }}"><span title="Changed since you last looked" style="width:6px;height:6px;border-radius:50%;background:var(--acc);flex-shrink:0;"></span></sc-if>
+              </div>
+            </sc-for>
+          </nav></sc-if>
+          <article style="max-width:720px;display:flex;flex-direction:column;gap:14px;min-width:0;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <button onClick="{{ toggleTree }}" style="background:{{ treeBg }};border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:4px 10px;font:500 12.5px 'Geist',sans-serif;cursor:pointer;white-space:nowrap;display:flex;gap:6px;align-items:center;">{{ treeLabel }}<sc-if value="{{ treeChanged }}" hint-placeholder-val="{{ false }}"><span style="width:6px;height:6px;border-radius:50%;background:var(--acc);"></span></sc-if></button>
+              <span style="font:400 12px 'Geist Mono',monospace;color:var(--tx4);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">{{ entryPath }}</span>
+            </div>
+            <sc-if value="{{ hasHeadings }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:6px 14px;flex-wrap:wrap;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--line);">
+                <span style="font-size:12px;color:var(--tx4);font-weight:500;">On this page</span>
+                <sc-for list="{{ headings }}" as="hd" hint-placeholder-count="3">
+                  <span onClick="{{ hd.go }}" style="font-size:13px;color:var(--tx3);cursor:pointer;" style-hover="color:var(--tx);">{{ hd.x }}</span>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ hasFm }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ fmRows }}" as="f" hint-placeholder-count="3">
+                <span style="font-size:12.5px;background:var(--raised);border-radius:5px;padding:3px 8px;color:var(--tx3);">{{ f.k }}: <span style="color:var(--tx);">{{ f.v }}</span></span>
+              </sc-for>
+            </div></sc-if>
+            <sc-for list="{{ blocks }}" as="b" hint-placeholder-count="6">
+              <div style="display:contents;">
+                <sc-if value="{{ b.isH1 }}" hint-placeholder-val="{{ false }}"><h1 style="margin:0 0 2px;font-size:30px;font-weight:600;letter-spacing:-0.02em;line-height:1.2;">{{ b.x }}</h1></sc-if>
+                <sc-if value="{{ b.isH2 }}" hint-placeholder-val="{{ false }}"><h2 id="{{ b.anchor }}" style="margin:16px 0 0;font-size:18px;font-weight:600;">{{ b.x }}</h2></sc-if>
+                <sc-if value="{{ b.isP }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:15.5px;line-height:1.65;color:var(--tx2);text-wrap:pretty;">{{ b.x }}</p></sc-if>
+                <sc-if value="{{ b.isLi }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:18px minmax(0,1fr);font-size:15px;line-height:1.6;color:var(--tx2);"><span style="color:var(--tx4);">–</span><span>{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isLink }}" hint-placeholder-val="{{ false }}"><div onClick="{{ b.open }}" style="display:grid;grid-template-columns:18px minmax(0,1fr);font-size:15px;line-height:1.6;cursor:pointer;"><span style="color:var(--tx4);">→</span><span style="color:var(--accTx);" style-hover="text-decoration:underline;">{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isCallout }}" hint-placeholder-val="{{ false }}"><div style="border:1px solid {{ b.cBorder }};border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;background:var(--panel);"><span style="font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:{{ b.cColor }};">{{ b.cLabel }}</span><span style="font-size:15px;line-height:1.55;color:var(--tx2);">{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isCheck }}" hint-placeholder-val="{{ false }}"><div onClick="{{ b.toggle }}" style="display:flex;gap:10px;align-items:center;font-size:15px;line-height:1.5;cursor:pointer;"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid {{ b.boxBorder }};background:{{ b.boxBg }};color:var(--accInk);display:grid;place-items:center;font-size:11px;font-weight:700;flex-shrink:0;">{{ b.box }}</span><span style="color:{{ b.textColor }};text-decoration:{{ b.deco }};">{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isCode }}" hint-placeholder-val="{{ false }}"><pre style="margin:0;background:var(--term);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font:400 12.5px/1.6 'Geist Mono',monospace;color:var(--tx2);white-space:pre-wrap;">{{ b.x }}</pre></sc-if>
+              </div>
+            </sc-for>
+          </article>
+          
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ tabBoard }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px 40px 64px;display:flex;flex-direction:column;gap:16px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ boardTabs }}" as="bt" hint-placeholder-count="2">
+                <button onClick="{{ bt.onClick }}" style="background:{{ bt.bg }};border:1px solid {{ bt.border }};color:{{ bt.color }};border-radius:7px;padding:5px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ bt.label }}</button>
+              </sc-for>
+            </div>
+            <button onClick="{{ toggleToml }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx3);border-radius:7px;padding:5px 12px;font:400 12.5px 'Geist Mono',monospace;cursor:pointer;">{{ tomlLabel }}</button>
+          </div>
+          <sc-if value="{{ showToml }}" hint-placeholder-val="{{ false }}">
+            <pre style="margin:0;background:var(--term);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font:400 12.5px/1.6 'Geist Mono',monospace;color:var(--tx2);white-space:pre-wrap;max-width:620px;">{{ wikiToml }}</pre>
+          </sc-if>
+          <div style="overflow-x:auto;">
+            <div style="min-width:880px;display:flex;flex-direction:column;gap:14px;">
+              <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;">
+                <sc-for list="{{ boardCols }}" as="c" hint-placeholder-count="4">
+                  <div style="display:flex;gap:8px;font-size:13px;color:var(--tx3);padding:0 4px;"><span style="font-weight:500;">{{ c.label }}</span><span style="color:var(--tx4);">{{ c.count }}</span></div>
+                </sc-for>
+              </div>
+              <sc-for list="{{ boardLanes }}" as="lane" hint-placeholder-count="1">
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <sc-if value="{{ lane.hasLabel }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px;color:var(--tx4);font-weight:500;padding:2px 4px 0;">{{ lane.label }}</span></sc-if>
+                  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;">
+                    <sc-for list="{{ lane.cells }}" as="cell" hint-placeholder-count="4">
+                      <div onDragOver="{{ cell.over }}" onDrop="{{ cell.drop }}" style="background:var(--side);border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:72px;">
+                        <sc-for list="{{ cell.cards }}" as="c" hint-placeholder-count="1">
+                          <div draggable="true" onDragStart="{{ c.drag }}" onClick="{{ c.open }}" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;cursor:grab;" style-hover="border-color:var(--line3);">
+                            <div style="display:flex;justify-content:space-between;font:500 11.5px 'Geist Mono',monospace;color:var(--tx4);"><span>{{ c.id }}</span><span style="color:{{ c.priColor }};">{{ c.pri }}</span></div>
+                            <div style="font-size:14px;line-height:1.4;text-wrap:pretty;">{{ c.title }}</div>
+                            <div style="display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--tx3);"><dc-import name="Avatar" size="20" color="{{ c.color }}" face="{{ c.face }}" hint-size="20px,20px"></dc-import><span>{{ c.who }}</span></div>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <span style="font-size:12.5px;color:var(--tx4);">Drag a card to change its status. Only that line of the task's frontmatter is rewritten.</span>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ tabSetup }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:24px 40px 64px;display:flex;flex-direction:column;gap:28px;max-width:960px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+            <div style="display:flex;flex-direction:column;gap:3px;"><span style="font-weight:600;font-size:16px;">Teams on this project <span style="font-weight:400;font-size:12.5px;color:var(--tx4);">· runtime state, not config</span></span><span style="color:var(--tx3);line-height:1.5;">Talk to a lead and they'll delegate. Open anyone else for a direct instruction.</span></div>
+            <button onClick="{{ deployToProject }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:6px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;white-space:nowrap;">Deploy a team</button>
+          </div>
+          <sc-for list="{{ sessionGroups }}" as="g" hint-placeholder-count="2">
+            <section style="display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                  <span style="font-weight:600;font-size:16px;">{{ g.teamName }}</span>
+                  <span style="font-size:13.5px;color:var(--tx3);">{{ g.goal }}</span>
+                </div>
+                <button onClick="{{ g.openTerm }}" style="background:var(--raised);border:1px solid var(--line2);color:var(--tx);border-radius:7px;padding:6px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;white-space:nowrap;">Open sessions</button>
+              </div>
+              <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">
+                <sc-for list="{{ g.rows }}" as="r" hint-placeholder-count="4">
+                  <div onClick="{{ r.open }}" style="display:grid;grid-template-columns:auto 150px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer;" style-hover="background:var(--hover);">
+                    <dc-import name="Avatar" size="32" color="{{ r.color }}" face="{{ r.face }}" dot="{{ r.dot }}" dot-border="var(--panel)" hint-size="32px,32px"></dc-import>
+                    <div style="display:flex;flex-direction:column;gap:1px;"><span style="font-weight:600;">{{ r.name }}</span><span style="font-size:12.5px;color:var(--tx4);">{{ r.roleLabel }}</span></div>
+                    <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                      <span style="font-size:13.5px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.task }}</span>
+                      <span style="font:400 12px 'Geist Mono',monospace;color:var(--tx4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ r.last }}</span>
+                    </div>
+                    <span style="font-size:12.5px;color:var(--tx3);">Open →</span>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+          </sc-for>
+          <sc-if value="{{ noProjDeps }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:24px;border:1px dashed var(--line2);border-radius:12px;color:var(--tx3);">No team is deployed here yet. Deploy one and each member gets its own clone of this project's repos.</div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ tabChanges }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:28px 40px 64px;display:flex;flex-direction:column;gap:36px;max-width:860px;">
+          <section style="display:flex;flex-direction:column;gap:10px;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;">Needs you</span>
+            <sc-for list="{{ projActions }}" as="n" hint-placeholder-count="3">
+              <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;">
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                  <span style="font:600 10.5px 'Geist Mono',monospace;letter-spacing:.05em;text-transform:uppercase;color:{{ n.kindColor }};border:1px solid {{ n.kindColor }};border-radius:4px;padding:1px 6px;white-space:nowrap;">{{ n.kindLabel }}</span>
+                  <dc-import name="Avatar" size="24" color="{{ n.color }}" face="{{ n.face }}" hint-size="24px,24px"></dc-import>
+                  <span style="font-weight:600;">{{ n.who }}</span>
+                  <span style="color:var(--tx4);font-size:13px;">{{ n.context }}</span>
+                  <span style="flex:1;"></span>
+                  <span style="font:400 11.5px 'Geist Mono',monospace;color:var(--tx4);">{{ n.source }}</span>
+                </div>
+                <div style="font-size:15.5px;line-height:1.5;text-wrap:pretty;">{{ n.text }}</div>
+                <sc-if value="{{ n.hasLink }}" hint-placeholder-val="{{ false }}"><span style="font:400 12.5px 'Geist Mono',monospace;color:var(--accTx);">{{ n.linkLabel }}</span></sc-if>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <sc-for list="{{ n.opts }}" as="o" hint-placeholder-count="2">
+                      <button onClick="{{ o.onClick }}" style="background:{{ o.bg }};border:1px solid {{ o.border }};color:{{ o.color }};border-radius:7px;padding:7px 14px;font:{{ o.weight }} 13px 'Geist',sans-serif;cursor:pointer;">{{ o.label }}</button>
+                    </sc-for>
+                  <sc-if value="{{ n.isQuestion }}" hint-placeholder-val="{{ false }}">
+                    <input onKeyDown="{{ n.onKey }}" placeholder="Or type an answer…" style="flex:1;min-width:180px;background:var(--term);border:1px solid var(--line2);border-radius:7px;padding:7px 10px;color:var(--tx);font:400 13.5px 'Geist',sans-serif;outline:none;">
+                  </sc-if>
+                </div>
+                <sc-if value="{{ n.sending }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:8px;">
+                    <textarea value="{{ sendNote }}" onChange="{{ setSendNote }}" rows="3" placeholder="What needs to change before this can merge?" style="background:var(--term);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;color:var(--tx);font:400 14px/1.5 'Geist',sans-serif;outline:none;resize:vertical;"></textarea>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;">
+                      <button onClick="{{ n.cancelSend }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:7px 14px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Cancel</button>
+                      <button onClick="{{ n.sendBack }}" style="background:var(--acc);border:none;color:var(--accInk);border-radius:7px;padding:7px 14px;font:600 13px 'Geist',sans-serif;cursor:pointer;">Send to {{ n.who }}</button>
+                    </div>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noProjActions }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:22px;border:1px dashed var(--line2);border-radius:12px;color:var(--tx3);">Nothing needs you on this project.</div>
+            </sc-if>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;gap:8px;align-items:baseline;"><span style="font-size:13px;color:var(--tx4);font-weight:500;">In flight</span><span style="font-size:12.5px;color:var(--tx4);">worktree → lead → PR</span></div>
+            <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;">
+              <sc-for list="{{ inFlight }}" as="p" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);">
+                  <dc-import name="Avatar" size="26" color="{{ p.color }}" face="{{ p.face }}" hint-size="26px,26px"></dc-import>
+                  <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                    <span style="font-weight:500;">{{ p.card }}</span>
+                    <span style="font-size:12.5px;color:var(--tx3);">{{ p.authorName }} · <span style="font-family:'Geist Mono',monospace;">{{ p.branch }}</span> · <span style="color:{{ p.noteColor }};">{{ p.note }}</span></span>
+                  </div>
+                  <span style="font-size:12.5px;color:var(--tx2);background:var(--raised);border-radius:5px;padding:3px 8px;white-space:nowrap;">{{ p.stageLabel }}</span>
+                  <button onClick="{{ p.openTerm }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:5px 11px;font:500 12.5px 'Geist',sans-serif;cursor:pointer;">Session</button>
+                </div>
+              </sc-for>
+              <sc-if value="{{ noInFlight }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;color:var(--tx4);font-size:13.5px;">No work in flight.</div></sc-if>
+            </div>
+          </section>
+          <sc-if value="{{ hasMerged }}" hint-placeholder-val="{{ false }}">
+            <section style="display:flex;flex-direction:column;gap:6px;">
+              <span style="font-size:13px;color:var(--tx4);font-weight:500;">Merged</span>
+              <sc-for list="{{ merged }}" as="p" hint-placeholder-count="1">
+                <div style="display:flex;gap:10px;align-items:center;font-size:13.5px;color:var(--tx3);"><span style="color:var(--ok);">✓</span><span>{{ p.card }}</span><span style="color:var(--tx4);">{{ p.note }}</span></div>
+              </sc-for>
+            </section>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ tabSetup }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:28px 48px 64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:36px;align-items:start;">
+          <div style="display:flex;flex-direction:column;gap:22px;max-width:520px;">
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <span style="font-size:13px;color:var(--tx4);font-weight:500;">Workspace</span>
+              <pre style="margin:0;font:400 13px/1.7 'Geist Mono',monospace;color:var(--tx2);white-space:pre;overflow-x:auto;">{{ folderTree }}</pre>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <span style="font-size:13px;color:var(--tx4);font-weight:500;">How work flows</span>
+              <sc-for list="{{ layers }}" as="l" hint-placeholder-count="3">
+                <div style="display:flex;flex-direction:column;gap:3px;">
+                  <span style="font-weight:600;">{{ l.title }}</span>
+                  <span style="color:var(--tx2);line-height:1.55;text-wrap:pretty;">{{ l.body }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:24px;">
+              <span style="font-size:13px;color:var(--tx4);font-weight:500;">What comes to you</span>
+              <sc-for list="{{ kindsInfo }}" as="ki" hint-placeholder-count="5">
+                <div style="display:grid;grid-template-columns:84px minmax(0,1fr);gap:12px;align-items:baseline;">
+                  <span style="font:600 10.5px 'Geist Mono',monospace;letter-spacing:.05em;text-transform:uppercase;color:{{ ki.c }};">{{ ki.label }}</span>
+                  <span style="color:var(--tx2);font-size:13.5px;line-height:1.5;text-wrap:pretty;">{{ ki.body }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
+              <span style="font-size:13px;color:var(--tx4);font-weight:500;">Pull requests</span>
+              <span style="font-weight:500;">{{ forgeLabel }}</span>
+              <span style="font-size:13px;color:var(--tx3);line-height:1.5;">{{ forgeNote }}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx3);">{{ proj.name }}/.foreman/project.yaml · read-only</span>
+              <button onClick="{{ editConfig }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:4px 10px;font:500 12.5px 'Geist',sans-serif;cursor:pointer;">Change with Chief of Staff</button>
+            </div>
+            <span style="font-size:13px;color:var(--tx3);line-height:1.5;margin:-2px 0 4px;">This file is config, committed with the project. Edit it in your editor, or have the Chief of Staff edit it. Its change then comes back to you in Changes as a review.</span>
+            <pre style="margin:0;background:var(--term);border:1px solid var(--line);border-radius:10px;padding:16px 18px;font:400 12.5px/1.65 'Geist Mono',monospace;color:var(--tx2);white-space:pre-wrap;user-select:text;">{{ projectYaml }}</pre>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:48px 48px 64px;display:flex;flex-direction:column;gap:36px;max-width:760px;">
+        <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.02em;">Settings</h1>
+        <section style="display:flex;flex-direction:column;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;padding-bottom:4px;">Workspace</span>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><span style="font-weight:500;">Folder</span><span style="font-size:13px;color:var(--tx3);line-height:1.5;text-wrap:pretty;">Every subfolder with a .foreman/project.yaml is a project. Foreman doesn’t clone anything. It uses the git repos it finds in each project folder.</span></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font:400 13px 'Geist Mono',monospace;color:var(--tx2);">~/agents-ws</span></div>
+            </div><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><span style="font-weight:500;">Listen on</span><span style="font-size:13px;color:var(--tx3);line-height:1.5;text-wrap:pretty;">There’s no login. Keep this on your own machine unless something in front of it handles authentication.</span></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><button onClick="{{ set.setLocal }}" style="background:{{ set.localBg }};border:1px solid var(--line2);color:var(--tx);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">This machine</button><button onClick="{{ set.setLan }}" style="background:{{ set.lanBg }};border:1px solid var(--line2);color:var(--tx);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Local network</button></div>
+            </div><div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><span style="font-weight:500;">Running sessions at once</span><span style="font-size:13px;color:var(--tx3);line-height:1.5;text-wrap:pretty;">Extra sessions wait in a queue until a slot frees up.</span></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><button onClick="{{ set.dec }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx);border-radius:6px;width:28px;height:28px;cursor:pointer;">−</button><span style="font:500 14px 'Geist Mono',monospace;min-width:28px;text-align:center;">{{ set.max }}</span><button onClick="{{ set.inc }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx);border-radius:6px;width:28px;height:28px;cursor:pointer;">+</button></div>
+            </div>
+          </section>
+        <section style="display:flex;flex-direction:column;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;padding-bottom:4px;">Harnesses</span>
+            <span style="font-size:13px;color:var(--tx3);line-height:1.5;padding-bottom:4px;">The command Foreman runs for each harness. It’s found on your PATH when you start the server.</span>
+            <sc-for list="{{ set.harnesses }}" as="hr" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);">
+                <span style="font-weight:500;">{{ hr.label }}</span>
+                <input value="{{ hr.cmd }}" onChange="{{ hr.setCmd }}" style="background:var(--term);border:1px solid var(--line2);border-radius:6px;padding:6px 9px;color:var(--tx);font:400 13px 'Geist Mono',monospace;outline:none;min-width:0;">
+                <span style="font:400 12px 'Geist Mono',monospace;color:{{ hr.statusColor }};white-space:nowrap;">{{ hr.status }}</span>
+              </div>
+            </sc-for>
+          </section>
+        <section style="display:flex;flex-direction:column;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;padding-bottom:4px;">Forge accounts</span>
+            <span style="font-size:13px;color:var(--tx3);line-height:1.5;padding-bottom:4px;">Tokens Foreman uses to push lead branches and open PRs. They stay on this machine. Each project's config names its forge.</span>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">GitHub</span><span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx3);">github.com · acme</span></div>
+              <span style="font:400 12px 'Geist Mono',monospace;color:var(--ok);">token set</span>
+              <button style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Change</button>
+            </div>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">Forgejo</span><span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx3);">localhost:3000</span></div>
+              <span style="font:400 12px 'Geist Mono',monospace;color:var(--ok);">token set</span>
+              <button style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Change</button>
+            </div>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-weight:500;">Gitea</span><span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx3);">—</span></div>
+              <span style="font:400 12px 'Geist Mono',monospace;color:var(--tx4);">not connected</span>
+              <button style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Connect</button>
+            </div>
+          </section>
+          <section style="display:flex;flex-direction:column;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;padding-bottom:4px;">Notifications</span>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><span style="font-weight:500;">Browser notifications</span></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><span style="font-size:13px;color:{{ notifColor }};">{{ notifLabel }}</span><button onClick="{{ toggleNotif }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Request</button></div>
+            </div><sc-for list="{{ set.notifyRows }}" as="nr" hint-placeholder-count="3">
+              <div onClick="{{ nr.toggle }}" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer;">
+                <span>{{ nr.label }}</span>
+                <span style="width:34px;height:20px;border-radius:10px;background:{{ nr.track }};position:relative;transition:background .15s;"><span style="position:absolute;top:2px;left:{{ nr.knob }};width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;"></span></span>
+              </div>
+            </sc-for>
+          </section>
+        <section style="display:flex;flex-direction:column;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;padding-bottom:4px;">Appearance</span>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:14px 0;border-bottom:1px solid var(--line);">
+              <div style="display:flex;flex-direction:column;gap:3px;min-width:0;"><span style="font-weight:500;">Theme</span></div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;"><button onClick="{{ set.setDark }}" style="background:{{ set.darkBg }};border:1px solid var(--line2);color:var(--tx);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Dark</button><button onClick="{{ set.setLight }}" style="background:{{ set.lightBg }};border:1px solid var(--line2);color:var(--tx);border-radius:6px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Light</button></div>
+            </div>
+          </section>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTeams }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:48px 48px 64px;display:flex;flex-direction:column;gap:28px;max-width:920px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.02em;">Teams</h1>
+            <div style="color:var(--tx3);font-size:15px;max-width:560px;line-height:1.5;">Definitions you can deploy to any number of projects. Each deployment runs its own sessions with the same souls.</div>
+          </div>
+          <button onClick="{{ newTeam }}" style="background:var(--acc);border:none;color:var(--accInk);border-radius:7px;padding:8px 14px;font:600 13px 'Geist',sans-serif;cursor:pointer;">New team</button>
+        </div>
+        <div style="display:flex;flex-direction:column;">
+          <sc-for list="{{ teamRows }}" as="t" hint-placeholder-count="4">
+            <div onClick="{{ t.open }}" style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:16px 6px;border-top:1px solid var(--line);cursor:pointer;" style-hover="background:var(--hover);">
+              <div style="display:flex;flex-direction:column;gap:3px;">
+                <span style="font-weight:600;font-size:15px;">{{ t.name }} <span style="font-weight:400;color:var(--tx4);font-size:13px;">· {{ t.kindLabel }} · {{ t.size }}</span></span>
+                <span style="color:var(--tx3);font-size:13.5px;">{{ t.where }}</span>
+              </div>
+              <div style="display:flex;gap:4px;">
+                <sc-for list="{{ t.avatars }}" as="m" hint-placeholder-count="4">
+                  <span title="{{ m.title }}" style="display:flex;"><dc-import name="Avatar" size="28" color="{{ m.c }}" face="{{ m.face }}" hint-size="28px,28px"></dc-import></span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTeam }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 48px 0;display:flex;flex-direction:column;gap:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;gap:12px;align-items:baseline;">
+              <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-0.02em;">{{ team.name }}</h1>
+              <span style="font-size:14px;color:var(--tx4);">{{ team.kindLabel }}</span>
+            </div>
+            <div style="color:var(--tx3);font-size:15px;">{{ team.where }}</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onClick="{{ team.hire }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:7px 13px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Hire</button>
+            <button onClick="{{ team.deploy }}" style="background:var(--acc);border:none;color:var(--accInk);border-radius:7px;padding:7px 13px;font:600 13px 'Geist',sans-serif;cursor:pointer;">Deploy to a project</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--line);">
+          <sc-for list="{{ teamTabs }}" as="tb" hint-placeholder-count="4">
+            <div onClick="{{ tb.onClick }}" style="padding:9px 14px;cursor:pointer;font-weight:500;color:{{ tb.color }};border-bottom:2px solid {{ tb.line }};margin-bottom:-1px;">{{ tb.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+      <sc-if value="{{ teamDeps }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:24px 48px 64px;display:flex;flex-direction:column;gap:10px;max-width:920px;">
+          <sc-for list="{{ team.deps }}" as="d" hint-placeholder-count="2">
+            <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 20px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;">
+              <div style="display:flex;flex-direction:column;gap:5px;min-width:0;">
+                <span onClick="{{ d.openProject }}" style="font-weight:600;font-size:15px;cursor:pointer;">{{ d.projectName }}</span>
+                <span style="color:var(--tx2);line-height:1.5;">{{ d.goal }}</span>
+                <span style="font-size:13px;color:var(--tx3);">{{ d.summary }}</span>
+              </div>
+              <div style="display:flex;gap:6px;">
+                <button onClick="{{ d.openTerm }}" style="background:var(--raised);border:1px solid var(--line2);color:var(--tx);border-radius:7px;padding:6px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Sessions</button>
+                <button onClick="{{ d.stop }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx3);border-radius:7px;padding:6px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Stop</button>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ team.noDeps }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:24px;border:1px dashed var(--line2);border-radius:12px;color:var(--tx3);">Not deployed anywhere. Deploy it to a project to start sessions.</div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <sc-if value="{{ teamMembers }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:20px 48px 64px;display:flex;flex-direction:column;max-width:920px;">
+          <sc-for list="{{ team.memberList }}" as="m" hint-placeholder-count="5">
+            <div onClick="{{ m.open }}" style="display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 6px;border-bottom:1px solid var(--line);cursor:pointer;" style-hover="background:var(--hover);">
+              <dc-import name="Avatar" size="38" color="{{ m.color }}" face="{{ m.face }}" hint-size="38px,38px"></dc-import>
+              <div style="display:flex;flex-direction:column;gap:2px;min-width:0;">
+                <span style="font-weight:600;">{{ m.name }} <span style="font-weight:400;color:var(--tx4);">· {{ m.role }} · {{ m.harnessLabel }}</span></span>
+                <span style="color:var(--tx3);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ m.personality }}</span>
+              </div>
+              <div style="display:flex;gap:12px;">
+                <sc-for list="{{ m.instances }}" as="i" hint-placeholder-count="1">
+                  <span style="display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--tx3);"><span style="width:7px;height:7px;border-radius:50%;background:{{ i.dot }};"></span>{{ i.project }}</span>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ teamPlaybook }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:28px 48px 64px;display:flex;flex-direction:column;gap:28px;max-width:760px;">
+          <p style="margin:0;color:var(--tx3);line-height:1.6;text-wrap:pretty;">The playbook is part of the team definition, so every deployment uses the same one. It's added to each member's session prompt. Each project's own gates and checks apply on top.</p>
+          <div style="display:flex;flex-direction:column;">
+            <sc-for list="{{ team.workflow }}" as="w" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:28px 110px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:baseline;">
+                <span style="font:500 12.5px 'Geist Mono',monospace;color:var(--tx4);">{{ w.n }}</span>
+                <span style="font-weight:600;">{{ w.who }}</span>
+                <span style="color:var(--tx2);line-height:1.5;">{{ w.does }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;">Escalate</span>
+            <sc-for list="{{ team.escalation }}" as="e" hint-placeholder-count="3">
+              <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;">
+                <span style="color:var(--tx2);">{{ e.when }}</span>
+                <span style="color:{{ e.c }};font-weight:500;">{{ e.to }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ teamFile }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:28px 48px 64px;display:flex;flex-direction:column;gap:8px;max-width:860px;">
+          <span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx3);">{{ team.yamlPath }}</span>
+          <pre style="margin:0;background:var(--term);border:1px solid var(--line);border-radius:10px;padding:16px 18px;font:400 12.5px/1.65 'Geist Mono',monospace;color:var(--tx2);white-space:pre-wrap;user-select:text;">{{ team.yaml }}</pre>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ isAgent }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:40px 48px 64px;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:40px;align-items:start;">
+        <div style="display:flex;flex-direction:column;gap:24px;">
+          <div style="display:flex;gap:16px;align-items:center;">
+            <dc-import name="Avatar" size="72" color="{{ agent.color }}" face="{{ agent.face }}" hint-size="72px,72px"></dc-import>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <h1 style="margin:0;font-size:26px;font-weight:600;letter-spacing:-0.02em;">{{ agent.name }}</h1>
+              <span onClick="{{ agent.openTeam }}" style="color:var(--tx3);cursor:pointer;">{{ agent.role }} · {{ agent.teamName }}</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;">Running on</span>
+            <sc-for list="{{ agent.instances }}" as="i" hint-placeholder-count="1">
+              <div style="display:grid;grid-template-columns:auto 80px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:9px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:{{ i.dot }};"></span>
+                <span style="font-weight:600;">{{ i.project }}</span>
+                <span style="color:var(--tx2);font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ i.task }}</span>
+                <button onClick="{{ i.openTerm }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:4px 10px;font:500 12.5px 'Geist',sans-serif;cursor:pointer;">Session</button>
+              </div>
+            </sc-for>
+            <sc-if value="{{ agent.noInstances }}" hint-placeholder-val="{{ false }}">
+              <span style="color:var(--tx3);font-size:13.5px;">Not running. {{ agent.teamName }} isn't deployed to any project.</span>
+            </sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:13px;color:var(--tx4);font-weight:500;">Look</span><span onClick="{{ agent.shuffle }}" style="font-size:12.5px;color:var(--accTx);cursor:pointer;">Shuffle</span></div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <sc-for list="{{ agent.swatchRows }}" as="r" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;align-items:center;">
+                  <span style="font-size:13px;color:var(--tx3);">{{ r.label }}</span>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="5">
+                      <span onClick="{{ o.onClick }}" style="width:22px;height:22px;border-radius:6px;background:{{ o.c }};cursor:pointer;box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px {{ o.ring }};"></span>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+              <sc-for list="{{ agent.traitRows }}" as="r" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:84px minmax(0,1fr);gap:10px;align-items:center;">
+                  <span style="font-size:13px;color:var(--tx3);">{{ r.label }}</span>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <sc-for list="{{ r.opts }}" as="o" hint-placeholder-count="4">
+                      <button onClick="{{ o.onClick }}" style="background:{{ o.bg }};border:1px solid {{ o.border }};color:var(--tx);border-radius:6px;padding:4px 10px;font:500 12.5px 'Geist',sans-serif;cursor:pointer;">{{ o.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;">Harness</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ agent.harnessOpts }}" as="h" hint-placeholder-count="5">
+                <button onClick="{{ h.onClick }}" style="background:{{ h.bg }};border:1px solid {{ h.border }};color:var(--tx);border-radius:7px;padding:6px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ h.label }}</button>
+              </sc-for>
+            </div>
+            <sc-if value="{{ agent.isCustom }}" hint-placeholder-val="{{ false }}">
+              <input value="{{ agent.cmd }}" onChange="{{ agent.setCmd }}" placeholder="./bin/my-agent --acp" style="background:var(--term);border:1px solid var(--line2);border-radius:7px;padding:8px 10px;color:var(--tx);font:400 13px 'Geist Mono',monospace;outline:none;">
+            </sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;">Personality</span>
+            <textarea value="{{ agent.personality }}" onChange="{{ agent.setPersonality }}" rows="3" style="background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--tx);font:400 15px/1.55 'Geist',sans-serif;outline:none;resize:vertical;"></textarea>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:var(--tx4);font-weight:500;">Skills</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+              <sc-for list="{{ agent.skillList }}" as="s" hint-placeholder-count="3">
+                <span style="display:flex;gap:4px;align-items:center;font-size:13px;background:var(--raised);color:var(--tx2);padding:4px 6px 4px 10px;border-radius:6px;">{{ s.label }}<span onClick="{{ s.remove }}" style="cursor:pointer;color:var(--tx4);padding:0 4px;">×</span></span>
+              </sc-for>
+              <input onKeyDown="{{ agent.addSkill }}" placeholder="+ add" style="background:transparent;border:1px dashed var(--line2);border-radius:6px;padding:4px 10px;color:var(--tx);font:400 13px 'Geist',sans-serif;outline:none;width:80px;">
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;">
+              <span style="font-size:13px;color:var(--tx4);font-weight:500;">Job description</span>
+              <span style="font-size:12.5px;color:var(--ok);">{{ agent.savedLabel }}</span>
+            </div>
+            <textarea value="{{ agent.instructions }}" onChange="{{ agent.setInstructions }}" rows="6" style="background:var(--term);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font:400 13px/1.65 'Geist Mono',monospace;color:var(--tx2);outline:none;resize:vertical;"></textarea>
+            <button onClick="{{ agent.reinterview }}" style="align-self:flex-start;background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:6px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Refine with Chief of Staff</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <span style="font-weight:600;">Session prompt</span>
+            <span style="color:var(--tx3);font-size:13.5px;line-height:1.5;text-wrap:pretty;">Generated at session start from this soul plus the project. The soul is the same everywhere; the context isn't.</span>
+          </div>
+          <sc-if value="{{ agent.hasPromptTabs }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ agent.promptTabs }}" as="p" hint-placeholder-count="2">
+                <button onClick="{{ p.onClick }}" style="background:{{ p.bg }};border:1px solid {{ p.border }};color:var(--tx);border-radius:7px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ p.label }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <pre style="margin:0;background:var(--term);border:1px solid var(--line);border-radius:10px;padding:16px 18px;font:400 12.5px/1.65 'Geist Mono',monospace;color:var(--tx2);white-space:pre-wrap;user-select:text;">{{ agent.prompt }}</pre>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTerm }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap;">
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            <sc-for list="{{ termDeps }}" as="s" hint-placeholder-count="3">
+              <button onClick="{{ s.onClick }}" style="background:{{ s.bg }};border:1px solid {{ s.border }};color:{{ s.color }};border-radius:7px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ s.label }}</button>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onClick="{{ toggleSplit }}" style="background:{{ splitBg }};border:1px solid var(--line2);color:var(--tx);border-radius:7px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ splitLabel }}</button>
+            <button onClick="{{ toggleDrawer }}" style="background:{{ drawerBg }};border:1px solid var(--line2);color:var(--tx);border-radius:7px;padding:5px 11px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Messages</button>
+          </div>
+        </div>
+        <div style="display:flex;padding:0 12px;border-bottom:1px solid var(--line);background:var(--side);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;flex-shrink:0;">
+          <sc-for list="{{ agentTabs }}" as="t" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;">
+              <sc-if value="{{ t.sep }}" hint-placeholder-val="{{ false }}"><span style="width:1px;height:20px;background:var(--line2);margin:0 6px 0 4px;"></span><span style="font-size:12px;color:var(--tx4);padding:0 4px;">Direct</span></sc-if>
+              <div onClick="{{ t.onClick }}" style="display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer;box-shadow:inset 0 -2px 0 {{ t.line }};color:{{ t.color }};white-space:nowrap;">
+                <dc-import name="Avatar" size="24" color="{{ t.c }}" face="{{ t.face }}" dot="{{ t.dot }}" dot-border="var(--side)" hint-size="24px,24px"></dc-import>
+                <span style="font-weight:500;">{{ t.name }}</span>
+                <sc-if value="{{ t.isLead }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px;color:var(--accTx);border:1px solid var(--accLine);border-radius:4px;padding:0 5px;">lead</span></sc-if>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;">
+          <div style="flex:1;min-width:0;display:grid;grid-template-columns:{{ paneCols }};gap:1px;background:var(--line);">
+            <sc-for list="{{ panes }}" as="p" hint-placeholder-count="1">
+              <div onMouseDown="{{ p.activate }}" style="display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--term);box-shadow:inset 0 2px 0 {{ p.activeLine }};">
+                <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid var(--line);font-size:13px;">
+                  <dc-import name="Avatar" size="26" color="{{ p.color }}" face="{{ p.face }}" dot="{{ p.dot }}" dot-border="var(--term)" hint-size="26px,26px"></dc-import>
+                  <span onClick="{{ p.openAgent }}" style="font-weight:600;cursor:pointer;">{{ p.name }}</span>
+                  <span style="color:var(--tx4);">{{ p.harnessLabel }} · {{ p.projectName }}</span>
+                  <span style="flex:1;"></span>
+                  <button onClick="{{ p.copy }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:5px;padding:2px 8px;font:400 12px 'Geist',sans-serif;cursor:pointer;">{{ p.copyLabel }}</button>
+                  <sc-if value="{{ p.closable }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ p.close }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:5px;padding:2px 8px;font:400 12px 'Geist',sans-serif;cursor:pointer;">×</button>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ p.direct }}" hint-placeholder-val="{{ false }}"><div style="padding:7px 16px;font-size:12.5px;color:var(--tx3);background:var(--side);border-bottom:1px solid var(--line);">Direct line to {{ p.name }}. {{ p.leadName }}, the lead, is kept in the loop.</div></sc-if>
+                <div data-term-body="1" style="flex:1;min-height:0;overflow:auto;padding:12px 18px;font:400 13px/1.6 'Geist Mono',monospace;user-select:text;">
+                  <sc-for list="{{ p.lines }}" as="l" hint-placeholder-count="8">
+                    <div style="color:{{ l.c }};white-space:pre-wrap;word-break:break-word;">{{ l.x }}</div>
+                  </sc-for>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:11px 18px;border-top:1px solid var(--line);">
+                  <span style="font:500 13px 'Geist Mono',monospace;color:var(--accTx);">❯</span>
+                  <input onKeyDown="{{ p.onKey }}" placeholder="{{ p.placeholder }}" style="flex:1;background:transparent;border:none;outline:none;color:var(--tx);font:400 13px 'Geist Mono',monospace;">
+                </div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ noPanes }}" hint-placeholder-val="{{ false }}">
+              <div style="background:var(--bg);display:grid;place-items:center;color:var(--tx3);padding:40px;text-align:center;">No team is deployed yet, so there are no sessions.</div>
+            </sc-if>
+          </div>
+          <sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+            <div style="width:340px;flex-shrink:0;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0;">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);">
+                <div style="display:flex;flex-direction:column;gap:2px;">
+                  <span style="font-weight:600;">Messages between agents</span>
+                  <span style="font-size:12.5px;color:var(--tx4);">{{ termDepLabel }} only</span>
+                </div>
+                <button onClick="{{ toggleDrawer }}" style="background:transparent;border:none;color:var(--tx3);font-size:16px;cursor:pointer;">×</button>
+              </div>
+              <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;">
+                <sc-for list="{{ acpList }}" as="m" hint-placeholder-count="4">
+                  <div onClick="{{ m.open }}" style="padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px;cursor:pointer;" style-hover="background:var(--hover);">
+                    <div style="display:flex;gap:6px;align-items:baseline;font-size:13px;">
+                      <span style="font-weight:600;">{{ m.fromName }}</span><span style="color:var(--acp);">→</span><span style="font-weight:600;">{{ m.toName }}</span>
+                      <span style="color:var(--tx4);font:400 11.5px 'Geist Mono',monospace;">{{ m.kind }}</span>
+                      <span style="flex:1;"></span><span style="color:var(--tx4);font-size:12px;">{{ m.t }}</span>
+                    </div>
+                    <div style="font-size:13px;color:var(--tx2);line-height:1.45;">{{ m.text }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+  </main>
+
+  <sc-if value="{{ cosOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);background:var(--panel);border-left:1px solid var(--line2);box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:45;">
+      <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--line);">
+        <div style="width:28px;height:28px;border-radius:7px;background:var(--acc);color:var(--accInk);display:grid;place-items:center;font-weight:700;">C</div>
+        <div style="display:flex;flex-direction:column;flex:1;">
+          <span style="font-weight:600;">Chief of Staff</span>
+          <span style="font:400 11.5px 'Geist Mono',monospace;color:var(--tx4);">claude-code · ~/agents-ws/.foreman/cos</span>
+        </div>
+        <button onClick="{{ closeCos }}" style="background:transparent;border:none;color:var(--tx3);font-size:18px;cursor:pointer;">×</button>
+      </div>
+      <div data-term-body="1" style="flex:1;min-height:0;overflow:auto;padding:18px;display:flex;flex-direction:column;gap:14px;">
+        <sc-for list="{{ cosMsgs }}" as="m" hint-placeholder-count="2">
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:{{ m.align }};">
+            <div style="max-width:88%;background:{{ m.bg }};border:1px solid {{ m.border }};border-radius:12px;padding:10px 13px;line-height:1.5;white-space:pre-wrap;text-wrap:pretty;">{{ m.text }}</div>
+            <sc-if value="{{ m.hasCard }}" hint-placeholder-val="{{ false }}">
+              <div style="width:100%;box-sizing:border-box;background:var(--term);border:1px solid var(--line2);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+                <span style="font-weight:600;">{{ m.card.title }}</span>
+                <sc-for list="{{ m.card.rows }}" as="r" hint-placeholder-count="3">
+                  <div style="display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px;font-size:13px;">
+                    <span style="color:var(--tx4);">{{ r.k }}</span><span style="color:var(--tx2);white-space:pre-wrap;">{{ r.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ m.hasChips }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <sc-for list="{{ m.chipList }}" as="c" hint-placeholder-count="3">
+                  <button onClick="{{ c.onClick }}" style="background:var(--raised);border:1px solid var(--line2);color:var(--tx);border-radius:16px;padding:6px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;" style-hover="border-color:var(--acc);">{{ c.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding:12px 14px;border-top:1px solid var(--line);">
+        <input onKeyDown="{{ cosKey }}" placeholder="Ask for anything…" style="width:100%;box-sizing:border-box;background:var(--term);border:1px solid var(--line2);border-radius:9px;padding:10px 12px;color:var(--tx);font:400 14px 'Geist',sans-serif;outline:none;">
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ deployOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeDeploy }}" style="position:fixed;inset:0;background:rgba(5,6,7,0.55);display:grid;place-items:center;z-index:50;padding:20px;">
+      <div onClick="{{ stop }}" style="width:min(520px,100%);background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:18px;box-shadow:var(--shadow);">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <h2 style="margin:0;font-size:20px;font-weight:600;">Deploy {{ dep.teamName }}</h2>
+          <span style="color:var(--tx3);font-size:13.5px;line-height:1.5;">Starts a separate set of sessions for this project. Deployments on other projects aren't affected.</span>
+        </div>
+        <sc-if value="{{ dep.pickTeam }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <span style="font-size:13px;color:var(--tx3);">Team</span>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ dep.teamOpts }}" as="o" hint-placeholder-count="3">
+                <button onClick="{{ o.onClick }}" style="background:{{ o.bg }};border:1px solid {{ o.border }};color:var(--tx);border-radius:7px;padding:7px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ o.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:13px;color:var(--tx3);">Project</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <sc-for list="{{ dep.projOpts }}" as="o" hint-placeholder-count="3">
+              <button onClick="{{ o.onClick }}" style="background:{{ o.bg }};border:1px solid {{ o.border }};color:{{ o.color }};border-radius:7px;padding:7px 12px;font:500 13px 'Geist',sans-serif;cursor:pointer;">{{ o.label }}</button>
+            </sc-for>
+          </div>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--tx3);">Goal on this project
+          <textarea value="{{ dep.goal }}" onChange="{{ setDeployGoal }}" rows="3" placeholder="What does done look like?" style="background:var(--term);border:1px solid var(--line2);border-radius:8px;padding:10px 12px;color:var(--tx);font:400 14px/1.5 'Geist',sans-serif;outline:none;resize:vertical;"></textarea>
+        </label>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button onClick="{{ closeDeploy }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:8px 14px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Cancel</button>
+          <button onClick="{{ doDeploy }}" style="background:var(--acc);border:none;color:var(--accInk);border-radius:7px;padding:8px 14px;font:600 13px 'Geist',sans-serif;cursor:pointer;opacity:{{ dep.ready }};">Deploy</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ adoptOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeAdopt }}" style="position:fixed;inset:0;background:rgba(5,6,7,0.55);display:grid;place-items:center;z-index:50;padding:20px;">
+      <div onClick="{{ stop }}" style="width:min(520px,100%);background:var(--panel);border:1px solid var(--line2);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:16px;box-shadow:var(--shadow);">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <h2 style="margin:0;font-size:20px;font-weight:600;">Add a project</h2>
+          <span style="color:var(--tx3);font-size:13.5px;line-height:1.55;">Folders in ~/agents-ws that aren’t projects yet. Clone your repos into a folder, then add it here.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <sc-for list="{{ adoptList }}" as="c" hint-placeholder-count="3">
+            <div onClick="{{ c.pick }}" style="display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:9px;border:1px solid {{ c.border }};background:{{ c.bg }};cursor:pointer;">
+              <span style="font:500 14px 'Geist Mono',monospace;">{{ c.id }}/</span>
+              <span style="font-size:13px;color:var(--tx3);">{{ c.detail }}</span>
+            </div>
+          </sc-for>
+          <sc-if value="{{ adoptEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;border:1px dashed var(--line2);border-radius:9px;color:var(--tx3);font-size:13.5px;">No new folders found in ~/agents-ws.</div></sc-if>
+        </div>
+        <sc-if value="{{ adoptNoteShow }}" hint-placeholder-val="{{ false }}"><span style="font-size:13px;color:var(--tx3);">{{ adoptNote }}</span></sc-if>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button onClick="{{ closeAdopt }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:7px;padding:8px 14px;font:500 13px 'Geist',sans-serif;cursor:pointer;">Cancel</button>
+          <button onClick="{{ doAdopt }}" style="background:var(--acc);border:none;color:var(--accInk);border-radius:7px;padding:8px 14px;font:600 13px 'Geist',sans-serif;cursor:pointer;opacity:{{ adoptReady }};">Add project</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--panel);border-left:1px solid var(--line2);box-shadow:var(--shadow);display:flex;flex-direction:column;z-index:44;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);">
+        <span style="font:400 12.5px 'Geist Mono',monospace;color:var(--tx3);">{{ sheetPath }}</span>
+        <div style="display:flex;gap:6px;">
+          <button onClick="{{ sheetToReader }}" style="background:transparent;border:1px solid var(--line2);color:var(--tx2);border-radius:6px;padding:4px 10px;font:500 12.5px 'Geist',sans-serif;cursor:pointer;">Open in wiki</button>
+          <button onClick="{{ closeSheet }}" style="background:transparent;border:none;color:var(--tx3);font-size:18px;cursor:pointer;">×</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow:auto;padding:20px 22px 32px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ sheetFm }}" as="f" hint-placeholder-count="3">
+                <span style="font-size:12.5px;background:var(--raised);border-radius:5px;padding:3px 8px;color:var(--tx3);">{{ f.k }}: <span style="color:var(--tx);">{{ f.v }}</span></span>
+              </sc-for>
+            </div>
+        <sc-for list="{{ sheetBlocks }}" as="b" hint-placeholder-count="6">
+              <div style="display:contents;">
+                <sc-if value="{{ b.isH1 }}" hint-placeholder-val="{{ false }}"><h1 style="margin:0 0 2px;font-size:22px;font-weight:600;letter-spacing:-0.02em;line-height:1.2;">{{ b.x }}</h1></sc-if>
+                <sc-if value="{{ b.isH2 }}" hint-placeholder-val="{{ false }}"><h2 id="{{ b.anchor }}" style="margin:10px 0 0;font-size:15px;font-weight:600;">{{ b.x }}</h2></sc-if>
+                <sc-if value="{{ b.isP }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:14.5px;line-height:1.65;color:var(--tx2);text-wrap:pretty;">{{ b.x }}</p></sc-if>
+                <sc-if value="{{ b.isLi }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:18px minmax(0,1fr);font-size:15px;line-height:1.6;color:var(--tx2);"><span style="color:var(--tx4);">–</span><span>{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isLink }}" hint-placeholder-val="{{ false }}"><div onClick="{{ b.open }}" style="display:grid;grid-template-columns:18px minmax(0,1fr);font-size:15px;line-height:1.6;cursor:pointer;"><span style="color:var(--tx4);">→</span><span style="color:var(--accTx);" style-hover="text-decoration:underline;">{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isCallout }}" hint-placeholder-val="{{ false }}"><div style="border:1px solid {{ b.cBorder }};border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:4px;background:var(--panel);"><span style="font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:{{ b.cColor }};">{{ b.cLabel }}</span><span style="font-size:15px;line-height:1.55;color:var(--tx2);">{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isCheck }}" hint-placeholder-val="{{ false }}"><div onClick="{{ b.toggle }}" style="display:flex;gap:10px;align-items:center;font-size:15px;line-height:1.5;cursor:pointer;"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid {{ b.boxBorder }};background:{{ b.boxBg }};color:var(--accInk);display:grid;place-items:center;font-size:11px;font-weight:700;flex-shrink:0;">{{ b.box }}</span><span style="color:{{ b.textColor }};text-decoration:{{ b.deco }};">{{ b.x }}</span></div></sc-if>
+                <sc-if value="{{ b.isCode }}" hint-placeholder-val="{{ false }}"><pre style="margin:0;background:var(--term);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font:400 12.5px/1.6 'Geist Mono',monospace;color:var(--tx2);white-space:pre-wrap;">{{ b.x }}</pre></sc-if>
+              </div>
+            </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="position:fixed;right:20px;top:20px;display:flex;flex-direction:column;gap:8px;z-index:60;width:320px;">
+    <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+      <div onClick="{{ t.open }}" style="background:var(--panel);border:1px solid var(--line3);border-radius:10px;padding:12px 14px;display:flex;gap:10px;cursor:pointer;box-shadow:var(--shadow);">
+        <span style="width:8px;height:8px;border-radius:50%;background:{{ t.c }};margin-top:6px;flex-shrink:0;"></span>
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <span style="font-weight:600;font-size:13.5px;">{{ t.title }}</span>
+          <span style="font-size:13px;color:var(--tx2);line-height:1.4;">{{ t.body }}</span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;liveSim&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Simulation&quot;},&quot;acpMarkers&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sessions&quot;}}">
+class Component extends DCLogic {
+  HN = { 'claude-code': 'Claude Code', codex: 'Codex CLI', pi: 'Pi', hermes: 'Hermes Agent', custom: 'Custom' };
+  KIND = { architect: 'Architect it', build: 'Build it', challenge: 'Challenge it' };
+  INSTR = {
+    'Team Lead': 'Break the goal into cards on the board.\nAssign cards and review every handoff before integrating.\nYou are the only member who opens PRs to main.',
+    'Engineer': 'Work only in your own worktree.\nWrite the test first. Hand off to the lead with a summary and test results.',
+    'QA': 'Try to break whatever is handed to you: property tests, fuzzing, races.\nFile every finding with a repro. Never fix the code yourself.',
+    'Scrum Master': 'Own ./wiki. Keep the board in sync with reality.\nRecord decisions in ADRs. Ping owners of stale cards.',
+    'Architect': 'Propose designs as ADRs in wiki/adr/.\nBack every claim with a spike and numbers.',
+    'Reviewer': 'Review diffs and ADRs for correctness and clarity.\nApprove or request changes. Never push code.'
+  };
+  ROSTER = { architect: ['Team Lead', 'Architect', 'Reviewer', 'Scrum Master'], build: ['Team Lead', 'Engineer', 'Engineer', 'QA', 'Scrum Master'], challenge: ['Team Lead', 'QA', 'QA', 'Reviewer'] };
+  PAL = ['#D9825B', '#8DB86B', '#6FA8DC', '#B48BD6', '#E07A9A', '#4FB3A9', '#CDB46B', '#8E9AAF'];
+  SKIN = ['#F1C9A5', '#E2AE85', '#C38A62', '#8D5A3B', '#5E3B26'];
+  HC = ['#2B2420', '#6B4A2F', '#D8B46A', '#A8A8A8', '#A4482C'];
+  HAIR = ['short', 'long', 'curly', 'bun', 'bald'];
+  EYES = ['dots', 'glasses', 'shades', 'sleepy'];
+  BEARD = ['none', 'stubble', 'full', 'mustache'];
+  candidates = [{ id: 'billing', repos: ['billing-api', 'billing-web'], wiki: false, desc: 'Invoicing and payment collection.' }, { id: 'mobile-app', repos: ['mobile-app'], wiki: true, desc: 'The customer mobile app.' }, { id: 'scratch', repos: [], wiki: false, desc: 'Scratch folder.' }];
+  POOL = ['Juno', 'Soren', 'Vale', 'Iris', 'Linnea', 'Marek', 'Ines', 'Corin', 'Yara', 'Teo'];
+  projects = {
+    ledger: { id: 'ledger', name: 'ledger', path: '~/agents-ws/ledger', desc: 'Settlement and reconciliation service.', repos: ['ledger-api', 'ledger-web'], checks: 'npm test', forge: 'forgejo', gates: ['new dependency', 'touches shared staging', 'scope change vs an accepted ADR'] },
+    relay: { id: 'relay', name: 'relay', path: '~/agents-ws/relay', desc: 'Event routing between internal services.', repos: ['relay-core'], checks: 'cargo test', forge: 'github', gates: ['adds a paid service'] },
+    harbor: { id: 'harbor', name: 'harbor', path: '~/agents-ws/harbor', desc: 'Infrastructure as code for the fleet.', repos: ['harbor-infra', 'harbor-modules'], checks: 'terraform validate', forge: 'none', gates: ['any apply outside sandbox accounts'] }
+  };
+  scripts = {
+    'mara@ledger': ['Checking wt/tove/LED-44 against lead/integration…', 'No conflicts.', 'Running npm test…', '  ✓ 248 passed'],
+    'tove@ledger': ['Editing src/routes/settle.ts', 'Writing migration 0018_idempotency_keys.sql', '  ✓ 12 passed'],
+    'rhea@ledger': ['fast-check: netting.associative', '  ✓ 500 runs', 'fast-check: netting.rounding', '✗ shrunk to [EUR 0.005, JPY 1]'],
+    'nyx@ledger': ['POST /settle currency="€" → 500', '✗ CurrencyCode.parse (src/money.ts:41)'],
+    'nyx@relay': ['publish with 64KB header → accepted', 'publish with 1MB header → ✗ broker crash'],
+    'lumen@relay': ['Ordering is per account → partition by account_id', 'Drafting "Consequences"…'],
+    'arden@relay': ['bench jetstream 20k msg/s   p99 7.8ms', 'bench jetstream 40k msg/s   p99 31ms']
+  };
+  state = this.seed();
+
+  seed() {
+    const ag = (id, name, role, team, harness, personality, skills, cmd) => ({ id, name, role, team, harness, cmd: cmd || '', personality, skills, instructions: this.INSTR[role] });
+    const agents = {
+      mara: ag('mara', 'Mara', 'Team Lead', 'atlas', 'claude-code', 'Calm, decisive, terse. Prefers small PRs.', ['decomposition', 'code review']),
+      ilya: ag('ilya', 'Ilya', 'Engineer', 'atlas', 'codex', 'Methodical. Writes the test first, distrusts floating point.', ['TypeScript', 'numerics']),
+      tove: ag('tove', 'Tove', 'Engineer', 'atlas', 'claude-code', 'Fast and pragmatic. Ships small, then hardens.', ['API design', 'migrations']),
+      rhea: ag('rhea', 'Rhea', 'QA', 'atlas', 'pi', 'Skeptical by default.', ['property testing']),
+      quill: ag('quill', 'Quill', 'Scrum Master', 'atlas', 'claude-code', 'Tidy and persistent.', ['wiki curation']),
+      kestrel: ag('kestrel', 'Kestrel', 'Team Lead', 'vesper', 'claude-code', 'Adversarial but disciplined.', ['threat modeling']),
+      nyx: ag('nyx', 'Nyx', 'QA', 'vesper', 'hermes', 'Chaotic on purpose.', ['fuzzing', 'Unicode']),
+      bram: ag('bram', 'Bram', 'QA', 'vesper', 'custom', 'Patient and stubborn.', ['concurrency'], './bin/loadbot --acp'),
+      lumen: ag('lumen', 'Lumen', 'Team Lead', 'orion', 'claude-code', 'Socratic. Argues both sides first.', ['distributed systems']),
+      arden: ag('arden', 'Arden', 'Architect', 'orion', 'codex', 'Prefers a benchmark to an opinion.', ['benchmarks']),
+      pike: ag('pike', 'Pike', 'Scrum Master', 'orion', 'pi', 'Turns debates into one-page decisions.', ['wiki curation']),
+      hale: ag('hale', 'Hale', 'Team Lead', 'sentinel', 'hermes', 'Careful and thorough.', ['security review']),
+      petra: ag('petra', 'Petra', 'Reviewer', 'sentinel', 'pi', 'Exacting about wording and assumptions.', ['review']),
+      odo: ag('odo', 'Odo', 'QA', 'sentinel', 'codex', 'Relentless about edge cases.', ['fuzzing'])
+    };
+    const cols = { mara: 0, ilya: 2, tove: 1, rhea: 4, quill: 7, kestrel: 3, nyx: 5, bram: 6, lumen: 2, arden: 0, pike: 4, hale: 6, petra: 3, odo: 1 };
+    Object.keys(agents).forEach(k => { agents[k].color = this.PAL[cols[k]]; });
+    const Fc = (sk, hair, hc, eyes, beard) => ({ skin: this.SKIN[sk], hair, hairColor: this.HC[hc], eyes, beard });
+    const faces = { mara: Fc(1, 'bun', 0, 'dots', 'none'), ilya: Fc(0, 'short', 1, 'glasses', 'stubble'), tove: Fc(2, 'long', 2, 'dots', 'none'), rhea: Fc(3, 'curly', 0, 'sleepy', 'none'), quill: Fc(0, 'short', 3, 'glasses', 'mustache'), kestrel: Fc(4, 'bald', 0, 'shades', 'full'), nyx: Fc(1, 'long', 4, 'shades', 'none'), bram: Fc(2, 'short', 1, 'dots', 'full'), lumen: Fc(3, 'curly', 3, 'glasses', 'none'), arden: Fc(0, 'short', 2, 'dots', 'stubble'), pike: Fc(1, 'bun', 4, 'dots', 'none'), hale: Fc(4, 'short', 3, 'sleepy', 'full'), petra: Fc(0, 'long', 1, 'glasses', 'none'), odo: Fc(2, 'bald', 0, 'dots', 'mustache') };
+    Object.keys(agents).forEach(k => { agents[k].face = faces[k]; });
+    const teams = {
+      atlas: { id: 'atlas', name: 'Atlas', kind: 'build', lead: 'mara', members: ['mara', 'ilya', 'tove', 'rhea', 'quill'],
+        workflow: [['scrum master', 'Turns the goal into cards on the board'], ['lead', 'Assigns cards. Members branch a worktree each'], ['members', 'Build, then hand off to the lead with tests'], ['qa', 'Challenges every handoff. Failures go back to the author'], ['lead', 'Integrates and opens the PR to main']],
+        escalation: [['Blocked for more than 30 minutes', 'lead'], ['Board out of date', 'scrum master']] },
+      vesper: { id: 'vesper', name: 'Vesper', kind: 'challenge', lead: 'kestrel', members: ['kestrel', 'nyx', 'bram'],
+        workflow: [['lead', 'Picks targets from what other teams hand off'], ['qa', 'Attack in their own sandbox. Every finding needs a repro'], ['lead', 'Sends high-severity findings to the owning team’s lead']],
+        escalation: [['Finding of high severity', 'lead']] },
+      orion: { id: 'orion', name: 'Orion', kind: 'architect', lead: 'lumen', members: ['lumen', 'arden', 'pike'],
+        workflow: [['scrum master', 'Captures requirements in the wiki'], ['lead', 'Drafts the ADR'], ['architect', 'Runs spikes to back or refute it'], ['lead', 'Opens the PR with the accepted ADR']],
+        escalation: [['Spike contradicts the draft', 'lead']] },
+      sentinel: { id: 'sentinel', name: 'Sentinel', kind: 'challenge', lead: 'hale', members: ['hale', 'petra', 'odo'],
+        workflow: [['lead', 'Scopes the review with you'], ['reviewer', 'Reads every change against the wiki'], ['qa', 'Tries to break what was reviewed'], ['lead', 'Writes the findings report in the wiki']],
+        escalation: [['Anything that looks like a security issue', 'ceo']] }
+    };
+    const deps = {
+      'atlas@ledger': { id: 'atlas@ledger', team: 'atlas', project: 'ledger', goal: 'Ship settlement engine v2 as specified in ADR-014, behind a feature flag.' },
+      'vesper@ledger': { id: 'vesper@ledger', team: 'vesper', project: 'ledger', goal: 'Break settlement v2 before users do.' },
+      'orion@relay': { id: 'orion@relay', team: 'orion', project: 'relay', goal: 'Propose the event-bus topology for relay v1.' },
+      'vesper@relay': { id: 'vesper@relay', team: 'vesper', project: 'relay', goal: 'Stress the JetStream spike: oversized messages, partitions, slow consumers.' }
+    };
+    const I = (status, task) => ({ status, task });
+    const inst = {
+      'mara@ledger': I('running', 'Reviewing Ilya’s handoff'), 'ilya@ledger': I('awaiting', 'Waiting on you: new dependency'), 'tove@ledger': I('running', 'Idempotency keys for POST /settle'), 'rhea@ledger': I('running', 'Property tests for netting'), 'quill@ledger': I('idle', 'Wiki is up to date'),
+      'kestrel@ledger': I('awaiting', 'Waiting on you: load test on staging'), 'nyx@ledger': I('running', 'Fuzzing /settle currency codes'), 'bram@ledger': I('done', 'Handed VSP-9 to Kestrel'),
+      'kestrel@relay': I('running', 'Planning attacks on the spike'), 'nyx@relay': I('running', 'Oversized message headers'), 'bram@relay': I('idle', 'Waiting for a target'),
+      'lumen@relay': I('running', 'Drafting ADR-003'), 'arden@relay': I('stopped', 'Session exited: rate limit'), 'pike@relay': I('idle', 'Waiting for the draft')
+    };
+    const L = (t, x) => ({ t, x });
+    const lines = {
+      'mara@ledger': [L('sys', 'claude-code · ledger/.sandboxes/mara'), L('out', 'Reading wt/ilya/LED-41: 14 files'), L('out', 'netting.ts:88 rounds before FX conversion. Flagging.'), L('acp', '⇄ ask → Rhea (req-41): property test on rounding'), L('acp', '⇄ Rhea replied to req-41: 2 failing seeds'), L('out', 'Resuming review of LED-41 with Rhea’s result.')],
+      'ilya@ledger': [L('sys', 'codex · ledger/.sandboxes/ilya · wt/ilya/LED-41'), L('acp', '⇄ Mara sent 2 review comments'), L('out', 'Plan: use decimal.js for exact netting.'), L('ask', '⚠ escalate: new dependency decimal.js@10.4.3. Approve? [y/N]')],
+      'tove@ledger': [L('sys', 'claude-code · ledger/.sandboxes/tove · wt/tove/LED-44'), L('out', 'Reading wiki/adr/014-settlement-v2.md')],
+      'rhea@ledger': [L('sys', 'pi · ledger/.sandboxes/rhea · wt/rhea/LED-45'), L('acp', '⇄ Mara asked (req-41): property test on rounding'), L('err', '✗ netting.rounding: 2 counterexamples'), L('acp', '⇄ reply → Mara (req-41): 2 failing seeds')],
+      'quill@ledger': [L('sys', 'claude-code · ledger/wiki'), L('ok', '✓ committed boards/sprint-07.md')],
+      'kestrel@ledger': [L('sys', 'claude-code · ledger/.sandboxes/kestrel'), L('acp', '⇄ Bram handed off VSP-9 (race in batch close)'), L('ask', '⚠ escalate: 500 rps for 10 min on shared staging. Proceed? [y/N]')],
+      'nyx@ledger': [L('sys', 'hermes · ledger/.sandboxes/nyx · wt/nyx/VSP-11'), L('out', 'corpus: 1,204 seeds')],
+      'bram@ledger': [L('sys', 'custom ./bin/loadbot · ledger/.sandboxes/bram'), L('ok', '✓ handoff → Kestrel: VSP-9')],
+      'kestrel@relay': [L('sys', 'claude-code · relay/.sandboxes/kestrel'), L('out', 'Reading wiki/spikes/jetstream.md')],
+      'nyx@relay': [L('sys', 'hermes · relay/.sandboxes/nyx'), L('out', 'Target: relay-core publish path')],
+      'bram@relay': [L('sys', 'custom ./bin/loadbot · relay/.sandboxes/bram'), L('sys', 'idle')],
+      'lumen@relay': [L('sys', 'claude-code · relay/.sandboxes/lumen'), L('acp', '⇄ ask → Arden (req-7): p99 at 20k msg/s?')],
+      'arden@relay': [L('sys', 'codex · relay/.sandboxes/arden · wt/arden/spike'), L('acp', '⇄ Lumen asked (req-7): p99 at 20k msg/s?')],
+      'pike@relay': [L('sys', 'pi · relay/wiki'), L('out', 'Created adr/003-event-bus.md')]
+    };
+    const acp = [
+      { t: '09:12', dep: 'vesper@ledger', from: 'bram', to: 'kestrel', kind: 'handoff', text: 'VSP-9 race in batch close, repro attached.' },
+      { t: '09:20', dep: 'atlas@ledger', from: 'mara', to: 'rhea', kind: 'ask', text: 'Property test for netting rounding across EUR, USD, JPY.' },
+      { t: '09:31', dep: 'atlas@ledger', from: 'rhea', to: 'mara', kind: 'reply', text: '2 failing seeds.' },
+      { t: '09:40', dep: 'orion@relay', from: 'lumen', to: 'arden', kind: 'ask', text: 'p99 publish latency at 20k msg/s?' }
+    ];
+    const pipeline = [
+      { id: 'p1', dep: 'atlas@ledger', author: 'mara', branch: 'lead/integration', card: 'PR #128: settlement v2 groundwork', stage: 4, note: 'Checks pass. Ready for you.', tone: 'ok' },
+      { id: 'p2', dep: 'atlas@ledger', author: 'ilya', branch: 'wt/ilya/LED-41', card: 'FX-aware netting', stage: 2, note: 'Mara requested changes', tone: 'err' },
+      { id: 'p3', dep: 'atlas@ledger', author: 'tove', branch: 'wt/tove/LED-44', card: 'Idempotency keys for POST /settle', stage: 0, note: 'In progress', tone: '' },
+      { id: 'p4', dep: 'vesper@ledger', author: 'bram', branch: 'wt/bram/VSP-9', card: 'Race repro: batch close vs late settle', stage: 2, note: 'With Kestrel', tone: '' },
+      { id: 'p5', dep: 'orion@relay', author: 'arden', branch: 'wt/arden/spike', card: 'JetStream throughput spike', stage: 1, note: 'Handed off to Lumen', tone: '' }
+    ];
+    let theme = 'dark';
+    try { theme = localStorage.getItem('foreman-theme') || 'dark'; } catch (e) {}
+    return {
+      screen: 'home', projectId: 'ledger', projTab: 'overview', teamId: 'atlas', teamTab: 'deps', agentId: 'mara', promptProj: null,
+      termDep: 'atlas@ledger', panes: ['mara'], activePane: 0, drawer: false, copied: null, wikiPage: 'index.md', seen: {}, checks: {}, taskOv: {}, boardId: null, sheet: null, showToml: false, forge: {}, actions: [{ id: 'a1', kind: 'blocked', k: 'arden@relay', text: 'Arden’s session exited: Codex CLI hit its rate limit three times in ten minutes.', opts: ['Retry now', 'Retry in 30 min', 'Switch to Claude Code'] }, { id: 'a2', kind: 'question', k: 'lumen@relay', text: 'Lumen asks: is a managed broker acceptable, or must the event bus be self-hosted?', opts: ['Self-hosted only', 'Managed is fine'] }, { id: 'a3', kind: 'finding', k: 'kestrel@ledger', text: 'Kestrel rates VSP-9 (race in batch close) as high severity: a late settle can be counted twice.', opts: ['Atlas fixes it now', 'Add to backlog', 'Not an issue'] }], treeOpen: false, secs: { proj: true, teams: true }, adopt: null, settings: { listen: 'local', max: 12, cmds: { 'claude-code': 'claude', codex: 'codex', pi: 'pi', hermes: 'hermes', custom: '' }, notify: { ask: true, done: true, pr: true } },
+      agents, teams, deps, inst, lines, acp, pipeline, toasts: [], sendBack: null, sendNote: '', savedAt: {}, scriptPos: {}, req: 50,
+      asks: { 'ilya@ledger': { q: 'Ilya wants to add decimal.js as a new dependency for exact money arithmetic.', opts: ['Approve', 'Deny'] }, 'kestrel@ledger': { q: 'Kestrel wants to run a 10-minute load test (500 rps) against shared staging.', opts: ['Go ahead', 'Hold off'] } },
+      notif: (typeof Notification !== 'undefined') ? Notification.permission : 'unsupported', theme,
+      cos: { open: false, flow: null, step: 0, data: {}, msgs: [] }, deploy: null
+    };
+  }
+
+  hhmm() { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  push(k, items) { this.setState(s => ({ lines: { ...s.lines, [k]: [...(s.lines[k] || []), ...items].slice(-400) } })); }
+  setInst(k, patch) { this.setState(s => ({ inst: { ...s.inst, [k]: { ...(s.inst[k] || {}), ...patch } } })); }
+  editAgent(id, patch) { this.setState(s => ({ agents: { ...s.agents, [id]: { ...s.agents[id], ...patch } }, savedAt: { ...s.savedAt, [id]: Date.now() } })); }
+  depsOfTeam(tid, s) { return Object.values((s || this.state).deps).filter(d => d.team === tid); }
+  depsOnProject(pid, s) { return Object.values((s || this.state).deps).filter(d => d.project === pid); }
+
+  notify(k, title, body, c) {
+    const tid = Math.random().toString(36).slice(2);
+    this.setState(s => ({ toasts: [...s.toasts, { id: tid, k, title, body, c }] }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== tid) })), 6500);
+    try { if (this.state.notif === 'granted') { const n = new Notification(title, { body, tag: k || tid }); n.onclick = () => { window.focus(); if (k) this.openSession(k); }; } } catch (e) {}
+  }
+
+  openSession(k) {
+    const [aid, pid] = k.split('@');
+    const dep = this.state.agents[aid].team + '@' + pid;
+    if (!this.state.deps[dep]) { this.setState({ screen: 'agent', agentId: aid }); return; }
+    this.setState(s => {
+      if (s.termDep !== dep) return { screen: 'term', termDep: dep, panes: [aid], activePane: 0 };
+      if (s.panes.includes(aid)) return { screen: 'term', activePane: s.panes.indexOf(aid) };
+      const panes = [...s.panes]; panes[s.activePane] = aid;
+      return { screen: 'term', panes };
+    });
+  }
+
+  respond(k, reply) {
+    this.push(k, [{ t: 'in', x: '❯ ' + reply }]);
+    this.setState(s => { const asks = { ...s.asks }; delete asks[k]; return { asks }; });
+    setTimeout(() => { this.push(k, [{ t: 'ok', x: '✓ CEO answered: ' + reply + '. Resuming where I paused.' }]); this.setInst(k, { status: 'running', task: 'Resumed: ' + reply }); }, 400);
+  }
+
+  componentDidMount() {
+    try { document.documentElement.dataset.theme = this.state.theme; } catch (e) {}
+    this.timers = [];
+    this.iv = setInterval(() => {
+      if (this.props.liveSim === false) return;
+      const s = this.state;
+      const ks = Object.keys(this.scripts).filter(k => s.inst[k] && s.inst[k].status === 'running');
+      if (!ks.length) return;
+      const k = ks[Math.floor(Math.random() * ks.length)];
+      const pos = s.scriptPos[k] || 0;
+      const x = this.scripts[k][pos % this.scripts[k].length];
+      this.setState(st => ({ scriptPos: { ...st.scriptPos, [k]: pos + 1 } }));
+      this.push(k, [{ t: x.includes('✗') ? 'err' : x.includes('✓') ? 'ok' : 'out', x }]);
+    }, 1800);
+    this.timers.push(setTimeout(() => {
+      if (this.props.liveSim === false || (this.state.inst['tove@ledger'] || {}).status !== 'running') return;
+      this.push('tove@ledger', [{ t: 'ok', x: '✓ LED-44 done.' }, { t: 'acp', x: '⇄ handoff → Mara: wt/tove/LED-44' }]);
+      this.push('mara@ledger', [{ t: 'acp', x: '⇄ Tove handed off wt/tove/LED-44' }]);
+      this.setState(s => ({ acp: [...s.acp, { t: this.hhmm(), dep: 'atlas@ledger', from: 'tove', to: 'mara', kind: 'handoff', text: 'LED-44 ready: 12 tests, migration 0018.' }], pipeline: s.pipeline.map(p => p.id === 'p3' ? { ...p, stage: 1, note: 'Handed off to Mara' } : p) }));
+      this.setInst('tove@ledger', { status: 'done', task: 'Handed LED-44 to Mara' });
+      this.notify('tove@ledger', 'Tove is done on ledger', 'Idempotency keys handed off to Mara.', 'var(--info)');
+    }, 15000));
+    this.timers.push(setTimeout(() => {
+      if (this.props.liveSim === false || (this.state.inst['nyx@relay'] || {}).status !== 'running') return;
+      this.push('nyx@relay', [{ t: 'err', x: '✗ 1MB header crashes the broker' }, { t: 'ask', x: '⚠ escalate: file this upstream with NATS, or keep it internal? [u/i]' }]);
+      this.setInst('nyx@relay', { status: 'awaiting', task: 'Waiting on you: report upstream?' });
+      this.setState(s => ({ asks: { ...s.asks, 'nyx@relay': { q: 'Nyx crashed the broker with a 1MB header. Report it upstream to NATS, or keep it internal for now?', opts: ['Report upstream', 'Keep internal'] } } }));
+      this.notify('nyx@relay', 'Nyx needs you on relay', 'Report a broker crash upstream, or keep it internal?', 'var(--acc)');
+    }, 24000));
+  }
+  componentWillUnmount() { clearInterval(this.iv); (this.timers || []).forEach(clearTimeout); }
+  componentDidUpdate() {
+    document.querySelectorAll('[data-term-body]').forEach(el => { if (!el.dataset.init || el.scrollHeight - el.scrollTop - el.clientHeight < 160) { el.scrollTop = el.scrollHeight; el.dataset.init = '1'; } });
+  }
+
+  delegate(k, target, req, pid, aid) {
+    const s = this.state, a = s.agents[aid], tk = target + '@' + pid, tn = s.agents[target].name, rid = 'req-' + s.req, dep = a.team + '@' + pid;
+    this.setState({ req: s.req + 1 });
+    setTimeout(() => { this.push(k, [{ t: 'acp', x: '⇄ ask → ' + tn + ' (' + rid + '): ' + req }]); this.push(tk, [{ t: 'acp', x: '⇄ ' + a.name + ' asked (' + rid + '): ' + req }]); this.setState(x => ({ acp: [...x.acp, { t: this.hhmm(), dep, from: aid, to: target, kind: 'ask', text: req }] })); }, 500);
+    setTimeout(() => { this.push(tk, [{ t: 'acp', x: '⇄ reply → ' + a.name + ' (' + rid + ')' }]); this.push(k, [{ t: 'acp', x: '⇄ ' + tn + ' replied to ' + rid }, { t: 'out', x: 'Resuming the task that asked for it.' }]); this.setState(x => ({ acp: [...x.acp, { t: this.hhmm(), dep, from: target, to: aid, kind: 'reply', text: 'Answer to ' + rid + ' returned.' }] })); }, 2800);
+  }
+
+  handleInput(k, value) {
+    const v = value.trim(); if (!v) return;
+    const s = this.state, [aid, pid] = k.split('@'), a = s.agents[aid], t = s.teams[a.team];
+    if ((s.inst[k] || {}).status === 'awaiting') { this.respond(k, v); return; }
+    this.push(k, [{ t: 'in', x: '❯ ' + v }]);
+    const mates = t.members.filter(x => x !== aid);
+    const m = v.match(/(?:ask|tell)\s+(\w+)/i);
+    if (m) {
+      const target = mates.find(x => s.agents[x].name.toLowerCase() === m[1].toLowerCase());
+      if (!target) { setTimeout(() => this.push(k, [{ t: 'err', x: '✗ No teammate "' + m[1] + '" on ' + pid + '. Teammates: ' + mates.map(x => s.agents[x].name).join(', ') }]), 400); return; }
+      this.delegate(k, target, v.replace(/^.*?(?:ask|tell)\s+\w+\s*(to|for|about)?\s*/i, '') || 'a status update', pid, aid);
+      return;
+    }
+    if (aid === t.lead) {
+      const pick = mates.find(x => ['Engineer', 'Architect', 'QA'].includes(s.agents[x].role)) || mates[0];
+      setTimeout(() => this.push(k, [{ t: 'out', x: 'Got it. ' + (pick ? 'Giving the first part to ' + s.agents[pick].name + '.' : 'Doing it myself.') }]), 400);
+      if (pick) this.delegate(k, pick, v, pid, aid);
+      return;
+    }
+    const lk = t.lead + '@' + pid;
+    setTimeout(() => { this.push(k, [{ t: 'out', x: 'On it. I’ll let ' + s.agents[t.lead].name + ' know.' }]); this.push(lk, [{ t: 'sys', x: 'ⓘ CEO gave ' + a.name + ' a direct instruction: ' + v }]); }, 400);
+  }
+
+  resolveAction(id, reply) {
+    const x = this.state.actions.find(a => a.id === id); if (!x) return;
+    this.setState(s => ({ actions: s.actions.filter(a => a.id !== id) }));
+    if (x.k.startsWith('cos@')) { this.notify(null, 'project.yaml', reply === 'Merge' ? 'Config change merged to main.' : 'Config change discarded.', reply === 'Merge' ? 'var(--ok)' : 'var(--tx4)'); return; }
+    this.push(x.k, x.kind === 'blocked' ? [{ t: 'sys', x: 'CEO: ' + reply + '. Restarting session…' }] : [{ t: 'in', x: '❯ ' + reply }]);
+    setTimeout(() => { this.push(x.k, [{ t: 'ok', x: x.kind === 'blocked' ? '✓ Session back. Resuming from the last checkpoint.' : '✓ CEO answered: ' + reply + '. Continuing.' }]); this.setInst(x.k, { status: 'running', task: x.kind === 'blocked' ? 'Resumed after restart' : 'Continuing: ' + reply }); }, 600);
+  }
+
+  randFace() { const r = a => a[Math.floor(Math.random() * a.length)]; return { skin: r(this.SKIN), hair: r(this.HAIR), hairColor: r(this.HC), eyes: r(this.EYES), beard: r(this.BEARD) }; }
+
+  moveCard(path, status, lane) {
+    if (!path) return;
+    const key = this.state.projectId + ':' + path;
+    this.setState(x => ({ taskOv: { ...x.taskOv, [key]: { ...(x.taskOv[key] || {}), status, ...(lane ? { priority: lane } : {}) } } }));
+    this.notify(null, path, 'status: ' + status + (lane ? ' · priority: ' + lane : ''), 'var(--info)');
+  }
+
+  scrollToAnchor(id) { const el = document.getElementById(id), m = document.querySelector('main'); if (el && m) m.scrollTo({ top: m.scrollTop + el.getBoundingClientRect().top - m.getBoundingClientRect().top - 24, behavior: 'smooth' }); }
+
+  renderBlocks(pid, path, entry, openEntry) {
+    const s = this.state; let hh = 0;
+    const CC = { warning: 'var(--acc)', success: 'var(--ok)', info: 'var(--info)' };
+    const CT = { warning: 'var(--accTx)', success: 'var(--ok)', info: 'var(--info)' };
+    return (entry ? entry.blocks : []).map((b, i) => {
+      const t = b[0];
+      const o = { x: b[1], isH1: t === 'h1', isH2: t === 'h2', isP: t === 'p', isLi: t === 'li', isLink: t === 'link', isCallout: t === 'callout', isCode: t === 'code', isCheck: t === 'check', anchor: '' };
+      if (o.isH2) o.anchor = 'h-' + (hh++);
+      if (o.isLink) o.open = openEntry(b[2]);
+      if (o.isCallout) { o.cLabel = b[2] || b[1]; o.x = b[3]; o.cBorder = CC[b[1]] || 'var(--line3)'; o.cColor = CT[b[1]] || 'var(--tx3)'; }
+      if (o.isCheck) { const key = pid + ':' + path + ':' + i; const v = key in s.checks ? s.checks[key] : !!b[2];
+        Object.assign(o, { box: v ? '✓' : '', boxBg: v ? 'var(--acc)' : 'transparent', boxBorder: v ? 'var(--acc)' : 'var(--line3)', textColor: v ? 'var(--tx3)' : 'var(--tx2)', deco: v ? 'line-through' : 'none', toggle: () => this.setState(x => ({ checks: { ...x.checks, [key]: !v } })) }); }
+      return o;
+    });
+  }
+
+  wikiFor(pid) {
+    const s = this.state, p = this.projects[pid];
+    const TK = {
+      ledger: [['LED-39', 'Schema migration 0016', 'done', 'medium', 'tove', 'feature'], ['LED-40', '/settle endpoint skeleton', 'done', 'high', 'ilya', 'feature'], ['LED-41', 'FX-aware netting', 'review', 'high', 'ilya', 'feature'], ['LED-44', 'Idempotency keys for POST /settle', 'in-progress', 'high', 'tove', 'feature'], ['LED-45', 'Property tests for netting', 'in-progress', 'medium', 'rhea', 'feature'], ['LED-47', 'Settlement report CSV export', 'todo', 'low', 'tove', 'feature'], ['LED-48', 'Multi-currency rounding policy', 'todo', 'medium', 'quill', 'feature'], ['VSP-9', 'Race: batch close vs late settle', 'review', 'high', 'mara', 'finding'], ['VSP-11', '500 on non-ASCII currency code', 'in-progress', 'medium', 'nyx', 'finding'], ['VSP-12', 'Authz bypass via merchant_id swap', 'todo', 'high', 'nyx', 'finding']],
+      relay: [['RLY-1', 'Requirements doc', 'done', 'medium', 'pike', 'feature'], ['RLY-3', 'ADR-003: event bus topology', 'in-progress', 'high', 'lumen', 'feature'], ['RLY-4', 'JetStream throughput spike', 'in-progress', 'high', 'arden', 'feature'], ['RLY-6', 'Dead-letter strategy', 'todo', 'low', 'lumen', 'feature'], ['RLY-8', 'Broker crash on 1MB header', 'todo', 'high', 'nyx', 'finding']],
+      harbor: []
+    };
+    const DESC = { 'LED-41': 'Net positions in exact decimals and convert currency before rounding. Mara requested changes: rounding still happens before FX conversion in netting.ts.', 'LED-44': 'Accept an Idempotency-Key header on POST /settle. Keys are kept 24 hours, scoped per merchant.', 'VSP-9': 'A late settle can land after the batch closes and be counted twice. Bram reproduced it 37 times in 200 runs.', 'VSP-12': 'Swapping merchant_id in the body may let one merchant settle against another’s balance. Not confirmed yet.', 'RLY-8': 'A message with a 1MB header crashes the broker. Waiting on your call about reporting upstream.' };
+    const tasks = (TK[pid] || []).map(r => ({ id: r[0], title: r[1], status: r[2], priority: r[3], assignee: r[4], kind: r[5], path: 'backlog/' + r[0] + '.md' }));
+    const ds = this.depsOnProject(pid);
+    const teamsLi = ds.length ? ds.map(d => ['li', s.teams[d.team].name + ' (' + s.teams[d.team].kind + '): ' + d.goal]) : [['p', 'No team is deployed here yet.']];
+    const docs = {
+      ledger: {
+        'index.md': [['h1', 'ledger'], ['p', p.desc + ' This wiki is the shared memory for every team deployed here.'], ['h2', 'Start here'], ['link', 'ADR-014: Settlement engine v2', 'adr/014-settlement-v2.md'], ['link', 'Backlog', 'backlog/index.md'], ['link', 'Today’s standup', 'standups/2026-10-12.md'], ['h2', 'Teams'], ...teamsLi, ['h2', 'Conventions'], ['li', 'Members work in wt/<agent>/<card>. Only leads open PRs to main.'], ['li', 'Every decision gets an ADR. Every finding gets a task with a repro.']],
+        'adr/013-ledger-ids.md': [['h1', 'ADR-013: ULIDs for ledger entries'], ['p', 'Entries get sortable ULIDs instead of sequential integers, so sandboxes can create them without coordinating.']],
+        'adr/014-settlement-v2.md': [['h1', 'ADR-014: Settlement engine v2'], ['h2', 'Context'], ['p', 'v1 nets in floating point and converts currency after rounding. It drifts by up to one minor unit per batch.'], ['h2', 'Decision'], ['li', 'Exact decimal arithmetic on every money path.'], ['li', 'Convert currency before rounding. Round once, at the end.'], ['li', 'Idempotency keys on POST /settle.'], ['callout', 'warning', 'Open question', 'The rounding policy for zero-decimal currencies like JPY is undecided.'], ['link', 'LED-48: Multi-currency rounding policy', 'backlog/LED-48.md'], ['h2', 'Consequences'], ['p', 'Adds a decimals dependency, which needs your approval. Settlement runs about 15% slower in benchmarks.'], ['h2', 'Related'], ['link', 'LED-41: FX-aware netting', 'backlog/LED-41.md'], ['link', 'VSP-9: Race in batch close', 'backlog/VSP-9.md']],
+        'backlog/index.md': [['h1', 'Backlog'], ['p', 'One file per task. The boards declared in wiki.toml are drawn from their frontmatter.'], ['link', 'Open the board', '#board']],
+        'standups/2026-10-12.md': [['h1', 'Standup, 12 Oct'], ['h2', 'Atlas'], ['li', 'Tove is close on idempotency keys (LED-44).'], ['li', 'Mara sent LED-41 back to Ilya over rounding order.'], ['h2', 'Vesper'], ['li', 'Bram reproduced the batch-close race (VSP-9).'], ['li', 'Nyx is fuzzing currency codes.'], ['h2', 'Waiting on the CEO'], ['check', 'decimal.js dependency for LED-41', false], ['check', 'Load test on shared staging', false]]
+      },
+      relay: {
+        'index.md': [['h1', 'relay'], ['p', p.desc], ['h2', 'Start here'], ['link', 'ADR-003: Event bus topology', 'adr/003-event-bus.md'], ['link', 'Backlog', 'backlog/index.md'], ['h2', 'Teams'], ...teamsLi],
+        'adr/003-event-bus.md': [['h1', 'ADR-003: Event bus topology'], ['callout', 'info', 'Draft', 'Lumen is writing this. Arden’s spike numbers go under Consequences.'], ['h2', 'Context'], ['p', 'Ordering must hold per account, not globally. Peak load is 20k messages per second.'], ['h2', 'Options'], ['li', 'Kafka'], ['li', 'NATS JetStream'], ['li', 'Redpanda']],
+        'backlog/index.md': [['h1', 'Backlog'], ['p', 'One file per task.'], ['link', 'Open the board', '#board']]
+      },
+      harbor: {
+        'index.md': [['h1', 'harbor'], ['p', p.desc], ['callout', 'info', 'Idle', 'No team is deployed here yet. Deploy one from the Sessions tab.'], ['h2', 'Teams'], ...teamsLi],
+        'backlog/index.md': [['h1', 'Backlog'], ['p', 'Empty for now.']]
+      }
+    }[pid] || { 'index.md': [['h1', pid], ['p', p.desc], ['callout', 'info', 'New', 'Created by the Chief of Staff. Deploy a team from the Sessions tab.'], ['h2', 'Repositories'], ...p.repos.map(r => ['li', r]), ['h2', 'Teams'], ...teamsLi], 'backlog/index.md': [['h1', 'Backlog'], ['p', 'Empty for now.']] };
+    const FM = { 'adr/013-ledger-ids.md': { type: 'adr', status: 'accepted' }, 'adr/014-settlement-v2.md': { type: 'adr', status: 'accepted', owner: 'mara' }, 'adr/003-event-bus.md': { type: 'adr', status: 'draft', owner: 'lumen' }, 'standups/2026-10-12.md': { type: 'standup', author: 'quill' } };
+    const CH = ['standups/2026-10-12.md', 'backlog/LED-44.md', 'adr/014-settlement-v2.md', 'adr/003-event-bus.md', 'backlog/RLY-8.md'];
+    const E = {};
+    Object.keys(docs).forEach(k => { E[k] = { blocks: docs[k], fm: FM[k], changed: CH.includes(k) }; });
+    tasks.forEach(t => { E[t.path] = { fm: { type: 'task', kind: t.kind, status: t.status, priority: t.priority, assignee: t.assignee }, changed: CH.includes(t.path),
+      blocks: [['h1', t.id + ': ' + t.title], ...(DESC[t.id] ? [['p', DESC[t.id]]] : []), ['h2', 'Checklist'], ['check', 'Worktree created', t.status !== 'todo'], ['check', 'Checks pass', t.status === 'review' || t.status === 'done'], ['check', 'Reviewed by the lead', t.status === 'done']] }; });
+    const keys = Object.keys(docs);
+    const tree = [{ label: 'index.md', path: 'index.md', d: 0 }];
+    ['adr', 'backlog', 'standups'].forEach(f => { const inF = keys.filter(k => k.startsWith(f + '/') && k !== f + '/index.md').concat(f === 'backlog' ? tasks.map(t => t.path) : []); if (!inF.length && !E[f + '/index.md']) return;
+      tree.push({ label: f + '/', path: E[f + '/index.md'] ? f + '/index.md' : null, d: 0, folder: true });
+      inF.forEach(k => tree.push({ label: k.split('/').pop(), path: k, d: 1 })); });
+    const boards = { ledger: [{ id: 'sprint', name: 'Sprint 07', lane: 'priority' }, { id: 'findings', name: 'Findings', kind: 'finding' }], relay: [{ id: 'adr', name: 'ADR track' }], harbor: [{ id: 'backlog', name: 'Backlog' }] }[pid] || [{ id: 'backlog', name: 'Backlog' }];
+    const toml = '# ' + pid + '/wiki/wiki.toml\n' + boards.map(b => '\n[[tool.wikiview.board]]\nid    = "' + b.id + '"\npath  = "/backlog"\nname  = "' + b.name + '"' + (b.kind ? '\nwhere = ["type=task", "kind=' + b.kind + '"]' : '') + (b.lane ? '\nlane  = "' + b.lane + '"' : '')).join('\n');
+    return { entries: E, tasks, tree, boards, toml };
+  }
+
+  composePrompt(aid, pid) {
+    const s = this.state, a = s.agents[aid], t = s.teams[a.team], p = this.projects[pid], d = s.deps[a.team + '@' + pid];
+    const isLead = aid === t.lead;
+    const roleName = key => { const map = { lead: 'Team Lead', 'scrum master': 'Scrum Master', qa: 'QA', architect: 'Architect', reviewer: 'Reviewer' }; const r = map[key]; if (!r) return key === 'ceo' ? 'CEO' : key; const m = t.members.find(x => s.agents[x].role === r); return m ? s.agents[m].name : r; };
+    const mates = t.members.filter(m => m !== aid).map(m => '- ' + s.agents[m].name + ', ' + s.agents[m].role + (m === t.lead ? ' (lead: integrates, opens PRs)' : '')).join('\n');
+    return '# You are ' + a.name + ', ' + a.role + ' on team ' + t.name + '\n' + a.personality + '\n\n## Your job\n' + a.instructions +
+      '\n\n## This assignment\nProject: ' + p.name + '  (' + p.path + ')\nGoal: ' + (d ? d.goal : '(not deployed)') +
+      '\nYour clone: ' + p.name + '/.sandboxes/' + aid + '\nBranches: ' + (isLead ? 'lead/*. You may open PRs to main.' : 'wt/' + aid + '/<card> only. No push to main.') +
+      '\nWiki: ' + p.name + '/wiki (' + (a.role === 'Scrum Master' ? 'read and write' : 'read only') + ')' +
+      '\n\n## Your team on ' + p.name + '\n' + mates + '\nYou can’t see their sandboxes. Work with them only through the tools below.' +
+      '\n\n## Tools (from Foreman)\nask(teammate, request)              Get info or work. Keep going meanwhile.\nreply(request_id, output)           Answer a request. Only `output` is returned.\nhandoff(teammate, branch, summary)  Pass finished work on. Your part ends.\nescalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.' + (isLead ? '\nopen_pr(title, summary)             Propose lead/* for main. Only you can.' : '') + '\n\nReplies arrive in this session as “⇄ <name> replied to req-N”.\nResume the task that asked for it. After escalate you resume\nfrom the same point with the CEO’s answer.' +
+      (isLead ? '\n\n## The CEO\nThe CEO talks to you. Break requests down and delegate with ask() or handoff().' : '\n\n## The CEO\nThe CEO normally talks to ' + s.agents[t.lead].name + '. If the CEO instructs you directly, do it and tell ' + s.agents[t.lead].name + ' what changed.') + '\n\n## Playbook\n' + t.workflow.map((w, i) => (i + 1) + '. ' + roleName(w[0]) + ': ' + w[1]).join('\n') +
+      '\n\n## Always escalate to the CEO\n' + p.gates.map(g => '- ' + g).join('\n') + '\nBefore any handoff, run: ' + p.checks;
+  }
+
+  // Chief of Staff
+  cosSay(text, chips, card) { this.setState(s => ({ cos: { ...s.cos, msgs: [...s.cos.msgs, { from: 'cos', text, chips: chips || [], card }] } })); }
+  cosMe(text) { this.setState(s => ({ cos: { ...s.cos, msgs: [...s.cos.msgs, { from: 'me', text }] } })); }
+  cosSet(patch) { this.setState(s => ({ cos: { ...s.cos, ...patch } })); }
+  openCos(flow, data) {
+    this.setState(s => ({ cos: { open: true, flow: null, step: 0, data: {}, msgs: s.cos.msgs.length ? s.cos.msgs : [{ from: 'cos', text: 'I set up teams, interview you for new roles, and pick up anything the UI doesn’t cover.', chips: ['Hire for a role', 'Create a team', 'New project', 'What needs me today?'] }] } }));
+    if (flow) setTimeout(() => this.startFlow(flow, data), 50);
+  }
+  startFlow(flow, data) {
+    this.cosSet({ flow, step: 0, data: data || {} });
+    const T = this.state.teams, roles = Object.keys(this.INSTR).filter(r => r !== 'Team Lead');
+    if (flow === 'hire') {
+      if (data && data.team) { this.cosSet({ step: 1 }); this.cosSay('Hiring for ' + T[data.team].name + '. What role?', roles); }
+      else this.cosSay('Which team is this hire for?', Object.values(T).map(t => t.name));
+    } else if (flow === 'config') this.cosSay('What should change in ' + data.pid + '/.foreman/project.yaml? I’ll edit it on a branch and send it to you as a review.', ['Send PRs to GitHub', 'Add a gate', 'Change the checks']);
+    else if (flow === 'project') this.cosSay('Which folder in ~/agents-ws should become a project? If it doesn’t exist, I’ll create it.', ['billing', 'mobile-app'].filter(n => !this.projects[n]));
+    else if (flow === 'team') this.cosSay('What is the new team for?', Object.values(this.KIND));
+    else if (flow === 'refine') this.cosSay('What should change about how ' + this.state.agents[data.agent].name + ' works? This applies on every project they’re deployed to.', ['Push back more', 'Communicate more', 'Narrower focus']);
+  }
+  cosAnswer(text) {
+    this.cosMe(text);
+    const c = this.state.cos, T = this.state.teams, A = this.state.agents, d = { ...c.data };
+    const next = (step, fn) => setTimeout(() => { this.cosSet({ step, data: d }); fn(); }, 450);
+    const pool = this.POOL.filter(n => !A[n.toLowerCase()]);
+    if (!c.flow) {
+      if (/project/i.test(text)) return setTimeout(() => this.startFlow('project'), 350);
+      if (/hire/i.test(text)) return setTimeout(() => this.startFlow('hire'), 350);
+      if (/team/i.test(text)) return setTimeout(() => this.startFlow('team'), 350);
+      if (/needs me/i.test(text)) { const n = Object.keys(this.state.asks).length + this.state.pipeline.filter(p => p.stage === 4 && p.tone !== 'merged').length; return setTimeout(() => this.cosSay(n + ' things are waiting on you. They’re at the top of Home.', ['Hire for a role', 'Create a team']), 400); }
+      return setTimeout(() => this.cosSay('On it. I’ll work on “' + text + '” and report back on Home when it’s done or if I need you.'), 450);
+    }
+    if (c.flow === 'hire') {
+      if (c.step === 0) { const t = Object.values(T).find(t => t.name === text); if (!t) return; d.team = t.id; return next(1, () => this.cosSay('What role?', Object.keys(this.INSTR).filter(r => r !== 'Team Lead'))); }
+      if (c.step === 1) { d.role = text; const sug = { Engineer: ['Backend APIs and migrations', 'Frontend and UX polish'], QA: ['Property tests and fuzzing', 'Load and concurrency'], Reviewer: ['Code review against the ADRs', 'Security review'], Architect: ['Data model and storage', 'Distributed systems'], 'Scrum Master': ['Keeping the wiki and board current'] }[text] || ['General work']; return next(2, () => this.cosSay('What will they spend most of their time on? A sentence is enough.', sug)); }
+      if (c.step === 2) { d.focus = text; return next(3, () => this.cosSay('How should they work with the rest of the team?', ['Heads-down, reports when done', 'Pushes back, challenges decisions', 'Collaborative, checks in often'])); }
+      if (c.step === 3) { d.style = text; return next(4, () => this.cosSay('Which harness should run them?', ['Claude Code', 'Codex CLI', 'Pi', 'Hermes Agent'])); }
+      if (c.step === 4) {
+        d.harness = Object.keys(this.HN).find(k => this.HN[k] === text) || 'claude-code';
+        d.name = pool[0];
+        d.instr = (this.INSTR[d.role] || '') + '\nFocus: ' + d.focus + '.';
+        const n = this.depsOfTeam(d.team).length;
+        return next(5, () => this.cosSay('Here’s the job description. ' + (n ? 'They’ll start on all ' + n + ' of ' + T[d.team].name + '’s deployments.' : T[d.team].name + ' isn’t deployed yet, so they’ll start when it is.'), ['Hire ' + d.name, 'Start over'], { title: d.name + ' · ' + d.role + ' · ' + T[d.team].name, rows: [{ k: 'Focus', v: d.focus }, { k: 'Works', v: d.style }, { k: 'Harness', v: this.HN[d.harness] }, { k: 'Job', v: d.instr }] }));
+      }
+      if (c.step === 5) {
+        if (/start over/i.test(text)) return setTimeout(() => this.startFlow('hire'), 300);
+        const id = d.name.toLowerCase(), t = T[d.team];
+        const ds = this.depsOfTeam(d.team);
+        this.setState(s => { const inst = { ...s.inst }, lines = { ...s.lines }; ds.forEach(x => { inst[id + '@' + x.project] = { status: 'starting', task: 'Cloning repos' }; lines[id + '@' + x.project] = [{ t: 'sys', x: d.harness + ' · ' + x.project + '/.sandboxes/' + id }]; });
+          return { agents: { ...s.agents, [id]: { id, name: d.name, role: d.role, team: d.team, harness: d.harness, cmd: '', color: this.PAL[Object.keys(s.agents).length % 8], face: this.randFace(), personality: d.style + '.', skills: [], instructions: d.instr } }, teams: { ...s.teams, [d.team]: { ...t, members: [...t.members, id] } }, inst, lines }; });
+        ds.forEach(x => setTimeout(() => { this.setInst(id + '@' + x.project, { status: 'idle', task: 'Waiting for a card' }); this.push(id + '@' + x.project, [{ t: 'ok', x: '✓ Ready.' }]); }, 1800));
+        return next(6, () => this.cosSay(d.name + ' has joined ' + t.name + '.', ['Open ' + d.name + '’s profile', 'Hire for a role']));
+      }
+      if (c.step === 6) { if (/profile/i.test(text)) { this.setState({ screen: 'agent', agentId: d.name.toLowerCase(), promptProj: null }); this.cosSet({ flow: null }); } else setTimeout(() => this.startFlow('hire'), 300); return; }
+    }
+    if (c.flow === 'team') {
+      if (c.step === 0) { d.kind = Object.keys(this.KIND).find(k => this.KIND[k] === text) || 'build'; return next(1, () => this.cosSay('What should we call it?', ['Meridian', 'Halcyon', 'Tern'].filter(n => !T[n.toLowerCase()]))); }
+      if (c.step === 1) { d.name = text.trim(); d.roster = this.ROSTER[d.kind].map((r, i) => [pool[i], r]);
+        return next(2, () => this.cosSay('Here’s the roster I’d start with. I’ll draft a job description for each role, and you can refine any of them later.', ['Create ' + d.name, 'Start over'], { title: d.name + ' · ' + this.KIND[d.kind], rows: d.roster.map(([n, r]) => ({ k: r, v: n })) })); }
+      if (c.step === 2) {
+        if (/start over/i.test(text)) return setTimeout(() => this.startFlow('team'), 300);
+        const id = d.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ids = d.roster.map(([n]) => n.toLowerCase());
+        const agents = { ...this.state.agents };
+        d.roster.forEach(([n, r], ri) => { agents[n.toLowerCase()] = { id: n.toLowerCase(), name: n, role: r, team: id, harness: 'claude-code', cmd: '', color: this.PAL[(ri * 3 + 1) % 8], face: this.randFace(), personality: 'Default ' + r.toLowerCase() + '.', skills: [], instructions: this.INSTR[r] }; });
+        this.setState(s => ({ agents, teams: { ...s.teams, [id]: { id, name: d.name, kind: d.kind, lead: ids[0], members: ids, workflow: T.atlas.workflow, escalation: [['Blocked for more than 30 minutes', 'lead']] } } }));
+        d.teamId = id;
+        return next(3, () => this.cosSay(d.name + ' is set up. It isn’t deployed anywhere yet.', ['Deploy to a project', 'Open ' + d.name]));
+      }
+      if (c.step === 3) { if (/deploy/i.test(text)) this.openDeploy(d.teamId, null); else this.setState({ screen: 'team', teamId: d.teamId, teamTab: 'members' }); this.cosSet({ flow: null }); return; }
+    }
+    if (c.flow === 'config') {
+      const n = Math.floor(10 + Math.random() * 89);
+      this.cosSet({ flow: null });
+      setTimeout(() => this.setState(st => ({ actions: [...st.actions, { id: 'cfg' + n, kind: 'review', k: 'cos@' + d.pid, source: 'Chief of Staff', text: 'Chief of Staff changed ' + d.pid + '/.foreman/project.yaml: ' + text + '.', link: 'foreman/config-' + n + ' → main · 1 file changed', opts: ['Merge', 'Discard'] }] })), 450);
+      return setTimeout(() => this.cosSay('Done: “' + text + '”. It’s on branch foreman/config-' + n + ' and waiting for you in ' + d.pid + ' → Changes.'), 500);
+    }
+    if (c.flow === 'project') {
+      if (c.step === 0) { d.name = text.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-'); if (this.projects[d.name]) return setTimeout(() => this.cosSay(d.name + ' already exists. Pick another name.', []), 400); return next(1, () => this.cosSay('Which repos go in ~/agents-ws/' + d.name + '? Git URLs or names, comma-separated.', [d.name + '-api, ' + d.name + '-web', d.name])); }
+      if (c.step === 1) { d.repos = text.split(',').map(x => x.trim().split('/').pop().replace(/\.git$/, '')).filter(Boolean); return next(2, () => this.cosSay('One line on what it is?', ['Internal tool', 'Customer-facing service'])); }
+      if (c.step === 2) {
+        const id = d.name;
+        this.projects[id] = { id, name: id, path: '~/agents-ws/' + id, desc: text.trim().replace(/\.?$/, '.'), repos: d.repos, checks: 'npm test', gates: ['new dependency'] };
+        this.setState({ screen: 'project', projectId: id, projTab: 'overview', wikiPage: 'index.md', sheet: null });
+        return next(3, () => this.cosSay('Created ' + id + ' with ' + d.repos.join(', ') + ', a wiki/ and .foreman/project.yaml. No team is on it yet.', ['Deploy a team', 'Done']));
+      }
+      if (c.step === 3) { if (/deploy/i.test(text)) this.openDeploy(null, d.name); this.cosSet({ flow: null }); return; }
+    }
+    if (c.flow === 'refine') {
+      this.editAgent(d.agent, { instructions: (A[d.agent].instructions || '') + '\nAdjustment: ' + text + '.' });
+      this.cosSet({ flow: null });
+      return setTimeout(() => this.cosSay('Updated ' + A[d.agent].name + '’s job description. Every running session picks it up on its next turn.'), 400);
+    }
+  }
+
+  openDeploy(teamId, projectId) { this.setState({ deploy: { team: teamId, project: projectId, goal: '', pickTeam: !teamId } }); }
+  doDeploy() {
+    const x = this.state.deploy; if (!x.team || !x.project || !x.goal.trim()) return;
+    const id = x.team + '@' + x.project; if (this.state.deps[id]) return;
+    const t = this.state.teams[x.team], p = this.projects[x.project];
+    this.setState(s => { const inst = { ...s.inst }, lines = { ...s.lines };
+      t.members.forEach(m => { inst[m + '@' + p.id] = { status: 'starting', task: 'Cloning ' + p.repos.join(', ') }; lines[m + '@' + p.id] = [{ t: 'sys', x: s.agents[m].harness + ' · ' + p.name + '/.sandboxes/' + m }, { t: 'out', x: 'Cloning ' + p.repos.join(', ') + ' · reading ' + p.name + '/wiki' }]; });
+      return { deploy: null, deps: { ...s.deps, [id]: { id, team: x.team, project: x.project, goal: x.goal.trim() } }, inst, lines }; });
+    t.members.forEach((m, i) => setTimeout(() => { this.setInst(m + '@' + p.id, { status: i === 0 ? 'running' : 'idle', task: i === 0 ? 'Breaking the goal into cards' : 'Waiting for a card' }); this.push(m + '@' + p.id, [{ t: 'ok', x: '✓ Ready.' }]); }, 1800 + i * 200));
+    this.notify(t.lead + '@' + p.id, t.name + ' deployed to ' + p.name, t.members.length + ' new sessions starting.', 'var(--ok)');
+  }
+  stopDep(id) {
+    const d = this.state.deps[id], t = this.state.teams[d.team];
+    this.setState(s => { const deps = { ...s.deps }; delete deps[id]; const inst = { ...s.inst }; t.members.forEach(m => delete inst[m + '@' + d.project]); return { deps, inst }; });
+    this.notify(null, t.name + ' stopped on ' + d.project, 'Worktrees are kept. Other deployments keep running.', 'var(--tx4)');
+  }
+
+  toYaml(t) {
+    const A = this.state.agents;
+    const ind = (x, n) => x.split('\n').map(l => ' '.repeat(n) + l).join('\n');
+    let y = '# the definition only; deployments live in each project\nteam: ' + t.id + '\nkind: ' + t.kind + '\nlead: ' + t.lead + '\n\nagents:\n';
+    t.members.forEach(m => { const a = A[m];
+      y += '  ' + m + ':\n    role: ' + a.role.toLowerCase().replace(/\s+/g, '_') + '\n    harness: ' + a.harness + (a.harness === 'custom' ? '\n    command: ' + a.cmd : '') + '\n    personality: ' + a.personality + '\n    skills: [' + a.skills.join(', ') + ']\n    instruction: |\n' + ind(a.instructions || '', 6) + '\n'; });
+    y += '\nplaybook:\n' + t.workflow.map(w => '  - ' + w[0] + ': ' + w[1]).join('\n');
+    y += '\n\nescalate:\n' + t.escalation.map(e => '  - when: ' + e[0] + '\n    to: ' + e[1]).join('\n');
+    return y;
+  }
+
+  renderVals() {
+    const s = this.state, A = s.agents, T = s.teams, P = this.projects, D = s.deps;
+    const showAcp = this.props.acpMarkers ?? true;
+    const SM = { running: 'var(--ok)', awaiting: 'var(--acc)', idle: 'var(--tx4)', done: 'var(--info)', starting: 'var(--acp)', stopped: 'var(--err)' };
+    const LC = { sys: 'var(--tx4)', in: 'var(--accTx)', out: 'var(--tx2)', acp: 'var(--acp)', err: 'var(--err)', ask: 'var(--ask)', ok: 'var(--ok)' };
+    const go = patch => () => this.setState(patch);
+    const hl = a => a.harness === 'custom' ? 'Custom: ' + (a.cmd || '—') : this.HN[a.harness];
+    const st = k => (s.inst[k] || { status: 'idle', task: '' });
+    const kindLabel = k => ({ architect: 'Architect', build: 'Build', challenge: 'Challenge' })[k];
+    const lines = arr => arr.filter(l => showAcp || l.t !== 'acp').map(l => ({ x: l.x, c: LC[l.t] || LC.out }));
+    const depAvatars = d => T[d.team].members.map(m => ({ i: A[m].name[0], c: A[m].color, face: A[m].face, dot: SM[st(m + '@' + d.project).status], title: A[m].name + ' · ' + A[m].role }));
+    const roleName = (t, key) => { if (key === 'ceo') return 'You'; const map = { lead: 'Team Lead', 'scrum master': 'Scrum Master', qa: 'QA', architect: 'Architect', reviewer: 'Reviewer' }; const r = map[key]; if (!r) return key.charAt(0).toUpperCase() + key.slice(1); const m = t.members.find(x => A[x].role === r); return m ? A[m].name : r; };
+    const allInst = Object.keys(s.inst);
+    const running = allInst.filter(k => s.inst[k].status === 'running').length;
+
+    const ask = Object.keys(s.asks).filter(k => s.inst[k]).map(k => { const [aid, pid] = k.split('@'), a = A[aid];
+      return { initial: a.name[0], color: a.color, face: a.face, who: a.name, pid, context: T[a.team].name + ' on ' + P[pid].name, text: s.asks[k].q,
+        opts: [...s.asks[k].opts.map((o, i) => ({ label: o, onClick: () => this.respond(k, o), bg: i === 0 ? 'var(--acc)' : 'transparent', border: i === 0 ? 'var(--acc)' : 'var(--line2)', color: i === 0 ? 'var(--accInk)' : 'var(--tx)', weight: i === 0 ? 600 : 500 })), { label: 'Open session', onClick: () => this.openSession(k), bg: 'transparent', border: 'transparent', color: 'var(--tx3)', weight: 500 }] }; });
+    const prs = s.pipeline.filter(p => p.stage === 4 && p.tone !== 'merged' && D[p.dep]).map(p => { const a = A[p.author], d = D[p.dep];
+      return { initial: a.name[0], color: a.color, face: a.face, who: a.name, pid: d.project, pipeId: p.id, context: T[d.team].name + ' on ' + P[d.project].name, text: a.name + ' opened ' + p.card + ' to main. Checks pass.',
+        opts: [{ label: 'Review', onClick: go({ screen: 'project', projectId: d.project, projTab: 'changes' }), bg: 'var(--acc)', border: 'var(--acc)', color: 'var(--accInk)', weight: 600 }] }; });
+    const KINDS = { approval: ['Approval', 'var(--accTx)'], question: ['Question', 'var(--info)'], review: ['Review', 'var(--ok)'], blocked: ['Blocked', 'var(--err)'], finding: ['Finding', 'var(--acp)'] };
+    const BT = i => i === 0 ? { bg: 'var(--acc)', border: 'var(--acc)', color: 'var(--accInk)', weight: 600 } : i === 1 ? { bg: 'transparent', border: 'var(--line2)', color: 'var(--tx)', weight: 500 } : { bg: 'transparent', border: 'var(--line2)', color: 'var(--tx2)', weight: 500 };
+    ask.forEach(x => { x.kind = 'approval'; x.source = 'escalate(approval)'; });
+    prs.forEach(x => { x.kind = 'review'; x.source = 'open_pr()'; });
+    const extra = s.actions.map(x => { const [aid, pid] = x.k.split('@'), cos = aid === 'cos', a = cos ? { name: 'Chief of Staff', color: '#E8A33D', face: { skin: '#E2AE85', hair: 'bald', eyes: 'glasses', beard: 'none' } } : A[aid]; return { kind: x.kind, source: x.source || (x.kind === 'blocked' ? 'raised by Foreman' : 'escalate(' + x.kind + ')'), initial: a.name[0], color: a.color, face: a.face, who: a.name, pid, context: cos ? 'on ' + P[pid].name : T[a.team].name + ' on ' + P[pid].name, text: x.text, hasLink: !!x.link, linkLabel: x.link || '',
+      isQuestion: x.kind === 'question', onKey: e => { if (e.key === 'Enter' && e.target.value.trim()) { this.resolveAction(x.id, e.target.value.trim()); e.target.value = ''; } },
+      opts: [...x.opts.map((o, i) => ({ label: o, onClick: () => this.resolveAction(x.id, o), ...BT(i) })), cos ? { label: 'Open Chief of Staff', onClick: () => this.openCos(), ...BT(2) } : { label: 'Open session', onClick: () => this.openSession(x.k), ...BT(2) }] }; });
+    const inbox = [...extra.filter(x => x.kind === 'blocked'), ...ask, ...prs, ...extra.filter(x => x.kind !== 'blocked')].map(x => ({ ...x, kindLabel: KINDS[x.kind][0], kindColor: KINDS[x.kind][1] }));
+
+    const nav = [['home', 'Home', inbox.length], ['term', 'Sessions']].map(([id, label, badge]) => ({ label, badge, hasBadge: !!badge, bg: s.screen === id ? 'var(--raised)' : 'transparent', color: s.screen === id ? 'var(--tx)' : 'var(--tx2)', onClick: go({ screen: id }) }));
+    const projNeeds = pid => Object.keys(s.asks).some(k => k.endsWith('@' + pid)) || s.actions.some(a => a.k.endsWith('@' + pid)) || s.pipeline.some(p => D[p.dep] && D[p.dep].project === pid && p.stage === 4 && p.tone !== 'merged');
+    const railProjects = Object.values(P).map(p => { const on = s.screen === 'project' && s.projectId === p.id; return { name: p.name, needs: projNeeds(p.id), bg: on ? 'var(--raised)' : 'transparent', color: on ? 'var(--tx)' : 'var(--tx2)', open: go({ screen: 'project', projectId: p.id, projTab: 'overview', wikiPage: 'index.md', sheet: null }) }; });
+    const railTeams = Object.values(T).map(t => { const n = this.depsOfTeam(t.id).length; const on = (s.screen === 'team' && s.teamId === t.id) || (s.screen === 'agent' && A[s.agentId].team === t.id);
+      return { name: t.name, where: n ? (n === 1 ? this.depsOfTeam(t.id)[0].project : n + ' projects') : '—', bg: on ? 'var(--raised)' : 'transparent', color: on ? 'var(--tx)' : 'var(--tx2)', open: go({ screen: 'team', teamId: t.id, teamTab: 'deps' }) }; });
+
+    const projectRows = Object.values(P).map(p => { const ds = this.depsOnProject(p.id); const run = ds.reduce((n, d) => n + T[d.team].members.filter(m => st(m + '@' + p.id).status === 'running').length, 0);
+      return { name: p.name, open: go({ screen: 'project', projectId: p.id, projTab: 'overview', wikiPage: 'index.md', sheet: null }), line: ds.length ? ds.map(d => T[d.team].name).join(', ') + ' · ' + run + ' agents working' : 'No team deployed',
+        state: projNeeds(p.id) ? 'needs you' : ds.length ? 'on track' : 'idle', stateColor: projNeeds(p.id) ? 'var(--accTx)' : ds.length ? 'var(--ok)' : 'var(--tx4)' }; });
+
+    // project
+    const proj = P[s.projectId];
+    const pds = this.depsOnProject(s.projectId);
+    const projPipe = s.pipeline.filter(p => D[p.dep] && D[p.dep].project === s.projectId);
+    const readyCount = projPipe.filter(p => p.stage === 4 && p.tone !== 'merged').length;
+    const projTabs = [['overview', 'Overview'], ['changes', 'Changes', inbox.filter(n => n.pid === s.projectId).length], ['board', 'Board'], ['setup', 'Settings']].map(([id, label, badge]) => ({ label, badge, hasBadge: !!badge, color: s.projTab === id ? 'var(--tx)' : 'var(--tx3)', line: s.projTab === id ? 'var(--acc)' : 'transparent', onClick: go({ projTab: id, sheet: null }) }));
+    const W = this.wikiFor(s.projectId);
+    const ov = t => ({ ...t, ...(s.taskOv[s.projectId + ':' + t.path] || {}) });
+    const openEntry = path => () => { if (path === '#board') { this.setState({ projTab: 'board', sheet: null }); return; } this.setState(x => ({ wikiPage: path, projTab: 'overview', sheet: null, seen: { ...x.seen, [s.projectId + ':' + path]: true } })); const mm = document.querySelector('main'); if (mm) mm.scrollTop = 0; };
+    const page = W.entries[s.wikiPage] ? s.wikiPage : 'index.md';
+    const wikiTree = W.tree.map(n => { const on = n.path === page; const ch = n.path && W.entries[n.path] && W.entries[n.path].changed && !s.seen[s.projectId + ':' + n.path];
+      return { label: n.label, indent: (10 + n.d * 14) + 'px', weight: n.folder ? 500 : 400, color: on ? 'var(--tx)' : n.folder ? 'var(--tx2)' : 'var(--tx3)', bg: on ? 'var(--raised)' : 'transparent', cursor: n.path ? 'pointer' : 'default', changed: !!ch, open: n.path ? openEntry(n.path) : () => {} }; });
+    const fmOf = path => { const e = W.entries[path]; if (!e || !e.fm) return []; const t = W.tasks.find(x => x.path === path); const fm = t ? { ...e.fm, status: ov(t).status, priority: ov(t).priority } : e.fm; return Object.keys(fm).filter(k => fm[k]).map(k => ({ k, v: fm[k] })); };
+    const blocks = this.renderBlocks(s.projectId, page, W.entries[page], openEntry);
+    const fmRows = fmOf(page);
+    const headings = blocks.filter(b => b.isH2).map(b => ({ x: b.x, go: () => this.scrollToAnchor(b.anchor) }));
+    const bd = W.boards.find(b => b.id === s.boardId) || W.boards[0];
+    const boardTabs = W.boards.map(b => { const on = b.id === bd.id; return { label: b.name, bg: on ? 'var(--raised)' : 'transparent', border: on ? 'var(--line3)' : 'var(--line2)', color: on ? 'var(--tx)' : 'var(--tx3)', onClick: go({ boardId: b.id }) }; });
+    const COLS = [['todo', 'To do'], ['in-progress', 'In progress'], ['review', 'Review'], ['done', 'Done']];
+    const PRI = { high: 'var(--err)', medium: 'var(--accTx)', low: 'var(--tx4)' };
+    const tasks = W.tasks.map(ov).filter(t => !bd.kind || t.kind === bd.kind);
+    const lanesV = bd.lane ? ['high', 'medium', 'low'] : [''];
+    const card = t => { const a = A[t.assignee]; return { id: t.id, title: t.title, who: a ? a.name : t.assignee, color: a ? a.color : '#8E9AAF', face: a ? a.face : null, pri: t.priority, priColor: PRI[t.priority] || 'var(--tx4)',
+      drag: e => { this.drag = t.path; try { e.dataTransfer.setData('text/plain', t.path); e.dataTransfer.effectAllowed = 'move'; } catch (er) {} }, open: go({ sheet: t.path }) }; };
+    const boardCols = COLS.map(([k, l]) => ({ label: l, count: tasks.filter(t => t.status === k).length }));
+    const boardLanes = lanesV.map(lv => ({ label: lv ? lv.charAt(0).toUpperCase() + lv.slice(1) + ' priority' : '', hasLabel: !!lv,
+      cells: COLS.map(([k]) => ({ over: e => { e.preventDefault(); }, drop: e => { e.preventDefault(); this.moveCard(this.drag, k, lv); }, cards: tasks.filter(t => t.status === k && (!lv || t.priority === lv)).map(card) })) }));
+    const sh = s.sheet && W.entries[s.sheet] ? s.sheet : null;
+    const sheetBlocks = sh ? this.renderBlocks(s.projectId, sh, W.entries[sh], openEntry) : [];
+    const sessionGroups = pds.map(d => { const t = T[d.team]; const order = [t.lead, ...t.members.filter(m => m !== t.lead)];
+      return { teamName: t.name, goal: d.goal, openTerm: go({ screen: 'term', termDep: d.id, panes: [t.lead], activePane: 0 }),
+        rows: order.map(m => { const k = m + '@' + d.project, a = A[m], i = st(k), ls = s.lines[k] || []; return { name: a.name, roleLabel: a.role + (m === t.lead ? ' · talk here' : ''), face: a.face, color: a.color, dot: SM[i.status], task: i.task, last: ls.length ? ls[ls.length - 1].x : '', open: () => this.openSession(k) }; }) }; });
+
+    const toneC = { ok: 'var(--ok)', err: 'var(--err)', ask: 'var(--accTx)', merged: 'var(--ok)' };
+    const item = p => { const d = D[p.dep], k = p.author + '@' + d.project; return { ...p, teamName: T[d.team].name, authorName: A[p.author].name, noteColor: toneC[p.tone] || 'var(--tx3)',
+      canMerge: p.stage === 4 && p.tone !== 'merged', canSendBack: p.stage >= 2 && p.tone !== 'merged', sending: s.sendBack === p.id,
+      toggleSendBack: () => this.setState(x => ({ sendBack: x.sendBack === p.id ? null : p.id, sendNote: '' })),
+      merge: () => { this.setState(x => ({ pipeline: x.pipeline.map(q => q.id === p.id ? { ...q, tone: 'merged', note: 'Merged to main at ' + this.hhmm() } : q) })); this.push(k, [{ t: 'ok', x: '✓ CEO merged ' + p.card }]); },
+      sendBack: () => { const note = s.sendNote.trim() || 'Needs another pass.'; this.setState(x => ({ sendBack: null, sendNote: '', pipeline: x.pipeline.map(q => q.id === p.id ? { ...q, stage: 0, tone: 'ask', note: 'You sent it back: ' + note } : q) })); this.push(k, [{ t: 'ask', x: '⚠ CEO sent ' + p.branch + ' back: ' + note }]); this.setInst(k, { status: 'running', task: 'Reworking after your notes' }); },
+      openTerm: () => this.openSession(k) }; };
+    const forge = proj.forge || 'forgejo';
+    const FN = { forgejo: 'Forgejo', gitea: 'Gitea', github: 'GitHub', none: 'Local only' };
+    const forgeUrl = forge === 'github' ? 'github.com/acme/' + proj.repos[0] : 'localhost:3000/' + proj.id + '/' + proj.repos[0];
+    const projActions = inbox.filter(n => n.pid === s.projectId).map(n => { if (n.kind !== 'review' || !n.pipeId) return n; const p = s.pipeline.find(q => q.id === n.pipeId); const it = item(p);
+      return { ...n, text: n.who + ' wants to merge ' + p.card + ' into main.', hasLink: true, linkLabel: (forge === 'none' ? 'Local PR · ' : 'Open on ' + FN[forge] + ' ↗ · ') + p.branch + ' → main · checks pass', sending: it.sending, sendBack: it.sendBack, cancelSend: it.toggleSendBack,
+        opts: [{ label: 'Merge', onClick: it.merge, ...BT(0) }, { label: 'Send back', onClick: it.toggleSendBack, ...BT(1) }, { label: 'Open session', onClick: it.openTerm, ...BT(2) }] }; });
+    const STG = ['in worktree', 'handed to lead', 'lead reviewing', 'integrated'];
+    const inFlight = projPipe.filter(p => p.tone !== 'merged' && p.stage < 4).map(p => ({ ...item(p), color: A[p.author].color, face: A[p.author].face, stageLabel: STG[p.stage] }));
+    const merged = projPipe.filter(p => p.tone === 'merged');
+    const kindsInfo = [['approval', 'An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer.'], ['question', 'An agent needs information only you have. It keeps working on other things meanwhile.'], ['review', 'The lead calls open_pr(). Foreman pushes the lead branch, opens the PR and runs the checks.'], ['finding', 'A challenge team rates something high severity. You decide who fixes it, and when.'], ['blocked', 'Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes.']].map(([k, body]) => ({ label: KINDS[k][0], c: KINDS[k][1], body }));
+    const forgeOpts = [['forgejo', 'Forgejo'], ['gitea', 'Gitea'], ['none', 'Local only']].map(([k, label]) => ({ label, bg: forge === k ? 'var(--accSoft)' : 'transparent', border: forge === k ? 'var(--acc)' : 'var(--line2)', onClick: () => this.setState(x => ({ forge: { ...x.forge, [s.projectId]: k } })) }));
+    const forgeNote = forge === 'none' ? 'PRs live inside Foreman. Merging runs git merge on your machine.' : 'PRs open on ' + forgeUrl + '. Merging here merges there. The token lives in your workspace Settings, never in this file.';
+    const forgeY = forge === 'none' ? 'none' : forge + '\n  url: https://' + forgeUrl.replace(/\/[^/]+$/, '');
+
+    const folderTree = '~/agents-ws/\n├─ .foreman/\n│  ├─ teams/          team definitions (souls, playbooks)\n│  ├─ cos/            Chief of Staff session\n│  └─ state.db        deployments, sessions, requests (runtime)\n└─ ' + proj.name + '/\n   ├─ ' + proj.repos.join('/\n   ├─ ') + '/\n   ├─ wiki/          + wiki.toml (boards)\n   ├─ .sandboxes/     one clone per agent, per project\n   └─ .foreman/\n      └─ project.yaml  repos, checks, gates, forge';
+    const layers = [
+      { title: 'Team definition', body: 'Lives once in the workspace: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.' },
+      { title: 'Deployment', body: 'A team on this project with a goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, sandboxes and message channel. Agents in two deployments never mix.' },
+      { title: 'Session prompt', body: 'Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt.' },
+      { title: 'Enforced by Foreman', body: 'Routes ask, reply, handoff and escalate between sessions. Tracks handoffs (that’s Changes), wakes requesters when replies land, sends escalations to Home, and only lets the lead push.' }
+    ];
+    const pyaml = 'project: ' + proj.id + '\nrepos: [' + proj.repos.join(', ') + ']\nwiki: ./wiki\nmain: main\n\nchecks: ' + proj.checks + '\nmerge_to_main: ceo\nforge:\n  kind: ' + forgeY + '\n\nalways_ask_ceo:\n' + proj.gates.map(g => '  - ' + g).join('\n');
+
+    // teams
+    const teamRows = Object.values(T).map(t => { const ds = this.depsOfTeam(t.id); return { name: t.name, kindLabel: kindLabel(t.kind), size: t.members.length + ' agents', avatars: t.members.map(m => ({ i: A[m].name[0], c: A[m].color, face: A[m].face, title: A[m].name + ' · ' + A[m].role })), where: ds.length ? 'Deployed on ' + ds.map(d => d.project).join(', ') : 'Not deployed', open: go({ screen: 'team', teamId: t.id, teamTab: 'deps' }) }; });
+    const tRaw = T[s.teamId];
+    const tds = this.depsOfTeam(tRaw.id);
+    const team = { name: tRaw.name, kindLabel: kindLabel(tRaw.kind), where: tds.length ? 'Deployed on ' + tds.length + (tds.length === 1 ? ' project' : ' projects') : 'Not deployed',
+      deploy: () => this.openDeploy(tRaw.id, null), hire: () => this.openCos('hire', { team: tRaw.id }),
+      deps: tds.map(d => { const run = tRaw.members.filter(m => st(m + '@' + d.project).status === 'running').length; const wait = tRaw.members.filter(m => s.asks[m + '@' + d.project]).length;
+        return { projectName: P[d.project].name, goal: d.goal, summary: run + ' working' + (wait ? ' · ' + wait + ' waiting on you' : ''), openProject: go({ screen: 'project', projectId: d.project, projTab: 'overview', wikiPage: 'index.md', sheet: null }), openTerm: go({ screen: 'term', termDep: d.id, panes: [tRaw.lead], activePane: 0 }), stop: () => this.stopDep(d.id) }; }),
+      noDeps: !tds.length,
+      memberList: tRaw.members.map(m => ({ ...A[m], initial: A[m].name[0], harnessLabel: hl(A[m]), open: go({ screen: 'agent', agentId: m, promptProj: null }), instances: tds.map(d => ({ project: d.project, dot: SM[st(m + '@' + d.project).status] })) })),
+      workflow: tRaw.workflow.map((w, i) => ({ n: i + 1, who: roleName(tRaw, w[0]), does: w[1] })),
+      escalation: tRaw.escalation.map(e => ({ when: e[0], to: roleName(tRaw, e[1]), c: e[1] === 'ceo' ? 'var(--accTx)' : 'var(--tx2)' })),
+      yamlPath: '~/agents-ws/.foreman/teams/' + tRaw.id + '.yaml', yaml: this.toYaml(tRaw) };
+    const teamTabs = [['deps', 'Deployments'], ['members', 'Members'], ['playbook', 'Playbook'], ['file', 'File']].map(([id, label]) => ({ label, color: s.teamTab === id ? 'var(--tx)' : 'var(--tx3)', line: s.teamTab === id ? 'var(--acc)' : 'transparent', onClick: go({ teamTab: id }) }));
+
+    // agent
+    const aid = s.agentId, ar = A[aid];
+    const ads = this.depsOfTeam(ar.team);
+    const pp = ads.find(d => d.project === s.promptProj) ? s.promptProj : (ads[0] ? ads[0].project : 'ledger');
+    const agent = { ...ar, initial: ar.name[0], teamName: T[ar.team].name, openTeam: go({ screen: 'team', teamId: ar.team, teamTab: 'members' }), isCustom: ar.harness === 'custom',
+      instances: ads.map(d => { const k = aid + '@' + d.project; return { project: d.project, dot: SM[st(k).status], task: st(k).task, openTerm: () => this.openSession(k) }; }), noInstances: !ads.length,
+      savedLabel: s.savedAt[aid] ? '✓ Saved. Applies on every project.' : '',
+      harnessOpts: Object.keys(this.HN).map(h => ({ label: this.HN[h], bg: ar.harness === h ? 'var(--accSoft)' : 'transparent', border: ar.harness === h ? 'var(--acc)' : 'var(--line2)', onClick: () => this.editAgent(aid, { harness: h }) })),
+      setCmd: e => this.editAgent(aid, { cmd: e.target.value }), setPersonality: e => this.editAgent(aid, { personality: e.target.value }), setInstructions: e => this.editAgent(aid, { instructions: e.target.value }),
+      skillList: ar.skills.map(k => ({ label: k, remove: () => this.editAgent(aid, { skills: A[aid].skills.filter(x => x !== k) }) })),
+      addSkill: e => { const v = e.target.value.trim(); if (e.key === 'Enter' && v) { this.editAgent(aid, { skills: [...A[aid].skills, v] }); e.target.value = ''; } },
+      reinterview: () => this.openCos('refine', { agent: aid }),
+      swatchRows: [['Background', 'color', this.PAL, true], ['Skin', 'skin', this.SKIN], ['Hair color', 'hairColor', this.HC]].map(([label, key, list, top]) => ({ label, opts: list.map(c => { const cur = top ? ar.color : (ar.face || {})[key]; return { c, ring: cur === c ? 'var(--tx)' : 'transparent', onClick: () => this.editAgent(aid, top ? { color: c } : { face: { ...A[aid].face, [key]: c } }) }; }) })),
+      traitRows: [['Hair', 'hair', this.HAIR], ['Eyes', 'eyes', this.EYES], ['Beard', 'beard', this.BEARD]].map(([label, key, list]) => ({ label, opts: list.map(v => { const on = (ar.face || {})[key] === v; return { label: v, bg: on ? 'var(--accSoft)' : 'transparent', border: on ? 'var(--acc)' : 'var(--line2)', onClick: () => this.editAgent(aid, { face: { ...A[aid].face, [key]: v } }) }; }) })),
+      shuffle: () => this.editAgent(aid, { face: this.randFace(), color: this.PAL[Math.floor(Math.random() * 8)] }),
+      hasPromptTabs: ads.length > 1, promptTabs: ads.map(d => ({ label: 'on ' + d.project, bg: pp === d.project ? 'var(--accSoft)' : 'transparent', border: pp === d.project ? 'var(--acc)' : 'var(--line2)', onClick: go({ promptProj: d.project }) })),
+      prompt: this.composePrompt(aid, pp) };
+
+    // sessions
+    const allDeps = Object.values(D);
+    const td = D[s.termDep] || allDeps[0];
+    const termDeps = allDeps.map(d => { const on = td && d.id === td.id; const wait = T[d.team].members.some(m => s.asks[m + '@' + d.project]); return { label: T[d.team].name + ' · ' + d.project + (wait ? ' •' : ''), bg: on ? 'var(--raised)' : 'transparent', border: on ? 'var(--line3)' : 'var(--line2)', color: on ? 'var(--tx)' : 'var(--tx3)', onClick: go({ termDep: d.id, panes: [T[d.team].lead], activePane: 0 }) }; });
+    const tt = td ? T[td.team] : null;
+    const paneIds = tt ? s.panes.filter(m => tt.members.includes(m)) : [];
+    if (tt && !paneIds.length) paneIds.push(tt.lead);
+    const agentTabs = tt ? [tt.lead, ...tt.members.filter(x => x !== tt.lead)].map((m, mi) => { const shown = paneIds.includes(m), act = paneIds[s.activePane] === m; return { name: A[m].name, i: A[m].name[0], c: A[m].color, face: A[m].face, isLead: m === tt.lead, sep: mi === 1, dot: SM[st(m + '@' + td.project).status], line: act ? 'var(--acc)' : shown ? 'var(--line3)' : 'transparent', color: shown ? 'var(--tx)' : 'var(--tx3)', onClick: () => this.openSession(m + '@' + td.project) }; }) : [];
+    const panes = paneIds.map((m, i) => { const k = m + '@' + td.project, a = A[m], ist = st(k); return { name: a.name, initial: a.name[0], color: a.color, face: a.face, direct: m !== tt.lead, leadName: A[tt.lead].name, harnessLabel: hl(a), projectName: td.project, dot: SM[ist.status], lines: lines(s.lines[k] || []), activeLine: i === s.activePane && paneIds.length > 1 ? 'var(--acc)' : 'transparent',
+      placeholder: ist.status === 'awaiting' ? 'Reply to ' + a.name + '…' : m === tt.lead ? 'Tell ' + a.name + ' what you need. They’ll delegate.' : 'Direct instruction to ' + a.name + '…', closable: paneIds.length > 1, copyLabel: s.copied === k ? 'Copied' : 'Copy',
+      activate: () => { if (s.activePane !== i) this.setState({ activePane: i }); },
+      close: e => { e.stopPropagation(); this.setState(x => ({ panes: x.panes.filter(p => p !== m), activePane: 0 })); },
+      copy: () => { try { navigator.clipboard.writeText((s.lines[k] || []).map(l => l.x).join('\n')); } catch (e) {} this.setState({ copied: k }); setTimeout(() => this.setState({ copied: null }), 1400); },
+      openAgent: go({ screen: 'agent', agentId: m, promptProj: td.project }),
+      onKey: e => { if (e.key === 'Enter') { this.handleInput(k, e.target.value); e.target.value = ''; } } }; });
+    const acpList = td ? s.acp.filter(m => m.dep === td.id).slice().reverse().map(m => ({ ...m, fromName: A[m.from].name, toName: A[m.to].name, open: () => this.openSession(m.from + '@' + td.project) })) : [];
+
+    // cos
+    const last = s.cos.msgs.length - 1;
+    const cosMsgs = s.cos.msgs.map((m, i) => ({ text: m.text, align: m.from === 'me' ? 'flex-end' : 'flex-start', bg: m.from === 'me' ? 'var(--accSoft)' : 'var(--raised)', border: m.from === 'me' ? 'var(--accLine)' : 'transparent',
+      hasCard: !!m.card, card: m.card || { title: '', rows: [] }, hasChips: i === last && m.chips && m.chips.length > 0, chipList: (m.chips || []).map(c => ({ label: c, onClick: () => this.cosAnswer(c) })) }));
+
+    // deploy modal
+    const x = s.deploy;
+    const dep = x ? { teamName: x.team ? T[x.team].name : 'a team', pickTeam: x.pickTeam, goal: x.goal,
+      teamOpts: Object.values(T).map(t => ({ label: t.name, bg: x.team === t.id ? 'var(--accSoft)' : 'transparent', border: x.team === t.id ? 'var(--acc)' : 'var(--line2)', onClick: () => this.setState(y => ({ deploy: { ...y.deploy, team: t.id } })) })),
+      projOpts: Object.values(P).map(p => { const exists = x.team && D[x.team + '@' + p.id]; return { label: p.name + (exists ? ' (already there)' : ''), bg: x.project === p.id ? 'var(--accSoft)' : 'transparent', border: x.project === p.id ? 'var(--acc)' : 'var(--line2)', color: exists ? 'var(--tx4)' : 'var(--tx)', onClick: () => { if (!exists) this.setState(y => ({ deploy: { ...y.deploy, project: p.id } })); } }; }),
+      ready: x.team && x.project && x.goal.trim() && !D[x.team + '@' + x.project] ? 1 : 0.45 } : { teamOpts: [], projOpts: [] };
+
+    const notifMap = { granted: ['on', 'var(--ok)'], denied: ['blocked', 'var(--err)'], default: ['turn on', 'var(--accTx)'], unsupported: ['n/a', 'var(--tx4)'] };
+
+    return {
+      nav, railProjects, railTeams,
+      projSecOpen: s.secs.proj, projChevron: s.secs.proj ? '▾' : '▸', toggleProjSec: () => this.setState(x => ({ secs: { ...x.secs, proj: !x.secs.proj } })), projSecNeeds: !s.secs.proj && railProjects.some(p => p.needs),
+      teamSecOpen: s.secs.teams, teamChevron: s.secs.teams ? '▾' : '▸', toggleTeamSec: () => this.setState(x => ({ secs: { ...x.secs, teams: !x.secs.teams } })),
+      projNeedsList: inbox.filter(n => n.pid === s.projectId), hasProjNeeds: inbox.some(n => n.pid === s.projectId), needsMax: s.treeOpen ? '992px' : '760px',
+      newProject: () => this.setState({ adopt: { pick: null } }),
+      adoptOpen: !!s.adopt, closeAdopt: () => this.setState({ adopt: null }),
+      adoptList: this.candidates.filter(c => !P[c.id]).map(c => { const on = s.adopt && s.adopt.pick === c.id; return { id: c.id, detail: (c.repos.length ? c.repos.length + (c.repos.length === 1 ? ' git repo: ' : ' git repos: ') + c.repos.join(', ') : 'No git repos yet') + ' · ' + (c.wiki ? 'has a wiki' : 'no wiki yet'), border: on ? 'var(--acc)' : 'var(--line)', bg: on ? 'var(--accSoft)' : 'transparent', pick: () => this.setState({ adopt: { pick: c.id } }) }; }),
+      adoptEmpty: !this.candidates.some(c => !P[c.id]),
+      adoptNoteShow: !!(s.adopt && s.adopt.pick), adoptNote: (() => { const c = s.adopt && this.candidates.find(x => x.id === s.adopt.pick); return c ? 'Adds ' + c.id + '/.foreman/project.yaml' + (c.wiki ? '.' : ' and an empty wiki/ with an index.md.') + (c.repos.length ? '' : ' Agents need at least one repo to work on.') : ''; })(),
+      adoptReady: s.adopt && s.adopt.pick ? 1 : 0.45,
+      doAdopt: () => { const c = s.adopt && this.candidates.find(x => x.id === s.adopt.pick); if (!c) return; this.projects[c.id] = { id: c.id, name: c.id, path: '~/agents-ws/' + c.id, desc: c.desc, repos: c.repos, checks: 'npm test', gates: ['new dependency'] }; this.setState({ adopt: null, screen: 'project', projectId: c.id, projTab: 'overview', wikiPage: 'index.md', sheet: null }); this.notify(null, c.id + ' added', 'Wrote .foreman/project.yaml. Deploy a team from Sessions.', 'var(--ok)'); },
+      isSettings: s.screen === 'settings', openSettings: go({ screen: 'settings' }), settingsBg: s.screen === 'settings' ? 'var(--raised)' : 'transparent', settingsColor: s.screen === 'settings' ? 'var(--tx)' : 'var(--tx3)',
+      set: (() => { const st2 = s.settings, up = p => this.setState(x => ({ settings: { ...x.settings, ...p } }));
+        const VER = { 'claude-code': 'found · 2.1.4', codex: 'found · 0.48.0', pi: 'found · 0.9.2', hermes: 'found · 1.3.0', custom: 'per agent' };
+        return { localBg: st2.listen === 'local' ? 'var(--raised)' : 'transparent', lanBg: st2.listen === 'lan' ? 'var(--raised)' : 'transparent', setLocal: () => up({ listen: 'local' }), setLan: () => up({ listen: 'lan' }),
+          max: st2.max, dec: () => up({ max: Math.max(1, st2.max - 1) }), inc: () => up({ max: Math.min(64, st2.max + 1) }),
+          harnesses: Object.keys(this.HN).filter(k => k !== 'custom').map(k => ({ label: this.HN[k], cmd: st2.cmds[k], status: st2.cmds[k] ? VER[k] : 'not set', statusColor: st2.cmds[k] ? 'var(--ok)' : 'var(--err)', setCmd: e => { const v = e.target.value; this.setState(x => ({ settings: { ...x.settings, cmds: { ...x.settings.cmds, [k]: v } } })); } })),
+          notifyRows: [['ask', 'An agent needs me'], ['done', 'An agent finishes'], ['pr', 'A PR is ready to merge']].map(([k, label]) => ({ label, track: st2.notify[k] ? 'var(--acc)' : 'var(--line3)', knob: st2.notify[k] ? '16px' : '2px', toggle: () => this.setState(x => ({ settings: { ...x.settings, notify: { ...x.settings.notify, [k]: !x.settings.notify[k] } } })) })),
+          darkBg: s.theme === 'dark' ? 'var(--raised)' : 'transparent', lightBg: s.theme === 'light' ? 'var(--raised)' : 'transparent',
+          setDark: () => { document.documentElement.dataset.theme = 'dark'; try { localStorage.setItem('foreman-theme', 'dark'); } catch (e) {} this.setState({ theme: 'dark' }); },
+          setLight: () => { document.documentElement.dataset.theme = 'light'; try { localStorage.setItem('foreman-theme', 'light'); } catch (e) {} this.setState({ theme: 'light' }); } }; })(),
+      readerCols: s.treeOpen ? 'minmax(150px,200px) minmax(0,760px)' : 'minmax(0,760px)', treeOpen: s.treeOpen, toggleTree: () => this.setState(x => ({ treeOpen: !x.treeOpen })),
+      treeLabel: s.treeOpen ? 'Hide files' : 'Files', treeBg: s.treeOpen ? 'var(--raised)' : 'transparent', treeChanged: !s.treeOpen && wikiTree.some(w => w.changed),
+      openCos: () => this.openCos(), closeCos: () => this.cosSet({ open: false }), cosOpen: s.cos.open, cosMsgs,
+      cosKey: e => { if (e.key === 'Enter' && e.target.value.trim()) { this.cosAnswer(e.target.value.trim()); e.target.value = ''; } },
+      notifLabel: notifMap[s.notif][0], notifColor: notifMap[s.notif][1],
+      toggleNotif: () => { if (typeof Notification === 'undefined') return; Notification.requestPermission().then(p => { this.setState({ notif: p }); if (p === 'granted') this.notify(null, 'Notifications on', 'You’ll hear from agents when they finish or need you.', 'var(--ok)'); }); },
+      themeLabel: s.theme, toggleTheme: () => { const t = s.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; try { localStorage.setItem('foreman-theme', t); } catch (e) {} this.setState({ theme: t }); },
+      isHome: s.screen === 'home', isProject: s.screen === 'project', isTeams: s.screen === 'teams', isTeam: s.screen === 'team', isAgent: s.screen === 'agent', isTerm: s.screen === 'term',
+      homeTitle: inbox.length ? inbox.length + (inbox.length === 1 ? ' thing needs you' : ' things need you') : 'All clear',
+      homeSub: running + ' sessions working across ' + allDeps.length + ' deployments.',
+      inbox, noInbox: !inbox.length, projectRows,
+      proj, projTabs, tabOverview: s.projTab === 'overview', tabChanges: s.projTab === 'changes', tabBoard: s.projTab === 'board', tabSessions: s.projTab === 'sessions', tabSetup: s.projTab === 'setup',
+      wikiTree, blocks, fmRows, hasFm: fmRows.length > 0, headings, hasHeadings: headings.length > 0, entryPath: proj.name + '/wiki/' + page,
+      boardTabs, boardCols, boardLanes, wikiToml: W.toml, showToml: !!s.showToml, tomlLabel: s.showToml ? 'Hide wiki.toml' : 'wiki.toml', toggleToml: () => this.setState(x => ({ showToml: !x.showToml })),
+      sheetOpen: !!sh, sheetPath: sh ? proj.name + '/wiki/' + sh : '', sheetBlocks, sheetFm: sh ? fmOf(sh) : [], closeSheet: go({ sheet: null }), sheetToReader: sh ? openEntry(sh) : () => {},
+      sessionGroups, noProjDeps: !pds.length, deployToProject: () => this.openDeploy(null, s.projectId),
+      projActions, noProjActions: !projActions.length, inFlight, noInFlight: !inFlight.length, merged, hasMerged: merged.length > 0, kindsInfo, forgeLabel: FN[forge], forgeNote, editConfig: () => this.openCos('config', { pid: s.projectId }), sendNote: s.sendNote, setSendNote: e => this.setState({ sendNote: e.target.value }),
+      folderTree, layers, projectYaml: pyaml,
+      teamRows, newTeam: () => this.openCos('team'),
+      team, teamTabs, teamDeps: s.teamTab === 'deps', teamMembers: s.teamTab === 'members', teamPlaybook: s.teamTab === 'playbook', teamFile: s.teamTab === 'file',
+      agent,
+      termDeps, agentTabs, panes, noPanes: !panes.length, paneCols: panes.length > 1 ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr)', termDepLabel: td ? T[td.team].name + ' on ' + td.project : '',
+      splitLabel: paneIds.length > 1 ? 'Single' : 'Split', splitBg: paneIds.length > 1 ? 'var(--raised)' : 'transparent',
+      toggleSplit: () => { if (!tt) return; if (paneIds.length > 1) this.setState({ panes: [paneIds[s.activePane] || paneIds[0]], activePane: 0 }); else this.setState({ termDep: td.id, panes: [paneIds[0], tt.members.find(m => m !== paneIds[0])], activePane: 1 }); },
+      drawer: s.drawer, drawerBg: s.drawer ? 'var(--raised)' : 'transparent', toggleDrawer: () => this.setState(y => ({ drawer: !y.drawer })), acpList,
+      deployOpen: !!x, dep, closeDeploy: go({ deploy: null }), stop: e => e.stopPropagation(),
+      setDeployGoal: e => { const v = e.target.value; this.setState(y => ({ deploy: { ...y.deploy, goal: v } })); }, doDeploy: () => this.doDeploy(),
+      toasts: s.toasts.map(t => ({ ...t, open: () => { if (t.k) this.openSession(t.k); this.setState(y => ({ toasts: y.toasts.filter(z => z.id !== t.id) })); } }))
+    };
+  }
+}
+</script>
+</body>
+</html>

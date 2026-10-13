@@ -1,6 +1,6 @@
 # Backlog
 
-**Goal (design phase):** finish the full design of Foreman (product definition, architecture and stack) and resolve every open decision before writing any code. The phase ends when no `decision` card is open and the spikes have confirmed the risky parts of the design.
+**Goal:** the design phase is complete: every product and architecture decision is in `product/`, except three runtime facts. Next is the [walking skeleton](./walking-skeleton.md), the first code, which settles those facts and is the base everything else builds on.
 
 Cards live in this folder (one `type: task` file each); retired ones in `archive/`. This page doesn't list them; query them:
 

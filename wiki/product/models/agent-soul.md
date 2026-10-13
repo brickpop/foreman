@@ -12,11 +12,11 @@ One member of a [team definition](./team-definition.md): who the agent is (name,
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| (key) | String | yes | | slug, unique within the team | Agent id (see [Team definition](./team-definition.md#open-questions) on collisions) |
+| (key) | String | yes | | slug, unique across the workspace | Agent id: the slug of the display name ([Team definition](./team-definition.md#schema)) |
 | `name` | String | yes | | unique across the workspace | Display name, used in @-mentions, tabs, prompts |
-| `role` | String | yes | | enum: `team_lead`, `architect`, `engineer`, `qa`, `scrum_master`, `reviewer`, or a custom role | Labels: Team Lead, Architect, Engineer, QA / Tester, Scrum Master, Reviewer |
+| `role` | String | yes | | `team_lead`, `architect`, `engineer`, `qa`, `scrum_master`, `reviewer`, or a custom role in snake_case (e.g. `security_auditor`) | Labels: Team Lead, Architect, Engineer, QA / Tester, Scrum Master, Reviewer; a custom role is shown with underscores as spaces, capitalised ("Security auditor"). Snake_case so a playbook can name it as a `who` ([Team definition](./team-definition.md#playbook-and-escalation)). A custom role never grants wiki write access (only `scrum_master`, or the lead when the team has none) |
 | `harness` | String | yes | | enum: `claude-code`, `codex`, `pi`, `hermes`, `custom` | Labels: Claude Code, Codex CLI, Pi, Hermes Agent, Custom ([Harness adapters](../architecture/harness-adapters.md)) |
-| `command` | String | when `harness: custom` | `""` | | The custom command line (e.g. `./bin/loadbot --acp`) |
+| `command` | String | when `harness: custom` | `""` | | The custom command line (e.g. `./bin/loadbot`) |
 | `personality` | String | | | | One or a few lines |
 | `skills` | Array of String | | `[]` | no duplicates | Shown as chips |
 | `instruction` | String (multi-line) | | the role's default | | The job description |
@@ -48,7 +48,6 @@ Used when a role is hired without a custom `instruction` (the CoS appends `Focus
 - The soul is the same in every deployment; only the composed [session prompt](../architecture/session-prompt.md) differs per project.
 - A soul edit reaches each running instance as a context-update message on its next turn, and a full re-prompt at its next restart.
 
-## Open questions
+## Harness override
 
-1. **Custom roles.** The PRD lists "custom" members but no field shape for a custom role (free text? does it get wiki write access?). Recommendation: free-text `role`; only `scrum_master` (or the lead fallback) gets wiki write access.
-2. **Switching harness from a blocked request.** "Switch to Claude Code" on a [blocked request](../features/requests.md): does it edit the soul (all deployments) or override that one instance? Recommendation: an instance-level override recorded on the [instance](./instance.md), lasting until the instance is restarted from the team file, with an option to persist it to the soul; the CEO edits the soul on the [Agent page](../features/agent-page.md) for a permanent change.
+"Switch harness" on a blocked [request](../features/requests.md) changes **that instance only**: the new harness is recorded as an override on the [instance](./instance.md) and lasts until the instance is next restarted from the team file. The request panel offers to also save it to the soul (all deployments). A permanent change is made here, through the [Agent page](../features/agent-page.md).

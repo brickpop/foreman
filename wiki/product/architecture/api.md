@@ -6,7 +6,7 @@ tags: [architecture, api, ui, security]
 
 # API
 
-The HTTP surface the SPA uses: JSON over HTTP, server-sent events for push, and one WebSocket per terminal. Served by the same binary as the UI ([Overview](./overview.md)). Agents don't use this API: they use the [ACP](./acp.md) tools on the separate ACP listener.
+The HTTP surface the SPA uses: JSON over HTTP, server-sent events for push, and one WebSocket per terminal. Served by the same binary as the UI ([Overview](./overview.md)). Agents don't use this API: they use the [Team tools](./team-tools.md) tools on the separate team-tools listener.
 
 All endpoints are local-only unless the listen setting changes. Every request passes the checks in [Security](./security.md#http-hardening) (Host allowlist, Origin check, access token).
 
@@ -18,7 +18,7 @@ The PRD's surface (indicative; names may still change during implementation, thi
 GET    /api/workspace                         projects, teams, settings summary
 GET    /api/projects/:id                      config (parsed), repos, deployments
 POST   /api/projects                          {folder} → write project.yaml (adopt)
-GET    /api/projects/:id/candidates           folders without project.yaml (for Add)
+GET    /api/candidates                        folders without project.yaml (for Add)
 
 GET    /api/teams | /api/teams/:id            definitions
 PUT    /api/teams/:id/agents/:agent           update soul (writes team file)
@@ -34,13 +34,13 @@ POST   /api/instances/:id/restart
 
 GET    /api/requests?project=&status=open
 POST   /api/requests/:id/resolve              {answer}
-GET    /api/acp?deployment=                   message log
-GET    /api/pipeline?project=
-POST   /api/pipeline/:id/merge
-POST   /api/pipeline/:id/send-back            {notes}
+GET    /api/messages?deployment=              message log
+GET    /api/pipeline?project=                 work items and pull requests (open, and merged in the last 7 days)
+POST   /api/pull-requests/:id/send-back       {notes}: close the PR, work items back to stage 0
+POST   /api/pull-requests/:id/discard         Chief of Staff config change: close the PR, delete the branch
 
 GET    /api/wiki/:project/tree | /entry/:path | /board/:id
-PUT    /api/wiki/:project/checkbox/:path      {index, version}
+PUT    /api/wiki/:project/checkbox/:path      {line, version}
 PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
 
 GET    /api/settings | PUT /api/settings
@@ -48,7 +48,7 @@ PUT    /api/secrets/forge/:kind               write-only token
 GET    /api/events                            SSE: requests, status, file changes
 ```
 
-Resource ids: project = folder name; team = team id; instance = `agent@project` (see the id-collision question in [Team definition](../models/team-definition.md#open-questions)); deployment = `team@project`.
+Resource ids: project = folder name; team = team id; instance = `agent@project` (agent ids are workspace-unique, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
 ## Error format
 
@@ -74,7 +74,7 @@ Every file-backed object the UI can change (wiki entry, team definition, setting
 - matching version → write, respond with the new version;
 - different version → `409 VERSION_CONFLICT` with the current version; the UI shows an error and reloads the object. Never last-writer-wins.
 
-Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field frontmatter rewrite, single-character checkbox flip). The checkbox body field `index` identifies the checkbox; the engine keys checkboxes by line, so the API should send the line (see open questions).
+Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field frontmatter rewrite, single-character checkbox flip). A checkbox is identified by its source line, the way the engine keys checkboxes, and the version guard makes that safe: if the entry changed since the UI read it, the line may have moved, and the write is refused with `409`. (The PRD sent an `index`; candidates are listed at `/api/candidates`, not under a project id, since they aren't projects yet.)
 
 ## Events
 
@@ -86,8 +86,8 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `instance.status` | an instance changes status or task | id, status, task |
 | `instance.line` | throttled "last output line" updates (for Settings rows) | id, line |
 | `deployment.created` / `deployment.stopped` | | deployment |
-| `acp.message` | a message is routed | the message |
-| `pipeline.changed` | an item changes stage, checks or merge state | the item |
+| `team.message` | a message is routed | the message |
+| `pipeline.changed` | a work item changes stage or checks, or a pull request is created, changes checks or state | the work item or pull request |
 | `wiki.changed` | files in a project wiki changed | project, paths, versions |
 | `config.changed` | `project.yaml`, a team file or settings changed (incl. parse errors) | which object, version, error? |
 | `workspace.changed` | projects or repos appeared or disappeared | — |
@@ -103,11 +103,4 @@ The notifier also derives browser notifications and toasts from these events on 
 - Several clients may attach to one instance (two tabs, split panes); all receive output, any may type. The PTY size follows the most recent resize.
 - The upgrade request passes the same Origin and token checks as the HTTP API: browsers do not apply the same-origin policy to WebSockets.
 
-`POST /api/instances/:id/input` is the line-input alternative (mobile or paste): the text plus a newline is written to the PTY, and the CEO's direct-instruction side effects ([Session prompt](./session-prompt.md#talking-to-the-ceo)) apply to both paths.
-
-## Open questions
-
-1. **Candidates endpoint.** `GET /api/projects/:id/candidates` is keyed by a project id, but candidates are folders that are *not* projects. Recommendation: `GET /api/candidates`.
-2. **Checkbox identity.** The PRD sends `{index}`; the wiki engine keys checkboxes by line number. Recommendation: send `{line, version}`, which the version guard makes safe.
-
-Owned elsewhere: whether a lane drag rewrites two fields ([Board](../features/board.md#open-questions)), direct-instruction detection in keystroke mode ([Sessions](../features/sessions.md#open-questions)), and the Chief of Staff transport ([Chief of Staff](../features/chief-of-staff.md#open-questions)).
+`POST /api/instances/:id/input` is the line-input alternative (mobile or paste): the text plus Enter is written to the PTY as the same raw bytes typing would produce. Foreman attaches no side effects to either path ([Sessions](../features/sessions.md#talking-to-the-team)).

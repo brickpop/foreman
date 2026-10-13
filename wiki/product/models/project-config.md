@@ -35,21 +35,19 @@ always_ask_ceo:                   # gates: these always raise an approval reques
 | `description` | String | | | one line | Shown in the project header |
 | `repos` | Array of String | | every git repo found in the folder | each a subfolder name of the project | The repos agents get clones of |
 | `wiki` | String (path) | | `./wiki` | relative to the project folder | The [wiki bundle](../architecture/wiki-engine.md) |
-| `main` | String | | `main` | branch name | Protected branch. Nobody pushes it; it changes only by CEO merge |
+| `main` | String | | `main` | branch name | Protected branch. Nobody pushes it; it changes only by the CEO's merge, on the forge or with git |
 | `checks` | String | | | shell command | Run in a sandbox before handoff and on PR ([Pipeline and pull requests](../features/pipeline-and-prs.md)) |
-| `merge_to_main` | String | | `ceo` | enum: `ceo` | v1: always `ceo` |
-| `forge.kind` | String | yes | | enum: `github`, `forgejo`, `gitea`, `none` | `none` = local-only PRs inside Foreman ([Forge adapters](../architecture/forge-adapters.md)) |
+| `merge_to_main` | String | | `ceo` | enum: `ceo` | v1: always `ceo`, who merges on the forge (or with git without one); Foreman never merges |
+| `forge.kind` | String | | `none` | enum: `github`, `forgejo`, `gitea`, `none` | `none` = no forge: the lead branch is published into the project repo for the CEO to review and merge with git ([Forge adapters](../architecture/forge-adapters.md)). A missing `forge` key means `none`; adoption writes it explicitly |
 | `forge.url` | String (URL) | when `kind` ≠ `none` | | | Org/owner base URL; the repo name on the forge = repo folder name |
 | `always_ask_ceo` | Array of String | | `[]` | | Gates. Hitting one makes the agent raise an approval [request](../features/requests.md). Listed in each [session prompt](../architecture/session-prompt.md) |
 
 ## Invariants
 
-- The project folder name and `project` are the same slug. **Not yet decided**: see open questions.
+- The project folder name is the project id. `project` must equal it; a mismatch is a validation error.
 - Foreman never writes this file outside the [Add a project](../features/add-project.md) adoption (initial write) and Chief of Staff edits on a branch.
 - No secret ever appears in this file. The forge token lives in [Secrets](./secrets.md).
 
-## Open questions
+## Invalid config
 
-1. **Missing `forge`.** The prototype renders an adopted project without `forge` as Forgejo. Options: adoption writes `forge: {kind: none}` explicitly and a missing `forge` is a validation error shown in [Project settings](../features/project-settings.md); or a missing `forge` is treated as `none` ("Local only"). Recommendations differ: validation error (from this entry) vs treat as `none` (from Project settings); both agree that adoption writes `kind: none`.
-2. **Folder name vs `project`.** If they differ, which is the id? Recommendation: the folder name is the id; `project` must equal it, else a validation error.
-3. **Invalid config.** How does the UI surface a `project.yaml` that fails to parse or validate? Recommendation: the project still appears, with an error banner on the project naming the field; new deployments and other features that need the invalid value are refused; running deployments keep running.
+A `project.yaml` that fails to parse or validate doesn't hide the project: it still appears, with an error banner on the project naming the file and the field. Foreman keeps the last good version in memory ([Persistence](../architecture/persistence.md#file-watching)); new deployments, and anything else that needs the invalid value, are refused; running deployments keep running.

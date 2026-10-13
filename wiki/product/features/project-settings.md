@@ -14,7 +14,7 @@ Padding `24px 40px 64px`.
 
 - Title "Teams on this project" followed by `· runtime state, not config` (400 12.5px `--tx4`). Subline: `Talk to a lead and they'll delegate. Open anyone else for a direct instruction.` Right: an outline **`Deploy a team`** button, opening [Deploy a team](./deploy-team.md) with this project preset.
 - Per [deployment](../models/deployment.md): the team name (600 16px), the goal (13.5px `--tx3`), and a raised **`Open sessions`** button ([Sessions](./sessions.md) on this deployment, lead pane).
-- A card of member rows (grid `auto 150px 1fr auto`, padding `12px 16px`), lead first:
+- A panel of member rows (grid `auto 150px 1fr auto`, padding `12px 16px`), lead first:
   - Avatar 32 with status dot (`dotBorder --panel`).
   - Name (600) and role (12.5px `--tx4`); the lead's role reads `<Role> · talk here`.
   - The current task (13.5px `--tx2`, ellipsis) and the **last terminal line** (Mono 12px `--tx4`, ellipsis, ANSI stripped) ([Instance](../models/instance.md)).
@@ -55,12 +55,12 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 - **"What comes to you"**: grid `84px 1fr`, the kind label (colored, Mono uppercase, no border) and a line:
   - Approval: "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer."
   - Question: "An agent needs information only you have. It keeps working on other things meanwhile."
-  - Review: "The lead calls open_pr(). Foreman pushes the lead branch, opens the PR and runs the checks."
+  - Review: "The lead calls open_pr(). Foreman runs the checks and opens the PR on your forge (or publishes the branch). You merge it there; Foreman notices."
   - Finding: "A challenge team rates something high severity. You decide who fixes it, and when."
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
-- **"Pull requests"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `Local only`, 500) and a note:
-  - forge `none`: "PRs live inside Foreman. Merging runs git merge on your machine."
-  - otherwise: "PRs open on `<forge url>`. Merging here merges there. The token lives in your workspace Settings, never in this file."
+- **"Pull requests"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:
+  - forge `none`: "No forge. When the lead is ready, Foreman publishes the lead branch in this project's repo for you to review and merge with git."
+  - otherwise: "PRs open on `<forge url>`. You review and merge them there; Foreman notices. The token lives in your workspace Settings, never in this file."
 - **`project.yaml`**: a row with `<project>/.foreman/project.yaml · read-only` (Mono 12.5px `--tx3`) and a small outline **`Change with Chief of Staff`** button ([Chief of Staff](./chief-of-staff.md), config flow). Below: "This file is config, committed with the project. Edit it in your editor, or have the Chief of Staff edit it. Its change then comes back to you in Changes as a review." Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 
-Everything in this block is read-only. Changes to `project.yaml` on disk show within about 1 s.
+Everything in this block is read-only. Changes to `project.yaml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

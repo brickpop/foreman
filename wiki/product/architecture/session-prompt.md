@@ -8,7 +8,7 @@ tags: [architecture, agents, teams, sessions]
 
 The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from four sources: the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [deployment](../models/deployment.md) (goal) and the [project config](../models/project-config.md) (path, gates, checks). It is passed to the harness as described by its [adapter](./harness-adapters.md).
 
-The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)).
+The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)). For an agent whose team isn't deployed anywhere, it shows the full template with the deployment-dependent variables (`{project}`, `{path}`, `{goal}`, `{repos}`, `{checks}`, `{gates}`…) left as highlighted placeholders, so the whole shape is visible before deploying.
 
 ## Template
 
@@ -37,7 +37,9 @@ ask(teammate, request)              Get info or work. Keep going meanwhile.
 reply(request_id, output)           Answer a request. Only `output` is returned.
 handoff(teammate, branch, summary)  Pass finished work on. Your part ends.
 escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.
-open_pr(title, summary)             Propose lead/* for main. Only you can.        (lead only)
+                                    A question doesn't pause you unless you pass wait: true.
+open_pr(branch, title, summary)     Propose one of your lead/{team}/* branches for main. Only you can.
+                                    Call it again on the same branch to update its PR. (lead only)
 Replies arrive in this session as "⇄ <name> replied to req-N".
 Resume the task that asked for it. After escalate you resume
 from the same point with the CEO's answer.
@@ -55,34 +57,39 @@ from the same point with the CEO's answer.
 Before any handoff, run: {checks}
 ```
 
+## Delivery
+
+The composed prompt is plain Markdown, written as the **user-level instruction file of the instance's private harness config directory** ([Session runner → Credentials](./session-runner.md#credentials)):
+
+| Harness | File | Loaded as |
+|---|---|---|
+| Claude Code | `$CLAUDE_CONFIG_DIR/CLAUDE.md` | User memory, in every session |
+| Codex CLI | `$CODEX_HOME/AGENTS.md` | Global instructions |
+| Custom | The adapter's choice (a flag with a file path, or the first stdin message) | |
+
+Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and PRs), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn; a soul edit while running is announced by a context-update message (below) and takes full effect at the next restart. To verify per harness in the [walking skeleton](../../backlog/walking-skeleton.md).
+
 ## Variable parts
 
 | Placeholder | Lead | Member |
 |---|---|---|
-| `{branches}` | `lead/*. You may open PRs to main.` | `wt/{agent}/<card> only. No push to main.` |
+| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). You may open PRs to main, one per branch. When told main moved, rebase that branch onto main and call open_pr again.` | `wt/{agent}/<card> only. No push to main.` |
 | `{wiki access}` | `read and write` if the team has no scrum master, else `read only` | `read and write` for the scrum master, else `read only` |
 | tools | all five, including `open_pr` | `ask`, `reply`, `handoff`, `escalate` |
-| `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask() or handoff()." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it and tell {lead} what changed." |
+| `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask() or handoff()." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it, and tell {lead} if it's relevant to the team." |
 
 - `Project: {project}  ({path})` has two spaces before the parenthesis.
-- Playbook steps resolve role keys to member names (`lead` → "Mara"); `ceo` → `CEO`; unknown keys are capitalised ("Members").
+- Playbook steps resolve their `who` ([Team definition](../models/team-definition.md#playbook-and-escalation)): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → `CEO`, a role name (`scrum_master`) → the name(s) of the member(s) with that role, an agent id → that agent's name. Anything else is shown as written (and flagged on the [Team page](../features/team-page.md)).
 - Gates come from `always_ask_ceo`, checks from `checks` in `project.yaml`.
-- The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (they change if the lead-branch naming question is resolved with a per-team prefix).
+- The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (`lead/<team>/*` for the lead, `wt/<agent>/<card>` for members).
 
 ## Talking to the CEO
 
 - The default contact for a team is its **lead**. Typing to the lead is a request; the lead delegates via `ask` or `handoff`.
-- The CEO can type to any member directly ("direct instruction"). Foreman:
-  1. shows a "Direct line" banner in that session ([Sessions](../features/sessions.md))
-  2. posts a system note into the lead's session: `ⓘ CEO gave Tove a direct instruction: …`
+- The CEO can type to any member directly ("direct instruction"): the keystrokes go raw to the member's terminal, under a "Direct line" banner ([Sessions](../features/sessions.md#talking-to-the-team)). Foreman doesn't tell the lead anything; the member's `{ceo section}` (above) asks it to tell the lead if the instruction is relevant to the team.
 
 ## Updates
 
-- A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)); the full re-prompt happens at the next restart.
+- A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)): the changed sections of its prompt in full (not a diff), prefixed with `ⓘ Your definition changed:`, one message per turn however many saves happened. The full re-prompt happens at the next restart.
+- Wiki access follows the PRD: read and write for the scrum master, or for the lead when the team has no scrum master; read only for everyone else (the prototype never granted it to a lead). The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#wiki-access)).
 - Roster changes (a hire) are a team edit: existing members learn about the new teammate through the same context update.
-
-## Open questions
-
-1. **Prompt for an undeployed agent.** The [Agent page](../features/agent-page.md) shows a prompt even when the team isn't deployed (the prototype composes it against an arbitrary project with `Goal: (not deployed)`). Options: show only the soul-only parts with "Deploy the team to see the full prompt"; show the full template with `{project}`-style placeholders and a note that it's filled in at deploy time; show nothing but a note. Recommendations differ: soul-only parts (from this entry) vs placeholder template (from the Agent page).
-2. **Context-update wording.** What exactly is injected on a soul edit (a diff, the new full job section, or a short note)? Recommendation: the changed sections in full, prefixed with `ⓘ Your definition changed:`.
-3. **Wiki access for the lead.** The PRD gives the lead write access when there is no scrum master; the prototype only ever grants it to the scrum master. Recommendation: follow the PRD (template above).

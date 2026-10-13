@@ -20,13 +20,14 @@ Padding `40px 48px 64px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, g
   - Swatch rows (84px label column): `Background` (8), `Skin` (5), `Hair color` (5).
   - Trait rows of option buttons labelled with the values: `Hair` (short, long, curly, bun, bald), `Eyes` (dots, glasses, shades, sleepy), `Beard` (none, stubble, full, mustache).
   - Shuffle randomizes all traits and the background.
-- **"Harness"**: option buttons `Claude Code`, `Codex CLI`, `Pi`, `Hermes Agent`, `Custom`. Custom shows a Mono command input (placeholder `./bin/my-agent --acp`). See [Harness adapters](../architecture/harness-adapters.md).
+  - The look is part of the soul: it is stored in the team file under the agent's `look:` ([Agent soul](../models/agent-soul.md)), so the face is the same on every project and the [Team page](./team-page.md) File tab shows it.
+- **"Harness"**: option buttons `Claude Code`, `Codex CLI`, `Pi`, `Hermes Agent`, `Custom`. Custom shows a Mono command input (placeholder `./bin/my-agent`). See [Harness adapters](../architecture/harness-adapters.md).
 - **"Personality"**: textarea (3 rows, 15px).
 - **"Skills"**: chips with `×`, and a `+ add` input (Enter adds; blank and duplicate skills are ignored).
-- **"Job description"**: a Mono textarea (6 rows, `--term`). Its label shows `✓ Saved. Applies on every project.` (12.5px `--ok`) after a save.
+- **"Job description"**: a Mono textarea (6 rows, `--term`). Its label shows `✓ Saved. Applies on every project.` (12.5px `--ok`) for 3 s after a save.
 - **`Refine with Chief of Staff`** (outline): the [Chief of Staff](./chief-of-staff.md) refine flow.
 
-**Saving**: every field saves to the team file without a save button ([API](../architecture/api.md), `PUT /api/teams/:id/agents/:agent`). Running instances get a context-update message on their next turn; the full prompt changes at the next restart ([Agent runtime](../architecture/agent-runtime.md)). A save that conflicts with a change made on disk meanwhile shows an error and reloads the field.
+**Saving**: no save button. Text fields (personality, skills input, job description, custom command) save on blur or Enter; choices (harness, look swatches and traits, Shuffle, removing a skill) save immediately. Each save writes the team file ([API](../architecture/api.md), `PUT /api/teams/:id/agents/:agent`) and shows `✓ Saved. Applies on every project.` for 3 s. Running instances get one context-update message per turn, however many saves happened in it; the full prompt changes at the next restart ([Agent runtime](../architecture/agent-runtime.md)). A save that conflicts with a change made on disk meanwhile shows an error and reloads the field.
 
 ## Right column
 
@@ -34,9 +35,4 @@ Padding `40px 48px 64px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, g
 - A switcher `on <project>` (option buttons), shown when the agent runs on more than one deployment.
 - The composed prompt in a `<pre>`, exactly as given to the harness ([Session prompt](../architecture/session-prompt.md), `GET /api/instances/:id/prompt`).
 
-## Open questions
-
-1. **Save timing and the "Saved" label.** The prototype saves on every keystroke and the label never clears. Each save rewrites a YAML file that agents and the CoS also read, and each one triggers a context update. Options: save on blur / Enter (text fields) and immediately (buttons, swatches); debounce ~800 ms. Recommendation: save on blur for text, immediately for choices; the label shows for 3 s; one context update per save, coalesced per turn.
-2. **Where `look` is stored.** PRD §5.4 stores it in the team file under each agent's `look:`; the prototype's File view omits it. Recommendation: in the team file, as the PRD says (it's part of the soul).
-
-The prompt shown when the team isn't deployed is owned by [Session prompt](../architecture/session-prompt.md#open-questions).
+When the team isn't deployed anywhere, the full template is shown with `{project}`, `{goal}`, `{repos}`… as highlighted placeholders (`--accTx` on `--accSoft`), and the switcher is hidden ([Session prompt](../architecture/session-prompt.md)).

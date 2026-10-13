@@ -23,10 +23,6 @@ The toggles gate browser notifications only; toasts always show.
 
 ## Behaviour
 
-- Each notification is tagged per instance (`agent@project`), so a newer one replaces an older one from the same instance.
+- Each notification is tagged per instance (`agent@project`), so a newer one replaces an older one from the same instance. The same tag also collapses duplicates when several Foreman tabs are open (every tab receives the event; the browser shows one notification per tag). To check in every browser in scope.
 - Clicking a notification focuses the Foreman tab and opens that instance's session.
 - Notifications are raised by any open Foreman tab; with several tabs open, only one shows each notification.
-
-## Open questions
-
-1. **Several open tabs.** Every open tab receives the same event. Options: let the browser's tag replacement collapse duplicates; elect one tab (e.g. via a broadcast channel). Recommendation: rely on the tag (same tag = one visible notification), and verify in the browsers in scope.

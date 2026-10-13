@@ -22,8 +22,4 @@ A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project 
 
 1. The deployment is created; every member gets an [instance](../models/instance.md) in `starting` (or `queued` when the session limit is reached, [Agent runtime](../architecture/agent-runtime.md#concurrency)) with the task `Cloning <repos>`.
 2. Sandboxes are created and sessions start ([Sandboxes and git policy](../architecture/sandboxes-and-git.md), [Agent runtime](../architecture/agent-runtime.md)). The first lines of each session read `<harness> · <project>/.sandboxes/<agent>` and `Cloning <repos> · reading <project>/wiki`.
-3. The dialog closes, the "deployed" toast appears (click opens the lead's session), and the lead receives the goal.
-
-## Open questions
-
-1. **Navigate after deploy?** The prototype stays where it was. Options: stay; open Sessions on the new deployment. Recommendation: open Sessions on the lead, since the next thing the CEO does is talk to it.
+3. The dialog closes, Foreman opens [Sessions](./sessions.md) on the new deployment with the lead's pane (the next thing the CEO does is talk to the lead), the "deployed" toast appears (click opens the lead's session), and the lead receives the goal.

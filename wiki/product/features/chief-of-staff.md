@@ -10,24 +10,41 @@ A built-in agent owned by Foreman: a harness session (Claude Code by default) ru
 
 ## Drawer
 
-Available from everywhere: the sidebar card, `+ New team`, a team's `Hire`, an agent's `Refine with Chief of Staff`, a project's `Change with Chief of Staff`. A right drawer, `min(420px, 100vw)` ([App shell](./app-shell.md#overlays)).
+Available from everywhere: the sidebar tile, `+ New team`, a team's `Hire`, an agent's `Refine with Chief of Staff`, a project's `Change with Chief of Staff`. A right drawer, `min(420px, 100vw)` ([App shell](./app-shell.md#overlays)).
 
 - **Header**: a 28×28 amber "C" tile (radius 7), "Chief of Staff", the session line `<harness> · ~/agents-ws/.foreman/cos` (Mono 11.5px `--tx4`), and `×`.
 - **Messages** (padding 18, gap 14): bubbles (max 88% wide, radius 12, padding `10px 13px`, line-height 1.5, preserved line breaks). The CoS is on the left on `--raised`; the CEO on the right on `--accSoft` with an `--accLine` border.
-- **Result card** (full width, `--term`, 1px `--line2`, radius 10, padding `14px 16px`): a title (600) and key/value rows (grid `90px 1fr`, keys `--tx4`, values `--tx2`).
+- **Result panel** (full width, `--term`, 1px `--line2`, radius 10, padding `14px 16px`): a title (600) and key/value rows (grid `90px 1fr`, keys `--tx4`, values `--tx2`).
 - **Quick-reply chips**, under the last message only. Clicking a chip sends its text as the CEO's answer.
 - **Input**: placeholder `Ask for anything…`; Enter sends.
 - A typing indicator shows while the CoS is working.
 - The conversation history persists; opening the drawer from an entry point starts that flow in the same conversation.
 - First open greets: "I set up teams, interview you for new roles, and pick up anything the UI doesn’t cover." with chips `Hire for a role`, `Create a team`, `What needs me today?`.
 
+## How the drawer is fed
+
+The CoS is a harness session like any other, so its raw output is a TUI stream, not chat bubbles. The drawer is built from **Foreman tools the CoS calls**, which works with any harness:
+
+| Tool | Renders |
+|---|---|
+| `say(text)` | A CoS bubble |
+| `present_choices(choices[])` | Quick-reply chips under the last message |
+| `show_panel(title, rows)` | A result panel (job description, roster, config change) |
+
+The CEO's bubbles and chip clicks go to the CoS session as input lines. The CoS's PTY stays visible in [Sessions](./sessions.md) for debugging, like any agent's.
+
 ## Flows
 
-Texts below are the CoS's lines; chips in brackets.
+Texts below are the CoS's lines; chips in brackets. There is no "New project" flow (the prototype had one that created folders and asked for git URLs, which contradicts "Foreman never clones"): projects come only from [Add a project](./add-project.md).
+
+Rules for every flow:
+- **Names** proposed for agents and teams are checked against the workspace (display names are unique across it); on a collision, or when the suggestion pool runs out, the CoS proposes another and lets the CEO type one.
+- **An answer the CoS doesn't recognise** (e.g. a team that doesn't exist) gets a clarifying question, never silence.
+- **Only an explicit `Hire <Name>` / `Create <Name>`** confirms. Anything else is treated as a change request or a question about the panel.
 
 ### Hire for a role
 
-From the sidebar card or a team's **Hire**.
+From the sidebar tile or a team's **Hire**.
 
 1. "Which team is this hire for?" [team names]. Skipped when started from a team: "Hiring for <Team>. What role?"
 2. "What role?" [Engineer, QA, Scrum Master, Architect, Reviewer]. Team Lead is not offered.
@@ -43,8 +60,8 @@ From the sidebar card or a team's **Hire**.
    | other | General work |
 
 4. "How should they work with the rest of the team?" [Heads-down, reports when done · Pushes back, challenges decisions · Collaborative, checks in often]
-5. "Which harness should run them?" [Claude Code, Codex CLI, Pi, Hermes Agent]
-6. "Here’s the job description. They’ll start on all N of <Team>’s deployments." (or "<Team> isn’t deployed yet, so they’ll start when it is.") A **job description card** titled `<Name> · <Role> · <Team>` with rows `Focus`, `Works`, `Harness`, `Job`. [Hire <Name>, Start over]
+5. "Which harness should run them?" [Claude Code, Codex CLI, Pi, Hermes Agent, Custom]. Custom is followed by "What command starts it?"
+6. "Here’s the job description. They’ll start on all N of <Team>’s deployments." (or "<Team> isn’t deployed yet, so they’ll start when it is.") A **job description panel** titled `<Name> · <Role> · <Team>` with rows `Focus`, `Works`, `Harness`, `Job`. [Hire <Name>, Start over]
    - Job = the role's default instructions plus `Focus: <focus>.`; personality = the working style.
 7. On **Hire**: the agent is added to the team file with a random face ([Avatar](../design/avatar.md)) and an instance starts on every deployment of the team. "<Name> has joined <Team>." [Open <Name>’s profile, Hire for a role]
 
@@ -61,19 +78,12 @@ Default instructions per role:
 
 ### Create a team
 
-From **`+ New team`**.
+From **`+ New team`**. There are no templates: the CoS drafts the team from what the CEO describes, using the example team files shipped with Foreman (Architect, Build, Challenge) as references ([Team definition](../models/team-definition.md#example-teams)).
 
-1. "What is the new team for?" [Architect it, Build it, Challenge it]
+1. "What is the new team for? A sentence or two is enough." Free text, no fixed chips (e.g. "Build the settlement features, with tests and reviews").
 2. "What should we call it?" [suggested names not already used]
-3. "Here’s the roster I’d start with. I’ll draft a job description for each role, and you can refine any of them later." A card `<Name> · <Kind>` with one row per role → generated agent name. [Create <Name>, Start over]
-
-   | Template | Roster |
-   |---|---|
-   | Architect | Team Lead, Architect, Reviewer, Scrum Master |
-   | Build | Team Lead, Engineer ×2, QA, Scrum Master |
-   | Challenge | Team Lead, QA ×2, Reviewer |
-
-4. On **Create**: writes `.foreman/teams/<id>.yaml` ([Team definition](../models/team-definition.md)) with the lead first, a playbook and escalation rules for the template, and each agent's default instructions. "<Name> is set up. It isn’t deployed anywhere yet." [Deploy to a project, Open <Name>]
+3. "Here’s the team I’d start with. I’ll draft a job description for each role, and you can refine any of them later." A panel `<Name>` with the one-line purpose and one row per role → generated agent name, plus the playbook steps. [Create <Name>, Change something, Start over]. "Change something" takes free text and redrafts.
+4. On **Create**: writes `.foreman/teams/<id>.yaml` ([Team definition](../models/team-definition.md)) with the purpose, the lead first, the drafted playbook and escalation rules, and each agent's drafted job description. "<Name> is set up. It isn’t deployed anywhere yet." [Deploy to a project, Open <Name>]
 
 ### Refine an agent
 
@@ -81,16 +91,8 @@ From the [Agent page](./agent-page.md). "What should change about how <Name> wor
 
 ### Change project config
 
-From [Project settings](./project-settings.md). "What should change in <project>/.foreman/project.yaml? I’ll edit it on a branch and send it to you as a review." [Send PRs to GitHub, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` and raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff changed <project>/.foreman/project.yaml: <summary>.` and actions Merge / Discard / Open Chief of Staff. "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
+From [Project settings](./project-settings.md). "What should change in <project>/.foreman/project.yaml? I’ll edit it on a branch and send it to you as a review." [Send PRs to GitHub, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` and raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff changed <project>/.foreman/project.yaml: <summary>.` and actions Open PR ↗ (with a forge) / Discard / Open Chief of Staff; like any review, it opens a PR on the forge, or publishes the branch when the project has no forge, and the CEO merges it there or with git ([Pipeline and pull requests](./pipeline-and-prs.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
 
 ### Anything else
 
 Free text. The CoS acts or answers, and reports back via Home when done or when it needs the CEO. "On it. I’ll work on “<text>” and report back on Home when it’s done or if I need you." Asked "What needs me today?", it summarizes the open requests (same count as Home, [Requests](./requests.md)).
-
-## Open questions
-
-1. **Chat UI on a terminal harness.** The drawer is a structured chat (bubbles, chips, cards), but the CoS is a harness session whose output is a TUI stream. Options: the CoS emits chips and cards through dedicated Foreman tools (e.g. `present_choices`, `show_card`) and its replies through a `say` tool, while the PTY stays available in Sessions for debugging; run the harness headless with structured JSON output. Recommendation: Foreman tools, so it works with any harness.
-2. **"New project" flow.** The prototype's CoS creates project folders and asks for git URLs, which contradicts "Foreman never clones". Options: drop it (projects come only from Add a project); allow creating an empty folder, no cloning. Recommendation: drop it in v1.
-3. **Hire and create edge cases.** Name collisions with existing agents or teams (display names must be unique across the workspace), an exhausted name pool, an unrecognized team answer (the prototype silently ignores it), and confirming a hire with anything except "Start over". Recommendation: names are checked against the workspace and the CoS proposes another; unrecognized answers get a clarifying question; only an explicit "Hire"/"Create" confirms.
-4. **Playbook for a new team.** The prototype copies one fixed playbook regardless of kind. Recommendation: one default playbook and escalation set per template (architect, build, challenge), stored with Foreman's templates.
-5. **Custom harness in the interview.** The hire flow doesn't offer Custom. Recommendation: offer it, then ask for the command.

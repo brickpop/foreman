@@ -12,18 +12,18 @@ One [team definition](../models/team-definition.md): where it is deployed, its m
 
 Padding `40px 48px 0`.
 
-- H1 with the team name and, beside it, the kind label (14px `--tx4`): `Architect`, `Build`, `Challenge` (or `Custom`).
+- H1 with the team name; under it, the team's one-line `purpose` (15px `--tx3`), when set ([Team definition](../models/team-definition.md)).
 - Subline: `Deployed on N project(s)`, or `Not deployed`.
 - Buttons: outline **`Hire`** (the [Chief of Staff](./chief-of-staff.md) hire flow, this team preset) and primary **`Deploy to a project`** ([Deploy a team](./deploy-team.md), this team preset).
 - Tabs, styled like the project tabs, no badges: `Deployments · Members · Playbook · File`.
 
 ## Deployments
 
-Padding `24px 48px 64px`, max 920px. One card per deployment (padding `16px 20px`):
+Padding `24px 48px 64px`, max 920px. One panel per deployment (padding `16px 20px`):
 
 - The project name (600 15px; opens the project's [Wiki reader](./wiki-reader.md)), the goal (`--tx2`), and `N working` plus ` · M waiting on you` when the deployment has open requests ([Requests](./requests.md)).
-- A raised **`Sessions`** button ([Sessions](./sessions.md) on this deployment) and a **`Stop`** button.
-- **Stop** ends that deployment only: its sessions terminate; sandboxes and worktrees stay on disk; other deployments of the team keep running ([Agent runtime](../architecture/agent-runtime.md)). A toast confirms. Whether Stop asks for confirmation, and what happens to the deployment's open requests and pipeline items, is open in [Deployment](../models/deployment.md#open-questions).
+- A raised **`Sessions`** button ([Sessions](./sessions.md) on this deployment) and a **`Stop`** button in the danger style ([Design system](../design/design-system.md#buttons)).
+- **Stop** ends that deployment only: its sessions terminate; sandboxes and worktrees stay on disk; other deployments of the team keep running ([Agent runtime](../architecture/agent-runtime.md)). Stop first asks for confirmation in a dialog: "Stop <Team> on <project>? <N> sessions end. Worktrees and sandboxes are kept." with `Cancel` and a danger `Stop`. Then a toast confirms. Its open requests expire and its work items and pull requests stay visible as stopped ([Deployment](../models/deployment.md#lifecycle)).
 - **Empty**: `Not deployed anywhere. Deploy it to a project to start sessions.`
 
 ## Members
@@ -39,7 +39,7 @@ Padding `20px 48px 64px`. One row per agent (grid `auto 1fr auto`, padding `14px
 Padding `28px 48px 64px`, max 760px.
 
 - Intro: "The playbook is part of the team definition, so every deployment uses the same one. It's added to each member's session prompt. Each project's own gates and checks apply on top."
-- Steps: grid `28px 110px 1fr`: the number (Mono `--tx4`), who (600), the text. Role keys resolve to the member's name (`lead` → "Mara"); `ceo` → "You"; other keys are shown capitalized ("Members").
+- Steps: grid `28px 110px 1fr`: the number (Mono `--tx4`), who (600), the text. `who` resolves as in [Playbook and escalation](../models/team-definition.md#playbook-and-escalation): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → "You", a role → its members' names, an agent id → its name. An unknown `who` is shown as written with a warning icon (`--acc`) and the tooltip "No member matches this; check the team file".
 - "Escalate": one line per rule, the condition (`--tx2`) and the target (500); `ceo` shows as "You" in `--accTx`.
 
 ## File

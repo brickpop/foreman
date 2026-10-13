@@ -22,7 +22,9 @@ lane    = "priority"          # optional lane field
 lanes   = ["high", "medium", "low"]
 ```
 
-Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findings" with `where = ["type=task", "kind=finding"]`).
+Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findings" with `where = ["type=task", "kind=finding"]`). A board shows exactly what its `where` selects: a sprint board filtering only `type=task` also shows findings, and the fix is a `kind` filter in `wiki.toml`, not special-casing in the UI.
+
+**Columns and lanes** come from `columns` and `lanes` in `wiki.toml` when declared; otherwise from the values found in the matching entries, in first-seen order. An entry whose status (or lane value) is missing or not in the list goes to an **Other** column (or lane) at the end, so no entry is ever invisible. Validation of the declaration lives in one place ([Wiki engine](../architecture/wiki-engine.md)).
 
 ## Layout
 
@@ -38,7 +40,8 @@ Body padding `20px 40px 64px`.
 
 ## Interactions
 
-- **Drag** a card to another cell: sets the column field to the column value and, on a board with lanes, the lane field to the lane value. Only those frontmatter lines change. The write is guarded by the entry's version: on conflict the card snaps back and an error toast says the file changed. A drop target cell is highlighted while dragging. Success shows a toast ([App shell](./app-shell.md#toasts)). API: `PUT /api/wiki/:project/card/:board/:path` ([API](../architecture/api.md)).
+- **Drag** a card to another cell: sets the column field to the column value and, on a board with lanes, the lane field to the lane value. Only those frontmatter lines change, both in one write (a drop into another lane rewrites two lines, unlike the PRD's "only that line"). The write is guarded by the entry's version: on conflict the card snaps back and an error toast says the file changed. A drop target cell is highlighted while dragging. Success shows a toast ([App shell](./app-shell.md#toasts)). API: `PUT /api/wiki/:project/card/:board/:path` ([API](../architecture/api.md)).
+- **Status menu**: every card has a small menu (keyboard-reachable, and the way to move cards on touch screens) listing the columns (and lanes); choosing one does exactly what a drag does. Drag and drop is native HTML5 ([Tech stack](../architecture/tech-stack.md)).
 - **Click** a card: opens the **side sheet**.
 
 ## Side sheet
@@ -47,10 +50,3 @@ Fixed right, `min(460px, 100vw)` ([App shell](./app-shell.md#overlays)).
 
 - Header: `<project>/wiki/<path>` (Mono 12.5px `--tx3`), **`Open in wiki`** (small outline; opens the entry in the [Wiki reader](./wiki-reader.md)) and `×`.
 - Body (padding `20px 22px 32px`, gap 12): frontmatter chips, then the rendered entry at sheet sizes (H1 22px, H2 15px, paragraphs 14.5px). Checkboxes are tickable, exactly as in the reader.
-
-## Open questions
-
-1. **Where columns and lanes come from.** The prototype hard-codes the four columns and the high/medium/low lanes. Options: from `columns`/`lanes` in `wiki.toml` (wikiview keys, as this repo's own `wiki.toml` uses), falling back to the values found in the entries, in first-seen order; always fixed. Recommendation: `wiki.toml` first, then the values found.
-2. **Cards with a missing or unknown status or lane value.** They vanish in the prototype. Options: hide; show them in an extra "Other" column/lane. Recommendation: an "Other" column/lane at the end, so no entry is ever invisible.
-3. **A board with no kind filter.** In the prototype, the sprint board shows findings mixed with tasks because it only filters `type=task`. Is that intended? Recommendation: yes, boards show exactly what their `where` says; the fix belongs in `wiki.toml`, not in the UI.
-4. **Lane drags rewrite two fields.** PRD §10.4 says a drag "rewrites only that frontmatter line", and the prototype's footer says the same, but a drop into another lane also changes the lane field (e.g. `priority`); the API is `PUT …/card/:board/:path {value, lane, version}` ([API](../architecture/api.md)). Confirm that a lane drag rewrites both lines (as described above) in one guarded write.

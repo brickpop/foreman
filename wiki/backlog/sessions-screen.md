@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Wire Sessions and Home to the real backend
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** the screens exist on the demo client ([Home and Sessions screens](./ui-home-sessions.md)); this card swaps their data for the real server, area by area ([Sessions](../product/features/sessions.md), [Home](../product/features/home.md)).
 

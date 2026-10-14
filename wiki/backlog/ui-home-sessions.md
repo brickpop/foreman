@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # Home and Sessions screens
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 **Why:** the CEO's daily view: what needs them, and the agents' terminals ([Home](../product/features/home.md), [Sessions](../product/features/sessions.md), [Requests](../product/features/requests.md)).
 

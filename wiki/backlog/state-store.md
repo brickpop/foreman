@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # State store: SQLite with migrations
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** deployments, instances, messages, requests and work items all live in `state.db` ([Persistence](../product/architecture/persistence.md)); the Instance manager needs deployments and instances first.
 

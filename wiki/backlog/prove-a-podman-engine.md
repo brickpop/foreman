@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [spike]
+epic: prove
 ---
 
 # Experiment A: drive Podman from Go through its REST API
-
-Epic: [Prove](./epics/prove.md)
 
 **Question:** can Foreman's Podman engine start a container with a terminal, stream it both ways, resize it, stop it, and find and re-attach to it after Foreman restarts, using Podman's REST API from plain Go (no podman CLI, no bindings module)? See [Building blocks → What is proven](../product/architecture/building-blocks.md#what-is-proven-and-what-isnt), [Session runner](../product/architecture/session-runner.md).
 

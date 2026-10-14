@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: medium
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # Settings screen, notifications and toasts
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 **Why:** workspace settings and how the CEO hears from agents ([Workspace settings screen](../product/features/settings.md), [Notifications](../product/features/notifications.md), [App shell](../product/features/app-shell.md)).
 

@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [chore]
+epic: terminal-multiplexer
 ---
 
 # Restructure the code along the building blocks
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** the code from the first steps predates [Building blocks](../product/architecture/building-blocks.md): `supervisor` mixes the Terminal block with a start-by-id map, and `runner/pty` is named after a mechanism, not where it runs. Everything in this epic builds on the block packages, so they come first.
 

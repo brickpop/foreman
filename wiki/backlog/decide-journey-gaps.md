@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [decision]
+epic: terminal-multiplexer
 ---
 
 # Decide the journey gaps G1–G5
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 The end-to-end journey surfaced five gaps, each with a proposal: [The journey → Gaps](../product/journey.md#gaps-this-journey-surfaces). The CEO decides each; the answer goes into the specs it concerns and the journey's table entry is removed.
 

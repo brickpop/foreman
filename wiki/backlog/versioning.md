@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: medium
 tags: [decision]
+epic: terminal-multiplexer
 ---
 
 # Versioning: Foreman and foreman-agent, state.db, team-file format
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 Three things carry a version and can drift apart, and the CEO decides what happens when they do. Once decided, the answers go into the specs below and the implementation steps run in this epic.
 

@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # App shell and the design-system components
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 Blocked by [API types](./api-types.md).
 

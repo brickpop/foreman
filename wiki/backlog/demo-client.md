@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # Demo client: seed data, simulated events, per-area swap
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 **Why:** every screen can be built and judged before its backend exists, on data that looks like the real thing (the prototype's), without lying about what is real.
 

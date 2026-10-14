@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Instance manager: deploy, run, restart, re-attach
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** the block that turns a deployment into running agents ([Building blocks → 5](../product/architecture/building-blocks.md), [Agent runtime](../product/architecture/agent-runtime.md)).
 

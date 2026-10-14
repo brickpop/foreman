@@ -1,6 +1,6 @@
 spec = "0.1"
 
-# Entry kinds: `spec` (product knowledge under product/), `task` (backlog cards), `epic` (groups of cards), `note` (anything else)
+# Entry kinds: `spec` (product knowledge under product/), `task` (backlog cards), `epic` (groups of cards, named by a card's `epic:` field), `note` (anything else)
 types = ["spec", "task", "epic", "note"]
 
 # Files that are NOT wiki entries (excluded from index and check; globs supported)
@@ -10,19 +10,20 @@ ignore = []
 ignore_orphans = ["backlog/**"]
 
 [[tool.wikiview.board]]
+id      = "epics"
+path    = "/backlog/epics"
+name    = "Epics"
+where   = ["type=epic"]
+status  = "status"
+columns = ["todo", "in-progress", "done"]
+
+# Cards, one lane per epic (in order). A card names its epic in its `epic:` field.
+[[tool.wikiview.board]]
 id      = "backlog"
 path    = "/backlog"
 name    = "Backlog"
 where   = ["type=task"]
 status  = "status"
-columns = ["todo", "in-progress", "blocked", "done"]
-lane    = "priority"
-lanes   = ["high", "medium", "low"]
-
-[[tool.wikiview.board]]
-id      = "product"
-path    = "/product"
-name    = "Build progress"
-where   = ["type=spec"]
-status  = "status"
-columns = ["planned", "partial", "built"]
+columns = ["todo", "blocked", "in-progress", "done"]
+lane    = "epic"
+lanes   = ["prove", "full-ui-demo", "terminal-multiplexer", "messaging-handoffs", "git", "workflow", "chief-of-staff"]

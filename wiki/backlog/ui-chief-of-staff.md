@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: medium
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # Chief of Staff drawer
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 **Why:** the CEO's assistant for everything the screens don't cover ([Chief of Staff](../product/features/chief-of-staff.md)).
 

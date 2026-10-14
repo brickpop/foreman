@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: medium
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Wire the project pages to the real backend: Add a project and the Wiki block
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** the project pages exist on the demo client ([Project pages](./ui-project-pages.md)); this card serves them from the real workspace and wikis ([Add a project](../product/features/add-project.md), [Wiki reader](../product/features/wiki-reader.md), [Board](../product/features/board.md), [Project settings](../product/features/project-settings.md), [Wiki engine](../product/architecture/wiki-engine.md)).
 

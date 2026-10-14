@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: medium
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Default project wiki conventions
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** agents keep a project's knowledge and tasks in its wiki, and the board reads task cards from it ([Board](../product/features/board.md), [Wiki engine](../product/architecture/wiki-engine.md)). For the board to show what agents write, every project wiki needs the same conventions: what a task card is (`type: task`, `status`, `assignee`, `priority`…), where cards live, and how agents use the `wiki` command. Foreman's own repo already works this way (`WORKFLOW.md` and `AGENTS.md` at its root).
 

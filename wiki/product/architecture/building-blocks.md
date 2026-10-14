@@ -144,6 +144,8 @@ Implementations, named by **where the process runs** (both give it a terminal):
 
 Each engine comes with the image builder that matches it. The Instance manager asks it for the project's image and puts the answer in `Spec.Image`.
 
+**Phasing:** phase 1 builds one image for every project (from `pclaude`'s Dockerfile, plus `foreman-agent`); the four-layer chain comes later ([Agent images](./tech-stack.md#agent-images)).
+
 ```go
 type Images interface {
     Ensure(ctx, project) (ref string, err error) // builds or tags the chain as needed: base → harness → workspace → project

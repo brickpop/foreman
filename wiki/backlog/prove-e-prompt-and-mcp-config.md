@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [spike]
+epic: prove
 ---
 
 # Experiment E: session prompt file and stdio MCP config for Claude Code, Pi and Hermes
-
-Epic: [Prove](./epics/prove.md)
 
 **Question:** does each harness read its standing instructions from a file in its private config dir (Claude Code `$CLAUDE_CONFIG_DIR/CLAUDE.md`, the equivalents for Pi and Hermes), and accept a local (stdio) MCP server from a config file, so that `foreman-agent mcp` can be registered without command-line tricks? See [Session prompt → Delivery](../product/architecture/session-prompt.md#delivery), [Harness adapters](../product/architecture/harness-adapters.md), [Building blocks → What is proven](../product/architecture/building-blocks.md#what-is-proven-and-what-isnt).
 

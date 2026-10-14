@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [spike]
+epic: prove
 ---
 
 # Experiment B: one Claude Code login shared by many containers
-
-Epic: [Prove](./epics/prove.md)
 
 **Question:** can 12 Claude Code containers share one login file, read-write, and survive token refreshes, each picking up the others' refreshed token instead of using a revoked one? And how must each harness be pointed at the shared file so that its own writes land there? See [Session runner → Credentials](../product/architecture/session-runner.md#credentials), [Building blocks → What is proven](../product/architecture/building-blocks.md#what-is-proven-and-what-isnt).
 

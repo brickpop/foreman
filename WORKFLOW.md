@@ -2,7 +2,7 @@
 
 This is the **workflow** layer for the `wiki/` bundle: the conventions this project follows on top of what [AGENTS.md](./AGENTS.md) and the `wiki` tool define. Edit it when the way we work changes.
 
-All commands run from the project root with `--root wiki` (or `just wiki <command>`). All entry paths below (`/backlog/x.md`) are relative to `wiki/`.
+All commands run from the project root with `--root wiki` (or, without it, from inside `wiki/`: `wiki` finds its bundle by walking up to a `wiki.toml`). All entry paths below (`/backlog/x.md`) are relative to `wiki/`.
 
 **The bundle is git-managed.** Commits are its history and its undo: retiring a task by deleting it loses nothing, and every `wiki move` or edit is reversible.
 
@@ -24,6 +24,7 @@ wiki/
 └── backlog/             # ephemeral: the kanban
     ├── index.md         # entry point: the goal and the queries that list the cards
     ├── <card>.md        # every live card (type: task), read with `wiki list` (ignore_orphans'd)
+    ├── epics/           # the epics: groups of cards, in order (type: epic)
     └── archive/         # retired work worth keeping (ignore_orphans'd)
 ```
 
@@ -37,6 +38,7 @@ wiki/
 |---|---|---|
 | `spec` | `product/` | One concept of the product: a model, a feature, an architectural piece, a design element |
 | `task` | `backlog/` | One coherent piece of work (including a decision to take) |
+| `epic` | `backlog/epics/` | A group of cards that delivers something usable on its own, in a fixed order |
 | `note` | anywhere | Everything else (e.g. `technical-debt.md`) |
 
 `wiki/wiki.toml` enforces this vocabulary: `wiki check` errors on any other type.
@@ -77,22 +79,45 @@ type: task
 status: todo              # todo | in-progress | blocked | done
 priority: medium          # high | medium | low
 tags: [feature]           # feature | bug | chore | test | decision | spike
+epic: terminal-multiplexer # the slug of its epic: the file name in backlog/epics/
 ---
 
 # Short imperative title
 
 Why this matters, and what "done" means. Link the spec entries it touches,
-e.g. [Sessions](../../product/features/sessions.md).
+e.g. [Sessions](../product/features/sessions.md).
 
 - [ ] step
 - [ ] step
 ```
 
-- **Progress** is `status`. **Urgency** is `priority`. There is no hand-maintained board: the backlog is read with `wiki list` and filters (see *Querying the backlog*), so nothing has to be kept in sync.
+- **Progress** is `status`. **Urgency** is `priority`. **Belonging** is `epic`. There is no hand-maintained board: the backlog is read with `wiki list` and filters (see *Querying the backlog*), or browsed on the boards declared in `wiki.toml` (see *Boards*), so nothing has to be kept in sync.
 - **Steps** are `- [ ]` checklist items inside the card (`wiki --root wiki checkboxes /backlog/x.md`).
 - **Dependencies** are body links: `Blocked by [Title](./other-task.md)`. A real graph edge, so `wiki backlinks` on the prerequisite shows what it unblocks and `wiki move` keeps it intact. A card waiting on another also gets `status: blocked`.
 - **Detail pages:** a card that needs notes keeps them in its body. If it outgrows that, add a `that-task/` folder beside `that-task.md` (never a `that-task/index.md`).
-- Not tracked: estimates, assignees, cycles, epics, milestones. Add them here first if they ever become necessary.
+- **Epic:** every card belongs to one epic, named by its `epic:` field (the epic's slug: its file name in `backlog/epics/`). A field rather than a link, so the Backlog board can lay the cards out in one lane per epic and `--where epic=<slug>` lists exactly an epic's cards. The epic itself links its cards' specs and journey steps, not each card.
+- Not tracked: estimates, assignees, cycles, milestones. Add them here first if they ever become necessary.
+
+## Epics
+
+Work is organised in **epics**, done in order. Each epic delivers something usable on its own and has exit criteria; the next one starts when it's done.
+
+```markdown
+---
+type: epic
+status: todo              # todo | in-progress | done
+order: 1                  # 0, 1, 2…: the order epics are done in
+---
+
+# Terminal multiplexer
+
+The goal, what is usable when it's done, the journey steps it covers, its exit criteria.
+```
+
+- An epic lives in `backlog/epics/<slug>.md`. Its cards name it in their `epic:` field (`epic: <slug>`), so `wiki --root wiki list --where epic=<slug>` lists them. A new epic is also added to the Backlog board's `lanes` in `wiki.toml`, in order.
+- Two epics may share an `order` when they run side by side.
+- Cards are written for the current epic and the next one; later epics get theirs when we get there. An epic's body says what it will contain until then.
+- An epic is `done` when its exit criteria hold and its cards are retired. Retire it like a card (delete, or move to `archive/`).
 
 ## Technical debt
 
@@ -112,11 +137,20 @@ The folder says only whether a card is live (`backlog/`) or retired (`backlog/ar
 
 `wiki/backlog/index.md` is the entry point, not a board: the **goal** of the current phase and the queries below. It does not list cards. Cards are kept out of `wiki orphans` by `ignore_orphans = ["backlog/**"]`, since nothing has to link to them.
 
-`wiki.toml` also declares wikiview boards over the same entries (cards by `status` and `priority`, specs by `status`), so the backlog can be browsed as a kanban by wikiview or by Foreman itself.
+## Boards
+
+`wiki.toml` declares two kanban boards over the same entries, for wikiview or Foreman itself to show:
+
+- **Epics**: the epics by `status` (To do → In progress → Done): the roadmap at a glance.
+- **Backlog**: the cards by `status`, in one lane per epic, in the epics' order. Priority stays on each card.
+
+The boards are views: the entries own their `status`, `priority` and `epic`, and moving a card on a board rewrites that field. Specs are not on a board: they are the definition, not work (their build status is a query, see below).
 
 ## Querying the backlog
 
-- **What's next?** `wiki --root wiki list --where type=task --where status=todo --where priority=high --prefix backlog/` (then `medium`, `low`). Read the cards and use judgment: blockers and decisions first.
+- **Which epic are we in?** `wiki --root wiki list --where type=epic --where status=in-progress`; all of them, in order: `wiki --root wiki list --where type=epic --format json` (sort by `order`).
+- **What's in an epic?** `wiki --root wiki list --where epic=terminal-multiplexer`; still open: add `--where status!=done`.
+- **What's next?** The current epic's cards with `status: todo`, high priority first (`wiki --root wiki list --where epic=<slug> --where status=todo --where priority=high`); `wiki --root wiki list --where type=task --where status=todo --where priority=high --prefix backlog/` across all epics. Read the cards and use judgment: blockers and decisions first.
 - **What's in progress?** `wiki --root wiki list --where type=task --where status=in-progress`.
 - **Everything live:** `wiki --root wiki list --where type=task --where status!=done --prefix backlog/` (archived cards are `done`).
 - **What does the user need to decide?** `wiki --root wiki list --where type=task --where tags=decision --where status!=done`.

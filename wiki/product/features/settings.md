@@ -39,6 +39,8 @@ One row each for **GitHub**, **Forgejo** and **Gitea**: the host and owner (or `
 
 ## Maintenance
 
+**Phasing:** phase 1 has one image for every project ([Agent images](../architecture/tech-stack.md#agent-images)), so the section shows Podman's state and that one image: its state, the harness version inside, its last build log, and **`Rebuild`** (without cache, picking up the latest Claude Code). The chain rows, Refresh with prune, Customize hints and Prune below are the target, built with the [full image chain](../../backlog/image-chain.md).
+
 "The images agent sessions run in. Foreman builds them as a chain: base, harnesses, this workspace, each project. A layer without its own Containerfile simply passes the one above through."
 
 At the top, Podman's state: `Podman 5.x · running` (`--ok`), or on macOS the machine's state (`machine running` / `starting…` / `stopped`), from [Session runner → The Podman service](../architecture/session-runner.md#the-podman-service).

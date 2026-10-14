@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: medium
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # Project pages and the Add a project dialog
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 **Why:** where a project's knowledge and progress live ([Wiki reader](../product/features/wiki-reader.md), [Changes](../product/features/changes.md), [Board](../product/features/board.md), [Project settings](../product/features/project-settings.md), [Add a project](../product/features/add-project.md)).
 

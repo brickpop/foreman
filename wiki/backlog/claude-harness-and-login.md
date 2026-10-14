@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Claude Code harness adapter and the login container
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** the first harness ([Harness adapters](../product/architecture/harness-adapters.md)), and the CEO's one login shared by every Claude instance ([Session runner → Credentials](../product/architecture/session-runner.md#credentials)).
 

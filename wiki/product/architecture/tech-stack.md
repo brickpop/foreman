@@ -79,6 +79,8 @@ Foreman builds the images its containers run, itself, through Podman's build API
 
 Every instance of a project runs layer 4, so the project's image name is stable and predictable. One harness layer holds every harness, rather than one image per harness, so layers 3 and 4 exist once per workspace and project, not once per harness.
 
+**Phasing.** The chain above is the target. Phase 1 ([Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md)) builds **one image for every project**, from a Containerfile that starts from [`pclaude`](https://github.com/brickpop/pclaude)'s Dockerfile (commit `7c9f9079`): `node:26-slim` with git, curl, jq, make, just, vim and the other shell tools, Go, Bun, Deno, Foundry and the `wiki` CLI, then Claude Code installed last; `ENTRYPOINT []`, `CMD ["claude"]`. Foreman's version adds `foreman-agent`. So phase 1 is base and Claude Code harness in one image, with the common toolchains that let agents run most projects' tests. The separate harness layer (Pi, Hermes), the workspace and project overrides, Refresh with prune, Prune and the full Maintenance screen come later ([Full image chain](../../backlog/image-chain.md)).
+
 **Names.** `<workspace>` is the workspace folder name and `<project>` the project folder name, slugified to what an image name allows (lowercase `a-z0-9`, with `.`, `_` or `-` between). Two folders that slugify to the same name are reported as a configuration error. The hierarchy in the name mirrors the chain, so `podman images localhost/foreman/ws/agents-ws` shows a workspace at a glance, and several workspaces on one machine never collide.
 
 **Overrides.** An override is a plain Containerfile the CEO writes in their editor; Foreman never generates or templates one. Foreman always builds it with the parent image passed as the `BASE` build argument, so an override starts with:
@@ -160,7 +162,7 @@ All through `just` (`just help` lists everything):
 - `just test`: the Go tests (and the UI unit tests once there are any). Go commands name their packages explicitly (`./cmd/... ./internal/... ./ui`), so stray `.go` files elsewhere are never picked up.
 - `just e2e` (not yet; added with the first UI flows): Playwright against a real `foreman` binary using the Direct engine and the fake harness. The [use cases](../use-cases.md) are the e2e suite.
 - `just lint`: `gofmt`, `go vet`, `staticcheck` (pinned as a Go tool in `go.mod`, run with `go tool staticcheck`), Biome.
-- `just wiki <args>`: `wiki --root wiki <args>`, and `just check` runs the wiki health check with the rest.
+- `just check`: the wiki health check (`wiki --root wiki check`). Other wiki commands run directly: `wiki --root wiki <command>` from the project root.
 
 Testing approach:
 - **Go:** standard `testing`. Components are tested through their real interfaces: a real SQLite in a temp dir, a real git repo in a temp dir, the Direct engine with `fakeharness`. No mocks of things we own.

@@ -33,6 +33,8 @@ Programs ask the terminal questions (cursor position, device attributes, status,
 - The browser's xterm.js is told **never** to answer (its handlers for those queries are overridden), so a session with viewers doesn't get two answers.
 - The emulator writes its answers to a synchronous pipe: Foreman drains it continuously, otherwise the next query would block the emulator and stall the session.
 
+**Known limitation:** a pending line wrap isn't restored (the emulator keeps it private), so one character may land a cell off for a viewer attaching exactly at the right margin, until the program redraws. Accepted for now: [Snapshots can't restore a pending line wrap](../../backlog/snapshot-pending-wrap.md).
+
 ## Size
 
 The emulator follows the session's terminal size: every resize goes to both the PTY and the emulator, so a snapshot always matches the size the program draws for.

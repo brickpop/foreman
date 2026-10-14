@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Workspace and config loading, file watcher, event stream
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** projects, team files and settings are files the CEO owns ([Workspace](../product/models/workspace.md)); the UI must follow them live within ~1 s, and every later screen needs the event stream.
 

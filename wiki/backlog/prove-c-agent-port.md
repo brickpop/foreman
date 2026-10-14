@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [spike]
+epic: prove
 ---
 
 # Experiment C: a container reaching Foreman's agent port on the host's loopback
-
-Epic: [Prove](./epics/prove.md)
 
 **Question:** can a process inside a rootless Podman container reach a port that Foreman opens **only on the host's loopback** (127.0.0.1), through `host.containers.internal`, on macOS (`podman machine`) and on Fedora (pasta networking)? And is that port unreachable from the local network? See [Team tools → Transport](../product/architecture/team-tools.md#transport), [Building blocks → Agent link](../product/architecture/building-blocks.md#4-agent-link-agentlink--foreman-agent).
 

@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [feature]
+epic: full-ui-demo
 ---
 
 # API types: Go structs and generated TypeScript
-
-Epic: [Full UI on a demo client](./epics/full-ui-demo.md)
 
 **Why:** the UI and the server must share one definition of every type that crosses the wire, before any screen is built on them (the epic's first condition; [Tech stack → Wire formats](../product/architecture/tech-stack.md#wire-formats)).
 

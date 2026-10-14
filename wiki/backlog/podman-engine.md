@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: high
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Podman execution engine
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** real agents run in rootless containers ([Session runner](../product/architecture/session-runner.md)).
 

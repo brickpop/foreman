@@ -3,11 +3,10 @@ type: task
 status: todo
 priority: high
 tags: [spike]
+epic: prove
 ---
 
 # Experiment D: deliver into Claude Code, and know when it is idle or waiting
-
-Epic: [Prove](./epics/prove.md)
 
 **Question:** can Foreman (1) type a message into Claude Code's interface reliably, including while it is busy, and (2) tell from Claude Code's hooks when it is busy, idle at its prompt after finishing, or waiting for the user (a question or a permission dialog)? And how long can a tool call stay open (for `escalate(approval)`) before Claude Code times it out? This is the core of messaging. See [Harness adapters](../product/architecture/harness-adapters.md), [Protocol](../product/architecture/protocol.md), [Building blocks → What is proven](../product/architecture/building-blocks.md#what-is-proven-and-what-isnt).
 

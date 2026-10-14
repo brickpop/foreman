@@ -3,11 +3,10 @@ type: task
 status: blocked
 priority: medium
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
 # Wire Team and Agent pages to the real backend: souls through team files
-
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
 
 **Why:** the pages exist on the demo client ([Team and Agent pages](./ui-teams-agents.md)); this card reads and writes the real team files ([Team page](../product/features/team-page.md), [Agent page](../product/features/agent-page.md), [Team definition](../product/models/team-definition.md), [Deploy a team](../product/features/deploy-team.md)).
 

@@ -3,19 +3,20 @@ type: task
 status: blocked
 priority: medium
 tags: [feature]
+epic: terminal-multiplexer
 ---
 
-# Image builder and Settings → Maintenance
+# Image builder (phase 1: one image) and Settings → Maintenance
 
-Epic: [Terminal multiplexer](./epics/terminal-multiplexer.md)
-
-**Why:** containers need the harness and the project's toolchain ([Agent images](../product/architecture/tech-stack.md#agent-images)).
+**Why:** containers need the harness and the tools to run a project's tests. Phase 1 builds **one image for every project** ([Agent images → Phasing](../product/architecture/tech-stack.md#agent-images)).
 
 Blocked by [Experiment A](./prove-a-podman-engine.md).
 
-**Done when:** the `Images` interface ([Building blocks → 1b](../product/architecture/building-blocks.md)) builds the four-layer chain through the API (transparent layers as tags, input-hash tags, Refresh, Prune), the Direct builder is a no-op, and [Settings → Maintenance](../product/features/settings.md#maintenance) shows and drives it.
+**Done when:** the `Images` interface ([Building blocks → 1b](../product/architecture/building-blocks.md)) builds the one image through Podman's API from an embedded Containerfile, the Direct builder is a no-op, and [Settings → Maintenance](../product/features/settings.md#maintenance) shows its state, harness version and build log, with **Rebuild**.
 
-- [ ] base and harness Containerfiles embedded in the binary
-- [ ] chain build, tag, cascade invalidation; build logs streamed
-- [ ] Refresh (with optional prune), Prune, status
-- [ ] the Maintenance section
+- [ ] the Containerfile, embedded in the binary: start from [`pclaude`](https://github.com/brickpop/pclaude)'s Dockerfile (commit `7c9f9079`: `node:26-slim`, shell tools, Go, Bun, Deno, Foundry, the `wiki` CLI, Claude Code last, `ENTRYPOINT []`, `CMD ["claude"]`), adding `foreman-agent`
+- [ ] build through the API on first use; tag by input hash; build log streamed
+- [ ] Rebuild without cache (latest Claude Code)
+- [ ] the phase 1 Maintenance section
+
+The four-layer chain, overrides, Refresh with prune and Prune: [Full image chain](./image-chain.md).

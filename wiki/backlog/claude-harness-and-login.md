@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: in-progress
 priority: high
 tags: [feature]
 epic: terminal-multiplexer
@@ -14,7 +14,7 @@ Unblocked: [Experiment B](./prove-b-shared-login.md) and [Experiment E](./prove-
 
 **Done when:** `harness/claudecode` implements `Launch` (the session prompt as `CLAUDE.md` in the instance's private config dir, the shared login file, permission mode, git identity), and Settings → Harnesses → Connect runs the login container in a dialog; the fake harness implements the same interface for tests.
 
-- [ ] the `Harness` interface and the fake harness adapter
-- [ ] session prompt composer ([Session prompt](../product/architecture/session-prompt.md))
-- [ ] private config dirs, shared login folder, `~/.gitconfig` (ro, if present)
-- [ ] login container + [Settings → Harnesses](../product/features/settings.md#harnesses)
+- [x] the `harness.Adapter` interface (`Launch` for now: `Deliver`, `Interpret` and `Diagnose` come with the agent link, in [Messaging and hand-offs](./epics/messaging-handoffs.md)) and the fake harness adapter
+- [x] session prompt composer ([Session prompt](../product/architecture/session-prompt.md)), with an epic 1 variant: without the agent link it lists no team tools, and says the agent works alone and leaves its work uncommitted for the CEO
+- [x] Claude Code `Launch`: private config dir in the sandbox (`.harness/claude-code`), `CLAUDE.md`, the shared login file, `.claude.json` seeded (onboarding, trust), `skipDangerousModePermissionPrompt`, `--dangerously-skip-permissions`, `--resume`, `~/.gitconfig` (ro, if present)
+- [ ] the login container's server side (start it as a terminal, `connected` status), once the [Instance manager](./instance-manager.md) wires the engine; its dialog is the [Settings screen](./ui-settings-notifications.md)'s; then `cmd/prove`'s login goes

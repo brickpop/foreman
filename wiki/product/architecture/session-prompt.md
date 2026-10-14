@@ -65,6 +65,8 @@ from the same point with the CEO's answer.
 Before any handoff, run: {checks}
 ```
 
+**Phasing:** until the agent link exists ([Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md)), the composer leaves out the Tools section and the lines that name tools (including the end of the lead's default job description). Instead it says that the agent's branch was made for it, that git is read-only and nothing is committed (the CEO reviews the uncommitted work in its worktrees), and that teammates can't be reached: the CEO relays.
+
 ## Delivery
 
 The composed prompt is plain Markdown, written as the **user-level instruction file of the instance's private harness config directory** ([Session runner → Credentials](./session-runner.md#credentials)):

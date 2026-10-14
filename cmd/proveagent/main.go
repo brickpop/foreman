@@ -1,7 +1,7 @@
 // Command proveagent is a stand-in for foreman-agent in the Prove epic's
 // experiments (wiki/backlog/epics/prove.md); it runs inside agent containers.
 //
-//	proveagent mcp           a local (stdio) MCP server with one tool, "ping"
+//	proveagent mcp           a local (stdio) MCP server with two tools: "ping", and "wait" (blocks for some seconds)
 //	proveagent hook <event>  forwards a harness hook event (JSON on stdin) to the host
 //
 // Configuration comes from the environment: FOREMAN_PROVE_SECRET (what ping
@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -67,7 +68,12 @@ func serveMCP(in io.Reader, out io.Writer) {
 	lines := bufio.NewScanner(in)
 	lines.Buffer(make([]byte, 1<<20), 1<<20)
 	enc := json.NewEncoder(out)
+	var mu sync.Mutex // replies come from waits running in the background too
+	var waits sync.WaitGroup
+	defer waits.Wait()
 	reply := func(id json.RawMessage, result any) {
+		mu.Lock()
+		defer mu.Unlock()
 		_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
 	}
 	for lines.Scan() {
@@ -90,20 +96,50 @@ func serveMCP(in io.Reader, out io.Writer) {
 		case "ping":
 			reply(req.ID, map[string]any{})
 		case "tools/list":
-			reply(req.ID, map[string]any{"tools": []any{map[string]any{
-				"name":        "ping",
-				"description": "Answers with a secret word, proving the call reached Foreman.",
-				"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
-			}}})
+			reply(req.ID, map[string]any{"tools": []any{
+				map[string]any{
+					"name":        "ping",
+					"description": "Answers with a secret word, proving the call reached Foreman.",
+					"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
+				},
+				map[string]any{
+					"name":        "wait",
+					"description": "Blocks for the given number of seconds, then answers. For testing how long a tool call may take.",
+					"inputSchema": map[string]any{"type": "object", "properties": map[string]any{
+						"seconds": map[string]any{"type": "number"},
+					}, "required": []string{"seconds"}},
+				},
+			}})
 		case "tools/call":
-			logLine("tool ping called")
+			var call struct {
+				Name      string `json:"name"`
+				Arguments struct {
+					Seconds float64 `json:"seconds"`
+				} `json:"arguments"`
+			}
+			_ = json.Unmarshal(req.Params, &call)
+			logLine("tool %s called", call.Name)
+			if call.Name == "wait" {
+				waits.Add(1)
+				go func(id json.RawMessage, d time.Duration) {
+					defer waits.Done()
+					time.Sleep(d)
+					logLine("tool wait answered after %v", d)
+					reply(id, map[string]any{"content": []any{map[string]any{
+						"type": "text", "text": fmt.Sprintf("waited %v", d),
+					}}})
+				}(req.ID, time.Duration(call.Arguments.Seconds*float64(time.Second)))
+				continue
+			}
 			reply(req.ID, map[string]any{"content": []any{map[string]any{
 				"type": "text", "text": "pong-" + os.Getenv("FOREMAN_PROVE_SECRET"),
 			}}})
 		default:
 			if len(req.ID) > 0 { // a request, not a notification
+				mu.Lock()
 				_ = enc.Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID,
 					"error": map[string]any{"code": -32601, "message": "method not found"}})
+				mu.Unlock()
 			}
 		}
 	}

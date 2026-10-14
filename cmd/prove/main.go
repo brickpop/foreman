@@ -37,6 +37,12 @@ func main() {
 			fmt.Sscan(os.Args[3], &n)
 		}
 		proveStorm(r, n)
+	case "d run":
+		seconds := 330
+		if len(os.Args) > 3 {
+			fmt.Sscan(os.Args[3], &seconds)
+		}
+		proveD(r, seconds)
 	case "b race":
 		variant, n := "file", 12
 		if len(os.Args) > 3 {

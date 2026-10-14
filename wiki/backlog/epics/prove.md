@@ -1,6 +1,6 @@
 ---
 type: epic
-status: in-progress
+status: done
 order: 0
 ---
 
@@ -19,3 +19,5 @@ order: 0
 **Exit criteria:** every experiment card is retired with PASS, or with FAIL and the specs already changed to the alternative design.
 
 **Cleanup (ephemeral code):** `cmd/prove/`, `cmd/proveagent/` and the `prove-*` recipes are throwaway, committed only so the experiments can run. Remove them once what they prove has landed in real code: the Podman client in the [Podman engine](../podman-engine.md), the image build in the [Image builder](../image-builder.md), the login in the [Claude Code harness](../claude-harness-and-login.md), and experiment D run on the real engine.
+
+**Done (2026-10-14):** A, B, C, D and E all passed for Claude Code on macOS (Fedora not run; macOS is the CEO's machine). The one design consequence: multi-line deliveries into Claude Code are not pasted ([D](../prove-d-claude-delivery-hooks.md)). What remains is the cleanup above, as each piece lands in real code: the Podman engine, the image builder and the worktrees already have; the login and D's checks go with the [Claude Code harness](../claude-harness-and-login.md).

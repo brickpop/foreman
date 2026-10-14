@@ -45,3 +45,18 @@ func TestServeMCP(t *testing.T) {
 		t.Error("an unknown method got no error")
 	}
 }
+
+// A wait blocks only its own call: a ping sent after it is answered first, and
+// the wait still answers before the server exits.
+func TestWaitRunsAlongsideOtherCalls(t *testing.T) {
+	in := strings.Join([]string{
+		`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"wait","arguments":{"seconds":0.2}}}`,
+		`{"jsonrpc":"2.0","id":2,"method":"ping"}`,
+	}, "\n")
+	var out bytes.Buffer
+	serveMCP(strings.NewReader(in), &out)
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `"id":2`) || !strings.Contains(lines[1], `"id":1`) || !strings.Contains(lines[1], "waited 200ms") {
+		t.Errorf("replies:\n%s", out.String())
+	}
+}

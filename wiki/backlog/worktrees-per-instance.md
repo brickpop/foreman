@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: terminal-multiplexer
@@ -17,5 +17,5 @@ Blocked by [Workspace and config](./workspace-config-events.md) (the project's c
 - [x] `Prepare(repo, worktree, branch, base)` in `internal/git`, one git command at a time per repo; tests on real temporary repos: new, existing (left on its branch with its work), an existing branch whose folder was deleted, a branch checked out elsewhere, a repo without `main` (the error points at `main` in project.toml), an empty repo, another repo in the way, twelve at once
 - [x] a check that git works in a container through the same-path, read-only `.git` mount, on both machines: `git status`, `diff` and `log` succeed (`git status` normally refreshes the worktree's index under `.git/worktrees/<name>/` and must skip that quietly), and `git commit` and `git checkout -b` fail cleanly: `TestGitThroughAReadOnlyGitMount` in `just test-podman` (composing these mounts for each instance is the [Instance manager](./instance-manager.md)'s)
 - [x] `.git/info/exclude` entry: `Exclude(path)` adds `/<path>/` to the enclosing repo's exclude file, once; nothing outside a repo
-- [ ] `just test-podman` on the CEO's Mac: git inside the container through the read-only `.git`
+- [x] `just test-podman` on the CEO's Mac (2026-10-14): git inside the container through the read-only `.git`
 - [x] specs: [Sandboxes and git policy](../product/architecture/sandboxes-and-git.md) and [Session runner](../product/architecture/session-runner.md) are `partial`

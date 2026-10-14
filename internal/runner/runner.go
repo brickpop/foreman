@@ -56,3 +56,26 @@ type Mount struct {
 type Size struct {
 	Cols, Rows uint16
 }
+
+// Images builds the images an engine's processes run
+// (wiki/product/architecture/building-blocks.md#1b-image-builder-runnerengine).
+// Phase 1 has one image for every project; Prune and per-layer Refresh come
+// with the full chain.
+type Images interface {
+	// Ensure returns the image to run project's processes on, building it
+	// first if needed; concurrent callers share one build.
+	Ensure(ctx context.Context, project string) (ref string, err error)
+	// Refresh rebuilds without cache and with the latest base image (new
+	// harness versions). Running processes keep their image.
+	Refresh(ctx context.Context) error
+	// Status is the state of each image, for Settings → Maintenance.
+	Status(ctx context.Context) []ImageStatus
+}
+
+// ImageStatus is one image's state.
+type ImageStatus struct {
+	Name  string `json:"name"`  // e.g. localhost/foreman/harness
+	Ref   string `json:"ref"`   // the exact tag Ensure returns, "" when there is none
+	State string `json:"state"` // "missing", "building", "ready" or "failed"
+	Log   string `json:"log"`   // the last build's output (its end, when long)
+}

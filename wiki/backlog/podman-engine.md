@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: terminal-multiplexer
@@ -17,4 +17,4 @@ Was blocked by [Experiment A](./prove-a-podman-engine.md), proven on macOS on 20
 - [x] libpod REST client over the socket (`net/http`), attach as a hijacked stream, attached **before** the start so the first output is kept
 - [x] mounts at the same path, `keep-id`, `:z` on SELinux; create and start one at a time; a stopped container left with the same name is removed, a running one refuses the start; exited containers are removed (their name is free again)
 - [x] Podman service start (`podman system service` / `podman machine start`); `Version()` for Settings → Maintenance (the section itself: [Image builder](./image-builder.md))
-- [ ] `just test-podman` on the CEO's Mac (and Fedora): the integration tests (first output, input, exit code, size and resize, Ctrl-P Ctrl-Q, mounts rw/ro and file ownership, re-attach from a second engine, stop, 12 starts at once)
+- [x] `just test-podman` on the CEO's Mac (2026-10-14) (and Fedora): the integration tests (first output, input, exit code, size and resize, Ctrl-P Ctrl-Q, mounts rw/ro and file ownership, re-attach from a second engine, stop, 12 starts at once)

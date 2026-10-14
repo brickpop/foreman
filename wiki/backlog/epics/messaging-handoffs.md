@@ -6,7 +6,7 @@ order: 2
 
 # Messaging and hand-offs
 
-**Goal:** agents work together. `foreman-agent` and the agent link carry team-tool calls and hook events; agents `ask`, `reply`, `handoff` and `contribute`, and write git through `switch`, `commit` and `update`; Messaging delivers to idle agents; the UI shows markers and the Messages drawer.
+**Goal:** agents work together. `foreman-agent` and the agent link carry team-tool calls and hook events; `foreman-agent` is added to the agent image ([Image builder](../image-builder.md)); agents `ask`, `reply`, `handoff` and `contribute`, and write git through `switch`, `commit` and `update`; Messaging delivers to idle agents; the UI shows markers and the Messages drawer.
 
 **Hand-offs name a branch** (`handoff(mara, "wt/tove/LED-44", …)`): every agent has its own worktree since [Terminal multiplexer](./terminal-multiplexer.md), and all worktrees share the repo, so the lead sees the branch at once. Foreman checks the branch against the policy and delivers the hand-off; checks and work items arrive with the [Git](./git.md) epic. Agents work in parallel: there is no gate between agents of one project.
 

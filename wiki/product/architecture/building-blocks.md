@@ -149,7 +149,7 @@ Implementations, named by **where the process runs** (both give it a terminal):
 
 Each engine comes with the image builder that matches it. The Instance manager asks it for the project's image and puts the answer in `Spec.Image`.
 
-**Phasing:** phase 1 builds one image for every project (from `pclaude`'s Dockerfile, plus `foreman-agent`); the four-layer chain comes later ([Agent images](./tech-stack.md#agent-images)).
+**Phasing:** phase 1 builds one image for every project (from `pclaude`'s Dockerfile, plus `foreman-agent`); the four-layer chain comes later ([Agent images](./tech-stack.md#agent-images)). Phase 1 implements `Ensure`, `Refresh` (no layer: the one image) and `Status`; `Prune` and per-layer Refresh come with the chain.
 
 ```go
 type Images interface {
@@ -466,7 +466,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 ## Code today, against these blocks
 
-- `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations.
+- `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
 - `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher.
 - `internal/events`: the Event bus; `internal/git`: Foreman's own git (`Init`, `Commit`), the start of the Git block.

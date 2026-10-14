@@ -1,7 +1,7 @@
 spec = "0.1"
 
-# Entry kinds: `spec` (product knowledge under product/), `task` (backlog cards), `note` (anything else)
-types = ["spec", "task", "note"]
+# Entry kinds: `spec` (product knowledge under product/), `task` (backlog cards), `epic` (groups of cards), `note` (anything else)
+types = ["spec", "task", "epic", "note"]
 
 # Files that are NOT wiki entries (excluded from index and check; globs supported)
 ignore = []

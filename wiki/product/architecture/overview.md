@@ -12,37 +12,11 @@ It listens on `localhost:8888` by default ([Workspace settings](../models/worksp
 
 ## Components
 
-| # | Component | Job | Entry |
-|---|---|---|---|
-| 1 | **HTTP server + SPA** | Serves the JSON API, SSE, the PTY WebSockets and the embedded UI build | [API](./api.md) |
-| 2 | **Workspace indexer** | Scans the [workspace](../models/workspace.md) for projects and repos. Watches config, team files and wikis; pushes changes to clients within ~1 s | [Persistence](./persistence.md) |
-| 3 | **Session supervisor** | Starts harnesses through the [session runner](./session-runner.md), one per instance. Owns lifecycle, restarts, the concurrency queue and logs. Exposes PTY I/O over WebSocket | [Agent runtime](./agent-runtime.md) |
-| 4 | **Sandbox manager** | Creates and refreshes per-instance clones, checks out branches, enforces branch policy | [Sandboxes and git policy](./sandboxes-and-git.md) |
-| 5 | **Team-tools router** | Exposes the agent tools to harnesses (MCP), routes messages between instances of one deployment, stores them, injects replies into the requester's session | [Team tools](./team-tools.md) |
-| 6 | **Request engine** | Creates, deduplicates and resolves [requests](../features/requests.md) (agent-raised and Foreman-raised). Resolving one writes the answer back to the agent and resumes it | [Request](../models/request.md) |
-| 7 | **Pipeline tracker** | Tracks work items through their stages and the pull requests that carry them; drives forge adapters and notices merges (on the forge, or in the project repo without one) | [Pipeline and PRs](../features/pipeline-and-prs.md), [Work item](../models/work-item.md), [Pull request](../models/pull-request.md) |
-| 8 | **Forge adapters** | GitHub, Forgejo, Gitea (REST) and `none` (local). Push lead branches, open PRs, poll their state and checks, comment on send-back, close discarded ones. Never merge | [Forge adapters](./forge-adapters.md) |
-| 9 | **Wiki engine** | Parses the bundle, builds tree, entries, boards, links; atomic single-field writes. Imports the agentic-wiki engine | [Wiki engine](./wiki-engine.md) |
-| 10 | **Prompt composer** | Builds each instance's session prompt from soul + team + deployment + project | [Session prompt](./session-prompt.md) |
-| 11 | **Notifier** | Pushes events to the UI (SSE); the UI raises browser notifications and toasts | [API](./api.md), [Notifications](../features/notifications.md) |
-| 12 | **Chief of Staff** | A Foreman-owned harness session with tools to read and edit Foreman files and project config (on a branch), create teams, hire agents and answer free-form requests | [Chief of Staff](../features/chief-of-staff.md) |
+The blocks Foreman is made of, their interfaces and how they connect are in [Building blocks](./building-blocks.md), the authoritative map. The rules below keep them swappable.
 
-## How they connect
-
-```
- Browser (SPA) ──HTTP/JSON, SSE, WS──▶ HTTP server ──▶ request engine · pipeline · wiki engine · indexer
-                                            │
-                                            ▼
-                                     session supervisor ──▶ session runner (Podman | PTY) ──▶ harness in container
-                                            ▲                                                   │
-                                            │                       MCP (team-tools listener, token)   │
-                                        team-tools router ◀────────────────────────────────────────────┘
-                                            │
-                              sandbox manager · forge adapters · state.db
-```
-
-- The UI never talks to a harness directly: PTY bytes flow through the supervisor, which also tees them to the session log.
-- Harnesses never talk to each other directly: only the team-tools router moves `output` between instances, and only within one [deployment](../models/deployment.md).
+Three invariants hold across all of them:
+- The UI never talks to a harness directly: terminal bytes flow through the Terminal block, which also tees them to the session log.
+- Harnesses never talk to each other directly: only Messaging moves `output` between instances, and only within one [deployment](../models/deployment.md).
 - Harnesses never touch a forge, a secret or another sandbox: pushes to forges are done by Foreman ([Sandboxes and git policy](./sandboxes-and-git.md)).
 
 ## Modularity
@@ -59,10 +33,15 @@ The seams known today (every new component adds its own):
 
 | Seam | Package | Implementations |
 |---|---|---|
-| Session runner: where a harness process runs | `runner` | Podman (production), local PTY (tests, dev); tmux possible later ([Session runner](./session-runner.md)) |
+| Execution engine: where a harness process runs | `runner` | Podman (production), Direct (tests, dev, or an explicit no-isolation setting); tmux possible later ([Building blocks](./building-blocks.md#1-execution-engine-runner), [Session runner](./session-runner.md)) |
 | Session driver: how Foreman talks to a harness | `harness` | PTY (v1); Agent Client Protocol later ([Harness adapters](./harness-adapters.md#session-drivers)) |
 | Harness adapter: per-harness details | `harness` | Claude Code, Pi, Hermes Agent, custom; Codex later; the fake harness in tests |
-| Image builder | `runner/podman` | libpod build API; a no-op for the PTY runner ([Agent images](./tech-stack.md#agent-images)) |
+| Session log: each session's raw history | `sessionlog` | files under `.foreman/logs/`; an in-memory log in tests |
+| Screen: server-side terminal state | `terminal` (consumer) | `charmbracelet/x/vt`; a fake in the Terminal's tests ([Terminal state](./terminal-state.md)) |
+| Terminal: one live process, its buffer and viewers | `terminal` | the Terminal block; a fake in the server's tests ([Building blocks](./building-blocks.md#2-terminal-terminal)) |
+| Agent link: how agents reach Foreman | `agentlink` + `foreman-agent` | one loopback port, a token per instance ([Team tools → Transport](./team-tools.md#transport)) |
+| Instance manager, Messaging, Workflow | `instances`, `messaging`, `workflow` | one each today ([Building blocks](./building-blocks.md)) |
+| Image builder | `runner/<engine>` | libpod build API (Podman); a no-op (Direct) ([Agent images](./tech-stack.md#agent-images)) |
 | Forge | `forge` | GitHub, Gitea (also Forgejo), none; a fake forge server in tests ([Forge adapters](./forge-adapters.md)) |
 | Secret store | `secrets` | 0600 file (v1); OS keychain later ([Secrets](../models/secrets.md)) |
 | Wiki engine | `wiki` | the agentic-wiki engine ([Wiki engine](./wiki-engine.md)) |
@@ -70,6 +49,15 @@ The seams known today (every new component adds its own):
 | Access guard: who may reach the server | `access` | the per-install token guard ([Security](./security.md#access-token)); real user auth if ever needed |
 | Workspace, as the server sees it | `workspace` | the folder on disk |
 | UI files | `ui` | embedded build, or a folder on disk (`--ui-dir`) |
+
+### In the UI
+
+The same idea holds in the browser, scaled to it:
+
+1. **Screens never talk to the network.** All server access goes through typed client interfaces in `ui/src/api/` (one per area: workspace, sessions, requests…). The transport behind them (HTTP, SSE, WebSocket) can change without touching a component, and tests give components an in-memory client.
+2. **Third-party widgets sit behind our own component.** The terminal is our `Terminal` component with our props, not xterm.js used directly in screens; the same goes for the markdown view, drag and drop, and the Radix primitives. Replacing a library is then a change in one file.
+3. **Components get data through props or hooks, never through globals.** The composition root is `ui/src/main.tsx`, which picks the real clients and provides them to the tree.
+4. **Design tokens, not literal values.** Colours, spacing and type come from the tokens in [Design system](../design/design-system.md), so the look can change in one place.
 
 ## Process model
 

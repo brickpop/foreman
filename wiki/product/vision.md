@@ -65,7 +65,7 @@ Roles with default job descriptions (used by the Chief of Staff and the example 
 - **Reliability**:
   - Instances survive UI disconnects.
   - On server restart, deployments are restored from `state.db` and sessions are restarted with the last task note ([Agent runtime](./architecture/agent-runtime.md)).
-  - PTY logs allow scrollback replay ([Persistence](./architecture/persistence.md)).
+  - Session logs keep each session's full history ([Persistence](./architecture/persistence.md)); a reload shows the exact current screen from a snapshot ([Terminal state](./architecture/terminal-state.md)).
 - **Performance**: 20+ concurrent sessions on a laptop. Terminal latency under 50ms locally. File changes reflected in the UI within 1s.
 - **Observability**: per-instance logs, a team-message log, a request history, and a server log with harness exit codes.
 - **Portability**: macOS and Linux first. Windows via WSL.

@@ -67,7 +67,7 @@ The composed prompt is plain Markdown, written as the **user-level instruction f
 | Codex CLI | `$CODEX_HOME/AGENTS.md` | Global instructions |
 | Custom | The adapter's choice (a flag with a file path, or the first stdin message) | |
 
-Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and PRs), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn; a soul edit while running is announced by a context-update message (below) and takes full effect at the next restart. To verify per harness in the [walking skeleton](../../backlog/walking-skeleton.md).
+Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and PRs), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn; a soul edit while running is announced by a context-update message (below) and takes full effect at the next restart. To verify per harness in the [Prove epic](../../backlog/epics/prove.md).
 
 ## Variable parts
 

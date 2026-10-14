@@ -29,7 +29,7 @@ Every adapter implements the same small set, so kinds are interchangeable. **For
 | open PR (title, summary, head, base = `main`) → URL, number | `open_pr` |
 | read PR state | polling, below |
 | read check status | after opening and while polling; shown as "checks pass" on review request panels ([Changes](../features/changes.md)), next to Foreman's own run of the project `checks` |
-| comment | CEO **Send back**: the notes are posted on the PR (and written into the lead's session; the pull request is closed and its work items go back to stage 0) |
+| comment | CEO **Send back**: the notes are posted on the PR (and delivered to the lead, typed into its session when idle; the pull request is closed and its work items go back to stage 0) |
 | close PR | CEO **Discard** on a Chief of Staff config change |
 
 For `none` there is no PR: `open_pr` publishes the lead branch into the project repo as a plain branch, and "comment" writes only to the lead's session.
@@ -41,7 +41,7 @@ While a [pull request](../models/pull-request.md) is open, Foreman polls it on t
 - **merged**: the pull request and its work items are marked merged, the review request resolves, the lead is told; Foreman's mirror fetches the new `main` from the forge, and sandboxes fetch it on next idle. The leads of the other open PRs on the same repo are told to rebase ([When main moves](../features/pipeline-and-prs.md#when-main-moves)).
 - **mergeability**: when the forge reports the PR as conflicting with `main`, `conflicting` is set (shown as "conflicts with main") and the lead is asked to rebase; cleared when the forge reports it mergeable again.
 - **closed** without merge: the pull request is closed, the review request resolves as closed, its work items go back to stage 0, the lead is told.
-- **new review comments** and "changes requested" reviews since the last poll: relayed into the lead's session.
+- **new review comments** and "changes requested" reviews since the last poll: delivered to the lead (typed into its session when idle).
 
 Without a forge, Foreman instead fetches the project repo's `main` on the same interval and checks whether it contains the lead branch head (`git merge-base --is-ancestor`).
 

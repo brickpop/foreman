@@ -36,13 +36,13 @@ Table `instances`.
 | `starting` | Container, sandbox and harness being set up | violet (`--team`) |
 | `running` | Working | green (`--ok`) |
 | `idle` | Waiting at its prompt with nothing assigned (and not right after a handoff) | grey (`--tx4`) |
-| `awaiting` | Waits on an open blocking approval from the CEO ([Request](./request.md#invariants)) | amber (`--acc`) |
+| `awaiting` | Waits on the CEO: an open `escalate(approval)`, or the harness reported it is waiting for the user ([Request](./request.md#invariants), [Protocol](../architecture/protocol.md#waiting-for-the-ceo)) | amber (`--acc`) |
 | `done` | Just handed off, nothing assigned yet. Lasts until the next input or card assignment, then becomes `idle` (or `running`) | blue (`--info`) |
 | `stopped` | Exited, crashed, rate-limited, or its deployment was stopped | red (`--err`) |
 
 ## Logs
 
-The raw PTY byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It serves scrollback replay in the browser terminal. Logs rotate at a size cap ([Persistence](../architecture/persistence.md#session-logs)).
+The raw terminal byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It is the session's history and audit trail; the browser terminal is restored from a snapshot of the server-side screen, not from the log ([Terminal state](../architecture/terminal-state.md)). Logs rotate at a size cap ([Persistence](../architecture/persistence.md#session-logs)).
 
 ## Invariants
 

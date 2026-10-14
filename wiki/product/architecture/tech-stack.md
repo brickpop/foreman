@@ -6,7 +6,7 @@ tags: [architecture, runtime, ui]
 
 # Tech stack
 
-The languages, libraries, repo layout, build and test setup. This entry is the single source of truth for "what do we use": other entries link here instead of naming libraries. Each choice says **why**, so that it can be challenged later. Every choice here is decided; the [walking skeleton](../../backlog/walking-skeleton.md) confirms the runtime ones.
+The languages, libraries, repo layout, build and test setup. This entry is the single source of truth for "what do we use": other entries link here instead of naming libraries. Each choice says **why**, so that it can be challenged later. Every choice here is decided; the [Prove epic](../../backlog/epics/prove.md) confirms the runtime ones.
 
 Guiding constraints, from the [vision](../vision.md): one local binary, local-first and offline-capable (no telemetry, no CDN calls), 20+ concurrent sessions on a laptop, macOS and Linux first, as few dependencies as possible, and every moving part behind a small swappable interface.
 
@@ -17,7 +17,7 @@ Guiding constraints, from the [vision](../vision.md): one local binary, local-fi
 | **Go** for the server | The `wiki` engine ([Wiki engine](./wiki-engine.md)) is a Go module with public packages, so Foreman reuses its rules instead of reimplementing them. PTY handling, process supervision and a single static binary are Go's home ground, and the PTY proofs of concept were already in Go. |
 | **One binary** serving the API and the built SPA | PRD requirement. The SPA is embedded with `//go:embed`. |
 | **Every agent instance runs in a rootless Podman container** | Real isolation from day one: an agent sees only what is mounted ([Session runner](./session-runner.md), [Security](./security.md)). |
-| **A swappable `Runner` interface** for where sessions run | Podman in production, a local PTY runner for hermetic tests and development. tmux or anything else can be added later without touching the rest ([Session runner](./session-runner.md)). |
+| **A swappable `Runner` interface** for where sessions run | Podman in production; the Direct engine (a pseudo-terminal on the host, no isolation) for hermetic tests and development. tmux or anything else can be added later without touching the rest ([Session runner](./session-runner.md)). |
 | **Foreman builds the agent images as a four-layer chain** | base → harness → workspace → project, a layer without a Containerfile is just a tag of its parent; Refresh and Prune live in Settings → Maintenance ([Agent images](#agent-images)). |
 | **Tailwind 4 + unstyled Radix primitives** for the UI | The prototype's tokens become CSS variables, Tailwind utilities sit over them, and Radix brings focus traps, Escape and keyboard navigation. |
 | **JSON API typed from Go structs (`tygo`); PTY as raw binary frames** | See [Wire formats](#wire-formats). Protobuf adds nothing on the PTY path and solves a versioning problem we don't have. |
@@ -31,15 +31,16 @@ Guiding constraints, from the [vision](../vision.md): one local binary, local-fi
 | HTTP routing | stdlib `net/http` (`ServeMux` method and path patterns) | Enough for ~30 endpoints; no framework. |
 | Server-sent events | stdlib (`http.Flusher`) | A dozen lines; no library needed. |
 | WebSocket (PTY streams) | `github.com/coder/websocket` | Small, context-aware, maintained; the stdlib has no WebSocket. |
-| Local PTY (test/dev runner) | `github.com/creack/pty` | The standard Go PTY package; used by the POCs. |
-| Podman | The libpod REST API over the Podman socket, with plain `net/http` | Avoids the very heavy `containers/podman/v5/pkg/bindings` module. See [Session runner](./session-runner.md#podman-runner-production). |
-| Team tools (agent tools) | MCP server via `github.com/modelcontextprotocol/go-sdk` (official SDK), Streamable HTTP transport | Claude Code and Codex speak MCP natively ([Team tools](./team-tools.md)). |
+| Pseudo-terminal (Direct engine) | `github.com/creack/pty` | The standard Go PTY package; used by the POCs. |
+| Podman | The libpod REST API over the Podman socket, with plain `net/http` | Avoids the very heavy `containers/podman/v5/pkg/bindings` module. See [Session runner](./session-runner.md#podman-engine-production). |
+| Team tools (agent tools) | MCP via `github.com/modelcontextprotocol/go-sdk` (official SDK): `foreman-agent` serves it to the harness over **stdio** (the form every harness supports) and relays to Foreman's agent port | Harnesses speak MCP natively; one shipped binary also carries the hook events ([Team tools → Transport](./team-tools.md#transport)) |
 | Runtime state | SQLite via `modernc.org/sqlite` (pure Go) | No CGO, so the binary cross-compiles and stays static. WAL mode. |
 | Queries and migrations | Hand-written `database/sql` in one `store` package; numbered `.sql` migrations embedded and applied by `PRAGMA user_version` | About 8 tables ([Persistence](./persistence.md)). An ORM or a code generator would cost more than it saves. |
 | YAML (project, team, settings files) | `go.yaml.in/yaml/v3` (the maintained continuation of `gopkg.in/yaml.v3`) | Its `Node` API edits a team file in place while keeping the CEO's comments and order. |
 | TOML (`wiki.toml`) | Through the wiki engine (`bundle.DecodeTool`) | Never parsed twice. |
 | Wiki | `github.com/agentic-wiki/wiki` (`bundle`, `index`, `parse`) | See [Wiki engine](./wiki-engine.md). |
 | Markdown → HTML | `github.com/yuin/goldmark` on the server, raw HTML disabled | Links are resolved by the engine's resolver and checkboxes carry their source line, so the browser never re-implements a wiki rule. Wiki content is written by agents, so it is untrusted: no raw HTML, and URLs are sanitised ([Security](./security.md)). |
+| Server-side terminal state | `github.com/charmbracelet/x/vt`, pinned at v0.1.0, behind the `Screen` interface | A maintained, pure-Go VT emulator (screen, scrollback, alternate screen, modes, styled render) from the Charm team. Its first tagged release is v0.1.0 (2026-10-12); the post-1.0 alternatives are a parser only (`go-vte`) or unmaintained since 2020 without scrollback (`vt10x`). Round-trip tests guard upgrades ([Terminal state](./terminal-state.md)) |
 | File watching | `github.com/fsnotify/fsnotify` | Config, team and wiki changes reach the UI within ~1s ([Persistence](./persistence.md)). |
 | Git | The `git` CLI (on the host for Foreman's own operations, in the container for agents) | Same behaviour as the CEO's git; `go-git` lacks parts of worktrees and hooks. |
 | Forges | Plain `net/http` clients: GitHub REST, and one Gitea client that also serves Forgejo (same API) | Three small adapters behind one interface ([Forge adapters](./forge-adapters.md)). |
@@ -117,32 +118,37 @@ One Go module at the root, the web UI in `ui/`:
 ```
 foreman/
 ├── cmd/
-│   ├── foreman/          # the server binary
+│   ├── foreman/          # the server binary, and the composition root
+│   ├── foreman-agent/    # the binary shipped into every container (stdio MCP server, hook command)
 │   └── fakeharness/      # scripted harness for tests (prints, waits, calls team tools)
-├── internal/             # one package per component of the architecture overview
-│   ├── server/           # HTTP, SSE, WebSocket handlers (depends only on interfaces)
-│   ├── access/           # who may talk to the server: the access-token guard
-│   ├── workspace/        # indexer, config loading (project, team, settings), file watcher
-│   ├── runtime/          # supervisor: instances, lifecycle, concurrency queue
-│   ├── runner/           # Runner interface + podman/ and pty/
-│   ├── harness/          # per-harness adapters
-│   ├── sandbox/          # clones, mirrors, branch policy
-│   ├── teamtools/        # MCP server and message router
-│   ├── requests/         # request engine
-│   ├── pipeline/         # pipeline tracker
-│   ├── forge/            # github, gitea (also Forgejo), none
+├── internal/             # one package per building block
+│   ├── runner/           # Execution engine: Runner interface + podman/ and direct/ (each with its image builder)
+│   ├── terminal/         # Terminal: one live process, its buffer, viewers, snapshots
+│   ├── screen/           # the Terminal's server-side terminal state (Screen)
+│   ├── sessionlog/       # the Terminal's raw byte log (history)
+│   ├── harness/          # Harness adapters: Claude Code, Pi, Hermes, custom, fake
+│   ├── prompt/           # session prompt composer (used by the harness adapters)
+│   ├── agentlink/        # Agent link: the agent port, tokens, tool calls and hook events
+│   ├── instances/        # Instance manager: what runs, status, restarts, queue
+│   ├── messaging/        # Messaging: queues and deliveries between agents and the CEO
+│   ├── workflow/         # Workflow: requests, work items, pull requests, gates
+│   ├── sandbox/          # Git: clones, mirrors, branch policy
+│   ├── forge/            # Forge adapters: github, gitea (also Forgejo), none
+│   ├── store/            # State store: SQLite, migrations
+│   ├── workspace/        # Workspace & config: projects, teams, settings, file watcher
 │   ├── wiki/             # thin layer over agentic-wiki + markdown rendering
-│   ├── prompt/           # session prompt composer
+│   ├── events/           # in-process event bus
 │   ├── cos/              # Chief of Staff
-│   └── store/            # SQLite, migrations
-├── images/               # Containerfiles per harness (embedded)
+│   ├── server/           # Web server: HTTP, SSE, WebSocket handlers (depends only on interfaces)
+│   └── access/           # who may talk to the server: the access-token guard
+├── images/               # Containerfiles for the base and harness layers (embedded)
 ├── ui/                   # Vite + React app (src/, built to ui/dist/app) and the Go package that embeds it
 ├── wiki/                 # this knowledge base
 ├── justfile
 └── README.md
 ```
 
-The packages map one-to-one to the components in the [architecture overview](./overview.md), so "where does X live" has one answer.
+The packages map one-to-one to the [building blocks](./building-blocks.md), so "where does X live" has one answer.
 
 ## Build, run and test
 
@@ -152,13 +158,13 @@ All through `just` (`just help` lists everything):
 - `just dev [workspace]`: rebuilds the UI on every change (`vite build --watch`) and runs the Go server on a scratch workspace (`.dev/workspace` by default), serving the UI from disk with the development flag `--ui-dir`. There is no separate Vite dev server: one origin keeps the access token, Host and Origin checks exactly as in production. Reload the page to see a UI change.
 - `just build`: `bun run build` in `ui/`, then `go build` with the UI embedded, giving one binary in `bin/foreman`.
 - `just test`: the Go tests (and the UI unit tests once there are any). Go commands name their packages explicitly (`./cmd/... ./internal/... ./ui`), so stray `.go` files elsewhere are never picked up.
-- `just e2e` (not yet; added with the first UI flows): Playwright against a real `foreman` binary using the PTY runner and the fake harness. The [use cases](../use-cases.md) are the e2e suite.
+- `just e2e` (not yet; added with the first UI flows): Playwright against a real `foreman` binary using the Direct engine and the fake harness. The [use cases](../use-cases.md) are the e2e suite.
 - `just lint`: `gofmt`, `go vet`, `staticcheck` (pinned as a Go tool in `go.mod`, run with `go tool staticcheck`), Biome.
 - `just wiki <args>`: `wiki --root wiki <args>`, and `just check` runs the wiki health check with the rest.
 
 Testing approach:
-- **Go:** standard `testing`. Components are tested through their real interfaces: a real SQLite in a temp dir, a real git repo in a temp dir, the PTY runner with `fakeharness`. No mocks of things we own.
-- **The fake harness** is the key test tool: a scripted program that prints output (including ANSI), waits for stdin, goes idle, and calls the team tools. Supervisor, team-message routing, requests and the pipeline are then testable end to end, deterministically, without models or network.
+- **Go:** standard `testing`. Components are tested through their real interfaces: a real SQLite in a temp dir, a real git repo in a temp dir, the Direct engine with `fakeharness`. No mocks of things we own.
+- **The fake harness** is the key test tool: a scripted program that prints output (including ANSI), waits for stdin, goes idle, and calls the team tools. The Terminal, Instance manager, Messaging and Workflow are then testable end to end, deterministically, without models or network.
 - **Podman runner:** integration tests behind a build tag, run when Podman is present.
 - **Web:** Vitest + Testing Library for components with logic (board, terminal pane wiring, request panels); Playwright for flows.
 

@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [architecture, workspace, runtime, config]
 ---
 
@@ -18,7 +18,7 @@ Where Foreman keeps what, and how changes on disk reach the UI. The principle (c
 | Workspace settings | `<workspace>/.foreman/settings.yaml` | Foreman (UI) | [Workspace settings](../models/workspace-settings.md) |
 | Secrets | OS keychain or `<workspace>/.foreman/secrets` (0600) | Foreman (UI) | Write-only from the UI ([Secrets](../models/secrets.md)) |
 | Runtime state | `<workspace>/.foreman/state.db` (SQLite) | Foreman | Deployments, instances, requests, team messages, work items, pull requests, read markers, UI prefs |
-| Session logs | `<workspace>/.foreman/logs/<agent>@<project>/<session-id>.log` | Foreman | Raw PTY byte stream, for replay and scrollback |
+| Session logs | `<workspace>/.foreman/logs/<agent>@<project>/<session-id>.log` | Foreman | Raw terminal byte stream: each session's history and audit trail (a reload shows a snapshot instead, [Terminal state](./terminal-state.md)) |
 
 ### state.db
 
@@ -29,7 +29,7 @@ Minimum tables, one model entry each: [deployments](../models/deployment.md), [i
 
 ### Session logs
 
-- The supervisor appends every byte read from a session to its current log file before fanning it out ([Session runner](./session-runner.md)). A new session id (and file) per harness start.
+- The Terminal block appends every byte read from a session to its current log file before fanning it out ([Building blocks](./building-blocks.md#2-terminal-terminal)). A new session id (and file) per harness start.
 - Scrollback for a newly attached terminal is replayed from the tail of the log, so the UI shows history after a reload or a server restart.
 - **Retention:** logs rotate per instance at a size cap (50 MB by default, a [workspace setting](../models/workspace-settings.md)); the oldest files beyond it are deleted. Logs hold whatever the harness printed, minus the secrets Foreman redacts ([Secrets](../models/secrets.md#invariants)).
 - The "last output line" shown in [Project settings](../features/project-settings.md) is derived from the stream (ANSI stripped), not stored separately.

@@ -24,7 +24,7 @@ Both drivers expose the same operations to the supervisor (start with a prompt, 
 A harness can be a team member if:
 1. Foreman can start it with a working directory, environment and a standing-instructions file ([Session prompt → Delivery](./session-prompt.md#delivery)).
 2. It can call the team tools, exposed as an MCP server ([Team tools](./team-tools.md)).
-3. It accepts stdin text while running (CEO input, injected team-message lines).
+3. It accepts input while running: the CEO's keystrokes, and deliveries typed by the adapter's `Deliver` when it is idle.
 
 Foreman never parses harness internals. It reads the output stream and talks to the agent through team tools and stdin.
 
@@ -36,7 +36,7 @@ One adapter per harness kind. Each declares:
 |---|---|
 | `command`, `args` | How to start it. The command comes from [workspace settings](../models/workspace-settings.md) (`claude`, `codex`, `pi`, `hermes`); `custom` uses the soul's `command` |
 | system prompt | Which user-level instruction file the harness reads from its config directory (Claude Code `CLAUDE.md`, Codex `AGENTS.md`), where the [session prompt](./session-prompt.md#delivery) is written. Custom harnesses use a flag with a file path or the first stdin message |
-| MCP registration | How the team-tools server is registered: an MCP config file or flag (e.g. Claude Code `--mcp-config`, Codex `mcp_servers` config), pointing at Foreman's team-tools listener with the instance token |
+| MCP registration | How the team-tools server is registered: an MCP config file or flag (e.g. Claude Code `--mcp-config`, Codex `mcp_servers` config) declaring the stdio server `foreman-agent mcp` ([Team tools → Transport](./team-tools.md#transport)) |
 | idle / waiting detection | Which signals mean "idle at prompt" and "waiting for input" (below) |
 | resume | Whether and how a previous harness session can be resumed ([Agent runtime](./agent-runtime.md#restarts)) |
 | auth | How credentials are passed into the container ([Session runner → Credentials](./session-runner.md#credentials)): which config directory variable the harness honours, where its credentials file lives, which API-key variables it reads |
@@ -48,9 +48,10 @@ Adapter configs are built into Foreman for the known harnesses. `custom` gets a 
 
 ## Idle and waiting detection
 
-Status (`running` / `idle` / `awaiting` / `done`) must not depend on scraping a TUI where it can be avoided: **harness-native hooks first, heuristics as fallback**. What each harness actually offers is confirmed in the [walking skeleton](../../backlog/walking-skeleton.md).
+Status (`running` / `idle` / `awaiting` / `done`) must not depend on scraping a TUI where it can be avoided: **harness-native hooks first, heuristics as fallback**. What each harness actually offers is confirmed in the [Prove epic](../../backlog/epics/prove.md).
 
-- **Hooks:** Claude Code hooks (e.g. `Stop` when a turn ends, `Notification` when it waits for input or permission) configured to call back into Foreman (a tiny command or an HTTP call to the team-tools listener with the instance token). Codex has a `notify` program hook. Pi and Hermes to be confirmed.
+- **Hooks:** the harness's own hooks, configured by the adapter to run `foreman-agent hook <event>`, which relays them through the [agent link](./building-blocks.md#4-agent-link-agentlink--foreman-agent): Claude Code `Stop` when a turn ends, `Notification` when it waits for the user. Codex has a `notify` program hook (later). Pi and Hermes to be confirmed.
+- **Idle is not waiting.** `Interpret` must tell apart a harness that finished and sits at its prompt (`idle`: nothing is raised) from one that waits **for the user** (`waiting`: a permission dialog, a choice, or a question it asked before stopping), which raises a request on Home ([Protocol → Waiting for the CEO](./protocol.md#waiting-for-the-ceo)). For Claude Code, whether its `Notification` hook payload says which case it is (and carries the question text and choices) is verified in the [Prove epic](../../backlog/epics/prove.md); if it can't, the fallback is to treat a `Notification` that follows a `Stop` within a short delay as idle.
 - **Team-message activity:** an open `escalate(approval)` means `awaiting` regardless of output; a `handoff` with nothing assigned means `done`.
 - **Fallback:** output silence for a few seconds after a turn plus a per-harness prompt pattern means `idle`.
 
@@ -58,5 +59,5 @@ Idle detection matters beyond the status dot: queued team messages and soul upda
 
 ## Open questions
 
-1. **Adapter mechanics per harness** (PRD §16.1): exact mechanism for system-prompt injection and MCP/team-tools registration. Claude Code and Codex support MCP; Pi and Hermes need confirmation. To confirm in the [walking skeleton](../../backlog/walking-skeleton.md); record the result in this entry.
-2. **Typing into a busy TUI.** Writing text to a TUI's stdin while it is mid-turn may interleave with its own input handling. Is queueing until idle enough for every harness, and how is "Enter" sent reliably (bracketed paste vs raw `\r`)? Confirm in the [walking skeleton](../../backlog/walking-skeleton.md).
+1. **Adapter mechanics per harness** (PRD §16.1): exact mechanism for system-prompt injection and MCP/team-tools registration. Claude Code and Codex support MCP; Pi and Hermes need confirmation. To confirm in the [Prove epic](../../backlog/epics/prove.md); record the result in this entry.
+2. **Typing into a busy TUI.** Writing text to a TUI's stdin while it is mid-turn may interleave with its own input handling. Is queueing until idle enough for every harness, and how is "Enter" sent reliably (bracketed paste vs raw `\r`)? Confirm in the [Prove epic](../../backlog/epics/prove.md).

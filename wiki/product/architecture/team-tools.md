@@ -22,41 +22,45 @@ The **team tools** are the tools Foreman exposes to every harness, as an MCP ser
 
 ## Delivery
 
-- Messages are delivered into the target's PTY as a clearly marked line, e.g. `⇄ Mara asked (req-41): …`.
-- Replies come back the same way, `⇄ Rhea replied to req-41`, plus the output. The prompt instructs agents to resume the task that asked for it ([Session prompt](./session-prompt.md)).
-- If the target is busy, the message is queued and delivered at its next idle prompt ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)). If the target is stopped, the requester gets an error line and Foreman raises a blocked request.
+- Messages reach the target as a **delivery**: text typed into its session through the harness adapter's `Deliver`, only when the target is idle, e.g. `⇄ Mara asked (req-41): …`. Replies come back the same way, `⇄ Rhea replied to req-41:` plus the output. The prompt instructs agents to resume the task that asked for it ([Session prompt](./session-prompt.md)). The exact texts are in [Protocol → Team tools](./protocol.md#team-tools).
+- If the target is busy, the message is queued and delivered at its next idle ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)). If the target is stopped within an active deployment, the message stays queued until it restarts (its stop already raised a blocked request); if the deployment stopped, the message expires. All cases: [Protocol → Messages](./protocol.md#messages).
 - Team messaging is scoped to a deployment. `nyx@ledger` cannot message `nyx@relay`. Cross-deployment messaging is deliberately disallowed.
 - Each message gets a monotonically increasing `req-N` **per deployment**, so the UI always qualifies it with the deployment.
-- **Delivered text is untrusted data.** A reply's `output` (or a finding's text) lands in another agent's session, where it acts as prompt input, so a confused or compromised agent could try to instruct its teammates. Every injected message is framed as quoted data with its sender (`⇄ Rhea replied to req-41:` followed by the quoted output) and capped in length (longer outputs are truncated with a note pointing at the artifact); nothing is ever delivered across deployments ([Security](./security.md)).
+- **Delivered text is untrusted data.** A reply's `output` (or a finding's text) lands in another agent's session, where it acts as prompt input, so a confused or compromised agent could try to instruct its teammates. Every delivery is framed as quoted data with its sender (`⇄ Rhea replied to req-41:` followed by the quoted output) and capped in length (longer outputs are truncated with a note pointing at the artifact); nothing is ever delivered across deployments ([Security](./security.md)).
 
-### Line conventions in terminals
+### Markers: notes for the CEO, never in the terminal
 
-Lines Foreman writes into sessions, and their glyphs (the UI colours them, see [Sessions](../features/sessions.md)):
+Anything written into a session's terminal is typed input to the agent ([Protocol → Deliveries and markers](./protocol.md#text-into-a-session-deliveries-and-markers)). So Foreman's notes for the CEO about agent traffic are **markers**: UI events (`instance.marker`) shown **beside** the terminal, in a thin strip on the session pane and in the Messages drawer ([Sessions](../features/sessions.md)), never written into the PTY. The terminal shows only what the agent's program prints, plus the deliveries it receives.
+
+Marker glyphs (the UI colours them):
 
 | Glyph | Meaning | Examples |
 |---|---|---|
-| `⇄` | team-message traffic (violet) | `⇄ ask → Rhea (req-41): …` (requester side) · `⇄ Mara asked (req-41): …` (target side) · `⇄ reply → Mara (req-41)` · `⇄ Rhea replied to req-41: …` · `⇄ handoff → Mara: wt/tove/LED-44` · `⇄ Tove handed off wt/tove/LED-44` |
-| `ⓘ` | System note | `ⓘ Your definition changed: …` (a [context update](./session-prompt.md#updates)) · `ⓘ Foreman restarted, output may be missing` |
-| `⚠` | Escalation | `⚠ escalate: … [y/N]` |
-| `✓` / `✗` | Success / error | `✓ CEO answered: <answer>. Resuming where I paused.` · `✗ No teammate "X" on ledger.` |
+| `⇄` | team-message traffic (violet) | `⇄ Mara → Rhea · ask · req-41` · `⇄ Rhea → Mara · reply · req-41` · `⇄ Tove handed off wt/tove/LED-44 to Mara` |
+| `ⓘ` | System note | `ⓘ Mara's definition changed` · `ⓘ Foreman restarted, output may be missing` |
+| `⚠` | Escalation | `⚠ Ilya escalated an approval: new dependency decimal.js` |
+| `✓` / `✗` | Success / error | `✓ CEO answered Ilya: approve` · `✗ Delivery to Rhea expired: deployment stopped` |
 
-A workspace setting toggles the display of team-message marker lines: it hides the lines Foreman injects into the view, never the harness's own output ([Workspace settings](../models/workspace-settings.md#schema)).
+Deliveries use the same glyphs in their text, because the agent reads them too (`⇄ Mara asked (req-41): …`, `✓ CEO answered: …`, `ⓘ Your definition changed: …`).
+
+A workspace setting toggles the marker strip on the session panes ([Workspace settings](../models/workspace-settings.md#schema)); the Messages drawer always lists the traffic.
 
 ## Transport
 
-The tools are an **MCP server** exposed by Foreman; each harness is configured to connect to it ([Harness adapters](./harness-adapters.md)).
+The tools are an **MCP server** inside Foreman, reached through the [agent link](./building-blocks.md#4-agent-link-agentlink--foreman-agent):
 
-- Harnesses run in containers ([Session runner](./session-runner.md)), so the server must be reachable from inside them: at `host.containers.internal` (works with `podman machine` on macOS and with pasta networking on Linux).
-- That conflicts with "bind to localhost only". **Design:** a separate **team-tools listener** for containers, distinct from the UI/API listener. It serves only the MCP endpoint (and harness hook callbacks), and every call must carry a **per-instance bearer token**, generated at spawn and passed in the container's environment. The token *is* the caller's identity: the router never trusts a "from" field.
-- Alternative: a Unix socket mounted into each container (identity = socket, no network listener). It doesn't cross the macOS VM boundary, so it can't be the only transport.
+- **`foreman-agent`**, a tiny static binary in every container (built with Foreman), is what the harness talks to. The harness starts `foreman-agent mcp` as a local **stdio** MCP server, the form every harness supports; its hooks run `foreman-agent hook <event>`. `foreman-agent` relays both to Foreman.
+- **One agent port** for every container: Foreman opens it on the host's **loopback**, separate from the UI's port. Containers reach it through Podman's host alias, `host.containers.internal`; none exposes a port of its own. Whether the alias reaches the host's loopback on Linux (rootless) and macOS (`podman machine`) is verified in the [Prove epic](../../backlog/epics/prove.md).
+- **A token per instance**, passed in the container's environment, is the caller's identity: Foreman never trusts a "from" field, so an agent can't speak for another.
+- `foreman-agent` reaches Foreman through **one address** (`tcp://host.containers.internal:<port>` today). Another transport, such as a Unix socket mounted on Linux, is a change in that one place.
 
 ### Per-instance setup
 
 Nothing about the team tools is configured by the CEO. At every spawn, Foreman:
 
-1. Generates the instance's bearer token: its identity, scoped to its deployment, kept only in memory and in the instance's environment, and revoked when the instance stops.
-2. Writes the harness's MCP configuration into the instance's private config directory ([Session runner → Credentials](./session-runner.md#credentials)): one server, `foreman`, at the team-tools listener's URL, with the token in the `Authorization` header (Claude Code: an `--mcp-config` file; Codex: `mcp_servers` in `$CODEX_HOME/config.toml`).
-3. Offers only the tools the role allows: `open_pr` is listed for the lead only; the others for everyone ([Tools](#tools)).
+1. Generates the instance's token: its identity, scoped to its deployment, kept only in memory and in the instance's environment, and revoked when the instance stops (the Instance manager registers it with the agent link).
+2. Writes the harness's MCP configuration into the instance's private config directory ([Session runner → Credentials](./session-runner.md#credentials)): one stdio server, `foreman`, running `foreman-agent mcp` (Claude Code: an `--mcp-config` file). The hooks configuration runs `foreman-agent hook <event>`.
+3. Offers only the tools the role allows: `foreman-agent` asks Foreman for its tool list, and Foreman answers by the token's role; `open_pr` is listed for the lead only ([Tools](#tools)).
 
 Agents get no other MCP servers in v1: only the team tools, plus whatever CLIs their [image](./tech-stack.md#agent-images) contains. CEO-configured MCP servers (per team or workspace) are a possible later addition.
 
@@ -66,8 +70,8 @@ Agents get no other MCP servers in v1: only the team tools, plus whatever CLIs t
 - **Blocking tool call** (the design): the MCP call doesn't return until the CEO resolves the request; the answer is the tool result, so the agent resumes naturally from the same point.
 - **Return immediately**, then write the answer into the agent's stdin when resolved: used only as the fallback below.
 
-Harnesses time out long MCP tool calls (e.g. Claude Code's MCP tool timeout), and the CEO may take hours. So the call blocks with a timeout below the harness limit and keep-alive progress notifications where supported; on timeout, return "pending, the answer will arrive in this session" and fall back to stdin injection. Each harness's timeout is measured in the [walking skeleton](../../backlog/walking-skeleton.md).
+Harnesses time out long MCP tool calls (e.g. Claude Code's MCP tool timeout), and the CEO may take hours. So the call blocks with a timeout below the harness limit and keep-alive progress notifications where supported; on timeout, return "pending, the answer will arrive in this session" and fall back to stdin injection. Each harness's timeout is measured in the [Prove epic](../../backlog/epics/prove.md).
 
 ## Open questions
 
-1. **Transport reachability** (to verify in the [walking skeleton](../../backlog/walking-skeleton.md)): confirm `host.containers.internal` reaches a host listener on Linux (rootless pasta) and macOS (podman machine), and on which address the team-tools listener must bind so that it is reachable by containers but not by the LAN.
+1. **Transport reachability** (to verify in the [Prove epic](../../backlog/epics/prove.md)): confirm that `foreman-agent`, through `host.containers.internal`, reaches the agent port bound to the host's loopback on Linux (rootless pasta) and macOS (podman machine); if the loopback isn't reachable on one of them, which address the agent port must bind to so that containers reach it but the LAN doesn't.

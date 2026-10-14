@@ -57,7 +57,7 @@ Acceptance:
 - [ ] When the CEO merges the PR on the forge, Foreman notices within a polling interval, resolves the request, notifies the lead, and lists the PR with its work items under Merged. The CEO's working copy is untouched.
 - [ ] Closing the PR on the forge without merging resolves the request as closed and returns its work items to stage 0; review comments made on the forge reach the lead's session.
 - [ ] Without a forge, `open_pr` publishes the lead branch into the project repo; the review request has no merge button and closes once the CEO merges the branch into `main` with git.
-- [ ] Send back posts the notes on the PR, writes them into the lead's session, closes the PR entry and returns its work items to stage 0.
+- [ ] Send back posts the notes on the PR, delivers them to the lead (typed into its session when idle), closes the PR entry and returns its work items to stage 0.
 - [ ] A non-lead calling `open_pr` is refused.
 - [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open PR at the same time; `open_pr` on a branch outside `lead/<own team>/*` is refused.
 - [ ] When one PR is merged, the lead of every other open PR on the same repo gets a "main moved, rebase" line; after the rebase, `open_pr` on the same branch updates the existing PR (same number, checks rerun) instead of opening a new one.

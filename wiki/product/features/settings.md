@@ -15,7 +15,8 @@ The **Settings** screen (sidebar footer): workspace-wide settings stored in `~/a
 | Folder | Every subfolder with a .foreman/project.yaml is a project. Foreman doesn’t clone anything. It uses the git repos it finds in each project folder. | The path, read-only (Mono 13px `--tx2`) |
 | Listen on | Anyone with the URL Foreman printed at start has full control. Keep this on your own machine unless you trust the network. | Segmented `This machine` / `Local network`. Choosing Local network asks for confirmation with a warning that anyone on the network can drive the agents ([Security](../architecture/security.md)). Takes effect on restart |
 | Running sessions at once | Extra sessions wait in a queue until a slot frees up. | Stepper, 1–64, default 12 ([Agent runtime](../architecture/agent-runtime.md#concurrency)) |
-| Show agent messages in terminals | team-message lines (`⇄`) in session panes. | Toggle, default on |
+| Run agents in | Containers isolate each agent from your machine. Without them, agents run as plain processes with full access to it. | Segmented `Containers (Podman)` / `Directly (no isolation)`. Choosing Directly asks for confirmation; while it is on, a warning stays visible here. Takes effect for sessions started afterwards ([Workspace settings](../models/workspace-settings.md)) |
+| Show agent messages beside terminals | The marker strip (`⇄` team traffic, escalations, notes) along each session pane. The Messages drawer always lists the traffic. | Toggle, default on |
 
 ## Harnesses
 

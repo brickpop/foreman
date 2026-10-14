@@ -18,7 +18,7 @@ The root folder Foreman runs on (e.g. `~/agents-ws`). It holds Foreman's own dat
 | **Workspace settings** | `~/agents-ws/.foreman/settings.yaml` (local, not shared) | The UI | Editable in the UI. See [Workspace settings](./workspace-settings.md). |
 | **Secrets** | OS keychain, or `~/agents-ws/.foreman/secrets` with 0600 permissions | The UI | Write-only fields. Never written into project folders. See [Secrets](./secrets.md). |
 | **Runtime state** | `~/agents-ws/.foreman/state.db` (SQLite) | Foreman | Deployments, instances, requests, team messages, work items, pull requests, read markers, UI prefs. See [Persistence](../architecture/persistence.md). |
-| **Session logs** | `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log` | Foreman | Raw PTY byte stream for replay and scrollback. |
+| **Session logs** | `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log` | Foreman | Raw terminal byte stream: each session's history and audit trail. |
 
 The file watcher reloads config and wiki changes within about 1 second and pushes them to clients ([API](../architecture/api.md)).
 

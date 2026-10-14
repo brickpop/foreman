@@ -1,12 +1,12 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [architecture, runtime, sessions, agents]
 ---
 
 # Agent runtime
 
-How an [instance](../models/instance.md) (one agent of one [deployment](../models/deployment.md)) comes to life, runs, fails, stops and recovers. The session supervisor owns this; it starts processes through the [session runner](./session-runner.md) and prepares their working copies through the [sandbox manager](./sandboxes-and-git.md).
+How an [instance](../models/instance.md) (one agent of one [deployment](../models/deployment.md)) comes to life, runs, fails, stops and recovers. The **Instance manager** owns this ([Building blocks](./building-blocks.md#5-instance-manager-instances)): it asks the image builder for the project's image and the harness adapter for the launch spec, starts the process through the [execution engine](./session-runner.md), wraps it in a [Terminal](./building-blocks.md#2-terminal-terminal), and prepares the working copy through [Git](./sandboxes-and-git.md).
 
 ## Instance lifecycle
 
@@ -44,16 +44,16 @@ Status values: `starting | running | idle | awaiting | done | stopped | queued`.
 ## Concurrency
 
 - Workspace setting `max running sessions` (default 12, 1–64; [Workspace settings](../models/workspace-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up.
-- A slot is held by every instance whose container is running, including one waiting on an approval or a reply. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the walking skeleton shows which harnesses support it.
+- A slot is held by every instance whose container is running, including one waiting on an approval or a reply. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the [Prove epic](../../backlog/epics/prove.md) shows which harnesses support it.
 - The Chief of Staff session does not count towards the limit (it is Foreman's own, and the CEO must always be able to reach it).
 
 ## Recovery
 
-Instances survive UI disconnects: the supervisor, not the browser, owns the attach.
+Instances survive UI disconnects: the Terminal, not the browser, holds the process.
 
 On server restart:
 1. Load deployments and instances from `state.db` ([Persistence](./persistence.md)).
-2. Ask the runner which containers are still running (`List`). Re-attach to each one whose instance is live; scrollback is replayed from Foreman's own session log, so nothing printed while Foreman was down is visible (an accepted gap, marked in the pane: [Session runner](./session-runner.md#podman-runner-production)).
+2. Ask the runner which containers are still running (`List`). Re-attach to each one whose instance is live; scrollback is replayed from Foreman's own session log, so nothing printed while Foreman was down is visible (an accepted gap, marked in the pane: [Session runner](./session-runner.md#podman-engine-production)).
 3. Instances that should be live but whose container is gone are restarted (see Restarts below).
 4. Containers that belong to no live instance are orphans: stopped and reported in the server log.
 

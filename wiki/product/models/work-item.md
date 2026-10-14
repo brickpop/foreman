@@ -29,7 +29,7 @@ Table `work_items`.
 ## Invariants
 
 - `handoff(teammate, branch, summary)` creates the work item, or advances it, to stage 1 ([Team tools](../architecture/team-tools.md)).
-- Stage 2 ("lead reviewing") starts when the handoff message is delivered into the lead's session (its `delivered_at`; it is queued while the lead is busy, see [Team message](./team-message.md)). By then Foreman has already fetched the branch into the lead's sandbox ([Sandboxes and git policy](../architecture/sandboxes-and-git.md#where-the-policy-is-enforced)). An `ask` from the lead to the author during review means "changes requested" and sends the work item back to stage 0.
+- Stage 2 ("lead reviewing") starts when the handoff message is delivered into the lead's session (its `delivered_at`; it is queued while the lead is busy, see [Team message](./team-message.md)). By then Foreman has already fetched the branch into the lead's sandbox ([Sandboxes and git policy](../architecture/sandboxes-and-git.md#where-the-policy-is-enforced)). Whether a change request from the lead (an `ask` to the author) sends the work item back to stage 0 is undecided ([Protocol → Open questions](../architecture/protocol.md#open-questions)).
 - Stage 3 ("integrated") is set when the branch is merged into any of the lead's `lead/<team>/*` branches in the lead's sandbox.
 - `pr_id` is set only by the lead's `open_pr`, only on stage-3 work items of the same deployment that have no `pr_id` yet and whose branch head is contained in the PR's branch (git ancestry), at creation or at a later update of that PR. A work item with a `pr_id` is listed under its PR, not on its own.
 - A work item is merged when its PR is merged; it has no merge time of its own.

@@ -60,20 +60,21 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 - Typing to the **lead** is a request; the lead delegates through [Team tools](../architecture/team-tools.md) (`ask`, `handoff`).
 - Typing to a **member** is a direct instruction. It goes raw to the member's terminal under the direct-line banner; Foreman posts nothing to the lead. The member tells the lead itself when the instruction matters to the team, as its [session prompt](../architecture/session-prompt.md#talking-to-the-ceo) asks.
 - Typing to an `awaiting` instance answers its open request ([Requests](./requests.md)).
+- **Another agent busy in the project** (until the Git epic, while agents share the project folder): the CEO's typing is never held back, but when another agent of the same project is `running`, the pane shows a warning strip above its input: `Another agent is busy in <project> (<Name>). You're both editing the same files.` (12.5px, `--accTx` on `--accSoft`, bottom border `--accLine`). It disappears when that agent goes idle. Foreman's own deliveries wait their turn ([Protocol → Messages](../architecture/protocol.md#messages)); the [Git epic](../../backlog/epics/git.md) removes both the turns and this warning.
 
-## Foreman-injected lines
+## Markers beside the terminal
 
-Foreman writes marked lines into sessions; they appear in the terminal like any output. Format (the glyph starts the line):
+The terminal shows only what the agent's program prints. Anything Foreman wrote into it would be typed input to the agent ([Protocol → Deliveries and markers](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)), so Foreman's notes for the CEO about the team's traffic are **markers**, shown beside the terminal: a thin strip along the pane (newest last, one line each, the glyph first) and the Messages drawer below. They come from `instance.marker` events.
 
 | Glyph | Meaning | Example | Color |
 |---|---|---|---|
-| `⇄` | team-message traffic | `⇄ Mara asked (req-41): …`, `⇄ Rhea replied to req-41: …`, `⇄ Tove handed off wt/tove/LED-44` | `--team` |
-| `⚠` | Escalation to the CEO | `⚠ escalate: … [y/N]` | `--ask` |
-| `✓` | Success / resumed | `✓ CEO answered: <answer>. Continuing.` | `--ok` |
-| `✗` | Error | `✗ No teammate "X" on <project>. Teammates: A, B` | `--err` |
+| `⇄` | team-message traffic | `⇄ Mara → Rhea · ask · req-41`, `⇄ Rhea → Mara · reply · req-41`, `⇄ Tove handed off wt/tove/LED-44 to Mara` | `--team` |
+| `⚠` | Escalation to the CEO | `⚠ Ilya escalated an approval: new dependency decimal.js` | `--ask` |
+| `✓` | Success / resumed | `✓ CEO answered Ilya: approve` | `--ok` |
+| `✗` | Error | `✗ Delivery to Rhea expired: deployment stopped` | `--err` |
 | `ⓘ` | System note | `ⓘ Foreman restarted, output may be missing` | `--tx4` |
 
-The exact delivery rules are in [Team tools](../architecture/team-tools.md). A workspace setting hides team-message (`⇄`) markers ([Settings](./settings.md)).
+What an agent itself receives (a teammate's ask, a reply, the CEO's answer) is a **delivery**: typed into its session when it is idle, so it appears in the terminal as the harness shows any input. The texts are in [Protocol → Team tools](../architecture/protocol.md#team-tools). A workspace setting hides the marker strip ([Settings](./settings.md)); the Messages drawer always lists the traffic.
 
 ## Messages drawer
 

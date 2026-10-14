@@ -4,6 +4,7 @@ Foreman's product definition. Every entry carries a `status` (`planned` / `parti
 
 - [Vision](./vision.md): summary, goals, non-goals, roles, non-functional requirements
 - [Glossary](./glossary.md)
+- [The end-to-end journey](./journey.md): one story through everything, step by step, with the blocks behind each step
 - [Use cases](./use-cases.md): the end-to-end scenarios v1 must pass
 
 ## Data models
@@ -48,10 +49,13 @@ Files Foreman reads or owns, and the runtime state it keeps.
 
 ## Architecture
 
-- [Overview](./architecture/overview.md): components and how they connect
+- [Building blocks](./architecture/building-blocks.md): the blocks, their interfaces, and what is proven
+- [Protocol](./architecture/protocol.md): the messaging and workflow schema: who sends what, as which struct, with which lifecycle
+- [Overview](./architecture/overview.md): modularity rules, process model, non-functional requirements
 - [Tech stack](./architecture/tech-stack.md): languages, libraries, repo layout, build and test
 - [Agent runtime](./architecture/agent-runtime.md): instance lifecycle, concurrency, recovery
 - [Session runner](./architecture/session-runner.md): where harness processes run (Podman, PTY)
+- [Terminal state](./architecture/terminal-state.md): server-side screens, snapshots, terminal queries
 - [Harness adapters](./architecture/harness-adapters.md)
 - [Sandboxes and git policy](./architecture/sandboxes-and-git.md)
 - [Team tools](./architecture/team-tools.md): the agent tools and message delivery

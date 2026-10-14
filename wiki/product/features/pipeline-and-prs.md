@@ -21,7 +21,7 @@ Approvals, questions, findings and blocked requests are independent of the pipel
 |---|---|---|
 | 0 | in worktree | A member works on `wt/<agent>/<card>`, the branch for one board card |
 | 1 | handed to lead | The member calls `handoff(lead, branch, summary)` ([Team tools](../architecture/team-tools.md)) |
-| 2 | lead reviewing | The handoff is delivered into the lead's session. Requesting changes (an `ask` to the author) sends the work item back to stage 0 with a note |
+| 2 | lead reviewing | The handoff is delivered into the lead's session. Whether requesting changes (an `ask` to the author) sends the work item back to stage 0 is undecided ([Protocol → Open questions](../architecture/protocol.md#open-questions)) |
 | 3 | integrated | Merged into one of the lead's `lead/<team>/*` branches in the lead's sandbox; checks run |
 
 Each work item carries a short **note**. Changes colors it by a **tone** (`ok`, `err`, `ask`, neutral) derived from the work item's state, never stored, e.g. "checks pass" (`ok`) or "2 review comments" (`ask`).
@@ -36,11 +36,11 @@ Only the lead calls `open_pr(branch, title, summary)`, naming one of its own lea
 |---|---|
 | Merged | Marks the PR merged (`merged_at`), resolves the review request, tells the lead. The PR and its work items move to "Merged". Sandboxes fetch the new `main` when next idle |
 | Closed without merge | Marks the PR closed, resolves the review request as closed, returns its work items to stage 0, tells the lead |
-| Review comments or "changes requested" | Relays them into the lead's session (`⇄` lines, [Sessions](./sessions.md)); the PR stays open |
+| Review comments or "changes requested" | Delivers them to the lead (typed into its session when it is idle; [Protocol](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)); the PR stays open |
 
 **Without a forge** (`forge: none`): there is no PR on a server. Foreman publishes the lead branch into the project repo as a plain branch (never checked out) and raises the review request: "<Lead> wants <branch> merged into main in <repo>." There is no merge button: the CEO reviews and merges with git. Foreman watches the project repo and, once its `main` contains the branch head, marks the PR merged, resolves the request and tells the lead.
 
-**`Send back`** exists either way: the CEO writes notes; Foreman posts them as a PR comment (when there is a PR on a forge) and into the lead's session, closes the PR, and returns its work items to stage 0 with the notes. The lead decides who reworks, and opens a new PR when ready.
+**`Send back`** exists either way: the CEO writes notes; Foreman posts them as a PR comment (when there is a PR on a forge) and delivers them to the lead (typed into its session when idle), closes the PR, and returns its work items to stage 0 with the notes. The lead decides who reworks, and opens a new PR when ready.
 
 Chief of Staff config changes (branch `foreman/config-N`, [Chief of Staff](./chief-of-staff.md)) are pull requests too, with no work items: a PR on the forge, or a branch to check without one. Their review request adds **`Discard`**, which closes the PR and deletes the branch.
 
@@ -50,6 +50,6 @@ The forge is chosen per project ([Project config](../models/project-config.md));
 
 Open PRs on the same repo race each other: when one is merged, the others may now be behind `main`, or conflict with it. **Foreman never rebases or resolves conflicts itself**; it tells the lead who has to:
 
-- When a PR is merged (seen on the forge, or detected in the project repo without a forge), Foreman writes a line into the session of the lead of **every other open PR targeting `main` of the same repo**: `⇄ main moved (PR #128 merged). Rebase lead/atlas/settlement-v2 onto main and push.` (without a forge, the merged branch's name replaces `PR #128`).
+- When a PR is merged (seen on the forge, or detected in the project repo without a forge), Foreman delivers a notice (typed into the session when it is idle) to the lead of **every other open PR targeting `main` of the same repo**: `⇄ main moved (PR #128 merged). Rebase lead/atlas/settlement-v2 onto main and push.` (without a forge, the merged branch's name replaces `PR #128`).
 - If the forge reports an open PR as conflicting with `main`, its review request panel shows **conflicts with main** (`--err`) and the lead gets the same line.
 - The lead rebases in its sandbox and calls `open_pr` again on the same branch. Foreman fetches it (rewriting a `lead/<team>/*` branch is allowed for its own lead; [Sandboxes and git policy](../architecture/sandboxes-and-git.md#branch-policy)), updates the PR's branch on the forge (or in the project repo), reruns the checks and refreshes the request. The PR, its number and its review request stay the same.

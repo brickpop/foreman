@@ -1,33 +1,33 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [architecture, runtime, sessions, security]
 ---
 
 # Session runner
 
-Where and how a harness process actually runs. The session supervisor ([Agent runtime](./agent-runtime.md)) never starts processes itself: it goes through a small **Runner** interface, so the execution backend is swappable without touching anything else.
+Where and how a harness process actually runs: the **Execution engine** of the [building blocks](./building-blocks.md#1-execution-engine-runner). Nothing above it starts processes itself: the [Instance manager](./agent-runtime.md) goes through a small **Runner** interface, so the engine is swappable without touching anything else.
 
-**Decided:** every agent instance runs in a **rootless Podman container from day one**. A local-PTY runner exists for hermetic tests and development.
+**Decided:** every agent instance runs in a **rootless Podman container from day one**. The **Direct** engine (a process on the host) exists for hermetic tests and development, and can be picked for real use only through an explicit setting with a "no isolation" warning.
 
 ## The Runner interface
 
-Conceptually (exact Go signatures are an implementation detail):
+Conceptually (exact Go signatures are an implementation detail; the authority is [Building blocks](./building-blocks.md#1-execution-engine-runner)):
 
 | Operation | Does |
 |---|---|
-| `Start(spec) → handle` | Starts a session from a spec: `{name, image, mounts, env, cmd, workdir, tty size, labels}`. `labels` carry the instance id so sessions can be found again |
-| `Attach(handle) → stream` | Bidirectional byte stream to the session's TTY (stdin in, merged stdout/stderr out). Several attaches over time; the supervisor holds one |
-| `Resize(handle, cols, rows)` | Propagates a terminal resize to the TTY |
-| `Stop(handle, grace)` | Graceful stop (SIGTERM, then kill after `grace`) |
-| `Wait(handle) → exit status` | Blocks until the process exits; returns the exit code (used to raise blocked requests) |
-| `List() → []handle` | Running sessions created by Foreman (by label), for [recovery](./agent-runtime.md#recovery) after a Foreman restart |
+| `Start(spec) → process` | Starts a process from a spec: `{image, command, dir, env, mounts, tty size, labels}`. `labels` carry the instance id so processes can be found again |
+| process: read / write | The process's terminal as a bidirectional byte stream (input in, merged output out) |
+| process: `Resize(cols, rows)` | Propagates a terminal resize |
+| process: `Stop(grace)` | Graceful stop (SIGTERM, then kill after `grace`) |
+| process: `Wait() → exit code` | Blocks until the process exits (used to raise blocked requests) |
+| `List() → []process` | Running processes this engine started (by label), for [recovery](./agent-runtime.md#recovery) after a Foreman restart |
 
-The supervisor tees every byte read from `Attach` into the instance's session log ([Persistence](./persistence.md)) before fanning it out to WebSocket clients ([API](./api.md#pty-websocket)).
+The [Terminal](./building-blocks.md#2-terminal-terminal) holding a process tees every byte it reads into the instance's session log ([Persistence](./persistence.md)) before fanning it out to viewers ([API](./api.md#pty-websocket)).
 
-## Podman runner (production)
+## Podman engine (production)
 
-- Foreman talks to Podman through the **libpod REST API over the Podman socket**, with a plain `net/http` client: no dependency, structured errors, attach as a hijacked stream. The official Go bindings module is avoided (a very large dependency tree), and so is shelling out to the `podman` CLI (to verify in the [walking skeleton](../../backlog/walking-skeleton.md)).
+- Foreman talks to Podman through the **libpod REST API over the Podman socket**, with a plain `net/http` client: no dependency, structured errors, attach as a hijacked stream. The official Go bindings module is avoided (a very large dependency tree), and so is shelling out to the `podman` CLI (to verify in the [Prove epic](../../backlog/epics/prove.md)).
 - Each instance is a container named from its instance id, labelled `foreman.instance=<id>`, `foreman.deployment=<id>`.
 - **No CPU or memory limits** by default; a workspace setting can add them later if 20+ sessions turn out to starve the laptop.
 - **Mounts, and nothing else of the host:**
@@ -39,7 +39,7 @@ The supervisor tees every byte read from `Attach` into the instance's session lo
 - **TTY:** the harness is the container's main process with a TTY, so the container keeps running when Foreman exits. After a Foreman restart, `List` finds it by label and Foreman re-attaches. Output printed while Foreman was down isn't in its log; that gap is accepted, and the pane shows `ⓘ Foreman restarted, output may be missing` at that point.
 - **User mapping:** `--userns keep-id:uid=1000,gid=1000` (the image's non-root user), so files written into the sandbox and wiki are owned by the CEO's user, not a subordinate UID.
 - **SELinux:** on hosts where `/sys/fs/selinux/enforce` exists (Fedora, RHEL), bind mounts get the shared `:z` label; elsewhere no suffix. The private `:Z` is not used: several containers mount the same wiki, and `:Z` would relabel it away from the others (learned in `pclaude`).
-- **Network:** containers need the network for model APIs. They reach Foreman's team-tools listener at `host.containers.internal` ([Team tools](./team-tools.md#transport)).
+- **Network:** containers need the network for model APIs. They reach Foreman's agent port at `host.containers.internal`, through `foreman-agent` ([Team tools → Transport](./team-tools.md#transport)).
 - **macOS:** Podman runs inside a VM (`podman machine`). Bind mounts cross the VM boundary (virtiofs), which is slower for heavy file I/O (e.g. `npm install`) and needs the workspace path shared with the machine. Unix sockets don't cross that boundary.
 - **Images:** each project's instances run its layer-4 image, which carries the harnesses and the project's toolchain ([Agent images](./tech-stack.md#agent-images)).
 
@@ -52,7 +52,7 @@ Foreman never spawns `podman` for container or image work: it calls the libpod R
 - Podman itself (and on macOS the initial `podman machine init`, sized for 20+ sessions) is a prerequisite the README covers. Foreman checks on start and refuses to run with a clear message if it's missing.
 - The state ("Podman 5.x · running", or the machine's state) is shown in [Settings → Maintenance](../features/settings.md#maintenance).
 
-Linking Podman's engine (libpod) into Foreman instead isn't viable: it would make Foreman a container engine, with cgo, conmon, crun and storage drivers, Linux only, and still no answer for macOS, where containers must run in a VM. To verify in the [walking skeleton](../../backlog/walking-skeleton.md).
+Linking Podman's engine (libpod) into Foreman instead isn't viable: it would make Foreman a container engine, with cgo, conmon, crun and storage drivers, Linux only, and still no answer for macOS, where containers must run in a VM. To verify in the [Prove epic](../../backlog/epics/prove.md).
 
 ## Credentials
 
@@ -62,22 +62,22 @@ Linking Podman's engine (libpod) into Foreman instead isn't viable: it would mak
 
 **One writable login, shared by every instance of the harness; everything else private.** Every agent container mounts the shared login folder **read-write**, and the instance's private config directory points the harness at the login file inside it (the adapter declares where, e.g. Claude Code's `.credentials.json` within `CLAUDE_CONFIG_DIR`). This is the situation the harnesses already handle on a single machine, with several `claude` sessions sharing one login: when one refreshes the token, it writes the shared file and the others read the new token instead of refreshing with a revoked one. If a harness has no login yet, its instances don't start and a **blocked** [request](../features/requests.md) says "Connect Claude Code in Settings". If the shared login stops working (revoked, or a logout elsewhere), every affected instance raises one **blocked** request: "Reconnect Claude Code in Settings".
 
-To verify in the [walking skeleton](../../backlog/walking-skeleton.md), per harness: (1) concurrent instances really do pick up each other's refreshes from the shared file (12 instances across several refresh cycles); (2) how to point the harness at the shared file so its own writes land there (a bind mount of the file, a symlink, or the whole folder), given how it writes (an atomic rename would replace a symlink or fail on a single-file mount). If sharing doesn't hold for a harness, the fallbacks are a **keeper** (the login container refreshes shortly before expiry and Foreman copies the fresh login to every instance) or one login per instance.
+To verify in the [Prove epic](../../backlog/epics/prove.md), per harness: (1) concurrent instances really do pick up each other's refreshes from the shared file (12 instances across several refresh cycles); (2) how to point the harness at the shared file so its own writes land there (a bind mount of the file, a symlink, or the whole folder), given how it writes (an atomic rename would replace a symlink or fail on a single-file mount). If sharing doesn't hold for a harness, the fallbacks are a **keeper** (the login container refreshes shortly before expiry and Foreman copies the fresh login to every instance) or one login per instance.
 
 **Private config, sharing nothing but the login.** Each instance gets a **private harness config directory** (Claude Code: `CLAUDE_CONFIG_DIR`) in its sandbox area, holding its own settings, history and memory, and its [session prompt](./session-prompt.md#delivery). The CEO's `~/.claude` is never mounted: an agent could plant a hook or setting there that later runs *on the host*, and would see the CEO's history from every other project. Forge tokens (`GH_TOKEN` and the like) are **never** injected: only Foreman's push path uses them ([Security](./security.md)).
 
 **Git config.** If the CEO has a `~/.gitconfig`, it is mounted **read-only** into every agent container (nothing is mounted when it doesn't exist), so aliases and preferences behave as on the host. Foreman also sets `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL` / `GIT_COMMITTER_NAME` / `GIT_COMMITTER_EMAIL` to the agent's display name and a per-agent address; the environment overrides the file's `user.*`, so every commit still says which agent made it. Credential helpers or `include` paths in the file that point at host programs or files simply don't resolve inside the container; agents never push to a forge anyway.
 
-## Local PTY runner (tests and development)
+## Direct engine (tests and development)
 
 - Spawns the command directly on the host in a pseudo-terminal (the approach of the original PTY proof of concept).
-- Used with a **fake scripted harness** (a small program that prints scripted output, calls team tools and reacts to stdin) so the supervisor, team-tools router, request engine and pipeline can be tested end-to-end, fast and without Podman or a model.
-- Gives no isolation, so it is **test and development only**: it is never selectable for real agents in v1.
+- Used with a **fake scripted harness** (a small program that prints scripted output, calls team tools and reacts to stdin) so the Terminal, Instance manager, Messaging and Workflow can be tested end-to-end, fast and without Podman or a model.
+- Gives **no isolation**: it is for tests and development, and selectable for real use only through an explicit setting that shows a "no isolation" warning ([Workspace settings](../models/workspace-settings.md)).
 - Sessions die with Foreman, so `List` returns nothing after a restart.
 
 A tmux-based runner (sessions survive restarts, attachable from a real terminal) could be a third implementation later. Not planned.
 
-Images are built by Foreman as a four-layer chain; see [Tech stack](./tech-stack.md#agent-images).
+Images are built by Foreman as a four-layer chain ([Tech stack](./tech-stack.md#agent-images)); the Direct engine's image builder is a no-op and the process uses the host's tools ([Building blocks](./building-blocks.md#1b-image-builder-runnerengine)).
 
 ## Prior art: the two proofs of concept
 
@@ -88,7 +88,7 @@ Two Go sketches written before this design, kept verbatim as reference at the en
 | `creack/pty`: `pty.Start(cmd)` plus `pty.Setsize` with a stable baseline (120×40) before the first output, so the TUI lays out predictably | The sketch read the PTY in request/response chunks, with a 300ms read deadline and a substring match on `"Claude Code >"` to guess the end of a turn. Here the PTY is a continuous byte stream fanned out to WebSocket viewers and the log, and turn detection comes from harness signals ([Harness adapters](./harness-adapters.md)) |
 | Running the harness **interactively, in a real TTY** | - |
 | Podman container spec: `Terminal: true` (a real TTY in the container), the harness as entrypoint, the workspace bind-mounted rw with the `z` option (SELinux relabelling, needed on Fedora and other SELinux hosts) | The sketch mounted the host's harness config dir read-only to reuse its login. That leaks every credential in it into every container and doesn't work on macOS (the Keychain); each instance instead gets a long-lived token as environment and a private config directory ([Credentials](#credentials)) |
-| A minimal image: base OS, `git`, `bash`, `openssh-client`, Node + the harness CLI, `TERM=xterm-256color`, `WORKDIR /workspace` | The image is Foreman's default image ([Agent images](./tech-stack.md#agent-images)); the official `containers/podman/v5/pkg/bindings` module the sketch used is avoided in favour of the libpod REST API ([Podman runner](#podman-runner-production)) |
+| A minimal image: base OS, `git`, `bash`, `openssh-client`, Node + the harness CLI, `TERM=xterm-256color`, `WORKDIR /workspace` | The image is Foreman's default image ([Agent images](./tech-stack.md#agent-images)); the official `containers/podman/v5/pkg/bindings` module the sketch used is avoided in favour of the libpod REST API ([Podman runner](#podman-engine-production)) |
 | Stop with a timeout, then remove | Containers outlive Foreman restarts and are re-attached, so removal happens only on instance stop |
 
 ### Reference: the PTY sketch

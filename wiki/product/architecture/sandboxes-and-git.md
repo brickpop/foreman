@@ -8,6 +8,8 @@ tags: [architecture, git, security, agents, pipeline]
 
 Each [instance](../models/instance.md) works in its **own clone** of the project's repos, never in a shared working tree, and only a team lead's branches (`lead/<team>/*`) can become PRs to `main`. The sandbox manager creates, refreshes and polices those clones. The [session runner](./session-runner.md) mounts them into the instance's container.
 
+**Phasing:** this is the design for the [Git epic](../../backlog/epics/git.md). Before it (epics 1–2), every agent of a deployment works in the project folder itself, mounted read-write, with no clones or per-agent branches.
+
 ## Layout and branches
 
 - Sandbox: `<project>/.sandboxes/<agent>/<repo>/` for each repo of the [project](../models/project-config.md) ([Workspace](../models/workspace.md)), created with `git clone --reference <mirror> --dissociate` from Foreman's mirror of the repo: fast like a shared clone, then fully independent. (`--shared`, a plain `--reference` and worktrees all keep pointing at the source object store by host path, which isn't mounted in the container, so git would break inside it.) Agent ids are workspace-unique, so sandbox paths never collide ([Team definition](../models/team-definition.md#schema)).
@@ -39,7 +41,7 @@ The PRD asks for "a pre-receive hook (or Foreman's own push proxy)" on "the proj
 
 ## Wiki access
 
-Only the scrum master's instance has the project `wiki/` writable; others get it read-only. If the team has no scrum master, the lead gets write access. With containers this is enforced by the mount mode ([Session runner](./session-runner.md#podman-runner-production)), not by convention.
+Only the scrum master's instance has the project `wiki/` writable; others get it read-only. If the team has no scrum master, the lead gets write access. With containers this is enforced by the mount mode ([Session runner](./session-runner.md#podman-engine-production)), not by convention.
 
 ## Checks
 

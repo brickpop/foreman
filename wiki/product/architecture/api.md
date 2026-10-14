@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [architecture, api, ui, security]
 ---
 
@@ -82,9 +82,10 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 
 | Type | When | Payload |
 |---|---|---|
-| `request.created` / `request.resolved` | request engine | the request |
+| `request.created` / `request.resolved` | Workflow creates or resolves a request | the request |
 | `instance.status` | an instance changes status or task | id, status, task |
 | `instance.line` | throttled "last output line" updates (for Settings rows) | id, line |
+| `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |
 | `team.message` | a message is routed | the message |
 | `pipeline.changed` | a work item changes stage or checks, or a pull request is created, changes checks or state | the work item or pull request |
@@ -97,10 +98,11 @@ The notifier also derives browser notifications and toasts from these events on 
 ## PTY WebSocket
 
 `WS /ws/pty/:instance`:
-- On connect, the server sends the scrollback replay from the session log ([Persistence](./persistence.md#session-logs)), then live output.
+- On connect, the server sends a **snapshot** of the current terminal state (screen, scrollback, cursor, modes; [Terminal state](./terminal-state.md)), then live output. An instance without a session is a `404`, before the upgrade.
 - **Binary frames** carry raw terminal bytes, both ways (keystrokes in, output out).
-- **Text frames** carry JSON control messages: `{"type":"resize","cols":120,"rows":40}` from the client; `{"type":"status",…}` / `{"type":"exit","code":…}` from the server.
+- **Text frames** carry JSON control messages: `{"type":"resize","cols":120,"rows":40}` from the client; `{"type":"exit","code":…}` from the server (a `status` message is planned with instance statuses). Unknown control messages are ignored on both sides.
 - Several clients may attach to one instance (two tabs, split panes); all receive output, any may type. The PTY size follows the most recent resize.
+- A viewer that falls more than 1024 output chunks behind is dropped, so a slow tab never stalls the agent. The server closes it with code `1013` (try again later); the client reconnects at once, clears its screen and receives a fresh snapshot. Other disconnects are retried with a backoff from 250 ms up to 5 s. After the `exit` message the server closes normally (`1000`) and the client doesn't reconnect.
 - The upgrade request passes the same Origin and token checks as the HTTP API: browsers do not apply the same-origin policy to WebSockets.
 
 `POST /api/instances/:id/input` is the line-input alternative (mobile or paste): the text plus Enter is written to the PTY as the same raw bytes typing would produce. Foreman attaches no side effects to either path ([Sessions](../features/sessions.md#talking-to-the-team)).

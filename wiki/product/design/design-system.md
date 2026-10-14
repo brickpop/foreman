@@ -36,7 +36,7 @@ Dark is `:root`; light overrides it under `html[data-theme="light"]`.
 | `--accLine` | `#3A3020` | `#EBCF9E` | Border of `--accSoft` surfaces, "lead" tag border |
 | `--ok` | `#6FCF8E` | `#23824A` | Running, success, "token set" |
 | `--info` | `#7AA7E8` | `#2B66B5` | Done, question kind, info callout |
-| `--team` | `#B79CF0` | `#7445C2` | team-message lines, starting status, finding kind, `→` in Messages |
+| `--team` | `#B79CF0` | `#7445C2` | team-message markers, starting status, finding kind, `→` in Messages |
 | `--err` | `#E5675A` | `#B8352A` | Stopped, errors, blocked kind, high priority |
 | `--ask` | `#F2BE6B` | `#8A5200` | Escalation (`⚠`) lines in the terminal |
 | `--shadow` | `0 16px 40px rgba(0,0,0,.55)` | `0 16px 40px rgba(40,30,10,.18)` | Drawers, modals, toasts |

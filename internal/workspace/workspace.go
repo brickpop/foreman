@@ -1,8 +1,11 @@
-// Package workspace locates a Foreman workspace and owns the files in its
-// .foreman/ folder that Foreman itself manages.
+// Package workspace is the files the CEO owns (wiki/product/models/workspace.md):
+// it locates a workspace, keeps its .foreman/ folder (the workspace repo, the
+// access token), loads and validates the config files, saves them version-
+// guarded with one commit each, and watches them change on disk.
 package workspace
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
@@ -10,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // DirName is the folder holding Foreman's own data inside a workspace.
@@ -20,6 +24,12 @@ const tokenFile = "access-token"
 // Workspace is a folder whose subfolders are projects.
 type Workspace struct {
 	root string // absolute path of the workspace folder
+
+	// Set by Load.
+	git    Git
+	mu     sync.Mutex // guards snap and saves
+	snap   snapshot
+	notify func(Change) // set by Watch
 }
 
 // Root is the absolute path of the workspace folder.
@@ -100,4 +110,11 @@ func (w *Workspace) AccessToken(rotate bool) (string, error) {
 		return "", err
 	}
 	return token, nil
+}
+
+// Git is what the workspace needs of git: the workspace repo
+// (wiki/product/models/workspace.md#the-workspace-repo).
+type Git interface {
+	Init(ctx context.Context, dir string) error
+	Commit(ctx context.Context, dir, message string, files ...string) error
 }

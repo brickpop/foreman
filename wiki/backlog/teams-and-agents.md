@@ -14,7 +14,7 @@ Blocked by [Team and Agent pages](./ui-teams-agents.md) and [Workspace and confi
 
 **Done when:** teams come from `.foreman/teams/*.toml`; soul edits are written back (version-guarded, one commit per save in the workspace repo); the session prompt is composed by the server; Deploy creates a real deployment (with the [Instance manager](./instance-manager.md)); these areas leave the demo client.
 
-- [ ] teams and souls API (read, version-guarded write)
+- [ ] teams and souls API (read, version-guarded write); a conflicting save prompts Keep mine / Take theirs instead of dropping the edit (low priority, [Agent page](../product/features/agent-page.md))
 - [ ] composed session prompt endpoint
 - [ ] Deploy wired to the Instance manager
 - [ ] swap the areas in main.tsx; remove their badges

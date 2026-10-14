@@ -14,6 +14,7 @@ Blocked by [Podman engine](./podman-engine.md), [Worktrees per instance](./workt
 
 **Done when:** deploying a team (the [Deploy a team](../product/features/deploy-team.md) dialog) starts one instance per member (image, its worktrees and the project repo mounted, launch, token placeholder, start, terminal), statuses follow the instance lifecycle, crashes restart per policy, the concurrency queue holds, stopping keeps the worktrees on disk (deleting merged `wt/*` branches is `Git.Prune`, in the [Git epic](./epics/git.md)), and after a Foreman restart running containers are re-attached. `--demo-session` is removed ([technical debt](../technical-debt.md)).
 
+- [ ] the `engine: podman | direct` setting ([Workspace settings](../product/models/workspace-settings.md)) picks the engine (moved from the [Podman engine](./podman-engine.md) card: this is its first user)
 - [ ] `Instances` interface: `Ensure`, `Status`, `Terminal`, `Watch`
 - [ ] deploy and stop (API + dialogs), statuses on the event stream
 - [ ] restart policy, concurrency queue

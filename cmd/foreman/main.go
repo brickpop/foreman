@@ -18,6 +18,8 @@ import (
 	"strings"
 
 	"github.com/brickpop/foreman/internal/access"
+	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/server"
@@ -60,6 +62,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
 	}
+	if err := ws.Load(context.Background(), git.CLI{}); err != nil {
+		return err
+	}
 
 	// Listen before printing the URL, so a busy port fails before the browser opens.
 	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", *port))
@@ -82,6 +87,10 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return fmt.Errorf("state: %w", err)
 	}
 	defer state.Close() // its tables reach the blocks with the Instance manager
+	bus := events.New()
+	if err := ws.Watch(context.Background(), func(c workspace.Change) { bus.Publish(configEvent(c)) }); err != nil {
+		return fmt.Errorf("watching the workspace: %w", err)
+	}
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
 	terms := newSessions(direct.Runner{}, func(instance string) (terminal.Log, error) { return logs.Open(instance) })
 	if fields := strings.Fields(*demo); len(fields) > 0 {
@@ -98,6 +107,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	handler := server.New(server.Options{
 		Guard:     access.NewTokenGuard(token, access.LocalHosts(*port), *port),
 		Workspace: ws,
+		Config:    ws,
+		Events:    bus,
 		Terminals: terms,
 		UI:        files,
 	})
@@ -163,4 +174,13 @@ func resolveProgram(program string) (string, error) {
 		return program, nil
 	}
 	return filepath.Abs(program)
+}
+
+// configEvent turns a change on disk into the event the browser gets
+// (wiki/product/architecture/api.md#events).
+func configEvent(c workspace.Change) events.Event {
+	if c.Kind == "projects" {
+		return events.Event{Type: "workspace.changed", Data: struct{}{}}
+	}
+	return events.Event{Type: "config.changed", Data: c}
 }

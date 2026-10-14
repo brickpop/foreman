@@ -301,9 +301,9 @@ type Workspace interface {
     Candidates() []Candidate                         // folders that aren't projects yet (Add a project)
     AddProject(folder) (Project, error)              // creates the project repo: project.toml and a starter wiki
     Teams() []Team;        Team(id) (Team, error)
-    SaveTeam(Team, version) error                    // version-guarded; one commit per save
-    Settings() Settings;   SaveSettings(Settings) error
-    Changes() <-chan Change                          // file watcher: config, team files, wiki, Containerfiles
+    SaveTeam(TeamConfig, version) (Team, error)      // version-guarded; one commit per save
+    Settings() SettingsFile; SaveSettings(Settings, version) (newVersion, error)
+    Watch(ctx, notify func(Change)) error            // file watcher: project.toml, team files, settings (wiki and Containerfiles join with their cards)
 }
 ```
 
@@ -338,7 +338,7 @@ In-process publish and subscribe: status changes, new and resolved requests, mes
 ```go
 type Bus interface {
     Publish(Event)
-    Subscribe(filter) (<-chan Event, cancel func())
+    Subscribe() (<-chan Event, cancel func())        // every event; a subscriber that falls behind is dropped, then refetches
 }
 ```
 
@@ -466,8 +466,10 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 ## Code today, against these blocks
 
-- `internal/runner` + `runner/direct`: the Execution engine and its Direct implementation.
+- `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
+- `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher.
+- `internal/events`: the Event bus; `internal/git`: Foreman's own git (`Init`, `Commit`), the start of the Git block.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
 - `cmd/foreman/sessions.go`: a start-by-instance map, scaffolding for `--demo-session` until the Instance manager exists ([technical debt](../../technical-debt.md)).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.

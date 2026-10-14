@@ -16,5 +16,6 @@ Blocked by [Project pages](./ui-project-pages.md) and [Workspace and config](./w
 
 - [ ] candidates and Add (API)
 - [ ] the Wiki block over the agentic-wiki engine; goldmark rendering, raw HTML off
+- [ ] the workspace watcher follows each project's wiki bundle; `wiki.changed` events ([API → Events](../product/architecture/api.md#events))
 - [ ] entries, boards, checkbox and field writes, each committed in the project repo (one commit per write, only that file, authored as the CEO), read markers (API + events)
 - [ ] swap the areas in main.tsx; remove their badges

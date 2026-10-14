@@ -1,0 +1,10 @@
+# Generates the UI's TypeScript types from the Go structs, the single source of
+# truth for API and event shapes (wiki/product/architecture/tech-stack.md#wire-formats).
+# Run `just types`; the output is committed.
+packages:
+  - path: github.com/brickpop/foreman/internal/workspace
+    output_path: ui/src/api/types/workspace.ts
+    include_files: [config.go, load.go]
+  - path: github.com/brickpop/foreman/internal/events
+    output_path: ui/src/api/types/events.ts
+    include_files: [event.go]

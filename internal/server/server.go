@@ -24,6 +24,8 @@ type Workspace interface {
 type Options struct {
 	Guard     Guard
 	Workspace Workspace
+	Config    Config
+	Events    Events
 	Terminals Terminals
 	UI        fs.FS // the built web app, index.html at its root
 }
@@ -41,6 +43,8 @@ func New(o Options) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, list)
 	})
+	configRoutes(mux, o.Config)
+	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))
 	mux.Handle("/", ui(o.UI))
 	return o.Guard.Wrap(mux)

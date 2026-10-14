@@ -15,12 +15,12 @@ All endpoints are local-only unless the listen setting changes. Every request pa
 The PRD's surface (indicative; names may still change during implementation, this entry is then updated):
 
 ```
-GET    /api/workspace                         projects, teams, settings summary
-GET    /api/projects/:id                      config (parsed), repos, deployments
+GET    /api/workspace                         the workspace folder
+GET    /api/projects | /api/projects/:id      config (parsed), repos, version, problems (deployments join with the Instance manager)
 POST   /api/projects                          {folder} → create the project repo (adopt)
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
-GET    /api/teams | /api/teams/:id            definitions
+GET    /api/teams | /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           update soul (writes team file)
 POST   /api/teams/:id/agents                  hire (from CoS)
 
@@ -46,7 +46,7 @@ GET    /api/wiki/:project/tree | /entry/:path | /board/:id
 PUT    /api/wiki/:project/checkbox/:path      {line, version}
 PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
 
-GET    /api/settings | PUT /api/settings
+GET    /api/settings | PUT /api/settings       settings, version, problems
 PUT    /api/secrets/forge/:kind               write-only token
 GET    /api/events                            SSE: requests, status, file changes
 ```
@@ -81,7 +81,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 
 ## Events
 
-`GET /api/events` is one SSE stream per browser tab. Each event has a `type` and a JSON payload; the client refetches or patches its cache.
+`GET /api/events` is one SSE stream per browser tab. Each event is one `data:` line holding `{"type": …, "data": …}` (the Go `events.Event`), so the browser needs one handler for every type; the client refetches or patches its cache. A client that falls behind is cut off, and refetches on reconnect.
 
 | Type | When | Payload |
 |---|---|---|
@@ -93,8 +93,8 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `team.message` | a message is routed | the message |
 | `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
 | `wiki.changed` | files in a project wiki changed | project, paths, versions |
-| `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | which object, version, error? |
-| `workspace.changed` | projects or repos appeared or disappeared | — |
+| `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |
+| `workspace.changed` | projects or repos appeared or disappeared | `{}`: refetch the project list |
 
 The notifier also derives browser notifications and toasts from these events on the client ([Notifications](../features/notifications.md)). On reconnect, the client refetches what it shows (SSE `Last-Event-ID` replay is not required).
 

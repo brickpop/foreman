@@ -1,5 +1,7 @@
 import { createContext, useContext } from "react";
+import { type EventHandlers, subscribeEvents } from "./events";
 import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
+import type { Project, SettingsFile, Team } from "./types/workspace";
 
 // Everything the UI asks of the server goes through this interface. Screens
 // never call fetch or WebSocket themselves, so the transport can change and
@@ -11,8 +13,15 @@ export type Instance = { id: string };
 
 export interface ForemanClient {
   workspace(): Promise<Workspace>;
+  projects(): Promise<Project[]>;
+  project(id: string): Promise<Project>;
+  teams(): Promise<Team[]>;
+  team(id: string): Promise<Team>;
+  settings(): Promise<SettingsFile>;
   instances(): Promise<Instance[]>;
   openTerminal(instance: string, handlers: PtyHandlers): PtyConnection;
+  /** Follows the server's events until the returned function is called. */
+  events(handlers: EventHandlers): () => void;
 }
 
 /** The client that talks to the Foreman server the page was loaded from. */
@@ -23,11 +32,17 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     return r.json() as Promise<T>;
   };
   const wsOrigin = origin.replace(/^http/, "ws");
+  const id = encodeURIComponent;
   return {
     workspace: () => getJSON("/api/workspace"),
+    projects: () => getJSON("/api/projects"),
+    project: (project) => getJSON(`/api/projects/${id(project)}`),
+    teams: () => getJSON("/api/teams"),
+    team: (team) => getJSON(`/api/teams/${id(team)}`),
+    settings: () => getJSON("/api/settings"),
     instances: () => getJSON("/api/instances"),
-    openTerminal: (instance, handlers) =>
-      openPty(`${wsOrigin}/ws/pty/${encodeURIComponent(instance)}`, handlers),
+    openTerminal: (instance, handlers) => openPty(`${wsOrigin}/ws/pty/${id(instance)}`, handlers),
+    events: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),
   };
 }
 

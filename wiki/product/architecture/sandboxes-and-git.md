@@ -48,7 +48,7 @@ A worktree's `.git` is a file pointing at `<project>/<repo>/.git/worktrees/<name
 - **`update(branch)`**: merges a named branch (the lead's, `main`, a teammate's) into the agent's worktrees. On a conflict the markers stay in the files; the agent resolves them and calls `commit`, which concludes the merge.
 - **`handoff`** commits pending work first, so a hand-off never misses the last changes.
 
-Foreman runs one git command at a time per repo, so git's own lock never collides, and its git runs with the repo's hooks and fsmonitor turned off, so nothing configured in a repo runs a program on the host when Foreman acts. The [session prompt](./session-prompt.md) tells agents that git writes go through the tools.
+Foreman runs one git command at a time per repo, so git's own lock never collides, and its git runs with the repo's hooks and fsmonitor turned off, so nothing configured in a repo runs a program on the host when Foreman acts. Its commits are unsigned, even where the CEO's git signs by default: they are automatic, and a signing agent would prompt, or fail, on every one. The [session prompt](./session-prompt.md) tells agents that git writes go through the tools.
 
 What this buys: no agent can damage refs, or plant a hook or a `.git/config` setting that would run a program on the CEO's machine the next time git runs there; every commit is authored as the agent who made it; and branch rules hold by construction, since Foreman is the only writer. **Trade-off, accepted:** every agent can still read every branch of the repo, its teammates' included.
 

@@ -36,7 +36,7 @@ Guiding constraints, from the [vision](../vision.md): one local binary, local-fi
 | Team tools (agent tools) | MCP via `github.com/modelcontextprotocol/go-sdk` (official SDK): `foreman-agent` serves it to the harness over **stdio** (the form every harness supports) and relays to Foreman's agent port | Harnesses speak MCP natively; one shipped binary also carries the hook events ([Team tools → Transport](./team-tools.md#transport)) |
 | Runtime state | SQLite via `modernc.org/sqlite` (pure Go) | No CGO, so the binary cross-compiles and stays static. WAL mode. |
 | Queries and migrations | Hand-written `database/sql` in one `store` package; numbered `.sql` migrations embedded and applied by `PRAGMA user_version` | About 8 tables ([Persistence](./persistence.md)). An ORM or a code generator would cost more than it saves. |
-| YAML (project, team, settings files) | `go.yaml.in/yaml/v3` (the maintained continuation of `gopkg.in/yaml.v3`) | Its `Node` API edits a team file in place while keeping the CEO's comments and order. |
+| TOML (`project.toml`, team files, `settings.toml`) | `github.com/BurntSushi/toml` | Every Foreman config file is TOML, like `wiki.toml`. A save re-encodes the whole file (comments aren't kept); the [workspace repo](../models/workspace.md#the-workspace-repo) keeps the history. |
 | TOML (`wiki.toml`) | Through the wiki engine (`bundle.DecodeTool`) | Never parsed twice. |
 | Wiki | `github.com/agentic-wiki/wiki` (`bundle`, `index`, `parse`) | See [Wiki engine](./wiki-engine.md). |
 | Markdown → HTML | `github.com/yuin/goldmark` on the server, raw HTML disabled | Links are resolved by the engine's resolver and checkboxes carry their source line, so the browser never re-implements a wiki rule. Wiki content is written by agents, so it is untrusted: no raw HTML, and URLs are sanitised ([Security](./security.md)). |
@@ -79,7 +79,7 @@ Foreman builds the images its containers run, itself, through Podman's build API
 
 Every instance of a project runs layer 4, so the project's image name is stable and predictable. One harness layer holds every harness, rather than one image per harness, so layers 3 and 4 exist once per workspace and project, not once per harness.
 
-**Phasing.** The chain above is the target. Phase 1 ([Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md)) builds **one image for every project**, from a Containerfile that starts from [`pclaude`](https://github.com/brickpop/pclaude)'s Dockerfile (commit `7c9f9079`): `node:26-slim` with git, curl, jq, make, just, vim and the other shell tools, Go, Bun, Deno, Foundry and the `wiki` CLI, then Claude Code installed last; `ENTRYPOINT []`, `CMD ["claude"]`. Foreman's version adds `foreman-agent`. So phase 1 is base and Claude Code harness in one image, with the common toolchains that let agents run most projects' tests. The separate harness layer (Pi, Hermes), the workspace and project overrides, Refresh with prune, Prune and the full Maintenance screen come later ([Full image chain](../../backlog/image-chain.md)).
+**Phasing.** The chain above is the target. Phase 1 ([Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md)) builds **one image for every project**, from a Containerfile that starts from [`pclaude`](https://github.com/brickpop/pclaude)'s Dockerfile (commit `7c9f9079`): a **basic Debian box** (`node:26-slim`, so Node; plus Bun, Go, `just`, the `wiki` CLI, git, curl, jq, make and the usual shell tools), then Claude Code installed last; `ENTRYPOINT []`, `CMD ["claude"]`. Anything more specialised comes from workspace or project overrides, later. Foreman's version adds `foreman-agent`. The file is `images/Containerfile` and the image is named `localhost/foreman/harness`, the target design's name for the harness layer, so the full chain builds on it later. The separate harness layer (Pi, Hermes), the workspace and project overrides, Refresh with prune, Prune and the full Maintenance screen come later ([Full image chain](../../backlog/image-chain.md)).
 
 **Names.** `<workspace>` is the workspace folder name and `<project>` the project folder name, slugified to what an image name allows (lowercase `a-z0-9`, with `.`, `_` or `-` between). Two folders that slugify to the same name are reported as a configuration error. The hierarchy in the name mirrors the chain, so `podman images localhost/foreman/ws/agents-ws` shows a workspace at a glance, and several workspaces on one machine never collide.
 
@@ -133,8 +133,8 @@ foreman/
 │   ├── agentlink/        # Agent link: the agent port, tokens, tool calls and hook events
 │   ├── instances/        # Instance manager: what runs, status, restarts, queue
 │   ├── messaging/        # Messaging: queues and deliveries between agents and the CEO
-│   ├── workflow/         # Workflow: requests, work items, pull requests, gates
-│   ├── sandbox/          # Git: clones, mirrors, branch policy
+│   ├── workflow/         # Workflow: requests, work items, merge requests, gates
+│   ├── git/              # Git: worktrees per agent, branch policy, pushes
 │   ├── forge/            # Forge adapters: github, gitea (also Forgejo), none
 │   ├── store/            # State store: SQLite, migrations
 │   ├── workspace/        # Workspace & config: projects, teams, settings, file watcher

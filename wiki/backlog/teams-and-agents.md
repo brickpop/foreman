@@ -12,7 +12,7 @@ epic: terminal-multiplexer
 
 Blocked by [Team and Agent pages](./ui-teams-agents.md) and [Workspace and config](./workspace-config-events.md).
 
-**Done when:** teams come from `.foreman/teams/*.yaml`; soul edits are written back (version-guarded, comments kept); the session prompt is composed by the server; Deploy creates a real deployment (with the [Instance manager](./instance-manager.md)); these areas leave the demo client.
+**Done when:** teams come from `.foreman/teams/*.toml`; soul edits are written back (version-guarded, one commit per save in the workspace repo); the session prompt is composed by the server; Deploy creates a real deployment (with the [Instance manager](./instance-manager.md)); these areas leave the demo client.
 
 - [ ] teams and souls API (read, version-guarded write)
 - [ ] composed session prompt endpoint

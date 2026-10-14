@@ -6,7 +6,7 @@ tags: [feature, ui, agents, teams, config]
 
 # Chief of Staff
 
-A built-in agent owned by Foreman: a harness session (Claude Code by default) running in `~/agents-ws/.foreman/cos/`. It interviews the CEO to define roles and teams, edits Foreman files and project config (config on a branch), and handles anything the UI doesn't cover. Its tools are Foreman-specific (read and edit team files, create teams, hire agents, edit `project.yaml` on a branch, raise requests); see [Agent runtime](../architecture/agent-runtime.md) and [Harness adapters](../architecture/harness-adapters.md).
+A built-in agent owned by Foreman: a harness session (Claude Code by default) running in `~/agents-ws/.foreman/cos/`. It interviews the CEO to define roles and teams, changes team files and project config (always on a branch that comes back to the CEO through `request_merge`, as a merge request like any other: Merge to main, Create PR on the forge of the repo it changes, or Reject; [Pipeline and merges](./pipeline-and-merges.md#review-and-merge)), and handles anything the UI doesn't cover. Its tools are Foreman-specific (read team files, create teams, hire agents, refine souls, edit `project.toml`, all on a branch; raise requests); see [Agent runtime](../architecture/agent-runtime.md) and [Harness adapters](../architecture/harness-adapters.md).
 
 ## Drawer
 
@@ -47,7 +47,7 @@ Rules for every flow:
 From the sidebar tile or a team's **Hire**.
 
 1. "Which team is this hire for?" [team names]. Skipped when started from a team: "Hiring for <Team>. What role?"
-2. "What role?" [Engineer, QA, Scrum Master, Architect, Reviewer]. Team Lead is not offered.
+2. "What role?" [Engineer, QA, Architect, Reviewer]. Team Lead is not offered.
 3. "What will they spend most of their time on? A sentence is enough." Suggestions per role:
 
    | Role | Suggestions |
@@ -56,25 +56,25 @@ From the sidebar tile or a team's **Hire**.
    | QA | Property tests and fuzzing · Load and concurrency |
    | Reviewer | Code review against the ADRs · Security review |
    | Architect | Data model and storage · Distributed systems |
-   | Scrum Master | Keeping the wiki and board current |
    | other | General work |
 
 4. "How should they work with the rest of the team?" [Heads-down, reports when done · Pushes back, challenges decisions · Collaborative, checks in often]
 5. "Which harness should run them?" [Claude Code, Codex CLI, Pi, Hermes Agent, Custom]. Custom is followed by "What command starts it?"
 6. "Here’s the job description. They’ll start on all N of <Team>’s deployments." (or "<Team> isn’t deployed yet, so they’ll start when it is.") A **job description panel** titled `<Name> · <Role> · <Team>` with rows `Focus`, `Works`, `Harness`, `Job`. [Hire <Name>, Start over]
    - Job = the role's default instructions plus `Focus: <focus>.`; personality = the working style.
-7. On **Hire**: the agent is added to the team file with a random face ([Avatar](../design/avatar.md)) and an instance starts on every deployment of the team. "<Name> has joined <Team>." [Open <Name>’s profile, Hire for a role]
+7. On **Hire**: the CoS adds the agent, with a random face ([Avatar](../design/avatar.md)), to the team file on a branch of the [workspace repo](../models/workspace.md#the-workspace-repo) and raises a **review** request through `request_merge`. Once the CEO merges it, an instance starts on every deployment of the team. "<Name> is ready to join <Team>: it’s waiting for you as a review." [Open the review, Hire for a role]
 
 Default instructions per role:
 
 | Role | Instructions |
 |---|---|
-| Team Lead | Break the goal into cards on the board. / Assign cards and review every handoff before integrating. / You are the only member who opens PRs to main. |
+| Team Lead | Break the goal into cards on the board. / Assign cards and review every handoff before integrating. / You are the only member who requests merges to main, with request_merge and the card that explains the work. |
 | Engineer | Work only in your own worktree. / Write the test first. Hand off to the lead with a summary and test results. |
 | QA | Try to break whatever is handed to you: property tests, fuzzing, races. / File every finding with a repro. Never fix the code yourself. |
-| Scrum Master | Own ./wiki. Keep the board in sync with reality. / Record decisions in ADRs. Ping owners of stale cards. |
-| Architect | Propose designs as ADRs in wiki/adr/. / Back every claim with a spike and numbers. |
+| Architect | Propose designs as ADRs with contribute (kind proposal). / Back every claim with a spike and numbers. |
 | Reviewer | Review diffs and ADRs for correctness and clarity. / Approve or request changes. Never push code. |
+
+There is no scrum master role: the lead is the only agent that writes the project's knowledge base. Standups, or nudging the owners of stale cards, can be part of any member's job description; such a member proposes board changes to the lead through `contribute`.
 
 ### Create a team
 
@@ -83,15 +83,15 @@ From **`+ New team`**. There are no templates: the CoS drafts the team from what
 1. "What is the new team for? A sentence or two is enough." Free text, no fixed chips (e.g. "Build the settlement features, with tests and reviews").
 2. "What should we call it?" [suggested names not already used]
 3. "Here’s the team I’d start with. I’ll draft a job description for each role, and you can refine any of them later." A panel `<Name>` with the one-line purpose and one row per role → generated agent name, plus the playbook steps. [Create <Name>, Change something, Start over]. "Change something" takes free text and redrafts.
-4. On **Create**: writes `.foreman/teams/<id>.yaml` ([Team definition](../models/team-definition.md)) with the purpose, the lead first, the drafted playbook and escalation rules, and each agent's drafted job description. "<Name> is set up. It isn’t deployed anywhere yet." [Deploy to a project, Open <Name>]
+4. On **Create**: writes `.foreman/teams/<id>.toml` ([Team definition](../models/team-definition.md)) with the purpose, the lead first, the drafted playbook and escalation rules, and each agent's drafted job description, on a branch of the [workspace repo](../models/workspace.md#the-workspace-repo), and raises a **review** request through `request_merge`. "<Name> is drafted. Once you merge it, deploy it from its page." [Open the review]
 
 ### Refine an agent
 
-From the [Agent page](./agent-page.md). "What should change about how <Name> works? This applies on every project they’re deployed to." [Push back more, Communicate more, Narrower focus]. The CoS appends `Adjustment: <text>.` to the job description. "Updated <Name>’s job description. Every running session picks it up on its next turn."
+From the [Agent page](./agent-page.md). "What should change about how <Name> works? This applies on every project they’re deployed to." [Push back more, Communicate more, Narrower focus]. The CoS appends `Adjustment: <text>.` to the job description on a branch of the workspace repo and raises a **review** request through `request_merge`. "Updated <Name>’s job description on a branch. Once you merge it, every running session picks it up on its next turn."
 
 ### Change project config
 
-From [Project settings](./project-settings.md). "What should change in <project>/.foreman/project.yaml? I’ll edit it on a branch and send it to you as a review." [Send PRs to GitHub, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` and raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff changed <project>/.foreman/project.yaml: <summary>.` and actions Open PR ↗ (with a forge) / Discard / Open Chief of Staff; like any review, it opens a PR on the forge, or publishes the branch when the project has no forge, and the CEO merges it there or with git ([Pipeline and pull requests](./pipeline-and-prs.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
+From [Project settings](./project-settings.md). "What should change in <project>/project/project.toml? I’ll edit it on a branch and send it to you as a review." [Use GitHub as the forge, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` of the [project repo](../models/project-config.md#the-project-repo) and calls `request_merge`, which raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff changed <project>/project/project.toml: <summary>.` and the actions of any review: Merge to main, Create PR (when the project repo has a forge), Reject, plus Open Chief of Staff ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
 
 ### Anything else
 

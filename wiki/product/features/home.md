@@ -23,7 +23,7 @@ One **request panel** per open [request](../models/request.md), across all proje
 - **Buttons** (wrap, gap 8), styled by position ([Design system](../design/design-system.md#buttons)):
   - Approval: its options (e.g. `Approve` / `Deny`), then **`Open session`** in the ghost style.
   - Question, finding, blocked: its options, then `Open session`.
-  - Review (a PR to `main`): text `<Lead> opened PR #<n>: <title> to main. Checks pass.` (without a forge: `<Lead> wants <branch> merged into main.`) and one primary **`Review`** button, which opens Project → [Changes](./changes.md). The CEO merges on the forge (or with git), never in Foreman ([Pipeline and pull requests](./pipeline-and-prs.md#review-and-merge)).
+  - Review (a merge request): text `<Lead> wants <entry title> merged into main in <repo>. Checks pass.` and one primary **`Review`** button, which opens Project → [Changes](./changes.md), where the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)).
   - Chief of Staff item: its options, then `Open Chief of Staff`.
 - Choosing an option resolves the request ([Requests](./requests.md)). `Open session` opens the agent's session in [Sessions](./sessions.md).
 - **Order**: blocked first, then approvals, reviews (Chief of Staff config reviews included), questions and findings; within a kind, oldest first.

@@ -22,24 +22,32 @@ The [Agent page](../features/agent-page.md) shows this exact composed text, one 
 ## This assignment
 Project: {project}  ({path})
 Goal: {deployment.goal}
-Your clone: {project}/.sandboxes/{agent}
+Your sandbox: {project}/.sandboxes/{agent} (a git worktree per repo)
 Branches: {branches}
-Wiki: {project}/wiki ({wiki access})
+Knowledge base: {project}/.sandboxes/{agent}/project/wiki ({wiki access})
 
 ## Your team on {project}
-- {name}, {role} (lead: integrates, opens PRs)
+- {name}, {role} (lead: integrates, requests merges to main)
 - {name}, {role}
 - ...
-You can't see their sandboxes. Work with them only through the tools below.
+You can't see their worktrees, only the branches they name. Work with them only through the tools below.
 
 ## Tools (from Foreman)
 ask(teammate, request)              Get info or work. Keep going meanwhile.
 reply(request_id, output)           Answer a request. Only `output` is returned.
-handoff(teammate, branch, summary)  Pass finished work on. Your part ends.
+switch(branch)                      Go to one of your branches (made from main if new).
+commit(message)                     Commit your changes, in every repo, on your branch.
+update(branch)                      Merge a branch (the lead's, main, a teammate's) into yours.
+                                    On conflicts: resolve the markers, then commit().
+handoff(teammate, branch, summary)  Pass finished work on (commits first). Your part ends. (members only)
+contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note.
 escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.
                                     A question doesn't pause you unless you pass wait: true.
-open_pr(branch, title, summary)     Propose one of your lead/{team}/* branches for main. Only you can.
-                                    Call it again on the same branch to update its PR. (lead only)
+request_merge(branch, entry)        Ask the CEO to merge one of your lead/{team}/* branches into main;
+                                    entry: the wiki card that explains the work. Only you can.
+                                    Call it again on the same branch to refresh it. (lead only)
+Git is read-only for you (status, diff, log, blame work); branch, commit
+and merge only through switch(), commit() and update().
 Replies arrive in this session as "⇄ <name> replied to req-N".
 Resume the task that asked for it. After escalate you resume
 from the same point with the CEO's answer.
@@ -67,21 +75,21 @@ The composed prompt is plain Markdown, written as the **user-level instruction f
 | Codex CLI | `$CODEX_HOME/AGENTS.md` | Global instructions |
 | Custom | The adapter's choice (a flag with a file path, or the first stdin message) | |
 
-Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and PRs), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn; a soul edit while running is announced by a context-update message (below) and takes full effect at the next restart. To verify per harness in the [Prove epic](../../backlog/epics/prove.md).
+Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and merges), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn; a soul edit while running is announced by a context-update message (below) and takes full effect at the next restart. To verify per harness in the [Prove epic](../../backlog/epics/prove.md).
 
 ## Variable parts
 
 | Placeholder | Lead | Member |
 |---|---|---|
-| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). You may open PRs to main, one per branch. When told main moved, rebase that branch onto main and call open_pr again.` | `wt/{agent}/<card> only. No push to main.` |
-| `{wiki access}` | `read and write` if the team has no scrum master, else `read only` | `read and write` for the scrum master, else `read only` |
-| tools | all five, including `open_pr` | `ask`, `reply`, `handoff`, `escalate` |
+| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch). Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with update("main"), resolve any conflicts and commit(), then call request_merge again.` | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch). No push to main.` |
+| `{wiki access}` | `read and write: edit, then commit()` | `read only: use contribute` |
+| tools | all but `handoff`, including `request_merge` | all but `request_merge` |
 | `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask() or handoff()." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it, and tell {lead} if it's relevant to the team." |
 
 - `Project: {project}  ({path})` has two spaces before the parenthesis.
-- Playbook steps resolve their `who` ([Team definition](../models/team-definition.md#playbook-and-escalation)): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → `CEO`, a role name (`scrum_master`) → the name(s) of the member(s) with that role, an agent id → that agent's name. Anything else is shown as written (and flagged on the [Team page](../features/team-page.md)).
-- Gates come from `always_ask_ceo`, checks from `checks` in `project.yaml`.
-- The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (`lead/<team>/*` for the lead, `wt/<agent>/<card>` for members).
+- Playbook steps resolve their `who` ([Team definition](../models/team-definition.md#playbook-and-escalation)): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → `CEO`, a role name (`qa`) → the name(s) of the member(s) with that role, an agent id → that agent's name. Anything else is shown as written (and flagged on the [Team page](../features/team-page.md)).
+- Gates come from `always_ask_ceo`, checks from `checks` in `project.toml`.
+- The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (`lead/<team>/*` for the lead; `wt/<agent>/main` and `wt/<agent>/<topic>` for members).
 
 ## Talking to the CEO
 
@@ -91,5 +99,5 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 ## Updates
 
 - A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)): the changed sections of its prompt in full (not a diff), prefixed with `ⓘ Your definition changed:`, one message per turn however many saves happened. The full re-prompt happens at the next restart.
-- Wiki access follows the PRD: read and write for the scrum master, or for the lead when the team has no scrum master; read only for everyone else (the prototype never granted it to a lead). The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#wiki-access)).
+- Knowledge-base access: read and write for the lead, who commits through `commit()` (no review); read only for everyone else, who use `contribute`. The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)). `{wiki access}` reads `read and write: edit, then commit()` or `read only: use contribute`.
 - Roster changes (a hire) are a team edit: existing members learn about the new teammate through the same context update.

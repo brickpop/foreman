@@ -1,6 +1,6 @@
 ---
 type: task
-status: blocked
+status: todo
 priority: high
 tags: [feature]
 epic: terminal-multiplexer
@@ -10,7 +10,7 @@ epic: terminal-multiplexer
 
 **Why:** real agents run in rootless containers ([Session runner](../product/architecture/session-runner.md)).
 
-Blocked by [Experiment A](./prove-a-podman-engine.md).
+Was blocked by [Experiment A](./prove-a-podman-engine.md), proven on macOS on 2026-10-14: its results are the starting point.
 
 **Done when:** `runner/podman` implements `Runner` and `Process` like `runner/direct` (start with mounts, env, labels and size; attach; resize; stop; wait; list for re-attach), with the Podman service started when needed, and integration tests behind a build tag that the CEO runs on macOS and Fedora.
 

@@ -13,7 +13,7 @@ All project knowledge and work tracking lives in the **`wiki/` bundle**, operate
 - **[`wiki/technical-debt.md`](./wiki/technical-debt.md)**: every workaround or limitation that's added temporarily goes here, with the reason and the planned fix. Review it often.
 - [WORKFLOW.md](./WORKFLOW.md) defines the conventions: entry types, tags, spec and task fields, lifecycle and how to query the backlog.
 
-Foreman manages project wikis in exactly this shape (`<project>/wiki/` with a `wiki.toml`), so this repo is also its own first test project.
+Foreman manages project wikis in this shape (a bundle with a `wiki.toml`), at `<project>/project/wiki/`. This repo doesn't follow that `project/` layout yet: its wiki lives in the code repo.
 
 ## Non functional requirements
 

@@ -6,13 +6,13 @@ tags: [feature, ui, workspace, config, security]
 
 # Workspace settings screen
 
-The **Settings** screen (sidebar footer): workspace-wide settings stored in `~/agents-ws/.foreman/settings.yaml` ([Workspace settings](../models/workspace-settings.md)) and tokens stored as [secrets](../models/secrets.md). Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`).
+The **Settings** screen (sidebar footer): workspace-wide settings stored in `~/agents-ws/.foreman/settings.toml` ([Workspace settings](../models/workspace-settings.md)) and tokens stored as [secrets](../models/secrets.md). Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`).
 
 ## Workspace
 
 | Row | Explanation | Control |
 |---|---|---|
-| Folder | Every subfolder with a .foreman/project.yaml is a project. Foreman doesn’t clone anything. It uses the git repos it finds in each project folder. | The path, read-only (Mono 13px `--tx2`) |
+| Folder | Every subfolder with a project/project.toml is a project. Foreman doesn’t clone anything. It uses the git repos it finds in each project folder. | The path, read-only (Mono 13px `--tx2`) |
 | Listen on | Anyone with the URL Foreman printed at start has full control. Keep this on your own machine unless you trust the network. | Segmented `This machine` / `Local network`. Choosing Local network asks for confirmation with a warning that anyone on the network can drive the agents ([Security](../architecture/security.md)). Takes effect on restart |
 | Running sessions at once | Extra sessions wait in a queue until a slot frees up. | Stepper, 1–64, default 12 ([Agent runtime](../architecture/agent-runtime.md#concurrency)) |
 | Run agents in | Containers isolate each agent from your machine. Without them, agents run as plain processes with full access to it. | Segmented `Containers (Podman)` / `Directly (no isolation)`. Choosing Directly asks for confirmation; while it is on, a warning stays visible here. Takes effect for sessions started afterwards ([Workspace settings](../models/workspace-settings.md)) |
@@ -28,14 +28,16 @@ Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`
 
 ## Forge accounts
 
-"Tokens Foreman uses to push lead branches, open PRs and watch them. They stay on this machine. Each project's config names its forge."
+"Tokens Foreman uses when you ask it to create a PR or sync a repo, and to watch those PRs. They stay on this machine. Each project's config names its forge."
 
 One row each for **GitHub**, **Forgejo** and **Gitea**: the host and owner (or `—`), the token status (`token set` `--ok`, or `not connected` `--tx4`), and **`Connect`** / **`Change`**. Connect or Change opens an inline form: host URL (prefilled `github.com` for GitHub) and a write-only token field; Save validates the token against the forge and stores it ([Forge adapters](../architecture/forge-adapters.md), `PUT /api/secrets/forge/:kind`). A stored token is never shown again.
+
+Below the rows, **Workspace repo**: where the [workspace repo](../models/workspace.md#the-workspace-repo) is hosted, so the Chief of Staff's team changes can become PRs there (Create PR on their merge request): `No forge` (the default; the CEO merges them locally) or one of the connected forges, with the repo's URL (`workspace_forge` in [Workspace settings](../models/workspace-settings.md#schema)). With a forge set, a small outline **`Sync`** button fetches the forge's `main`, merges it in and pushes the workspace repo's `main` there, stopping with a message on a conflict; nothing is pushed automatically ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)).
 
 ## Notifications
 
 - **Browser notifications**: the permission state, `on` (`--ok`), `blocked` (`--err`), `turn on` (`--accTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
-- Toggles (default on): `An agent needs me`, `An agent finishes`, `A PR is ready to merge` ([Notifications](./notifications.md)).
+- Toggles (default on): `An agent needs me`, `An agent finishes`, `A merge is requested` ([Notifications](./notifications.md)).
 
 ## Maintenance
 

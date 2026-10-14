@@ -6,12 +6,12 @@ order: 4
 
 # Workflow with the CEO
 
-**Goal:** everything that needs the CEO reaches them, and their answers flow back. Requests (approval, question, waiting in its session, blocked, finding) on Home and Changes with notifications; `open_pr` runs the checks, pushes and opens the PR on the forge; merges are noticed and other leads are told to rebase.
+**Goal:** everything that needs the CEO reaches them, and their answers flow back. Requests (approval, question, waiting in its session, blocked, finding) on Home and Changes with notifications; `request_merge` runs the checks and raises the review; the CEO merges to main, creates a PR on the forge, or rejects; merges are noticed and other leads are told to merge `main` in.
 
-**Usable when done:** the full loop from a goal to a merged PR, with approvals, crashes and findings handled from the UI.
+**Usable when done:** the full loop from a goal to a merge into `main`, with approvals, crashes and findings handled from the UI.
 
 **Journey steps:** 18–19 and 21–23 of [the journey](../../product/journey.md).
 
-**Blocked by:** [Messaging and hand-offs](./messaging-handoffs.md), and [Git](./git.md) for pull requests (pushing lead branches, integration).
+**Blocked by:** [Messaging and hand-offs](./messaging-handoffs.md), and [Git](./git.md) for merges (local merge, the optional forge PR, integration).
 
-**Exit criteria:** the steps above work end to end, including a real PR on GitHub (and Gitea/Forgejo) merged by the CEO.
+**Exit criteria:** the steps above work end to end, including a Merge to main, and a real PR on GitHub (and Gitea/Forgejo) created and merged by the CEO.

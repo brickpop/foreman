@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 priority: high
 tags: [spike]
 epic: prove
@@ -20,3 +20,8 @@ Claude writes the recipe; the CEO runs it on macOS and Fedora.
 **PASS:** both work for a harness, which is then supported in v1. **FAIL:** a harness lacks one of them.
 
 **On FAIL:** that harness's adapter uses its fallback (a command-line flag, or the first message), recorded in [Harness adapters](../product/architecture/harness-adapters.md); a harness with neither is dropped from v1.
+
+## Progress
+
+- **Claude Code (2026-10-14, macOS): PASS.** `CLAUDE.md` in the instance's `CLAUDE_CONFIG_DIR` is read as the session prompt (it knew the codeword); `--mcp-config` starts the stdio `foreman-agent` stand-in, which listed its tool; the tool call's answer came back through it. The shared login file mounted alone into the private config dir worked. (Run in print mode, which is fine for an experiment; the product only runs interactive sessions.)
+- **Pi and Hermes:** not set up yet (the CEO, 2026-10-14); to run when they are.

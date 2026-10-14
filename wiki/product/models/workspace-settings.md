@@ -6,7 +6,7 @@ tags: [model, config, workspace]
 
 # Workspace settings
 
-`~/agents-ws/.foreman/settings.yaml`: local, per-machine settings, not shared with anyone. Edited only through the [Workspace settings screen](../features/settings.md). Forge tokens are not here: they are [Secrets](./secrets.md).
+`~/agents-ws/.foreman/settings.toml`, in the [workspace repo](./workspace.md#the-workspace-repo): local, per-machine settings, not shared with anyone. Edited only through the [Workspace settings screen](../features/settings.md); each save is one commit. Forge tokens are not here: they are [Secrets](./secrets.md).
 
 ## Schema
 
@@ -21,9 +21,11 @@ tags: [model, config, workspace]
 | `team_message_markers` | Boolean | | `true` | | Show the marker strip beside session terminals, toggled on the [Settings screen](../features/settings.md) as "Show agent messages beside terminals". Markers are never written into a terminal ([Sessions](../features/sessions.md#markers-beside-the-terminal)) |
 | `log_cap_mb` | Number | | `50` | > 0 | Session log size cap per instance before rotation ([Persistence](../architecture/persistence.md#session-logs)) |
 | `forges.<kind>` | Map | | | `kind` ∈ `github`, `forgejo`, `gitea` | Host or owner per forge account; the token lives in [Secrets](./secrets.md) |
+| `workspace_forge.kind` | String | | `none` | enum: `github`, `forgejo`, `gitea`, `none` | The forge hosting the [workspace repo](./workspace.md#the-workspace-repo), where Create PR on the Chief of Staff's team-change merge requests opens the PR; `none`: Merge to main only ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)). Its account and token are the matching `forges.<kind>`; nothing is pushed automatically: the CEO pushes `main` with Sync ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)) |
+| `workspace_forge.url` | String (URL) | when `kind` ≠ `none` | | | The workspace repo on the forge |
 | `notifications.needs_me` | Boolean | | `true` | | "An agent needs me" ([Notifications](../features/notifications.md)) |
 | `notifications.finishes` | Boolean | | `true` | | "An agent finishes" |
-| `notifications.pr_ready` | Boolean | | `true` | | "A PR is ready to merge" |
+| `notifications.merge_requested` | Boolean | | `true` | | "A merge is requested" |
 
 Field names are a proposal; the PRD names the contents ("listen, limits, harness commands, notifications"), not the keys.
 

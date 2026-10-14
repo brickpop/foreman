@@ -12,9 +12,9 @@ epic: terminal-multiplexer
 
 Blocked by [Project pages](./ui-project-pages.md) and [Workspace and config](./workspace-config-events.md).
 
-**Done when:** Add a project writes `project.yaml` and a starter wiki; Overview renders real entries (server-side markdown, links through the engine, changed dots); Board shows the boards from `wiki.toml` with version-guarded drags; Settings shows the real config; these areas leave the demo client (Changes stays on demo until epics 3–4).
+**Done when:** Add a project creates the project repo (`project/`: `git init`, `project.toml`, a starter wiki, first commit); Overview renders real entries (server-side markdown, links through the engine, changed dots); Board shows the boards from `wiki.toml` with version-guarded drags; Settings shows the real config; these areas leave the demo client (Changes stays on demo until epics 3–4).
 
 - [ ] candidates and Add (API)
 - [ ] the Wiki block over the agentic-wiki engine; goldmark rendering, raw HTML off
-- [ ] entries, boards, checkbox and field writes, read markers (API + events)
+- [ ] entries, boards, checkbox and field writes, each committed in the project repo (one commit per write, only that file, authored as the CEO), read markers (API + events)
 - [ ] swap the areas in main.tsx; remove their badges

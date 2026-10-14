@@ -6,14 +6,14 @@ tags: [architecture, runtime, sessions, agents]
 
 # Agent runtime
 
-How an [instance](../models/instance.md) (one agent of one [deployment](../models/deployment.md)) comes to life, runs, fails, stops and recovers. The **Instance manager** owns this ([Building blocks](./building-blocks.md#5-instance-manager-instances)): it asks the image builder for the project's image and the harness adapter for the launch spec, starts the process through the [execution engine](./session-runner.md), wraps it in a [Terminal](./building-blocks.md#2-terminal-terminal), and prepares the working copy through [Git](./sandboxes-and-git.md).
+How an [instance](../models/instance.md) (one agent of one [deployment](../models/deployment.md)) comes to life, runs, fails, stops and recovers. The **Instance manager** owns this ([Building blocks](./building-blocks.md#5-instance-manager-instances)): it asks the image builder for the project's image and the harness adapter for the launch spec, starts the process through the [execution engine](./session-runner.md), wraps it in a [Terminal](./building-blocks.md#2-terminal-terminal), and prepares the instance's worktrees through [Git](./sandboxes-and-git.md).
 
 ## Instance lifecycle
 
 1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then for each team member create an instance in the `starting` state.
-2. **Sandbox**: clone each project repo into `<project>/.sandboxes/<agent>/<repo>`. Fetch, then check out:
-   - lead: `lead/<team>/integration` (created from `main` if missing; [Sandboxes and git policy](./sandboxes-and-git.md#layout-and-branches))
-   - members: idle on `main`. They create `wt/<agent>/<card>` when assigned a card.
+2. **Sandbox**: `Git.Prepare` makes a git worktree of each code repo at `<project>/.sandboxes/<agent>/<repo>` if it doesn't exist yet ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
+   - lead: `lead/<team>/integration` (created from `main` if missing)
+   - members: their home branch `wt/<agent>/main` (created from `main`). They create `wt/<agent>/<topic>` when assigned a card.
 3. **Compose prompt** ([Session prompt](./session-prompt.md)) and **spawn** the harness in its container with the sandbox as working directory ([Harness adapters](./harness-adapters.md)).
 4. **Run**: status follows harness signals and team-message activity:
    - `running`: producing output / working a turn
@@ -21,7 +21,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
    - `awaiting`: has an open [request](../models/request.md) to the CEO
    - `done`: handed off, nothing assigned
 5. **Crash / exit / rate limit**: Foreman marks the instance `stopped` and raises a **blocked** request ([Requests](../features/requests.md)).
-6. **Stop deployment**: terminate the processes (containers) and keep sandboxes and worktrees on disk. Other deployments of the same team are not affected.
+6. **Stop deployment**: terminate the processes (containers) and keep worktrees on disk; `Git.Prune` deletes the agents' `wt/*` branches already merged into `main` ([Branches](./sandboxes-and-git.md#branches)). Other deployments of the same team are not affected.
 7. **Soul edit**: when a [team definition](../models/team-definition.md) changes, each running instance gets a context-update message on its next turn (injected at its next idle prompt, like a queued team message). A full re-prompt happens at the next restart.
 
 Status values: `starting | running | idle | awaiting | done | stopped | queued`.
@@ -37,7 +37,7 @@ Status values: `starting | running | idle | awaiting | done | stopped | queued`.
 | `idle` / `done` | CEO input, team message or reply delivered | `running` |
 | any live | `escalate(approval)` or blocking `escalate(question)` | `awaiting` |
 | `awaiting` | request resolved | `running` |
-| any live | process exit, crash, rate limit, no output for N min (default 20, see below), sandbox or git error, merge conflict on `lead/<team>/*` | `stopped` + blocked request; a crash first gets one automatic restart (see below) |
+| any live | process exit, crash, rate limit, no output for N min (default 20, see below), sandbox or git error (a merge conflict from `update` is not one: it goes back to the agent, who resolves it and commits) | `stopped` + blocked request; a crash first gets one automatic restart (see below) |
 | `stopped` | CEO picks Retry / Switch harness | `starting` |
 | any | deployment stopped | `stopped` (no request) |
 

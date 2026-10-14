@@ -13,10 +13,10 @@ The end-to-end scenarios v1 must pass. Each one becomes an end-to-end test; the 
 Run `foreman` in `~/agents-ws`, open the UI, then use **+ New project** and add the `ledger` folder (repos already cloned). Next, use **+ New team** to have the Chief of Staff draft "Atlas", a team to build features. Finally, deploy Atlas to ledger with a goal, and the sessions start.
 
 Acceptance:
-- [ ] `foreman` started in a folder serves the UI on `localhost:8888`, and `.foreman/` exists in the workspace.
-- [ ] The [Add a project](./features/add-project.md) dialog lists `ledger/` with its detected repos; adding it writes `ledger/.foreman/project.yaml` and, if missing, `ledger/wiki/index.md`. Nothing is cloned.
-- [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a roster from the purpose (using the shipped example teams as references) and, once the CEO confirms, writes `.foreman/teams/atlas.yaml`.
-- [ ] [Deploying](./features/deploy-team.md) Atlas to ledger with a goal creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one sandbox per instance, and every instance reaches `running` or `idle`.
+- [ ] `foreman` started in a folder serves the UI on `localhost:8888`, and `.foreman/` exists in the workspace as a git repo (the workspace repo).
+- [ ] The [Add a project](./features/add-project.md) dialog lists `ledger/` with its detected repos; adding it creates the project repo `ledger/project/` (`git init`, `project.toml`, a starter wiki). Nothing is cloned.
+- [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a roster from the purpose (using the shipped example teams as references) and, once the CEO confirms, writes `.foreman/teams/atlas.toml` on a branch of the workspace repo and raises a review request; Atlas appears once the CEO merges it.
+- [ ] [Deploying](./features/deploy-team.md) Atlas to ledger with a goal creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
 
 ## 2. Delegate through the lead
 
@@ -25,9 +25,11 @@ In Sessions, open the Atlas · ledger tab and type to Mara: "Add idempotency key
 Acceptance:
 - [ ] Text typed in Mara's pane reaches Mara's harness stdin.
 - [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the Messages drawer, and as a team-message marker line in both panes.
-- [ ] Tove's commits land on `wt/tove/LED-44` in Tove's sandbox only.
+- [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
+- [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
 - [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in [Changes](./features/changes.md) → In flight.
-- [ ] When the scrum master (or lead) updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
+- [ ] Tove's `contribute(finding, …)` writes a note in `ledger/project/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
+- [ ] When the lead updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
 
 ## 3. Direct instruction
 
@@ -47,20 +49,20 @@ Acceptance:
 - [ ] The request shows on [Home](./features/home.md) and in ledger's Changes; a toast and (if permitted) a browser [notification](./features/notifications.md) fire.
 - [ ] Picking "Approve" resolves the request, delivers the answer to Ilya's paused tool call, and Ilya's instance leaves `awaiting`.
 
-## 5. PR review
+## 5. Merge review
 
-Mara calls `open_pr`. Foreman runs the checks and opens the PR on Forgejo. A review request appears. The CEO merges on Forgejo, or sends it back with notes from Foreman.
+Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO merges to main from Foreman, or creates a PR on Forgejo and merges there, or rejects it with a reason.
 
 Acceptance:
-- [ ] `open_pr` from the lead runs the project checks, pushes the lead branch to the forge, opens a PR to `main`, and creates a [pull request](./models/pull-request.md) entry with its URL and number, carrying every integrated work item (they leave "In flight" and are listed under it).
-- [ ] A review request appears with the PR link line and Open PR ↗ / Send back / Open session; there is no merge button.
-- [ ] When the CEO merges the PR on the forge, Foreman notices within a polling interval, resolves the request, notifies the lead, and lists the PR with its work items under Merged. The CEO's working copy is untouched.
-- [ ] Closing the PR on the forge without merging resolves the request as closed and returns its work items to stage 0; review comments made on the forge reach the lead's session.
-- [ ] Without a forge, `open_pr` publishes the lead branch into the project repo; the review request has no merge button and closes once the CEO merges the branch into `main` with git.
-- [ ] Send back posts the notes on the PR, delivers them to the lead (typed into its session when idle), closes the PR entry and returns its work items to stage 0.
-- [ ] A non-lead calling `open_pr` is refused.
-- [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open PR at the same time; `open_pr` on a branch outside `lead/<own team>/*` is refused.
-- [ ] When one PR is merged, the lead of every other open PR on the same repo gets a "main moved, rebase" line; after the rebase, `open_pr` on the same branch updates the existing PR (same number, checks rerun) instead of opening a new one.
+- [ ] `request_merge` from the lead runs the project checks and creates a [merge request](./models/merge-request.md) for each repo with new commits, titled from the entry and carrying every integrated work item (they leave "In flight" and are listed under it). Nothing is pushed to the forge.
+- [ ] A review request appears with the entry's title, the branch and checks, and Merge to main / Create PR on Forgejo / Reject / Open session.
+- [ ] Merge to main merges the branch into `main` on the host, resolves the request, tells the lead, and lists the merge request with its work items under Merged. A branch that doesn't merge cleanly changes nothing, shows "conflicts with main" and asks the lead to merge `main` in.
+- [ ] Create PR pushes the branch and opens a PR on the forge; the panel then shows Open PR ↗. When the CEO merges it on the forge, Foreman notices within a polling interval, resolves the request and notifies the lead; closing it without merging rejects the merge request and returns its work items to stage 0; review comments made on the forge reach the lead's session.
+- [ ] On a repo without a forge, Create PR is not offered.
+- [ ] Reject asks for a reason, delivers it to the lead (typed into its session when idle), closes the PR if there is one, returns the work items to stage 0, and keeps the branch, so the lead can `switch` back to it.
+- [ ] A non-lead calling `request_merge` is refused; so is an entry that doesn't exist in the wiki.
+- [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<own team>/*` is refused.
+- [ ] When one merge request is merged, the lead of every other open one on the same repo gets a "main moved" line asking it to merge `main` in with `update("main")`; after that, `request_merge` on the same branch refreshes the existing merge request (checks rerun, its PR pushed again if it has one) instead of creating a new one.
 
 ## 6. Challenge team finding
 
@@ -76,7 +78,7 @@ Acceptance:
 Deploy Vesper to relay as well. There are now two independent Vesper deployments with separate sessions and messages. Editing Nyx's soul updates both.
 
 Acceptance:
-- [ ] `nyx@ledger` and `nyx@relay` are separate instances with separate sandboxes, logs and team-message channels.
+- [ ] `nyx@ledger` and `nyx@relay` are separate instances with separate worktrees, logs and team-message channels.
 - [ ] A team message from `nyx@ledger` can never reach `nyx@relay` or any relay instance.
 - [ ] Editing Nyx's personality writes the team file once, and both running instances receive a context-update message on their next turn.
 
@@ -94,16 +96,16 @@ Acceptance:
 From Atlas, choose **Hire** and complete the CoS interview. The new engineer joins and starts on every Atlas deployment.
 
 Acceptance:
-- [ ] The interview ends with a job description panel; confirming adds the agent to `atlas.yaml` with a random face.
-- [ ] A new instance starts on every active Atlas deployment.
+- [ ] The interview ends with a job description panel; confirming adds the agent to `atlas.toml`, with a random face, on a branch of the workspace repo, and raises a review request.
+- [ ] Once the CEO merges it, a new instance starts on every active Atlas deployment.
 
 ## 10. Change config safely
 
-In Project Settings, choose "Change with Chief of Staff" and ask it to "Send PRs to GitHub". A branch is created with the edit, and a review request appears.
+In Project Settings, choose "Change with Chief of Staff" and ask it to "Use GitHub as the forge". A branch is created with the edit, and a review request appears.
 
 Acceptance:
-- [ ] The CoS edits `project.yaml` on a branch `foreman/config-N`, never on `main`.
-- [ ] A review request appears in the project's Changes (a PR on the forge, or a branch to check without one); once the CEO merges it, `project.yaml` on `main` changes and the UI reflects it within 1 s; Discard closes the PR, deletes the branch and leaves `main` untouched.
+- [ ] The CoS edits `project.toml` on a branch `foreman/config-N` of the project repo, never on `main`.
+- [ ] A review request appears in the project's Changes, with Merge to main, Create PR (when the project repo has a forge) and Reject; once merged, `project.toml` on `main` changes and the UI reflects it within 1 s; Reject leaves `main` untouched and tells the Chief of Staff why.
 
 ## 11. Read the wiki
 
@@ -127,5 +129,5 @@ Acceptance:
 On the Team → Deployments tab, choose **Stop** on one project. Its sessions end, worktrees are kept, and other projects continue.
 
 Acceptance:
-- [ ] All instances of that deployment are terminated and marked `stopped`; their sandboxes and branches remain on disk.
+- [ ] All instances of that deployment are terminated and marked `stopped`; their worktrees and branches remain on disk.
 - [ ] Deployments of the same team on other projects keep running untouched.

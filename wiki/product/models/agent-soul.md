@@ -14,9 +14,9 @@ One member of a [team definition](./team-definition.md): who the agent is (name,
 |---|---|---|---|---|---|
 | (key) | String | yes | | slug, unique across the workspace | Agent id: the slug of the display name ([Team definition](./team-definition.md#schema)) |
 | `name` | String | yes | | unique across the workspace | Display name, used in @-mentions, tabs, prompts |
-| `role` | String | yes | | `team_lead`, `architect`, `engineer`, `qa`, `scrum_master`, `reviewer`, or a custom role in snake_case (e.g. `security_auditor`) | Labels: Team Lead, Architect, Engineer, QA / Tester, Scrum Master, Reviewer; a custom role is shown with underscores as spaces, capitalised ("Security auditor"). Snake_case so a playbook can name it as a `who` ([Team definition](./team-definition.md#playbook-and-escalation)). A custom role never grants wiki write access (only `scrum_master`, or the lead when the team has none) |
+| `role` | String | yes | | `team_lead`, `architect`, `engineer`, `qa`, `reviewer`, or a custom role in snake_case (e.g. `security_auditor`) | Labels: Team Lead, Architect, Engineer, QA / Tester, Reviewer; a custom role is shown with underscores as spaces, capitalised ("Security auditor"). Snake_case so a playbook can name it as a `who` ([Team definition](./team-definition.md#playbook-and-escalation)). No role but the lead's grants write access to the knowledge base |
 | `harness` | String | yes | | enum: `claude-code`, `codex`, `pi`, `hermes`, `custom` | Labels: Claude Code, Codex CLI, Pi, Hermes Agent, Custom ([Harness adapters](../architecture/harness-adapters.md)) |
-| `command` | String | when `harness: custom` | `""` | | The custom command line (e.g. `./bin/loadbot`) |
+| `command` | String | when `harness = "custom"` | `""` | | The custom command line (e.g. `./bin/loadbot`) |
 | `personality` | String | | | | One or a few lines |
 | `skills` | Array of String | | `[]` | no duplicates | Shown as chips |
 | `instruction` | String (multi-line) | | the role's default | | The job description |
@@ -35,10 +35,9 @@ Used when a role is hired without a custom `instruction` (the CoS appends `Focus
 
 | Role | Default `instruction` |
 |---|---|
-| Team Lead | Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who opens PRs to main. |
+| Team Lead | Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges to main (request_merge, with the card that explains the work). |
 | Engineer | Work only in your own worktree. Write the test first. Hand off to the lead with a summary and test results. |
 | QA | Try to break whatever is handed to you: property tests, fuzzing, races. File every finding with a repro. Never fix the code yourself. |
-| Scrum Master | Own ./wiki. Keep the board in sync with reality. Record decisions in ADRs. Ping owners of stale cards. |
 | Architect | Propose designs as ADRs in wiki/adr/. Back every claim with a spike and numbers. |
 | Reviewer | Review diffs and ADRs for correctness and clarity. Approve or request changes. Never push code. |
 

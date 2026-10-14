@@ -6,7 +6,7 @@ tags: [feature, ui, wiki]
 
 # Wiki reader
 
-The project's **Overview** tab: a reader for the project's wiki bundle (`<project>/wiki/`), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only. Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
+The project's **Overview** tab: a reader for the project's wiki bundle (`<project>/project/wiki/`), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only. Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
 
 ## Project header and tabs
 
@@ -22,7 +22,7 @@ A centered grid (gap 32). Tree closed: one column `minmax(0, 760px)`. Tree open:
 ## Toolbar
 
 - **`Files`** / **`Hide files`** toggle (raised when open). **Closed by default.** While closed, it shows an amber dot if any entry changed since the CEO last looked.
-- The current entry path (Mono 12px `--tx4`, ellipsis): `<project>/wiki/<path>`.
+- The current entry path (Mono 12px `--tx4`, ellipsis): `<project>/project/wiki/<path>`.
 
 ## File tree
 

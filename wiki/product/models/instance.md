@@ -6,7 +6,7 @@ tags: [model, sessions, agents, runtime]
 
 # Instance
 
-One [agent soul](./agent-soul.md) running in one [deployment](./deployment.md): a live harness process attached to a terminal, in its own container and sandbox ([Session runner](../architecture/session-runner.md)). Also called a session. Identified as `agent@project` (e.g. `mara@ledger`). Its terminal is live in [Sessions](../features/sessions.md); its lifecycle is in [Agent runtime](../architecture/agent-runtime.md).
+One [agent soul](./agent-soul.md) running in one [deployment](./deployment.md): a live harness process attached to a terminal, in its own container and worktrees ([Session runner](../architecture/session-runner.md)). Also called a session. Identified as `agent@project` (e.g. `mara@ledger`). Its terminal is live in [Sessions](../features/sessions.md); its lifecycle is in [Agent runtime](../architecture/agent-runtime.md).
 
 ## Schema
 
@@ -21,7 +21,7 @@ Table `instances`.
 | `task` | String | | | | Current task note (e.g. "Waiting for a card"). Used to restart after a server restart |
 | `pid` | Number | | | | Harness process id (inside the container, or the container's) |
 | `pty_id` | String | | | | Handle of the attached terminal in the session runner (e.g. container id) |
-| `sandbox_path` | String | yes | | | `<project>/.sandboxes/<agent>/` |
+| `sandbox_path` | String | yes | | | `<project>/.sandboxes/<agent>/`: its worktrees, one per code repo |
 | `harness` | String | yes | the soul's harness | enum as in [Agent soul](./agent-soul.md) | Harness actually running: differs from the soul after a "Switch harness", an override that lasts until the instance is next restarted from the team file ([Agent soul](./agent-soul.md#harness-override)) |
 | `harness_session_id` | String | | | | The harness's own session id, for native resume on restart ([Agent runtime](../architecture/agent-runtime.md#restarts)) |
 | `started_at` | Timestamp | | | | |
@@ -33,7 +33,7 @@ Table `instances`.
 | Status | Meaning | Color ([Design system](../design/design-system.md)) |
 |---|---|---|
 | `queued` | Waiting for a free slot (max running sessions reached) | grey dashed outline (`--tx4`) |
-| `starting` | Container, sandbox and harness being set up | violet (`--team`) |
+| `starting` | Container, worktrees and harness being set up | violet (`--team`) |
 | `running` | Working | green (`--ok`) |
 | `idle` | Waiting at its prompt with nothing assigned (and not right after a handoff) | grey (`--tx4`) |
 | `awaiting` | Waits on the CEO: an open `escalate(approval)`, or the harness reported it is waiting for the user ([Request](./request.md#invariants), [Protocol](../architecture/protocol.md#waiting-for-the-ceo)) | amber (`--acc`) |
@@ -46,7 +46,7 @@ The raw terminal byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<
 
 ## Invariants
 
-- One container and one sandbox per instance; instances never share a working tree.
+- One container and one worktree per code repo per instance; instances never share a working tree (they share each repo's `.git`, read-only to them).
 - An instance in `awaiting` has at least one open blocking request.
 - A crash, exit or rate limit sets `stopped` and raises a blocked [request](../features/requests.md).
 - Instances survive UI disconnects.

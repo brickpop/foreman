@@ -6,7 +6,7 @@ tags: [architecture, team-tools, requests, pipeline]
 
 # Protocol
 
-The messaging and workflow schema: who sends what, through which [building block](./building-blocks.md), as which struct, with which lifecycle, and what the UI hears. The models stay the single source of the **stored** fields ([Team message](../models/team-message.md), [Request](../models/request.md), [Work item](../models/work-item.md), [Pull request](../models/pull-request.md), [Instance](../models/instance.md)); this entry owns the wire and in-memory types and the interactions between blocks. Go structs are sketches: field names and comments are the contract, exact types are settled in code.
+The messaging and workflow schema: who sends what, through which [building block](./building-blocks.md), as which struct, with which lifecycle, and what the UI hears. The models stay the single source of the **stored** fields ([Team message](../models/team-message.md), [Request](../models/request.md), [Work item](../models/work-item.md), [Merge request](../models/merge-request.md), [Instance](../models/instance.md)); this entry owns the wire and in-memory types and the interactions between blocks. Go structs are sketches: field names and comments are the contract, exact types are settled in code.
 
 ## Actors and channels
 
@@ -14,14 +14,14 @@ Three actors, and every interaction enters through exactly one channel:
 
 | Actor | Channel | Struct | Received by |
 |---|---|---|---|
-| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`handoff`, `escalate`, `open_pr`) |
+| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `update`, `handoff`, `contribute`, `escalate`, `request_merge`) |
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
 | CEO | Answering a request (Home, Changes) | `Answer` | Web server → **Workflow** `Resolve` |
-| CEO | Send back, Discard (a pull request) | `PRAction` | Web server → **Workflow** |
+| CEO | Merge to main, Create PR on the forge, Reject (a merge request) | `MergeAction` | Web server → **Workflow** |
 | Foreman | Process exit, silence, rate limit, git or build error | internal | **Instance manager** / **Workflow** → blocked [request](#requests) |
-| Foreman | Forge poll, project-repo watch | internal | **Workflow** → [pull request](#work-items-and-pull-requests) transitions |
+| Foreman | Forge poll, project-repo watch | internal | **Workflow** → [merge request](#work-items-and-merge-requests) transitions |
 
 Agents never reach each other except through Messaging, never reach the CEO except through Workflow, and never reach anything with a forge token.
 
@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "handoff" | "escalate" | "open_pr"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "update" | "handoff" | "contribute" | "escalate" | "request_merge"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -91,8 +91,8 @@ Whenever the harness reports it is waiting for the user, Workflow raises a reque
 
 Anything Foreman writes into a session's terminal is **typed input**: harnesses are full-screen programs that read the terminal as their keyboard. So there are two different things, never mixed:
 
-- A **delivery** is text the agent must read: a teammate's ask, a reply, a handoff to the lead, the CEO's answer, a rebase notice. Messaging hands it to `Instances.Deliver`, which waits until the recipient is `idle` and then calls the harness adapter's `Deliver` (type the text, then submit). It starts a turn.
-- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (req-41)", "PR #128 opened". It is a UI event (`instance.marker`) shown **beside** the terminal: a thin strip on the session pane, and the Messages drawer. It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
+- A **delivery** is text the agent must read: a teammate's ask, a reply, a handoff to the lead, the CEO's answer, a "main moved" notice. Messaging hands it to `Instances.Deliver`, which waits until the recipient is `idle` and then calls the harness adapter's `Deliver` (type the text, then submit). It starts a turn.
+- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (req-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) shown **beside** the terminal: a thin strip on the session pane, and the Messages drawer. It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
 
 Every delivery is also shown as a marker. Delivered text is untrusted data: it is framed with its sender and capped ([Team tools → Delivery](./team-tools.md#delivery)).
 
@@ -104,9 +104,13 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 |---|---|---|---|
 | `ask` | anyone | no: returns the request id at once | Messaging |
 | `reply` | the agent an `ask` was addressed to | no | Messaging |
-| `handoff` | anyone | no: returns once the branch is fetched; checks run after | Workflow (+ Messaging for the delivery) |
+| `switch` | anyone | until the worktrees are switched (seconds) | Workflow (+ Git) |
+| `commit` | anyone | until the commit is made (seconds) | Workflow (+ Git) |
+| `update` | anyone | until the merge is done (seconds) | Workflow (+ Git) |
+| `handoff` | members (the lead has no `wt/` branch to hand off) | no: returns once the branch is checked; checks run after | Workflow (+ Messaging for the delivery) |
+| `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
 | `escalate` | anyone | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
-| `open_pr` | the lead only | no: returns once the branch is fetched; checks, push and PR follow | Workflow |
+| `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
 
 ### `ask`
 
@@ -132,18 +136,66 @@ type ReplyResult struct {}
 - Markers: `Rhea → Mara · reply · req-41`.
 - Errors: `unknown_request` (no such `req-N` in the deployment), `not_addressee` (the ask wasn't to the caller), `already_replied` (one reply per ask: further information is a new `ask`), `bad_artifact`, `too_long`.
 
+### `switch`
+
+```go
+type SwitchArgs   struct { Branch string }                                // "wt/tove/LED-44"; the lead: "lead/atlas/settlement-v2"
+type SwitchResult struct { Created bool; Repos []string }               // created: the branch was new (made from main); the repos switched
+```
+
+- Effect: Workflow asks Git to switch the caller's worktrees, in each of its code repos, to `Branch`, creating it from `main` where it doesn't exist yet. `Branch` must be one of the caller's own: `wt/<agent>/<topic>` for a member, `lead/<team>/<topic>` for the lead (the lead never works on `wt/` branches). The same call starts new work and goes back to earlier work (e.g. a branch whose merge request was rejected). A lead can keep several lead branches, and so several merge requests, at once. Agents can't create branches themselves: each repo's `.git` is read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)).
+- Nothing is delivered; no marker.
+- Errors: `uncommitted_changes` (commit first, so no work is carried from one branch to another), `branch_not_allowed` (not one of the caller's own), `bad_branch` (not a valid branch name), `git_error`.
+
+### `commit`
+
+```go
+type CommitArgs   struct { Message string }
+type CommitResult struct { Commits []RepoCommit }        // one per repo that had changes
+type RepoCommit   struct { Repo string; Branch string; Commit string }
+```
+
+- Effect: Workflow asks Git to stage everything in each of the caller's worktrees that has changes and commit it on the branch checked out there, authored as the agent (from its token). For the lead it also commits its changes in the live project repo, on its `main` (other agents can't write that checkout). Agents can't commit themselves: every repo's `.git`, the project repo's included, is mounted read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). After an `update` with conflicts, the commit concludes the merge.
+- Nothing is delivered; no marker.
+- Errors: `nothing_to_commit`, `conflicts_left` (conflict markers still in a file of an unfinished merge), `git_error` (with git's message).
+
+### `update`
+
+```go
+type UpdateArgs   struct { Branch string }               // e.g. "lead/atlas/integration", "main", "wt/tove/LED-44"
+type UpdateResult struct { Repos []RepoUpdate }
+type RepoUpdate   struct { Repo string; Merged bool; Conflicts []string } // files left with conflict markers
+```
+
+- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and calls `commit`.
+- Nothing is delivered; a merge into a lead branch may let Workflow detect an integration ([Work items and merge requests](#work-items-and-merge-requests)).
+- Errors: `branch_not_found` (in none of the caller's repos), `uncommitted_changes` (commit first, so a merge never mixes with unsaved work), `git_error`.
+
 ### `handoff`
 
 ```go
-type HandoffArgs   struct { Teammate string; Branch string; Summary string } // branch: wt/<caller>/<card>
+type HandoffArgs   struct { Teammate string; Branch string; Summary string } // branch: wt/<caller>/<topic>
 type HandoffResult struct { WorkItem string; Checks string }                  // checks: "running"
 ```
 
-- Effect: Workflow asks Git to fetch `Branch` from the caller's clone into the mirror (policy: a member may hand off only `wt/<self>/*`), then runs the project checks in a throwaway container ([Checks](./sandboxes-and-git.md#checks)), creating or advancing the [work item](#work-items-and-pull-requests).
-- Checks pass: the branch is fetched into the teammate's clone and delivered to the teammate: `⇄ Tove handed off wt/tove/LED-44: <summary>`. The caller gets `✓ Checks pass: wt/tove/LED-44 handed to Mara.` as a delivery when idle.
+- Effect: Workflow first commits any pending changes in the caller's worktrees, as `commit` does with the summary as the message, so a hand-off never misses the last changes. It then checks `Branch` against the policy (a member may hand off only `wt/<self>/*`; [Sandboxes and git policy](./sandboxes-and-git.md#branch-policy)). Every worktree shares the repo, so nothing is fetched: the lead sees the branch at once. Workflow then runs the project checks in a throwaway container ([Checks](./sandboxes-and-git.md#checks)), creating or advancing the [work item](#work-items-and-merge-requests).
+- Checks pass: the hand-off is delivered to the teammate: `⇄ Tove handed off wt/tove/LED-44: <summary>`. The caller gets `✓ Checks pass: wt/tove/LED-44 handed to Mara.` as a delivery when idle.
 - Checks fail: nothing goes to the teammate; the caller gets `✗ Checks fail on wt/tove/LED-44: <first lines>. Fix and hand off again.`
 - Markers: `Tove → Mara · handoff · wt/tove/LED-44`, then the checks outcome.
 - Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
+- Phasing: in [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) a hand-off is the policy check and the delivery only; checks and work items arrive with the [Git](../../backlog/epics/git.md) epic.
+
+### `contribute`
+
+```go
+type ContributeArgs   struct { Kind string; Title string; Body string } // kind: "finding" | "proposal" | "note"
+type ContributeResult struct { Path string }                            // "project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md"
+```
+
+- Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `Body`. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
+- Delivered to the caller's lead: `⇄ Tove contributed: <title> (project/wiki/inbox/<file>)`. The lead decides what becomes of it.
+- Markers: `Tove → Mara · contribute · <title>`.
+- Errors: `bad_kind`, `too_long`.
 
 ### `escalate`
 
@@ -166,33 +218,34 @@ type EscalateResult struct {
 - `question` without `Wait`, and `finding`: the call returns at once; the answer arrives as a delivery: `✓ CEO answered: <answer>. Continuing.`
 - Errors: `bad_kind`, `too_long`.
 
-### `open_pr`
+### `request_merge`
 
 ```go
-type OpenPRArgs   struct { Branch string; Title string; Summary string } // branch: lead/<own team>/<topic>
-type OpenPRResult struct { PullRequest string; Updated bool; Checks string } // updated: an open PR on this branch was refreshed
+type RequestMergeArgs   struct { Branch string; Entry string } // branch: lead/<own team>/<topic>; entry: a wiki path, e.g. "backlog/LED-44.md"; required for a lead, optional for the Chief of Staff (which describes its change in the request)
+type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks string } // one per repo with new commits; refreshed: open ones on this branch were updated
 ```
 
-- Effect: Workflow fetches `Branch` from the lead's clone (a lead may rewrite its own `lead/<team>/*`), runs the checks, then pushes and opens (or updates) the [pull request](#work-items-and-pull-requests) and its **review** request.
-- Delivered to the lead when done: `✓ PR #128 opened: <url>` (no forge: `✓ lead/atlas/settlement-v2 published for review in ledger-api.`), or `✗ Checks fail on lead/atlas/settlement-v2: <first lines>. No PR was opened.`
-- Markers: `Mara · open_pr · lead/atlas/settlement-v2`, then the outcome.
-- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main`).
+- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`; the Chief of Staff: its own `foreman/config-N`) and that `Entry` exists in the project's wiki (a lead must name one; the Chief of Staff may leave it empty and describe the change in the request instead), runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
+- Delivered to the lead when done: `✓ Merge requested: lead/atlas/settlement-v2 in ledger-api.`, or `✗ Checks fail on lead/atlas/settlement-v2: <first lines>. No merge was requested.`
+- Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
+- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`.
 
 ### Deliveries Foreman originates
 
 | When | To | Delivered text |
 |---|---|---|
-| A pull request is merged | its lead | `✓ PR #128 merged into main.` |
-| Another PR on the same repo is merged | every other open PR's lead | `⇄ main moved (PR #128 merged). Rebase lead/atlas/settlement-v2 onto main and push.` ([When main moves](../features/pipeline-and-prs.md#when-main-moves)) |
-| The forge reports a conflict | that PR's lead | the same rebase notice |
-| Review comments on the forge | the PR's lead | `⇄ Review on PR #128 by <user>: <comment>` |
-| Send back, or closed on the forge | the PR's lead | `✗ PR #128 sent back: <notes>. Its work items are back in your hands.` |
+| A merge request is merged (Merge to main, or on the forge) | its lead | `✓ lead/atlas/integration merged into main in ledger-api.` |
+| Another merge request on the same repo is merged | the lead of every other open one | `⇄ main moved (lead/atlas/integration merged). Merge it into lead/atlas/settlement-v2 with update("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
+| Merge to main finds a conflict, or the forge reports one | that merge request's lead | the same notice |
+| The CEO chooses Create PR | the merge request's lead | `ⓘ The CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
+| Review comments on the forge (after Create PR) | the merge request's lead | `⇄ Review on PR #128 by <user>: <comment>` |
+| Reject, or its PR closed on the forge | the merge request's lead | `✗ Merge of lead/atlas/settlement-v2 rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it.` |
 | "Owning team fixes now" on a finding | the named team's lead | `ⓘ CEO: <team> fixes "<finding>" now.` |
 | A soul or team edit | each running instance | `ⓘ Your definition changed: …` ([Session prompt → Updates](./session-prompt.md#updates)) |
 
 ## Messages
 
-Messaging's unit: one `ask`, `reply` or `handoff` between two instances of one deployment, or a delivery Foreman originates. Stored as a [team message](../models/team-message.md) (agent-to-agent kinds) for the Messages drawer.
+Messaging's unit: one `ask`, `reply`, `handoff` or `contribute` notice between two instances of one deployment, or a delivery Foreman originates. Stored as a [team message](../models/team-message.md) (agent-to-agent kinds) for the Messages drawer.
 
 ```go
 type Message struct {
@@ -200,7 +253,7 @@ type Message struct {
     Deployment  string
     From        string    // instance id, or "foreman" / "ceo" for originated deliveries
     To          string    // instance id
-    Kind        string    // "ask" | "reply" | "handoff" | "notice"
+    Kind        string    // "ask" | "reply" | "handoff" | "contribute" | "notice"
     Body        string    // for a reply: only the output
     InReplyTo   string    // reply: the ask's id
     Artifact    string    // a branch or wiki path, optional
@@ -221,7 +274,6 @@ Lifecycle:
     └── Deliver fails 3 times ────────────▶ failed    (reason: the adapter's error; a blocked request on the recipient)
 ```
 
-- **Turns per project (until the Git epic):** while the agents of a project share its mounted folder, they take turns. A delivery goes to an agent only when **no other agent in the same project** (in any deployment on it) is `running`; otherwise it waits, like a delivery to a busy recipient. This gate covers every Foreman-originated delivery (messages, answers, notices). The CEO's own typing bypasses it; the UI warns instead ([Sessions](../features/sessions.md#talking-to-the-team)). The [Git epic](../../backlog/epics/git.md) removes the gate: with a worktree per agent, agents work in parallel.
 - **Ordering:** per recipient, FIFO by creation. When the recipient becomes idle, every queued message for it is delivered **in one input**, in order, so a burst of messages costs one turn and never interleaves with a turn in progress.
 - **Recipient state:** `idle` → delivered now · `running` or `awaiting` → queued until the next `idle` · `queued` or `starting` → queued; delivered after the first `idle` · `stopped` within an active deployment → queued, and the sender gets the marker "Tove is stopped; req-41 will be delivered when it restarts" (the stop already raised a blocked request) · deployment stopped → expired.
 - **Scope:** `From` and `To` are always instances of `Deployment` (or Foreman/CEO). Names in `ask`, `reply` and `handoff` resolve only within the caller's deployment.
@@ -240,7 +292,7 @@ type Request struct {
     Instance    string   // who raised it, or who it is about (blocked); absent for cos
     Summary     string
     Options     []string // first = primary
-    PullRequest string   // review only
+    MergeRequest string  // review only
     CallID      string   // approval (or question with wait): the open tool call to answer
     Status      string   // "open" | "resolved" | "expired"
     Answer      string
@@ -254,7 +306,7 @@ Lifecycle:
 
 ```
   open ──── CEO answers (Resolve) ─────────────────▶ resolved
-    │ ──── its PR leaves open (review) ──────────────▶ resolved
+    │ ──── its merge request leaves open (review) ────▶ resolved
     │ ──── the instance restarts fine (blocked) ─────▶ resolved
     └──── deployment stopped / instance gone ───────▶ expired
 ```
@@ -265,24 +317,24 @@ How the answer travels back:
 |---|---|
 | `approval`, `question` with `wait` | The open tool call (`CallID`) returns the answer; if it already returned `Pending`, a delivery carries it |
 | `question`, `finding` | A delivery to the raiser (`✓ CEO answered: …`); a finding's action may also deliver to another team's lead |
-| `review` | No answer: the CEO acts on the forge; Send back is a `PRAction`. The request resolves when its PR leaves `open` |
+| `review` | No answer: Merge to main, Create PR and Reject are `MergeAction`s. The request resolves when its merge request leaves `open` |
 | `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch harness |
 | `source: harness` (approval or question) | Typed into the session with the harness adapter's `Deliver`; also resolved by the next `busy` hook if the CEO answered in the terminal |
 
 **Dedup:** a new request with the same instance, kind and normalised summary as an `open` one created within 10 minutes isn't created; the open one is returned (its `RequestID` is the tool result). Details: [Request](../models/request.md#invariants).
 
-## Work items and pull requests
+## Work items and merge requests
 
-Stored as [work items](../models/work-item.md) and [pull requests](../models/pull-request.md); the flow is in [Pipeline and pull requests](../features/pipeline-and-prs.md).
+Stored as [work items](../models/work-item.md) and [merge requests](../models/merge-request.md); the flow is in [Pipeline and merges](../features/pipeline-and-merges.md).
 
 Work item:
 
 ```
-  handoff,       delivered       head found in a         open_pr        PR
-  checks pass    to the lead     lead/<team>/* branch    includes it    merged
- ────────────▶ 1 handed ────▶ 2 reviewing ────────────▶ 3 integrated ────▶ in PR ────▶ merged
+  handoff,       delivered       head found in a         request_merge  its merge request
+  checks pass    to the lead     lead/<team>/* branch    includes it    is merged
+ ────────────▶ 1 handed ────▶ 2 reviewing ────────────▶ 3 integrated ────▶ requested ──▶ merged
                   ▲                │                                        │
-                  │      lead asks │ the author (?)            PR closed or │ sent back
+                  │      lead asks │ the author (?)                         │ rejected
                   │                ▼                                        ▼
                   └───────── 0 in worktree ◀───────────────────────────────┘
           handoff again, checks pass      ▲
@@ -297,23 +349,24 @@ Work item:
 | (stays 0, note "checks fail") | `handoff` whose checks fail | Workflow |
 | 1 → 2 reviewing | the handoff delivery's `DeliveredAt` | Messaging event |
 | 2 → 0 (undecided) | a change request from the lead to the author while the item is in review | [open question 1](#open-questions) |
-| 2 → 3 integrated | the item's branch head is an ancestor of one of the lead's `lead/<team>/*` heads | Git, checked when the lead goes `idle` and on `open_pr` |
-| 3 → in PR | `open_pr` on a branch containing it | Workflow |
-| in PR → merged / → 0 | its PR merged / closed or sent back | Workflow |
+| 2 → 3 integrated | the item's branch head is an ancestor of one of the lead's `lead/<team>/*` heads | Git, checked when the lead goes `idle` and on `request_merge` |
+| 3 → requested | `request_merge` on a branch containing it | Workflow |
+| requested → merged / → 0 | its merge request merged / rejected | Workflow |
 
-Pull request:
+Merge request:
 
 ```
-           open_pr (checks pass, pushed)              forge: merged, or main contains the head (no forge)
+          request_merge (checks pass)           Merge to main, or merged on the forge (after Create PR)
   (none) ─────────────────────────────▶ open ─────────────────────────────────────────▶ merged
                                          │ ▲
-                     open_pr again       │ │  (updated: new head, checks rerun, same number and request)
+               request_merge again       │ │  (refreshed: checks rerun; pushed to its PR if any; same request)
                                          │ └──┘
-                                         └── forge: closed · Send back · Discard (CoS) ───▶ closed
+                                         └── Reject · its PR closed on the forge ───────▶ rejected
 ```
 
-- `merged` and `closed` are final. Entering either resolves the review request and delivers to the lead. Entering `merged` sends the rebase notice to the leads of every other open PR on the same repo.
-- Several PRs can be open at once: one per (repo, lead branch).
+- Create PR on the forge doesn't change the state: the merge request stays `open`, now with a PR to watch.
+- `merged` and `rejected` are final. Entering either resolves the review request and delivers to the lead. Entering `merged` sends the "main moved" notice to the leads of every other open merge request on the same repo.
+- Several merge requests can be open at once: one per (repo, lead branch).
 
 ## Events
 
@@ -323,10 +376,10 @@ Every state change is published on the in-process event bus; the web server stre
 |---|---|---|---|
 | `instance.status` | instance id, status, task | Instance manager | Sessions tabs, Home, Project and Team rows, avatars |
 | `instance.line` | instance id, last output line (throttled) | Terminal | Project settings rows |
-| `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
+| `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Messages drawer |
 | `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, Changes, sidebar badges, notifications |
-| `pipeline.changed` | the work item or pull request | Workflow | Changes |
+| `pipeline.changed` | the work item or merge request | Workflow | Changes |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
 | `wiki.changed`, `config.changed`, `workspace.changed` | as in [API](./api.md#events) | Workspace & config, Wiki | Overview, Board, Settings |
 
@@ -334,8 +387,9 @@ Every state change is published on the in-process event bus; the web server stre
 
 - **Identity comes from the token.** `Instance` and `Deployment` in every `ToolCall` and `HookEvent` are set by the agent link from the caller's token; nothing in a payload can claim another identity.
 - **Messages never cross deployments.** Team-tool names resolve within the caller's deployment only.
-- **Only `Output` and `Artifact` cross sandboxes** in a reply; a handoff moves a branch, through Foreman, never a path.
-- **Only the lead opens pull requests**, only from its own `lead/<team>/*` branches.
+- **Only `Output` and `Artifact` cross sandboxes** in a reply; a handoff names a branch, never a path.
+- **Only the lead requests merges**, only from its own `lead/<team>/*` branches (the Chief of Staff from its own config branches), and **only the CEO's action merges or reaches a forge**.
+- **Only Foreman writes git.** Agents read it; every commit, merge and branch, in the code repos and the project repo alike, is a team tool run on the host ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)).
 - **Nothing is typed into a session except deliveries**, and only when the recipient is idle (the CEO's own keystrokes excepted).
 - **Every request has exactly one way back**: a tool result, a delivery, a forge event or an instance action (see [Requests](#requests)).
 - **Every state change is an event**, so the UI never polls for it.

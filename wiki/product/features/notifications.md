@@ -17,7 +17,7 @@ Foreman tells the CEO when something happens, so they don't have to watch the UI
 |---|---|---|
 | A new [request](./requests.md), any kind | "An agent needs me" | `<Name> needs you on <project>` / the summary |
 | An instance becomes `done` ([Instance](../models/instance.md)) | "An agent finishes" | `<Name> is done on <project>` / the handoff summary |
-| A review request is raised (PR ready) | "A PR is ready to merge" | `<Lead> opened a PR on <project>` / the PR title |
+| A review request is raised (a merge is requested) | "A merge is requested" | `<Lead> requested a merge on <project>` / the entry's title |
 
 The toggles gate browser notifications only; toasts always show.
 

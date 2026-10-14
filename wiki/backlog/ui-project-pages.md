@@ -12,7 +12,7 @@ epic: full-ui-demo
 
 Blocked by [Demo client](./demo-client.md) and [App shell](./app-shell.md).
 
-**Done when:** the project header and tabs; Overview renders wiki entries (headings, lists, links between entries, callouts, checkboxes, code, images; "On this page"; frontmatter chips; the Files tree with changed dots); Changes shows the request panels with Send back and the PR line, In flight and Merged; Board shows boards, columns and lanes with drag and drop and the side sheet; Settings shows teams on the project and the read-only config; the Add a project dialog lists candidates.
+**Done when:** the project header and tabs; Overview renders wiki entries (headings, lists, links between entries, callouts, checkboxes, code, images; "On this page"; frontmatter chips; the Files tree with changed dots); Changes shows the request panels with Merge to main, Create PR and Reject, In flight and Merged; Board shows boards, columns and lanes with drag and drop and the side sheet; Settings shows teams on the project and the read-only config; the Add a project dialog lists candidates.
 
 - [ ] project header and tabs (Changes badge)
 - [ ] Overview: rendered entries, Files tree, changed dots

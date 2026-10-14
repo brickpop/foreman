@@ -12,10 +12,10 @@ Foreman's product definition. Every entry carries a `status` (`planned` / `parti
 Files Foreman reads or owns, and the runtime state it keeps.
 
 - [Workspace](./models/workspace.md): folder layout and the config / state / content split
-- [Project config](./models/project-config.md) (`project.yaml`)
-- [Team definition](./models/team-definition.md) (`.foreman/teams/<team>.yaml`)
+- [Project config](./models/project-config.md) (`project/project.toml`)
+- [Team definition](./models/team-definition.md) (`.foreman/teams/<team>.toml`)
 - [Agent soul](./models/agent-soul.md)
-- [Workspace settings](./models/workspace-settings.md) (`settings.yaml`)
+- [Workspace settings](./models/workspace-settings.md) (`settings.toml`)
 - [Secrets](./models/secrets.md)
 - Runtime state (`state.db`)
   - [Deployment](./models/deployment.md)
@@ -23,7 +23,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Request](./models/request.md)
   - [Team message](./models/team-message.md)
   - [Work item](./models/work-item.md): an agent's branch on its way to the lead
-  - [Pull request](./models/pull-request.md): the lead's proposal to merge into `main`
+  - [Merge request](./models/merge-request.md): the lead's proposal to merge into `main`
   - [UI state](./models/ui-state.md): read markers and UI preferences
 
 ## Features
@@ -43,7 +43,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Deploy a team](./features/deploy-team.md)
 - [Chief of Staff](./features/chief-of-staff.md)
 - [Requests](./features/requests.md): the five kinds of things that need the CEO
-- [Pipeline and pull requests](./features/pipeline-and-prs.md)
+- [Pipeline and merges](./features/pipeline-and-merges.md)
 - [Notifications](./features/notifications.md)
 - [Workspace settings screen](./features/settings.md)
 

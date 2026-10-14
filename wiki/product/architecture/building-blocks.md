@@ -27,7 +27,7 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 │ EDGE        Web server · Access guard                                       │
 │ CORE        Workflow · Messaging · Instance manager · Agent link            │
 │             Harness adapters · Terminal · Execution engine + Image builder  │
-│             Git (arrives with the Git epic)                                 │
+│             Git (worktrees per agent)                                       │
 │ FOUNDATION  Workspace & config · Wiki · State store · Event bus · Secrets · │
 │             Forge adapter                                                   │
 └──────┬────────────────────────────────────────────────────▲────────────────┘
@@ -46,7 +46,7 @@ An arrow means "calls through an interface". Blocks below the dashed line are us
                                Web server (+ Access guard)
           ┌───────────────┬──────────────┬───────────────┬─────────────────┐
           │ attach, input │ CEO messages │ answers,      │ projects, teams,│
-          ▼               ▼              ▼ PR actions    ▼ settings, wiki  │
+          ▼               ▼              ▼ merge actions ▼ settings, wiki  │
    ┌──────────────┐  ┌───────────┐  ┌──────────┐  ┌────────────────────┐  │
    │   Instance   │◀─│ Messaging │◀─│ Workflow │─▶│ Workspace & config │  │
    │   manager    │  └───────────┘  └──┬────┬──┘  │ Wiki               │  │
@@ -54,7 +54,7 @@ An arrow means "calls through an interface". Blocks below the dashed line are us
      │   │   │  │          │           ▼    ▼                              │
      │   │   │  │          │         Git   Forge adapter                   │
      │   │   │  │ register │ ask, reply,          ▲ escalate, handoff,     │
-     │   │   │  │ tokens   │ handoff              │ open_pr                │
+     │   │   │  │ tokens   │ handoff              │ request_merge, …       │
      │   │   │  └────────▶ Agent link ────────────┘                        │
      │   │   │              ▲    │ hook events ──▶ Instance manager        │
      │   │   │              │                                              │
@@ -75,17 +75,18 @@ Every arrow, in words:
 |---|---|---|
 | Web server | Instance manager | Open a terminal view, type into it, deploy, stop |
 | Web server | Messaging | The CEO's line-mode messages; the Messages drawer |
-| Web server | Workflow | Answer a request; Send back or Discard a PR |
+| Web server | Workflow | Answer a request; Merge to main, Create PR or Reject a merge request; Sync a reserved repo |
 | Web server | Workspace & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
-| Workflow | Messaging | Deliver answers, notices ("PR #128 opened", rebase) to agents |
-| Workflow | Git | Fetch a hand-off branch, detect integration, push a lead branch (Git epic) |
-| Workflow | Forge adapter | Open, poll, comment on, close pull requests |
-| Workflow | Workspace & config | Gates and checks from `project.yaml`; team files changed by the Chief of Staff's tools |
-| Messaging | Instance manager | Deliver a message when the recipient is idle (and it's its turn); start a stopped recipient |
+| Workflow | Messaging | Deliver answers, notices ("PR #128 opened", "main moved") to agents |
+| Workflow | Git | Switch, commit and update an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge to main, push a branch for a PR, or Sync a reserved repo (Git epic) |
+| Workflow | Forge adapter | On the CEO's Create PR: open, then poll, comment on and close pull requests |
+| Workflow | Workspace & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
+| Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
-| Agent link | Workflow | `escalate`, `handoff`, `open_pr`, and the Chief of Staff's tools |
+| Agent link | Workflow | `switch`, `commit`, `update`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
 | Agent link | Instance manager | Hook events (busy, idle, waiting for the CEO) |
+| Instance manager | Git | The instance's worktrees, before it starts |
 | Instance manager | Image builder | The project's image |
 | Instance manager | Harness adapter | Launch spec and files; delivering text; reading hook events; diagnosing exits |
 | Instance manager | Agent link | Register an instance's token when it starts, revoke it when it stops |
@@ -98,20 +99,24 @@ Every arrow, in words:
 ┌──────────────────── container for tove@ledger (Podman, rootless) ────────────────────┐
 │                                                                                     │
 │  harness TUI (Claude Code / Pi / Hermes)         reads ──▶ CLAUDE.md / AGENTS.md     │
-│     │  stdio MCP: ask · reply · handoff · escalate · open_pr                         │
+│     │  stdio MCP: ask · reply · handoff · contribute · escalate · request_merge     │
+│     │             switch · commit · update (git writes, run by Foreman on the host) │
 │     │  hooks: "foreman-agent hook stop | notification | …"                          │
 │     ▼                                                                               │
 │  foreman-agent ──────────── tcp: host.containers.internal:<agent port>, token ──────┼──▶ Agent link
 │                                                                                     │
 │  Mounts                                                                             │
-│   /…/ledger/ledger-api   project folder, rw        (until the Git epic: shared by    │
-│                                                    every agent of the project; turns)│
-│   /…/ledger/wiki         rw for the scrum master (lead if none), ro for the others   │
+│   /…/ledger/.sandboxes/tove/ledger-api   Tove's worktree (wt/tove/*), rw            │
+│   /…/ledger/ledger-api/.git              the repo every worktree shares, ro         │
+│   /…/ledger/.sandboxes/tove/project      the live project repo (project.toml, wiki):│
+│                                          rw for the lead, else ro                   │
+│                                          (its .git ro for every agent)              │
 │   $CLAUDE_CONFIG_DIR     the instance's private config: prompt, MCP + hooks config,  │
 │                          history, memory (rw)                                        │
 │   …/credentials/<h>/     the harness's shared login file (rw)                        │
 │   ~/.gitconfig           ro, if it exists                                            │
-│  Never mounted: the rest of ~, ~/.ssh, ~/.config, .foreman/ (secrets, state, teams)  │
+│  Never mounted: the rest of ~, ~/.ssh, ~/.config, .foreman/ (secrets, state, teams), │
+│  the CEO's working files, other agents' worktrees                                   │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -237,9 +242,7 @@ Details: [Agent runtime](./agent-runtime.md).
 
 ### 6. Messaging (`messaging`)
 
-Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` notices, CEO answers. It numbers them (`req-N` per deployment), stores them, queues them per recipient and delivers through `Instances.Deliver`. Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
-
-Until the Git epic, agents of one project share its mounted folder, so Messaging enforces **turns per project**: it delivers to an agent only when no other agent of the same project is busy ([Protocol → Messages](./protocol.md#messages)). The CEO's direct typing bypasses the gate, with a warning in the UI.
+Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`req-N` per deployment), stores them, queues them per recipient and delivers through `Instances.Deliver`. Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
 
 ```go
 type Messaging interface {
@@ -252,33 +255,37 @@ Details: [Team tools](./team-tools.md), [Team message](../models/team-message.md
 
 ### 7. Workflow (`workflow`)
 
-Gives events their meaning: `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on Home (and its answer back); `handoff` → a [work item](../models/work-item.md); `open_pr` → checks, a push and a [pull request](../models/pull-request.md) through Git and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes.
+Gives events their meaning: `switch`, `commit` and `update` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on Home (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's Merge to main, Create PR or Reject → Git and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
 
 ```go
 type Workflow interface {
-    Handle(ToolCall) (Result, error)   // escalate, handoff, open_pr, Chief of Staff tools
+    Handle(ToolCall) (Result, error)   // switch, commit, update, escalate, handoff, contribute, request_merge, Chief of Staff tools
     Resolve(request, answer) error     // the CEO answers a request
     Requests(filter) []Request
 }
 ```
 
-Details: [Requests](../features/requests.md), [Pipeline and pull requests](../features/pipeline-and-prs.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and pull requests](./protocol.md#work-items-and-pull-requests).
+Details: [Requests](../features/requests.md), [Pipeline and merges](../features/pipeline-and-merges.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and merge requests](./protocol.md#work-items-and-merge-requests).
 
 ### 8. Git (`git`)
 
-Everything Foreman does with repositories on the agents' behalf. Agents themselves only use plain git inside their own working tree; they never push anywhere.
+Everything Foreman does with repositories on the agents' behalf, on the host. Each instance gets a **git worktree** of each code repo, sharing the repo with the CEO's checkout and every other agent ([Sandboxes and git policy](./sandboxes-and-git.md)). Agents only read git: each repo's `.git` is mounted read-only, and every git write is a team tool that Foreman runs here, with the repo's hooks off and one git command at a time per repo ([Agents and git](./sandboxes-and-git.md#agents-and-git)). Agents never push anywhere.
 
 ```go
 type Git interface {
-    Prepare(instance, repo) (path string, err error) // the working tree the instance mounts
-    Fetch(from instance, branch, to instance) error  // a hand-off: make a branch visible to the lead
+    Prepare(instance, repo) (path string, err error) // the instance's worktree of the repo, made if missing
+    Switch(instance, repo, branch) error             // switch its worktree to the branch, made from main if missing
+    Commit(instance, repo, message) (commit string, err error) // everything changed in its worktree (or the live project repo, for its writers), on its branch, authored as the agent
+    Update(instance, repo, branch) (conflicts []string, err error) // merge a branch into its worktree; conflicts stay as markers
+    Prune(instance, repo) error                      // its deployment ended: delete its wt/* branches already merged into main
     Contains(repo, branch, into string) (bool, error) // integration detection: is the work in a lead branch?
-    Push(repo, branch, remote) error                 // a lead branch to the forge, with Foreman's token
-    Sync(repo) error                                 // after a merge: refresh main for the working trees
+    Merge(repo, branch) error                        // the CEO's Merge to main: merge the branch into main on the host
+    Push(repo, branch, remote) error                 // on the CEO's Create PR (the branch) or Sync (a reserved repo's main), with Foreman's token
+    Fetch(repo) error                                // after a merge on the forge, and as Sync's first step: fetch the forge's main into the repo
 }
 ```
 
-**Phasing.** Epics 1–2 have no Git block: `Prepare` is effectively "the project folder itself", shared by all agents of the project (with Messaging's turns), and hand-offs are messages only. The [Git epic](../../backlog/epics/git.md) brings a working tree and branch per agent and removes the turns. Whether those working trees are **git worktrees of the mounted repo** (the CEO's direction) or clones from a mirror (the earlier design in [Sandboxes and git policy](./sandboxes-and-git.md)) is decided when that epic starts; the interface above fits both.
+**Phasing.** `Prepare` (a worktree and home branch per agent) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit` and `Update`, behind the `switch`, `commit` and `update` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `Merge`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
 
 ## The foundation blocks
 
@@ -286,15 +293,15 @@ No open risk here: standard techniques. Each is still behind its own interface.
 
 ### Workspace & config (`workspace`)
 
-The files the CEO owns: the workspace folder, `project.yaml`, team files, settings; and the file watcher that notices their changes.
+The files the CEO owns: the workspace folder and [workspace repo](../models/workspace.md#the-workspace-repo) (team files, settings), each project's [project repo](../models/project-config.md#the-project-repo) (`project.toml`); and the file watcher that notices their changes. All TOML.
 
 ```go
 type Workspace interface {
     Projects() []Project;  Project(id) (Project, error)
     Candidates() []Candidate                         // folders that aren't projects yet (Add a project)
-    AddProject(folder) (Project, error)              // writes project.yaml and a starter wiki
+    AddProject(folder) (Project, error)              // creates the project repo: project.toml and a starter wiki
     Teams() []Team;        Team(id) (Team, error)
-    SaveTeam(Team, version) error                    // version-guarded, comment-preserving
+    SaveTeam(Team, version) error                    // version-guarded; one commit per save
     Settings() Settings;   SaveSettings(Settings) error
     Changes() <-chan Change                          // file watcher: config, team files, wiki, Containerfiles
 }
@@ -304,7 +311,7 @@ Details: [Workspace](../models/workspace.md), [Persistence → File watching](./
 
 ### Wiki (`wiki`)
 
-Reads project wikis through the agentic-wiki engine; renders entries for the reader; edits one line at a time. Agents write the wiki as plain files in their mount; Foreman only reads it, plus the CEO's checkbox ticks and card moves.
+Reads project wikis through the agentic-wiki engine; renders entries for the reader; edits one line at a time. The lead writes the wiki as plain files in the live project repo, and commit them through `commit()`; Foreman only reads it, plus the CEO's checkbox ticks and card moves and the `contribute` notes it files in `inbox/`, each committed on its own (one commit per write).
 
 ```go
 type Wiki interface {
@@ -320,7 +327,7 @@ Details: [Wiki engine](./wiki-engine.md).
 
 ### State store (`store`)
 
-Runtime state in `state.db` (SQLite): deployments, instances, messages, requests, work items, pull requests, read markers, UI preferences. Each block owns its own tables and reaches them only through its own store interface (`store.Deployments`, `store.Messages`, …); no block reads another's tables.
+Runtime state in `state.db` (SQLite): deployments, instances, messages, requests, work items, merge requests, read markers, UI preferences. Each block owns its own tables and reaches them only through its own store interface (`store.Deployments`, `store.Messages`, …); no block reads another's tables.
 
 Details: [Persistence](./persistence.md).
 
@@ -358,7 +365,7 @@ type Forge interface {
 }
 ```
 
-Implementations: GitHub, Gitea (also Forgejo), none. Never merges. Details: [Forge adapters](./forge-adapters.md).
+Implementations: GitHub, Gitea (also Forgejo), none. Used only on the CEO's Create PR or Sync; never merges. Details: [Forge adapters](./forge-adapters.md).
 
 ### Web server + UI (`server`, `access`, `ui/`)
 
@@ -386,6 +393,7 @@ The flows everything else is made of. Time runs downwards. The [journey](../jour
 
 ```
 Instance manager      Image builder     Harness adapter        Agent link     Execution engine     Terminal
+      │ Git.Prepare(instance, repo) for each code repo → its worktrees (made if missing)
       │ Ensure(project) ──▶│
       │◀── image ref ──────│
       │ Launch(instance) ───────────────────▶│ spec + files (prompt, MCP config → foreman-agent, hooks)
@@ -409,7 +417,7 @@ Browser ──keys──▶ Web server ──Input()──▶ Terminal ──▶
 Mara's harness   foreman-agent   Agent link   Messaging                       Instance manager        Tove's harness
  ask(tove,"…") ──▶ MCP ─────────▶ ToolCall ──▶ store req-41; marker ─▶ Event bus ─▶ UI: "Mara asked Tove (req-41)"
  ◀── "req-41" ──────────────────────────────── (non-blocking: Mara keeps working)
-                                              Deliver(tove, text) ──▶ waits: Tove idle, and her turn
+                                              Deliver(tove, text) ──▶ waits: Tove idle
                                                                       Harness.Deliver ──────────▶ "⇄ Mara asked (req-41): …"
                                                                                                     … works …
  reply(req-41, out) ◀────────── (the same path, from Tove; delivered to Mara when she is idle) ─────┘
@@ -423,14 +431,16 @@ Agent ── escalate(approval, …) ──▶ Agent link ──▶ Workflow: cr
 CEO answers in the UI ──▶ Workflow.Resolve ──▶ the open tool call returns the answer ──▶ the agent resumes
 ```
 
-**5. Hand-off, integration and a PR** (Git and Workflow epics; before the Git epic a hand-off is a message only)
+**5. Hand-off, integration and a merge** (hand-off from epic 2; work items, integration and merges from the Git and Workflow epics)
 
 ```
-Member ── handoff(lead, branch, summary) ──▶ Workflow: work item ──▶ Git.Fetch(member → lead)
+Member ── switch(branch), then commit(message) ──▶ Workflow: Git.Switch, Git.Commit in its worktrees
+Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pending work), policy check, work item (one repo: nothing to fetch)
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
-Lead merges it into lead/<team>/<topic> (plain git in its own working tree) ──▶ Git.Contains → work item integrated
-Lead ── open_pr(branch, title, summary) ──▶ Workflow: checks ──▶ Git.Push ──▶ Forge.OpenPR ──▶ request "Review" ──▶ Home
-CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: PR merged, lead told, other leads told to rebase ──▶ Git.Sync
+Lead ── update(branch) ──▶ Workflow: Git.Update into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
+Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Home
+CEO: Merge to main ──▶ Workflow ──▶ Git.Merge  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Reject ──▶ reason delivered to the lead
+(after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
 ```
 
 **6. A screen whose backend isn't built yet** (Full UI on a demo client)
@@ -446,11 +456,11 @@ Screen ──▶ ForemanClient ──▶ demo client: seed data, simulated event
 |---|---|---|
 | | Terminal streaming to the browser, access guard | **Built and tested** (Direct engine) |
 | | Terminal snapshots on reload | Built; one rare edge case open (a pending line wrap), parked as polish |
-| **A** | Execution engine on Podman: start, attach, resize, re-attach after a Foreman restart, from Go | **Unproven** |
-| **B** | Harness + engine: one login shared by many concurrent containers | **Unproven, riskiest** |
-| **C** | Agent link: a container reaching the host's loopback port on macOS and Linux | **Unproven** |
+| **A** | Execution engine on Podman: start, attach, resize, re-attach after a Foreman restart, from Go | **Proven on macOS** (2 ms keystrokes; [results](../../backlog/prove-a-podman-engine.md)); Linux not yet run |
+| **B** | Harness + engine: one login shared by many concurrent containers | **Proven for Claude Code on macOS**, print mode: the login file alone, bind-mounted into each private config dir, survives 12 sessions refreshing at once ([results](../../backlog/prove-b-shared-login.md)); mid-session refresh in interactive sessions is checked in D; Linux not yet run |
+| **C** | Agent link: a container reaching the host's loopback port on macOS and Linux | **Proven on macOS** ([results](../../backlog/prove-c-agent-port.md)); Linux (pasta) not yet run |
 | **D** | Harness (Claude Code): `Deliver` into a busy TUI, and `Interpret` from hooks (idle, waiting for the CEO) | **Unproven, core to messaging** |
-| **E** | Harness: prompt file + stdio MCP config accepted by Claude Code, Pi, Hermes | Likely for Claude Code; unverified for Pi and Hermes |
+| **E** | Harness: prompt file + stdio MCP config accepted by Claude Code, Pi, Hermes | **Proven for Claude Code on macOS** ([results](../../backlog/prove-e-prompt-and-mcp-config.md)); Pi and Hermes when set up |
 
 A–E are proven before the blocks that depend on them are built: one small experiment each, run on the CEO's macOS and Fedora machines through a `just` recipe, with a yes/no outcome written back into the specs ([Prove epic](../../backlog/epics/prove.md)).
 

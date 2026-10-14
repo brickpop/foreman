@@ -56,7 +56,7 @@ In-app mirrors of [notifications](./notifications.md), shown regardless of brows
 | New request | `<Name> needs you on <project>` | the request summary | `--acc` |
 | Deployed | `<Team> deployed to <project>` | `<N> new sessions starting.` (opens the lead's session) | `--ok` |
 | Stopped | `<Team> stopped on <project>` | `Worktrees are kept. Other deployments keep running.` | `--tx4` |
-| Project added | `<id> added` | `Wrote .foreman/project.yaml. Deploy a team from its Settings tab.` | `--ok` |
-| Config review resolved | `project.yaml` | `Config change merged to main.` (`--ok`) or `Config change discarded.` (`--tx4`) | |
+| Project added | `<id> added` | `Created project/ with project.toml and a wiki. Deploy a team from its Settings tab.` | `--ok` |
+| Config review resolved | `project.toml` | `Config change merged to main.` (`--ok`) or `Config change rejected.` (`--tx4`) | |
 | Board move | `<path>` (e.g. `backlog/LED-44.md`) | `status: <s>`, plus ` · priority: <lane>` when the lane changed | `--info` |
 | Notifications enabled | `Notifications on` | `You’ll hear from agents when they finish or need you.` | `--ok` |

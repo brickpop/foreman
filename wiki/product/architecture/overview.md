@@ -61,7 +61,7 @@ The same idea holds in the browser, scaled to it:
 
 ## Process model
 
-- **One container per running instance**, decided: every harness runs in a rootless Podman container with only its own sandbox and the wiki mounted ([Session runner](./session-runner.md)). Inside it the harness is attached to a TTY.
+- **One container per running instance**, decided: every harness runs in a rootless Podman container with only its own worktrees (and their repos' `.git`, read-only: Foreman writes git for the agents) and the project repo mounted ([Session runner](./session-runner.md)). Inside it the harness is attached to a TTY.
 - Foreman **never parses harness internals**. It reads the output stream (for logs, the "last line" and silence detection) and talks to the agent through the team tools and stdin.
 - Harness integration contract (per [Harness adapters](./harness-adapters.md)):
   1. Foreman can start it with a working directory, environment and an initial prompt or system prompt file.
@@ -78,7 +78,7 @@ The same idea holds in the browser, scaled to it:
 
 - **Local first**: binds to localhost by default. No telemetry. Works offline, except harnesses and forges that need the network.
 - **Security**: no user accounts in v1, but every request needs the per-install access token ([Security](./security.md#access-token)); binding to the network shows a warning. Secrets are never written to project folders or logs. Agents never receive forge tokens. See [Security](./security.md) for what this does and doesn't protect against.
-- **Isolation**: separate clones and containers per instance; Team tools return only designated outputs; wiki write access limited to the scrum master or lead.
+- **Isolation**: a separate worktree and container per instance; Team tools return only designated outputs; knowledge-base write access limited to the lead.
 - **Reliability**: instances survive UI disconnects. On server restart, deployments are restored from `state.db`; running containers are re-attached, stopped ones restarted with the last task note ([Agent runtime](./agent-runtime.md#recovery)). PTY logs allow scrollback replay.
 - **Performance**: 20+ concurrent sessions on a laptop. Terminal latency under 50 ms locally. File changes reflected in the UI within 1 s.
 - **Observability**: per-instance logs, a team-message log, a request history, and a server log with harness exit codes.

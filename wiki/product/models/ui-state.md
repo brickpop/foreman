@@ -14,7 +14,7 @@ Table `read_markers`: what the CEO has seen in each wiki, for the "changed since
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| `path` | String | yes | | unique; project-qualified (`<project>/wiki/<entry>`) | |
+| `path` | String | yes | | unique; project-qualified (`<project>/project/wiki/<entry>`) | |
 | `last_seen_version` | String | yes | | | The entry version the CEO last opened (the same version used to guard wiki writes) |
 
 An entry shows a changed dot when its current version differs from `last_seen_version`, or it has no marker. Whatever the [Wiki reader](../features/wiki-reader.md) displays counts as seen, including the `index.md` shown when the Overview opens; the marker stores the version seen, so any later change re-lights the dot. When a project is added, every existing entry is marked as seen, so a new project doesn't start with every entry dotted.

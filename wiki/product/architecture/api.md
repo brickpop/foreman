@@ -17,8 +17,8 @@ The PRD's surface (indicative; names may still change during implementation, thi
 ```
 GET    /api/workspace                         projects, teams, settings summary
 GET    /api/projects/:id                      config (parsed), repos, deployments
-POST   /api/projects                          {folder} → write project.yaml (adopt)
-GET    /api/candidates                        folders without project.yaml (for Add)
+POST   /api/projects                          {folder} → create the project repo (adopt)
+GET    /api/candidates                        folders without project/project.toml (for Add)
 
 GET    /api/teams | /api/teams/:id            definitions
 PUT    /api/teams/:id/agents/:agent           update soul (writes team file)
@@ -35,9 +35,12 @@ POST   /api/instances/:id/restart
 GET    /api/requests?project=&status=open
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
-GET    /api/pipeline?project=                 work items and pull requests (open, and merged in the last 7 days)
-POST   /api/pull-requests/:id/send-back       {notes}: close the PR, work items back to stage 0
-POST   /api/pull-requests/:id/discard         Chief of Staff config change: close the PR, delete the branch
+GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
+POST   /api/merge-requests/:id/merge          Merge to main: Foreman merges the branch locally
+POST   /api/merge-requests/:id/create-pr      Create PR on the repo's forge: push the branch, open the PR
+POST   /api/merge-requests/:id/reject         {reason}: close its PR if any, deliver the reason, work items back to stage 0
+POST   /api/repos/workspace/sync              Sync: fetch, merge in and push the workspace repo's main (stops on a conflict)
+POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 
 GET    /api/wiki/:project/tree | /entry/:path | /board/:id
 PUT    /api/wiki/:project/checkbox/:path      {line, version}
@@ -88,9 +91,9 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |
 | `team.message` | a message is routed | the message |
-| `pipeline.changed` | a work item changes stage or checks, or a pull request is created, changes checks or state | the work item or pull request |
+| `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
 | `wiki.changed` | files in a project wiki changed | project, paths, versions |
-| `config.changed` | `project.yaml`, a team file or settings changed (incl. parse errors) | which object, version, error? |
+| `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | which object, version, error? |
 | `workspace.changed` | projects or repos appeared or disappeared | — |
 
 The notifier also derives browser notifications and toasts from these events on the client ([Notifications](../features/notifications.md)). On reconnect, the client refetches what it shows (SSE `Last-Event-ID` replay is not required).

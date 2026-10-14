@@ -18,10 +18,10 @@ Table `team_messages`.
 | `deployment_id` | String → Deployment | yes | | | Team messaging is scoped to a deployment |
 | `from_instance` | String → Instance | yes | | same deployment | |
 | `to_instance` | String → Instance | yes | | same deployment | |
-| `kind` | String | yes | | enum: `ask`, `reply`, `handoff` | One per team tool that sends a message. The PRD also listed `review`, but no tool produces it: a lead's review comments are an `ask` to the author |
+| `kind` | String | yes | | enum: `ask`, `reply`, `handoff`, `contribute` | One per team tool that sends a message (`contribute`: the notice to the lead, its artifact the inbox entry). The PRD also listed `review`, but no tool produces it: a lead's review comments are an `ask` to the author |
 | `request_ref` | String | | | `req-N` | Monotonically increasing **per deployment** (the PRD; the prototype used one global counter). An `ask` creates it; its `reply` carries the same ref. The same `req-41` can exist in two deployments, so the UI always shows it with its deployment |
 | `body` | String | yes | | | For a reply, **only** the designated `output` |
-| `artifact_ref` | String | | | a branch name or a wiki path | Optional artifact reference from `reply` or `handoff` |
+| `artifact_ref` | String | | | a branch name or a wiki path | Optional artifact reference from `reply`, `handoff` or `contribute` |
 | `created_at` | Timestamp | yes | now | | |
 | `delivered_at` | Timestamp | | | | When the line reached the target's PTY. Empty while queued for a busy target ([Team tools](../architecture/team-tools.md#delivery)) |
 

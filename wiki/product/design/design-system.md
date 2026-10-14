@@ -147,7 +147,7 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | **Secondary** (outline) | Transparent, 1px `--line2`, `--tx2` (or `--tx`), 500 13px, radius 7, padding `6–8px 12–14px` | Cancel, Hire, Deploy a team, Session, Refine with Chief of Staff |
 | **Raised** | `--raised`, 1px `--line2`, `--tx` | Open sessions, Sessions |
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
-| **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Discard. Always behind a confirmation |
+| **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Reject. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on Home approval request panels |
 | **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Split, Messages, Listen on, Theme |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |

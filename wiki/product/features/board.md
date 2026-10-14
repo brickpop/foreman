@@ -48,5 +48,5 @@ Body padding `20px 40px 64px`.
 
 Fixed right, `min(460px, 100vw)` ([App shell](./app-shell.md#overlays)).
 
-- Header: `<project>/wiki/<path>` (Mono 12.5px `--tx3`), **`Open in wiki`** (small outline; opens the entry in the [Wiki reader](./wiki-reader.md)) and `×`.
+- Header: `<project>/project/wiki/<path>` (Mono 12.5px `--tx3`), **`Open in wiki`** (small outline; opens the entry in the [Wiki reader](./wiki-reader.md)) and `×`.
 - Body (padding `20px 22px 32px`, gap 12): frontmatter chips, then the rendered entry at sheet sizes (H1 22px, H2 15px, paragraphs 14.5px). Checkboxes are tickable, exactly as in the reader.

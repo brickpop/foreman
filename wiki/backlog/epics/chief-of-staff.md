@@ -6,9 +6,9 @@ order: 5
 
 # Chief of Staff
 
-**Goal:** the agent that sets Foreman up for the CEO: creating teams from the example rosters, hiring, refining souls, and changing project config on a branch that comes back as a review.
+**Goal:** the agent that sets Foreman up for the CEO: creating teams from the example rosters, hiring, refining souls (team files, in the workspace repo) and changing project config (`project.toml`, in the project repo), always on a branch that comes back through `request_merge` as a review, like any merge request: Merge to main, Create PR on the forge of the repo it changes (the workspace repo's `workspace_forge`, the project repo's `forge.project_repo`), or Reject ([Pipeline and merges](../../product/features/pipeline-and-merges.md#review-and-merge)).
 
-**Usable when done:** a team is created, hired into and tuned entirely by talking to the Chief of Staff; config changes arrive as reviews.
+**Usable when done:** a team is created, hired into and tuned entirely by talking to the Chief of Staff; team and config changes arrive as reviews.
 
 **Journey steps:** 7, 25 and 27 of [the journey](../../product/journey.md).
 

@@ -10,6 +10,8 @@ A **harness** is the CLI program that runs an agent: Claude Code, Codex CLI, Pi,
 
 ## Session drivers
 
+**Interactive sessions only (the CEO's rule).** Every agent session in the product is the harness's real interactive interface in a terminal. The product never runs a harness in a non-interactive or automation mode (Claude Code's `claude -p` / `--print`, or any equivalent "print and exit" mode): an agent is always a live session the CEO can watch and type into. (The Prove experiments may use print mode as a measuring tool; that is not product behaviour.)
+
 **Decided:** how Foreman drives a harness session is itself swappable, through a **session driver** per harness, with two implementations:
 
 | Driver | How Foreman talks to the harness | What the CEO sees | Status |

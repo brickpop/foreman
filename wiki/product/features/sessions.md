@@ -60,7 +60,6 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 - Typing to the **lead** is a request; the lead delegates through [Team tools](../architecture/team-tools.md) (`ask`, `handoff`).
 - Typing to a **member** is a direct instruction. It goes raw to the member's terminal under the direct-line banner; Foreman posts nothing to the lead. The member tells the lead itself when the instruction matters to the team, as its [session prompt](../architecture/session-prompt.md#talking-to-the-ceo) asks.
 - Typing to an `awaiting` instance answers its open request ([Requests](./requests.md)).
-- **Another agent busy in the project** (until the Git epic, while agents share the project folder): the CEO's typing is never held back, but when another agent of the same project is `running`, the pane shows a warning strip above its input: `Another agent is busy in <project> (<Name>). You're both editing the same files.` (12.5px, `--accTx` on `--accSoft`, bottom border `--accLine`). It disappears when that agent goes idle. Foreman's own deliveries wait their turn ([Protocol → Messages](../architecture/protocol.md#messages)); the [Git epic](../../backlog/epics/git.md) removes both the turns and this warning.
 
 ## Markers beside the terminal
 

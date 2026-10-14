@@ -12,6 +12,6 @@ The end-to-end journey surfaced five gaps, each with a proposal: [The journey â†
 
 - [ ] G1 kickoff: how the lead starts on the goal after a deploy
 - [ ] G2 how the Chief of Staff runs (needed by epic 4, can wait)
-- [ ] G3 who writes task cards in the wiki
-- [ ] G4 the server-side screen after a Foreman restart
-- [ ] G5 the Git block as a core block
+- [x] G3 who writes task cards in the wiki: the lead, committing through `commit()` in the live project repo; others through `contribute` (decided 2026-10-14)
+- [x] G4 the server-side screen after a Foreman restart: running containers are re-attached and the screen rebuilt from the session log; gone ones get a new session (decided 2026-10-14)
+- [x] G5 the Git block as a core block: worktrees per agent from epic 1, merge plumbing in the Git epic (decided 2026-10-14)

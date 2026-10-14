@@ -469,7 +469,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 - `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
 - `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher.
-- `internal/events`: the Event bus; `internal/git`: Foreman's own git (`Init`, `Commit`), the start of the Git block.
+- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the start of the Git block: `Init`, `Commit`, `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager), `Exclude`.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
 - `cmd/foreman/sessions.go`: a start-by-instance map, scaffolding for `--demo-session` until the Instance manager exists ([technical debt](../../technical-debt.md)).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.

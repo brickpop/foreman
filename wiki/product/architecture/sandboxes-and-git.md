@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [architecture, git, security, agents, pipeline]
 ---
 

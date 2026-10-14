@@ -56,7 +56,7 @@ func loaded(t *testing.T, setup func(root string)) *Workspace {
 	if setup != nil {
 		setup(ws.Root())
 	}
-	if err := ws.Load(ctx, git.CLI{}); err != nil {
+	if err := ws.Load(ctx, git.New()); err != nil {
 		t.Fatal(err)
 	}
 	return ws
@@ -76,7 +76,7 @@ func TestLoadMakesTheWorkspaceRepoWithWhatIsThere(t *testing.T) {
 		t.Errorf("runtime files were committed:\n%s", log)
 	}
 	// Loading again changes nothing.
-	if err := ws.Load(ctx, git.CLI{}); err != nil {
+	if err := ws.Load(ctx, git.New()); err != nil {
 		t.Fatal(err)
 	}
 	if again := gitLog(t, ws.Path()); again != log {

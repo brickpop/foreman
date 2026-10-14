@@ -62,7 +62,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
 	}
-	if err := ws.Load(context.Background(), git.CLI{}); err != nil {
+	if err := ws.Load(context.Background(), git.New()); err != nil {
 		return err
 	}
 

@@ -18,10 +18,10 @@ type Session struct {
 	// Sandbox is the instance's folder on the host (<project>/.sandboxes/<agent>),
 	// its working directory, mounted at the same path. The adapter keeps the
 	// harness's private config inside it.
-	Sandbox string
-	Prompt  string // the composed session prompt
-	Command string // the harness command from the settings; "" for the adapter's default
-	Resume  string // the harness's own session id to resume, if any
+	Sandbox  string
+	Prompt   string // the composed session prompt
+	Command  string // the harness command from the settings; "" for the adapter's default
+	Continue bool   // a restart: pick up the instance's previous conversation
 }
 
 // Launch is how to start a harness: what the instance manager adds to the
@@ -47,6 +47,11 @@ var ErrNotConnected = errors.New("harness: not connected (Settings → Harnesses
 // runner.Runner is one engine (direct.Runner, podman.Runner).
 type Adapter interface {
 	Launch(Session) (Launch, error)
+	// Login is how to run the harness's own login (Settings → Harnesses →
+	// Connect), in a terminal the CEO types into.
+	Login() (Launch, error)
+	// Connected reports whether the harness has a login.
+	Connected() bool
 }
 
 // WriteFiles writes a launch's files, creating their folders.

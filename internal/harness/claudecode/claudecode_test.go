@@ -102,12 +102,17 @@ func TestLaunchOptions(t *testing.T) {
 	gitconfig := filepath.Join(t.TempDir(), ".gitconfig")
 	write(t, gitconfig, "[alias]\n  st = status\n")
 	a.GitConfig = gitconfig
-	s.Command, s.Resume = "/opt/claude", "abc-123"
+	s.Command, s.Continue = "/opt/claude", true
+	// Nothing to continue yet: no --continue.
+	if l, _ := a.Launch(s); len(l.Command) != 2 {
+		t.Errorf("continue without a conversation: %v", l.Command)
+	}
+	write(t, filepath.Join(ConfigDir(s.Sandbox), "projects", "-ws-ledger", "abc.jsonl"), "{}\n")
 	l, err := a.Launch(s)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(l.Command, []string{"/opt/claude", "--dangerously-skip-permissions", "--resume", "abc-123"}) {
+	if !reflect.DeepEqual(l.Command, []string{"/opt/claude", "--dangerously-skip-permissions", "--continue"}) {
 		t.Errorf("command %v", l.Command)
 	}
 	if last := l.Mounts[len(l.Mounts)-1]; last != (runner.Mount{Source: gitconfig, Target: "/home/node/.gitconfig", ReadOnly: true}) {
@@ -128,5 +133,28 @@ func TestLaunchRefusals(t *testing.T) {
 	write(t, filepath.Join(ConfigDir(s.Sandbox), ".claude.json"), "{broken")
 	if _, err := a.Launch(s); err == nil {
 		t.Error("a broken account record was accepted")
+	}
+}
+
+func TestLoginAndConnected(t *testing.T) {
+	creds := filepath.Join(t.TempDir(), "credentials", "claude-code")
+	a := Adapter{Credentials: creds}
+	if a.Connected() {
+		t.Error("connected without a login")
+	}
+	l, err := a.Login()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Stat(creds); err != nil || info.Mode().Perm() != 0o700 {
+		t.Errorf("the login folder: %v %v", info, err)
+	}
+	if !reflect.DeepEqual(l.Command, []string{"claude"}) || l.Env[0] != "CLAUDE_CONFIG_DIR="+creds ||
+		!reflect.DeepEqual(l.Mounts, []runner.Mount{{Source: creds, Target: creds}}) {
+		t.Errorf("login %+v", l)
+	}
+	write(t, filepath.Join(creds, ".credentials.json"), "{}")
+	if !a.Connected() {
+		t.Error("not connected with a login")
 	}
 }

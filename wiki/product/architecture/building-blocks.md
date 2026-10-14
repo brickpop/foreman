@@ -238,6 +238,8 @@ type Instances interface {
 }
 ```
 
+Built so far (`internal/instances`): `Deploy`, `Stop`, `List`, `Terminal` and `Restore` (re-attach after a Foreman restart); statuses live in the state store and go out on the event bus, so `Status` and `Watch` are the store and the bus. `Deliver` comes with Messaging.
+
 Details: [Agent runtime](./agent-runtime.md).
 
 ### 6. Messaging (`messaging`)
@@ -470,7 +472,8 @@ A–E are proven before the blocks that depend on them are built: one small expe
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
 - `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher.
 - `internal/events`: the Event bus; `internal/git`: Foreman's own git, the start of the Git block: `Init`, `Commit`, `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager), `Exclude`.
-- `internal/harness` (the `Adapter` interface, `Launch` only so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
+- `internal/instances`: the Instance manager.
+- `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
 - `cmd/foreman/sessions.go`: a start-by-instance map, scaffolding for `--demo-session` until the Instance manager exists ([technical debt](../../technical-debt.md)).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.

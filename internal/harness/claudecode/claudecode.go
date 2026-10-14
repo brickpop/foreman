@@ -56,8 +56,9 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		command = "claude"
 	}
 	args := []string{command, "--dangerously-skip-permissions"}
-	if s.Resume != "" {
-		args = append(args, "--resume", s.Resume)
+	if s.Continue && hasConversation(dir) {
+		// The latest conversation in this config dir: always the instance's own.
+		args = append(args, "--continue")
 	}
 	l := harness.Launch{
 		Command: args,
@@ -110,4 +111,31 @@ func (a Adapter) account(dir, sandbox string) ([]byte, error) {
 	projects[sandbox] = project
 	record["projects"] = projects
 	return json.MarshalIndent(record, "", "  ")
+}
+
+// hasConversation reports whether the config dir holds a conversation to
+// continue: `--continue` fails without one (a session that crashed at once).
+func hasConversation(dir string) bool {
+	found, _ := filepath.Glob(filepath.Join(dir, "projects", "*", "*.jsonl"))
+	return len(found) > 0
+}
+
+// Connected reports whether the shared login exists.
+func (a Adapter) Connected() bool {
+	_, err := os.Stat(filepath.Join(a.Credentials, ".credentials.json"))
+	return err == nil
+}
+
+// Login runs Claude Code on the shared login folder as its config dir, so the
+// login lands there. It never asks to log in on its own: the CEO types /login
+// (experiment B).
+func (a Adapter) Login() (harness.Launch, error) {
+	if err := os.MkdirAll(a.Credentials, 0o700); err != nil {
+		return harness.Launch{}, err
+	}
+	return harness.Launch{
+		Command: []string{"claude"},
+		Env:     []string{"CLAUDE_CONFIG_DIR=" + a.Credentials},
+		Mounts:  []runner.Mount{{Source: a.Credentials, Target: a.Credentials}},
+	}, nil
 }

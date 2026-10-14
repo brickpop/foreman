@@ -11,7 +11,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 
 - **State:** until deployments exist, nothing creates instances. The development flag `foreman --demo-session "<command>"` (used by `just dev`) starts one session, instance `demo`, through a start-by-instance map in `cmd/foreman/sessions.go`. The command is split on spaces, with no quoting. The UI's Sessions screen lists whatever sessions exist.
 - **Why:** a live session in the browser was needed before deployments, teams and instances exist.
-- **Fix:** remove the flag and its wiring in `cmd/foreman` when [deployments](./product/models/deployment.md) start sessions ([Instance manager](./backlog/instance-manager.md)); `just dev` then deploys a test team instead.
+- **Fix:** deployments start sessions now ([Instance manager](./backlog/instance-manager.md)), but nothing in the UI deploys a team yet. Remove the flag and its wiring in `cmd/foreman` (`sessions.go`, the demo part of `views.go`) once the Deploy dialog is wired to the real server ([Teams and agents](./backlog/teams-and-agents.md)); `just dev` then seeds a demo team on the Direct engine instead.
 
 ## Snapshots: a pending line wrap, and mirrored emulator state
 

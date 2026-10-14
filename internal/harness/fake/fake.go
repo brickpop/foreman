@@ -24,3 +24,11 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		Files:   []harness.File{{Path: prompt, Data: []byte(s.Prompt), Mode: 0o600}},
 	}, nil
 }
+
+// Connected is always true: the fake harness needs no login.
+func (Adapter) Connected() bool { return true }
+
+// Login runs the program, as if it were a login.
+func (a Adapter) Login() (harness.Launch, error) {
+	return harness.Launch{Command: []string{a.Program}}, nil
+}

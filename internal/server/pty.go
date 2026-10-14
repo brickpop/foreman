@@ -15,8 +15,6 @@ import (
 // terminal package, through an adapter in cmd/foreman).
 type Terminals interface {
 	Attach(instance string) (Terminal, error)
-	// List returns the ids of the instances that have a session, sorted.
-	List() []string
 }
 
 // Terminal is one viewer's attachment to a session.

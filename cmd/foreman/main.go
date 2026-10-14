@@ -20,6 +20,9 @@ import (
 	"github.com/brickpop/foreman/internal/access"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/harness/claudecode"
+	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/server"
@@ -62,9 +65,17 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
 	}
-	if err := ws.Load(context.Background(), git.New()); err != nil {
+	ctx := context.Background()
+	gitCLI := git.New()
+	if err := ws.Load(ctx, gitCLI); err != nil {
 		return err
 	}
+	// Before listening: Podman may have to start, and an error must come first.
+	engineRunner, engineImages, closeEngine, err := engine(ctx, ws.Settings().Settings.Engine, stdout)
+	if err != nil {
+		return err
+	}
+	defer closeEngine()
 
 	// Listen before printing the URL, so a busy port fails before the browser opens.
 	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", *port))
@@ -82,17 +93,31 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if *uiDir != "" {
 		files = os.DirFS(*uiDir)
 	}
-	state, err := store.Open(context.Background(), ws.Path("state.db"))
+	state, err := store.Open(ctx, ws.Path("state.db"))
 	if err != nil {
 		return fmt.Errorf("state: %w", err)
 	}
-	defer state.Close() // its tables reach the blocks with the Instance manager
+	defer state.Close()
 	bus := events.New()
-	if err := ws.Watch(context.Background(), func(c workspace.Change) { bus.Publish(configEvent(c)) }); err != nil {
+	if err := ws.Watch(ctx, func(c workspace.Change) { bus.Publish(configEvent(c)) }); err != nil {
 		return fmt.Errorf("watching the workspace: %w", err)
 	}
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
-	terms := newSessions(direct.Runner{}, func(instance string) (terminal.Log, error) { return logs.Open(instance) })
+	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
+	adapters := map[string]harness.Adapter{
+		"claude-code": claudecode.Adapter{Credentials: ws.Path("credentials", "claude-code"), GitConfig: homeGitConfig()},
+	}
+	manager := instances.New(instances.Deps{
+		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
+		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters,
+		OpenLog: openLog, Publish: bus.Publish,
+	})
+	if err := manager.Restore(ctx); err != nil {
+		return fmt.Errorf("restoring the instances: %w", err)
+	}
+	terms := newSessions(direct.Runner{}, openLog)
+	login := logins{adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog)}
+	views := agents{Manager: manager, demo: terms, logins: login.terms}
 	if fields := strings.Fields(*demo); len(fields) > 0 {
 		// Scaffolding until deployments start sessions (wiki/technical-debt.md).
 		fields[0], err = resolveProgram(fields[0])
@@ -100,7 +125,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			return fmt.Errorf("demo session: %w", err)
 		}
 		spec := runner.Spec{Name: "demo", Command: fields, Dir: ws.Root()}
-		if err := terms.start(context.Background(), "demo", spec); err != nil {
+		if err := terms.start(ctx, "demo", spec); err != nil {
 			return fmt.Errorf("demo session: %w", err)
 		}
 	}
@@ -109,7 +134,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Workspace: ws,
 		Config:    ws,
 		Events:    bus,
-		Terminals: terms,
+		Agents:    views,
+		Harnesses: login,
+		Terminals: views,
 		UI:        files,
 	})
 	return http.Serve(listener, handler)
@@ -183,4 +210,14 @@ func configEvent(c workspace.Change) events.Event {
 		return events.Event{Type: "workspace.changed", Data: struct{}{}}
 	}
 	return events.Event{Type: "config.changed", Data: c}
+}
+
+// homeGitConfig is the CEO's ~/.gitconfig, mounted read-only into agents'
+// containers when it exists.
+func homeGitConfig() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".gitconfig")
 }

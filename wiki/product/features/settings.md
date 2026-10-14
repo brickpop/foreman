@@ -24,7 +24,7 @@ The **Settings** screen (sidebar footer): workspace-wide settings stored in `~/a
 
 Rows (grid `130px 1fr auto`): the harness label, a Mono command input (defaults `claude`, `codex`, `pi`, `hermes`), and the detection status in the harness image: `found · <version>` (`--ok`) or `not set` / `not found` (`--err`). The prototype detected them on the host PATH; with every session in a container, the image is what counts. Custom harnesses are configured per agent and not listed here. See [Harness adapters](../architecture/harness-adapters.md).
 
-Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the login container's terminal in a dialog running the harness's own login (`claude /login` for Claude Code). See [Session runner → Credentials](../architecture/session-runner.md#credentials).
+Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the login container's terminal in a dialog running the harness's own login (for Claude Code: Claude Code itself, where the CEO types `/login`, since it never asks on its own). See [Session runner → Credentials](../architecture/session-runner.md#credentials).
 
 ## Forge accounts
 

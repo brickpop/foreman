@@ -16,5 +16,5 @@ Blocked by [Team and Agent pages](./ui-teams-agents.md) and [Workspace and confi
 
 - [ ] teams and souls API (read, version-guarded write); a conflicting save prompts Keep mine / Take theirs instead of dropping the edit (low priority, [Agent page](../product/features/agent-page.md))
 - [ ] composed session prompt endpoint
-- [ ] Deploy wired to the Instance manager
+- [ ] Deploy wired to the Instance manager (`ForemanClient.deploy` and `stop` exist; `POST /api/deployments`, `DELETE /api/deployments/:id`); then remove `--demo-session` ([technical debt](../technical-debt.md))
 - [ ] swap the areas in main.tsx; remove their badges

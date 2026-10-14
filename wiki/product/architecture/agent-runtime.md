@@ -26,6 +26,8 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 
 Status values: `starting | running | idle | awaiting | done | stopped | queued`.
 
+**Phasing:** in epic 1 there are no hooks yet (the agent link is epic 2), so statuses are the lifecycle's own: `queued`, `starting`, `running` (the process is alive), `stopped`.
+
 ### Status transitions
 
 | From | Event | To |
@@ -59,7 +61,7 @@ On server restart:
 
 ## Restarts
 
-- **How:** when the adapter supports it, the harness resumes its own session (`claude --resume <id>`, Codex session resume; the harness session id is stored on the [instance](../models/instance.md)). Otherwise it starts fresh with a summary: the last task note (`instances.task`) plus the instance's last team messages.
+- **How:** when the adapter supports it, the harness resumes its own session. Claude Code: `claude --continue`, the latest conversation in the instance's private config dir, which is always its own (no session id needed); skipped when there is none yet. Others by their session id, stored on the [instance](../models/instance.md) (Codex session resume). Otherwise it starts fresh with a summary: the last task note (`instances.task`) plus the instance's last team messages.
 - **When, automatically:** a crash gets **one** automatic restart (counted in `instances.restarts`) before a blocked request is raised; a second crash, or any rate limit, goes straight to the CEO. A rate limit is never retried automatically.
 - **Stuck sessions:** "no output for N minutes" (`stuck_after_minutes`, default 20, a [workspace setting](../models/workspace-settings.md)) counts silence only while the harness is not signalling a running tool through its hooks, so a long, silent test run isn't "stuck".
 

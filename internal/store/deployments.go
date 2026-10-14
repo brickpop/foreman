@@ -7,18 +7,6 @@ import (
 	"time"
 )
 
-// Deployment is a team assigned to a project with a goal
-// (wiki/product/models/deployment.md).
-type Deployment struct {
-	ID        string // team@project
-	TeamID    string
-	ProjectID string
-	Goal      string
-	Status    string // DeploymentActive or DeploymentStopped
-	CreatedAt time.Time
-	StoppedAt time.Time // zero while active
-}
-
 const (
 	DeploymentActive  = "active"
 	DeploymentStopped = "stopped"

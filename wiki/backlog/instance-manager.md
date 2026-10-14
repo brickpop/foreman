@@ -1,6 +1,6 @@
 ---
 type: task
-status: blocked
+status: done
 priority: high
 tags: [feature]
 epic: terminal-multiplexer
@@ -14,8 +14,9 @@ Blocked by [Podman engine](./podman-engine.md), [Worktrees per instance](./workt
 
 **Done when:** deploying a team (the [Deploy a team](../product/features/deploy-team.md) dialog) starts one instance per member (image, its worktrees and the project repo mounted, launch, token placeholder, start, terminal), statuses follow the instance lifecycle, crashes restart per policy, the concurrency queue holds, stopping keeps the worktrees on disk (deleting merged `wt/*` branches is `Git.Prune`, in the [Git epic](./epics/git.md)), and after a Foreman restart running containers are re-attached. `--demo-session` is removed ([technical debt](../technical-debt.md)).
 
-- [ ] the `engine: podman | direct` setting ([Workspace settings](../product/models/workspace-settings.md)) picks the engine (moved from the [Podman engine](./podman-engine.md) card: this is its first user)
-- [ ] `Instances` interface: `Ensure`, `Status`, `Terminal`, `Watch`
-- [ ] deploy and stop (API + dialogs), statuses on the event stream
-- [ ] restart policy, concurrency queue
-- [ ] re-attach on boot
+- [x] the `engine: podman | direct` setting picks the engine at startup (Podman started first, an error before the URL is printed; `direct` prints a no-isolation warning; `just dev` sets `direct`)
+- [x] the manager: `Deploy`, `Stop`, `List`, `Terminal`, `Restore`; statuses in the store and on the event stream (`instance.status`, `deployment.created`, `deployment.stopped`). Epic 1 statuses: queued, starting, running, stopped (idle, awaiting, done need the hooks: epic 2)
+- [x] deploy and stop through the API (`POST /api/deployments`, `DELETE /api/deployments/:id`, `GET /api/instances` with statuses) and the client; the dialogs are the UI cards' ([Team and Agent pages](./ui-teams-agents.md), wired in [Teams and agents](./teams-and-agents.md))
+- [x] restart policy (a crash restarts once, continuing its conversation; a second stops it) and the concurrency queue (`max_sessions`)
+- [x] re-attach on boot (running containers by label; live instances without one restart; orphans stopped)
+- Not here: why an instance stopped reaches only the server log until blocked requests exist ([Workflow](./epics/workflow.md)); `--demo-session` goes with the Deploy dialog ([technical debt](../technical-debt.md))

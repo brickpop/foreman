@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -193,27 +192,5 @@ func TestPTYDisconnectDetachesEvenWhenTheSessionIsQuiet(t *testing.T) {
 	case <-term.closed:
 	case <-time.After(3 * time.Second):
 		t.Fatal("viewer stayed attached after the browser left")
-	}
-}
-
-func (f fakeTerminals) List() []string {
-	ids := make([]string, 0, len(f))
-	for id := range f {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func TestInstancesListsTheSessions(t *testing.T) {
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), UI: builtUI,
-		Terminals: fakeTerminals{"tove@ledger": newFakeTerminal(""), "mara@ledger": newFakeTerminal("")}})
-	w := get(t, h, "/api/instances")
-	if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != `[{"id":"mara@ledger"},{"id":"tove@ledger"}]` {
-		t.Errorf("got %d %q", w.Code, w.Body.String())
-	}
-	empty := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), UI: builtUI, Terminals: fakeTerminals{}})
-	if w := get(t, empty, "/api/instances"); strings.TrimSpace(w.Body.String()) != "[]" {
-		t.Errorf("no sessions must be an empty list, not null: %q", w.Body.String())
 	}
 }

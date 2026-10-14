@@ -26,7 +26,7 @@ POST   /api/teams/:id/agents                  hire (from CoS)
 
 POST   /api/deployments                       {team, project, goal}
 DELETE /api/deployments/:id                   stop
-GET    /api/instances?deployment=             status, task, last line
+GET    /api/instances                         the instances of the active deployments, with their status
 GET    /api/instances/:id/prompt              composed session prompt
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
 POST   /api/instances/:id/input               line input (alt to WS)
@@ -47,6 +47,8 @@ PUT    /api/wiki/:project/checkbox/:path      {line, version}
 PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
 
 GET    /api/settings | PUT /api/settings       settings, version, problems
+GET    /api/harnesses                         the supported harnesses and their login (connected or not)
+POST   /api/harnesses/:id/connect             start the harness's login in a terminal → {terminal}: open it with WS /ws/pty/:terminal
 PUT    /api/secrets/forge/:kind               write-only token
 GET    /api/events                            SSE: requests, status, file changes
 ```

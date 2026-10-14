@@ -4,27 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 )
-
-// Instance is one agent running in one deployment
-// (wiki/product/models/instance.md). Empty strings and zero values are
-// stored as NULL.
-type Instance struct {
-	ID               string // agent@project
-	DeploymentID     string
-	AgentID          string
-	Status           string // queued, starting, running, idle, awaiting, done or stopped
-	Task             string // the current task note, for a restart
-	PID              int
-	PtyID            string // the engine's handle (e.g. the container id)
-	SandboxPath      string
-	Harness          string
-	HarnessSessionID string // for the harness's own resume
-	StartedAt        time.Time
-	LastOutputAt     time.Time
-	Restarts         int
-}
 
 // Instances is the instances table.
 type Instances interface {

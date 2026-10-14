@@ -77,3 +77,17 @@ func TestFlagsOnEitherSideOfTheFolder(t *testing.T) {
 		t.Error("two folders accepted")
 	}
 }
+
+func TestRelativeProgramsResolveAgainstTheStartFolder(t *testing.T) {
+	cwd, _ := os.Getwd()
+	for in, want := range map[string]string{
+		".dev/fakeharness": filepath.Join(cwd, ".dev/fakeharness"),
+		"./x":              filepath.Join(cwd, "x"),
+		"bash":             "bash", // left to the PATH lookup
+		"/usr/bin/env":     "/usr/bin/env",
+	} {
+		if got, err := resolveProgram(in); err != nil || got != want {
+			t.Errorf("resolveProgram(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+}

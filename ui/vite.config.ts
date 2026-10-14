@@ -8,5 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   // dist/app, not dist: the build empties its folder, and dist/.gitkeep must
   // survive so the Go embed always matches something on a fresh clone.
-  build: { outDir: "dist/app", emptyOutDir: true },
+  // chunkSizeWarningLimit: the 500 kB default targets sites downloaded over the
+  // network; Foreman serves its UI from the same machine.
+  build: { outDir: "dist/app", emptyOutDir: true, chunkSizeWarningLimit: 2000 },
 });

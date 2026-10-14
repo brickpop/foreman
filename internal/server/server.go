@@ -24,6 +24,7 @@ type Workspace interface {
 type Options struct {
 	Guard     Guard
 	Workspace Workspace
+	Terminals Terminals
 	UI        fs.FS // the built web app, index.html at its root
 }
 
@@ -33,6 +34,14 @@ func New(o Options) http.Handler {
 	mux.HandleFunc("GET /api/workspace", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, workspaceSummary{Path: o.Workspace.Root()})
 	})
+	mux.HandleFunc("GET /api/instances", func(w http.ResponseWriter, r *http.Request) {
+		list := []instanceSummary{}
+		for _, id := range o.Terminals.List() {
+			list = append(list, instanceSummary{ID: id})
+		}
+		writeJSON(w, http.StatusOK, list)
+	})
+	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))
 	mux.Handle("/", ui(o.UI))
 	return o.Guard.Wrap(mux)
 }
@@ -40,6 +49,12 @@ func New(o Options) http.Handler {
 // workspaceSummary is the body of GET /api/workspace.
 type workspaceSummary struct {
 	Path string `json:"path"`
+}
+
+// instanceSummary is one entry of GET /api/instances. It grows into the
+// instance model (status, task, last line) with deployments.
+type instanceSummary struct {
+	ID string `json:"id"`
 }
 
 // ui serves the built SPA: real files as they are, every other path as

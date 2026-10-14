@@ -1,19 +1,8 @@
-import { useEffect, useState } from "react";
+import { Sessions } from "./screens/Sessions";
 
-type Workspace = { path: string };
-
-// Walking-skeleton shell: the sidebar brand and the workspace the server reports.
+// Walking-skeleton shell: the sidebar brand and the Sessions screen.
+// The full shell is specified in wiki/product/features/app-shell.md.
 export function App() {
-  const [workspace, setWorkspace] = useState<Workspace>();
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    fetch("/api/workspace")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then(setWorkspace)
-      .catch((e: Error) => setError(e.message));
-  }, []);
-
   return (
     <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)]">
       <aside className="flex flex-col border-r border-line bg-side">
@@ -23,12 +12,12 @@ export function App() {
           </div>
           <div className="text-[15px] font-semibold tracking-[-0.01em]">Foreman</div>
         </div>
+        <nav className="px-2.5">
+          <div className="rounded-md bg-raised px-2.5 py-2 font-medium text-tx">Sessions</div>
+        </nav>
       </aside>
-      <main className="p-12">
-        <h1 className="m-0 text-3xl font-semibold tracking-[-0.02em]">Workspace</h1>
-        <p className="font-mono text-[12.5px] text-tx4">
-          {error ? `Couldn't reach the server: ${error}` : (workspace?.path ?? "…")}
-        </p>
+      <main className="min-h-0 min-w-0">
+        <Sessions />
       </main>
     </div>
   );

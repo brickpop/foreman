@@ -4,6 +4,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,11 +13,16 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/brickpop/foreman/internal/access"
+	"github.com/brickpop/foreman/internal/runner"
+	"github.com/brickpop/foreman/internal/runner/pty"
 	"github.com/brickpop/foreman/internal/server"
+	"github.com/brickpop/foreman/internal/sessionlog"
+	"github.com/brickpop/foreman/internal/supervisor"
 	"github.com/brickpop/foreman/internal/workspace"
 	"github.com/brickpop/foreman/ui"
 )
@@ -35,6 +41,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	port := flags.String("port", "8888", "port for the web UI")
 	newToken := flags.Bool("new-token", false, "replace the access token (logs every browser out)")
 	uiDir := flags.String("ui-dir", "", "development: serve the web UI from this folder instead of the embedded build")
+	demo := flags.String("demo-session", "", "development: start one session running this command (space-separated, no quoting) as instance \"demo\"")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "Usage: foreman [<workspace-dir>] [flags]")
 		flags.PrintDefaults()
@@ -64,14 +71,28 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		openBrowser(url, stdout)
 	}
 
+	// The composition root: the only place that picks concrete implementations.
 	files := ui.UI()
 	if *uiDir != "" {
 		files = os.DirFS(*uiDir)
 	}
-	// The composition root: the only place that picks concrete implementations.
+	logs := sessionlog.Dir{Root: ws.Path("logs")}
+	sup := supervisor.New(pty.Runner{}, func(instance string) (supervisor.Log, error) { return logs.Open(instance) })
+	if fields := strings.Fields(*demo); len(fields) > 0 {
+		// Scaffolding until deployments start sessions (wiki/technical-debt.md).
+		fields[0], err = resolveProgram(fields[0])
+		if err != nil {
+			return fmt.Errorf("demo session: %w", err)
+		}
+		spec := runner.Spec{Name: "demo", Command: fields, Dir: ws.Root()}
+		if err := sup.Start(context.Background(), "demo", spec); err != nil {
+			return fmt.Errorf("demo session: %w", err)
+		}
+	}
 	handler := server.New(server.Options{
 		Guard:     access.NewTokenGuard(token, access.LocalHosts(*port), *port),
 		Workspace: ws,
+		Terminals: terminals{sup},
 		UI:        files,
 	})
 	return http.Serve(listener, handler)
@@ -125,4 +146,31 @@ func openBrowser(url string, stdout io.Writer) {
 	if err := exec.Command(name, url).Start(); err != nil {
 		fmt.Fprintln(stdout, "(couldn't open a browser; use the URL above)")
 	}
+}
+
+// terminals adapts the supervisor to the server's Terminals interface.
+type terminals struct{ sup *supervisor.Supervisor }
+
+func (t terminals) Attach(instance string) (server.Terminal, error) {
+	a, err := t.sup.Attach(instance)
+	if errors.Is(err, supervisor.ErrUnknown) {
+		return nil, server.ErrNoTerminal
+	}
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (t terminals) List() []string { return t.sup.List() }
+
+// resolveProgram makes a relative program path ("bin/x", "./x") absolute,
+// against the folder foreman was started in: sessions run in another working
+// directory, where the relative path would point somewhere else. Bare names
+// ("bash") are left for the PATH lookup.
+func resolveProgram(program string) (string, error) {
+	if !strings.ContainsRune(program, filepath.Separator) || filepath.IsAbs(program) {
+		return program, nil
+	}
+	return filepath.Abs(program)
 }

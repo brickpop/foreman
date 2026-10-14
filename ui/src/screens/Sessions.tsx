@@ -13,7 +13,7 @@ export function Sessions() {
   const terminal = useRef<TerminalHandle>(null);
 
   useEffect(() => {
-    client
+    client.agents
       .instances()
       .then((list) => {
         setInstances(list);

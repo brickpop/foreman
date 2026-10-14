@@ -33,3 +33,82 @@ export interface Instance {
   lastOutputAt: string /* RFC 3339 */;
   restarts: number /* int */;
 }
+/**
+ * Request is something waiting for the CEO (wiki/product/models/request.md).
+ */
+export interface Request {
+  id: string;
+  kind: string; // approval, question, review, finding or blocked
+  projectId: string;
+  deploymentId: string; // "" for the Chief of Staff
+  instanceId: string; // who raised it, or who it is about; "" for the Chief of Staff
+  summary: string;
+  options: string[]; // the first is the primary action
+  source: string; // agent, harness, foreman or cos
+  status: string; // open, resolved or expired
+  answer: string;
+  createdAt: string /* RFC 3339 */;
+  resolvedAt: string /* RFC 3339 */;
+  mergeRequestId: string; // for a review
+  links: Link[];
+}
+/**
+ * Link is an extra link on a request's panel (a branch, a wiki entry).
+ */
+export interface Link {
+  label: string;
+  href: string;
+}
+/**
+ * TeamMessage is one message between two instances of a deployment
+ * (wiki/product/models/team-message.md).
+ */
+export interface TeamMessage {
+  id: number /* int64 */;
+  deploymentId: string;
+  fromInstance: string;
+  toInstance: string;
+  kind: string; // ask, reply, handoff or contribute
+  requestRef: string; // req-N, per deployment
+  body: string;
+  artifactRef: string; // a branch or a wiki path
+  createdAt: string /* RFC 3339 */;
+  deliveredAt: string /* RFC 3339 */; // zero while queued for a busy target
+}
+/**
+ * WorkItem is a member's piece of work on its way to main
+ * (wiki/product/models/work-item.md).
+ */
+export interface WorkItem {
+  id: string;
+  deploymentId: string;
+  authorInstance: string;
+  branch: string;
+  cardRef: string; // the board card it implements
+  stage: number /* int */; // 0 in worktree, 1 handed to lead, 2 lead reviewing, 3 integrated
+  note: string;
+  checksStatus: string;
+  mergeRequestId: string;
+}
+/**
+ * MergeRequest asks the CEO to merge a branch into a repo's main
+ * (wiki/product/models/merge-request.md).
+ */
+export interface MergeRequest {
+  id: string;
+  projectId: string; // "" for a Chief of Staff change to the workspace repo
+  deploymentId: string; // "" for a Chief of Staff change
+  authorInstance: string;
+  repo: string; // a code repo, "project" or "workspace"
+  branch: string;
+  entry: string; // the wiki card explaining the work
+  state: string; // open, merged or rejected
+  checksStatus: string;
+  conflicting: boolean;
+  forgePrUrl: string;
+  forgePrNumber: number /* int */;
+  note: string;
+  createdAt: string /* RFC 3339 */;
+  mergedAt: string /* RFC 3339 */;
+  rejectedAt: string /* RFC 3339 */;
+}

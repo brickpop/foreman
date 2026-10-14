@@ -16,3 +16,6 @@ packages:
   - path: github.com/brickpop/foreman/internal/harness
     output_path: ui/src/api/types/harness.ts
     include_files: [types.go]
+  - path: github.com/brickpop/foreman/internal/wiki
+    output_path: ui/src/api/types/wiki.ts
+    include_files: [types.go]

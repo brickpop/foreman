@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 priority: high
 tags: [feature]
 epic: full-ui-demo
@@ -14,7 +14,7 @@ epic: full-ui-demo
 
 Blocks every other card of this epic.
 
-- [ ] the Go structs, with JSON tags and comments that carry into TypeScript
+- [x] the Go structs, with JSON tags and comments that carry into TypeScript: workspace config, events, harness status, the `state.db` rows (deployments, instances, requests, team messages, work items, merge requests: `internal/store/types.go`) and the wiki's tree, entry and board (`internal/wiki/types.go`)
 - [x] `tygo` pinned as a Go tool; `just types` recipe; generated files committed; `just lint` fails when they are stale (done with [Workspace and config](./workspace-config-events.md): workspace config and events)
-- [ ] `ForemanClient` extended to every area, typed with the generated types
-- [ ] the real client keeps working for workspace, instances and terminals
+- [x] `ForemanClient` extended to every area, typed with the generated types, and **grouped by area** (`workspace`, `agents`, `harnesses`, `requests`, `messages`, `pipeline`, `wiki`, `events`), each with a `demo` flag, so `main.tsx` can pick real or demo per area
+- [x] the real client keeps working for workspace, instances and terminals (its other areas call the endpoints of [API](../product/architecture/api.md), which land with their backend)

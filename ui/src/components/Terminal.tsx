@@ -55,7 +55,7 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
     term.open(host.current);
     fit.fit();
 
-    const conn = client.openTerminal(instance, {
+    const conn = client.agents.openTerminal(instance, {
       output: (data) => term.write(data),
       reset: () => term.reset(),
       exit: (code) => term.write(`\r\n\x1b[90m[session exited with code ${code}]\x1b[0m\r\n`),

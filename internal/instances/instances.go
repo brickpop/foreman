@@ -165,6 +165,9 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 			if err := l.proc.Stop(stopGrace); err != nil {
 				slog.Warn("stopping an instance", "instance", inst.ID, "err", err)
 			}
+			// Gone now: free its slot at once, so a redeploy right after starts it
+			// (watch, which also releases it, may not have run yet).
+			m.release(inst.ID)
 		}
 		m.setStatus(ctx, inst.ID, Stopped)
 	}

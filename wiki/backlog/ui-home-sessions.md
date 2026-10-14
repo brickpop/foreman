@@ -1,6 +1,6 @@
 ---
 type: task
-status: blocked
+status: todo
 priority: high
 tags: [feature]
 epic: full-ui-demo
@@ -10,7 +10,7 @@ epic: full-ui-demo
 
 **Why:** the CEO's daily view: what needs them, and the agents' terminals ([Home](../product/features/home.md), [Sessions](../product/features/sessions.md), [Requests](../product/features/requests.md)).
 
-Blocked by [Demo client](./demo-client.md) and [App shell](./app-shell.md).
+Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.md) are in place.
 
 **Done when:** Home shows the request panels (all kinds, their actions, the order), the projects list, and the empty state; Sessions shows deployment tabs, agent tabs (lead first, Direct divider, status dots), single or split panes with headers (Copy, close), the direct-line banner, line-input mode, the markers strip and the Messages drawer. The terminal is real (the real client); the rest runs on demo data.
 

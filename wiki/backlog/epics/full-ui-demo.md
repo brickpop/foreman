@@ -11,7 +11,7 @@ order: 0
 It runs **alongside [Prove](./prove.md)**: the CEO runs the experiments while the UI is built.
 
 **Conditions (the CEO's):**
-1. **API types first.** The wire types from [Protocol](../../product/architecture/protocol.md) and the [models](../../product/index.md#data-models) are Go structs in one package (`internal/api`); TypeScript is generated from them with `tygo` (a `just` recipe; the generated file is committed; lint later checks it's current). The demo client returns exactly those types, so the UI can't drift from the backend.
+1. **API types first.** The wire types from [Protocol](../../product/architecture/protocol.md) and the [models](../../product/index.md#data-models) are Go structs, each in the package that owns it (decided: no separate `internal/api`); TypeScript is generated from them with `tygo` (`just types`; the generated files are committed; `just lint` fails when they are stale). The demo client returns exactly those types, so the UI can't drift from the backend.
 2. **Demo data is visibly marked:** anything served by the demo client carries a "demo data" badge.
 3. **The demo client lives only in the UI's composition root,** and is never presented as real.
 

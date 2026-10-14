@@ -22,7 +22,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("httpClient", () => {
   it("deploys with a JSON body", async () => {
     const calls = stubFetch(201, { id: "atlas@ledger" });
-    const dep = await httpClient("http://x").deploy("atlas", "ledger", "Ship it");
+    const dep = await httpClient("http://x").agents.deploy("atlas", "ledger", "Ship it");
     expect(dep.id).toBe("atlas@ledger");
     expect(calls[0]).toMatchObject({ url: "http://x/api/deployments", method: "POST" });
     expect(JSON.parse(calls[0].body ?? "")).toEqual({
@@ -35,7 +35,7 @@ describe("httpClient", () => {
 
   it("stops with DELETE, escaping the id", async () => {
     const calls = stubFetch(204, undefined);
-    await httpClient("http://x").stop("atlas@ledger");
+    await httpClient("http://x").agents.stop("atlas@ledger");
     expect(calls[0]).toMatchObject({
       url: "http://x/api/deployments/atlas%40ledger",
       method: "DELETE",
@@ -44,7 +44,9 @@ describe("httpClient", () => {
 
   it("connects and returns the login terminal", async () => {
     stubFetch(200, { terminal: "connect:claude-code" });
-    expect(await httpClient("http://x").connect("claude-code")).toBe("connect:claude-code");
+    expect(await httpClient("http://x").harnesses.connect("claude-code")).toBe(
+      "connect:claude-code",
+    );
   });
 
   it("surfaces the server's error message", async () => {
@@ -52,11 +54,15 @@ describe("httpClient", () => {
       error: "This team is already deployed on this project",
       code: "ALREADY_DEPLOYED",
     });
-    await expect(httpClient("http://x").deploy("a", "b", "c")).rejects.toThrow("already deployed");
+    await expect(httpClient("http://x").agents.deploy("a", "b", "c")).rejects.toThrow(
+      "already deployed",
+    );
   });
 
   it("falls back to the status when the error isn't JSON", async () => {
     vi.stubGlobal("fetch", async () => new Response("oops", { status: 500 }));
-    await expect(httpClient("http://x").instances()).rejects.toThrow("/api/instances: HTTP 500");
+    await expect(httpClient("http://x").agents.instances()).rejects.toThrow(
+      "/api/instances: HTTP 500",
+    );
   });
 });

@@ -22,6 +22,7 @@ import (
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
+	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/terminal"
 	"github.com/brickpop/foreman/internal/workspace"
 	"github.com/brickpop/foreman/ui"
@@ -76,6 +77,11 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if *uiDir != "" {
 		files = os.DirFS(*uiDir)
 	}
+	state, err := store.Open(context.Background(), ws.Path("state.db"))
+	if err != nil {
+		return fmt.Errorf("state: %w", err)
+	}
+	defer state.Close() // its tables reach the blocks with the Instance manager
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
 	terms := newSessions(direct.Runner{}, func(instance string) (terminal.Log, error) { return logs.Open(instance) })
 	if fields := strings.Fields(*demo); len(fields) > 0 {

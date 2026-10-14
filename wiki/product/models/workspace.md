@@ -24,7 +24,7 @@ The file watcher reloads config and wiki changes within about 1 second and pushe
 
 ### The workspace repo
 
-`.foreman/` is a git repo, created (`git init`) with the workspace. It versions the files the CEO owns there (`teams/`, `settings.toml`); its `.gitignore` keeps out `state.db`, `logs/`, `secrets`, `credentials/` and `access-token`. Every save from the UI is **one commit**. The Chief of Staff changes team files only on a branch that comes back to the CEO as a review ([Chief of Staff](../features/chief-of-staff.md)): a **merge request like any other**, through `request_merge`: Merge to main, Create PR on the workspace repo's forge when [settings](./workspace-settings.md#schema) name one (`workspace_forge`), or Reject. Nothing is pushed automatically: with a forge set, the CEO pushes `main` there with **Sync** in [Settings](../features/settings.md#forge-accounts) ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)).
+`.foreman/` is a git repo, created (`git init`) with the workspace. It versions the files the CEO owns there (`teams/`, `settings.toml`); its `.gitignore` keeps out `state.db*` (the database and its WAL side files), `logs/`, `secrets`, `credentials/` and `access-token`. Every save from the UI is **one commit**. The Chief of Staff changes team files only on a branch that comes back to the CEO as a review ([Chief of Staff](../features/chief-of-staff.md)): a **merge request like any other**, through `request_merge`: Merge to main, Create PR on the workspace repo's forge when [settings](./workspace-settings.md#schema) name one (`workspace_forge`), or Reject. Nothing is pushed automatically: with a forge set, the CEO pushes `main` there with **Sync** in [Settings](../features/settings.md#forge-accounts) ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)).
 
 All of Foreman's config files are **TOML**. A save rewrites the whole file, so hand-written comments don't survive it; git keeps every earlier version.
 
@@ -46,7 +46,7 @@ foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
 ```
 ~/agents-ws/
 ├─ .foreman/               the workspace repo (git)
-│  ├─ .gitignore           state.db, logs/, secrets, credentials/, access-token
+│  ├─ .gitignore           state.db*, logs/, secrets, credentials/, access-token
 │  ├─ settings.toml        workspace settings (listen, limits, harness commands, notifications)
 │  ├─ teams/               team definitions (souls + playbooks)
 │  │  └─ atlas.toml

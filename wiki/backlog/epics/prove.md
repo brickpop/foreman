@@ -17,3 +17,5 @@ order: 0
 **Journey steps it underpins:** 1–3 and 9 (engine, images, login), 13–14 (agent link, delivery), 21–22 (waiting for the CEO). See [the journey](../../product/journey.md).
 
 **Exit criteria:** every experiment card is retired with PASS, or with FAIL and the specs already changed to the alternative design.
+
+**Cleanup (ephemeral code):** `cmd/prove/`, `cmd/proveagent/` and the `prove-*` recipes are throwaway, committed only so the experiments can run. Remove them once what they prove has landed in real code: the Podman client in the [Podman engine](../podman-engine.md), the image build in the [Image builder](../image-builder.md), the login in the [Claude Code harness](../claude-harness-and-login.md), and experiment D run on the real engine.

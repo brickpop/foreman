@@ -105,11 +105,20 @@ func (s *VT) Resize(size runner.Size) {
 
 // Close stops the screen; pending answers are still delivered.
 func (s *VT) Close() error {
+	// vt's Close sets an unguarded flag that its Read checks, so closing while
+	// drain is reading is a data race (wiki/technical-debt.md). Ending the
+	// answers pipe first lets drain finish; the emulator is closed after.
 	s.mu.Lock()
-	err := s.emu.Close()
+	if pw, ok := s.emu.InputPipe().(*io.PipeWriter); ok {
+		_ = pw.CloseWithError(io.EOF)
+	} else {
+		_ = s.emu.Close() // racy, but drain must end
+	}
 	s.mu.Unlock()
 	<-s.done
-	return err
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.emu.Close()
 }
 
 // modes the snapshot restores in its own way, not by replaying them.

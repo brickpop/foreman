@@ -12,7 +12,7 @@ import (
 )
 
 // Terminals gives access to running sessions' terminals (implemented by the
-// supervisor, through an adapter in cmd/foreman).
+// terminal package, through an adapter in cmd/foreman).
 type Terminals interface {
 	Attach(instance string) (Terminal, error)
 	// List returns the ids of the instances that have a session, sorted.
@@ -21,7 +21,7 @@ type Terminals interface {
 
 // Terminal is one viewer's attachment to a session.
 type Terminal interface {
-	Replay() []byte        // recent output, sent first
+	Snapshot() []byte      // the screen as it was on attach, sent first
 	Output() <-chan []byte // live output; closed on exit, or when the viewer fell behind
 	Exit() (int, bool)     // exit code, once exited
 	Input(p []byte) error  // bytes typed by the CEO
@@ -35,7 +35,7 @@ var ErrNoTerminal = errors.New("no such terminal")
 // Close codes and control messages of the PTY WebSocket
 // (wiki/product/architecture/api.md#pty-websocket).
 const (
-	// closeBehind tells the client it fell behind: reconnect to get a fresh replay.
+	// closeBehind tells the client it fell behind: reconnect to get a fresh snapshot.
 	closeBehind = websocket.StatusTryAgainLater
 	// maxInput bounds one input message (a large paste).
 	maxInput = 1 << 20
@@ -74,7 +74,7 @@ func handlePTY(terms Terminals) http.HandlerFunc {
 		defer cancel()
 		go readInput(ctx, cancel, conn, term)
 
-		if err := writeChunks(ctx, conn, term.Replay()); err != nil {
+		if err := writeChunks(ctx, conn, term.Snapshot()); err != nil {
 			return
 		}
 		// Watch the client too: a quiet session must not keep a gone viewer attached.
@@ -103,7 +103,7 @@ func handlePTY(terms Terminals) http.HandlerFunc {
 	}
 }
 
-// writeChunks sends the replay in frames of a bounded size.
+// writeChunks sends the snapshot in frames of a bounded size.
 func writeChunks(ctx context.Context, conn *websocket.Conn, data []byte) error {
 	const frame = 64 * 1024
 	for len(data) > 0 {

@@ -1,8 +1,8 @@
-// Package pty runs sessions as plain processes on the host, in a
-// pseudo-terminal. It gives NO isolation: it exists for tests and development
+// Package direct runs processes on the host, in a pseudo-terminal Foreman
+// allocates. It gives NO isolation: it exists for tests and development
 // (wiki/product/architecture/session-runner.md). Image and Mounts are ignored,
-// and sessions die with Foreman, so List returns none.
-package pty
+// and processes die with Foreman, so List returns none.
+package direct
 
 import (
 	"context"
@@ -19,15 +19,15 @@ import (
 	"github.com/brickpop/foreman/internal/runner"
 )
 
-// Runner is the local PTY runner.
+// Runner is the Direct execution engine.
 type Runner struct{}
 
 var _ runner.Runner = Runner{}
 
 // Start launches spec.Command in a new pseudo-terminal.
-func (Runner) Start(ctx context.Context, spec runner.Spec) (runner.Session, error) {
+func (Runner) Start(ctx context.Context, spec runner.Spec) (runner.Process, error) {
 	if len(spec.Command) == 0 {
-		return nil, errors.New("pty: empty command")
+		return nil, errors.New("direct: empty command")
 	}
 	// Not CommandContext: a session outlives the request that started it.
 	cmd := exec.Command(spec.Command[0], spec.Command[1:]...)
@@ -43,15 +43,15 @@ func (Runner) Start(ctx context.Context, spec runner.Spec) (runner.Session, erro
 	if err != nil {
 		return nil, err
 	}
-	s := &session{cmd: cmd, tty: tty, labels: spec.Labels, done: make(chan struct{}), drained: make(chan struct{})}
-	go s.reap()
-	return s, nil
+	pr := &process{cmd: cmd, tty: tty, labels: spec.Labels, done: make(chan struct{}), drained: make(chan struct{})}
+	go pr.reap()
+	return pr, nil
 }
 
-// List returns nothing: PTY sessions don't survive Foreman.
-func (Runner) List(context.Context) ([]runner.Session, error) { return nil, nil }
+// List returns nothing: direct processes die with Foreman.
+func (Runner) List(context.Context) ([]runner.Process, error) { return nil, nil }
 
-type session struct {
+type process struct {
 	cmd    *exec.Cmd
 	tty    *os.File
 	labels map[string]string
@@ -69,61 +69,61 @@ type session struct {
 // (EIO); some platforms keep it blocked until the terminal is closed.
 const drainGrace = 2 * time.Second
 
-func (s *session) reap() {
-	err := s.cmd.Wait()
+func (pr *process) reap() {
+	err := pr.cmd.Wait()
 	var exit *exec.ExitError
 	switch {
 	case err == nil:
 	case errors.As(err, &exit):
-		s.exitCode = exit.ExitCode()
+		pr.exitCode = exit.ExitCode()
 	default:
-		s.waitErr = err
+		pr.waitErr = err
 	}
-	close(s.done)
+	close(pr.done)
 	select {
-	case <-s.drained:
+	case <-pr.drained:
 	case <-time.After(drainGrace):
 	}
-	_ = s.tty.Close()
+	_ = pr.tty.Close()
 }
 
-func (s *session) Read(p []byte) (int, error) {
-	n, err := s.tty.Read(p)
+func (pr *process) Read(p []byte) (int, error) {
+	n, err := pr.tty.Read(p)
 	// Linux reports the end of a PTY whose process exited as EIO; it's EOF.
 	if err != nil {
 		if errors.Is(err, syscall.EIO) || errors.Is(err, os.ErrClosed) {
 			err = io.EOF
 		}
-		s.drainOne.Do(func() { close(s.drained) })
+		pr.drainOne.Do(func() { close(pr.drained) })
 	}
 	return n, err
 }
 
-func (s *session) Write(p []byte) (int, error) { return s.tty.Write(p) }
+func (pr *process) Write(p []byte) (int, error) { return pr.tty.Write(p) }
 
-func (s *session) Labels() map[string]string { return s.labels }
+func (pr *process) Labels() map[string]string { return pr.labels }
 
-func (s *session) Resize(size runner.Size) error {
-	return creack.Setsize(s.tty, &creack.Winsize{Cols: size.Cols, Rows: size.Rows})
+func (pr *process) Resize(size runner.Size) error {
+	return creack.Setsize(pr.tty, &creack.Winsize{Cols: size.Cols, Rows: size.Rows})
 }
 
-func (s *session) Stop(grace time.Duration) error {
+func (pr *process) Stop(grace time.Duration) error {
 	select {
-	case <-s.done:
+	case <-pr.done:
 		return nil
 	default:
 	}
-	_ = s.cmd.Process.Signal(syscall.SIGTERM)
+	_ = pr.cmd.Process.Signal(syscall.SIGTERM)
 	select {
-	case <-s.done:
+	case <-pr.done:
 	case <-time.After(grace):
-		_ = s.cmd.Process.Kill()
-		<-s.done
+		_ = pr.cmd.Process.Kill()
+		<-pr.done
 	}
 	return nil
 }
 
-func (s *session) Wait() (int, error) {
-	<-s.done
-	return s.exitCode, s.waitErr
+func (pr *process) Wait() (int, error) {
+	<-pr.done
+	return pr.exitCode, pr.waitErr
 }

@@ -1,10 +1,11 @@
-package pty
+package direct
 
 import (
 	"bytes"
 	"context"
 	"io"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/brickpop/foreman/internal/runner"
 )
 
-func start(t *testing.T, spec runner.Spec) runner.Session {
+func start(t *testing.T, spec runner.Spec) runner.Process {
 	t.Helper()
 	s, err := Runner{}.Start(context.Background(), spec)
 	if err != nil {
@@ -23,7 +24,7 @@ func start(t *testing.T, spec runner.Spec) runner.Session {
 }
 
 // readAll reads the session's output until it ends, failing after a timeout.
-func readAll(t *testing.T, s runner.Session) string {
+func readAll(t *testing.T, s runner.Process) string {
 	t.Helper()
 	out := make(chan string, 1)
 	go func() {
@@ -41,7 +42,7 @@ func readAll(t *testing.T, s runner.Session) string {
 }
 
 // readUntil reads until want appears in the output.
-func readUntil(t *testing.T, s runner.Session, want string) string {
+func readUntil(t *testing.T, s runner.Process, want string) string {
 	t.Helper()
 	found := make(chan string, 1)
 	go func() {
@@ -85,6 +86,11 @@ func TestOutputAndExitCode(t *testing.T) {
 // The last bytes a process prints right before exiting must not be lost, even
 // when the reader only gets to them after the process is gone.
 func TestFinalOutputSurvivesTheExit(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		// macOS holds a process's exit until its terminal output is read, so a
+		// reader can never come after the exit there (the Terminal always reads).
+		t.Skip("macOS can't exit with unread terminal output")
+	}
 	s := start(t, sh(`echo THE-END; exit 0`))
 	if code, _ := s.Wait(); code != 0 {
 		t.Fatalf("exit %d", code)

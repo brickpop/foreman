@@ -1,21 +1,20 @@
-// Package supervisor owns running sessions: it starts them through a Runner,
-// keeps their output in a session log, and fans it out to every attached
-// viewer (wiki/product/architecture/agent-runtime.md). It depends only on the
-// runner.Runner interface and on Log, so both are swappable.
-package supervisor
+// Package terminal is one live process and its buffer: it keeps the output in
+// a session log, fans it out to every viewer, and takes input
+// (wiki/product/architecture/building-blocks.md#2-terminal-terminal). It does
+// not decide whether a process should run, or restart it. It depends only on
+// runner.Process and Log, so both are swappable.
+package terminal
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
-	"sort"
 	"sync"
 
 	"github.com/brickpop/foreman/internal/runner"
 )
 
-// Log is where a session's raw output is kept, for replay.
+// Log is where a process's raw output is kept, for replay.
 type Log interface {
 	io.Writer
 	// Tail returns at most the last max bytes written.
@@ -23,115 +22,50 @@ type Log interface {
 	Close() error
 }
 
-// LogOpener opens the log of a new session of an instance.
-type LogOpener func(instance string) (Log, error)
-
-var (
-	// ErrUnknown means no session was ever started for the instance.
-	ErrUnknown = errors.New("supervisor: unknown instance")
-	// ErrRunning means the instance already has a running session.
-	ErrRunning = errors.New("supervisor: instance already running")
-	// ErrExited means the session has ended and takes no more input.
-	ErrExited = errors.New("supervisor: session has exited")
-)
+// ErrExited means the process has ended and takes no more input.
+var ErrExited = errors.New("terminal: process has exited")
 
 const (
-	// ReplayMax is how much scrollback a newly attached viewer receives.
-	ReplayMax = 1 << 20
+	// SnapshotMax is how much recent output a newly attached viewer receives.
+	SnapshotMax = 1 << 20
 	// viewerBuffer is how many output chunks a viewer may lag behind before it
-	// is dropped; a slow viewer must never stall the session.
+	// is dropped; a slow viewer must never stall the process.
 	viewerBuffer = 1024
 )
 
-// Supervisor runs sessions, one per instance at a time.
-type Supervisor struct {
-	runner  runner.Runner
-	openLog LogOpener
-
-	mu    sync.Mutex
-	terms map[string]*terminal
-}
-
-// New returns a supervisor that starts sessions with r and logs them with open.
-func New(r runner.Runner, open LogOpener) *Supervisor {
-	return &Supervisor{runner: r, openLog: open, terms: map[string]*terminal{}}
-}
-
-// Start launches a session for instance.
-func (s *Supervisor) Start(ctx context.Context, instance string, spec runner.Spec) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if t, ok := s.terms[instance]; ok && !t.hasExited() {
-		return ErrRunning
-	}
-	log, err := s.openLog(instance)
-	if err != nil {
-		return err
-	}
-	session, err := s.runner.Start(ctx, spec)
-	if err != nil {
-		_ = log.Close()
-		return err
-	}
-	t := &terminal{instance: instance, session: session, log: log, viewers: map[*Attachment]struct{}{}}
-	s.terms[instance] = t
-	go t.pump()
-	return nil
-}
-
-// List returns the ids of the instances that have a session (running or exited), sorted.
-func (s *Supervisor) List() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ids := make([]string, 0, len(s.terms))
-	for id := range s.terms {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-// Attach returns a view of instance's session: the recent output to replay,
-// then the live output until the session exits or the viewer falls behind.
-func (s *Supervisor) Attach(instance string) (*Attachment, error) {
-	s.mu.Lock()
-	t, ok := s.terms[instance]
-	s.mu.Unlock()
-	if !ok {
-		return nil, ErrUnknown
-	}
-	return t.attach()
-}
-
-type terminal struct {
-	instance string
-	session  runner.Session
-	log      Log
+// Terminal is one running process, its log and its viewers.
+type Terminal struct {
+	process runner.Process
+	log     Log
+	name    string // for the server log only
+	done    chan struct{}
 
 	mu       sync.Mutex
-	viewers  map[*Attachment]struct{}
+	viewers  map[*View]struct{}
 	exited   bool
 	exitCode int
 }
 
-func (t *terminal) hasExited() bool {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.exited
+// New takes over process and log: it reads the output until the process
+// exits, then closes the log.
+func New(name string, process runner.Process, log Log) *Terminal {
+	t := &Terminal{process: process, log: log, name: name, done: make(chan struct{}), viewers: map[*View]struct{}{}}
+	go t.pump()
+	return t
 }
 
-// pump copies the session's output to the log and to every viewer, under one
-// lock with attach, so a viewer sees the replay and then the live output with
-// no gap and no duplicate.
-func (t *terminal) pump() {
+// pump copies the output to the log and to every viewer, under one lock with
+// Attach, so a viewer sees the snapshot and then the live output with no gap
+// and no duplicate.
+func (t *Terminal) pump() {
 	buf := make([]byte, 32*1024)
 	for {
-		n, err := t.session.Read(buf)
+		n, err := t.process.Read(buf)
 		if n > 0 {
 			chunk := append([]byte(nil), buf[:n]...)
 			t.mu.Lock()
 			if _, werr := t.log.Write(chunk); werr != nil {
-				slog.Warn("session log write failed", "instance", t.instance, "err", werr)
+				slog.Warn("session log write failed", "terminal", t.name, "err", werr)
 			}
 			for v := range t.viewers {
 				select {
@@ -147,9 +81,9 @@ func (t *terminal) pump() {
 			break
 		}
 	}
-	code, err := t.session.Wait()
+	code, err := t.process.Wait()
 	if err != nil {
-		slog.Warn("session wait failed", "instance", t.instance, "err", err)
+		slog.Warn("process wait failed", "terminal", t.name, "err", err)
 	}
 	t.mu.Lock()
 	t.exited, t.exitCode = true, code
@@ -159,70 +93,84 @@ func (t *terminal) pump() {
 	}
 	t.mu.Unlock()
 	_ = t.log.Close()
+	close(t.done)
 }
 
-func (t *terminal) attach() (*Attachment, error) {
+// Attach returns a viewer: the recent output, then the live output until the
+// process exits or the viewer falls behind.
+func (t *Terminal) Attach() (*View, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	replay, err := t.log.Tail(ReplayMax)
+	// Until the server-side screen is wired in, the snapshot is the log's tail
+	// (wiki/backlog/terminal-fidelity.md).
+	snapshot, err := t.log.Tail(SnapshotMax)
 	if err != nil {
 		return nil, err
 	}
-	a := &Attachment{term: t, replay: replay, out: make(chan []byte, viewerBuffer)}
+	v := &View{term: t, snapshot: snapshot, out: make(chan []byte, viewerBuffer)}
 	if t.exited {
-		a.end()
+		v.end()
 	} else {
-		t.viewers[a] = struct{}{}
+		t.viewers[v] = struct{}{}
 	}
-	return a, nil
+	return v, nil
 }
 
-// Attachment is one viewer of a session.
-type Attachment struct {
-	term   *terminal
-	replay []byte
-	out    chan []byte
-	once   sync.Once
-}
-
-func (a *Attachment) end() { a.once.Do(func() { close(a.out) }) }
-
-// Replay is the recent output, to show before the live output.
-func (a *Attachment) Replay() []byte { return a.replay }
-
-// Output delivers live output; it is closed when the session exits, when the
-// viewer falls too far behind (attach again to catch up), or on Close.
-func (a *Attachment) Output() <-chan []byte { return a.out }
-
-// Exit reports the exit code once the session has exited.
-func (a *Attachment) Exit() (code int, exited bool) {
-	a.term.mu.Lock()
-	defer a.term.mu.Unlock()
-	return a.term.exitCode, a.term.exited
-}
-
-// Input sends bytes to the session's terminal, as typed.
-func (a *Attachment) Input(p []byte) error {
-	if a.term.hasExited() {
+// Input sends bytes to the process, as typed.
+func (t *Terminal) Input(p []byte) error {
+	if t.hasExited() {
 		return ErrExited
 	}
-	_, err := a.term.session.Write(p)
+	_, err := t.process.Write(p)
 	return err
 }
 
-// Resize sets the session's terminal size. Several viewers share one terminal,
-// so the last one to resize wins.
-func (a *Attachment) Resize(size runner.Size) error {
-	if a.term.hasExited() {
+// Resize sets the terminal size. Viewers share one terminal, so the last one
+// to resize wins.
+func (t *Terminal) Resize(size runner.Size) error {
+	if t.hasExited() {
 		return ErrExited
 	}
-	return a.term.session.Resize(size)
+	return t.process.Resize(size)
 }
 
+// Done is closed once the process has exited and its output is fully logged.
+func (t *Terminal) Done() <-chan struct{} { return t.done }
+
+// ExitCode reports the exit code once the process has exited.
+func (t *Terminal) ExitCode() (code int, exited bool) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.exitCode, t.exited
+}
+
+func (t *Terminal) hasExited() bool {
+	_, exited := t.ExitCode()
+	return exited
+}
+
+// View is one viewer of a terminal.
+type View struct {
+	term     *Terminal
+	snapshot []byte
+	out      chan []byte
+	once     sync.Once
+}
+
+func (v *View) end() { v.once.Do(func() { close(v.out) }) }
+
+// Snapshot recreates the screen as it was when the viewer attached; show it
+// before the live output.
+func (v *View) Snapshot() []byte { return v.snapshot }
+
+// Output delivers live output; it is closed when the process exits, when the
+// viewer falls too far behind (attach again to catch up), or on Close.
+func (v *View) Output() <-chan []byte { return v.out }
+
 // Close detaches the viewer.
-func (a *Attachment) Close() {
-	a.term.mu.Lock()
-	delete(a.term.viewers, a)
-	a.term.mu.Unlock()
-	a.end()
+func (v *View) Close() {
+	v.term.mu.Lock()
+	delete(v.term.viewers, v)
+	v.term.mu.Unlock()
+	v.end()
 }

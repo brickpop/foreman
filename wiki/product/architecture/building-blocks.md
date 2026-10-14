@@ -466,7 +466,8 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 ## Code today, against these blocks
 
-- `internal/runner` + `runner/pty`: the Execution engine and its Direct implementation (to be renamed `runner/direct`).
-- `internal/supervisor`: today it is the Terminal block plus a start-by-instance-id map. It becomes `terminal` (one process, its buffer, its views); the Instance manager is built separately.
+- `internal/runner` + `runner/direct`: the Execution engine and its Direct implementation.
+- `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
+- `cmd/foreman/sessions.go`: a start-by-instance map, scaffolding for `--demo-session` until the Instance manager exists ([technical debt](../../technical-debt.md)).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.
 - `internal/server`, `internal/access`, `ui/` (with `ForemanClient` and its real implementation): the Web server and UI.

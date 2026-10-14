@@ -18,8 +18,8 @@ import (
 
 // fakeTerminal is a Terminal the test drives: it pushes output and ends it.
 type fakeTerminal struct {
-	replay []byte
-	out    chan []byte
+	snapshot []byte
+	out      chan []byte
 
 	mu     sync.Mutex
 	input  []string
@@ -30,11 +30,11 @@ type fakeTerminal struct {
 	once   sync.Once
 }
 
-func newFakeTerminal(replay string) *fakeTerminal {
-	return &fakeTerminal{replay: []byte(replay), out: make(chan []byte, 16), closed: make(chan struct{})}
+func newFakeTerminal(snapshot string) *fakeTerminal {
+	return &fakeTerminal{snapshot: []byte(snapshot), out: make(chan []byte, 16), closed: make(chan struct{})}
 }
 
-func (f *fakeTerminal) Replay() []byte        { return f.replay }
+func (f *fakeTerminal) Snapshot() []byte      { return f.snapshot }
 func (f *fakeTerminal) Output() <-chan []byte { return f.out }
 func (f *fakeTerminal) Exit() (int, bool) {
 	f.mu.Lock()
@@ -119,12 +119,12 @@ func TestPTYUnknownInstanceIs404(t *testing.T) {
 	}
 }
 
-func TestPTYStreamsReplayThenLiveThenExit(t *testing.T) {
+func TestPTYStreamsSnapshotThenLiveThenExit(t *testing.T) {
 	term := newFakeTerminal("earlier \x1b[1moutput\x1b[0m")
 	conn := dial(t, ptyServer(t, fakeTerminals{"mara@ledger": term})+"/ws/pty/mara@ledger")
 
 	if kind, data := read(t, conn); kind != websocket.MessageBinary || data != "earlier \x1b[1moutput\x1b[0m" {
-		t.Fatalf("first frame %v %q, want the replay as binary", kind, data)
+		t.Fatalf("first frame %v %q, want the snapshot as binary", kind, data)
 	}
 	term.out <- []byte("live")
 	if _, data := read(t, conn); data != "live" {
@@ -143,12 +143,12 @@ func TestPTYStreamsReplayThenLiveThenExit(t *testing.T) {
 	}
 }
 
-func TestPTYEmptyReplaySendsNothingFirst(t *testing.T) {
+func TestPTYEmptySnapshotSendsNothingFirst(t *testing.T) {
 	term := newFakeTerminal("")
 	conn := dial(t, ptyServer(t, fakeTerminals{"x": term})+"/ws/pty/x")
 	term.out <- []byte("first")
 	if _, data := read(t, conn); data != "first" {
-		t.Errorf("first frame %q: an empty replay must not send an empty frame", data)
+		t.Errorf("first frame %q: an empty snapshot must not send an empty frame", data)
 	}
 }
 
@@ -177,7 +177,7 @@ func TestPTYInputAndResizeReachTheTerminal(t *testing.T) {
 func TestPTYViewerThatFellBehindIsAskedToReconnect(t *testing.T) {
 	term := newFakeTerminal("")
 	conn := dial(t, ptyServer(t, fakeTerminals{"x": term})+"/ws/pty/x")
-	close(term.out) // the supervisor dropped this viewer; the session is still running
+	close(term.out) // the terminal dropped this viewer; the session is still running
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if _, _, err := conn.Read(ctx); websocket.CloseStatus(err) != closeBehind {

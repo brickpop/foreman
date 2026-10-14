@@ -1,5 +1,5 @@
 // Package runner defines where a harness process runs. Implementations live in
-// subpackages (pty, and podman later); see
+// subpackages (direct, and podman later); see
 // wiki/product/architecture/session-runner.md.
 package runner
 
@@ -9,18 +9,18 @@ import (
 	"time"
 )
 
-// Runner starts sessions: one harness process attached to a terminal.
+// Runner starts processes: one harness process attached to a terminal.
 type Runner interface {
 	// Start launches the process described by spec.
-	Start(ctx context.Context, spec Spec) (Session, error)
-	// List returns the sessions still running that this runner started
+	Start(ctx context.Context, spec Spec) (Process, error)
+	// List returns the processes still running that this runner started
 	// (found by label), so they can be re-attached after a Foreman restart.
-	// Runners whose sessions die with Foreman return none.
-	List(ctx context.Context) ([]Session, error)
+	// Runners whose processes die with Foreman return none.
+	List(ctx context.Context) ([]Process, error)
 }
 
-// Session is one running process with a terminal.
-type Session interface {
+// Process is one running process with a terminal.
+type Process interface {
 	// Read returns the terminal's output (stdout and stderr, merged, raw bytes).
 	// Write sends input to the terminal.
 	io.ReadWriter

@@ -45,6 +45,32 @@ It listens on `localhost:8888` by default ([Workspace settings](../models/worksp
 - Harnesses never talk to each other directly: only the team-tools router moves `output` between instances, and only within one [deployment](../models/deployment.md).
 - Harnesses never touch a forge, a secret or another sandbox: pushes to forges are done by Foreman ([Sandboxes and git policy](./sandboxes-and-git.md)).
 
+## Modularity
+
+**Interfaces everywhere between components.** Every primitive must be swappable with ease, at any time: the way sessions run, how a harness is driven, where secrets live, which forge is used, how state is stored, how events travel. These rules make that true in the code, and reviews check them:
+
+1. **One package per component, one small interface per seam.** A component exposes only what others may ask of it. Consumers depend on that interface (declared where it is consumed, Go-style), never on a concrete type.
+2. **One composition root.** `cmd/foreman` builds the concrete implementations and wires them together. No package constructs its own dependencies; no globals, no init-time singletons. Swapping an implementation is a change in one place.
+3. **No reaching across.** Components talk through their interfaces or the in-process event bus, never through each other's internals. Each component owns its own tables in `state.db`; no SQL touches another component's tables.
+4. **Implementation types stay home.** Data crossing a seam is plain Go structs (the same ones the UI's TypeScript types are generated from). Nothing like a libpod type, a GitHub API type or an xterm-specific frame leaks outside its implementation package.
+5. **Every boundary is an interface, even with a single implementation today.** Swappability is the requirement, not a reaction to a second implementation showing up: any piece can be replaced later without touching its consumers, and every consumer can be tested against a double. The "no abstractions without clear need" rule in `AGENTS.md` applies *inside* a component, whose internals stay plain code, not to the boundaries between components.
+
+The seams known today (every new component adds its own):
+
+| Seam | Package | Implementations |
+|---|---|---|
+| Session runner: where a harness process runs | `runner` | Podman (production), local PTY (tests, dev); tmux possible later ([Session runner](./session-runner.md)) |
+| Session driver: how Foreman talks to a harness | `harness` | PTY (v1); Agent Client Protocol later ([Harness adapters](./harness-adapters.md#session-drivers)) |
+| Harness adapter: per-harness details | `harness` | Claude Code, Pi, Hermes Agent, custom; Codex later; the fake harness in tests |
+| Image builder | `runner/podman` | libpod build API; a no-op for the PTY runner ([Agent images](./tech-stack.md#agent-images)) |
+| Forge | `forge` | GitHub, Gitea (also Forgejo), none; a fake forge server in tests ([Forge adapters](./forge-adapters.md)) |
+| Secret store | `secrets` | 0600 file (v1); OS keychain later ([Secrets](../models/secrets.md)) |
+| Wiki engine | `wiki` | the agentic-wiki engine ([Wiki engine](./wiki-engine.md)) |
+| Runtime state | `store` | SQLite (also in tests, in a temp dir) ([Persistence](./persistence.md)) |
+| Access guard: who may reach the server | `access` | the per-install token guard ([Security](./security.md#access-token)); real user auth if ever needed |
+| Workspace, as the server sees it | `workspace` | the folder on disk |
+| UI files | `ui` | embedded build, or a folder on disk (`--ui-dir`) |
+
 ## Process model
 
 - **One container per running instance**, decided: every harness runs in a rootless Podman container with only its own sandbox and the wiki mounted ([Session runner](./session-runner.md)). Inside it the harness is attached to a TTY.

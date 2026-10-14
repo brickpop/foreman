@@ -1,0 +1,9 @@
+# Build output
+/bin/
+/ui/dist/app/
+
+# Dependencies
+/ui/node_modules/
+
+# `just dev` scratch workspace
+/.dev/

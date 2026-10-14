@@ -1,0 +1,136 @@
+/* Design tokens: wiki/product/design/design-system.md is the source of truth. */
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+:root {
+  --bg: #0e0f11;
+  --side: #0b0c0e;
+  --panel: #131518;
+  --raised: #1b1e22;
+  --hover: #17191c;
+  --term: #08090a;
+  --line: #1f2227;
+  --line2: #2c3036;
+  --line3: #3a3f46;
+  --tx: #e6e3dc;
+  --tx2: #c9c6bf;
+  --tx3: #9a9ca3;
+  --tx4: #80838a;
+  --acc: #e8a33d;
+  --accTx: #e8a33d;
+  --accInk: #17130b;
+  --accSoft: #1a1610;
+  --accLine: #3a3020;
+  --ok: #6fcf8e;
+  --info: #7aa7e8;
+  --team: #b79cf0;
+  --err: #e5675a;
+  --ask: #f2be6b;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* Light theme: chosen explicitly, or by the OS when the theme is "system". */
+:root[data-theme="light"] {
+  --bg: #f5f3ee;
+  --side: #edeae3;
+  --panel: #ffffff;
+  --raised: #eeebe4;
+  --hover: #e6e2da;
+  --term: #fbfaf7;
+  --line: #e0dcd3;
+  --line2: #cfcac0;
+  --line3: #b5afa3;
+  --tx: #1b1a17;
+  --tx2: #3f3d38;
+  --tx3: #5f5d57;
+  --tx4: #75726b;
+  --acc: #e8a33d;
+  --accTx: #8a5200;
+  --accInk: #17130b;
+  --accSoft: #fbf1df;
+  --accLine: #ebcf9e;
+  --ok: #23824a;
+  --info: #2b66b5;
+  --team: #7445c2;
+  --err: #b8352a;
+  --ask: #8a5200;
+  --shadow: 0 16px 40px rgba(40, 30, 10, 0.18);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f5f3ee;
+    --side: #edeae3;
+    --panel: #ffffff;
+    --raised: #eeebe4;
+    --hover: #e6e2da;
+    --term: #fbfaf7;
+    --line: #e0dcd3;
+    --line2: #cfcac0;
+    --line3: #b5afa3;
+    --tx: #1b1a17;
+    --tx2: #3f3d38;
+    --tx3: #5f5d57;
+    --tx4: #75726b;
+    --acc: #e8a33d;
+    --accTx: #8a5200;
+    --accInk: #17130b;
+    --accSoft: #fbf1df;
+    --accLine: #ebcf9e;
+    --ok: #23824a;
+    --info: #2b66b5;
+    --team: #7445c2;
+    --err: #b8352a;
+    --ask: #8a5200;
+    --shadow: 0 16px 40px rgba(40, 30, 10, 0.18);
+  }
+}
+
+/* Tailwind utilities over the tokens: bg-panel, text-tx3, border-line2… */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-side: var(--side);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-hover: var(--hover);
+  --color-term: var(--term);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-line3: var(--line3);
+  --color-tx: var(--tx);
+  --color-tx2: var(--tx2);
+  --color-tx3: var(--tx3);
+  --color-tx4: var(--tx4);
+  --color-acc: var(--acc);
+  --color-accTx: var(--accTx);
+  --color-accInk: var(--accInk);
+  --color-accSoft: var(--accSoft);
+  --color-accLine: var(--accLine);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-team: var(--team);
+  --color-err: var(--err);
+  --color-ask: var(--ask);
+  --shadow-overlay: var(--shadow);
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", monospace;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--tx);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+a {
+  color: var(--accTx);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+::selection {
+  background: rgb(232 163 61 / 0.35);
+}

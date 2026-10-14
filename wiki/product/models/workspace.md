@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [model, workspace, config]
 ---
 
@@ -33,6 +33,7 @@ foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
 - On every start Foreman prints the URL with the [access token](../architecture/security.md#access-token) and opens it in the default browser; `--no-open` only prints it.
 - `--port` sets the UI port (default `8888`); the interface it binds to follows the `listen` [setting](./workspace-settings.md).
 - `--new-token` replaces the access token before starting, which logs every browser out.
+- `--ui-dir <folder>` (development only) serves the web UI from a folder instead of the embedded build; `just dev` uses it.
 
 ## Layout
 

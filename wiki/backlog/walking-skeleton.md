@@ -33,7 +33,7 @@ Done when the slice runs on both platforms and every item above is written back 
 
 Each step ends with tests passing here and a commit prepared for the CEO. Podman steps come with `just` recipes the CEO runs on Fedora and macOS.
 
-1. [ ] Server shell: Go module, `foreman [dir]` with the first-run prompt, access token (URL, cookie, Host/Origin checks), embedded SPA placeholder, justfile, README
+1. [x] Server shell: Go module, `foreman [dir]` with the first-run prompt, access token (URL, cookie, Host/Origin checks), embedded SPA placeholder, justfile, README
 2. [ ] Terminal path, hermetic: Runner interface, local PTY runner, fake harness, `/ws/pty/:instance`, xterm.js page, session log replay
 3. [ ] Podman runner over the libpod REST API, and the image chain (build, tag, refresh, prune), with check recipes
 4. [ ] Claude Code in a container: login container, shared login file, session prompt file, MCP config

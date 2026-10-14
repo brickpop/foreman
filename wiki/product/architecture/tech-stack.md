@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [architecture, runtime, ui]
 ---
 
@@ -54,7 +54,7 @@ Not used, on purpose: web frameworks, ORMs, dependency-injection containers, a m
 |---|---|---|
 | Language / framework | TypeScript, React 19 | Mature ecosystem for the two hard widgets (terminal, kanban). |
 | Build / dev server | Vite | Fast dev server with a proxy to the Go server; static build to embed. |
-| Package manager and scripts | Bun | Same as the CEO's other projects. Only for the `web/` toolchain; nothing runs on Bun in production. |
+| Package manager, scripts and runtime for the UI toolchain | Bun, and only Bun (never npm, yarn, pnpm or Node). `ui/bunfig.toml` sets `run.bun = true`, so Vite, TypeScript and Biome run on the Bun runtime even though their binaries declare `node` | The CEO's rule. Only for building the UI; nothing runs on Bun in production (the UI is embedded in the Go binary). |
 | Server state | TanStack Query | Caching, refetching and optimistic updates (the board drag). SSE events invalidate or patch the cached queries, so there is one data path. |
 | Routing | TanStack Router | Typed path and search params (project / tab / entry path, team / tab, sessions / deployment). |
 | Styling | Tailwind CSS 4 with the [design tokens](../design/design-system.md) declared as CSS variables | The prototype is a token system with inline styles, which maps 1:1 onto Tailwind utilities over the same variables. Both themes switch by `data-theme` on `<html>`. |
@@ -112,7 +112,7 @@ The Go structs are the single source of truth for API and event shapes. TypeScri
 
 ## Repo layout
 
-One Go module at the root, one web app in `web/`:
+One Go module at the root, the web UI in `ui/`:
 
 ```
 foreman/
@@ -120,7 +120,8 @@ foreman/
 │   ├── foreman/          # the server binary
 │   └── fakeharness/      # scripted harness for tests (prints, waits, calls team tools)
 ├── internal/             # one package per component of the architecture overview
-│   ├── server/           # HTTP, SSE, WebSocket handlers; embeds web/dist
+│   ├── server/           # HTTP, SSE, WebSocket handlers (depends only on interfaces)
+│   ├── access/           # who may talk to the server: the access-token guard
 │   ├── workspace/        # indexer, config loading (project, team, settings), file watcher
 │   ├── runtime/          # supervisor: instances, lifecycle, concurrency queue
 │   ├── runner/           # Runner interface + podman/ and pty/
@@ -135,7 +136,7 @@ foreman/
 │   ├── cos/              # Chief of Staff
 │   └── store/            # SQLite, migrations
 ├── images/               # Containerfiles per harness (embedded)
-├── web/                  # Vite + React app (src/, built to web/dist)
+├── ui/                   # Vite + React app (src/, built to ui/dist/app) and the Go package that embeds it
 ├── wiki/                 # this knowledge base
 ├── justfile
 └── README.md
@@ -147,11 +148,12 @@ The packages map one-to-one to the components in the [architecture overview](./o
 
 All through `just` (`just help` lists everything):
 
-- `just dev`: the Go server (with the PTY runner unless Podman is available) and the Vite dev server, which proxies `/api` and `/ws` to it.
-- `just build`: `bun run build` in `web/`, then `go build` with the SPA embedded, giving one `foreman` binary.
-- `just test`: `go test ./...` and the web unit tests.
-- `just e2e`: Playwright against a real `foreman` binary using the PTY runner and the fake harness. The [use cases](../use-cases.md) are the e2e suite.
-- `just lint`: `go vet`, `staticcheck`, Biome.
+- `just setup`: installs the UI's dependencies (`bun install` in `ui/`). Vite, Tailwind, TypeScript 7 and Biome ship native binaries per platform, so each OS needs its own checkout of the repo (e.g. a git worktree per machine) with its own `ui/node_modules`.
+- `just dev [workspace]`: rebuilds the UI on every change (`vite build --watch`) and runs the Go server on a scratch workspace (`.dev/workspace` by default), serving the UI from disk with the development flag `--ui-dir`. There is no separate Vite dev server: one origin keeps the access token, Host and Origin checks exactly as in production. Reload the page to see a UI change.
+- `just build`: `bun run build` in `ui/`, then `go build` with the UI embedded, giving one binary in `bin/foreman`.
+- `just test`: the Go tests (and the UI unit tests once there are any). Go commands name their packages explicitly (`./cmd/... ./internal/... ./ui`), so stray `.go` files elsewhere are never picked up.
+- `just e2e` (not yet; added with the first UI flows): Playwright against a real `foreman` binary using the PTY runner and the fake harness. The [use cases](../use-cases.md) are the e2e suite.
+- `just lint`: `gofmt`, `go vet`, `staticcheck` (pinned as a Go tool in `go.mod`, run with `go tool staticcheck`), Biome.
 - `just wiki <args>`: `wiki --root wiki <args>`, and `just check` runs the wiki health check with the rest.
 
 Testing approach:

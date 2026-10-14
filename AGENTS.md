@@ -24,7 +24,7 @@ Foreman manages project wikis in exactly this shape (`<project>/wiki/` with a `w
    - Aim for "less is more": the small, beautiful tool that solves an entire class of problems
    - Avoid premature optimization
    - Don't get distracted with other non-requirements
-   - No abstractions without clear benefit
+   - No abstractions without clear benefit *inside* a component. Between components it's the opposite: every boundary is an interface (see Flexibility and modularity)
    - Code should be obvious at first glance
 
 2. **Only Build What's Needed**
@@ -51,8 +51,8 @@ Foreman manages project wikis in exactly this shape (`<project>/wiki/` with a `w
    - Only comment the "why", not the "what"
 
 6. **Flexibility and modularity** CRUCIAL
-   - The codebase needs to be modular and flexible.
-   - Components need to be easily reusable and swappable (e.g. the session runner, harness adapters and forge adapters are interfaces with interchangeable implementations)
+   - The codebase needs to be modular and flexible. **Interfaces, interfaces, interfaces:** every boundary between components is an interface, even with one implementation, so any piece can be swapped at any time.
+   - Components need to be easily reusable and swappable: the rules and the list of seams are in [Architecture overview → Modularity](./wiki/product/architecture/overview.md#modularity)
 
 7. **Discoverability**
    - Things should be easy to find out, always following the same pattern
@@ -88,6 +88,7 @@ Foreman manages project wikis in exactly this shape (`<project>/wiki/` with a `w
 2. **Use `just` and the `justfile` for tasks**
     - Keep commands simple and clear: one stop shop
     - Public recipes have a `# comment` above them so `just help` lists them, and related recipes share a `[group('name')]`
+    - The UI uses **Bun only**: `bun install`, `bun run`, `bunx`. Never npm, yarn, pnpm or node. `ui/bunfig.toml` makes every script run on the Bun runtime.
 
 3. **Track technical debt**
     - Every workaround → item in `wiki/technical-debt.md`
@@ -121,7 +122,7 @@ Foreman manages project wikis in exactly this shape (`<project>/wiki/` with a `w
 
 **MUST NOT DO:**
 
-1. ❌ Add abstractions without clear need
+1. ❌ Add abstractions inside a component without clear need (boundaries between components are always interfaces)
 2. ❌ Skip backlog or `wiki/product/` updates
 3. ❌ Mixed conventions
 4. ❌ Make decisions that weren't defined yet without asking first

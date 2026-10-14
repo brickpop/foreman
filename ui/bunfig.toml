@@ -1,0 +1,3 @@
+# Run every package script and binary (vite, tsc, biome) on the Bun runtime, never Node.
+[run]
+bun = true

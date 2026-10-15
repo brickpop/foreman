@@ -70,7 +70,7 @@ The terminal shows only what the agent's program prints. Anything Foreman wrote 
 
 | Glyph | Meaning | Example | Color |
 |---|---|---|---|
-| `⇄` | team-message traffic | `⇄ Mara → Rhea · ask · req-41`, `⇄ Rhea → Mara · reply · req-41`, `⇄ Tove handed off wt/tove/LED-44 to Mara` | `--team` |
+| `⇄` | team-message traffic | `⇄ Mara → Rhea · ask · msg-41`, `⇄ Rhea → Mara · reply · msg-41`, `⇄ Tove handed off wt/tove/LED-44 to Mara` | `--team` |
 | `⚠` | Escalation to the CEO | `⚠ Ilya escalated an approval: new dependency decimal.js` | `--ask` |
 | `✓` | Success / resumed | `✓ CEO answered Ilya: approve` | `--ok` |
 | `✗` | Error | `✗ Delivery to Rhea expired: deployment stopped` | `--err` |

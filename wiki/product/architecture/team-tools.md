@@ -13,6 +13,7 @@ The **team tools** are the tools Foreman exposes to every harness, as an MCP ser
 | Tool | Who | Semantics |
 |---|---|---|
 | `ask(teammate, request) → request_id` | all | Sends a request to a teammate in the same deployment. Non-blocking: the caller keeps working. |
+| `read_message(id)` | all | Reads one message addressed to the caller, in full: a delivery only names it and quotes its start ([Delivery](#delivery)). |
 | `reply(request_id, output, artifact?)` | the addressee | Answers a request. **Only `output` (and an optional artifact reference) is returned** to the requester. No other context crosses sandboxes. An `artifact` is a branch name or a wiki path, nothing else: paths inside the replier's sandbox are unreadable to the requester by design. |
 | `switch(branch)` | all | Switches the caller's worktrees, in each of its code repos, to one of its own branches (`wt/<agent>/<topic>`, or `lead/<team>/<topic>` for the lead), creating it from `main` if it doesn't exist yet. Details: [Protocol → `switch`](./protocol.md#switch). |
 | `commit(message)` | all | Commits everything changed in the caller's worktrees, each on the branch checked out there, authored as the caller. For the lead, it also commits its changes in the live project repo. Agents read git but can't write it ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)); Foreman runs the commit on the host. Details: [Protocol → `commit`](./protocol.md#commit). |
@@ -26,11 +27,11 @@ The **team tools** are the tools Foreman exposes to every harness, as an MCP ser
 
 ## Delivery
 
-- Messages reach the target as a **delivery**: text typed into its session through the harness adapter's `Deliver`, only when the target is idle, e.g. `⇄ Mara asked (req-41): …`. Replies come back the same way, `⇄ Rhea replied to req-41:` plus the output. The prompt instructs agents to resume the task that asked for it ([Session prompt](./session-prompt.md)). The exact texts are in [Protocol → Team tools](./protocol.md#team-tools).
+- Messages reach the target as a **delivery**: one line of plain words, no symbols, typed into its session through the harness adapter's `Deliver`, only when the target is idle: `Message msg-41 from Mara (ask): <its start>… Read it with read_message("msg-41"); answer with reply("msg-41", output).` The agent reads the whole message with `read_message`. Replies come back the same way, and the prompt instructs agents to resume the task that asked for it ([Session prompt](./session-prompt.md)). Why one line (the CEO's decision, 2026-10-15): a multi-line paste reaches Claude Code wrapped as pasted content, which it treats as possibly not the user's ([experiment D](../../backlog/prove-d-claude-delivery-hooks.md)); a long reply never floods the terminal either. The exact texts are in [Protocol → Team tools](./protocol.md#team-tools).
 - If the target is busy, the message is queued and delivered at its next idle ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)). If the target is stopped within an active deployment, the message stays queued until it restarts (its stop already raised a blocked request); if the deployment stopped, the message expires. All cases: [Protocol → Messages](./protocol.md#messages).
 - Team messaging is scoped to a deployment. `nyx@ledger` cannot message `nyx@relay`. Cross-deployment messaging is deliberately disallowed.
-- Each message gets a monotonically increasing `req-N` **per deployment**, so the UI always qualifies it with the deployment.
-- **Delivered text is untrusted data.** A reply's `output` (or a finding's text) lands in another agent's session, where it acts as prompt input, so a confused or compromised agent could try to instruct its teammates. Every delivery is framed as quoted data with its sender (`⇄ Rhea replied to req-41:` followed by the quoted output) and capped in length (longer outputs are truncated with a note pointing at the artifact); nothing is ever delivered across deployments ([Security](./security.md)).
+- Each message gets a monotonically increasing `msg-N` **per deployment**, so the UI always qualifies it with the deployment. The same id reads it (`read_message`) and answers an ask (`reply`).
+- **Delivered text is untrusted data.** A reply's `output` (or a finding's text) lands in another agent's session, where it acts as prompt input, so a confused or compromised agent could try to instruct its teammates. Every delivery names its sender, and the message itself only comes back through `read_message`, framed as quoted data from that sender and capped in length (longer outputs are truncated with a note pointing at the artifact); nothing is ever delivered across deployments ([Security](./security.md)).
 
 ### Markers: notes for the CEO, never in the terminal
 
@@ -40,12 +41,12 @@ Marker glyphs (the UI colours them):
 
 | Glyph | Meaning | Examples |
 |---|---|---|
-| `⇄` | team-message traffic (violet) | `⇄ Mara → Rhea · ask · req-41` · `⇄ Rhea → Mara · reply · req-41` · `⇄ Tove handed off wt/tove/LED-44 to Mara` |
+| `⇄` | team-message traffic (violet) | `⇄ Mara → Rhea · ask · msg-41` · `⇄ Rhea → Mara · reply · msg-41` · `⇄ Tove handed off wt/tove/LED-44 to Mara` |
 | `ⓘ` | System note | `ⓘ Mara's definition changed` · `ⓘ Foreman restarted, output may be missing` |
 | `⚠` | Escalation | `⚠ Ilya escalated an approval: new dependency decimal.js` |
 | `✓` / `✗` | Success / error | `✓ CEO answered Ilya: approve` · `✗ Delivery to Rhea expired: deployment stopped` |
 
-Deliveries use the same glyphs in their text, because the agent reads them too (`⇄ Mara asked (req-41): …`, `✓ CEO answered: …`, `ⓘ Your definition changed: …`).
+Deliveries don't use these glyphs: what the agent reads is plain words (`Message msg-41 from Mara (ask): …`, `From the CEO, on …`, `From Foreman: …`).
 
 A workspace setting toggles the marker strip on the session panes ([Workspace settings](../models/workspace-settings.md#schema)); the Messages drawer always lists the traffic.
 
@@ -53,8 +54,8 @@ A workspace setting toggles the marker strip on the session panes ([Workspace se
 
 The tools are an **MCP server** inside Foreman, reached through the [agent link](./building-blocks.md#4-agent-link-agentlink--foreman-agent):
 
-- **`foreman-agent`**, a tiny static binary in every container (built with Foreman), is what the harness talks to. The harness starts `foreman-agent mcp` as a local **stdio** MCP server, the form every harness supports; its hooks run `foreman-agent hook <event>`. `foreman-agent` relays both to Foreman.
-- **One agent port** for every container: Foreman opens it on the host's **loopback**, separate from the UI's port. Containers reach it through Podman's host alias, `host.containers.internal`; none exposes a port of its own. Whether the alias reaches the host's loopback on Linux (rootless) and macOS (`podman machine`) is verified in the [Prove epic](../../backlog/epics/prove.md).
+- **`foreman-agent`**, a tiny static binary mounted read-only into every container when it starts (decided 2026-10-15): Foreman carries a Linux build for its own CPU type inside its binary, so it always matches the running Foreman, and upgrading Foreman never rebuilds the image, is what the harness talks to. The harness starts `foreman-agent mcp` as a local **stdio** MCP server, the form every harness supports; its hooks run `foreman-agent hook <event>`. `foreman-agent` relays both to Foreman.
+- **One agent port** for every container: Foreman opens it on the host's **loopback**, separate from the UI's port: the next one (`--port` + 1, so 8889 by default). Containers reach it through Podman's host alias, `host.containers.internal`; none exposes a port of its own. Whether the alias reaches the host's loopback on Linux (rootless) and macOS (`podman machine`) is verified in the [Prove epic](../../backlog/epics/prove.md).
 - **A token per instance**, passed in the container's environment, is the caller's identity: Foreman never trusts a "from" field, so an agent can't speak for another.
 - `foreman-agent` reaches Foreman through **one address** (`tcp://host.containers.internal:<port>` today). Another transport, such as a Unix socket mounted on Linux, is a change in that one place.
 
@@ -62,19 +63,15 @@ The tools are an **MCP server** inside Foreman, reached through the [agent link]
 
 Nothing about the team tools is configured by the CEO. At every spawn, Foreman:
 
-1. Generates the instance's token: its identity, scoped to its deployment, kept only in memory and in the instance's environment, and revoked when the instance stops (the Instance manager registers it with the agent link).
+1. Gives the instance its token: its identity, signed with the workspace's agent-link secret (`.foreman/credentials/agent-link`, never in git) and passed only in the instance's environment. It is accepted only while the instance runs, so a stopped instance's token is dead; and since the same instance always gets the same token, a container that kept running across a Foreman restart is still recognised (built 2026-10-15, rather than tokens kept only in memory, which a restart would have lost).
 2. Writes the harness's MCP configuration into the instance's private config directory ([Session runner → Credentials](./session-runner.md#credentials)): one stdio server, `foreman`, running `foreman-agent mcp` (Claude Code: an `--mcp-config` file). The hooks configuration runs `foreman-agent hook <event>`.
 3. Offers only the tools the role allows: `foreman-agent` asks Foreman for its tool list, and Foreman answers by the token's role; `request_merge` is listed for the lead only, `handoff` for members only ([Tools](#tools)).
 
 Agents get no other MCP servers in v1: only the team tools, plus whatever CLIs their [image](./tech-stack.md#agent-images) contains. CEO-configured MCP servers (per team or workspace) are a possible later addition.
 
-## Pausing on approval
+## Waiting on approval
 
-`escalate(approval)` "pauses the caller until answered", and "approval answers also resume the paused tool call". Two ways to build it:
-- **Blocking tool call** (the design): the MCP call doesn't return until the CEO resolves the request; the answer is the tool result, so the agent resumes naturally from the same point.
-- **Return immediately**, then write the answer into the agent's stdin when resolved: used only as the fallback below.
-
-Harnesses time out long MCP tool calls (e.g. Claude Code's MCP tool timeout), and the CEO may take hours. So the call blocks with a timeout below the harness limit and keep-alive progress notifications where supported; on timeout, return "pending, the answer will arrive in this session" and fall back to stdin injection. Each harness's timeout is measured in the [Prove epic](../../backlog/epics/prove.md).
+`escalate(approval)` (and `question` with `wait: true`) **returns at once** (the CEO's decision, 2026-10-15): the result tells the agent to wait for the CEO's answer before the step it asked about, and the instance is `awaiting` until then. The answer arrives as a delivery like any other message (`From the CEO, on <request>: <answer>. Resume where you paused.`). No tool call is held open: Claude Code moves a call to the background after 120 s ([experiment D](../../backlog/prove-d-claude-delivery-hooks.md)), and one mechanism (deliveries) serves every answer.
 
 ## Open questions
 

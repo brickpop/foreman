@@ -163,3 +163,78 @@ func TestLoginAndConnected(t *testing.T) {
 		t.Error("not connected with a login")
 	}
 }
+
+// With the agent link, Claude Code gets the foreman MCP server (and only it)
+// and every followed hook runs foreman-agent; the link's env reaches both.
+func TestLaunchWithTheAgentLink(t *testing.T) {
+	a, s := setup(t)
+	s.Opener = "Your goal on ledger: ship"
+	s.Link = harness.Link{Program: "/opt/foreman/foreman-agent", Env: []string{"FOREMAN_AGENT_URL=http://h:1", "FOREMAN_AGENT_TOKEN=t0k"}}
+	l, err := a.Launch(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := ConfigDir(s.Sandbox)
+	want := []string{"claude", "--dangerously-skip-permissions", "--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config", s.Opener}
+	if !reflect.DeepEqual(l.Command, want) {
+		t.Errorf("command %v", l.Command)
+	}
+	if !reflect.DeepEqual(l.Env, []string{"CLAUDE_CONFIG_DIR=" + dir, "FOREMAN_AGENT_URL=http://h:1", "FOREMAN_AGENT_TOKEN=t0k"}) {
+		t.Errorf("env %v", l.Env)
+	}
+	server := file(t, l, "mcp.json")["mcpServers"].(map[string]any)["foreman"].(map[string]any)
+	if server["command"] != "/opt/foreman/foreman-agent" || !reflect.DeepEqual(server["args"], []any{"mcp"}) ||
+		!reflect.DeepEqual(server["env"], map[string]any{"FOREMAN_AGENT_URL": "http://h:1", "FOREMAN_AGENT_TOKEN": "t0k"}) {
+		t.Errorf("mcp server %v", server)
+	}
+	hooks := file(t, l, "settings.json")["hooks"].(map[string]any)
+	if len(hooks) != len(hookEvents) {
+		t.Errorf("hooks %v", hooks)
+	}
+	for _, event := range hookEvents {
+		entry := hooks[event].([]any)[0].(map[string]any)
+		command := entry["hooks"].([]any)[0].(map[string]any)["command"]
+		if command != "/opt/foreman/foreman-agent hook "+event {
+			t.Errorf("%s runs %v", event, command)
+		}
+		if _, matched := entry["matcher"]; matched != (event == "PreToolUse" || event == "PostToolUse") {
+			t.Errorf("%s matcher %v", event, entry["matcher"])
+		}
+	}
+	// Without the link: no MCP config, no hooks.
+	s.Link = harness.Link{}
+	l, _ = a.Launch(s)
+	if len(l.Command) != 3 || file(t, l, "settings.json")["hooks"] != nil {
+		t.Errorf("without the link: %v", l.Command)
+	}
+	for _, f := range l.Files {
+		if filepath.Base(f.Path) == "mcp.json" {
+			t.Error("an MCP config without the link")
+		}
+	}
+}
+
+// What experiment D saw each event mean.
+func TestInterpret(t *testing.T) {
+	var a Adapter
+	for _, tc := range []struct {
+		event, payload string
+		want           harness.Activity
+	}{
+		{"SessionStart", `{}`, harness.Idle},
+		{"UserPromptSubmit", `{"prompt":"hi"}`, harness.Busy},
+		{"PreToolUse", `{"tool_name":"Bash"}`, harness.Busy},
+		{"PreToolUse", `{"tool_name":"AskUserQuestion"}`, harness.Waiting},
+		{"PostToolUse", `{"tool_name":"AskUserQuestion"}`, harness.Busy},
+		{"Notification", `{"notification_type":"permission_prompt"}`, harness.Waiting},
+		{"Notification", `{"notification_type":"idle_prompt"}`, harness.Idle},
+		{"Notification", `{"notification_type":"auth_success"}`, harness.Unknown},
+		{"Stop", `{"last_assistant_message":"done"}`, harness.Idle},
+		{"PreCompact", `{}`, harness.Unknown},
+		{"PreToolUse", `not json`, harness.Busy},
+	} {
+		if got := a.Interpret(tc.event, []byte(tc.payload)); got != tc.want {
+			t.Errorf("%s %s: %q, want %q", tc.event, tc.payload, got, tc.want)
+		}
+	}
+}

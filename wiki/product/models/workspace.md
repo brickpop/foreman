@@ -53,7 +53,7 @@ foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
 │  │  └─ atlas.toml
 │  ├─ cos/                 Chief of Staff working directory and session
 │  ├─ secrets              forge tokens (0600), unless the OS keychain is used
-│  ├─ credentials/         the harnesses' shared logins
+│  ├─ credentials/         the harnesses' shared logins, and agent-link (the secret that signs agents' tokens)
 │  ├─ access-token         the per-install access token (0600)
 │  ├─ state.db             runtime state
 │  └─ logs/                PTY logs per instance

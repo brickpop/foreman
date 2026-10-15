@@ -37,6 +37,7 @@ They are separate sessions that Foreman runs: your harness's own agent or messag
 ## Tools (from Foreman)
 ask(teammate, request)              Get info or work. Keep going meanwhile.
 reply(request_id, output)           Answer a request. Only `output` is returned.
+read_message(id)                    Read a message to you in full (a delivery quotes only its start).
 switch(branch)                      Go to one of your branches (made from main if new).
 commit(message)                     Commit your changes, in every repo, on your branch.
 update(branch)                      Merge a branch (the lead's, main, a teammate's) into yours.
@@ -44,15 +45,15 @@ update(branch)                      Merge a branch (the lead's, main, a teammate
 handoff(teammate, branch, summary)  Pass finished work on (commits first). Your part ends. (members only)
 contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note.
 escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.
-                                    A question doesn't pause you unless you pass wait: true.
+                                    For an approval, wait for the answer before that step.
 request_merge(branch, entry)        Ask the CEO to merge one of your lead/{team}/* branches into main;
                                     entry: the wiki card that explains the work. Only you can.
                                     Call it again on the same branch to refresh it. (lead only)
 Git is read-only for you (status, diff, log, blame work); branch, commit
 and merge only through switch(), commit() and update().
-Replies arrive in this session as "⇄ <name> replied to req-N".
-Resume the task that asked for it. After escalate you resume
-from the same point with the CEO's answer.
+Messages arrive in this session as one line, "Message msg-N from <name> (<kind>): …".
+Read the whole message with read_message("msg-N"). After a reply, resume the task
+that asked for it; after an approval, wait for the CEO's answer, then resume.
 
 ## The CEO
 {ceo section}
@@ -102,6 +103,6 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 
 ## Updates
 
-- A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)): the changed sections of its prompt in full (not a diff), prefixed with `ⓘ Your definition changed:`, one message per turn however many saves happened. The full re-prompt happens at the next restart.
+- A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)): the changed sections of its prompt in full (not a diff), delivered as a message of kind `notice` (`From Foreman: your definition changed. Read it with read_message("msg-N").`), one message per turn however many saves happened. The full re-prompt happens at the next restart.
 - Knowledge-base access: read and write for the lead, who commits through `commit()` (no review); read only for everyone else, who use `contribute`. The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)). `{wiki access}` reads `read and write: edit, then commit()` or `read only: use contribute`.
 - Roster changes (a hire) are a team edit: existing members learn about the new teammate through the same context update.

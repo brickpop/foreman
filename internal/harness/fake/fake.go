@@ -25,7 +25,7 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	}
 	return harness.Launch{
 		Command: command,
-		Env:     []string{"FOREMAN_PROMPT_FILE=" + prompt},
+		Env:     append([]string{"FOREMAN_PROMPT_FILE=" + prompt}, s.Link.Env...),
 		Files:   []harness.File{{Path: prompt, Data: []byte(s.Prompt), Mode: 0o600}},
 	}, nil
 }
@@ -43,3 +43,6 @@ func (Adapter) Connected() bool { return true }
 func (a Adapter) Login() (harness.Launch, error) {
 	return harness.Launch{Command: []string{a.Program}}, nil
 }
+
+// Interpret: the fake harness sends no hooks.
+func (Adapter) Interpret(string, []byte) harness.Activity { return harness.Unknown }

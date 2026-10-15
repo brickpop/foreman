@@ -37,6 +37,8 @@ const (
 	Queued   = "queued"
 	Starting = "starting"
 	Running  = "running"
+	Idle     = "idle"
+	Awaiting = "awaiting"
 	Stopped  = "stopped"
 )
 
@@ -65,6 +67,17 @@ type Deps struct {
 	Adapters    map[string]harness.Adapter // by harness name (claude-code, …)
 	OpenLog     func(instance string) (terminal.Log, error)
 	Publish     func(events.Event)
+	Agent       AgentLink
+}
+
+// AgentLink is foreman-agent as the instances get it: mounted into each
+// container, reaching Foreman's agent port with the instance's token
+// (wiki/product/architecture/team-tools.md#transport).
+type AgentLink struct {
+	Host  string // the binary on the host; "" when it isn't built: agents start without team tools
+	Path  string // where it is in the container (the Direct engine: Host)
+	URL   string // the agent port, as an instance reaches it
+	Token func(instance string) string
 }
 
 // Manager runs the instances of every active deployment.
@@ -205,6 +218,34 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 	dep.Status = store.DeploymentStopped
 	m.publish("deployment.stopped", dep)
 	return nil
+}
+
+// Live reports whether the instance has a process or a start under way: the
+// agent link accepts its token only then.
+func (m *Manager) Live(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.live[id] != nil
+}
+
+// Hook takes one of an instance's harness hook events: what it says the
+// harness is doing becomes the instance's status (running, idle, awaiting).
+// Before the instance runs, or once it stops, the event changes nothing.
+func (m *Manager) Hook(id, event string, payload []byte) {
+	ctx := context.Background()
+	inst, err := m.Instances.Get(ctx, id)
+	if err != nil {
+		return
+	}
+	adapter := m.Adapters[inst.Harness]
+	if adapter == nil {
+		return
+	}
+	status, ok := map[harness.Activity]string{harness.Busy: Running, harness.Idle: Idle, harness.Waiting: Awaiting}[adapter.Interpret(event, payload)]
+	if !ok || (inst.Status != Running && inst.Status != Idle && inst.Status != Awaiting) {
+		return
+	}
+	m.setStatus(ctx, id, status)
 }
 
 // Terminal returns a running instance's terminal.
@@ -413,6 +454,12 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		// A restart (after a crash, or a Foreman restart) picks up its conversation;
 		// a new deployment starts fresh.
 		Continue: !first,
+	}
+	if m.Agent.Host != "" {
+		mounts = append(mounts, runner.Mount{Source: m.Agent.Host, Target: m.Agent.Path, ReadOnly: true})
+		session.Link = harness.Link{Program: m.Agent.Path, Env: []string{
+			"FOREMAN_AGENT_URL=" + m.Agent.URL, "FOREMAN_AGENT_TOKEN=" + m.Agent.Token(id),
+		}}
 	}
 	if lead && first && dep.Goal != "" {
 		// The kickoff (journey G1): the lead starts on the goal at once. Only on

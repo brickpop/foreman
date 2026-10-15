@@ -32,6 +32,6 @@ Table `deployments`.
 ## Invariants
 
 - At most one **active** deployment per (team, project) pair. The Deploy dialog disables already-deployed pairs.
-- At most one row per (team, project) pair: re-deploying a stopped pair **reactivates** that row (new goal, `status: active`, `stopped_at` cleared), keeping its `req-N` counter, team-message history and worktrees.
+- At most one row per (team, project) pair: re-deploying a stopped pair **reactivates** that row (new goal, `status: active`, `stopped_at` cleared), keeping its `msg-N` counter, team-message history and worktrees.
 - Team messaging is scoped to a deployment: `nyx@ledger` cannot message `nyx@relay`.
 - Stopping one deployment never touches another.

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -130,5 +131,30 @@ func TestAccessTokenRegeneratedWhenEmpty(t *testing.T) {
 	}
 	if token == "" {
 		t.Error("an empty token file produced an empty token")
+	}
+}
+
+// The agent link's secret survives restarts (running containers keep their
+// tokens), is private, differs from the access token, and stays out of git.
+func TestAgentSecret(t *testing.T) {
+	ws, err := Init(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := ws.AgentSecret()
+	if err != nil || len(first) < 40 {
+		t.Fatalf("secret %q %v", first, err)
+	}
+	again, _ := ws.AgentSecret()
+	token, _ := ws.AccessToken(false)
+	if string(again) != string(first) || string(first) == token {
+		t.Error("the secret changed, or is the access token")
+	}
+	info, err := os.Stat(ws.Path("credentials", "agent-link"))
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Errorf("secret file: %v %v", info, err)
+	}
+	if !strings.Contains(gitignore, "credentials/") {
+		t.Error("credentials/ isn't ignored by the workspace repo")
 	}
 }

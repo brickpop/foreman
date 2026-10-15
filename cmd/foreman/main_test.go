@@ -102,3 +102,14 @@ func TestFakeHarnessNeedsTheDirectEngine(t *testing.T) {
 		t.Errorf("on podman: %v", err)
 	}
 }
+
+func TestTheAgentPortIsTheNextOne(t *testing.T) {
+	if p, err := nextPort("8888"); err != nil || p != "8889" {
+		t.Errorf("8888: %q %v", p, err)
+	}
+	for _, bad := range []string{"65535", "0", "x", ""} {
+		if _, err := nextPort(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}

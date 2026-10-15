@@ -60,7 +60,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 - *Under the hood:* the agent edits files in the live project repo, mounted read-write for her (its `.git` read-only), and calls `commit()`, which Foreman runs on the host; Foreman's file watcher notices; the Wiki block re-reads; the Event bus updates the Board and the "changed" dot in the reader.
 
 **13. The lead delegates.** Mara calls the team tool `ask(tove, "Take LED-44 …")`.
-- *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `req-41` queued for `tove@ledger`; `ask` returns `req-41` at once, Mara keeps working. A **marker** "Mara asked Tove (req-41)" appears beside both panes and in the Messages drawer (UI only).
+- *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `msg-41` queued for `tove@ledger`; `ask` returns `msg-41` at once, Mara keeps working. A **marker** "Mara asked Tove (msg-41)" appears beside both panes and in the Messages drawer (UI only).
 
 **14. The engine wakes the teammate.** Tove is idle, so Messaging delivers: the text appears in Tove's terminal as if typed, and she starts.
 - *Under the hood:* Instance manager knows Tove is `idle` (her last hook event); Messaging → `Instances.Deliver` → Harness adapter `Deliver` (types the text, then Enter) → Terminal `Input`. Tove's next hook says `busy`. Had she been busy, the message would wait for her next `idle`.

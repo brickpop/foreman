@@ -1,7 +1,7 @@
 // Package harness is everything harness-specific (Claude Code, the fake
 // harness in tests, and later Pi, Hermes, Codex, custom commands) behind one
 // interface (wiki/product/architecture/building-blocks.md#3-harness-adapter-harness).
-// Epic 1 needs Launch; Deliver, Interpret and Diagnose join with the agent link.
+// Deliver and Diagnose join with Messaging.
 package harness
 
 import (
@@ -24,7 +24,27 @@ type Session struct {
 	// Opener is the session's first message, typed in as if by the CEO; the
 	// session stays interactive. "" for none.
 	Opener string
+	// Link is how the harness reaches Foreman: the team tools and the hooks
+	// both go through foreman-agent. Zero when foreman-agent isn't built.
+	Link Link
 }
+
+// Link is foreman-agent as the instance sees it.
+type Link struct {
+	Program string   // its path where the harness runs (in the container)
+	Env     []string // FOREMAN_AGENT_URL and FOREMAN_AGENT_TOKEN
+}
+
+// Activity is what a hook event says the harness is doing
+// (wiki/product/architecture/harness-adapters.md#idle-and-waiting-detection).
+type Activity string
+
+const (
+	Unknown Activity = ""        // the event says nothing about it
+	Busy    Activity = "busy"    // working on a turn
+	Idle    Activity = "idle"    // at its prompt, finished
+	Waiting Activity = "waiting" // waiting for the user: a question or a dialog
+)
 
 // Launch is how to start a harness: what the instance manager adds to the
 // process spec (alongside the worktrees and repos), and the files to write first.
@@ -54,6 +74,8 @@ type Adapter interface {
 	// sending it (the CEO's Shift+Enter).
 	Newline() string
 	Launch(Session) (Launch, error)
+	// Interpret reads one of its hook events (the name and the JSON payload).
+	Interpret(event string, payload []byte) Activity
 	// Login is how to run the harness's own login (Settings → Harnesses →
 	// Connect), in a terminal the CEO types into.
 	Login() (Launch, error)

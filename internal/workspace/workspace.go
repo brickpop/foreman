@@ -85,7 +85,21 @@ func (w *Workspace) Path(elem ...string) string {
 // AccessToken returns the per-install access token, generating it on first use.
 // With rotate, a new token replaces the stored one, which logs every browser out.
 func (w *Workspace) AccessToken(rotate bool) (string, error) {
-	path := w.Path(tokenFile)
+	return secret(w.Path(tokenFile), rotate)
+}
+
+// AgentSecret signs the agent link's tokens (internal/agentlink), generated on
+// first use. Kept under credentials/, which the workspace repo ignores.
+func (w *Workspace) AgentSecret() ([]byte, error) {
+	if err := os.MkdirAll(w.Path("credentials"), 0o700); err != nil {
+		return nil, err
+	}
+	s, err := secret(w.Path("credentials", "agent-link"), false)
+	return []byte(s), err
+}
+
+// secret reads a random secret from path, or makes one (also with rotate).
+func secret(path string, rotate bool) (string, error) {
 	if !rotate {
 		data, err := os.ReadFile(path)
 		if err == nil {

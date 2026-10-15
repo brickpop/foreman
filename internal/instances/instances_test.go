@@ -516,3 +516,56 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 		t.Error("a prompt for no instance")
 	}
 }
+
+// eventIsActivity reads a hook event's name as the activity itself.
+type eventIsActivity struct{ fake.Adapter }
+
+func (eventIsActivity) Interpret(event string, _ []byte) harness.Activity { return harness.Activity(event) }
+
+// Hook events move a running instance between running, idle and awaiting;
+// they never wake, start or revive one.
+func TestHooksBecomeStatuses(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if !f.m.Live("mara@ledger") || f.m.Live("tove@ledger") {
+		t.Error("live: mara runs, tove sleeps")
+	}
+	for _, step := range []struct{ event, want string }{
+		{"idle", Idle}, {"waiting", Awaiting}, {"", Awaiting}, {"busy", Running}, {"idle", Idle},
+	} {
+		f.m.Hook("mara@ledger", step.event, nil)
+		if s := f.status("mara@ledger"); s.Status != step.want {
+			t.Errorf("after %q: %s, want %s", step.event, s.Status, step.want)
+		}
+	}
+	f.m.Hook("tove@ledger", "busy", nil)
+	if s := f.status("tove@ledger"); s.Status != Asleep {
+		t.Errorf("a hook woke tove: %s", s.Status)
+	}
+	f.m.Hook("nobody@ledger", "busy", nil) // nothing to change, nothing to break
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.m.Hook("mara@ledger", "busy", nil)
+	if s := f.status("mara@ledger"); s.Status != Stopped || f.m.Live("mara@ledger") {
+		t.Errorf("a hook after the stop: %s", s.Status)
+	}
+}
+
+// The harness gets foreman-agent's place and the instance's own token.
+func TestTheHarnessGetsTheAgentLink(t *testing.T) {
+	f := newFixture(t, `echo "link=$FOREMAN_AGENT_URL $FOREMAN_AGENT_TOKEN"; cat`, 12)
+	f.deps.Agent = AgentLink{Host: "/bin/foreman-agent", Path: "/opt/foreman/foreman-agent", URL: "http://h:8889",
+		Token: func(id string) string { return "token-of-" + id }}
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	f.output("mara@ledger", "link=http://h:8889 token-of-mara@ledger")
+}

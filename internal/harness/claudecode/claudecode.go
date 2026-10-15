@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/runner"
@@ -46,12 +47,28 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	if err != nil {
 		return harness.Launch{}, err
 	}
-	settings, _ := json.MarshalIndent(map[string]any{
+	config := map[string]any{
 		// No bypass-mode warning at startup.
 		"skipDangerousModePermissionPrompt": true,
-	}, "", "  ")
-
+	}
 	args := []string{a.Command(), "--dangerously-skip-permissions"}
+	var files []harness.File
+	if s.Link.Program != "" {
+		// Its hooks and the team tools, both through foreman-agent; only this
+		// MCP server (--strict-mcp-config), whatever else is configured.
+		config["hooks"] = hooks(s.Link.Program)
+		env := map[string]string{}
+		for _, kv := range s.Link.Env {
+			k, v, _ := strings.Cut(kv, "=")
+			env[k] = v
+		}
+		mcp, _ := json.MarshalIndent(map[string]any{"mcpServers": map[string]any{
+			"foreman": map[string]any{"command": s.Link.Program, "args": []string{"mcp"}, "env": env},
+		}}, "", "  ")
+		files = append(files, harness.File{Path: filepath.Join(dir, "mcp.json"), Data: mcp, Mode: 0o600})
+		args = append(args, "--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config")
+	}
+	settings, _ := json.MarshalIndent(config, "", "  ")
 	if s.Continue && hasConversation(dir) {
 		// The latest conversation in this config dir: always the instance's own.
 		args = append(args, "--continue")
@@ -63,15 +80,15 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	}
 	l := harness.Launch{
 		Command: args,
-		Env:     []string{"CLAUDE_CONFIG_DIR=" + dir},
+		Env:     append([]string{"CLAUDE_CONFIG_DIR=" + dir}, s.Link.Env...),
 		// The login file alone, so a refresh by any instance reaches all of
 		// them (a symlink breaks that; experiment B).
 		Mounts: []runner.Mount{{Source: login, Target: filepath.Join(dir, ".credentials.json")}},
-		Files: []harness.File{
+		Files: append([]harness.File{
 			{Path: filepath.Join(dir, "CLAUDE.md"), Data: []byte(s.Prompt), Mode: 0o600},
 			{Path: filepath.Join(dir, "settings.json"), Data: settings, Mode: 0o600},
 			{Path: filepath.Join(dir, ".claude.json"), Data: account, Mode: 0o600},
-		},
+		}, files...),
 	}
 	if a.GitConfig != "" {
 		if _, err := os.Stat(a.GitConfig); err == nil {
@@ -112,6 +129,52 @@ func (a Adapter) account(dir, sandbox string) ([]byte, error) {
 	projects[sandbox] = project
 	record["projects"] = projects
 	return json.MarshalIndent(record, "", "  ")
+}
+
+// hookEvents are the Claude Code hooks Foreman follows (experiment D).
+var hookEvents = []string{"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "Stop"}
+
+// hooks is settings.json's "hooks": every event runs `foreman-agent hook <event>`.
+func hooks(program string) map[string]any {
+	all := map[string]any{}
+	for _, event := range hookEvents {
+		entry := map[string]any{"hooks": []any{map[string]any{"type": "command", "command": program + " hook " + event}}}
+		if event == "PreToolUse" || event == "PostToolUse" {
+			entry["matcher"] = "*"
+		}
+		all[event] = []any{entry}
+	}
+	return all
+}
+
+// Interpret reads a hook event (experiment D): a question to the user is its
+// AskUserQuestion tool, then a permission_prompt notification; a finished turn
+// is Stop.
+func (Adapter) Interpret(event string, payload []byte) harness.Activity {
+	var p struct {
+		ToolName         string `json:"tool_name"`
+		NotificationType string `json:"notification_type"`
+	}
+	_ = json.Unmarshal(payload, &p)
+	switch event {
+	case "SessionStart", "Stop":
+		return harness.Idle
+	case "UserPromptSubmit", "PostToolUse":
+		return harness.Busy
+	case "PreToolUse":
+		if p.ToolName == "AskUserQuestion" {
+			return harness.Waiting
+		}
+		return harness.Busy
+	case "Notification":
+		switch p.NotificationType {
+		case "permission_prompt":
+			return harness.Waiting
+		case "idle_prompt":
+			return harness.Idle
+		}
+	}
+	return harness.Unknown
 }
 
 // hasConversation reports whether the config dir holds a conversation to

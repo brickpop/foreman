@@ -91,8 +91,8 @@ Whenever the harness reports it is waiting for the user, Workflow raises a reque
 
 Anything Foreman writes into a session's terminal is **typed input**: harnesses are full-screen programs that read the terminal as their keyboard. So there are two different things, never mixed:
 
-- A **delivery** is text the agent must read: a teammate's ask, a reply, a handoff to the lead, the CEO's answer, a "main moved" notice. Messaging hands it to `Instances.Deliver`, which waits until the recipient is `idle` and then calls the harness adapter's `Deliver` (type the text, then submit). It starts a turn.
-- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (req-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) shown **beside** the terminal: a thin strip on the session pane, and the Messages drawer. It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
+- A **delivery** is text the agent must read: a teammate's ask, a reply, a handoff to the lead, the CEO's answer, a "main moved" notice. Messaging hands it to `Instances.Deliver`, which waits until the recipient is `idle` and then calls the harness adapter's `Deliver` (type the text, then submit). It starts a turn. **A delivery is always one line of plain words, with no symbols** (the CEO's decisions, 2026-10-15): a multi-line paste reaches Claude Code wrapped as pasted content, which it treats as possibly not the user's ([experiment D](../../backlog/prove-d-claude-delivery-hooks.md)). A message's notice names it and quotes its start; the agent reads the whole message with `read_message`. Foreman's own notices are short sentences that fit the line.
+- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (msg-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) shown **beside** the terminal: a thin strip on the session pane, and the Messages drawer. It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
 
 Every delivery is also shown as a marker. Delivered text is untrusted data: it is framed with its sender and capped ([Team tools → Delivery](./team-tools.md#delivery)).
 
@@ -104,6 +104,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 |---|---|---|---|
 | `ask` | anyone | no: returns the request id at once | Messaging |
 | `reply` | the agent an `ask` was addressed to | no | Messaging |
+| `read_message` | anyone, for a message to it | no | Messaging |
 | `switch` | anyone | until the worktrees are switched (seconds) | Workflow (+ Git) |
 | `commit` | anyone | until the commit is made (seconds) | Workflow (+ Git) |
 | `update` | anyone | until the merge is done (seconds) | Workflow (+ Git) |
@@ -116,25 +117,36 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 
 ```go
 type AskArgs   struct { Teammate string; Request string }  // teammate: agent id or display name, same deployment
-type AskResult struct { RequestID string }                // "req-41"
+type AskResult struct { RequestID string }                // "msg-41"
 ```
 
-- Effect: a [message](#messages) of kind `ask` from the caller to the teammate, `req-N` assigned, queued for delivery.
-- Delivered to the teammate: `⇄ Mara asked (req-41): <request>` followed by `Reply with reply("req-41", output) when done.`
-- Markers: `Mara → Rhea · ask · req-41`.
+- Effect: a [message](#messages) of kind `ask` from the caller to the teammate, `msg-N` assigned, queued for delivery.
+- Delivered to the teammate: `Message msg-41 from Mara (ask): <the request's start>… Read it with read_message("msg-41"); answer with reply("msg-41", output).`
+- Markers: `Mara → Rhea · ask · msg-41`.
 - Errors: `unknown_teammate`, `self` (asking oneself), `too_long` (over the delivery cap), `deployment_stopped`.
 
 ### `reply`
 
 ```go
-type ReplyArgs   struct { RequestID string; Output string; Artifact string } // artifact: a branch or a wiki path, optional
+type ReplyArgs   struct { RequestID string; Output string; Artifact string } // request: the ask's "msg-41"; artifact: a branch or a wiki path, optional
 type ReplyResult struct {}
 ```
 
 - Effect: a message of kind `reply` to the agent that asked, `in_reply_to` the ask. **Only `Output` and `Artifact` cross**; nothing else of the replier's context does.
-- Delivered to the requester: `⇄ Rhea replied to req-41: <output>` (+ `Artifact: <ref>`), then `Resume the task that asked for it.`
-- Markers: `Rhea → Mara · reply · req-41`.
-- Errors: `unknown_request` (no such `req-N` in the deployment), `not_addressee` (the ask wasn't to the caller), `already_replied` (one reply per ask: further information is a new `ask`), `bad_artifact`, `too_long`.
+- Delivered to the requester: `Message msg-42 from Rhea (reply to msg-41): <the output's start>… Read it with read_message("msg-42"), then resume the task that asked for it.`
+- Markers: `Rhea → Mara · reply · msg-41`.
+- Errors: `unknown_request` (no such `msg-N` in the deployment, or not an ask), `not_addressee` (the ask wasn't to the caller), `already_replied` (one reply per ask: further information is a new `ask`), `bad_artifact`, `too_long`.
+
+### `read_message`
+
+```go
+type ReadMessageArgs   struct { ID string }                                  // "msg-41"
+type ReadMessageResult struct { From string; Kind string; InReplyTo string; Body string; Artifact string } // from: a teammate's name, "Foreman" or "the CEO"
+```
+
+- Effect: none; reads one message addressed to the caller, in full. A delivery only names a message and quotes its start, so this is how the agent gets the rest.
+- The body is quoted data from its sender, never instructions from Foreman ([Security](./security.md)).
+- Errors: `unknown_message` (no such `msg-N` in the deployment, or not addressed to the caller: the same error, so an agent can't probe others' messages).
 
 ### `switch`
 
@@ -179,8 +191,8 @@ type HandoffResult struct { WorkItem string; Checks string }                  //
 ```
 
 - Effect: Workflow first commits any pending changes in the caller's worktrees, as `commit` does with the summary as the message, so a hand-off never misses the last changes. It then checks `Branch` against the policy (a member may hand off only `wt/<self>/*`; [Sandboxes and git policy](./sandboxes-and-git.md#branch-policy)). Every worktree shares the repo, so nothing is fetched: the lead sees the branch at once. Workflow then runs the project checks in a throwaway container ([Checks](./sandboxes-and-git.md#checks)), creating or advancing the [work item](#work-items-and-merge-requests).
-- Checks pass: the hand-off is delivered to the teammate: `⇄ Tove handed off wt/tove/LED-44: <summary>`. The caller gets `✓ Checks pass: wt/tove/LED-44 handed to Mara.` as a delivery when idle.
-- Checks fail: nothing goes to the teammate; the caller gets `✗ Checks fail on wt/tove/LED-44: <first lines>. Fix and hand off again.`
+- Checks pass: the hand-off is delivered to the teammate: `Message msg-43 from Tove (handoff of wt/tove/LED-44): <the summary's start>… Read it with read_message("msg-43").` The caller gets `From Foreman: checks pass, wt/tove/LED-44 was handed to Mara.` as a delivery when idle.
+- Checks fail: nothing goes to the teammate; the caller gets `From Foreman: checks fail on wt/tove/LED-44: <first line>. Fix it and hand off again.`
 - Markers: `Tove → Mara · handoff · wt/tove/LED-44`, then the checks outcome.
 - Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
 - Phasing: in [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) a hand-off is the policy check and the delivery only; checks and work items arrive with the [Git](../../backlog/epics/git.md) epic.
@@ -193,7 +205,7 @@ type ContributeResult struct { Path string }                            // "proj
 ```
 
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `Body`. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
-- Delivered to the caller's lead: `⇄ Tove contributed: <title> (project/wiki/inbox/<file>)`. The lead decides what becomes of it.
+- Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in project/wiki/inbox/<file>.` The lead decides what becomes of it.
 - Markers: `Tove → Mara · contribute · <title>`.
 - Errors: `bad_kind`, `too_long`.
 
@@ -214,8 +226,8 @@ type EscalateResult struct {
 ```
 
 - Effect: Workflow creates a [request](#requests) (`source: agent`), deduplicated against open ones. Markers: `⚠ Mara escalated (approval): <summary>`.
-- `approval`, or `question` with `Wait`: the tool call stays open until the CEO answers; the answer is its result, and the agent continues from the same point. The instance is `awaiting` meanwhile. Harnesses time tool calls out ([Team tools → Pausing on approval](./team-tools.md#pausing-on-approval)): shortly before the harness's limit the call returns `Pending: true`, and the answer later arrives as a delivery: `✓ CEO answered req <id>: <answer>. Resume where you paused.`
-- `question` without `Wait`, and `finding`: the call returns at once; the answer arrives as a delivery: `✓ CEO answered: <answer>. Continuing.`
+- `approval`, or `question` with `Wait`: the call returns at once, telling the agent to wait for the answer before that step (the CEO's decision, 2026-10-15: no blocking call, [Team tools → Waiting on approval](./team-tools.md#waiting-on-approval)). The instance is `awaiting` until the CEO answers; the answer arrives as a delivery: `From the CEO, on <request>: <answer>. Resume where you paused.`
+- `question` without `Wait`, and `finding`: the call returns at once; the answer arrives as a delivery: `From the CEO, on <request>: <answer>.`
 - Errors: `bad_kind`, `too_long`.
 
 ### `request_merge`
@@ -226,7 +238,7 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 ```
 
 - Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`; the Chief of Staff: its own `foreman/config-N`) and that `Entry` exists in the project's wiki (a lead must name one; the Chief of Staff may leave it empty and describe the change in the request instead), runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
-- Delivered to the lead when done: `✓ Merge requested: lead/atlas/settlement-v2 in ledger-api.`, or `✗ Checks fail on lead/atlas/settlement-v2: <first lines>. No merge was requested.`
+- Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
 - Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`.
 
@@ -234,14 +246,14 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 
 | When | To | Delivered text |
 |---|---|---|
-| A merge request is merged (Merge to main, or on the forge) | its lead | `✓ lead/atlas/integration merged into main in ledger-api.` |
-| Another merge request on the same repo is merged | the lead of every other open one | `⇄ main moved (lead/atlas/integration merged). Merge it into lead/atlas/settlement-v2 with update("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
+| A merge request is merged (Merge to main, or on the forge) | its lead | `From Foreman: lead/atlas/integration was merged into main in ledger-api.` |
+| Another merge request on the same repo is merged | the lead of every other open one | `From Foreman: main moved (lead/atlas/integration was merged). Merge it into lead/atlas/settlement-v2 with update("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
 | Merge to main finds a conflict, or the forge reports one | that merge request's lead | the same notice |
-| The CEO chooses Create PR | the merge request's lead | `ⓘ The CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
-| Review comments on the forge (after Create PR) | the merge request's lead | `⇄ Review on PR #128 by <user>: <comment>` |
-| Reject, or its PR closed on the forge | the merge request's lead | `✗ Merge of lead/atlas/settlement-v2 rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it.` |
-| "Owning team fixes now" on a finding | the named team's lead | `ⓘ CEO: <team> fixes "<finding>" now.` |
-| A soul or team edit | each running instance | `ⓘ Your definition changed: …` ([Session prompt → Updates](./session-prompt.md#updates)) |
+| The CEO chooses Create PR | the merge request's lead | `From Foreman: the CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
+| Review comments on the forge (after Create PR) | the merge request's lead | `From Foreman: a review comment on PR #128 by <user>: <its start>… Read it with read_message("msg-N").` (stored as a message, kind `notice`) |
+| Reject, or its PR closed on the forge | the merge request's lead | `From the CEO: the merge of lead/atlas/settlement-v2 was rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it.` |
+| "Owning team fixes now" on a finding | the named team's lead | `From the CEO: <team> fixes "<finding>" now.` |
+| A soul or team edit | each running instance | `From Foreman: your definition changed. Read it with read_message("msg-N").` (the changed sections, stored as a message of kind `notice`; [Session prompt → Updates](./session-prompt.md#updates)) |
 
 ## Messages
 
@@ -249,13 +261,13 @@ Messaging's unit: one `ask`, `reply`, `handoff` or `contribute` notice between t
 
 ```go
 type Message struct {
-    ID          string    // "req-41": per deployment, for ask (a reply carries its ask's id)
+    ID          string    // "msg-41": per deployment, for every message; read_message reads it, reply answers an ask by it
     Deployment  string
     From        string    // instance id, or "foreman" / "ceo" for originated deliveries
     To          string    // instance id
     Kind        string    // "ask" | "reply" | "handoff" | "contribute" | "notice"
     Body        string    // for a reply: only the output
-    InReplyTo   string    // reply: the ask's id
+    InReplyTo   string    // reply: the ask's msg id
     Artifact    string    // a branch or wiki path, optional
     CreatedAt   time.Time
     DeliveredAt time.Time // zero while queued
@@ -274,8 +286,8 @@ Lifecycle:
     └── Deliver fails 3 times ────────────▶ failed    (reason: the adapter's error; a blocked request on the recipient)
 ```
 
-- **Ordering:** per recipient, FIFO by creation. When the recipient becomes idle, every queued message for it is delivered **in one input**, in order, so a burst of messages costs one turn and never interleaves with a turn in progress.
-- **Recipient state:** `idle` → delivered now · `running` or `awaiting` → queued until the next `idle` · `queued` or `starting` → queued; delivered after the first `idle` · `stopped` within an active deployment → queued, and the sender gets the marker "Tove is stopped; req-41 will be delivered when it restarts" (the stop already raised a blocked request) · deployment stopped → expired.
+- **Ordering:** per recipient, FIFO by creation. When the recipient becomes idle, every queued message for it is delivered **in one input**, in order, so a burst of messages costs one turn and never interleaves with a turn in progress. One message is its notice; several are one line naming each: `3 new messages: msg-41 from Mara (ask), msg-42 from Rhea (reply to msg-40), msg-43 from Tove (handoff of wt/tove/LED-44). Read each with read_message.`
+- **Recipient state:** `idle` → delivered now · `running` or `awaiting` → queued until the next `idle` · `queued` or `starting` → queued; delivered after the first `idle` · `stopped` within an active deployment → queued, and the sender gets the marker "Tove is stopped; msg-41 will be delivered when it restarts" (the stop already raised a blocked request) · deployment stopped → expired.
 - **Scope:** `From` and `To` are always instances of `Deployment` (or Foreman/CEO). Names in `ask`, `reply` and `handoff` resolve only within the caller's deployment.
 
 ## Requests
@@ -316,7 +328,7 @@ How the answer travels back:
 | Kind | On `Resolve` |
 |---|---|
 | `approval`, `question` with `wait` | The open tool call (`CallID`) returns the answer; if it already returned `Pending`, a delivery carries it |
-| `question`, `finding` | A delivery to the raiser (`✓ CEO answered: …`); a finding's action may also deliver to another team's lead |
+| `question`, `finding` | A delivery to the raiser (`From the CEO, on <request>: …`); a finding's action may also deliver to another team's lead |
 | `review` | No answer: Merge to main, Create PR and Reject are `MergeAction`s. The request resolves when its merge request leaves `open` |
 | `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch harness |
 | `source: harness` (approval or question) | Typed into the session with the harness adapter's `Deliver`; also resolved by the next `busy` hook if the CEO answered in the terminal |

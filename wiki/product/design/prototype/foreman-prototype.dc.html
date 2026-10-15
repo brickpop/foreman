@@ -979,10 +979,10 @@ class Component extends DCLogic {
     };
     const L = (t, x) => ({ t, x });
     const lines = {
-      'mara@ledger': [L('sys', 'claude-code · ledger/.sandboxes/mara'), L('out', 'Reading wt/ilya/LED-41: 14 files'), L('out', 'netting.ts:88 rounds before FX conversion. Flagging.'), L('acp', '⇄ ask → Rhea (req-41): property test on rounding'), L('acp', '⇄ Rhea replied to req-41: 2 failing seeds'), L('out', 'Resuming review of LED-41 with Rhea’s result.')],
+      'mara@ledger': [L('sys', 'claude-code · ledger/.sandboxes/mara'), L('out', 'Reading wt/ilya/LED-41: 14 files'), L('out', 'netting.ts:88 rounds before FX conversion. Flagging.'), L('acp', '⇄ ask → Rhea (msg-41): property test on rounding'), L('acp', '⇄ Rhea replied to msg-41: 2 failing seeds'), L('out', 'Resuming review of LED-41 with Rhea’s result.')],
       'ilya@ledger': [L('sys', 'codex · ledger/.sandboxes/ilya · wt/ilya/LED-41'), L('acp', '⇄ Mara sent 2 review comments'), L('out', 'Plan: use decimal.js for exact netting.'), L('ask', '⚠ escalate: new dependency decimal.js@10.4.3. Approve? [y/N]')],
       'tove@ledger': [L('sys', 'claude-code · ledger/.sandboxes/tove · wt/tove/LED-44'), L('out', 'Reading wiki/adr/014-settlement-v2.md')],
-      'rhea@ledger': [L('sys', 'pi · ledger/.sandboxes/rhea · wt/rhea/LED-45'), L('acp', '⇄ Mara asked (req-41): property test on rounding'), L('err', '✗ netting.rounding: 2 counterexamples'), L('acp', '⇄ reply → Mara (req-41): 2 failing seeds')],
+      'rhea@ledger': [L('sys', 'pi · ledger/.sandboxes/rhea · wt/rhea/LED-45'), L('acp', '⇄ Mara asked (msg-41): property test on rounding'), L('err', '✗ netting.rounding: 2 counterexamples'), L('acp', '⇄ reply → Mara (msg-41): 2 failing seeds')],
       'quill@ledger': [L('sys', 'claude-code · ledger/wiki'), L('ok', '✓ committed boards/sprint-07.md')],
       'kestrel@ledger': [L('sys', 'claude-code · ledger/.sandboxes/kestrel'), L('acp', '⇄ Bram handed off VSP-9 (race in batch close)'), L('ask', '⚠ escalate: 500 rps for 10 min on shared staging. Proceed? [y/N]')],
       'nyx@ledger': [L('sys', 'hermes · ledger/.sandboxes/nyx · wt/nyx/VSP-11'), L('out', 'corpus: 1,204 seeds')],
@@ -990,8 +990,8 @@ class Component extends DCLogic {
       'kestrel@relay': [L('sys', 'claude-code · relay/.sandboxes/kestrel'), L('out', 'Reading wiki/spikes/jetstream.md')],
       'nyx@relay': [L('sys', 'hermes · relay/.sandboxes/nyx'), L('out', 'Target: relay-core publish path')],
       'bram@relay': [L('sys', 'custom ./bin/loadbot · relay/.sandboxes/bram'), L('sys', 'idle')],
-      'lumen@relay': [L('sys', 'claude-code · relay/.sandboxes/lumen'), L('acp', '⇄ ask → Arden (req-7): p99 at 20k msg/s?')],
-      'arden@relay': [L('sys', 'codex · relay/.sandboxes/arden · wt/arden/spike'), L('acp', '⇄ Lumen asked (req-7): p99 at 20k msg/s?')],
+      'lumen@relay': [L('sys', 'claude-code · relay/.sandboxes/lumen'), L('acp', '⇄ ask → Arden (msg-7): p99 at 20k msg/s?')],
+      'arden@relay': [L('sys', 'codex · relay/.sandboxes/arden · wt/arden/spike'), L('acp', '⇄ Lumen asked (msg-7): p99 at 20k msg/s?')],
       'pike@relay': [L('sys', 'pi · relay/wiki'), L('out', 'Created adr/003-event-bus.md')]
     };
     const acp = [
@@ -1206,7 +1206,7 @@ class Component extends DCLogic {
       '\nYour clone: ' + p.name + '/.sandboxes/' + aid + '\nBranches: ' + (isLead ? 'lead/*. You may open PRs to main.' : 'wt/' + aid + '/<card> only. No push to main.') +
       '\nWiki: ' + p.name + '/wiki (' + (a.role === 'Scrum Master' ? 'read and write' : 'read only') + ')' +
       '\n\n## Your team on ' + p.name + '\n' + mates + '\nYou can’t see their sandboxes. Work with them only through the tools below.' +
-      '\n\n## Tools (from Foreman)\nask(teammate, request)              Get info or work. Keep going meanwhile.\nreply(request_id, output)           Answer a request. Only `output` is returned.\nhandoff(teammate, branch, summary)  Pass finished work on. Your part ends.\nescalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.' + (isLead ? '\nopen_pr(title, summary)             Propose lead/* for main. Only you can.' : '') + '\n\nReplies arrive in this session as “⇄ <name> replied to req-N”.\nResume the task that asked for it. After escalate you resume\nfrom the same point with the CEO’s answer.' +
+      '\n\n## Tools (from Foreman)\nask(teammate, request)              Get info or work. Keep going meanwhile.\nreply(request_id, output)           Answer a request. Only `output` is returned.\nhandoff(teammate, branch, summary)  Pass finished work on. Your part ends.\nescalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.' + (isLead ? '\nopen_pr(title, summary)             Propose lead/* for main. Only you can.' : '') + '\n\nReplies arrive in this session as “⇄ <name> replied to msg-N”.\nResume the task that asked for it. After escalate you resume\nfrom the same point with the CEO’s answer.' +
       (isLead ? '\n\n## The CEO\nThe CEO talks to you. Break requests down and delegate with ask() or handoff().' : '\n\n## The CEO\nThe CEO normally talks to ' + s.agents[t.lead].name + '. If the CEO instructs you directly, do it and tell ' + s.agents[t.lead].name + ' what changed.') + '\n\n## Playbook\n' + t.workflow.map((w, i) => (i + 1) + '. ' + roleName(w[0]) + ': ' + w[1]).join('\n') +
       '\n\n## Always escalate to the CEO\n' + p.gates.map(g => '- ' + g).join('\n') + '\nBefore any handoff, run: ' + p.checks;
   }

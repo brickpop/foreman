@@ -5,19 +5,26 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
+	"github.com/brickpop/foreman/agentbin"
 	"github.com/brickpop/foreman/internal/access"
+	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
@@ -88,6 +95,16 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	// The agent port: the next one, on the host's loopback only, where
+	// containers reach it through Podman's host alias (experiment C).
+	agentPort, err := nextPort(*port)
+	if err != nil {
+		return err
+	}
+	agentListener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", agentPort))
+	if err != nil {
+		return fmt.Errorf("the agent port: %w", err)
+	}
 	url := fmt.Sprintf("http://127.0.0.1:%s/?token=%s", *port, token)
 	fmt.Fprintf(stdout, "Foreman is serving %s\nOpen: %s\n", ws.Root(), url)
 	if !*noOpen {
@@ -121,11 +138,37 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		adapters["claude-code"] = fake.Adapter{Program: program}
 		fmt.Fprintf(stdout, "Agents run on the fake harness (%s), not Claude Code\n", program)
 	}
+	secret, err := ws.AgentSecret()
+	if err != nil {
+		return fmt.Errorf("agent link: %w", err)
+	}
+	agentHost, err := writeAgent()
+	if err != nil {
+		return fmt.Errorf("foreman-agent: %w", err)
+	}
+	if agentHost == "" {
+		fmt.Fprintln(stdout, "foreman-agent isn't built (just build): agents start without the team tools")
+	}
+	var link *agentlink.Link
+	agent := instances.AgentLink{
+		Host: agentHost, Path: "/opt/foreman/foreman-agent", URL: "http://host.containers.internal:" + agentPort,
+		Token: func(id string) string { return link.Token(id) },
+	}
+	if running == "direct" {
+		// A host process: no mount, no host alias.
+		agent.Path, agent.URL = agentHost, "http://127.0.0.1:"+agentPort
+	}
 	manager := instances.New(instances.Deps{
 		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters,
-		OpenLog: openLog, Publish: bus.Publish,
+		OpenLog: openLog, Publish: bus.Publish, Agent: agent,
 	})
+	link = agentlink.New(secret, manager.Live, noTools{}, manager)
+	go func() {
+		if err := http.Serve(agentListener, link.Handler()); err != nil {
+			slog.Error("the agent port stopped", "err", err)
+		}
+	}()
 	if err := manager.Restore(ctx); err != nil {
 		return fmt.Errorf("restoring the instances: %w", err)
 	}
@@ -204,6 +247,53 @@ func resolveProgram(program string) (string, error) {
 		return program, nil
 	}
 	return filepath.Abs(program)
+}
+
+// nextPort is the port after port: the agent port, next to the UI's.
+func nextPort(port string) (string, error) {
+	n, err := strconv.Atoi(port)
+	if err != nil || n < 1 || n > 65534 {
+		return "", fmt.Errorf("--port %q: not a port with a free one after it", port)
+	}
+	return strconv.Itoa(n + 1), nil
+}
+
+// writeAgent puts the embedded foreman-agent where containers can mount it:
+// the user's cache folder, which Podman's machine shares on macOS, named by
+// its content so Foreman versions don't overwrite each other's. "" when the
+// binary isn't built.
+func writeAgent() (string, error) {
+	data := agentbin.Binary()
+	if data == nil {
+		return "", nil
+	}
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	path := filepath.Join(cache, "foreman", "foreman-agent-"+hex.EncodeToString(sum[:6]))
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return "", err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o755); err != nil {
+		return "", err
+	}
+	return path, os.Rename(tmp, path)
+}
+
+// noTools serves no team tools yet: they join with Messaging
+// (wiki/backlog/messaging-delivery.md).
+type noTools struct{}
+
+func (noTools) List(string) []agentlink.Tool { return nil }
+
+func (noTools) Call(context.Context, string, string, json.RawMessage) agentlink.Result {
+	return agentlink.Result{Text: "unknown tool", Error: true}
 }
 
 // configEvent turns a change on disk into the event the browser gets

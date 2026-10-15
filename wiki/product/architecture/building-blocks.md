@@ -148,7 +148,7 @@ Implementations, named by **where the process runs** (both give it a terminal):
 
 Each engine comes with the image builder that matches it. The Instance manager asks it for the project's image and puts the answer in `Spec.Image`.
 
-**Phasing:** phase 1 builds one image for every project (from `pclaude`'s Dockerfile, plus `foreman-agent`); the four-layer chain comes later ([Agent images](./tech-stack.md#agent-images)). Phase 1 implements `Ensure`, `Refresh` (no layer: the one image) and `Status`; `Prune` and per-layer Refresh come with the chain.
+**Phasing:** phase 1 builds one image for every project (from `pclaude`'s Dockerfile; `foreman-agent` is mounted, not built in); the four-layer chain comes later ([Agent images](./tech-stack.md#agent-images)). Phase 1 implements `Ensure`, `Refresh` (no layer: the one image) and `Status`; `Prune` and per-layer Refresh come with the chain.
 
 ```go
 type Images interface {
@@ -210,7 +210,7 @@ Details: [Harness adapters](./harness-adapters.md), [Session prompt](./session-p
 
 How an agent inside a container talks to Foreman. Structured only: Foreman never infers events by reading terminal output, except inside a harness adapter as a last resort for a harness without hooks.
 
-- **`foreman-agent`**: a tiny static binary in every container (built with Foreman, carried by the harness image layer). The harness starts `foreman-agent mcp` as a local (stdio) MCP server, which every harness supports; hooks run `foreman-agent hook <event>`. It relays both to Foreman.
+- **`foreman-agent`**: a tiny static binary, mounted read-only into every container when it starts (decided 2026-10-15): Foreman carries a Linux build for its own CPU type inside its binary, so it always matches the running Foreman, and upgrading Foreman never rebuilds the image. The harness starts `foreman-agent mcp` as a local (stdio) MCP server, which every harness supports; hooks run `foreman-agent hook <event>`. It relays both to Foreman.
 - **The agent port**: **one** port that Foreman opens on the host's loopback, separate from the UI's. Every container connects to it through Podman's host alias (`host.containers.internal`); none exposes a port. Each instance has its own token (container environment), which is its identity: an agent can't speak for another.
 - `foreman-agent` reaches Foreman through one address (`tcp://…` today), so another transport (a mounted Unix socket on Linux, say) is a change in one place.
 
@@ -243,7 +243,7 @@ Details: [Agent runtime](./agent-runtime.md).
 
 ### 6. Messaging (`messaging`)
 
-Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`req-N` per deployment), stores them, queues them per recipient and delivers through `Instances.Deliver`. Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
+Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`msg-N` per deployment), stores them, queues them per recipient and delivers through `Instances.Deliver`. Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
 
 ```go
 type Messaging interface {
@@ -416,12 +416,12 @@ Browser ──keys──▶ Web server ──Input()──▶ Terminal ──▶
 
 ```
 Mara's harness   foreman-agent   Agent link   Messaging                       Instance manager        Tove's harness
- ask(tove,"…") ──▶ MCP ─────────▶ ToolCall ──▶ store req-41; marker ─▶ Event bus ─▶ UI: "Mara asked Tove (req-41)"
- ◀── "req-41" ──────────────────────────────── (non-blocking: Mara keeps working)
+ ask(tove,"…") ──▶ MCP ─────────▶ ToolCall ──▶ store msg-41; marker ─▶ Event bus ─▶ UI: "Mara asked Tove (msg-41)"
+ ◀── "msg-41" ──────────────────────────────── (non-blocking: Mara keeps working)
                                               Deliver(tove, text) ──▶ waits: Tove idle
-                                                                      Harness.Deliver ──────────▶ "⇄ Mara asked (req-41): …"
+                                                                      Harness.Deliver ──────────▶ "⇄ Mara asked (msg-41): …"
                                                                                                     … works …
- reply(req-41, out) ◀────────── (the same path, from Tove; delivered to Mara when she is idle) ─────┘
+ reply(msg-41, out) ◀────────── (the same path, from Tove; delivered to Mara when she is idle) ─────┘
 ```
 
 **4. An agent needs the CEO** (approval; epic 4)
@@ -474,6 +474,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 - `internal/instances`: the Instance manager.
 - `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
+- `internal/agentlink` (the agent port: tokens, the tool and hook relay, and the client), `cmd/foreman-agent` (the stdio MCP server and hook forwarder), `agentbin/` (its Linux build, embedded in `foreman` and written to the user's cache folder to be mounted): the Agent link. The tools themselves join with Messaging.
 - `cmd/foreman/sessions.go`: the harnesses' login terminals, by id (instances' terminals are the Instance manager's).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.
 - `internal/server`, `internal/access`, `ui/` (with `ForemanClient` and its real implementation): the Web server and UI.

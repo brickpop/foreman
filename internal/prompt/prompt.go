@@ -145,6 +145,7 @@ func tools(in Input, lead bool) string {
 	rows := []string{
 		"ask(teammate, request)              Get info or work. Keep going meanwhile.",
 		"reply(request_id, output)           Answer a request. Only `output` is returned.",
+		"read_message(id)                    Read a message to you in full (a delivery quotes only its start).",
 		"switch(branch)                      Go to one of your branches (made from main if new).",
 		"commit(message)                     Commit your changes, in every repo, on your branch.",
 		"update(branch)                      Merge a branch (the lead's, main, a teammate's) into yours.",
@@ -156,7 +157,7 @@ func tools(in Input, lead bool) string {
 	rows = append(rows,
 		"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note.",
 		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
-		"                                    A question doesn't pause you unless you pass wait: true.",
+		"                                    For an approval, wait for the answer before that step.",
 	)
 	if lead {
 		rows = append(rows,
@@ -168,9 +169,9 @@ func tools(in Input, lead bool) string {
 	return "## Tools (from Foreman)\n" + strings.Join(rows, "\n") + "\n" +
 		"Git is read-only for you (status, diff, log, blame work); branch, commit\n" +
 		"and merge only through switch(), commit() and update().\n" +
-		"Replies arrive in this session as \"⇄ <name> replied to req-N\".\n" +
-		"Resume the task that asked for it. After escalate you resume\n" +
-		"from the same point with the CEO's answer.\n"
+		"Messages arrive in this session as one line, \"Message msg-N from <name> (<kind>): …\".\n" +
+		"Read the whole message with read_message(\"msg-N\"). After a reply, resume the task\n" +
+		"that asked for it; after an approval, wait for the CEO's answer, then resume.\n"
 }
 
 // Who resolves a playbook or escalation `who`

@@ -64,15 +64,7 @@ From the sidebar tile or a team's **Hire**.
    - Job = the role's default instructions plus `Focus: <focus>.`; personality = the working style.
 7. On **Hire**: the CoS adds the agent, with a random face ([Avatar](../design/avatar.md)), to the team file on a branch of the [workspace repo](../models/workspace.md#the-workspace-repo) and raises a **review** request through `request_merge`. Once the CEO merges it, an instance starts on every deployment of the team. "<Name> is ready to join <Team>: it’s waiting for you as a review." [Open the review, Hire for a role]
 
-Default instructions per role:
-
-| Role | Instructions |
-|---|---|
-| Team Lead | Break the goal into cards on the board. / Assign cards and review every handoff before integrating. / You are the only member who requests merges to main, with request_merge and the card that explains the work. |
-| Engineer | Work only in your own worktree. / Write the test first. Hand off to the lead with a summary and test results. |
-| QA | Try to break whatever is handed to you: property tests, fuzzing, races. / File every finding with a repro. Never fix the code yourself. |
-| Architect | Propose designs as ADRs with contribute (kind proposal). / Back every claim with a spike and numbers. |
-| Reviewer | Review diffs and ADRs for correctness and clarity. / Approve or request changes. Never push code. |
+The job is the role's default job description ([Agent soul → Default job descriptions](../models/agent-soul.md#default-job-descriptions), the one source) plus `Focus: <focus>.`
 
 There is no scrum master role: the lead is the only agent that writes the project's knowledge base. Standups, or nudging the owners of stale cards, can be part of any member's job description; such a member proposes board changes to the lead through `contribute`.
 
@@ -91,7 +83,7 @@ From the [Agent page](./agent-page.md). "What should change about how <Name> wor
 
 ### Change project config
 
-From [Project settings](./project-settings.md). "What should change in <project>/project/project.toml? I’ll edit it on a branch and send it to you as a review." [Use GitHub as the forge, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` of the [project repo](../models/project-config.md#the-project-repo) and calls `request_merge`, which raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff changed <project>/project/project.toml: <summary>.` and the actions of any review: Merge to main, Create PR (when the project repo has a forge), Reject, plus Open Chief of Staff ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
+From [Project settings](./project-settings.md). "What should change in <project>/project/project.toml? I’ll edit it on a branch and send it to you as a review." [Use GitHub as the forge, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` of the [project repo](../models/project-config.md#the-project-repo) and calls `request_merge`, which raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff proposes a change to <project>/project/project.toml: <summary>.` and the actions of any review: Merge to main, Create PR (when the project repo has a forge), Reject, plus Open Chief of Staff ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
 
 ### Anything else
 

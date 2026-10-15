@@ -9,7 +9,7 @@ import {
 } from "../api/client";
 import { harnessLabel } from "../app/model";
 import { permission } from "../app/notifications";
-import { keys, useHarnesses, useSettings, useWorkspace } from "../app/queries";
+import { keys, useHarnesses, useSaveSettings, useSettings, useWorkspace } from "../app/queries";
 import { applyTheme, savedTheme, type Theme } from "../app/theme";
 import { DemoBadge } from "../components/DemoBadge";
 import { Modal } from "../components/Overlays";
@@ -49,23 +49,13 @@ export function Settings() {
 }
 
 /** Saves a change to the settings read last; a failure says why and the screen refetches. */
-function useSaveSettings() {
-  const client = useClient();
-  const queries = useQueryClient();
-  const file = useSettings();
+function useSave() {
+  const save = useSaveSettings();
   const toast = useToast();
-  const save = useMutation({
-    mutationFn: (change: (s: SettingsData) => SettingsData) => {
-      if (!file.data) throw new Error("Settings aren't loaded yet");
-      return client.workspace.saveSettings(
-        change(structuredClone(file.data.settings)),
-        file.data.version,
-      );
-    },
-    onError: (e) => toast({ title: "Settings not saved", body: e.message, color: "var(--err)" }),
-    onSettled: () => queries.invalidateQueries({ queryKey: keys.settings }),
-  });
-  return save.mutate;
+  return (change: (s: SettingsData) => SettingsData) =>
+    save(change).catch((e: Error) =>
+      toast({ title: "Settings not saved", body: e.message, color: "var(--err)" }),
+    );
 }
 
 function Section({
@@ -144,7 +134,7 @@ function Confirm({
 }
 
 function WorkspaceSection({ settings }: { settings: SettingsData }) {
-  const save = useSaveSettings();
+  const save = useSave();
   const workspace = useWorkspace();
   const [confirm, setConfirm] = useState<"lan" | "direct">();
   return (
@@ -333,7 +323,7 @@ function HarnessRow({
   settings: SettingsData;
   onConnect: () => void;
 }) {
-  const save = useSaveSettings();
+  const save = useSave();
   const saved = settings.harnesses?.[harness.id]?.command ?? "";
   const [command, setCommand] = useState(saved);
   const commit = () => {
@@ -357,7 +347,7 @@ function HarnessRow({
         onChange={(e) => setCommand(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx outline-none focus:border-acc"
+        className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
       />
       <span className="flex items-center gap-3">
         <span className={`text-[13px] ${harness.connected ? "text-ok" : "text-tx4"}`}>
@@ -462,7 +452,7 @@ function ForgeRow({
             <input
               value={host}
               onChange={(e) => setHost(e.target.value)}
-              className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx outline-none focus:border-acc"
+              className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
             />
           </label>
           <label className="flex flex-col gap-1 text-[13px] text-tx3">
@@ -472,7 +462,7 @@ function ForgeRow({
               autoComplete="off"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx outline-none focus:border-acc"
+              className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
             />
           </label>
           {connect.error && <p className="m-0 text-[13px] text-err">{connect.error.message}</p>}
@@ -493,7 +483,7 @@ function ForgeRow({
 
 /** Where the workspace repo is hosted, so the Chief of Staff's changes can become PRs there. */
 function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connected: string[] }) {
-  const save = useSaveSettings();
+  const save = useSave();
   const current = settings.workspaceForge;
   // A forge needs its repo URL before it can be saved (settings validation).
   const [kind, setKind] = useState(current.kind);
@@ -533,7 +523,7 @@ function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connec
             onChange={(e) => setUrl(e.target.value)}
             onBlur={commitUrl}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-            className="flex-1 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx outline-none focus:border-acc"
+            className="flex-1 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
           />
           <Button variant="tiny" disabled title="Comes with the Git epic">
             Sync
@@ -552,7 +542,8 @@ const permissionColor = {
 };
 
 function NotificationsSection({ settings }: { settings: SettingsData }) {
-  const save = useSaveSettings();
+  const save = useSave();
+  const toast = useToast();
   const [state, setState] = useState(permission);
   const toggles: { key: keyof SettingsData["notifications"]; label: string }[] = [
     { key: "needsMe", label: "An agent needs me" },
@@ -569,7 +560,16 @@ function NotificationsSection({ settings }: { settings: SettingsData }) {
         {state === "turn on" && (
           <Button
             variant="tiny"
-            onClick={() => Notification.requestPermission().then(() => setState(permission()))}
+            onClick={async () => {
+              await Notification.requestPermission();
+              setState(permission());
+              if (permission() === "on")
+                toast({
+                  title: "Notifications on",
+                  body: "You'll hear from agents when they finish or need you.",
+                  color: "var(--ok)",
+                });
+            }}
           >
             Request
           </Button>

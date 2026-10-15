@@ -64,7 +64,7 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 
 ## Markers beside the terminal
 
-The terminal shows only what the agent's program prints. Anything Foreman wrote into it would be typed input to the agent ([Protocol → Deliveries and markers](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)), so Foreman's notes for the CEO about the team's traffic are **markers**, shown beside the terminal: a thin strip along the pane (newest last, one line each, the glyph first) and the Messages drawer below. They come from `instance.marker` events.
+The terminal shows only what the agent's program prints. Anything Foreman wrote into it would be typed input to the agent ([Protocol → Deliveries and markers](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)), so Foreman's notes for the CEO about the team's traffic are **markers**, shown beside the terminal: a thin strip along the pane (newest last, one line each, the glyph first) and the Messages drawer below. They come from `instance.marker` events. **Phasing:** until `instance.marker` events exist (the [messaging epic](../../backlog/epics/messaging-handoffs.md)), the strip shows the `⇄` team traffic only, built from the team messages.
 
 | Glyph | Meaning | Example | Color |
 |---|---|---|---|

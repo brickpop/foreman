@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
 import type { Look } from "../api/types/workspace";
 import { Avatar, chiefOfStaffLook } from "./Avatar";
@@ -17,6 +17,8 @@ type Props = {
   /** For a review: the sentence that replaces the summary. */
   reviewText?: string;
   onAnswer: (answer: string) => void;
+  /** An answer is on its way: the options wait. */
+  answering?: boolean;
   onOpenSession: () => void;
   /** Home: a review's Review button (opens Changes). */
   onReview?: () => void;
@@ -37,6 +39,7 @@ export function RequestPanel({
   context,
   reviewText,
   onAnswer,
+  answering = false,
   onOpenSession,
   onReview,
   onOpenChiefOfStaff,
@@ -50,14 +53,50 @@ export function RequestPanel({
   const [answer, setAnswer] = useState("");
   const freeText = r.kind === "approval" || r.kind === "question";
   const look = fromChiefOfStaff ? chiefOfStaffLook : who?.look;
+  // On Home the whole card opens who raised it (its session, or the Chief of
+  // Staff); its controls keep their own action, and selecting text opens nothing.
+  const opens = !changes && (fromChiefOfStaff || r.instanceId !== "");
+  const openCard = (e: MouseEvent<HTMLElement>) => {
+    if (!opens || (e.target as HTMLElement).closest("a, button, input, textarea, label")) return;
+    if (window.getSelection()?.toString()) return;
+    (fromChiefOfStaff ? onOpenChiefOfStaff : onOpenSession)();
+  };
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the name button is the keyboard path
     <article
-      className={`flex flex-col rounded-xl border border-line bg-panel ${changes ? "gap-3 px-[18px] py-4" : "gap-3.5 px-5 py-[18px]"}`}
+      onClick={openCard}
+      className={`flex flex-col rounded-xl border border-line bg-panel ${changes ? "gap-3 px-[18px] py-4" : "gap-3.5 px-5 py-[18px]"} ${opens ? "cursor-pointer hover:border-line3" : ""}`}
     >
       <header className="flex items-center gap-2.5">
         {changes && <KindChip kind={r.kind} />}
-        <Avatar look={look} size={changes ? 24 : 32} ring={changes ? undefined : "var(--acc)"} />
-        <span className="font-semibold">{fromChiefOfStaff ? "Chief of Staff" : who?.name}</span>
+        {/* Who raised it opens their session (the Chief of Staff: its drawer). With no
+            agent behind it, Foreman raised it (a crash, a failed build): nothing to open. */}
+        {fromChiefOfStaff || r.instanceId ? (
+          <button
+            type="button"
+            onClick={fromChiefOfStaff ? onOpenChiefOfStaff : onOpenSession}
+            title={fromChiefOfStaff ? "Open Chief of Staff" : "Open the session"}
+            className="flex items-center gap-2.5 text-left"
+          >
+            <Avatar
+              look={look}
+              size={changes ? 24 : 32}
+              ring={changes ? undefined : "var(--acc)"}
+            />
+            <span className="font-semibold">
+              {fromChiefOfStaff ? "Chief of Staff" : (who?.name ?? r.instanceId)}
+            </span>
+          </button>
+        ) : (
+          <>
+            <Avatar
+              look={look}
+              size={changes ? 24 : 32}
+              ring={changes ? undefined : "var(--acc)"}
+            />
+            <span className="font-semibold">Foreman</span>
+          </>
+        )}
         <span className="text-[13px] text-tx4">{context}</span>
         <span className="flex-1" />
         {changes ? (
@@ -81,6 +120,7 @@ export function RequestPanel({
               <Button
                 key={option}
                 variant={i === 0 ? "primary" : "secondary"}
+                disabled={answering}
                 className={i === 1 ? "!text-tx" : ""}
                 onClick={() => onAnswer(option)}
               >
@@ -88,11 +128,14 @@ export function RequestPanel({
               </Button>
             ))
           ))}
-        {fromChiefOfStaff ? (
+        {/* On Home the card itself opens it; in Changes this button does. Nothing to
+            open for a Foreman-raised request. */}
+        {changes && fromChiefOfStaff && (
           <Button variant="ghost" onClick={onOpenChiefOfStaff}>
             Open Chief of Staff
           </Button>
-        ) : (
+        )}
+        {changes && !fromChiefOfStaff && r.instanceId !== "" && (
           <Button variant="ghost" onClick={onOpenSession}>
             Open session
           </Button>
@@ -103,7 +146,9 @@ export function RequestPanel({
           className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (answer.trim()) onAnswer(answer.trim());
+            if (!answer.trim() || answering) return;
+            onAnswer(answer.trim());
+            setAnswer("");
           }}
         >
           <input

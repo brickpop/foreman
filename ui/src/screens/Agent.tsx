@@ -1,12 +1,13 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import type { Soul, Team } from "../api/client";
+import { useEffect, useRef, useState } from "react";
+import { isConflict, type Soul, type Team } from "../api/client";
 import type { Look } from "../api/types/workspace";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import { palettes, randomLook, roleLabel } from "../app/model";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DemoBadge } from "../components/DemoBadge";
+import { useToast } from "../components/Toasts";
 import { Button, Dot } from "../components/ui";
 
 // One agent's soul (wiki/product/features/agent-page.md): who it is, what it
@@ -49,30 +50,48 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
   const instances = useInstances();
   const openChiefOfStaff = useOpenChiefOfStaff();
   const teamsQuery = useTeams();
-  const save = useSaveSoul(team.id);
+  const toast = useToast();
+  const soul = useSaveSoul(team, id);
   const [draft, setDraft] = useState(saved);
   const [savedAt, setSavedAt] = useState(0);
   const [conflict, setConflict] = useState(false);
   const [skill, setSkill] = useState("");
-  // A change from elsewhere shows, unless an edit is waiting on a conflict.
+  // The soul the draft started from: a draft that differs holds unsaved typing.
+  const base = useRef(saved);
+  // A save from elsewhere shows at once, unless it would drop unsaved typing:
+  // then the CEO chooses (Keep mine / Take theirs). Our own saves change nothing.
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow the saved soul's version only
   useEffect(() => {
-    if (!conflict) setDraft(saved);
+    if (team.version === soul.lastSaved()) return;
+    const typing = JSON.stringify(draft) !== JSON.stringify(base.current);
+    base.current = saved;
+    if (typing) setConflict(true);
+    else setDraft(saved);
   }, [team.version]);
 
-  const commit = (next: Soul, version = team.version) => {
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const commit = (next: Soul) => {
     setDraft(next);
-    save.mutate(
-      { agent: id, soul: next, version },
-      {
-        onSuccess: () => {
-          setConflict(false);
-          setSavedAt(Date.now());
-          setTimeout(() => setSavedAt(0), 3000);
-        },
-        onError: () => setConflict(true),
+    // A custom harness waits for its command: the file requires one.
+    if (next.harness === "custom" && next.command.trim() === "") return;
+    soul.save(next).then(
+      (s) => {
+        base.current = s.value;
+        setConflict(false);
+        setSavedAt(Date.now());
+        clearTimeout(savedTimer.current);
+        savedTimer.current = setTimeout(() => setSavedAt(0), 3000);
+      },
+      (e: Error) => {
+        if (isConflict(e)) setConflict(true);
+        else toast({ title: "Not saved", body: e.message, color: "var(--err)" });
       },
     );
+  };
+  const addSkill = () => {
+    const s = skill.trim();
+    setSkill("");
+    if (s && !draft.skills.includes(s)) set("skills", [...draft.skills, s]);
   };
   const set = <K extends keyof Soul>(key: K, value: Soul[K]) => commit({ ...draft, [key]: value });
   const setLook = (key: keyof Look, value: string) => set("look", { ...draft.look, [key]: value });
@@ -110,8 +129,10 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
             <Button
               variant="primary"
               onClick={async () => {
+                // Save over the latest version: read it first.
                 const fresh = await teamsRefetch();
-                commit(draft, fresh ?? team.version);
+                if (fresh) soul.seen(fresh);
+                commit(draft);
               }}
             >
               Keep mine
@@ -120,6 +141,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
               onClick={() => {
                 setConflict(false);
                 setDraft(saved);
+                base.current = saved;
               }}
             >
               Take theirs
@@ -229,8 +251,8 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
           <input
             value={draft.command}
             onChange={(e) => setDraft({ ...draft, command: e.target.value })}
-            onBlur={() => draft.command !== saved.command && commit(draft)}
-            onKeyDown={(e) => e.key === "Enter" && commit(draft)}
+            onBlur={() => draft.command !== base.current.command && commit(draft)}
+            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
             placeholder="./bin/my-agent"
             aria-label="Custom command"
             className={`${field} font-mono`}
@@ -275,12 +297,9 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
           <input
             value={skill}
             onChange={(e) => setSkill(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              const s = skill.trim();
-              setSkill("");
-              if (s && !draft.skills.includes(s)) set("skills", [...draft.skills, s]);
-            }}
+            // Enter adds it, and so does leaving the field: a typed skill is never lost.
+            onKeyDown={(e) => e.key === "Enter" && addSkill()}
+            onBlur={addSkill}
             placeholder="+ add"
             aria-label="Add a skill"
             className="w-20 rounded-[6px] border border-dashed border-line2 bg-transparent px-2 py-1 text-[13px] text-tx placeholder:text-tx4"
@@ -308,9 +327,9 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
   );
 
   // Keep mine saves over the latest version: fetch it first.
-  async function teamsRefetch(): Promise<string | undefined> {
+  async function teamsRefetch(): Promise<Team | undefined> {
     const r = await teamsQuery.refetch();
-    return r.data?.find((t) => t.id === team.id)?.version;
+    return r.data?.find((t) => t.id === team.id);
   }
 }
 

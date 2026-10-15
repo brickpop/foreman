@@ -13,13 +13,16 @@ import {
   useAnswer,
   useEntryTitle,
   useInstances,
+  useMergeRequest,
   usePipeline,
   useProjects,
   useRequests,
+  useSettings,
   useTeams,
 } from "../app/queries";
 import { DemoBadge } from "../components/DemoBadge";
 import { RequestPanel } from "../components/RequestPanel";
+import { ReviewPanel } from "../components/ReviewPanel";
 import { Empty, PageTitle, SectionLabel } from "../components/ui";
 
 // The CEO's inbox (wiki/product/features/home.md): every open request across
@@ -92,30 +95,55 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
   const navigate = useNavigate();
   const answer = useAnswer();
   const openChiefOfStaff = useOpenChiefOfStaff();
+  const settings = useSettings();
+  const projects = useProjects();
   const agent = agentOf(teams, r.instanceId);
+  const reviewText = useReviewText(r, agent?.soul.name);
+  // A Chief of Staff change is reviewed right here (home.md#request-list): its
+  // merge request carries the change to look at.
+  const fromChiefOfStaff = r.source === "cos" && r.kind === "review";
+  const mr = useMergeRequest(fromChiefOfStaff ? r.mergeRequestId : "");
   // A Chief of Staff change to a team file belongs to no project.
   const where = r.projectId ? `on ${r.projectId}` : "";
   const context = r.source === "cos" || !agent ? where : `${agent.team.config.name} ${where}`;
+  const openSession = () =>
+    navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
+  if (fromChiefOfStaff && mr.data) {
+    // The forge of the repo it changes: the workspace repo's, or the project repo's.
+    const project = projects.data?.find((p) => p.id === r.projectId);
+    const forge = r.projectId
+      ? project?.config.forge.projectRepo
+        ? project.config.forge.kind
+        : "none"
+      : (settings.data?.settings.workspaceForge.kind ?? "none");
+    return (
+      <ReviewPanel
+        request={r}
+        mr={mr.data}
+        forge={forge}
+        context={context}
+        author="the Chief of Staff"
+        variant="home"
+        onOpenSession={openSession}
+        onOpenChiefOfStaff={() => openChiefOfStaff()}
+      />
+    );
+  }
   return (
     <RequestPanel
       request={r}
       who={agent && { name: agent.soul.name, look: agent.soul.look }}
       context={context}
-      reviewText={useReviewText(r, agent?.soul.name)}
-      onAnswer={(text) => answer.mutate({ id: r.id, answer: text })}
-      onOpenSession={() =>
-        navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } })
-      }
-      onReview={
-        // A Chief of Staff item shows its options right here (home.md#request-list).
-        r.source === "cos"
-          ? undefined
-          : () =>
-              navigate({
-                to: "/projects/$project",
-                params: { project: r.projectId },
-                search: { tab: "changes" },
-              })
+      reviewText={reviewText}
+      onAnswer={(text) => answer.mutate({ request: r, answer: text })}
+      answering={answer.isPending}
+      onOpenSession={openSession}
+      onReview={() =>
+        navigate({
+          to: "/projects/$project",
+          params: { project: r.projectId },
+          search: { tab: "changes" },
+        })
       }
       onOpenChiefOfStaff={() => openChiefOfStaff()}
     />

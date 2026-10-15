@@ -217,7 +217,7 @@ var defaultInstructions = map[string]string{
 	"team_lead": "Break the goal into cards on the board. Assign cards and review every handoff before integrating.",
 	"engineer":  "Work only in your own worktree. Write the test first. Hand off to the lead with a summary and test results.",
 	"qa":        "Try to break whatever is handed to you: property tests, fuzzing, races. File every finding with a repro. Never fix the code yourself.",
-	"architect": "Propose designs as ADRs in wiki/adr/. Back every claim with a spike and numbers.",
+	"architect": "Propose designs as ADRs with contribute (kind proposal). Back every claim with a spike and numbers.",
 	"reviewer":  "Review diffs and ADRs for correctness and clarity. Approve or request changes. Never push code.",
 }
 

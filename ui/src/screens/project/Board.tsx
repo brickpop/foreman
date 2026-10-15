@@ -54,6 +54,7 @@ const priorityColor: Record<string, string> = {
 };
 
 export function Board({ project }: { project: string }) {
+  const navigate = useNavigate();
   const boards = useBoards(project);
   const [chosen, setChosen] = useState<string>();
   const [toml, setToml] = useState(false);
@@ -64,6 +65,7 @@ export function Board({ project }: { project: string }) {
   );
   const list = boards.data ?? [];
   const board = list.find((b) => b.id === chosen) ?? list[0];
+  if (boards.isPending) return null;
   if (!board) return <p className="px-10 pt-5 text-tx3">No board is declared in wiki.toml.</p>;
   const { columns, lanes } = layout(board);
 
@@ -79,6 +81,12 @@ export function Board({ project }: { project: string }) {
             title: card.path,
             body: `status: ${column}${lane !== now.lane && lane ? ` · ${board.laneField}: ${lane}` : ""}`,
             color: "var(--info)",
+            onOpen: () =>
+              navigate({
+                to: "/projects/$project",
+                params: { project },
+                search: { tab: "overview", entry: card.path },
+              }),
           }),
       },
     );
@@ -185,7 +193,10 @@ function Cell({
         e.preventDefault();
         setOver(true);
       }}
-      onDragLeave={() => setOver(false)}
+      // Moving over a card inside the cell is not leaving it.
+      onDragLeave={(e: DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+      }}
       onDrop={(e: DragEvent) => {
         e.preventDefault();
         setOver(false);
@@ -197,10 +208,13 @@ function Cell({
       {cards.map((card) => {
         const assignee = card.assignee ? agentOf(teams.data ?? [], `${card.assignee}@`) : undefined;
         return (
-          // biome-ignore lint/a11y/noStaticElementInteractions: dragged; the keyboard path is the status menu
+          // biome-ignore lint/a11y/noStaticElementInteractions: dragged and clicked; the keyboard paths are the title button and the status menu
+          // biome-ignore lint/a11y/useKeyWithClickEvents: the title button is the keyboard path to the sheet
           <div
             key={card.path}
             draggable
+            // A click anywhere on the card opens its sheet (the title button's click lands here too).
+            onClick={() => onOpen(card.path)}
             onDragStart={(e) => e.dataTransfer.setData("text/plain", card.path)}
             className="group flex cursor-grab flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 py-2.5 hover:border-line3"
           >
@@ -214,13 +228,12 @@ function Cell({
                 </span>
               )}
               <span className="flex-1" />
-              {menu(card)}
+              {/* The menu moves the card; its clicks don't open the sheet. */}
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops the click from reaching the card */}
+              {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events never open the sheet */}
+              <span onClick={(e) => e.stopPropagation()}>{menu(card)}</span>
             </div>
-            <button
-              type="button"
-              onClick={() => onOpen(card.path)}
-              className="text-left text-sm leading-[1.4] text-tx"
-            >
+            <button type="button" className="text-left text-sm leading-[1.4] text-tx">
               {card.title}
             </button>
             {assignee && (
@@ -246,7 +259,6 @@ function MoveMenu({
   card: Card;
   onMove: (column: string, lane: string) => void;
 }) {
-  const at = cell(board, card);
   const item =
     "cursor-pointer rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover";
   return (
@@ -261,7 +273,8 @@ function MoveMenu({
             <Menu.Item
               key={c}
               className={item}
-              onSelect={() => onMove(c, at.lane === "Other" ? board.lanes[0] : at.lane)}
+              // Only the status changes: the lane keeps its value, even one the board doesn't declare.
+              onSelect={() => onMove(c, card.lane)}
             >
               {columnLabel(c)}
             </Menu.Item>
@@ -272,11 +285,7 @@ function MoveMenu({
                 {titleCase(board.laneField)}
               </Menu.Label>
               {board.lanes.map((l) => (
-                <Menu.Item
-                  key={l}
-                  className={item}
-                  onSelect={() => onMove(at.column === "Other" ? board.columns[0] : at.column, l)}
-                >
+                <Menu.Item key={l} className={item} onSelect={() => onMove(card.column, l)}>
                   {titleCase(l)}
                 </Menu.Item>
               ))}

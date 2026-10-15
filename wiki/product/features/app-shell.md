@@ -48,7 +48,7 @@ Drawers and the side sheet overlay the content; they don't push it. Clicking out
 In-app mirrors of [notifications](./notifications.md), shown regardless of browser permission.
 
 - Toast panel: `--panel`, 1px `--line3`, radius 10, padding `12px 14px`, `--shadow`, pointer cursor. An 8px colored dot (top margin 6px), a title (600 13.5px) and a body (13px `--tx2`, line-height 1.4).
-- Dismissed automatically after **6.5 s**, or on click. A click on a toast tied to an instance opens that session in [Sessions](./sessions.md); every other toast navigates to the screen it is about (a board move opens the entry in the [Wiki reader](./wiki-reader.md), "project added" opens the project), so every toast click goes somewhere.
+- Dismissed automatically after **6.5 s**, on click, or with its **×** (top right, `--tx4`), which only dismisses it. A click on a toast tied to an instance opens that session in [Sessions](./sessions.md); every other toast navigates to the screen it is about (a board move opens the entry in the [Wiki reader](./wiki-reader.md), "project added" opens the project), so every toast click goes somewhere; the × is the way to dismiss without leaving the screen.
 
 | Event | Title | Body | Dot |
 |---|---|---|---|

@@ -1,4 +1,4 @@
-import type { Instance, Project, Request, Team } from "../api/client";
+import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
 import type { Look, Soul } from "../api/types/workspace";
 
 // Pure derivations the screens share: who an instance is, how requests are
@@ -39,8 +39,8 @@ export function homeTitle(open: number): string {
 /** Home's subtitle: running sessions across active deployments. */
 export function homeSubtitle(instances: Instance[]): string {
   const running = instances.filter((i) => i.status === "running").length;
-  const deployments = new Set(instances.map((i) => i.deploymentId)).size;
-  return `${running} sessions working across ${deployments} deployments.`;
+  const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean)).size;
+  return `${plural(running, "session")} working across ${plural(deployments, "deployment")}.`;
 }
 
 export type ProjectRow = {
@@ -166,4 +166,38 @@ export function roster(c: Team["config"]): string[] {
   for (const id of c.order ?? []) add(id);
   for (const id of Object.keys(c.agents).sort()) add(id);
   return ids;
+}
+
+/** A count with its noun: "1 session", "3 sessions". */
+export function plural(n: number, noun: string): string {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
+
+const forgeLabels: Record<string, string> = {
+  github: "GitHub",
+  forgejo: "Forgejo",
+  gitea: "Gitea",
+  none: "No forge",
+};
+
+/** A forge kind as it reads. */
+export function forgeLabel(kind: string): string {
+  return forgeLabels[kind] ?? kind;
+}
+
+/** How many files a unified diff touches. */
+export function filesChanged(diff: string): number {
+  return diff.split("\n").filter((l) => l.startsWith("+++ ")).length;
+}
+
+/** A merge request's link line: its PR, its branch, and its checks, or for a
+ * Chief of Staff change (no checks) how many files it changes. */
+export function linkLine(mr: MergeRequest, forge: string, files?: number): string {
+  const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
+  const tail = mr.conflicting
+    ? "conflicts with main"
+    : mr.authorInstance === "cos"
+      ? `${plural(files ?? 0, "file")} changed`
+      : `checks ${mr.checksStatus || "running"}`;
+  return `${pr}${mr.branch} → main · ${tail}`;
 }

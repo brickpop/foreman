@@ -113,6 +113,10 @@ export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
 
 export interface PipelineArea extends Area {
   list(project: string): Promise<Pipeline>;
+  /** One merge request, wherever it is (a Chief of Staff change to the workspace repo has no project). */
+  mergeRequest(id: string): Promise<MergeRequest>;
+  /** What it changes: a unified diff of its branch against main. */
+  diff(mergeRequest: string): Promise<string>;
   merge(mergeRequest: string): Promise<void>;
   createPr(mergeRequest: string): Promise<void>;
   reject(mergeRequest: string, reason: string): Promise<void>;
@@ -206,8 +210,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     });
     if (!r.ok) {
       // The API's error format: {error, code}.
-      const e = (await r.json().catch(() => ({}))) as { error?: string };
-      throw new Error(e.error ?? `${path}: HTTP ${r.status}`);
+      const e = (await r.json().catch(() => ({}))) as { error?: string; code?: string };
+      throw new ApiError(e.error ?? `${path}: HTTP ${r.status}`, e.code ?? "");
     }
     return r;
   };
@@ -285,6 +289,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     pipeline: {
       demo: false,
       list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
+      mergeRequest: (mr) => getJSON(`/api/merge-requests/${id(mr)}`),
+      diff: async (mr) =>
+        (await getJSON<{ diff: string }>(`/api/merge-requests/${id(mr)}/diff`)).diff,
       merge: (mr) => send("POST", `/api/merge-requests/${id(mr)}/merge`),
       createPr: (mr) => send("POST", `/api/merge-requests/${id(mr)}/create-pr`),
       reject: (mr, reason) => send("POST", `/api/merge-requests/${id(mr)}/reject`, { reason }),
@@ -317,6 +324,21 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
 }
 
 const noChiefOfStaff = new Error("The Chief of Staff doesn't run on the server yet");
+
+/** A refused request, with the API's machine code (CONFLICT, INVALID, …). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message);
+  }
+}
+
+/** Whether a save was refused because the file changed since it was read. */
+export function isConflict(e: unknown): boolean {
+  return e instanceof ApiError && e.code === "CONFLICT";
+}
 
 export const ClientContext = createContext<ForemanClient | null>(null);
 

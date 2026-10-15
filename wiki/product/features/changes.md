@@ -25,11 +25,13 @@ By kind:
 | Review (a merge request) | `<Lead> wants <entry title> merged into main in <repo>.` Link: `<branch> → main · checks <pass│fail│running>`, then the entry (opens it in the wiki reader) | **`Merge to main`** (primary; Foreman merges locally), **`Create PR on <Forgejo│GitHub│Gitea>`** (outline, only when the repo has a forge), **`Reject`** (danger style), **`Open session`** ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)) |
 | Review, after Create PR | the same text; the link line becomes `PR #<n> on <forge> · <branch> → main · checks <…>` | **`Open PR ↗`** (primary, the PR in a new tab; the CEO merges there and the request closes when Foreman sees it), **`Reject`** (also closes the PR), **`Open session`** |
 | Approval, Question | the request | its options, plus an inline input `Or type an answer…` (flex 1, min 180px); Enter submits |
-| Chief of Staff config review | `Chief of Staff changed <project>/project/project.toml: <change>.` (or `… changed team <Team>: <change>.`) Link: `foreman/config-N → main · 1 file changed` | the same actions as any review: **`Merge to main`**, **`Create PR on <forge>`** (with a forge), **`Reject`**; and `Open Chief of Staff` |
+| Chief of Staff config review | `Chief of Staff proposes a change to <project>/project/project.toml: <change>.` (or `… to teams/<team>.toml: <change>.`) Link: `foreman/config-N → main · 1 file changed` | the same actions as any review: **`Merge to main`**, **`Create PR on <forge>`** (with a forge), **`Reject`**; and `Open Chief of Staff` |
 
 When Merge to main finds a conflict, or the forge reports the PR as conflicting with `main`, the review panel's link line ends with **conflicts with main** (`--err`) instead of the checks; the lead has already been asked to merge `main` in ([When main moves](./pipeline-and-merges.md#when-main-moves)).
 
-**Reject** expands an inline editor under the request panel: a textarea (3 rows, placeholder `Why is this rejected? What needs to change?`), then `Cancel` and the danger-style `Reject and tell <Author>` (disabled while empty). Only one editor is open at a time; closing it clears the reason. Effect: [Pipeline and merges](./pipeline-and-merges.md#review-and-merge).
+The **link line** of a review shows the change: clicking it opens its diff against `main` in a dialog (each line marked added, removed or kept), or the PR on the forge once there is one. That is what the CEO reads before deciding.
+
+**Reject** expands an inline editor under the request panel: a textarea (3 rows, placeholder `What should <Author> change? (optional)`), then `Cancel` and the danger-style `Reject and tell <Author>`. The message is optional; when given, it goes to the author (the lead, or the Chief of Staff, which answers in its conversation and offers to propose the change again). Only one editor is open at a time; closing it clears the reason. Effect: [Pipeline and merges](./pipeline-and-merges.md#review-and-merge).
 
 **Empty**: `Nothing needs you on this project.`
 

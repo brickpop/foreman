@@ -19,19 +19,23 @@ export function WikiArticle({
   onTick: (line: number, done: boolean) => void;
 }) {
   const body = useRef<HTMLDivElement>(null);
-  // The server renders checkboxes disabled; here they become the one thing to tick.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the HTML changes
+  // The server renders checkboxes disabled; here they become the one thing to
+  // tick. Their state comes from the entry's checkbox list, not the HTML.
+  const done = (line: number) => entry.checkboxes.find((c) => c.line === line)?.done ?? false;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run when the HTML or the boxes change
   useEffect(() => {
-    for (const box of body.current?.querySelectorAll("input[type=checkbox]") ?? []) {
-      (box as HTMLInputElement).disabled = false;
+    for (const el of body.current?.querySelectorAll("input[type=checkbox]") ?? []) {
+      const box = el as HTMLInputElement;
+      box.disabled = false;
+      if (box.dataset.line) box.checked = done(Number(box.dataset.line));
     }
-  }, [entry.html]);
+  }, [entry.html, entry.checkboxes]);
   const click = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const box = target.closest("input[type=checkbox][data-line]") as HTMLInputElement | null;
     if (box) {
       e.preventDefault();
-      onTick(Number(box.dataset.line), !box.hasAttribute("checked"));
+      onTick(Number(box.dataset.line), !done(Number(box.dataset.line)));
       return;
     }
     const link = target.closest("a") as HTMLAnchorElement | null;

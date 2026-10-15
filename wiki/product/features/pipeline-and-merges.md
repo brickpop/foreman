@@ -36,7 +36,7 @@ The review request shows the entry's title, the branch and repo, the checks, and
 |---|---|
 | **`Merge to main`** (primary) | Merges the branch into `main` on the host, in the repo the merge request targets. (How this relates to the CEO's own checkout of `main` is [open](#open-questions).) The merge request and its work items move to "Merged", the request resolves, the lead is told, and merged branches are deleted under the existing rule ([Branches](../architecture/sandboxes-and-git.md#branches)). If the branch doesn't merge cleanly, nothing changes: the merge request is marked "conflicts with main" and the lead is asked to merge `main` in (*When main moves*) |
 | **`Create PR on <forge>`** (only when the repo has a forge) | Pushes the branch and opens a pull request on the forge, recording its URL and number; the request then shows **`Open PR ↗`** instead, and the CEO merges there. Foreman polls the PR ([Forge adapters](../architecture/forge-adapters.md#pr-state)), see below |
-| **`Reject`** | Asks for a reason, delivers it to the lead (typed into its session when idle), closes the forge PR if there is one (posting the reason as a comment), and returns the work items to stage 0. The branch stays: the lead can `switch` back to it, rework and request again |
+| **`Reject`** | Asks for an optional message, delivers it to the author (the lead, typed into its session when idle; or the Chief of Staff, which answers in its conversation and offers to propose the change again), closes the forge PR if there is one (posting the reason as a comment), and returns the work items to stage 0. The branch stays: the lead can `switch` back to it, rework and request again |
 
 After Create PR, the forge is watched:
 

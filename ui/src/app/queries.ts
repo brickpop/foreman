@@ -1,7 +1,17 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { type Board, type Soul, useClient } from "../api/client";
+import {
+  type Board,
+  type ForemanClient,
+  type Request,
+  type Settings,
+  type Soul,
+  type Team,
+  useClient,
+} from "../api/client";
 import type { Event } from "../api/types/events";
+import { useToast } from "../components/Toasts";
+import { type SerialSaver, serialSaver } from "./serialSave";
 
 // Server state, through TanStack Query: one hook per query, and server events
 // invalidating what they touch, so every screen has one data path
@@ -62,7 +72,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
   switch (e.type) {
     case "config.changed": {
       const object = (e.data as { object?: string }).object;
-      if (object === "team") return [keys.teams];
+      // A team change also changes its members' prompts.
+      if (object === "team") return [keys.teams, ["prompt"]];
       if (object === "settings") return [keys.settings];
       return [keys.projects];
     }
@@ -134,12 +145,26 @@ export function useEntryTitle(project: string, path: string) {
   });
 }
 
-/** Answers a request; the list refetches. */
+/** Answers a request; the list refetches. A failure, and a resolved Chief of
+ * Staff review, show as toasts (app-shell.md, Toasts). */
 export function useAnswer() {
   const c = useClient();
   const queries = useQueryClient();
+  const toast = useToast();
   return useMutation({
-    mutationFn: ({ id, answer }: { id: string; answer: string }) => c.requests.resolve(id, answer),
+    mutationFn: ({ request, answer }: { request: Request; answer: string }) =>
+      c.requests.resolve(request.id, answer),
+    onSuccess: (_r, { request, answer }) => {
+      if (request.source !== "cos" || request.kind !== "review") return;
+      const merged = answer === "Merge to main";
+      toast({
+        title: request.projectId ? "project.toml" : "Team file",
+        body: merged ? "Config change merged to main." : "Config change rejected.",
+        color: merged ? "var(--ok)" : "var(--tx4)",
+      });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Answer not sent", body: e.message, color: "var(--err)" }),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),
   });
 }
@@ -239,14 +264,29 @@ export function useDeployments() {
 }
 
 /** Saves a soul in its team file; the teams refetch. */
-export function useSaveSoul(team: string) {
+export function useSaveSoul(team: Team, agent: string) {
   const c = useClient();
   const queries = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { agent: string; soul: Soul; version: string }) =>
-      c.workspace.saveSoul(team, v.agent, v.soul, v.version),
-    onSettled: () => queries.invalidateQueries({ queryKey: keys.teams }),
-  });
+  const saver = useRef(
+    serialSaver<Soul>(async (soul, version) => {
+      const saved = await c.workspace.saveSoul(team.id, agent, soul, version);
+      return { value: saved.config.agents[agent], version: saved.version };
+    }),
+  ).current;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: what the server serves, by version
+  useEffect(() => {
+    saver.seen({ value: team.config.agents[agent], version: team.version });
+  }, [team.version]);
+  return {
+    /** Saves the soul; quick saves in a row queue up. */
+    save: (soul: Soul) =>
+      saver.change(() => soul).finally(() => queries.invalidateQueries({ queryKey: keys.teams })),
+    /** The version of the last save made here: a newer one came from elsewhere. */
+    lastSaved: saver.lastSaved,
+    /** Takes a fresh read now (Keep mine, after a conflict). */
+    seen: (fresh: Team) =>
+      saver.seen({ value: fresh.config.agents[agent], version: fresh.version }),
+  };
 }
 
 /** An instance's session prompt, or the agent's template when not deployed. */
@@ -255,5 +295,51 @@ export function usePrompt(team: string, agent: string, instance?: string) {
   return useQuery({
     queryKey: ["prompt", team, agent, instance ?? ""],
     queryFn: () => (instance ? c.agents.prompt(instance) : c.workspace.promptTemplate(team, agent)),
+  });
+}
+
+// One queue for settings.toml across the app: every Settings section saves
+// through it, so quick changes in different sections don't refuse each other.
+const settingsSavers = new WeakMap<ForemanClient, SerialSaver<Settings>>();
+
+/** Saves a change to the settings (serialSave.ts); they refetch after each save. */
+export function useSaveSettings() {
+  const c = useClient();
+  const queries = useQueryClient();
+  const file = useSettings();
+  let saver = settingsSavers.get(c);
+  if (!saver) {
+    saver = serialSaver<Settings>(async (s, version) => {
+      const saved = await c.workspace.saveSettings(s, version);
+      return { value: saved.settings, version: saved.version };
+    });
+    settingsSavers.set(c, saver);
+  }
+  const current = saver;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: what the server serves, by version
+  useEffect(() => {
+    if (file.data) current.seen({ value: file.data.settings, version: file.data.version });
+  }, [file.data?.version]);
+  return (change: (s: Settings) => Settings) =>
+    current.change(change).finally(() => queries.invalidateQueries({ queryKey: keys.settings }));
+}
+
+/** One merge request, wherever it is (under ["pipeline"], so pipeline events refresh it). */
+export function useMergeRequest(id: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: ["pipeline", "mr", id],
+    queryFn: () => c.pipeline.mergeRequest(id),
+    enabled: id !== "",
+  });
+}
+
+/** What a merge request changes. */
+export function useDiff(mergeRequest: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: ["pipeline", "diff", mergeRequest],
+    queryFn: () => c.pipeline.diff(mergeRequest),
+    enabled: mergeRequest !== "",
   });
 }

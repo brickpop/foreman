@@ -43,7 +43,9 @@ export function Sessions() {
   const teams = useTeams();
   const requests = useRequests();
   const tabs = deploymentTabs(instances.data ?? [], teams.data ?? [], requests.data ?? []);
-  const deployment = search.deployment ?? tabs[0]?.id ?? "";
+  // A deployment that is gone (stopped, mistyped) falls back to the first one.
+  const asked = tabs.some((t) => t.id === search.deployment) ? search.deployment : undefined;
+  const deployment = asked ?? tabs[0]?.id ?? "";
   const roster = rosterOrder(deployment, instances.data ?? [], teams.data ?? []);
   const [panes, setPanesState] = useState<Panes>(
     () => remembered.get(deployment) ?? initialPanes(roster),
@@ -322,7 +324,7 @@ function Pane({
             onKeyDown={(e) => {
               if (e.key === "Escape") return closeLine();
               if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-              if (e.shiftKey && newline) return; // the textarea adds the line
+              if (e.shiftKey) return; // the textarea adds the line
               e.preventDefault();
               // An empty line still sends Enter (it answers a harness's prompt).
               // Without a known newline, each pasted line is sent on its own.
@@ -331,7 +333,7 @@ function Pane({
             }}
             placeholder={linePlaceholder(name, instance.status, isLead)}
             aria-label={`Line input to ${name}`}
-            className="flex-1 resize-none bg-transparent leading-[1.5] text-tx placeholder:text-tx4 focus:outline-none"
+            className="flex-1 resize-none bg-transparent leading-[1.5] text-tx placeholder:text-tx4"
           />
         </div>
       )}

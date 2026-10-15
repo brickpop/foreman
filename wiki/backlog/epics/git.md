@@ -16,6 +16,7 @@ What it builds ([Sandboxes and git policy](../../product/architecture/sandboxes-
 - **merged detection**: a merge request is merged when `main` contains its branch head, whoever merged it (Foreman, the forge, or the CEO's own git);
 - **Sync** for the reserved repos: on the CEO's click, fetch the forge's `main`, merge it in, then push the workspace repo's or the project repo's `main`; on a conflict, stop and tell the CEO;
 - the branch policy checks on `handoff` and `request_merge` (members on `wt/<agent>/*`, leads on `lead/<team>/*`, nobody on `main`).
+- **merge request reads**: `GET /api/merge-requests/:id` and `GET /api/merge-requests/:id/diff` (the change the CEO reads before deciding; served by the demo client until then);
 - **forge tokens**: `GET /api/secrets/forge` and `PUT /api/secrets/forge/:kind` (check the token against the forge, store it as a [secret](../../product/models/secrets.md), write `forges.<kind>.url`), then Settings → Forge accounts switches from the demo client to the real one, and Sync is enabled;
 
 **To decide in this epic:**

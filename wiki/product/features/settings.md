@@ -26,7 +26,7 @@ Rows (grid `130px 1fr auto`): the harness label, a Mono command input (defaults 
 
 **Phasing:** the detection status comes with the [full image chain](../../backlog/image-chain.md); until then a row shows the command and the login only.
 
-Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the login container's terminal in a dialog running the harness's own login (for Claude Code: Claude Code itself, where the CEO types `/login`, since it never asks on its own). See [Session runner → Credentials](../architecture/session-runner.md#credentials).
+Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the login container's terminal in a dialog running the harness's own login (for Claude Code: Claude Code itself, where the CEO types `/login`, since it never asks on its own). See [Session runner → Credentials](../architecture/session-runner.md#credentials). **Phasing:** `reconnect needed` needs the adapter to detect an expired login; until then a row shows `connected` or `not connected`.
 
 ## Forge accounts
 
@@ -34,7 +34,7 @@ Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`
 
 One row each for **GitHub**, **Forgejo** and **Gitea**: the host and owner (or `—`), the token status (`token set` `--ok`, or `not connected` `--tx4`), and **`Connect`** / **`Change`**. Connect or Change opens an inline form: host URL (prefilled `github.com` for GitHub) and a write-only token field; Save validates the token against the forge and stores it ([Forge adapters](../architecture/forge-adapters.md), `PUT /api/secrets/forge/:kind`). A stored token is never shown again.
 
-Below the rows, **Workspace repo**: where the [workspace repo](../models/workspace.md#the-workspace-repo) is hosted, so the Chief of Staff's team changes can become PRs there (Create PR on their merge request): `No forge` (the default; the CEO merges them locally) or one of the connected forges, with the repo's URL (`workspace_forge` in [Workspace settings](../models/workspace-settings.md#schema)). With a forge set, a small outline **`Sync`** button fetches the forge's `main`, merges it in and pushes the workspace repo's `main` there, stopping with a message on a conflict; nothing is pushed automatically ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)).
+Below the rows, **Workspace repo**: where the [workspace repo](../models/workspace.md#the-workspace-repo) is hosted, so the Chief of Staff's team changes can become PRs there (Create PR on their merge request): `No forge` (the default; the CEO merges them locally) or one of the connected forges, with the repo's URL (`workspace_forge` in [Workspace settings](../models/workspace-settings.md#schema)). With a forge set, a small outline **`Sync`** button fetches the forge's `main`, merges it in and pushes the workspace repo's `main` there, stopping with a message on a conflict; nothing is pushed automatically ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)). **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
 
 ## Notifications
 

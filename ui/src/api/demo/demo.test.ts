@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ForemanClient } from "../client";
 import type { Event } from "../types/events";
 import { demoClient } from "./demo";
-import type { Seed } from "./seed";
+import { type Seed, seed } from "./seed";
 
 const zero = "0001-01-01T00:00:00Z";
 
@@ -351,5 +351,15 @@ describe("demoClient's settings", () => {
     expect((await c.maintenance.status()).images[0].state).toBe("building");
     vi.advanceTimersByTime(1000);
     expect((await c.maintenance.status()).images[0].state).toBe("ready");
+  });
+});
+
+describe("demoClient's pipeline, on the prototype's data", () => {
+  it("resolves a merge request's review when it is merged or rejected, as the server does", async () => {
+    const c = demoClient(seed, { tick: 0 });
+    const review = (await c.requests.list()).find((r) => r.mergeRequestId === "mr-2");
+    expect(review?.status).toBe("open");
+    await c.pipeline.merge("mr-2");
+    expect((await c.requests.list()).some((r) => r.id === review?.id)).toBe(false);
   });
 });

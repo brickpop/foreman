@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { useState } from "react";
 import { type Deployment, type Team as TeamData, useClient } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { harnessLabel, resolveWho, roleLabel, roster } from "../app/model";
+import { harnessLabel, plural, resolveWho, roleLabel, roster } from "../app/model";
 import {
   keys,
   useDeployments,
@@ -84,7 +84,8 @@ export function Team() {
       {tab === "members" && <Members team={team} deployments={mine} />}
       {tab === "playbook" && <Playbook team={team} />}
       {tab === "file" && <File team={team} />}
-      <DeployDialog open={deploy} onClose={() => setDeploy(false)} team={id} />
+      {/* Mounted only while open: each opening starts fresh, on this team. */}
+      {deploy && <DeployDialog open onClose={() => setDeploy(false)} team={id} />}
     </div>
   );
 }
@@ -107,6 +108,12 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
         title: `${team.config.name} stopped on ${d.projectId}`,
         body: "Worktrees are kept. Other deployments keep running.",
         color: "var(--tx4)",
+        onOpen: () =>
+          navigate({
+            to: "/projects/$project",
+            params: { project: d.projectId },
+            search: { tab: "settings" },
+          }),
       });
     },
   });
@@ -122,30 +129,51 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
             (r) => r.status === "open" && r.deploymentId === d.id,
           ).length;
           return (
-            <Panel key={d.id} className="flex items-center gap-4 px-5 py-4">
-              <div className="flex flex-1 flex-col gap-0.5">
-                <Link
-                  to="/projects/$project"
-                  params={{ project: d.projectId }}
-                  search={{ tab: "overview" }}
-                  className="text-[15px] font-semibold text-tx"
-                >
-                  {d.projectId}
-                </Link>
-                <span className="text-tx2">{d.goal}</span>
-                <span className="text-[13px] text-tx4">
-                  {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
-                </span>
-              </div>
-              <Button
-                variant="raised"
-                onClick={() => navigate({ to: "/sessions", search: { deployment: d.id } })}
+            <Panel key={d.id} className="hover:border-line3">
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: the whole card opens the project; the title link is the keyboard path */}
+              {/* biome-ignore lint/a11y/useKeyWithClickEvents: the title link is the keyboard path */}
+              <div
+                className="flex cursor-pointer items-center gap-4 px-5 py-4"
+                onClick={(e) => {
+                  // The buttons and the link inside do their own thing.
+                  if ((e.target as HTMLElement).closest("a, button")) return;
+                  navigate({
+                    to: "/projects/$project",
+                    params: { project: d.projectId },
+                    search: { tab: "overview" },
+                  });
+                }}
               >
-                Sessions
-              </Button>
-              <Button variant="danger" onClick={() => setStopping(d)}>
-                Stop
-              </Button>
+                <div className="flex flex-1 flex-col gap-0.5">
+                  <Link
+                    to="/projects/$project"
+                    params={{ project: d.projectId }}
+                    search={{ tab: "overview" }}
+                    className="text-[15px] font-semibold text-tx"
+                  >
+                    {d.projectId}
+                  </Link>
+                  <span className="text-tx2">{d.goal}</span>
+                  <span className="text-[13px] text-tx4">
+                    {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
+                  </span>
+                </div>
+                <Button
+                  variant="raised"
+                  onClick={() => navigate({ to: "/sessions", search: { deployment: d.id } })}
+                >
+                  Sessions
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={() => {
+                    stop.reset(); // no error left from another deployment
+                    setStopping(d);
+                  }}
+                >
+                  Stop
+                </Button>
+              </div>
             </Panel>
           );
         })
@@ -157,8 +185,8 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
       >
         <div className="flex flex-col gap-4">
           <p className="m-0 text-tx2">
-            {stopping ? sessions(stopping).length : 0} sessions end. Worktrees and branches are
-            kept.
+            {plural(stopping ? sessions(stopping).length : 0, "session")} end. Worktrees and
+            branches are kept.
           </p>
           {stop.error && <p className="m-0 text-[13px] text-err">{stop.error.message}</p>}
           <div className="flex justify-end gap-2">

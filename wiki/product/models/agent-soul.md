@@ -38,7 +38,7 @@ Used when a role is hired without a custom `instruction` (the CoS appends `Focus
 | Team Lead | Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges to main (request_merge, with the card that explains the work). |
 | Engineer | Work only in your own worktree. Write the test first. Hand off to the lead with a summary and test results. |
 | QA | Try to break whatever is handed to you: property tests, fuzzing, races. File every finding with a repro. Never fix the code yourself. |
-| Architect | Propose designs as ADRs in wiki/adr/. Back every claim with a spike and numbers. |
+| Architect | Propose designs as ADRs with contribute (kind proposal): only the lead writes the knowledge base. Back every claim with a spike and numbers. |
 | Reviewer | Review diffs and ADRs for correctness and clarity. Approve or request changes. Never push code. |
 
 ## Invariants

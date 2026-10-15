@@ -64,11 +64,15 @@ export function Project() {
           ))}
         </nav>
       </header>
-      {tab === "overview" && <Overview project={id} entry={entry} />}
-      {tab === "changes" && <Changes project={project} />}
-      {tab === "board" && <Board project={id} />}
-      {tab === "settings" && <ProjectSettings project={project} onDeploy={() => setDeploy(true)} />}
-      <DeployDialog open={deploy} onClose={() => setDeploy(false)} project={id} />
+      {/* Keyed by project: switching projects starts each tab fresh (tree, board, editors). */}
+      {tab === "overview" && <Overview key={id} project={id} entry={entry} />}
+      {tab === "changes" && <Changes key={id} project={project} />}
+      {tab === "board" && <Board key={id} project={id} />}
+      {tab === "settings" && (
+        <ProjectSettings key={id} project={project} onDeploy={() => setDeploy(true)} />
+      )}
+      {/* Mounted only while open: each opening starts fresh, on this project. */}
+      {deploy && <DeployDialog open onClose={() => setDeploy(false)} project={id} />}
     </div>
   );
 }

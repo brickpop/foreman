@@ -1,16 +1,18 @@
 import { roster } from "../../app/model";
-import type {
-  Deployment,
-  ForemanClient,
-  Instance,
-  MergeRequest,
-  Request,
-  TeamMessage,
+import {
+  ApiError,
+  type Deployment,
+  type ForemanClient,
+  type Instance,
+  type MergeRequest,
+  type Request,
+  type TeamMessage,
 } from "../client";
 import type { EventHandlers } from "../events";
 import type { PtyConnection, PtyHandlers } from "../pty";
 import type { Event } from "../types/events";
 import { demoChiefOfStaff } from "./chiefOfStaff";
+import { type TeamConfig, teamToml } from "./files";
 import type { Seed } from "./seed";
 
 // The demo client (wiki/backlog/demo-client.md): the prototype's data in
@@ -34,9 +36,10 @@ export type DemoOptions = {
   replyMs?: number;
 };
 
-class Conflict extends Error {
+/** A stale version, refused as the server would (code CONFLICT). */
+class Conflict extends ApiError {
   constructor(what: string) {
-    super(`${what} changed since you opened it`);
+    super(`${what} changed since you opened it`, "CONFLICT");
   }
 }
 
@@ -72,7 +75,19 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
   let timer: ReturnType<typeof setInterval> | undefined;
   let step = 0;
   const simulate = () => simulateTeam(state, setStatus, emit, iso, step++);
-  const cos = demoChiefOfStaff(state, emit, { iso, replyMs: options.replyMs ?? 900 });
+  /** Each merge request's diff; the prototype's merge requests have none. */
+  const diffs = new Map<string, string>();
+  const cos = demoChiefOfStaff(state, emit, { iso, replyMs: options.replyMs ?? 900, diffs });
+  /** Merging or rejecting a merge request resolves its review, as the server does. */
+  const resolveReview = (mergeRequest: string, answer: string) => {
+    for (const r of state.requests) {
+      if (r.mergeRequestId !== mergeRequest || r.status !== "open") continue;
+      r.status = "resolved";
+      r.answer = answer;
+      r.resolvedAt = iso();
+      emit("request.resolved", r);
+    }
+  };
 
   return {
     workspace: {
@@ -214,9 +229,6 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
         r.answer = answer;
         r.resolvedAt = iso();
         emit("request.resolved", r);
-        cos.resolved(r);
-        // A merged team change: the team files as they now read.
-        for (const t of state.teams) t.source = teamToml(t.config);
       },
     },
     messages: {
@@ -232,11 +244,20 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
           ),
           mergeRequests: state.mergeRequests.filter((m) => m.projectId === project),
         }),
+      mergeRequest: async (id) => reply(mergeRequest(state, id)),
+      diff: async (id) => {
+        mergeRequest(state, id);
+        return diffs.get(id) ?? "(demo data: no diff recorded for this merge request)";
+      },
       merge: async (id) => {
         const mr = mergeRequest(state, id);
         mr.state = "merged";
         mr.mergedAt = iso();
         emit("pipeline.changed", mr);
+        resolveReview(id, "Merge to main");
+        cos.merged(id); // a Chief of Staff change applies now
+        // The team files as they now read.
+        for (const t of state.teams) t.source = teamToml(t.config);
       },
       createPr: async (id) => {
         const mr = mergeRequest(state, id);
@@ -250,6 +271,8 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
         mr.note = reason;
         mr.rejectedAt = iso();
         emit("pipeline.changed", mr);
+        resolveReview(id, "Reject");
+        cos.rejected(id, reason);
       },
     },
     wiki: {
@@ -458,45 +481,6 @@ function markSeen(nodes: Seed["wiki"][string]["tree"], path: string) {
     if (n.path === path) n.changed = false;
     markSeen(n.children, path);
   }
-}
-
-type TeamConfig = Seed["teams"][number]["config"];
-
-const q = (s: string) => JSON.stringify(s);
-
-/** A team file as TOML, for the File tab (the server shows the real file). */
-export function teamToml(c: TeamConfig): string {
-  const lines = [`team = ${q(c.team)}`, `name = ${q(c.name)}`];
-  if (c.purpose) lines.push(`purpose = ${q(c.purpose)}`);
-  lines.push(`lead = ${q(c.lead)}`);
-  if (c.playbook.length > 0) {
-    lines.push("playbook = [");
-    for (const step of c.playbook) {
-      for (const [who, text] of Object.entries(step)) lines.push(`  { ${who} = ${q(text)} },`);
-    }
-    lines.push("]");
-  }
-  for (const e of c.escalate)
-    lines.push("", "[[escalate]]", `when = ${q(e.when)}`, `to = ${q(e.to)}`);
-  for (const id of roster(c)) {
-    const s = c.agents[id];
-    lines.push(
-      "",
-      `[agents.${id}]`,
-      `name = ${q(s.name)}`,
-      `role = ${q(s.role)}`,
-      `harness = ${q(s.harness)}`,
-    );
-    if (s.command) lines.push(`command = ${q(s.command)}`);
-    if (s.personality) lines.push(`personality = ${q(s.personality)}`);
-    if (s.skills.length > 0) lines.push(`skills = [${s.skills.map(q).join(", ")}]`);
-    if (s.instruction) lines.push(`instruction = """\n${s.instruction.trim()}\n"""`);
-    lines.push("", `[agents.${id}.look]`);
-    for (const [k, v] of Object.entries(s.look)) {
-      lines.push(`${k === "hairColor" ? "hair_color" : k} = ${q(v)}`);
-    }
-  }
-  return `${lines.join("\n")}\n`;
 }
 
 /** A session prompt for demo data. The real one is composed by the server only

@@ -96,7 +96,7 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 - Page padding: Home, Settings `48px 48px 64px`; Project and Team header `40px 48px 0`; Agent `40px 48px 64px`.
 - Project tab bodies: Overview `24px 32px 64px`; Board `20px 40px 64px`; Changes `28px 40px 64px`; Settings, teams part `24px 40px 64px`, config part `28px 48px 64px`.
 - Team tab bodies: Deployments `24px 48px 64px`; Members `20px 48px 64px`; Playbook and File `28px 48px 64px`.
-- Max widths: Home and Team tabs 920px; Settings 760px; Changes 860px; Project settings 960px; Playbook 760px; File 860px; wiki article 720px inside a 760px column; `wiki.toml` panel 620px.
+- Max widths: Home and Team tabs 920px; Settings 760px; Changes 860px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
 - Vertical gaps: 40px between Home sections; 36px between Settings and Changes sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
 - Row padding: list rows `14px 4px` or `16px 6px`; table-like rows `12px 16px`; settings rows `14px 0` or `12px 0` with a bottom border.
 
@@ -166,13 +166,13 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 
 ## Hover
 
-Rows and nav items get `--hover`. "+ New project" / "+ New team" get `--tx` on `--hover`. Board cards get a `--line3` border. "On this page" items turn `--tx`. Wiki links underline. CoS chips get an `--acc` border.
+Rows and nav items get `--hover`. "+ New project" / "+ New team" get `--tx` on `--hover`. Board cards get a `--line3` border. "On this page" items turn `--tx`. Wiki links never underline (no underline anywhere). CoS chips get an `--acc` border.
 
 ## Accessibility (v1 scope)
 
 The prototype has no focus styles, no Escape handling, no focus trap and fake disabled buttons (opacity 0.45 but still clickable). The real UI must:
 
-- Use real `disabled` controls: not clickable, not focusable, 0.45 opacity, default cursor.
+- Use real `disabled` controls: not clickable, not focusable, 0.45 opacity, `not-allowed` cursor (as in the global rules).
 - Show a visible focus ring on every interactive element for keyboard focus (`:focus-visible`): 2px `--acc` outline with a 2px offset.
 - Close the topmost overlay (side sheet, drawer, modal) on **Escape**, and return focus to the element that opened it.
 - Trap focus inside modals while they are open.

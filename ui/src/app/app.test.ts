@@ -45,7 +45,10 @@ describe("sidebarModel", () => {
 
 describe("staleKeys", () => {
   it("invalidates what each event touches", () => {
-    expect(staleKeys({ type: "config.changed", data: { object: "team" } })).toEqual([keys.teams]);
+    expect(staleKeys({ type: "config.changed", data: { object: "team" } })).toEqual([
+      keys.teams,
+      ["prompt"],
+    ]);
     expect(staleKeys({ type: "config.changed", data: { object: "settings" } })).toEqual([
       keys.settings,
     ]);
@@ -101,6 +104,9 @@ describe("Home's model", () => {
         inst("lumen@relay", "running", "orion@relay"),
       ]),
     ).toBe("2 sessions working across 2 deployments.");
+    expect(homeSubtitle([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
+      "1 session working across 1 deployment.",
+    );
   });
 
   it("gives each project its line and state", () => {

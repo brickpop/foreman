@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Request } from "../../api/client";
+import { filesChanged, linkLine } from "../../app/model";
 import { repoDetail } from "../../components/AddProject";
 import { cell, columnLabel, layout } from "./Board";
-import { linkLine, sourceLabel } from "./Changes";
+import { sourceLabel } from "./Changes";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;
 const board = (cards: Card[], lanes: string[] = []) =>
@@ -71,6 +72,14 @@ describe("Changes", () => {
       "lead/atlas/integration → main · conflicts with main",
     );
     expect(linkLine({ ...mr, checksStatus: "" }, "none")).toContain("checks running");
+    // A Chief of Staff change has no checks: it says how many files it changes.
+    const cos = {
+      branch: "foreman/config-1",
+      authorInstance: "cos",
+      checksStatus: "",
+    } as MergeRequest;
+    expect(linkLine(cos, "none", 1)).toBe("foreman/config-1 → main · 1 file changed");
+    expect(linkLine(cos, "none", 2)).toBe("foreman/config-1 → main · 2 files changed");
   });
 });
 
@@ -81,5 +90,12 @@ describe("Add a project", () => {
     expect(repoDetail(["billing-api", "billing-web"])).toBe(
       "2 git repos: billing-api, billing-web",
     );
+  });
+});
+
+describe("filesChanged", () => {
+  it("counts the files of a unified diff", () => {
+    expect(filesChanged("--- a/x\n+++ b/x\n+one\n--- a/y\n+++ b/y\n-two")).toBe(2);
+    expect(filesChanged("")).toBe(0);
   });
 });

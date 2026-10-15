@@ -43,6 +43,12 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
         title: `${p.id} added`,
         body: "Created project/ with project.toml and a wiki. Deploy a team from its Settings tab.",
         color: "var(--ok)",
+        onOpen: () =>
+          navigate({
+            to: "/projects/$project",
+            params: { project: p.id },
+            search: { tab: "settings" },
+          }),
       });
     },
   });

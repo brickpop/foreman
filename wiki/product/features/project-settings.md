@@ -17,7 +17,7 @@ Padding `24px 40px 64px`.
 - A panel of member rows (grid `auto 150px 1fr auto`, padding `12px 16px`), lead first:
   - Avatar 32 with status dot (`dotBorder --panel`).
   - Name (600) and role (12.5px `--tx4`); the lead's role reads `<Role> · talk here`.
-  - The current task (13.5px `--tx2`, ellipsis) and the **last terminal line** (Mono 12px `--tx4`, ellipsis, ANSI stripped) ([Instance](../models/instance.md)).
+  - The current task (13.5px `--tx2`, ellipsis) and the **last terminal line** (Mono 12px `--tx4`, ellipsis, ANSI stripped) ([Instance](../models/instance.md)). **Phasing:** the last line needs the `instance.line` event (tracked on the [Sessions screen](../../backlog/sessions-screen.md) card); until then a row shows the task only.
   - `Open →` (12.5px `--tx3`). A click anywhere on the row opens that session.
 - **Empty**: `No team is deployed here yet. Deploy one and each member gets its own worktree of this project's repos.`
 
@@ -61,7 +61,7 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 - **"Merges"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:
   - forge `none`: "No forge. You merge requested branches into main from Changes; Foreman does the merge."
   - otherwise: "Merge to main from Changes, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file."
-  - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync.
+  - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
 - **`project.toml`**: a row with `<project>/project/project.toml · read-only` (Mono 12.5px `--tx3`) and a small outline **`Change with Chief of Staff`** button ([Chief of Staff](./chief-of-staff.md), config flow). Below: "This file is config, committed in the project repo. Edit it in your editor, or have the Chief of Staff edit it. Its change then comes back to you in Changes as a review." Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 
 Everything in this block is read-only. Changes to `project.toml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

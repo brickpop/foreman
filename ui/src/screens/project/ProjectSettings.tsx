@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { Project } from "../../api/client";
 import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
-import { agentOf } from "../../app/model";
+import { agentOf, forgeLabel } from "../../app/model";
 import { useDeployments, useInstances, useTeams, useWorkspace } from "../../app/queries";
 import { rosterOrder } from "../../app/sessions";
 import { Avatar } from "../../components/Avatar";
@@ -9,13 +9,6 @@ import { Button, Empty, Panel } from "../../components/ui";
 
 // The project's Settings tab (wiki/product/features/project-settings.md): the
 // teams on it (runtime state), then its configuration (read-only).
-
-const forgeNames: Record<string, string> = {
-  github: "GitHub",
-  forgejo: "Forgejo",
-  gitea: "Gitea",
-  none: "No forge",
-};
 
 export function ProjectSettings({ project, onDeploy }: { project: Project; onDeploy: () => void }) {
   return (
@@ -205,7 +198,7 @@ function Configuration({ project }: { project: Project }) {
           </div>
         </Block>
         <Block title="Merges">
-          <span className="font-medium">{forgeNames[forge.kind] ?? forge.kind}</span>
+          <span className="font-medium">{forgeLabel(forge.kind)}</span>
           <span className="text-[13.5px] text-tx2">
             {forge.kind === "none"
               ? "No forge. You merge requested branches into main from Changes; Foreman does the merge."

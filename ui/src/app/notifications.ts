@@ -53,7 +53,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
       body: "Open the session to see the hand-off.",
       instance: id,
       deployment: instances.find((i) => i.id === id)?.deploymentId ?? "",
-      color: "var(--ok)",
+      color: "var(--info)",
     };
   }
   return undefined;

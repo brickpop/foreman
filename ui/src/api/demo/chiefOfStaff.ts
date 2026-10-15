@@ -1,6 +1,16 @@
-import { randomLook, roleLabel } from "../../app/model";
-import type { ChiefOfStaffArea, CosConversation, CosEntry, CosPanel, Request } from "../client";
+import { plural, randomLook, roleLabel } from "../../app/model";
+import type {
+  ChiefOfStaffArea,
+  CosConversation,
+  CosEntry,
+  CosPanel,
+  MergeRequest,
+  Request,
+} from "../client";
+import { lineDiff, type TeamConfig, teamToml } from "./files";
 import type { Seed } from "./seed";
+
+const unset = "0001-01-01T00:00:00Z";
 
 // The Chief of Staff on the demo client: the flows of
 // wiki/product/features/chief-of-staff.md#flows, scripted. The real one is a
@@ -92,8 +102,12 @@ const teamNames = ["Orion", "Vega", "Lyra", "Polaris", "Draco", "Cygnus"];
 export function demoChiefOfStaff(
   state: Seed,
   emit: (type: string, data: unknown) => void,
-  options: { iso: () => string; replyMs: number },
-): { area: ChiefOfStaffArea; resolved: (r: Request) => void } {
+  options: { iso: () => string; replyMs: number; diffs: Map<string, string> },
+): {
+  area: ChiefOfStaffArea;
+  merged: (mergeRequest: string) => void;
+  rejected: (mergeRequest: string, reason: string) => void;
+} {
   const talk: CosConversation = {
     session: `Claude Code · ${state.workspace.path}/.foreman/cos`,
     items: [],
@@ -101,9 +115,13 @@ export function demoChiefOfStaff(
     working: false,
   };
   let flow: Flow = { flow: "none" };
-  /** What merging each Chief of Staff review applies. */
-  const pending = new Map<string, () => void>();
-  let configBranch = 0;
+  /** What merging each Chief of Staff review applies, and the names it drafts
+   * (taken until it is merged or rejected, so no other draft proposes them). */
+  const pending = new Map<
+    string,
+    { apply: () => void; names: string[]; summary: string; redo?: string }
+  >(); // by merge request
+  let branches = 0; // foreman/config-N
 
   const newVersion = () => Math.random().toString(16).slice(2, 10);
   const changed = () => emit("cos.changed", {});
@@ -130,6 +148,7 @@ export function demoChiefOfStaff(
     new Set(
       state.teams
         .flatMap((t) => [t.config.name, ...Object.values(t.config.agents).map((s) => s.name)])
+        .concat([...pending.values()].flatMap((p) => p.names))
         .map((n) => n.toLowerCase()),
     );
   const freeName = (pool: string[]) => pool.find((n) => !usedNames().has(n.toLowerCase()));
@@ -140,26 +159,60 @@ export function demoChiefOfStaff(
   const deploymentsOf = (team: string) =>
     state.deployments.filter((d) => d.teamId === team && d.status === "active").length;
 
-  const raiseReview = (summary: string, projectId: string, apply: () => void) => {
+  /** Proposes a change the way the real Chief of Staff does: a branch with the
+   * edited file, a merge request and its review request. Merging applies it. */
+  const propose = (p: {
+    summary: string;
+    file: string; // the file it changes, as the review names it
+    projectId: string; // "" for a team file (the workspace repo)
+    before: string;
+    after: string;
+    apply: () => void;
+    names?: string[];
+    redo?: string; // the chip that starts the flow again after a rejection
+  }) => {
+    branches++;
+    const mr: MergeRequest = {
+      id: `mr-cos-${branches}`,
+      projectId: p.projectId,
+      deploymentId: "",
+      authorInstance: "cos",
+      repo: p.projectId ? "project" : "workspace",
+      branch: `foreman/config-${branches}`,
+      entry: "",
+      state: "open",
+      checksStatus: "",
+      conflicting: false,
+      forgePrUrl: "",
+      forgePrNumber: 0,
+      note: "",
+      createdAt: options.iso(),
+      mergedAt: unset,
+      rejectedAt: unset,
+    };
     const r: Request = {
       id: `cos-${state.requests.length + 1}`,
       kind: "review",
-      projectId,
+      projectId: p.projectId,
       deploymentId: "",
       instanceId: "",
-      summary,
+      summary: `Chief of Staff proposes a change to ${p.file}: ${p.summary}.`,
       options: ["Merge to main", "Reject"],
       source: "cos",
       status: "open",
       answer: "",
       createdAt: options.iso(),
-      resolvedAt: "0001-01-01T00:00:00Z",
-      mergeRequestId: "",
+      resolvedAt: unset,
+      mergeRequestId: mr.id,
       links: [],
     };
+    state.mergeRequests.push(mr);
     state.requests.push(r);
-    pending.set(r.id, apply);
+    options.diffs.set(mr.id, lineDiff(p.file, p.before, p.after));
+    pending.set(mr.id, { apply: p.apply, names: p.names ?? [], summary: p.summary, redo: p.redo });
+    emit("pipeline.changed", mr);
     emit("request.created", r);
+    return mr;
   };
 
   // Hire for a role.
@@ -299,29 +352,53 @@ export function demoChiefOfStaff(
     }
     askHire(h);
   };
+  /** Proposes an edit of a team file: the diff shows it, merging applies it
+   * to the file as it is then. */
+  const proposeTeamEdit = (
+    team: Seed["teams"][number],
+    summary: string,
+    edit: (c: TeamConfig) => void,
+    more: { names?: string[]; redo?: string } = {},
+  ) => {
+    const after = structuredClone(team.config);
+    edit(after);
+    return propose({
+      summary,
+      file: `teams/${team.id}.toml`,
+      projectId: "",
+      before: teamToml(team.config),
+      after: teamToml(after),
+      apply: () => {
+        edit(team.config);
+        team.version = newVersion();
+        emit("config.changed", { object: "team", id: team.id, version: team.version });
+      },
+      ...more,
+    });
+  };
   const hire = (h: Hire) => {
     const team = state.teams.find((t) => t.id === h.team);
     const name = h.name;
     if (!team || !name) return;
-    raiseReview(
-      `Chief of Staff changed team ${team.config.name}: hire ${name}, ${h.role?.replaceAll("_", " ")}.`,
-      "",
-      () => {
-        const id = name.toLowerCase();
-        team.config.order = [...team.config.order, id];
-        team.config.agents[id] = {
-          name,
-          role: h.role ?? "engineer",
-          harness: h.harness ?? "claude-code",
-          command: h.command ?? "",
-          personality: h.style ?? "",
-          skills: [],
-          instruction: hireJob(h),
-          look: randomLook(),
-        };
-        team.version = newVersion();
-        emit("config.changed", { object: "team", id: team.id, version: team.version });
+    const id = name.toLowerCase();
+    const soul = {
+      name,
+      role: h.role ?? "engineer",
+      harness: h.harness ?? "claude-code",
+      command: h.command ?? "",
+      personality: h.style ?? "",
+      skills: [],
+      instruction: hireJob(h),
+      look: randomLook(),
+    };
+    proposeTeamEdit(
+      team,
+      `hire ${name}, ${roleLabel(soul.role)}`,
+      (c) => {
+        c.order = [...c.order, id];
+        c.agents[id] = structuredClone(soul);
       },
+      { names: [name], redo: "Hire for a role" },
     );
     flow = { flow: "none" };
     say(`${name} is ready to join ${team.config.name}: it’s waiting for you as a review.`, [
@@ -403,8 +480,14 @@ export function demoChiefOfStaff(
     const name = d.name ?? "";
     const id = name.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
     const members = roster(d);
-    raiseReview(`Chief of Staff changed team ${name}: a new team, “${d.purpose}”.`, "", () => {
-      const agents = Object.fromEntries(
+    const config: TeamConfig = {
+      team: id,
+      name,
+      purpose: d.purpose ?? "",
+      lead: members[0]?.[1].toLowerCase() ?? "",
+      playbook: draftPlaybook,
+      escalate: [{ when: "a gate in project.toml", to: "ceo" }],
+      agents: Object.fromEntries(
         members.map(([role, n]) => [
           n.toLowerCase(),
           {
@@ -420,25 +503,22 @@ export function demoChiefOfStaff(
             look: randomLook(),
           },
         ]),
-      );
-      const team = {
-        id,
-        config: {
-          team: id,
-          name,
-          purpose: d.purpose ?? "",
-          lead: members[0]?.[1].toLowerCase() ?? "",
-          playbook: draftPlaybook,
-          escalate: [{ when: "a gate in project.toml", to: "ceo" }],
-          agents,
-          order: members.map(([, n]) => n.toLowerCase()),
-        },
-        version: newVersion(),
-        problems: [],
-        source: "",
-      };
-      state.teams.push(team);
-      emit("config.changed", { object: "team", id, version: team.version });
+      ),
+      order: members.map(([, n]) => n.toLowerCase()),
+    };
+    propose({
+      summary: `a new team, ${name}: “${d.purpose}”`,
+      file: `teams/${id}.toml`,
+      projectId: "",
+      before: "", // a new file
+      after: teamToml(config),
+      apply: () => {
+        const team = { id, config, version: newVersion(), problems: [], source: "" };
+        state.teams.push(team);
+        emit("config.changed", { object: "team", id, version: team.version });
+      },
+      names: [name, ...members.map(([, n]) => n)],
+      redo: "Create a team",
     });
     flow = { flow: "none" };
     say(`${name} is drafted. Once you merge it, deploy it from its page.`, ["Open the review"]);
@@ -449,7 +529,7 @@ export function demoChiefOfStaff(
     if (open.length === 0) return "Nothing needs you right now.";
     const kinds = new Map<string, number>();
     for (const r of open) kinds.set(r.kind, (kinds.get(r.kind) ?? 0) + 1);
-    const parts = [...kinds].map(([k, n]) => `${n} ${k}${n === 1 ? "" : "s"}`);
+    const parts = [...kinds].map(([k, n]) => (k === "blocked" ? `${n} blocked` : plural(n, k)));
     return `${open.length} thing${open.length === 1 ? "" : "s"} need${open.length === 1 ? "s" : ""} you: ${parts.join(", ")}. They’re on Home.`;
   };
 
@@ -466,30 +546,34 @@ export function demoChiefOfStaff(
         const soul = team?.config.agents[agent];
         flow = { flow: "none" };
         if (!team || !soul) return say("I can’t find that agent any more.");
-        raiseReview(
-          `Chief of Staff changed team ${team.config.name}: ${soul.name}, “${t}”.`,
-          "",
-          () => {
-            soul.instruction = `${soul.instruction} Adjustment: ${t}.`.trim();
-            team.version = newVersion();
-            emit("config.changed", { object: "team", id: team.id, version: team.version });
-          },
-        );
+        proposeTeamEdit(team, `${soul.name}, “${t}”`, (c) => {
+          const s = c.agents[agent];
+          if (s) s.instruction = `${s.instruction} Adjustment: ${t}.`.trim();
+        });
         return say(
           `Updated ${soul.name}’s job description on a branch. Once you merge it, every running session picks it up on its next turn.`,
         );
       }
       case "project-config": {
-        const project = flow.project;
+        const project = state.projects.find((p) => p.id === (flow as { project: string }).project);
         flow = { flow: "none" };
-        configBranch++;
-        raiseReview(
-          `Chief of Staff changed ${project}/project/project.toml: ${t}.`,
-          project,
-          () => {},
-        );
+        if (!project) return say("I can’t find that project any more.");
+        // The demo can't edit TOML from a sentence: it notes the request in the file.
+        const after = `${project.source.trimEnd()}\n# ${t} (the Chief of Staff's edit, demo)\n`;
+        const mr = propose({
+          summary: t,
+          file: `${project.id}/project/project.toml`,
+          projectId: project.id,
+          before: project.source,
+          after,
+          apply: () => {
+            project.source = after;
+            project.version = newVersion();
+            emit("config.changed", { object: "project", id: project.id, version: project.version });
+          },
+        });
         return say(
-          `Done: “${t}”. It’s on branch foreman/config-${configBranch} and waiting for you in ${project} → Changes.`,
+          `Done: “${t}”. It’s on branch ${mr.branch} and waiting for you in ${project.id} → Changes.`,
         );
       }
       case "none":
@@ -503,7 +587,9 @@ export function demoChiefOfStaff(
         }
         if (t === "What needs me today?") return say(needsMe());
         if (t === "Open the review")
-          return say("It’s at the top of Home, with Merge to main and Reject.");
+          return say(
+            "It’s at the top of Home: open its change from the link, then Merge to main or Reject.",
+          );
         return say(
           `On it. I’ll work on “${t}” and report back on Home when it’s done or if I need you.`,
         );
@@ -564,10 +650,22 @@ export function demoChiefOfStaff(
         reply(() => answer(text));
       },
     },
-    resolved: (r) => {
-      const apply = pending.get(r.id);
-      pending.delete(r.id);
-      if (apply && r.answer === "Merge to main") apply();
+    merged: (mergeRequest) => {
+      const change = pending.get(mergeRequest);
+      pending.delete(mergeRequest);
+      change?.apply();
+    },
+    // The CEO's message comes back to the Chief of Staff, in its conversation.
+    rejected: (mergeRequest, reason) => {
+      const change = pending.get(mergeRequest);
+      pending.delete(mergeRequest);
+      if (!change) return;
+      const why = reason.trim() ? `: “${reason.trim()}”` : ".";
+      say(
+        `You rejected “${change.summary}”${why} Tell me what to change and I'll propose it again.`,
+        change.redo ? [change.redo] : [],
+      );
+      changed();
     },
   };
 }

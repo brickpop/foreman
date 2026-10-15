@@ -1,18 +1,8 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import {
-  type MergeRequest,
-  type Project,
-  type Request,
-  type Team,
-  useClient,
-  type WorkItem,
-} from "../../api/client";
+import type { MergeRequest, Project, Request, Team, WorkItem } from "../../api/client";
 import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
 import { agentOf, ordered } from "../../app/model";
 import {
-  keys,
   useAnswer,
   useEntryTitle,
   useInstances,
@@ -22,13 +12,11 @@ import {
 } from "../../app/queries";
 import { Avatar } from "../../components/Avatar";
 import { RequestPanel } from "../../components/RequestPanel";
-import { useToast } from "../../components/Toasts";
+import { ReviewPanel } from "../../components/ReviewPanel";
 import { Button, Empty, Panel, SectionLabel } from "../../components/ui";
 
 // The project's actionable tab (wiki/product/features/changes.md): what needs
 // the CEO, work moving towards main, and what recently merged.
-
-const forgeNames: Record<string, string> = { github: "GitHub", forgejo: "Forgejo", gitea: "Gitea" };
 
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
@@ -39,13 +27,6 @@ export function sourceLabel(r: Request): string {
 }
 
 const stageLabels = ["in worktree", "handed to lead", "lead reviewing", "integrated"];
-
-/** A merge request's link line. */
-export function linkLine(mr: MergeRequest, forge: string): string {
-  const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeNames[forge] ?? forge} · ` : "";
-  const tail = mr.conflicting ? "conflicts with main" : `checks ${mr.checksStatus || "running"}`;
-  return `${pr}${mr.branch} → main · ${tail}`;
-}
 
 export function Changes({ project }: { project: Project }) {
   const requests = useRequests();
@@ -64,7 +45,11 @@ export function Changes({ project }: { project: Project }) {
     .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))
     .slice(0, 20);
   const openMrs = mrs.filter((m) => m.state === "open");
-  const loose = items.filter((w) => !openMrs.some((m) => m.id === w.mergeRequestId) && w.stage < 3);
+  // In flight on their own: every work item not carried by an open or merged merge
+  // request, integrated ones included (they wait for the lead's request_merge).
+  const carried = (w: (typeof items)[number]) =>
+    mrs.some((m) => m.id === w.mergeRequestId && (m.state === "open" || m.state === "merged"));
+  const loose = items.filter((w) => !carried(w));
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-9 px-10 pt-7 pb-16">
       <section className="flex flex-col gap-2.5">
@@ -144,121 +129,55 @@ function ChangesRequest({
   mr?: MergeRequest;
 }) {
   const navigate = useNavigate();
-  const client = useClient();
-  const queries = useQueryClient();
-  const toast = useToast();
   const answer = useAnswer();
   const openChiefOfStaff = useOpenChiefOfStaff();
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
   const agent = agentOf(teams, r.instanceId);
   const title = useEntryTitle(project.id, mr?.entry ?? "");
-  const act = useMutation({
-    mutationFn: async (action: "merge" | "createPr" | "reject") => {
-      if (!mr) return;
-      if (action === "merge") await client.pipeline.merge(mr.id);
-      if (action === "createPr") await client.pipeline.createPr(mr.id);
-      if (action === "reject") await client.pipeline.reject(mr.id, reason.trim());
-      if (action !== "createPr")
-        await client.requests.resolve(r.id, action === "merge" ? "Merge to main" : "Reject");
-    },
-    onError: (e: Error) => toast({ title: "Not done", body: e.message, color: "var(--err)" }),
-    onSettled: () => {
-      queries.invalidateQueries({ queryKey: ["pipeline"] });
-      queries.invalidateQueries({ queryKey: keys.requests });
-    },
-  });
   const openSession = () =>
     navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
+  const fromChiefOfStaff = r.source === "cos";
   const context =
-    r.source === "cos" || !agent
-      ? `on ${project.id}`
-      : `${agent.team.config.name} on ${project.id}`;
-  const review = r.kind === "review" && mr;
-  const forge = project.config.forge.kind;
-  return (
-    <div className="flex flex-col gap-2">
-      <RequestPanel
+    fromChiefOfStaff || !agent ? `on ${project.id}` : `${agent.team.config.name} on ${project.id}`;
+  const who = agent && { name: agent.soul.name, look: agent.soul.look };
+  if (r.kind === "review" && mr) {
+    return (
+      <ReviewPanel
         request={r}
+        mr={mr}
+        // The project repo's own forge for a config change, the code repo's otherwise.
+        forge={
+          mr.repo === "project" && !project.config.forge.projectRepo
+            ? "none"
+            : project.config.forge.kind
+        }
+        who={who}
+        context={context}
+        // A Chief of Staff change says what it proposes in its own words.
+        reviewText={
+          fromChiefOfStaff
+            ? undefined
+            : `${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into main in ${mr.repo}.`
+        }
+        author={fromChiefOfStaff ? "the Chief of Staff" : (agent?.soul.name ?? "the lead")}
         variant="changes"
         source={sourceLabel(r)}
-        who={agent && { name: agent.soul.name, look: agent.soul.look }}
-        context={context}
-        reviewText={
-          review
-            ? `${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into main in ${mr.repo}.`
-            : undefined
-        }
-        onAnswer={(text) => answer.mutate({ id: r.id, answer: text })}
         onOpenSession={openSession}
         onOpenChiefOfStaff={() => openChiefOfStaff()}
-        actions={
-          review ? (
-            <>
-              {mr.forgePrUrl ? (
-                <Button
-                  variant="primary"
-                  onClick={() => window.open(mr.forgePrUrl, "_blank", "noopener")}
-                >
-                  Open PR ↗
-                </Button>
-              ) : (
-                <>
-                  <Button variant="primary" onClick={() => act.mutate("merge")}>
-                    Merge to main
-                  </Button>
-                  {forge !== "none" && (
-                    <Button onClick={() => act.mutate("createPr")}>
-                      Create PR on {forgeNames[forge] ?? forge}
-                    </Button>
-                  )}
-                </>
-              )}
-              <Button variant="danger" onClick={() => setRejecting(true)}>
-                Reject
-              </Button>
-            </>
-          ) : undefined
-        }
-      >
-        {review && (
-          <span className={`font-mono text-[12.5px] ${mr.conflicting ? "text-err" : "text-accTx"}`}>
-            {mr.forgePrUrl ? (
-              <a href={mr.forgePrUrl} target="_blank" rel="noopener">
-                {linkLine(mr, forge)}
-              </a>
-            ) : (
-              linkLine(mr, forge)
-            )}
-          </span>
-        )}
-      </RequestPanel>
-      {rejecting && (
-        <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel p-4">
-          <textarea
-            rows={3}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Why is this rejected? What needs to change?"
-            aria-label="Why this is rejected"
-            className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
-          />
-          <span className="flex justify-end gap-2">
-            <Button
-              onClick={() => {
-                setRejecting(false);
-                setReason("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button variant="danger" disabled={!reason.trim()} onClick={() => act.mutate("reject")}>
-              Reject and tell {agent?.soul.name ?? "the lead"}
-            </Button>
-          </span>
-        </div>
-      )}
-    </div>
+      />
+    );
+  }
+  return (
+    <RequestPanel
+      request={r}
+      variant="changes"
+      source={sourceLabel(r)}
+      who={who}
+      context={context}
+      onAnswer={(text) => answer.mutate({ request: r, answer: text })}
+      answering={answer.isPending}
+      onOpenSession={openSession}
+      onOpenChiefOfStaff={() => openChiefOfStaff()}
+    />
   );
 }
 

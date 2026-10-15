@@ -1,7 +1,8 @@
 import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 
 // In-app toasts (wiki/product/features/app-shell.md#toasts): top right,
-// dismissed after 6.5 s or on click; a click goes where the toast is about.
+// dismissed after 6.5 s, on click (which goes where the toast is about), or
+// with its × (which goes nowhere).
 
 export type Toast = {
   title: string;
@@ -41,26 +42,43 @@ export function Toasts({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={show}>
       {children}
       <div
-        className="fixed top-5 right-5 z-[60] flex w-80 flex-col gap-2"
+        // pointer-events-auto: an open dialog turns pointer events off everywhere else.
+        className="pointer-events-auto fixed top-5 right-5 z-[60] flex w-80 flex-col gap-2"
         aria-live="polite"
         role="status"
       >
         {shown.map((t) => (
-          <button
+          <div
             key={t.id}
-            type="button"
-            onClick={() => {
-              dismiss(t.id);
-              t.onOpen?.();
-            }}
-            className="flex gap-2.5 rounded-[10px] border border-line3 bg-panel px-3.5 py-3 text-left shadow-overlay"
+            className="flex items-start rounded-[10px] border border-line3 bg-panel shadow-overlay"
           >
-            <span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ background: t.color }} />
-            <span className="flex flex-col gap-0.5">
-              <span className="text-[13.5px] font-semibold">{t.title}</span>
-              <span className="text-[13px] leading-[1.4] text-tx2">{t.body}</span>
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                dismiss(t.id);
+                t.onOpen?.();
+              }}
+              className="flex min-w-0 flex-1 gap-2.5 py-3 pl-3.5 text-left"
+            >
+              <span
+                className="mt-1.5 size-2 shrink-0 rounded-full"
+                style={{ background: t.color }}
+              />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[13.5px] font-semibold">{t.title}</span>
+                <span className="text-[13px] leading-[1.4] text-tx2">{t.body}</span>
+              </span>
+            </button>
+            {/* Dismisses without going anywhere. */}
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => dismiss(t.id)}
+              className="px-3 py-2.5 text-[16px] leading-none text-tx4 hover:text-tx"
+            >
+              ×
+            </button>
+          </div>
         ))}
       </div>
     </ToastContext.Provider>

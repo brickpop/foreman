@@ -19,19 +19,23 @@ export function Overview({ project, entry }: { project: string; entry?: string }
   const tick = useTick(project, (e) =>
     toast({ title: path, body: e.message, color: "var(--err)" }),
   );
-  const open = (p: string) => {
+  const open = (p: string, replace = false) =>
     navigate({
       to: "/projects/$project",
       params: { project },
       search: { tab: "overview", entry: p },
+      replace,
     });
-    window.scrollTo({ top: 0 });
-  };
-  // An unknown path falls back to index.md.
+  // Opening an entry, from anywhere, shows its top. The page scrolls in <main>.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on every entry shown
+  useEffect(() => {
+    document.querySelector("main")?.scrollTo({ top: 0 });
+  }, [path]);
+  // An unknown path falls back to index.md, replacing it so Back doesn't return to it.
   const missing = current.isError && path !== "index.md";
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the entry turns out missing
   useEffect(() => {
-    if (missing) open("index.md");
+    if (missing) open("index.md", true);
   }, [missing]);
   return (
     <div className="flex flex-col gap-5 px-8 pt-6 pb-16">
@@ -80,6 +84,7 @@ function hasChanged(nodes: Node[]): boolean {
 
 /** Whether a folder holds the current entry: those start expanded. */
 function holds(n: Node, path: string): boolean {
+  if (path === `${n.path}/index.md`) return true; // its own index isn't among its children
   return n.children.some((c) => c.path === path || holds(c, path));
 }
 
@@ -133,6 +138,11 @@ function Folder({
   onOpen: (path: string) => void;
 }) {
   const [open, setOpen] = useState(holds(node, current));
+  // Following a link into a collapsed folder opens it; a folder the CEO opened stays open.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the current entry changes
+  useEffect(() => {
+    if (holds(node, current)) setOpen(true);
+  }, [current]);
   const index = `${node.path}/index.md`;
   // The whole row toggles; expanding a folder with an index.md also opens it.
   const toggle = () => {

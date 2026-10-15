@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   type CosEntry,
   type Instance,
@@ -37,6 +37,12 @@ export function Shell() {
   };
   // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menu]);
   const [addProject, setAddProject] = useState(false);
   return (
     <ChiefOfStaffContext.Provider value={openChiefOfStaff}>
@@ -46,23 +52,35 @@ export function Shell() {
           <button
             type="button"
             aria-label="Menu"
+            aria-expanded={menu}
             onClick={() => setMenu(true)}
             className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side px-2.5 py-1 text-tx2 max-[760px]:block"
           >
             ☰
           </button>
+          {menu && (
+            <button
+              type="button"
+              aria-label="Close the menu"
+              tabIndex={-1}
+              onClick={() => setMenu(false)}
+              className="fixed inset-0 z-[35] hidden bg-black/40 max-[760px]:block"
+            />
+          )}
           <Sidebar
             onChiefOfStaff={openChiefOfStaff}
             onAddProject={() => setAddProject(true)}
             open={menu}
             onClose={() => setMenu(false)}
           />
-          <main className="min-h-0 min-w-0 overflow-auto">
+          {/* Under 760px the content starts below the menu button. */}
+          <main className="min-h-0 min-w-0 overflow-auto max-[760px]:pt-12">
             <Outlet />
           </main>
         </div>
         <ChiefOfStaffDrawer open={chiefOfStaff} onClose={() => setChiefOfStaff(false)} />
-        <AddProject open={addProject} onClose={() => setAddProject(false)} />
+        {/* Mounted only while open: each opening starts fresh. */}
+        {addProject && <AddProject open onClose={() => setAddProject(false)} />}
       </Toasts>
     </ChiefOfStaffContext.Provider>
   );
@@ -163,6 +181,8 @@ function Sidebar({
               search={{ tab: "overview" }}
               className={rowItem}
               activeProps={navActive}
+              // Active on every tab of the project, not only the one the link opens.
+              activeOptions={{ includeSearch: false }}
             >
               {p.id}
               {p.needsYou && <Dot title="Needs you" />}
@@ -186,6 +206,8 @@ function Sidebar({
               search={{ tab: "deployments" }}
               className={rowItem}
               activeProps={navActive}
+              // Active on every tab, and on its members' Agent pages (paths under it).
+              activeOptions={{ includeSearch: false }}
             >
               {t.name}
               <span className="text-xs text-tx4">{t.deployedOn}</span>

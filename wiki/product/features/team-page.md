@@ -21,7 +21,7 @@ Padding `40px 48px 0`.
 
 Padding `24px 48px 64px`, max 920px. One panel per deployment (padding `16px 20px`):
 
-- The project name (600 15px; opens the project's [Wiki reader](./wiki-reader.md)), the goal (`--tx2`), and `N working` plus ` · M waiting on you` when the deployment has open requests ([Requests](./requests.md)).
+- The whole panel opens the project's [Wiki reader](./wiki-reader.md) (the project name, 600 15px, is the keyboard path; its buttons keep their own action), the goal (`--tx2`), and `N working` plus ` · M waiting on you` when the deployment has open requests ([Requests](./requests.md)).
 - A raised **`Sessions`** button ([Sessions](./sessions.md) on this deployment) and a **`Stop`** button in the danger style ([Design system](../design/design-system.md#buttons)).
 - **Stop** ends that deployment only: its sessions terminate; worktrees and branches stay on disk; other deployments of the team keep running ([Agent runtime](../architecture/agent-runtime.md)). Stop first asks for confirmation in a dialog: "Stop <Team> on <project>? <N> sessions end. Worktrees and branches are kept." with `Cancel` and a danger `Stop`. Then a toast confirms. Its open requests expire and its work items and pull requests stay visible as stopped ([Deployment](../models/deployment.md#lifecycle)).
 - **Empty**: `Not deployed anywhere. Deploy it to a project to start sessions.`

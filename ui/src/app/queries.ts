@@ -1,4 +1,4 @@
-import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useClient } from "../api/client";
 import type { Event } from "../api/types/events";
@@ -15,6 +15,7 @@ export const keys = {
   instances: ["instances"],
   requests: ["requests"],
   harnesses: ["harnesses"],
+  messages: ["messages"],
 } as const;
 
 export function useWorkspace() {
@@ -65,6 +66,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "request.created":
     case "request.resolved":
       return [keys.requests];
+    case "team.message":
+      return [keys.messages];
     default:
       return [];
   }
@@ -87,4 +90,43 @@ export function useLiveEvents() {
 
 function invalidate(queries: QueryClient, stale: readonly (readonly string[])[]) {
   for (const key of stale) queries.invalidateQueries({ queryKey: key });
+}
+
+export function usePipeline(project: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: ["pipeline", project],
+    queryFn: () => c.pipeline.list(project),
+    enabled: project !== "",
+  });
+}
+
+/** An entry's title (a review names its wiki card). */
+export function useEntryTitle(project: string, path: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: ["entry", project, path],
+    queryFn: () => c.wiki.entry(project, path),
+    enabled: path !== "",
+    select: (e) => e.title,
+  });
+}
+
+/** Answers a request; the list refetches. */
+export function useAnswer() {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, answer }: { id: string; answer: string }) => c.requests.resolve(id, answer),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),
+  });
+}
+
+export function useMessages(deployment: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.messages, deployment],
+    queryFn: () => c.messages.list(deployment),
+    enabled: deployment !== "",
+  });
 }

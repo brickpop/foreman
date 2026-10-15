@@ -55,6 +55,70 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "workspace.changed", data: {} })).toEqual([keys.projects]);
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
     expect(staleKeys({ type: "request.created", data: {} })).toEqual([keys.requests]);
+    expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages]);
     expect(staleKeys({ type: "something.else", data: {} })).toEqual([]);
+  });
+});
+
+import { checksSentence, homeSubtitle, homeTitle, ordered, projectRows } from "./model";
+
+const req = (id: string, kind: string, createdAt: string, projectId = "ledger") =>
+  ({ id, kind, createdAt, projectId, status: "open" }) as Request;
+const inst = (id: string, status: string, deploymentId: string) =>
+  ({ id, status, deploymentId }) as Instance;
+
+describe("Home's model", () => {
+  it("orders requests by kind, oldest first within one", () => {
+    const list = ordered([
+      req("q", "question", "2026-10-14T09:00:00Z"),
+      req("f", "finding", "2026-10-14T08:00:00Z"),
+      req("a2", "approval", "2026-10-14T09:30:00Z"),
+      req("b", "blocked", "2026-10-14T09:40:00Z"),
+      req("a1", "approval", "2026-10-14T09:10:00Z"),
+      req("r", "review", "2026-10-14T07:00:00Z"),
+    ]);
+    expect(list.map((r) => r.id)).toEqual(["b", "a1", "a2", "r", "q", "f"]);
+  });
+
+  it("titles and subtitles", () => {
+    expect([homeTitle(0), homeTitle(1), homeTitle(3)]).toEqual([
+      "All clear",
+      "1 thing needs you",
+      "3 things need you",
+    ]);
+    expect(
+      homeSubtitle([
+        inst("mara@ledger", "running", "atlas@ledger"),
+        inst("tove@ledger", "idle", "atlas@ledger"),
+        inst("lumen@relay", "running", "orion@relay"),
+      ]),
+    ).toBe("2 sessions working across 2 deployments.");
+  });
+
+  it("gives each project its line and state", () => {
+    const rows = projectRows(
+      [project("ledger"), project("relay"), project("harbor")],
+      [team("atlas", "Atlas"), team("orion", "Orion")],
+      [
+        inst("mara@ledger", "running", "atlas@ledger"),
+        inst("tove@ledger", "running", "atlas@ledger"),
+        inst("lumen@relay", "idle", "orion@relay"),
+      ],
+      [req("x", "question", "2026-10-14T09:00:00Z", "ledger")],
+    );
+    expect(rows).toEqual([
+      { id: "ledger", line: "Atlas · 2 agents working", state: "needs you" },
+      { id: "relay", line: "Orion · 0 agents working", state: "idle" },
+      { id: "harbor", line: "No team deployed", state: "idle" },
+    ]);
+  });
+
+  it("says how checks went", () => {
+    expect(["pass", "fail", "running", ""].map(checksSentence)).toEqual([
+      " Checks pass.",
+      " Checks fail.",
+      " Checks running.",
+      "",
+    ]);
   });
 });

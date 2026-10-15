@@ -5,6 +5,7 @@ import { DemoBadge } from "../components/DemoBadge";
 import { Drawer } from "../components/Overlays";
 import { Toasts } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
+import { ChiefOfStaffContext } from "./chiefOfStaff";
 import {
   useInstances,
   useLiveEvents,
@@ -23,35 +24,37 @@ export function Shell() {
   // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
   return (
-    <Toasts>
-      <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
-        <button
-          type="button"
-          aria-label="Menu"
-          onClick={() => setMenu(true)}
-          className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side px-2.5 py-1 text-tx2 max-[760px]:block"
+    <ChiefOfStaffContext.Provider value={() => setChiefOfStaff(true)}>
+      <Toasts>
+        <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
+          <button
+            type="button"
+            aria-label="Menu"
+            onClick={() => setMenu(true)}
+            className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side px-2.5 py-1 text-tx2 max-[760px]:block"
+          >
+            ☰
+          </button>
+          <Sidebar
+            onChiefOfStaff={() => setChiefOfStaff(true)}
+            open={menu}
+            onClose={() => setMenu(false)}
+          />
+          <main className="min-h-0 min-w-0 overflow-auto">
+            <Outlet />
+          </main>
+        </div>
+        <Drawer
+          open={chiefOfStaff}
+          onClose={() => setChiefOfStaff(false)}
+          title="Chief of Staff"
+          width={420}
+          layer={45}
         >
-          ☰
-        </button>
-        <Sidebar
-          onChiefOfStaff={() => setChiefOfStaff(true)}
-          open={menu}
-          onClose={() => setMenu(false)}
-        />
-        <main className="min-h-0 min-w-0 overflow-auto">
-          <Outlet />
-        </main>
-      </div>
-      <Drawer
-        open={chiefOfStaff}
-        onClose={() => setChiefOfStaff(false)}
-        title="Chief of Staff"
-        width={420}
-        layer={45}
-      >
-        <p className="p-5 text-tx3">The Chief of Staff comes with its own card.</p>
-      </Drawer>
-    </Toasts>
+          <p className="p-5 text-tx3">The Chief of Staff comes with its own card.</p>
+        </Drawer>
+      </Toasts>
+    </ChiefOfStaffContext.Provider>
   );
 }
 

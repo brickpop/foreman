@@ -29,7 +29,7 @@ DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status
 GET    /api/instances/:id/prompt              composed session prompt
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
-POST   /api/instances/:id/input               line input (alt to WS)
+(line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
 POST   /api/instances/:id/restart
 
 GET    /api/requests?project=&status=open

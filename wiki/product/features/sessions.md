@@ -47,7 +47,7 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 - Auto-scroll follows output while the view is within 160px of the bottom; scrolling up stops following.
 - Keystrokes go straight to the PTY, raw, always ([API](../architecture/api.md), `WS /ws/pty/:instance`). Foreman doesn't interpret them.
 
-**Line input** (optional mode, for paste or mobile; padding `11px 18px`, top border): an amber `❯` (Mono 500 13px `--accTx`) and a borderless input; Enter sends the line ([API](../architecture/api.md), `POST /api/instances/:id/input`) as the same raw bytes typing it would produce (the text, then Enter). Placeholders:
+**Line input** (optional mode, for paste or mobile; padding `11px 18px`, top border): an amber `❯` (Mono 500 13px `--accTx`) and a borderless input; Enter sends the line through the pane's terminal connection (`WS /ws/pty/:instance`) as the same raw bytes typing it would produce (the text, then Enter). The mode is switched on by a **`Line`** button in the pane header. Placeholders:
 
 | Situation | Placeholder |
 |---|---|

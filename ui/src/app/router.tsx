@@ -17,8 +17,9 @@ const home = createRoute({ getParentRoute: () => root, path: "/", component: Hom
 const sessions = createRoute({
   getParentRoute: () => root,
   path: "sessions",
-  validateSearch: (s: Record<string, unknown>): { deployment?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { deployment?: string; agent?: string } => ({
     deployment: typeof s.deployment === "string" ? s.deployment : undefined,
+    agent: typeof s.agent === "string" ? s.agent : undefined,
   }),
   component: Sessions,
 });

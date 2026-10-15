@@ -43,7 +43,7 @@ Dark is `:root`; light overrides it under `html[data-theme="light"]`.
 
 Fixed values that are not tokens (keep them as named constants): modal backdrop `rgba(5,6,7,0.55)` in both themes; toggle knob `#fff`; selection `rgba(232,163,61,.35)`.
 
-Global rules: `html, body` have no margin, `--bg` background and `--tx` color. Links are `--accTx`, with no underline, not even on hover: no clickable element shows an underline (the CEO's rule). WebKit scrollbars are 10px with a `--line2` thumb, radius 8px and a 2px `--bg` border; the agent-tab strip uses `scrollbar-width: thin`.
+Global rules: `html, body` have no margin, `--bg` background and `--tx` color. Links are `--accTx`, with no underline, not even on hover: no clickable element shows an underline (the CEO's rule). Every clickable element (buttons, links, tabs, toggles) shows the pointer cursor; a disabled one shows `not-allowed`. WebKit scrollbars are 10px with a `--line2` thumb, radius 8px and a 2px `--bg` border; the agent-tab strip uses `scrollbar-width: thin`.
 
 ## Type
 

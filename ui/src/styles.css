@@ -131,3 +131,21 @@ a {
 ::selection {
   background: rgb(232 163 61 / 0.35);
 }
+
+/* Everything clickable shows the pointer (Tailwind 4 resets buttons to the
+   arrow); a disabled control shows it can't be used. */
+@layer base {
+  button,
+  [role="button"],
+  [role="tab"],
+  a[href],
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}

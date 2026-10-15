@@ -4,6 +4,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { useClient } from "../api/client";
+import type { PtyConnection } from "../api/pty";
 
 // Our terminal component. Screens use this, never xterm.js directly, so the
 // emulator can be replaced in one file (wiki/product/architecture/overview.md#in-the-ui).
@@ -11,6 +12,8 @@ import { useClient } from "../api/client";
 export type TerminalHandle = {
   /** The whole buffer (scrollback included) as plain text, for Copy. */
   text(): string;
+  /** Types text into the session, as the keyboard would (line input). */
+  send(text: string): void;
 };
 
 const token = (name: string) =>
@@ -20,6 +23,7 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
   const client = useClient();
   const host = useRef<HTMLDivElement>(null);
   const xterm = useRef<XTerm | null>(null);
+  const connection = useRef<PtyConnection | null>(null);
 
   useImperativeHandle(ref, () => ({
     text() {
@@ -30,6 +34,9 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
         lines.push(buffer.getLine(i)?.translateToString(true) ?? "");
       }
       return lines.join("\n").trimEnd();
+    },
+    send(text) {
+      connection.current?.send(text);
     },
   }));
 
@@ -60,6 +67,7 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
       reset: () => term.reset(),
       exit: (code) => term.write(`\r\n\x1b[90m[session exited with code ${code}]\x1b[0m\r\n`),
     });
+    connection.current = conn;
     conn.resize(term.cols, term.rows);
     const typing = term.onData((data) => conn.send(data));
     const resizing = term.onResize(({ cols, rows }) => conn.resize(cols, rows));
@@ -71,6 +79,7 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
       typing.dispose();
       resizing.dispose();
       conn.close();
+      connection.current = null;
       term.dispose();
       xterm.current = null;
     };

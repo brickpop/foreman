@@ -279,7 +279,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       resolve: notBuilt("requests"),
     },
     messages: {
-      list: notBuilt("team messages"),
+      list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
     },
     pipeline: {
       list: notBuilt("the pipeline"),

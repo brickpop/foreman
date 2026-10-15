@@ -237,13 +237,13 @@ type Instances interface {
 }
 ```
 
-Built so far (`internal/instances`): `Deploy`, `Stop`, `List`, `Terminal` and `Restore` (re-attach after a Foreman restart); statuses live in the state store and go out on the event bus, so `Status` and `Watch` are the store and the bus. `Deliver` comes with Messaging.
+Built so far (`internal/instances`): `Deploy`, `Stop`, `List`, `Terminal` and `Restore` (re-attach after a Foreman restart, keeping a live agent's `idle` or `awaiting`); statuses live in the state store and go out on the event bus, so `Status` and `Watch` are the store and the bus; `Hook` turns harness hook events into statuses; `Type` writes into an instance's terminal. Delivery itself lives in Messaging, which reads the status and types: there is no `Instances.Deliver`.
 
 Details: [Agent runtime](./agent-runtime.md).
 
 ### 6. Messaging (`messaging`)
 
-Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`msg-N` per deployment), stores them, queues them per recipient and delivers through `Instances.Deliver`. Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
+Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`msg-N` per deployment), stores them, queues them per recipient and delivers them when the recipient is idle: one plain line typed into its terminal (`Instances.Type`), then Enter after a short pause, so the harness doesn't take the Enter as part of a paste. Every harness so far takes a typed line and Enter, so there is no per-harness `Deliver` yet: an adapter gets one when its harness needs other keystrokes. Messaging hears every status change and deployment stop straight from the instance manager, not through the event bus (which drops a subscriber that falls behind), and sweeps once at startup. Built: `internal/messaging` (`ask`, `reply`, `read_message`). Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
 
 ```go
 type Messaging interface {
@@ -419,7 +419,7 @@ Mara's harness   foreman-agent   Agent link   Messaging                       In
  ask(tove,"…") ──▶ MCP ─────────▶ ToolCall ──▶ store msg-41; marker ─▶ Event bus ─▶ UI: "Mara asked Tove (msg-41)"
  ◀── "msg-41" ──────────────────────────────── (non-blocking: Mara keeps working)
                                               Deliver(tove, text) ──▶ waits: Tove idle
-                                                                      Harness.Deliver ──────────▶ "⇄ Mara asked (msg-41): …"
+                                                                      types one line ──────────▶ "Message msg-41 from Mara (ask): …"
                                                                                                     … works …
  reply(msg-41, out) ◀────────── (the same path, from Tove; delivered to Mara when she is idle) ─────┘
 ```

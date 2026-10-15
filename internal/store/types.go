@@ -59,19 +59,22 @@ type Link struct {
 	Href  string `json:"href"`
 }
 
-// TeamMessage is one message between two instances of a deployment
-// (wiki/product/models/team-message.md).
+// TeamMessage is one message to an instance of a deployment, from a teammate,
+// Foreman or the CEO (wiki/product/models/team-message.md).
 type TeamMessage struct {
 	ID           int64     `json:"id"`
 	DeploymentID string    `json:"deploymentId"`
-	FromInstance string    `json:"fromInstance"`
+	Ref          string    `json:"ref"`          // msg-N, per deployment
+	FromInstance string    `json:"fromInstance"` // an instance, or foreman / ceo
 	ToInstance   string    `json:"toInstance"`
-	Kind         string    `json:"kind"`       // ask, reply, handoff or contribute
-	RequestRef   string    `json:"requestRef"` // req-N, per deployment
+	Kind         string    `json:"kind"`      // ask, reply, handoff, contribute or notice
+	InReplyTo    string    `json:"inReplyTo"` // a reply's ask
 	Body         string    `json:"body"`
 	ArtifactRef  string    `json:"artifactRef"` // a branch or a wiki path
+	State        string    `json:"state"`       // queued, delivered, expired or failed
+	Reason       string    `json:"reason"`      // why it expired or failed
 	CreatedAt    time.Time `json:"createdAt"`
-	DeliveredAt  time.Time `json:"deliveredAt"` // zero while queued for a busy target
+	DeliveredAt  time.Time `json:"deliveredAt"` // zero while queued
 }
 
 // WorkItem is a member's piece of work on its way to main

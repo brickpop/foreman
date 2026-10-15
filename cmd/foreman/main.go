@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,6 +20,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/brickpop/foreman/agentbin"
 	"github.com/brickpop/foreman/internal/access"
@@ -31,6 +31,7 @@ import (
 	"github.com/brickpop/foreman/internal/harness/claudecode"
 	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/instances"
+	"github.com/brickpop/foreman/internal/messaging"
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
@@ -158,12 +159,30 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		// A host process: no mount, no host alias.
 		agent.Path, agent.URL = agentHost, "http://127.0.0.1:"+agentPort
 	}
+	// Messaging hears every status change and stop from the manager itself,
+	// never through the bus, which drops a subscriber that falls behind.
+	var messenger *messaging.Messenger
+	publish := func(e events.Event) {
+		bus.Publish(e)
+		switch d := e.Data.(type) {
+		case instances.StatusChange:
+			messenger.StatusChanged(d.ID, d.Status)
+		case store.Deployment:
+			if e.Type == "deployment.stopped" {
+				messenger.DeploymentStopped(d.ID)
+			}
+		}
+	}
 	manager := instances.New(instances.Deps{
 		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters,
-		OpenLog: openLog, Publish: bus.Publish, Agent: agent,
+		OpenLog: openLog, Publish: publish, Agent: agent,
 	})
-	link = agentlink.New(secret, manager.Live, noTools{}, manager)
+	messenger = messaging.New(messaging.Deps{
+		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
+		Config: ws, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
+	})
+	link = agentlink.New(secret, manager.Live, messenger, manager)
 	go func() {
 		if err := http.Serve(agentListener, link.Handler()); err != nil {
 			slog.Error("the agent port stopped", "err", err)
@@ -171,6 +190,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}()
 	if err := manager.Restore(ctx); err != nil {
 		return fmt.Errorf("restoring the instances: %w", err)
+	}
+	if err := messenger.Sweep(ctx); err != nil {
+		return fmt.Errorf("delivering what waited: %w", err)
 	}
 	login := logins{adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog)}
 	views := agents{Manager: manager, logins: login.terms}
@@ -180,6 +202,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Config:      ws,
 		Events:      bus,
 		Agents:      views,
+		Messages:    messenger,
 		Harnesses:   login,
 		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:   views,
@@ -284,16 +307,6 @@ func writeAgent() (string, error) {
 		return "", err
 	}
 	return path, os.Rename(tmp, path)
-}
-
-// noTools serves no team tools yet: they join with Messaging
-// (wiki/backlog/messaging-delivery.md).
-type noTools struct{}
-
-func (noTools) List(string) []agentlink.Tool { return nil }
-
-func (noTools) Call(context.Context, string, string, json.RawMessage) agentlink.Result {
-	return agentlink.Result{Text: "unknown tool", Error: true}
 }
 
 // configEvent turns a change on disk into the event the browser gets

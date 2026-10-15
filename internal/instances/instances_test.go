@@ -520,7 +520,9 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 // eventIsActivity reads a hook event's name as the activity itself.
 type eventIsActivity struct{ fake.Adapter }
 
-func (eventIsActivity) Interpret(event string, _ []byte) harness.Activity { return harness.Activity(event) }
+func (eventIsActivity) Interpret(event string, _ []byte) harness.Activity {
+	return harness.Activity(event)
+}
 
 // Hook events move a running instance between running, idle and awaiting;
 // they never wake, start or revive one.
@@ -568,4 +570,20 @@ func TestTheHarnessGetsTheAgentLink(t *testing.T) {
 	}
 	f.waitStatus("mara@ledger", Running)
 	f.output("mara@ledger", "link=http://h:8889 token-of-mara@ledger")
+}
+
+// A run frees only its own slot: the late end of a stopped run must not free
+// the run a redeploy started in its place (seen as a flaky redeploy).
+func TestARunReleasesOnlyItsOwnSlot(t *testing.T) {
+	m := New(Deps{})
+	old, current := &live{}, &live{}
+	m.live["mara@ledger"] = current
+	m.release("mara@ledger", old)
+	if m.live["mara@ledger"] != current {
+		t.Fatal("the old run freed the new run's slot")
+	}
+	m.release("mara@ledger", current)
+	if m.Live("mara@ledger") {
+		t.Error("the run's own release didn't free it")
+	}
 }

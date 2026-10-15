@@ -26,7 +26,7 @@ Both drivers expose the same operations to the Instance manager (start with a pr
 A harness can be a team member if:
 1. Foreman can start it with a working directory, environment and a standing-instructions file ([Session prompt → Delivery](./session-prompt.md#delivery)).
 2. It can call the team tools, exposed as an MCP server ([Team tools](./team-tools.md)).
-3. It accepts input while running: the CEO's keystrokes, and deliveries typed by the adapter's `Deliver` when it is idle.
+3. It accepts input while running: the CEO's keystrokes, and deliveries: one plain line, then Enter, typed when it is idle ([Building blocks → Messaging](./building-blocks.md#6-messaging-messaging)).
 
 Foreman never parses harness internals. It reads the output stream and talks to the agent through team tools and stdin.
 

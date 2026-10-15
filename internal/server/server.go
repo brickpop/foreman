@@ -27,6 +27,7 @@ type Options struct {
 	Config      Config
 	Events      Events
 	Agents      Agents
+	Messages    Messages
 	Harnesses   Harnesses
 	Maintenance Maintenance
 	Terminals   Terminals
@@ -40,6 +41,7 @@ func New(o Options) http.Handler {
 		writeJSON(w, http.StatusOK, workspaceSummary{Path: o.Workspace.Root()})
 	})
 	agentRoutes(mux, o.Agents)
+	messageRoutes(mux, o.Messages)
 	harnessRoutes(mux, o.Harnesses)
 	maintenanceRoutes(mux, o.Maintenance)
 	configRoutes(mux, o.Config)

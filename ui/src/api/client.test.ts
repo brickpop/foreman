@@ -66,6 +66,15 @@ describe("httpClient", () => {
     );
   });
 
+  it("lists a deployment's messages", async () => {
+    const calls = stubFetch(200, []);
+    await httpClient("http://x").messages.list("atlas@ledger");
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/messages?deployment=atlas%40ledger",
+      method: "GET",
+    });
+  });
+
   it("ends a login with DELETE", async () => {
     const calls = stubFetch(204, undefined);
     await httpClient("http://x").harnesses.endLogin("claude-code");

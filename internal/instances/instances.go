@@ -208,7 +208,7 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 			}
 			// Gone now: free its slot at once, so a redeploy right after starts it
 			// (watch, which also releases it, may not have run yet).
-			m.release(inst.ID)
+			m.release(inst.ID, l)
 		}
 		m.setStatus(ctx, inst.ID, Stopped)
 	}
@@ -246,6 +246,15 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 		return
 	}
 	m.setStatus(ctx, id, status)
+}
+
+// Type writes p into the instance's terminal, as if typed (a delivery).
+func (m *Manager) Type(id string, p []byte) error {
+	term, err := m.Terminal(id)
+	if err != nil {
+		return err
+	}
+	return term.Input(p)
 }
 
 // Terminal returns a running instance's terminal.
@@ -315,7 +324,11 @@ func (m *Manager) adopt(ctx context.Context, id string, p runner.Process) error 
 	m.mu.Lock()
 	m.live[id] = l
 	m.mu.Unlock()
-	m.setStatus(ctx, id, Running)
+	// Its process lived on: what its hooks last said still holds (idle stays
+	// idle, so a message queued for it is delivered).
+	if inst, err := m.Instances.Get(ctx, id); err != nil || (inst.Status != Idle && inst.Status != Awaiting) {
+		m.setStatus(ctx, id, Running)
+	}
 	go m.watch(id, l)
 	return nil
 }
@@ -330,7 +343,7 @@ func (m *Manager) enqueue(id string) {
 	if inst, err := m.Instances.Get(ctx, id); err == nil && inst.Status != Queued {
 		inst.Status = Queued
 		_ = m.Instances.Put(ctx, inst)
-		m.publish("instance.status", statusChange{ID: id, Status: Queued})
+		m.publish("instance.status", StatusChange{ID: id, Status: Queued})
 	}
 }
 
@@ -387,14 +400,14 @@ func (m *Manager) start(id string, l *live) {
 	}
 	if err != nil {
 		slog.Warn("starting an instance", "instance", id, "err", err)
-		m.release(id)
+		m.release(id, l)
 		m.setStatus(ctx, id, Stopped)
 		return
 	}
 	inst, _ := m.Instances.Get(ctx, id)
 	inst.Status, inst.StartedAt = Running, time.Now()
 	_ = m.Instances.Put(ctx, inst)
-	m.publish("instance.status", statusChange{ID: id, Status: Running})
+	m.publish("instance.status", StatusChange{ID: id, Status: Running})
 	go m.watch(id, l)
 }
 
@@ -492,7 +505,7 @@ func (m *Manager) watch(id string, l *live) {
 	m.mu.Lock()
 	stopping := l.stopping
 	m.mu.Unlock()
-	m.release(id)
+	m.release(id, l)
 	if stopping {
 		m.startQueued()
 		return
@@ -513,14 +526,18 @@ func (m *Manager) watch(id string, l *live) {
 	m.startQueued()
 }
 
-func (m *Manager) release(id string) {
+// release frees the slot of one run of the instance: only its own, so the late
+// end of a stopped run never frees the run that replaced it (a redeploy).
+func (m *Manager) release(id string, l *live) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.live, id)
+	if m.live[id] == l {
+		delete(m.live, id)
+	}
 }
 
-// statusChange is the instance.status event's payload.
-type statusChange struct {
+// StatusChange is the instance.status event's data.
+type StatusChange struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
 }
@@ -534,7 +551,7 @@ func (m *Manager) setStatus(ctx context.Context, id, status string) {
 	if err := m.Instances.Put(ctx, inst); err != nil {
 		slog.Warn("saving an instance", "instance", id, "err", err)
 	}
-	m.publish("instance.status", statusChange{ID: id, Status: status})
+	m.publish("instance.status", StatusChange{ID: id, Status: status})
 }
 
 func (m *Manager) publish(typ string, data any) {
@@ -602,7 +619,16 @@ func (m *Manager) compose(inst store.Instance, dep store.Deployment, team worksp
 	return prompt.Compose(prompt.Input{
 		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Path: filepath.Join(m.Root, project.ID),
 		Config: project.Config, Goal: dep.Goal,
+		Tools: m.tools(inst.AgentID == team.Config.Lead),
 	})
+}
+
+// tools are the team tools an instance gets: none without foreman-agent.
+func (m *Manager) tools(lead bool) []string {
+	if m.Agent.Host == "" {
+		return nil
+	}
+	return prompt.Offered(lead)
 }
 
 // Prompt is the session prompt an instance runs with, exactly as composed for

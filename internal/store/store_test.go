@@ -49,7 +49,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 2 {
+	if v := version(t, db.sql); v != 3 {
 		t.Errorf("version %d after the first open", v)
 	}
 	var mode string
@@ -410,5 +410,131 @@ func TestTheAsleepMigrationKeepsTheInstances(t *testing.T) {
 	}
 	if _, err := db.Exec(`UPDATE instances SET status = 'napping'`); err == nil {
 		t.Error("the CHECK was lost")
+	}
+}
+
+// --- team messages ------------------------------------------------------------
+
+func deployTwo(t *testing.T, db *DB) {
+	t.Helper()
+	for _, p := range []string{"ledger", "relay"} {
+		if _, err := db.Deployments().Deploy(ctx, "atlas", p, "g"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestMessagesAreNumberedPerDeployment(t *testing.T) {
+	db := open(t)
+	deployTwo(t, db)
+	m := db.Messages()
+	add := func(dep, from, to, kind string) TeamMessage {
+		t.Helper()
+		msg, err := m.Add(ctx, TeamMessage{DeploymentID: dep, FromInstance: from, ToInstance: to, Kind: kind, Body: "b"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return msg
+	}
+	a := add("atlas@ledger", "mara@ledger", "tove@ledger", "ask")
+	b := add("atlas@ledger", "tove@ledger", "mara@ledger", "ask")
+	c := add("atlas@relay", "mara@relay", "tove@relay", "ask")
+	if a.Ref != "msg-1" || b.Ref != "msg-2" || c.Ref != "msg-1" || a.State != MessageQueued || a.CreatedAt.IsZero() {
+		t.Errorf("refs %s %s %s, state %s", a.Ref, b.Ref, c.Ref, a.State)
+	}
+	// Past nine: numbered, not sorted as text.
+	for range 9 {
+		add("atlas@ledger", "mara@ledger", "tove@ledger", "notice")
+	}
+	if last := add("atlas@ledger", "mara@ledger", "tove@ledger", "notice"); last.Ref != "msg-12" {
+		t.Errorf("after msg-11: %s", last.Ref)
+	}
+	got, err := m.Get(ctx, "atlas@ledger", "msg-2")
+	if err != nil || got.ID != b.ID || got.FromInstance != "tove@ledger" {
+		t.Errorf("get %+v %v", got, err)
+	}
+	if _, err := m.Get(ctx, "atlas@relay", "msg-2"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("another deployment's ref: %v", err)
+	}
+}
+
+func TestConcurrentMessagesGetDistinctRefs(t *testing.T) {
+	db := open(t)
+	deployTwo(t, db)
+	var wg sync.WaitGroup
+	refs := make(chan string, 20)
+	for range 20 {
+		wg.Go(func() {
+			msg, err := db.Messages().Add(ctx, TeamMessage{DeploymentID: "atlas@ledger", FromInstance: "a", ToInstance: "b", Kind: "ask", Body: "x"})
+			if err != nil {
+				t.Error(err)
+			}
+			refs <- msg.Ref
+		})
+	}
+	wg.Wait()
+	close(refs)
+	seen := map[string]bool{}
+	for r := range refs {
+		if seen[r] {
+			t.Errorf("%s twice", r)
+		}
+		seen[r] = true
+	}
+}
+
+func TestMessageQueueRepliesAndExpiry(t *testing.T) {
+	db := open(t)
+	deployTwo(t, db)
+	m := db.Messages()
+	ask, _ := m.Add(ctx, TeamMessage{DeploymentID: "atlas@ledger", FromInstance: "mara@ledger", ToInstance: "tove@ledger", Kind: "ask", Body: "build cal"})
+	other, _ := m.Add(ctx, TeamMessage{DeploymentID: "atlas@relay", FromInstance: "mara@relay", ToInstance: "tove@relay", Kind: "ask", Body: "x"})
+	if _, err := m.ReplyTo(ctx, "atlas@ledger", ask.Ref); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no reply yet: %v", err)
+	}
+	reply, _ := m.Add(ctx, TeamMessage{DeploymentID: "atlas@ledger", FromInstance: "tove@ledger", ToInstance: "mara@ledger", Kind: "reply",
+		InReplyTo: ask.Ref, Body: "done", ArtifactRef: "wt/tove/cal"})
+	if got, err := m.ReplyTo(ctx, "atlas@ledger", ask.Ref); err != nil || got.ID != reply.ID || got.ArtifactRef != "wt/tove/cal" {
+		t.Errorf("reply %+v %v", got, err)
+	}
+	if q, _ := m.Queued(ctx, "tove@ledger"); len(q) != 1 || q[0].ID != ask.ID {
+		t.Errorf("queued for tove: %+v", q)
+	}
+	if err := m.SetState(ctx, []int64{ask.ID}, MessageDelivered, ""); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.Get(ctx, "atlas@ledger", ask.Ref)
+	if got.State != MessageDelivered || got.DeliveredAt.IsZero() {
+		t.Errorf("delivered: %+v", got)
+	}
+	if q, _ := m.Queued(ctx, "tove@ledger"); len(q) != 0 {
+		t.Errorf("still queued: %+v", q)
+	}
+	// Expiry ends only what waits, in that deployment.
+	expired, err := m.Expire(ctx, "atlas@ledger", "deployment_stopped")
+	if err != nil || len(expired) != 1 || expired[0].ID != reply.ID || expired[0].State != MessageExpired {
+		t.Errorf("expired %+v %v", expired, err)
+	}
+	if got, _ := m.Get(ctx, "atlas@ledger", ask.Ref); got.State != MessageDelivered {
+		t.Errorf("a delivered message expired: %s", got.State)
+	}
+	if got, _ := m.Get(ctx, "atlas@relay", other.Ref); got.State != MessageQueued {
+		t.Errorf("another deployment's message expired: %s", got.State)
+	}
+	if list, _ := m.List(ctx, "atlas@ledger"); len(list) != 2 || list[0].ID != ask.ID {
+		t.Errorf("list %+v", list)
+	}
+}
+
+func TestMessageRules(t *testing.T) {
+	db := open(t)
+	deployTwo(t, db)
+	for what, msg := range map[string]TeamMessage{
+		"unknown deployment": {DeploymentID: "nobody@ledger", FromInstance: "a", ToInstance: "b", Kind: "ask", Body: "x"},
+		"unknown kind":       {DeploymentID: "atlas@ledger", FromInstance: "a", ToInstance: "b", Kind: "gossip", Body: "x"},
+	} {
+		if _, err := db.Messages().Add(ctx, msg); err == nil {
+			t.Errorf("%s accepted", what)
+		}
 	}
 }

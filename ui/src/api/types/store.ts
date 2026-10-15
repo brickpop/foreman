@@ -60,20 +60,23 @@ export interface Link {
   href: string;
 }
 /**
- * TeamMessage is one message between two instances of a deployment
- * (wiki/product/models/team-message.md).
+ * TeamMessage is one message to an instance of a deployment, from a teammate,
+ * Foreman or the CEO (wiki/product/models/team-message.md).
  */
 export interface TeamMessage {
   id: number /* int64 */;
   deploymentId: string;
-  fromInstance: string;
+  ref: string; // msg-N, per deployment
+  fromInstance: string; // an instance, or foreman / ceo
   toInstance: string;
-  kind: string; // ask, reply, handoff or contribute
-  requestRef: string; // req-N, per deployment
+  kind: string; // ask, reply, handoff, contribute or notice
+  inReplyTo: string; // a reply's ask
   body: string;
   artifactRef: string; // a branch or a wiki path
+  state: string; // queued, delivered, expired or failed
+  reason: string; // why it expired or failed
   createdAt: string /* RFC 3339 */;
-  deliveredAt: string /* RFC 3339 */; // zero while queued for a busy target
+  deliveredAt: string /* RFC 3339 */; // zero while queued
 }
 /**
  * WorkItem is a member's piece of work on its way to main

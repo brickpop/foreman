@@ -25,9 +25,12 @@ var atlas = workspace.TeamConfig{
 	},
 }
 
-func input(agent string, tools bool) Input {
+// every team tool, as the finished epic will offer them
+var every = []string{"ask", "reply", "read_message", "switch", "commit", "update", "handoff", "contribute", "escalate", "request_merge"}
+
+func input(agent string, tools []string) Input {
 	return Input{
-		Agent: agent, Team: atlas, Project: "ledger", Path: "/ws/ledger", Goal: "Ship invoices.\n", TeamTools: tools,
+		Agent: agent, Team: atlas, Project: "ledger", Path: "/ws/ledger", Goal: "Ship invoices.\n", Tools: tools,
 		Config: workspace.ProjectConfig{Main: "main", Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
 	}
 }
@@ -74,13 +77,13 @@ The CEO normally talks to Mara. If the CEO instructs you directly, do it, and te
 - new dependency
 Before you tell the CEO you're done, run: npm test
 `
-	if got := Compose(input("tove", false)); got != want {
+	if got := Compose(input("tove", nil)); got != want {
 		t.Errorf("got:\n%s\nwant:\n%s", got, want)
 	}
 }
 
 func TestLeadPromptWithTeamTools(t *testing.T) {
-	got := Compose(input("mara", true))
+	got := Compose(input("mara", every))
 	for _, want := range []string{
 		"# You are Mara, Team Lead on team Atlas\nCalm, decisive.\n",
 		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges to main", // the role's default job
@@ -89,8 +92,8 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"- Mara, Team Lead (lead: integrates, requests merges to main)\n",
 		"## Tools (from Foreman)\n",
 		"request_merge(branch, entry)        Ask the CEO to merge one of your lead/atlas/* branches into main;",
-		"The CEO talks to you. Break requests down and delegate with ask() or handoff().",
-		"Before any handoff, run: npm test",
+		"The CEO talks to you. Break requests down and delegate with ask().",
+		"Before you request a merge, run: npm test",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -102,14 +105,17 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 }
 
 func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
-	member := Compose(input("ilya", true))
+	member := Compose(input("ilya", every))
+	if !strings.Contains(member, "Before any handoff, run: npm test") {
+		t.Errorf("member checks line:\n%s", member)
+	}
 	if !strings.Contains(member, "handoff(teammate, branch, summary)") || strings.Contains(member, "request_merge(") {
 		t.Errorf("member tools:\n%s", member)
 	}
 	if !strings.Contains(member, "Branches: wt/ilya/<card> only;") || !strings.Contains(member, "(read only: use contribute)") {
 		t.Errorf("member branches or wiki access:\n%s", member)
 	}
-	lead := Compose(input("mara", false))
+	lead := Compose(input("mara", nil))
 	for _, absent := range []string{"## Tools", "request_merge", "commit()", "ask()"} {
 		if strings.Contains(lead, absent) {
 			t.Errorf("an epic 1 prompt mentions %q:\n%s", absent, lead)
@@ -121,7 +127,7 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 }
 
 func TestOptionalSectionsAreLeftOut(t *testing.T) {
-	in := input("ilya", false)
+	in := input("ilya", nil)
 	in.Team.Playbook = nil
 	in.Config = workspace.ProjectConfig{Main: "trunk"}
 	got := Compose(in)
@@ -132,6 +138,41 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	}
 	if !strings.Contains(got, "made for you from trunk.") {
 		t.Error("the project's main branch name isn't used")
+	}
+}
+
+// Today's step: the messaging tools, with git still read-only.
+func TestMessagingToolsOnly(t *testing.T) {
+	for _, agent := range []string{"mara", "ilya"} {
+		got := Compose(input(agent, Offered(agent == "mara")))
+		for _, want := range []string{
+			"Work with them only through the tools below.",
+			"ask(teammate, request)", "reply(request_id, output)", "read_message(id)",
+			"Messages arrive in this session as one line",
+			"A reply (or a handoff) is its outcome: the result, the decisions you took",
+			"## Git\nGit is read-only for you",
+		} {
+			if !strings.Contains(got, want) {
+				t.Errorf("%s: missing %q in:\n%s", agent, want, got)
+			}
+		}
+		for _, absent := range []string{"switch(", "commit(", "handoff(", "request_merge", "contribute", "requests merges", "the CEO relays"} {
+			if strings.Contains(got, absent) {
+				t.Errorf("%s: offers %q, which isn't built:\n%s", agent, absent, got)
+			}
+		}
+	}
+}
+
+// The role decides: handoff for members, request_merge for the lead.
+func TestOfferedFollowsTheRole(t *testing.T) {
+	saved := built
+	t.Cleanup(func() { built = saved })
+	built = every
+	lead, member := strings.Join(Offered(true), ","), strings.Join(Offered(false), ",")
+	if strings.Contains(lead, "handoff") || !strings.Contains(lead, "request_merge") ||
+		!strings.Contains(member, "handoff") || strings.Contains(member, "request_merge") {
+		t.Errorf("lead %s; member %s", lead, member)
 	}
 }
 

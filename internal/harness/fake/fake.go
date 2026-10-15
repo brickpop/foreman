@@ -44,5 +44,13 @@ func (a Adapter) Login() (harness.Launch, error) {
 	return harness.Launch{Command: []string{a.Program}}, nil
 }
 
-// Interpret: the fake harness sends no hooks.
-func (Adapter) Interpret(string, []byte) harness.Activity { return harness.Unknown }
+// Interpret reads the hooks the fake harness sends, named as Claude Code's.
+func (Adapter) Interpret(event string, _ []byte) harness.Activity {
+	switch event {
+	case "SessionStart", "Stop":
+		return harness.Idle
+	case "UserPromptSubmit":
+		return harness.Busy
+	}
+	return harness.Unknown
+}

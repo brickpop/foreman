@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { type Instance, isNotBuilt, type Team, type TeamMessage, useClient } from "../api/client";
+import { type Instance, type Team, type TeamMessage, useClient } from "../api/client";
 import { agentOf, harnessLabel } from "../app/model";
 import {
   keys,
@@ -31,7 +31,7 @@ import { DeployDialog } from "../components/DeployDialog";
 import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, Dot, LeadTag, NotBuilt, Segmented, Toggle } from "../components/ui";
+import { Button, Dot, LeadTag, Segmented, Toggle } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
 // tabs, agent tabs, one or two panes of real terminals, markers and the
@@ -419,7 +419,8 @@ function markerText(m: TeamMessage, teams: Team[]): string {
   const name = (id: string) => agentOf(teams, id)?.soul.name ?? id;
   if (m.kind === "handoff")
     return `${name(m.fromInstance)} handed off ${m.artifactRef} to ${name(m.toInstance)}`;
-  return `${name(m.fromInstance)} → ${name(m.toInstance)} · ${m.kind}${m.requestRef ? ` · ${m.requestRef}` : ""}`;
+  // A reply is shown with its ask's id, so the pair reads as one exchange.
+  return `${name(m.fromInstance)} → ${name(m.toInstance)} · ${m.kind} · ${m.kind === "reply" ? m.inReplyTo : m.ref}`;
 }
 
 /** The team-message traffic of the deployment, newest first. It narrows the
@@ -459,11 +460,6 @@ function MessagesDrawer({
         </button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
-        {isNotBuilt(messages.error) && (
-          <div className="p-4">
-            <NotBuilt what="team messages" />
-          </div>
-        )}
         {rows.map((m) => (
           <button
             key={m.id}
@@ -475,7 +471,10 @@ function MessagesDrawer({
               <span className="font-semibold">{name(m.fromInstance)}</span>
               <span className="text-team">→</span>
               <span className="font-semibold">{name(m.toInstance)}</span>
-              <span className="font-mono text-[11.5px] text-tx4">{m.kind}</span>
+              <span className="font-mono text-[11.5px] text-tx4">
+                {m.ref} · {m.kind}
+                {m.state !== "delivered" && ` · ${m.state}`}
+              </span>
               <span className="flex-1" />
               <span className="text-xs text-tx4">{m.createdAt.slice(11, 16)}</span>
             </span>

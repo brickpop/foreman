@@ -28,7 +28,7 @@ Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findi
 
 ## Layout
 
-Body padding `20px 40px 64px`.
+Body padding `24px 48px 64px`, like every project tab.
 
 - **Toolbar**: the **board switcher** (segmented, one button per declared board; on = raised with `--line3` border) and, right-aligned, a Mono **`wiki.toml`** / **`Hide wiki.toml`** button that reveals the board's declaration in a `<pre>` (max 620px), quoted from the file.
 - **Grid**, min width 880px, scrolling horizontally when narrower.

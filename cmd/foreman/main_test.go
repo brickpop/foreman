@@ -98,7 +98,7 @@ func TestFakeHarnessNeedsTheDirectEngine(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	dir := t.TempDir()
 	err := run([]string{dir, "--yes", "--no-open", "--fake-harness", "/bin/true"}, strings.NewReader(""), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), `needs engine = "direct"`) {
+	if err == nil || !strings.Contains(err.Error(), "drop --fake-harness") {
 		t.Errorf("on podman: %v", err)
 	}
 }

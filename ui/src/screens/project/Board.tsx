@@ -68,11 +68,11 @@ export function Board({ project }: { project: string }) {
   if (boards.isPending) return null;
   if (isNotBuilt(boards.error))
     return (
-      <div className="px-10 pt-5">
+      <div className="px-12 pt-6">
         <NotBuilt what="the wiki" />
       </div>
     );
-  if (!board) return <p className="px-10 pt-5 text-tx3">No board is declared in wiki.toml.</p>;
+  if (!board) return <p className="px-12 pt-6 text-tx3">No board is declared in wiki.toml.</p>;
   const { columns, lanes } = layout(board);
 
   const drop = (card: Card, column: string, lane: string) => {
@@ -99,7 +99,7 @@ export function Board({ project }: { project: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-4 px-10 pt-5 pb-16">
+    <div className="flex flex-col gap-4 px-12 pt-6 pb-16">
       <div className="flex items-center gap-3">
         {list.length > 1 && (
           <Segmented

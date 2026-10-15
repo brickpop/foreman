@@ -20,7 +20,6 @@ type Session struct {
 	// harness's private config inside it.
 	Sandbox  string
 	Prompt   string // the composed session prompt
-	Command  string // the harness command from the settings; "" for the adapter's default
 	Continue bool   // a restart: pick up the instance's previous conversation
 	// Opener is the session's first message, typed in as if by the CEO; the
 	// session stays interactive. "" for none.

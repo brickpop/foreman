@@ -51,11 +51,7 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		"skipDangerousModePermissionPrompt": true,
 	}, "", "  ")
 
-	command := s.Command
-	if command == "" {
-		command = a.Command()
-	}
-	args := []string{command, "--dangerously-skip-permissions"}
+	args := []string{a.Command(), "--dangerously-skip-permissions"}
 	if s.Continue && hasConversation(dir) {
 		// The latest conversation in this config dir: always the instance's own.
 		args = append(args, "--continue")

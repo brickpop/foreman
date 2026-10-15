@@ -13,11 +13,11 @@ The project's **Overview** tab: a reader for the project's wiki bundle (`<projec
 Shared by every project tab:
 
 - Header: the project name (H1), its description (15px `--tx3`) and, right-aligned and bottom-aligned, the folder path (Mono 12.5px `--tx4`, e.g. `~/agents-ws/ledger`). From [Project config](../models/project-config.md).
-- Tabs (padding `9px 14px`, 500): `Overview · Changes · Board · Settings`. Active: `--tx` with a 2px `--acc` bottom border over the 1px `--line` rule; inactive `--tx3`. **Changes** carries a count badge of the project's open requests ([Changes](./changes.md)). Switching tabs closes the side sheet.
+- Tabs (padding `9px 14px`, 500): `Overview · Changes · Board · Settings`. Active: `--tx` with a 2px `--acc` bottom border over the 1px `--line` rule; inactive `--tx3`. **Changes** carries a count badge of the project's open requests ([Changes](./changes.md)). Switching tabs closes the side sheet. Every tab's body has the same sides as the header (48px) and uses the full width, so the four tabs line up.
 
 ## Layout
 
-A grid (gap 32) using the full width. Tree closed: the article alone, `minmax(0, 1fr)`. Tree open: `minmax(150px, 200px) minmax(0, 1fr)`, so the article shrinks by the tree. Body padding `24px 32px 64px`.
+A grid (gap 32) using the full width. Tree closed: the article alone, `minmax(0, 1fr)`. Tree open: `minmax(150px, 200px) minmax(0, 1fr)`, so the article shrinks by the tree. Body padding `24px 48px 64px`.
 
 ## Toolbar
 

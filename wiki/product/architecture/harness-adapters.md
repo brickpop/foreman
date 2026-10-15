@@ -36,7 +36,7 @@ One adapter per harness kind. Each declares:
 
 | Field | Meaning |
 |---|---|
-| `command`, `args` | How to start it. The command comes from [workspace settings](../models/workspace-settings.md) (`claude`, `codex`, `pi`, `hermes`); `custom` uses the soul's `command` |
+| `command`, `args` | How to start it. The harness's own command (`claude`, `codex`, `pi`, `hermes`), installed in the agent image Foreman builds, so there is no setting for it; `custom` uses the soul's `command` |
 | system prompt | Which user-level instruction file the harness reads from its config directory (Claude Code `CLAUDE.md`, Codex `AGENTS.md`), where the [session prompt](./session-prompt.md#delivery) is written. Custom harnesses use a flag with a file path or the first stdin message |
 | MCP registration | How the team-tools server is registered: an MCP config file or flag (e.g. Claude Code `--mcp-config`, Codex `mcp_servers` config) declaring the stdio server `foreman-agent mcp` ([Team tools → Transport](./team-tools.md#transport)) |
 | newline keystroke | What starts a new line in its input without sending it, typed for the CEO's Shift+Enter in the terminal and for each line break of the line input ([Sessions](../features/sessions.md)). Claude Code: `\` then Enter (its documented quick escape; to confirm on the CEO's Mac against Option+Enter and Ctrl+J). Sent to the UI with the harness status (`GET /api/harnesses`) |

@@ -11,6 +11,7 @@ export function Modal({
   title,
   children,
   width = 520,
+  buttonsOnly = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -18,6 +19,9 @@ export function Modal({
   children: ReactNode;
   /** Wider for a terminal; 520 by default. */
   width?: number;
+  /** Closes through its own buttons only: a terminal inside needs Escape, and a
+   * stray click outside mustn't end what runs in it. */
+  buttonsOnly?: boolean;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -28,6 +32,8 @@ export function Modal({
         >
           <Dialog.Content
             aria-describedby={undefined}
+            onEscapeKeyDown={(e) => buttonsOnly && e.preventDefault()}
+            onPointerDownOutside={(e) => buttonsOnly && e.preventDefault()}
             style={{ width: `min(${width}px, 100%)` }}
             className="rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
           >

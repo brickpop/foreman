@@ -44,11 +44,14 @@ export function Segmented<T extends string>({
   value,
   onChange,
   label,
+  onClose,
 }: {
   options: { value: T; label: ReactNode; disabled?: boolean }[];
   value: T;
   onChange: (value: T) => void;
   label: string;
+  /** Gives each option a × (Sessions' deployment tabs: Stop). */
+  onClose?: { label: string; close: (value: T) => void };
 }) {
   return (
     <ToggleGroup.Root
@@ -58,16 +61,41 @@ export function Segmented<T extends string>({
       aria-label={label}
       className="inline-flex gap-1"
     >
-      {options.map((o) => (
-        <ToggleGroup.Item
-          key={o.value}
-          value={o.value}
-          disabled={o.disabled}
-          className={segment(o.value === value)}
-        >
-          {o.label}
-        </ToggleGroup.Item>
-      ))}
+      {options.map((o) => {
+        const on = o.value === value;
+        if (!onClose)
+          return (
+            <ToggleGroup.Item
+              key={o.value}
+              value={o.value}
+              disabled={o.disabled}
+              className={segment(on)}
+            >
+              {o.label}
+            </ToggleGroup.Item>
+          );
+        // The × sits beside the option, not in it: a button can't hold a button.
+        return (
+          <span key={o.value} className={`${segment(on)} inline-flex items-center gap-2 pr-1.5`}>
+            <ToggleGroup.Item
+              value={o.value}
+              disabled={o.disabled}
+              className="focus-visible:outline-2 focus-visible:outline-acc"
+            >
+              {o.label}
+            </ToggleGroup.Item>
+            <button
+              type="button"
+              aria-label={`${onClose.label} ${o.value}`}
+              title={onClose.label}
+              onClick={() => onClose.close(o.value)}
+              className="rounded px-1 text-tx4 hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"
+            >
+              ×
+            </button>
+          </span>
+        );
+      })}
     </ToggleGroup.Root>
   );
 }

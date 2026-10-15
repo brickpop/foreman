@@ -173,7 +173,7 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 		"port":       {`port = 70000`, "port"},
 		"sessions":   {`max_sessions = 0`, "max_sessions"},
 		"engine":     {`engine = "docker"`, "engine"},
-		"harness":    {"[harnesses.gpt]\ncommand = \"x\"", "harnesses.gpt"},
+		"harnesses":  {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: unknown field"},
 		"stuck":      {`stuck_after_minutes = 0`, "stuck_after_minutes"},
 		"log cap":    {`log_cap_mb = -1`, "log_cap_mb"},
 		"forge kind": {"[forges.bitbucket]\nurl = \"https://x\"", "forges.bitbucket"},

@@ -9,7 +9,12 @@ import (
 	"github.com/brickpop/foreman/internal/harness"
 )
 
-type fakeHarnesses struct{ connected []string }
+type fakeHarnesses struct{ connected, ended []string }
+
+func (f *fakeHarnesses) EndLogin(id string) error {
+	f.ended = append(f.ended, id)
+	return nil
+}
 
 func (f *fakeHarnesses) Harnesses() []harness.Status {
 	return []harness.Status{{ID: "claude-code", Connected: false}}
@@ -36,5 +41,11 @@ func TestHarnessesAndConnect(t *testing.T) {
 	}
 	if w := send(h, "POST", "/api/harnesses/pi/connect", ""); w.Code != http.StatusNotFound {
 		t.Errorf("unknown harness: %d", w.Code)
+	}
+	if w := send(h, "DELETE", "/api/harnesses/claude-code/connect", ""); w.Code != http.StatusNoContent || len(f.ended) != 1 {
+		t.Errorf("end the login: %d %v", w.Code, f.ended)
+	}
+	if w := send(h, "DELETE", "/api/harnesses/pi/connect", ""); w.Code != http.StatusNotFound || len(f.ended) != 1 {
+		t.Errorf("end an unknown harness's login: %d", w.Code)
 	}
 }

@@ -5,6 +5,7 @@ import { type Instance, isNotBuilt, type Team, type TeamMessage, useClient } fro
 import { agentOf, harnessLabel } from "../app/model";
 import {
   keys,
+  useDeployments,
   useHarnesses,
   useInstances,
   useMessages,
@@ -26,6 +27,8 @@ import {
   typedLine,
 } from "../app/sessions";
 import { Avatar } from "../components/Avatar";
+import { DeployDialog } from "../components/DeployDialog";
+import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
 import { Button, Dot, LeadTag, NotBuilt, Segmented, Toggle } from "../components/ui";
@@ -53,6 +56,9 @@ export function Sessions() {
     () => remembered.get(deployment) ?? initialPanes(roster),
   );
   const [messages, setMessages] = useState(false);
+  const [stopping, setStopping] = useState<string>(); // a deployment id
+  const deployments = useDeployments();
+  const toStop = deployments.data?.find((d) => d.id === stopping);
   const setPanes = (p: Panes) => {
     remembered.set(deployment, p);
     setPanesState(p);
@@ -70,7 +76,11 @@ export function Sessions() {
 
   if (instances.isPending) return <Centered>…</Centered>;
   if (tabs.length === 0)
-    return <Centered>No team is deployed yet, so there are no sessions.</Centered>;
+    return (
+      <Centered>
+        <NoSessions />
+      </Centered>
+    );
 
   const team = teams.data?.find((t) => t.id === deployment.split("@")[0]);
   const byId = new Map(roster.map((i) => [i.id, i]));
@@ -82,6 +92,7 @@ export function Sessions() {
           label="Deployments"
           value={deployment}
           onChange={(d) => navigate({ to: "/sessions", search: { deployment: d } })}
+          onClose={{ label: "Stop", close: setStopping }}
           options={tabs.map((t) => ({
             value: t.id,
             label: (
@@ -99,6 +110,13 @@ export function Sessions() {
         <Toggle on={messages} onChange={setMessages}>
           Messages
         </Toggle>
+        {toStop && (
+          <StopDialog
+            deployment={toStop}
+            teamName={teams.data?.find((t) => t.id === toStop.teamId)?.config.name ?? toStop.teamId}
+            onClose={() => setStopping(undefined)}
+          />
+        )}
       </div>
       <AgentTabs
         roster={roster}
@@ -466,6 +484,21 @@ function MessagesDrawer({
         ))}
       </div>
     </aside>
+  );
+}
+
+/** Nothing deployed: deploy from here, choosing the team and the project. */
+function NoSessions() {
+  const [deploy, setDeploy] = useState(false);
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <span>No team is deployed yet, so there are no sessions.</span>
+      <Button variant="primary" onClick={() => setDeploy(true)}>
+        Deploy a team
+      </Button>
+      {/* Mounted only while open: each opening starts fresh. */}
+      {deploy && <DeployDialog open onClose={() => setDeploy(false)} />}
+    </div>
   );
 }
 

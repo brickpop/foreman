@@ -102,7 +102,7 @@ func TestLaunchOptions(t *testing.T) {
 	gitconfig := filepath.Join(t.TempDir(), ".gitconfig")
 	write(t, gitconfig, "[alias]\n  st = status\n")
 	a.GitConfig = gitconfig
-	s.Command, s.Continue = "/opt/claude", true
+	s.Continue = true
 	// Nothing to continue yet: no --continue.
 	if l, _ := a.Launch(s); len(l.Command) != 2 {
 		t.Errorf("continue without a conversation: %v", l.Command)
@@ -112,12 +112,12 @@ func TestLaunchOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(l.Command, []string{"/opt/claude", "--dangerously-skip-permissions", "--continue"}) {
+	if !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue"}) {
 		t.Errorf("command %v", l.Command)
 	}
 	// The opener is the last argument, a prompt: interactive, never -p.
 	s.Opener = "Your goal on ledger: -v ship it"
-	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"/opt/claude", "--dangerously-skip-permissions", "--continue", s.Opener}) {
+	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue", s.Opener}) {
 		t.Errorf("with an opener: %v", l.Command)
 	}
 	if last := l.Mounts[len(l.Mounts)-1]; last != (runner.Mount{Source: gitconfig, Target: "/home/node/.gitconfig", ReadOnly: true}) {

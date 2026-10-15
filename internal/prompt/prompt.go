@@ -45,6 +45,7 @@ func Compose(in Input) string {
 	line("Your sandbox: %s/.sandboxes/%s (a git worktree per repo)", in.Project, in.Agent)
 	line("Branches: %s", branches(in, lead))
 	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(in, lead))
+	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	line("")
 	line("## Your team on %s", in.Project)
 	for _, id := range in.Team.Roster() {
@@ -60,10 +61,12 @@ func Compose(in Input) string {
 	}
 	if in.TeamTools {
 		line("You can't see their worktrees, only the branches they name. Work with them only through the tools below.")
+		line("They are separate sessions that Foreman runs: your harness's own agent or messaging tools don't reach them.")
 		line("")
 		b.WriteString(tools(in, lead))
 	} else {
 		line("You can't see their worktrees, and there is no way to reach them yet: the CEO relays what is needed.")
+		line("They are separate sessions that Foreman runs: your harness's own agent or messaging tools don't reach them.")
 		line("")
 		line("## Git")
 		line("Git is read-only for you (status, diff, log, blame work). Don't commit, branch or merge:")

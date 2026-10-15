@@ -88,22 +88,16 @@ type Look struct {
 
 // Settings is settings.toml. Absent fields keep their defaults.
 type Settings struct {
-	Listen             string                     `toml:"listen" json:"listen"`
-	Port               int                        `toml:"port" json:"port"`
-	MaxSessions        int                        `toml:"max_sessions" json:"maxSessions"`
-	Engine             string                     `toml:"engine" json:"engine"`
-	Harnesses          map[string]HarnessSettings `toml:"harnesses,omitempty" json:"harnesses"`
-	StuckAfterMinutes  int                        `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
-	TeamMessageMarkers bool                       `toml:"team_message_markers" json:"teamMessageMarkers"`
-	LogCapMB           int                        `toml:"log_cap_mb" json:"logCapMb"`
-	Forges             map[string]ForgeAccount    `toml:"forges,omitempty" json:"forges"`
-	WorkspaceForge     WorkspaceForge             `toml:"workspace_forge" json:"workspaceForge"`
-	Notifications      Notifications              `toml:"notifications" json:"notifications"`
-}
-
-// HarnessSettings is one harness's command.
-type HarnessSettings struct {
-	Command string `toml:"command" json:"command"`
+	Listen             string                  `toml:"listen" json:"listen"`
+	Port               int                     `toml:"port" json:"port"`
+	MaxSessions        int                     `toml:"max_sessions" json:"maxSessions"`
+	Engine             string                  `toml:"engine" json:"engine"`
+	StuckAfterMinutes  int                     `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
+	TeamMessageMarkers bool                    `toml:"team_message_markers" json:"teamMessageMarkers"`
+	LogCapMB           int                     `toml:"log_cap_mb" json:"logCapMb"`
+	Forges             map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
+	WorkspaceForge     WorkspaceForge          `toml:"workspace_forge" json:"workspaceForge"`
+	Notifications      Notifications           `toml:"notifications" json:"notifications"`
 }
 
 // ForgeAccount is a forge account's host or owner; its token is a secret.
@@ -329,11 +323,6 @@ func (s Settings) validate() problems {
 	}
 	if s.Engine != "podman" && s.Engine != "direct" {
 		p.add(`engine: must be "podman" or "direct"`)
-	}
-	for _, h := range sortedKeys(s.Harnesses) {
-		if !slices.Contains(harnesses, h) || h == "custom" {
-			p.add("harnesses.%s: not a harness", h)
-		}
 	}
 	if s.StuckAfterMinutes <= 0 {
 		p.add("stuck_after_minutes: must be more than 0")

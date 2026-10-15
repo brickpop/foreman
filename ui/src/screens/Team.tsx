@@ -1,21 +1,12 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { type Deployment, type Team as TeamData, useClient } from "../api/client";
+import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { harnessLabel, plural, resolveWho, roleLabel, roster } from "../app/model";
-import {
-  keys,
-  useDeployments,
-  useInstances,
-  useRequests,
-  useTeams,
-  useWorkspace,
-} from "../app/queries";
+import { harnessLabel, resolveWho, roleLabel, roster } from "../app/model";
+import { useDeployments, useInstances, useRequests, useTeams, useWorkspace } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
-import { Modal } from "../components/Overlays";
-import { useToast } from "../components/Toasts";
+import { StopDialog } from "../components/StopDialog";
 import { Button, Dot, Empty, Panel } from "../components/ui";
 
 export type TeamTab = "deployments" | "members" | "playbook" | "file";
@@ -88,31 +79,9 @@ export function Team() {
 
 function Deployments({ team, deployments }: { team: TeamData; deployments: Deployment[] }) {
   const navigate = useNavigate();
-  const client = useClient();
-  const queries = useQueryClient();
-  const toast = useToast();
   const instances = useInstances();
   const requests = useRequests();
   const [stopping, setStopping] = useState<Deployment>();
-  const stop = useMutation({
-    mutationFn: (d: Deployment) => client.agents.stop(d.id),
-    onSuccess: (_r, d) => {
-      queries.invalidateQueries({ queryKey: keys.instances });
-      queries.invalidateQueries({ queryKey: keys.deployments });
-      setStopping(undefined);
-      toast({
-        title: `${team.config.name} stopped on ${d.projectId}`,
-        body: "Worktrees are kept. Other deployments keep running.",
-        color: "var(--tx4)",
-        onOpen: () =>
-          navigate({
-            to: "/projects/$project",
-            params: { project: d.projectId },
-            search: { tab: "settings" },
-          }),
-      });
-    },
-  });
   const sessions = (d: Deployment) => (instances.data ?? []).filter((i) => i.deploymentId === d.id);
   return (
     <section className="flex w-full max-w-[920px] flex-col gap-3 px-12 pt-6 pb-16">
@@ -160,13 +129,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                 >
                   Sessions
                 </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => {
-                    stop.reset(); // no error left from another deployment
-                    setStopping(d);
-                  }}
-                >
+                <Button variant="danger" onClick={() => setStopping(d)}>
                   Stop
                 </Button>
               </div>
@@ -174,29 +137,13 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
           );
         })
       )}
-      <Modal
-        open={stopping !== undefined}
-        onClose={() => setStopping(undefined)}
-        title={`Stop ${team.config.name} on ${stopping?.projectId ?? ""}?`}
-      >
-        <div className="flex flex-col gap-4">
-          <p className="m-0 text-tx2">
-            {plural(stopping ? sessions(stopping).length : 0, "session")} end. Worktrees and
-            branches are kept.
-          </p>
-          {stop.error && <p className="m-0 text-[13px] text-err">{stop.error.message}</p>}
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setStopping(undefined)}>Cancel</Button>
-            <Button
-              variant="danger"
-              disabled={stop.isPending}
-              onClick={() => stopping && stop.mutate(stopping)}
-            >
-              Stop
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {stopping && (
+        <StopDialog
+          deployment={stopping}
+          teamName={team.config.name}
+          onClose={() => setStopping(undefined)}
+        />
+      )}
     </section>
   );
 }

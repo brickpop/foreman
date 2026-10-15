@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import {
   type ForgeAccount,
-  type HarnessStatus,
   type ImageStatus,
   isNotBuilt,
   type Settings as SettingsData,
@@ -19,8 +18,8 @@ import {
   useWorkspace,
 } from "../app/queries";
 import { applyTheme, savedTheme, type Theme } from "../app/theme";
+import { ConnectDialog } from "../components/ConnectDialog";
 import { Modal } from "../components/Overlays";
-import { Terminal } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
 import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
@@ -41,7 +40,7 @@ export function Settings() {
       {s && (
         <>
           <WorkspaceSection settings={s} />
-          <HarnessesSection settings={s} />
+          <HarnessesSection />
           <ForgeSection settings={s} />
           <NotificationsSection settings={s} />
         </>
@@ -287,98 +286,35 @@ function Stepper({
   );
 }
 
-function HarnessesSection({ settings }: { settings: SettingsData }) {
-  const client = useClient();
-  const queries = useQueryClient();
+function HarnessesSection() {
   const harnesses = useHarnesses();
-  const [login, setLogin] = useState<{ harness: string; terminal: string }>();
-  const toast = useToast();
-  const connect = useMutation({
-    mutationFn: (harness: string) => client.harnesses.connect(harness),
-    onSuccess: (terminal, harness) => setLogin({ harness, terminal }),
-    onError: (e) => toast({ title: "Login not started", body: e.message, color: "var(--err)" }),
-  });
+  const [connecting, setConnecting] = useState<string>();
   return (
     <Section
       label="Harnesses"
-      intro="The command Foreman runs for each harness inside the agent image."
+      intro="The coding programs agents run, built into the agent image. Each needs its own login, once per workspace."
     >
       {(harnesses.data ?? []).map((h) => (
-        <HarnessRow
+        <div
           key={h.id}
-          harness={h}
-          settings={settings}
-          onConnect={() => connect.mutate(h.id)}
-        />
-      ))}
-      <Modal
-        open={login !== undefined}
-        onClose={() => {
-          setLogin(undefined);
-          queries.invalidateQueries({ queryKey: keys.harnesses });
-        }}
-        title={`Connect ${login ? harnessLabel(login.harness) : ""}`}
-        width={760}
-      >
-        <div className="flex flex-col gap-3">
-          <p className="m-0 text-[13.5px] text-tx3">
-            The harness’s own login, in its container. For Claude Code, type{" "}
-            <span className="font-mono text-tx2">/login</span> and follow it. Close this once it
-            says you’re logged in.
-          </p>
-          <div className="h-[380px] overflow-hidden rounded-[10px] border border-line bg-term">
-            {login && <Terminal instance={login.terminal} />}
-          </div>
+          className="grid grid-cols-[130px_1fr_auto] items-center gap-4 border-b border-line py-3"
+        >
+          <span className="font-medium">{harnessLabel(h.id)}</span>
+          <span className="font-mono text-[13px] text-tx3">{h.command}</span>
+          <span className="flex items-center gap-3">
+            <span className={`text-[13px] ${h.connected ? "text-ok" : "text-tx4"}`}>
+              {h.connected ? "connected" : "not connected"}
+            </span>
+            <Button variant="small" onClick={() => setConnecting(h.id)}>
+              {h.connected ? "Reconnect" : "Connect"}
+            </Button>
+          </span>
         </div>
-      </Modal>
+      ))}
+      {connecting && (
+        <ConnectDialog harness={connecting} onClose={() => setConnecting(undefined)} />
+      )}
     </Section>
-  );
-}
-
-function HarnessRow({
-  harness,
-  settings,
-  onConnect,
-}: {
-  harness: HarnessStatus;
-  settings: SettingsData;
-  onConnect: () => void;
-}) {
-  const save = useSave();
-  const saved = settings.harnesses?.[harness.id]?.command ?? "";
-  const [command, setCommand] = useState(saved);
-  const commit = () => {
-    const next = command.trim();
-    if (next === saved) return;
-    save((s) => {
-      const all = { ...s.harnesses };
-      // Empty, or the default: the harness's own command, nothing to store.
-      if (next === "" || next === harness.command) delete all[harness.id];
-      else all[harness.id] = { command: next };
-      return { ...s, harnesses: all };
-    });
-  };
-  return (
-    <div className="grid grid-cols-[130px_1fr_auto] items-center gap-4 border-b border-line py-3">
-      <span className="font-medium">{harnessLabel(harness.id)}</span>
-      <input
-        aria-label={`${harnessLabel(harness.id)} command`}
-        value={command}
-        placeholder={harness.command}
-        onChange={(e) => setCommand(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-        className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
-      />
-      <span className="flex items-center gap-3">
-        <span className={`text-[13px] ${harness.connected ? "text-ok" : "text-tx4"}`}>
-          {harness.connected ? "connected" : "not connected"}
-        </span>
-        <Button variant="small" onClick={onConnect}>
-          {harness.connected ? "Reconnect" : "Connect"}
-        </Button>
-      </span>
-    </div>
   );
 }
 

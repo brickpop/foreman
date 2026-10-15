@@ -40,12 +40,12 @@ export function Overview({ project, entry }: { project: string; entry?: string }
   }, [missing]);
   if (notBuilt)
     return (
-      <div className="px-8 pt-6">
+      <div className="px-12 pt-6">
         <NotBuilt what="the wiki" />
       </div>
     );
   return (
-    <div className="flex flex-col gap-5 px-8 pt-6 pb-16">
+    <div className="flex flex-col gap-5 px-12 pt-6 pb-16">
       <div className="flex items-center gap-3">
         <Button
           variant={files ? "raised" : "secondary"}

@@ -55,6 +55,34 @@ func TestConnectStartsTheLoginTerminalOnce(t *testing.T) {
 	_ = a.Input([]byte("\x04")) // end the login (cat ends on EOF)
 }
 
+// Closing the dialog ends a running login; ending none is harmless, and the
+// next Connect starts a fresh one.
+func TestEndLogin(t *testing.T) {
+	l := testLogins(t)
+	ctx := context.Background()
+	if err := l.EndLogin("fake"); err != nil {
+		t.Errorf("no login running: %v", err)
+	}
+	id, err := l.Connect(ctx, "fake")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := l.EndLogin("fake"); err != nil {
+		t.Fatal(err)
+	}
+	waitExit(t, l.terms, id)
+	if err := l.EndLogin("fake"); err != nil {
+		t.Errorf("already ended: %v", err)
+	}
+	if _, err := l.Connect(ctx, "fake"); err != nil {
+		t.Errorf("connect after ending: %v", err)
+	}
+	_ = l.EndLogin("fake")
+	if err := l.EndLogin("nope"); !errors.Is(err, errUnknownHarness) {
+		t.Errorf("unknown harness: %v", err)
+	}
+}
+
 // A terminal id is looked for among the instances, then the logins.
 func TestTerminalsAreFoundWhereverTheyRun(t *testing.T) {
 	l := testLogins(t)

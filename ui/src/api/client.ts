@@ -82,6 +82,8 @@ export interface HarnessesArea {
   list(): Promise<HarnessStatus[]>;
   /** Starts the harness's login; returns the terminal to open with agents.openTerminal. */
   connect(harness: string): Promise<string>;
+  /** Ends the harness's login, if one runs. */
+  endLogin(harness: string): Promise<void>;
 }
 
 export interface MaintenanceArea {
@@ -261,6 +263,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         const r = await request("POST", `/api/harnesses/${id(harness)}/connect`);
         return ((await r.json()) as { terminal: string }).terminal;
       },
+      endLogin: (harness) => send("DELETE", `/api/harnesses/${id(harness)}/connect`),
     },
     maintenance: {
       status: () => getJSON("/api/maintenance"),

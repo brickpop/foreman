@@ -6,7 +6,7 @@ tags: [feature, ui, requests, pipeline]
 
 # Changes
 
-The project's actionable tab: what needs the CEO on this project, the work moving towards `main`, and what recently merged. Body padding `28px 40px 64px`, max width 860px, 36px between sections. The project header and tabs are described in [Wiki reader](./wiki-reader.md#project-header-and-tabs).
+The project's actionable tab: what needs the CEO on this project, the work moving towards `main`, and what recently merged. Body padding `24px 48px 64px` (every project tab uses the header's 48px sides and the full width: [Wiki reader](./wiki-reader.md#project-header-and-tabs)), 36px between sections. The project header and tabs are described in [Wiki reader](./wiki-reader.md#project-header-and-tabs).
 
 ## 1. Needs you
 

@@ -66,6 +66,15 @@ describe("httpClient", () => {
     );
   });
 
+  it("ends a login with DELETE", async () => {
+    const calls = stubFetch(204, undefined);
+    await httpClient("http://x").harnesses.endLogin("claude-code");
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/harnesses/claude-code/connect",
+      method: "DELETE",
+    });
+  });
+
   it("wakes an instance with POST", async () => {
     const calls = stubFetch(204, undefined);
     await httpClient("http://x").agents.wake("tove@ledger");

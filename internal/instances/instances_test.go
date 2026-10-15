@@ -284,6 +284,59 @@ func TestDeployRefusals(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err == nil || !strings.Contains(err.Error(), "isn't supported yet") {
 		t.Errorf("an unsupported harness: %v", err)
 	}
+	// A harness without a login: refused before anything is created.
+	f.m.Adapters["codex"] = disconnected{}
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "codex isn't connected yet") {
+		t.Errorf("a harness without a login: %v", err)
+	}
+	if _, err := f.db.Deployments().Get(ctx, "orion@ledger"); err == nil {
+		t.Error("a refused deployment was stored")
+	}
+}
+
+type disconnected struct{ fake.Adapter }
+
+func (disconnected) Connected() bool { return false }
+
+// A Stop that lands while an instance is starting, after its process exists
+// but before it is handed over, still stops it and frees its slot.
+func TestStopWhileStarting(t *testing.T) {
+	f := newFixture(t, keepsRunning, 1)
+	opening, release := make(chan struct{}), make(chan struct{})
+	open := f.deps.OpenLog
+	f.deps.OpenLog = func(id string) (terminal.Log, error) {
+		if id == "mara@ledger" {
+			close(opening)
+			<-release
+		}
+		return open(id)
+	}
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	<-opening
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	f.m.Wait()
+	if s := f.status("mara@ledger"); s.Status != Stopped {
+		t.Errorf("stopped while starting, now %s", s.Status)
+	}
+	if _, err := f.m.Terminal("mara@ledger"); !errors.Is(err, ErrNotRunning) {
+		t.Errorf("a stopped instance kept its terminal: %v", err)
+	}
+	// Its one slot is free: another deployment's lead starts.
+	write(t, filepath.Join(f.root, ".foreman", "teams", "orion.toml"),
+		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
+	if err := f.ws.Load(ctx, git.New()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("nora@ledger", Running)
 }
 
 func TestStopKeepsTheWorktrees(t *testing.T) {

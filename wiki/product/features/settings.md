@@ -20,13 +20,13 @@ The **Settings** screen (sidebar footer): workspace-wide settings stored in `~/a
 
 ## Harnesses
 
-"The command Foreman runs for each harness inside the agent image. Versions are what the image contains; see Maintenance."
+"The coding programs agents run, built into the agent image. Each needs its own login, once per workspace."
 
-Rows (grid `130px 1fr auto`): the harness label, a Mono command input (defaults `claude`, `codex`, `pi`, `hermes`) (empty means the harness's own command, shown as the placeholder; typing it back stores nothing), and the detection status in the harness image: `found · <version>` (`--ok`) or `not set` / `not found` (`--err`). The prototype detected them on the host PATH; with every session in a container, the image is what counts. Custom harnesses are configured per agent and not listed here. See [Harness adapters](../architecture/harness-adapters.md).
+Rows (grid `130px 1fr auto`): the harness label, its command in Mono `--tx3` (read-only: Foreman builds the image, so the command is always the harness's own, `claude`, `codex`, `pi`, `hermes`; decided 2026-10-15, no command setting), and the detection status in the harness image: `found · <version>` (`--ok`) or `not found` (`--err`). Custom harnesses are configured per agent and not listed here. See [Harness adapters](../architecture/harness-adapters.md).
 
 **Phasing:** the detection status comes with the [full image chain](../../backlog/image-chain.md); until then a row shows the command and the login only.
 
-Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the login container's terminal in a dialog running the harness's own login (for Claude Code: Claude Code itself, where the CEO types `/login`, since it never asks on its own). See [Session runner → Credentials](../architecture/session-runner.md#credentials). **Phasing:** `reconnect needed` needs the adapter to detect an expired login; until then a row shows `connected` or `not connected`.
+Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the **Connect dialog** (`ConnectDialog`, 760px): the login container's terminal running the harness's own login (for Claude Code: Claude Code itself, where the CEO types `/login`, since it never asks on its own). Under the terminal, the login state, followed while open (`Not connected yet.` in `--tx4`, then `<Harness> is connected.` in `--ok`), and one button: `Cancel`, which becomes a primary `Done` once connected. It closes only through that button, never Escape or the backdrop: Escape belongs to the terminal, and a stray click mustn't end the login. Closing ends the login container (`DELETE /api/harnesses/:id/connect`), logged in or not. The same dialog opens from [Deploy a team](./deploy-team.md). See [Session runner → Credentials](../architecture/session-runner.md#credentials). **Phasing:** `reconnect needed` needs the adapter to detect an expired login; until then a row shows `connected` or `not connected`.
 
 ## Forge accounts
 

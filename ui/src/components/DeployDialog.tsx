@@ -2,13 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { keys, useDeployments, useProjects, useTeams } from "../app/queries";
+import { harnessLabel } from "../app/model";
+import { keys, useDeployments, useHarnesses, useProjects, useTeams } from "../app/queries";
+import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
 // Assigns a team to a project with a goal (wiki/product/features/deploy-team.md).
-// Opened with a team preset (Team page) or a project preset (Project settings).
+// Opened with a team preset (Team page), a project preset (Project settings),
+// or neither (empty Sessions). A harness without a login is connected from here.
 
 const option = (on: boolean, disabled = false) =>
   `rounded-[7px] border px-3 py-1.5 text-[13px] ${
@@ -40,6 +43,15 @@ export function DeployDialog({
   const [team, setTeam] = useState(presetTeam);
   const [project, setProject] = useState(presetProject);
   const [goal, setGoal] = useState("");
+  const [connecting, setConnecting] = useState<string>();
+  const harnesses = useHarnesses();
+  // The team's harnesses without a login: its agents couldn't start, so connect first.
+  const used = new Set(
+    Object.values(teams.data?.find((t) => t.id === team)?.config.agents ?? {}).map(
+      (a) => a.harness,
+    ),
+  );
+  const unconnected = (harnesses.data ?? []).filter((h) => used.has(h.id) && !h.connected);
   const already = (p: string) =>
     (deployments.data ?? []).some((d) => d.teamId === team && d.projectId === p);
   const teamName = teams.data?.find((t) => t.id === team)?.config.name ?? team;
@@ -62,7 +74,7 @@ export function DeployDialog({
       });
     },
   });
-  const ready = team && project && goal.trim() && !already(project);
+  const ready = team && project && goal.trim() && !already(project) && unconnected.length === 0;
   return (
     <Modal
       open={open}
@@ -116,6 +128,19 @@ export function DeployDialog({
             className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
           />
         </label>
+        {unconnected.map((h) => (
+          <div
+            key={h.id}
+            className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2"
+          >
+            <span className="flex-1">
+              {harnessLabel(h.id)} isn’t connected yet, so this team’s agents can’t start.
+            </span>
+            <Button variant="small" onClick={() => setConnecting(h.id)}>
+              Connect
+            </Button>
+          </div>
+        ))}
         {deploy.error && <p className="m-0 text-[13px] text-err">{deploy.error.message}</p>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
@@ -128,6 +153,9 @@ export function DeployDialog({
           </Button>
         </div>
       </div>
+      {connecting && (
+        <ConnectDialog harness={connecting} onClose={() => setConnecting(undefined)} />
+      )}
     </Modal>
   );
 }

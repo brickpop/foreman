@@ -26,7 +26,7 @@ function Teams({ project, onDeploy }: { project: Project; onDeploy: () => void }
   const teams = useTeams();
   const mine = (deployments.data ?? []).filter((d) => d.projectId === project.id);
   return (
-    <section className="flex flex-col gap-5 px-10 pt-6 pb-16">
+    <section className="flex flex-col gap-5 px-12 pt-6 pb-16">
       <div className="flex items-start gap-4">
         <div className="flex flex-1 flex-col gap-1">
           <h2 className="m-0 text-base font-semibold">

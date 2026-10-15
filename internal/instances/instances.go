@@ -157,8 +157,14 @@ func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspac
 		return team, project, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}
 	for _, agent := range team.Config.Roster() {
-		if h := team.Config.Agents[agent].Harness; m.Adapters[h] == nil {
+		h := team.Config.Agents[agent].Harness
+		adapter := m.Adapters[h]
+		if adapter == nil {
 			return team, project, fmt.Errorf("%w: %s's harness %q isn't supported yet", ErrInvalid, agent, h)
+		}
+		// Refused here, not when the agent starts, where it would only reach the log.
+		if !adapter.Connected() {
+			return team, project, fmt.Errorf("%w: %s isn't connected yet: log in under Settings → Harnesses → Connect", ErrInvalid, h)
 		}
 	}
 	return team, project, nil
@@ -316,12 +322,27 @@ func (m *Manager) start(id string, l *live) {
 	ctx := context.Background()
 	m.setStatus(ctx, id, Starting)
 	proc, err := m.launch(ctx, id)
-	m.mu.Lock()
-	stopping := l.stopping
-	m.mu.Unlock()
-	if err == nil && stopping {
-		_ = proc.Stop(stopGrace)
-		err = errors.New("stopped while starting")
+	var log terminal.Log
+	if err == nil {
+		if log, err = m.OpenLog(id); err != nil {
+			_ = proc.Stop(stopGrace)
+			err = fmt.Errorf("session log: %w", err)
+		}
+	}
+	if err == nil {
+		// Checked and handed over in one step: a Stop either sees the process
+		// (and stops it) or is seen here.
+		m.mu.Lock()
+		stopping := l.stopping
+		if !stopping {
+			l.proc, l.term = proc, terminal.New(id, proc, log)
+		}
+		m.mu.Unlock()
+		if stopping {
+			_ = proc.Stop(stopGrace)
+			_ = log.Close()
+			err = errors.New("stopped while starting")
+		}
 	}
 	if err != nil {
 		slog.Warn("starting an instance", "instance", id, "err", err)
@@ -329,17 +350,6 @@ func (m *Manager) start(id string, l *live) {
 		m.setStatus(ctx, id, Stopped)
 		return
 	}
-	log, err := m.OpenLog(id)
-	if err != nil {
-		_ = proc.Stop(stopGrace)
-		slog.Warn("starting an instance: session log", "instance", id, "err", err)
-		m.release(id)
-		m.setStatus(ctx, id, Stopped)
-		return
-	}
-	m.mu.Lock()
-	l.proc, l.term = proc, terminal.New(id, proc, log)
-	m.mu.Unlock()
 	inst, _ := m.Instances.Get(ctx, id)
 	inst.Status, inst.StartedAt = Running, time.Now()
 	_ = m.Instances.Put(ctx, inst)
@@ -397,11 +407,9 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	}
 
 	text := m.compose(inst, dep, team, project)
-	settings := m.Config.Settings().Settings
 	first := inst.StartedAt.IsZero()
 	session := harness.Session{
 		Instance: id, Sandbox: inst.SandboxPath, Prompt: text,
-		Command: settings.Harnesses[inst.Harness].Command,
 		// A restart (after a crash, or a Foreman restart) picks up its conversation;
 		// a new deployment starts fresh.
 		Continue: !first,

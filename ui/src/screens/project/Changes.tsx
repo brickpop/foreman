@@ -59,12 +59,12 @@ export function Changes({ project }: { project: Project }) {
   const loose = items.filter((w) => !carried(w));
   if (isNotBuilt(pipeline.error))
     return (
-      <div className="mx-auto w-full max-w-[860px] px-10 pt-7">
+      <div className="px-12 pt-6">
         <NotBuilt what="requests or the pipeline" />
       </div>
     );
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-9 px-10 pt-7 pb-16">
+    <div className="flex flex-col gap-9 px-12 pt-6 pb-16">
       <section className="flex flex-col gap-2.5">
         <SectionLabel>Needs you</SectionLabel>
         {open.length === 0 ? (

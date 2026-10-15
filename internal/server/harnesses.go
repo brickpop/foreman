@@ -13,6 +13,8 @@ type Harnesses interface {
 	// Connect starts the harness's login in a terminal and returns the
 	// terminal's id, for /ws/pty/{id}.
 	Connect(ctx context.Context, id string) (string, error)
+	// EndLogin ends the harness's login, if one runs.
+	EndLogin(id string) error
 }
 
 func harnessRoutes(mux *http.ServeMux, h Harnesses) {
@@ -21,11 +23,7 @@ func harnessRoutes(mux *http.ServeMux, h Harnesses) {
 	})
 	mux.HandleFunc("POST /api/harnesses/{id}/connect", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
-		known := false
-		for _, s := range h.Harnesses() {
-			known = known || s.ID == id
-		}
-		if !known {
+		if !known(h, id) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such harness")
 			return
 		}
@@ -36,4 +34,24 @@ func harnessRoutes(mux *http.ServeMux, h Harnesses) {
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"terminal": term})
 	})
+	mux.HandleFunc("DELETE /api/harnesses/{id}/connect", func(w http.ResponseWriter, r *http.Request) {
+		if !known(h, r.PathValue("id")) {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such harness")
+			return
+		}
+		if err := h.EndLogin(r.PathValue("id")); err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+func known(h Harnesses, id string) bool {
+	for _, s := range h.Harnesses() {
+		if s.ID == id {
+			return true
+		}
+	}
+	return false
 }

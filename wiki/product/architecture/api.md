@@ -55,6 +55,7 @@ GET    /api/settings | PUT /api/settings       settings, version, problems; PUT 
 | PUT /api/settings       settings, version, problems
 GET    /api/harnesses                         the supported harnesses: their default command, newline keystroke and login (connected or not)
 POST   /api/harnesses/:id/connect             start the harness's login in a terminal → {terminal}: open it with WS /ws/pty/:terminal
+DELETE /api/harnesses/:id/connect             end the harness's login, if one runs (the Connect dialog closed) → 204
 GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
 PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
 GET    /api/maintenance                       {running, engine, podman, images}: the engine running now (podman or direct) and its state; why Podman can't be chosen ("" when installed); each image's name, ref, state, last build log

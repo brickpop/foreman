@@ -16,7 +16,6 @@ tags: [model, config, workspace]
 | `port` | Number | | `8888` | | The server listens on `localhost:8888` by default |
 | `max_sessions` | Number | | `12` | 1–64 | Max running sessions at once. Instances beyond it are `queued` ([Agent runtime](../architecture/agent-runtime.md)) |
 | `engine` | String | | `podman` | enum: `podman`, `direct` | The [execution engine](../architecture/building-blocks.md#1-execution-engine-runner) agents run on. `direct` runs them as plain processes on the host with **no isolation**; choosing it asks for confirmation and the Settings screen keeps a warning visible while it is on. Meant for tests and development. The engine is chosen when Foreman starts: a change takes effect on the next restart |
-| `harnesses.<harness>.command` | String | | `claude`, `codex`, `pi`, `hermes` | | Command per harness, run inside the harness image ([Agent images](../architecture/tech-stack.md#agent-images)); the UI shows detection status ("found · version" or "not set") ([Harness adapters](../architecture/harness-adapters.md)) |
 | `stuck_after_minutes` | Number | | `20` | > 0 | No output for this long raises a blocked [request](../features/requests.md) |
 | `team_message_markers` | Boolean | | `true` | | Show the marker strip beside session terminals, toggled on the [Settings screen](../features/settings.md) as "Show agent messages beside terminals". Markers are never written into a terminal ([Sessions](../features/sessions.md#markers-beside-the-terminal)) |
 | `log_cap_mb` | Number | | `50` | > 0 | Session log size cap per instance before rotation ([Persistence](../architecture/persistence.md#session-logs)) |
@@ -27,7 +26,7 @@ tags: [model, config, workspace]
 | `notifications.finishes` | Boolean | | `true` | | "An agent finishes" |
 | `notifications.merge_requested` | Boolean | | `true` | | "A merge is requested" |
 
-Field names are a proposal; the PRD names the contents ("listen, limits, harness commands, notifications"), not the keys.
+There is no harness command setting (decided 2026-10-15): Foreman builds the agent image, so each harness runs its own command (`claude`, …); a `[harnesses]` table is reported as an unknown field. Field names are a proposal; the PRD names the contents ("listen, limits, harness commands, notifications"), not the keys.
 
 ## Invariants
 

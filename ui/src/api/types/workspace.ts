@@ -83,19 +83,12 @@ export interface Settings {
   port: number /* int */;
   maxSessions: number /* int */;
   engine: string;
-  harnesses: { [key: string]: HarnessSettings};
   stuckAfterMinutes: number /* int */;
   teamMessageMarkers: boolean;
   logCapMb: number /* int */;
   forges: { [key: string]: ForgeAccount};
   workspaceForge: WorkspaceForge;
   notifications: Notifications;
-}
-/**
- * HarnessSettings is one harness's command.
- */
-export interface HarnessSettings {
-  command: string;
 }
 /**
  * ForgeAccount is a forge account's host or owner; its token is a secret.

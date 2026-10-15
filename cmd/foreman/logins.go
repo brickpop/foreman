@@ -29,6 +29,15 @@ func (l logins) Harnesses() []harness.Status {
 	return list
 }
 
+// EndLogin ends the harness's login, if one runs: the CEO closed its dialog,
+// logged in or not.
+func (l logins) EndLogin(id string) error {
+	if l.adapters[id] == nil {
+		return errUnknownHarness
+	}
+	return l.terms.stop("connect:" + id)
+}
+
 // Connect starts the harness's login in a terminal, connect:<harness>, and
 // returns its id; a login already running is reused.
 func (l logins) Connect(ctx context.Context, id string) (string, error) {

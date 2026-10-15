@@ -6,7 +6,7 @@ tags: [feature, ui, teams, runtime]
 
 # Deploy a team
 
-A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project with a goal, creating a [deployment](../models/deployment.md). Opened from the [Team page](./team-page.md) (team preset), [Project settings](./project-settings.md) (project preset), or the [Chief of Staff](./chief-of-staff.md) after creating a team.
+A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project with a goal, creating a [deployment](../models/deployment.md). Opened from the [Team page](./team-page.md) (team preset), [Project settings](./project-settings.md) (project preset), empty [Sessions](./sessions.md) (nothing preset), or the [Chief of Staff](./chief-of-staff.md) after creating a team.
 
 ## Content
 
@@ -19,6 +19,10 @@ A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project 
 ## Effect
 
 `POST /api/deployments {team, project, goal}` ([API](../architecture/api.md)). Existing deployments are untouched.
+
+It is refused, with the reason shown in the dialog and nothing created, when the team or project has problems, when a member's harness isn't supported yet, or when a member's harness has no login yet (`claude-code isn't connected yet: log in under Settings → Harnesses → Connect`).
+
+The dialog doesn't wait for that refusal: once a team is chosen, each of its harnesses without a login gets a row, `<Harness> isn't connected yet, so this team's agents can't start.`, with a small **`Connect`** button that opens the Connect dialog ([Settings → Harnesses](./settings.md#harnesses)) over this one. Deploy stays disabled until every one is connected.
 
 1. The deployment is created; every member gets an [instance](../models/instance.md). Only the lead starts: `starting` (or `queued` when the session limit is reached, [Agent runtime](../architecture/agent-runtime.md#concurrency)) with the task `Cloning <repos>`. The other members are `asleep` until they have work ([Lazy starts](../architecture/agent-runtime.md#lazy-starts)).
 2. The lead's worktrees are created and its session starts ([Sandboxes and git policy](../architecture/sandboxes-and-git.md), [Agent runtime](../architecture/agent-runtime.md)). The first lines of a session read `<harness> · <project>/.sandboxes/<agent>` and `Worktrees of <repos> · reading project/wiki`.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/server"
@@ -19,12 +20,13 @@ type sessions struct {
 
 	mu    sync.Mutex
 	terms map[string]*terminal.Terminal
+	procs map[string]runner.Process // each terminal's process, to stop it
 }
 
 var errRunning = errors.New("instance already running")
 
 func newSessions(r runner.Runner, openLog func(string) (terminal.Log, error)) *sessions {
-	return &sessions{runner: r, openLog: openLog, terms: map[string]*terminal.Terminal{}}
+	return &sessions{runner: r, openLog: openLog, terms: map[string]*terminal.Terminal{}, procs: map[string]runner.Process{}}
 }
 
 // start runs spec as the terminal id; one whose process exited can start
@@ -47,7 +49,22 @@ func (s *sessions) start(ctx context.Context, instance string, spec runner.Spec)
 		return err
 	}
 	s.terms[instance] = terminal.New(instance, process, log)
+	s.procs[instance] = process
 	return nil
+}
+
+// stop ends the terminal's process, if it runs; its terminal stays, exited.
+func (s *sessions) stop(id string) error {
+	s.mu.Lock()
+	t, p := s.terms[id], s.procs[id]
+	s.mu.Unlock()
+	if t == nil {
+		return nil
+	}
+	if _, exited := t.ExitCode(); exited {
+		return nil
+	}
+	return p.Stop(2 * time.Second)
 }
 
 // Attach implements server.Terminals.

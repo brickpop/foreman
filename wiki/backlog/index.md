@@ -26,6 +26,7 @@ See `WORKFLOW.md` at the project root for the conventions.
 
 Raised during design, no cards yet; they get one when an epic needs them.
 
+- **First-run onboarding** (the CEO's request, 2026-10-15): a new workspace walks the CEO through what agents need before the first deploy, in order: the engine (Podman installed, a machine on macOS), the agent image built (Settings → Maintenance), each harness connected (Settings → Harnesses), optionally a forge account, then a project and a team. Today each step is found by hitting its refusal (the Deploy dialog's Connect row, the engine message at startup).
 - **What agent "skills" mean technically**: plain text in the session prompt, or the harness's own skills feature; it decides what the Agent page's skill chips actually change.
 - **Resource lifecycle**: cleanup of logs, images, agent memory and stopped deployments, and what happens when the laptop sleeps or the Podman VM wakes; without it, disk use grows forever and agents may stall after a sleep.
 - **Config changed outside Foreman, at startup** (the CEO's idea, low priority): a CLI prompt when the server starts, Keep mine / Take theirs, for team or settings files changed outside Foreman. What exactly it compares (uncommitted edits in the workspace repo?) is to be defined.

@@ -75,7 +75,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	running := ws.Settings().Settings.Engine
 	// The fake harness is a host binary: a container can't run it.
 	if *fakeHarness != "" && running != "direct" {
-		return fmt.Errorf("--fake-harness needs engine = \"direct\" (this workspace runs %s): set it in Settings or settings.toml", running)
+		return fmt.Errorf("this workspace runs on %s, where --fake-harness can't run (it is a host program): drop --fake-harness to run Claude Code, or set engine = \"direct\" in settings.toml", running)
 	}
 	engineRunner, engineImages, closeEngine, err := engine(ctx, running, stdout)
 	if err != nil {
@@ -119,6 +119,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			return fmt.Errorf("fake harness: %w", err)
 		}
 		adapters["claude-code"] = fake.Adapter{Program: program}
+		fmt.Fprintf(stdout, "Agents run on the fake harness (%s), not Claude Code\n", program)
 	}
 	manager := instances.New(instances.Deps{
 		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,

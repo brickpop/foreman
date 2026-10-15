@@ -17,6 +17,7 @@ type fakeAgents struct {
 	list     []store.Instance
 	deployed []deployRequest
 	stopped  []string
+	woken    []string
 }
 
 func (f *fakeAgents) Deploy(_ context.Context, team, project, goal string) (store.Deployment, error) {
@@ -129,6 +130,25 @@ func TestInstancePrompt(t *testing.T) {
 		t.Errorf("prompt %v", body)
 	}
 	if w := get(t, h, "/api/instances/nobody@ledger/prompt"); w.Code != http.StatusNotFound {
+		t.Errorf("unknown instance: %d", w.Code)
+	}
+}
+
+func (f *fakeAgents) Wake(_ context.Context, id string) error {
+	if id != "tove@ledger" {
+		return store.ErrNotFound
+	}
+	f.woken = append(f.woken, id)
+	return nil
+}
+
+func TestWake(t *testing.T) {
+	a := &fakeAgents{}
+	h := withAgents(a)
+	if w := send(h, "POST", "/api/instances/tove@ledger/wake", ""); w.Code != http.StatusNoContent || len(a.woken) != 1 {
+		t.Errorf("wake: %d %+v", w.Code, a.woken)
+	}
+	if w := send(h, "POST", "/api/instances/nobody@ledger/wake", ""); w.Code != http.StatusNotFound {
 		t.Errorf("unknown instance: %d", w.Code)
 	}
 }

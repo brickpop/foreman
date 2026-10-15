@@ -166,17 +166,18 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
             id: `${agent}@${project}`,
             deploymentId: id,
             agentId: agent,
-            status: "starting",
+            // Only the lead starts; the others sleep until woken.
+            status: agent === t.config.lead ? "starting" : "asleep",
             task: "",
             sandboxPath: `${state.workspace.path}/${project}/.sandboxes/${agent}`,
             harness: t.config.agents[agent].harness,
-            startedAt: iso(),
+            startedAt: agent === t.config.lead ? iso() : zero,
             lastOutputAt: zero,
             restarts: 0,
           };
           state.instances = [...state.instances.filter((i) => i.id !== inst.id), inst];
-          emit("instance.status", { id: inst.id, status: "starting" });
-          setTimeout(() => setStatus(inst, agent === t.config.lead ? "running" : "idle"), 1500);
+          emit("instance.status", { id: inst.id, status: inst.status });
+          if (agent === t.config.lead) setTimeout(() => setStatus(inst, "running"), 1500);
         }
         return structuredClone(dep);
       },
@@ -188,6 +189,13 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
           setStatus(i, "stopped");
         }
         emit("deployment.stopped", dep);
+      },
+      wake: async (instance) => {
+        const inst = find(state.instances, (i) => i.id === instance, "instance");
+        if (inst.status !== "asleep") return;
+        inst.startedAt = iso();
+        setStatus(inst, "starting");
+        setTimeout(() => setStatus(inst, "running"), 1500);
       },
       openTerminal: (id, h) => (options.terminal ?? noticeTerminal)(id, h),
     },

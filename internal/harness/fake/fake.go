@@ -15,11 +15,16 @@ type Adapter struct {
 
 var _ harness.Adapter = Adapter{}
 
-// Launch runs the program, with its session prompt in a file it is told about.
+// Launch runs the program, with its session prompt in a file it is told about
+// and the opener, if any, as its argument.
 func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	prompt := filepath.Join(s.Sandbox, ".harness", "fake", "PROMPT.md")
+	command := []string{a.Program}
+	if s.Opener != "" {
+		command = append(command, s.Opener)
+	}
 	return harness.Launch{
-		Command: []string{a.Program},
+		Command: command,
 		Env:     []string{"FOREMAN_PROMPT_FILE=" + prompt},
 		Files:   []harness.File{{Path: prompt, Data: []byte(s.Prompt), Mode: 0o600}},
 	}, nil

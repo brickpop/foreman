@@ -196,17 +196,22 @@ describe("demoClient", () => {
     for (const area of Object.values(c)) expect(area.demo).toBe(true);
   });
 
-  it("deploys: a deployment, its instances starting then running, and events", async () => {
+  it("deploys: the lead starting then running, the others asleep until woken", async () => {
     vi.useFakeTimers();
     const { c, events } = client();
     const dep = await c.agents.deploy("atlas", "ledger", "Ship it");
     expect(dep).toMatchObject({ id: "atlas@ledger", status: "active", goal: "Ship it" });
     expect((await c.agents.instances()).map((i) => [i.id, i.status])).toEqual([
       ["mara@ledger", "starting"],
-      ["tove@ledger", "starting"],
+      ["tove@ledger", "asleep"],
     ]);
     vi.advanceTimersByTime(1500);
-    expect((await c.agents.instances()).map((i) => i.status)).toEqual(["running", "idle"]);
+    expect((await c.agents.instances()).map((i) => i.status)).toEqual(["running", "asleep"]);
+    await c.agents.wake("tove@ledger");
+    await c.agents.wake("mara@ledger"); // already up: nothing happens
+    expect((await c.agents.instances()).map((i) => i.status)).toEqual(["running", "starting"]);
+    vi.advanceTimersByTime(1500);
+    expect((await c.agents.instances()).map((i) => i.status)).toEqual(["running", "running"]);
     expect(events.map((e) => e.type)).toContain("deployment.created");
     await expect(c.agents.deploy("atlas", "ledger", "again")).rejects.toThrow("already deployed");
     await c.agents.stop("atlas@ledger");

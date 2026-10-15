@@ -18,5 +18,6 @@ Blocked by [Team and Agent pages](./ui-teams-agents.md) and [Workspace and confi
 - [x] teams and souls API: `GET /api/teams`, `PUT /api/teams/:id/agents/:agent` (version-guarded; 409 / 400 like settings, through one `writeSaveError`; the loaded team is copied before the change); the Agent page's Keep mine / Take theirs already handles a conflict
 - [x] composed session prompt endpoint (`GET /api/instances/:id/prompt`, and the template)
 - [ ] waits for the CEO's review of the whole UI on the demo client ([Full UI demo](./epics/full-ui-demo.md)): no second, real mode meanwhile
+- [x] lazy starts (journey G1): only the lead starts on deploy, with the goal as its harness's opening message (`harness.Session.Opener`; Claude Code's prompt argument); the others are `asleep` (migration 002) until `Manager.Wake` (`POST /api/instances/:id/wake`, the pane's Start); the demo client does the same
 - [ ] Deploy wired to the Instance manager (`ForemanClient.deploy` and `stop` exist; `POST /api/deployments`, `DELETE /api/deployments/:id`); then remove `--demo-session` ([technical debt](../technical-debt.md))
 - [ ] swap the areas in main.tsx; remove their badges

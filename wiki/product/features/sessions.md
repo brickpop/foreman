@@ -37,6 +37,8 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 
 **Pane header** (padding `9px 16px`, 13px): when split, Avatar 26 with status dot (`dotBorder --term`) and the name (600, opens the [Agent page](./agent-page.md) showing this deployment's prompt); in a single pane both are left out, since the active tab already names the agent. Then `<Harness label> · <project>` (`--tx4`); a spacer; **`Line`** (toggles the line input below); **`Copy`** (copies the whole buffer, scrollback included, as plain text; shows `Copied` for 1.4 s); **`×`** when split (closes the pane; pane 1 becomes active).
 
+**Asleep agent** (status `asleep`: no session runs until it has work, [Agent runtime → Lazy starts](../architecture/agent-runtime.md#lazy-starts)): the pane has no terminal, and its header no `Line` or `Copy`. Centered instead: `<Name> is asleep: no session runs until there's work for them.` (13.5px `--tx3`) and an outline **`Start <Name>`** button, which wakes it; the terminal appears once it runs. A failure shows an error toast.
+
 **Direct-line banner** on every non-lead pane (padding `7px 16px`, 12.5px `--tx3`, `--side`, bottom border): `Direct line to <Name>. They'll tell <Lead>, the lead, if it matters.`
 
 **Body**: a real terminal emulator on `--term`, Geist Mono 13px / 1.6.

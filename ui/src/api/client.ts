@@ -78,6 +78,8 @@ export interface AgentsArea extends Area {
   prompt(instance: string): Promise<string>;
   deploy(team: string, project: string, goal: string): Promise<Deployment>;
   stop(deployment: string): Promise<void>;
+  /** Starts an asleep instance; any other is left as it is. */
+  wake(instance: string): Promise<void>;
   openTerminal(id: string, handlers: PtyHandlers): PtyConnection;
 }
 
@@ -257,6 +259,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
           await request("POST", "/api/deployments", { team, project, goal })
         ).json() as Promise<Deployment>,
       stop: (deployment) => send("DELETE", `/api/deployments/${id(deployment)}`),
+      wake: (instance) => send("POST", `/api/instances/${id(instance)}/wake`),
       openTerminal: (instance, handlers) => openPty(`${wsOrigin}/ws/pty/${id(instance)}`, handlers),
     },
     harnesses: {

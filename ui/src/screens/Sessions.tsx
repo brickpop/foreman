@@ -1,8 +1,10 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import type { Instance, Team, TeamMessage } from "../api/client";
+import { type Instance, type Team, type TeamMessage, useClient } from "../api/client";
 import { agentOf, harnessLabel } from "../app/model";
 import {
+  keys,
   useHarnesses,
   useInstances,
   useMessages,
@@ -26,6 +28,7 @@ import {
 import { Avatar } from "../components/Avatar";
 import { DemoBadge } from "../components/DemoBadge";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
+import { useToast } from "../components/Toasts";
 import { Button, Dot, LeadTag, Segmented, Toggle } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
@@ -212,7 +215,9 @@ function Pane({
     terminal.current?.focus();
   };
   // The shortcut: open Line; from the terminal, back into Line; from Line, close it.
+  const asleep = instance.status === "asleep";
   const toggleLine = () => {
+    if (asleep) return;
     if (!lineMode) setLineMode(true);
     else if (document.activeElement !== lineInput.current) lineInput.current?.focus();
     else closeLine();
@@ -277,17 +282,21 @@ function Pane({
           {harnessLabel(instance.harness)} · {project}
         </span>
         <span className="flex-1" />
-        <Button
-          variant="tiny"
-          onClick={() => (lineMode ? closeLine() : setLineMode(true))}
-          aria-pressed={lineMode}
-          title={`Line input (${lineShortcut()})`}
-        >
-          Line
-        </Button>
-        <Button variant="tiny" onClick={copy}>
-          {copied ? "Copied" : "Copy"}
-        </Button>
+        {!asleep && (
+          <>
+            <Button
+              variant="tiny"
+              onClick={() => (lineMode ? closeLine() : setLineMode(true))}
+              aria-pressed={lineMode}
+              title={`Line input (${lineShortcut()})`}
+            >
+              Line
+            </Button>
+            <Button variant="tiny" onClick={copy}>
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </>
+        )}
         {split && (
           <Button variant="tiny" onClick={onClose} aria-label={`Close ${name}'s pane`}>
             ×
@@ -299,15 +308,19 @@ function Pane({
           Direct line to {name}. They'll tell {leadName}, the lead, if it matters.
         </div>
       )}
-      <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
-          <Terminal instance={instance.id} newline={newline} ref={terminal} />
+      {asleep ? (
+        <Asleep instance={instance.id} name={name} />
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
+            <Terminal instance={instance.id} newline={newline} ref={terminal} />
+          </div>
+          {settings.data?.settings.teamMessageMarkers !== false && (
+            <Markers deployment={instance.deploymentId} instance={instance.id} teams={teams} />
+          )}
         </div>
-        {settings.data?.settings.teamMessageMarkers !== false && (
-          <Markers deployment={instance.deploymentId} instance={instance.id} teams={teams} />
-        )}
-      </div>
-      {lineMode && (
+      )}
+      {lineMode && !asleep && (
         <div className="flex items-start gap-2 border-t border-line px-[18px] py-[11px]">
           <span className="font-mono text-[13px] leading-[1.5] font-medium text-accTx">❯</span>
           {/* Enter sends; Shift+Enter starts a new line, typed as the harness's newline. */}
@@ -335,6 +348,28 @@ function Pane({
         </div>
       )}
     </section>
+  );
+}
+
+/** An asleep agent's pane: no session runs until it is started. */
+function Asleep({ instance, name }: { instance: string; name: string }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  const wake = useMutation({
+    mutationFn: () => client.agents.wake(instance),
+    onSuccess: () => queries.invalidateQueries({ queryKey: keys.instances }),
+    onError: (e) => toast({ title: `${name} didn't start`, body: e.message, color: "var(--err)" }),
+  });
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="m-0 max-w-[380px] text-[13.5px] text-tx3">
+        {name} is asleep: no session runs until there's work for them.
+      </p>
+      <Button disabled={wake.isPending} onClick={() => wake.mutate()}>
+        Start {name}
+      </Button>
+    </div>
   );
 }
 

@@ -159,8 +159,32 @@ func (f *fixture) branch(dir string) string {
 // keepsRunning is a harness that waits for input and echoes its prompt file's title.
 const keepsRunning = `head -n1 "$FOREMAN_PROMPT_FILE"; cat`
 
-func TestDeployStartsEveryMemberInItsSandbox(t *testing.T) {
-	f := newFixture(t, keepsRunning, 12)
+// output waits until id's terminal has printed want, and returns what it printed.
+func (f *fixture) output(id, want string) string {
+	f.t.Helper()
+	term, err := f.m.Terminal(id)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	v, _ := term.Attach()
+	defer v.Close()
+	deadline := time.After(5 * time.Second)
+	got := string(v.Snapshot())
+	for !strings.Contains(got, want) {
+		select {
+		case chunk := <-v.Output():
+			got += string(chunk)
+		case <-deadline:
+			f.t.Fatalf("%s never printed %q: %q", id, want, got)
+		}
+	}
+	return got
+}
+
+// Only the lead starts, with the goal as its opener; a member sleeps, with no
+// sandbox, until it is woken, and then starts without one.
+func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
+	f := newFixture(t, `echo "opener: [$1]"; `+keepsRunning, 12)
 	dep, err := f.m.Deploy(ctx, "atlas", "ledger", "Ship invoices")
 	if err != nil {
 		t.Fatal(err)
@@ -168,27 +192,28 @@ func TestDeployStartsEveryMemberInItsSandbox(t *testing.T) {
 	if dep.ID != "atlas@ledger" {
 		t.Errorf("deployment %+v", dep)
 	}
+	f.waitStatus("mara@ledger", Running)
+	if got := f.output("mara@ledger", "# You are"); !strings.Contains(got, "opener: [Your goal on ledger: Ship invoices]") {
+		t.Errorf("the lead's opener: %q", got)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if s := f.status("tove@ledger"); s.Status != Asleep || !s.StartedAt.IsZero() {
+		t.Errorf("tove before any work: %+v", s)
+	}
+	if _, err := os.Stat(filepath.Join(f.root, "ledger", ".sandboxes", "tove")); !os.IsNotExist(err) {
+		t.Errorf("an asleep member has a sandbox: %v", err)
+	}
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Running)
+	if got := f.output("tove@ledger", "# You are"); !strings.Contains(got, "opener: []") {
+		t.Errorf("a member got an opener: %q", got)
+	}
 	for _, id := range []string{"mara@ledger", "tove@ledger"} {
-		inst := f.waitStatus(id, Running)
-		if inst.StartedAt.IsZero() || inst.SandboxPath != filepath.Join(f.root, "ledger", ".sandboxes", strings.Split(id, "@")[0]) {
+		if inst := f.status(id); inst.StartedAt.IsZero() || inst.SandboxPath != filepath.Join(f.root, "ledger", ".sandboxes", strings.Split(id, "@")[0]) {
 			t.Errorf("%s: %+v", id, inst)
 		}
-		term, err := f.m.Terminal(id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		v, _ := term.Attach()
-		deadline := time.After(5 * time.Second)
-		got := string(v.Snapshot())
-		for !strings.Contains(got, "# You are") {
-			select {
-			case chunk := <-v.Output():
-				got += string(chunk)
-			case <-deadline:
-				t.Fatalf("%s never printed its prompt's title: %q", id, got)
-			}
-		}
-		v.Close()
 	}
 	if b := f.branch(filepath.Join(f.root, "ledger", ".sandboxes", "mara", "ledger-api")); b != "lead/atlas/integration" {
 		t.Errorf("the lead's branch %q", b)
@@ -204,6 +229,35 @@ func TestDeployStartsEveryMemberInItsSandbox(t *testing.T) {
 	defer f.mu.Unlock()
 	if len(f.events) == 0 || f.events[0].Type != "deployment.created" {
 		t.Errorf("events %+v", f.events)
+	}
+}
+
+// Wake starts only an asleep instance.
+func TestWake(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if err := f.m.Wake(ctx, "nobody@ledger"); err == nil {
+		t.Error("woke an instance that doesn't exist")
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if s := f.status("mara@ledger"); s.Status != Running || s.Restarts != 0 {
+		t.Errorf("waking a running lead: %+v", s)
+	}
+	_ = f.m.Stop(ctx, "atlas@ledger")
+	if s := f.status("tove@ledger"); s.Status != Stopped {
+		t.Errorf("an asleep member after stop: %+v", s)
+	}
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(200 * time.Millisecond)
+	if s := f.status("tove@ledger"); s.Status != Stopped {
+		t.Errorf("woke a stopped instance: %+v", s)
 	}
 }
 
@@ -237,6 +291,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
 		t.Fatal(err)
 	}
+	_ = f.m.Wake(ctx, "tove@ledger")
 	f.waitStatus("tove@ledger", Running)
 	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
 		t.Fatal(err)
@@ -259,7 +314,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "next goal"); err != nil {
 		t.Fatal(err)
 	}
-	f.waitStatus("tove@ledger", Running)
+	f.waitStatus("mara@ledger", Running)
 }
 
 // Beyond max_sessions, instances wait their turn.
@@ -268,7 +323,8 @@ func TestTheConcurrencyLimitQueues(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
 		t.Fatal(err)
 	}
-	f.waitStatus("mara@ledger", Running) // the lead first
+	f.waitStatus("mara@ledger", Running)
+	_ = f.m.Wake(ctx, "tove@ledger")
 	time.Sleep(200 * time.Millisecond)
 	if s := f.status("tove@ledger"); s.Status != Queued {
 		t.Fatalf("tove is %s with one slot taken", s.Status)
@@ -282,15 +338,19 @@ func TestTheConcurrencyLimitQueues(t *testing.T) {
 	}
 }
 
-// A crash restarts once; a second one stops the instance.
+// A crash restarts once, without the opener again; a second one stops the instance.
 func TestACrashRestartsOnceThenStops(t *testing.T) {
-	f := newFixture(t, `sleep 0.2; exit 3`, 12)
+	f := newFixture(t, `echo "[$1]" >> "$FOREMAN_PROMPT_FILE.openers"; sleep 0.2; exit 3`, 12)
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
 		t.Fatal(err)
 	}
 	inst := f.waitStatus("mara@ledger", Stopped)
 	if inst.Restarts != 1 {
 		t.Errorf("restarts %d, want 1", inst.Restarts)
+	}
+	openers, _ := os.ReadFile(filepath.Join(f.root, "ledger", ".sandboxes", "mara", ".harness", "fake", "PROMPT.md.openers"))
+	if string(openers) != "[Your goal on ledger: g]\n[]\n" {
+		t.Errorf("openers per start: %q", openers)
 	}
 }
 
@@ -311,9 +371,9 @@ func TestRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, agent := range []string{"mara", "tove"} {
+	for agent, status := range map[string]string{"mara": Running, "tove": Running, "ivo": Asleep} {
 		_ = f.db.Instances().Put(ctx, store.Instance{
-			ID: agent + "@ledger", DeploymentID: dep.ID, AgentID: agent, Status: Running, Harness: "claude-code",
+			ID: agent + "@ledger", DeploymentID: dep.ID, AgentID: agent, Status: status, Harness: "claude-code",
 			SandboxPath: filepath.Join(f.root, "ledger", ".sandboxes", agent), StartedAt: time.Now().Add(-time.Hour),
 		})
 	}
@@ -337,6 +397,9 @@ func TestRestore(t *testing.T) {
 		_ = term.Input([]byte("still here\n"))
 	}
 	f.waitStatus("tove@ledger", Running) // restarted
+	if s := f.status("ivo@ledger"); s.Status != Asleep {
+		t.Errorf("an asleep instance after a restore: %+v", s)
+	}
 	done := make(chan struct{})
 	go func() { _, _ = orphan.Wait(); close(done) }()
 	select {
@@ -386,6 +449,7 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "Ship invoices"); err != nil {
 		t.Fatal(err)
 	}
+	_ = f.m.Wake(ctx, "tove@ledger")
 	f.waitStatus("tove@ledger", Running)
 	shown, err := f.m.Prompt(ctx, "tove@ledger")
 	if err != nil {

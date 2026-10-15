@@ -60,6 +60,11 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		// The latest conversation in this config dir: always the instance's own.
 		args = append(args, "--continue")
 	}
+	if s.Opener != "" {
+		// A prompt argument opens an interactive session with it as the first message
+		// (only -p would make it one-shot).
+		args = append(args, s.Opener)
+	}
 	l := harness.Launch{
 		Command: args,
 		Env:     []string{"CLAUDE_CONFIG_DIR=" + dir},

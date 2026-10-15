@@ -48,7 +48,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
   4. Agent link: registers the instance's token.
   5. Execution engine `Start`: the container with its worktree (rw) and `ledger-api/.git` (read-only: agents read git, Foreman writes it) at their host paths, the live project repo `ledger/project/` at `<sandbox>/project` (rw for Mara, the lead, read-only for the others), its private config, the shared login file, `~/.gitconfig` (ro).
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
-  7. **Kickoff:** the lead receives the goal as a first delivery, so it starts working. (Gap G1: not specified yet.)
+  7. **Kickoff:** only Mara, the lead, starts now: her harness starts with the goal as its opening message (`Your goal on ledger: …`), so she starts working at once. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
 **10. Watch.** Home: "4 sessions working across 1 deployment". **Sessions** → tab "Atlas · ledger" → Mara's pane (the lead's tab is first).
 - *Under the hood:* Web server → Terminal `Attach` → a View: the snapshot of Mara's screen, then live output (WebSocket, raw bytes).
@@ -121,7 +121,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 
 | # | Gap | Proposal (to decide) |
 |---|---|---|
-| G1 | **Kickoff:** nothing makes the lead start on the goal after a deploy; a TUI harness waits at its prompt | On deploy, Messaging delivers the goal to the lead as its first input ("Your goal on ledger: …"); the goal is also in the session prompt |
+| G1 | ~~**Kickoff**~~ | **Resolved** (2026-10-15): only the lead starts on deploy, its harness launched with the goal as its opening message (still an interactive session); the other members sleep until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)) |
 | G2 | **How the Chief of Staff runs:** which engine, which mounts, and where it makes its branches of the workspace repo and of the project repos | An instance in a container that works on its own branches of the workspace repo (team files) and of the project repos (`project.toml`); it changes things only through its team tools, never `.foreman/` secrets or state |
 | G3 | ~~**Who writes cards**~~ | **Resolved** by the CEO's repo model: the lead writes the knowledge base (the live project repo), and commit through `commit()` (no review); everyone else contributes through `contribute` ([Sandboxes and git policy](./architecture/sandboxes-and-git.md#project-knowledge-base)) |
 | G4 | ~~**Screen after a Foreman restart**~~ | **Resolved** (2026-10-14): a container still running is resumed (Foreman re-attaches and rebuilds the screen by replaying the session log into a fresh emulator); a container that is gone gets a new terminal session ([Agent runtime → Restarts](./architecture/agent-runtime.md#restarts)) |

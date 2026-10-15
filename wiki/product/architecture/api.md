@@ -33,6 +33,7 @@ GET    /api/teams/:id/agents/:agent/prompt    {prompt}: the template before any 
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
 (line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
 POST   /api/instances/:id/restart
+POST   /api/instances/:id/wake            starts an asleep instance (204; any other status is left as it is)
 
 GET    /api/requests?project=&status=open
 POST   /api/requests/:id/resolve              {answer}

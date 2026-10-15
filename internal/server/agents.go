@@ -20,6 +20,8 @@ type Agents interface {
 	ActiveDeployments(ctx context.Context) ([]store.Deployment, error)
 	// Prompt is an instance's session prompt, exactly as composed for its harness.
 	Prompt(ctx context.Context, instance string) (string, error)
+	// Wake starts an asleep instance; any other is left as it is.
+	Wake(ctx context.Context, instance string) error
 }
 
 // deployRequest is the body of POST /api/deployments.
@@ -47,6 +49,17 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 		default:
 			writeJSON(w, http.StatusOK, map[string]string{"prompt": text})
+		}
+	})
+	mux.HandleFunc("POST /api/instances/{id}/wake", func(w http.ResponseWriter, r *http.Request) {
+		err := a.Wake(r.Context(), r.PathValue("id"))
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such instance")
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		default:
+			w.WriteHeader(http.StatusNoContent)
 		}
 	})
 	mux.HandleFunc("GET /api/deployments", func(w http.ResponseWriter, r *http.Request) {

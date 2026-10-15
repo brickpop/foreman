@@ -120,6 +120,7 @@ Instance status ([Instance](../models/instance.md)) maps to one color everywhere
 | `starting` | `--team` |
 | `stopped` | `--err` |
 | `queued` (waiting for a session slot) | `--tx4` dot drawn as a dashed outline (no fill), so it reads differently from `idle` |
+| `asleep` (no session until it is woken) | `--tx4` dot drawn as a solid outline (no fill) |
 
 Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--tx4`.
 

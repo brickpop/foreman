@@ -23,7 +23,7 @@ type Instance struct {
 	ID               string    `json:"id"` // agent@project
 	DeploymentID     string    `json:"deploymentId"`
 	AgentID          string    `json:"agentId"`
-	Status           string    `json:"status"` // queued, starting, running, idle, awaiting, done or stopped
+	Status           string    `json:"status"` // asleep, queued, starting, running, idle, awaiting, done or stopped
 	Task             string    `json:"task"`   // the current task note, for a restart
 	PID              int       `json:"-"`
 	PtyID            string    `json:"-"` // the engine's handle (e.g. the container id)

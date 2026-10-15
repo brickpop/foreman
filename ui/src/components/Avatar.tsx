@@ -191,12 +191,14 @@ export function statusColor(status: string): string {
     case "stopped":
       return "var(--err)";
     default:
-      return "var(--tx4)"; // idle, queued
+      return "var(--tx4)"; // idle, queued, asleep
   }
 }
 
-/** A status dot's fill: queued is a dashed outline, so it reads differently from idle. */
+/** A status dot's fill: queued is a dashed outline and asleep a plain one, so they
+ * read differently from idle. */
 export function dotStyle(status: string): { background: string; border?: string } {
   if (status === "queued") return { background: "var(--bg)", border: "1.5px dashed var(--tx4)" };
+  if (status === "asleep") return { background: "var(--bg)", border: "1.5px solid var(--tx4)" };
   return { background: statusColor(status) };
 }

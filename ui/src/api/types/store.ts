@@ -25,7 +25,7 @@ export interface Instance {
   id: string; // agent@project
   deploymentId: string;
   agentId: string;
-  status: string; // queued, starting, running, idle, awaiting, done or stopped
+  status: string; // asleep, queued, starting, running, idle, awaiting, done or stopped
   task: string; // the current task note, for a restart
   sandboxPath: string;
   harness: string;

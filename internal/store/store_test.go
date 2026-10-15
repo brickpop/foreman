@@ -49,7 +49,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 1 {
+	if v := version(t, db.sql); v != 2 {
 		t.Errorf("version %d after the first open", v)
 	}
 	var mode string
@@ -380,5 +380,35 @@ func TestReadsDoNotWaitForAWrite(t *testing.T) {
 		}
 	case <-time.After(time.Second):
 		t.Fatal("a read waited for the open write")
+	}
+}
+
+// 002 rebuilds the instances table for the asleep status: existing rows survive.
+func TestTheAsleepMigrationKeepsTheInstances(t *testing.T) {
+	db := rawDB(t)
+	first, err := migrationFiles.ReadFile("migrations/001_deployments_instances.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db, migrations("001_deployments_instances.sql", string(first))); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES ('atlas@ledger', 'atlas', 'ledger', 'g', 'now');
+		INSERT INTO instances (id, deployment_id, agent_id, status, sandbox_path, harness, restarts) VALUES ('mara@ledger', 'atlas@ledger', 'mara', 'running', '/s', 'claude-code', 2)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db, migrationFiles); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	var restarts int
+	if err := db.QueryRow(`SELECT status, restarts FROM instances WHERE id = 'mara@ledger'`).Scan(&status, &restarts); err != nil || status != "running" || restarts != 2 {
+		t.Errorf("after the migration: %q %d %v", status, restarts, err)
+	}
+	if _, err := db.Exec(`UPDATE instances SET status = 'asleep'`); err != nil {
+		t.Errorf("asleep refused: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE instances SET status = 'napping'`); err == nil {
+		t.Error("the CHECK was lost")
 	}
 }

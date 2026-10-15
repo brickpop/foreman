@@ -5,8 +5,11 @@
 // limit, and re-attaches after a Foreman restart
 // (wiki/product/architecture/agent-runtime.md).
 //
-// Epic 1: no agent link yet, so statuses are the lifecycle's own (queued,
-// starting, running, stopped); idle, awaiting and done come with the hooks.
+// Only the lead starts on deploy; the other members sleep until they are
+// woken (wiki/product/architecture/agent-runtime.md#lazy-starts).
+//
+// Epic 1: no agent link yet, so statuses are the lifecycle's own (asleep,
+// queued, starting, running, stopped); idle, awaiting and done come with the hooks.
 package instances
 
 import (
@@ -30,6 +33,7 @@ import (
 
 // Statuses (wiki/product/models/instance.md#statuses).
 const (
+	Asleep   = "asleep"
 	Queued   = "queued"
 	Starting = "starting"
 	Running  = "running"
@@ -91,7 +95,8 @@ var (
 // stopGrace is how long a harness gets to end before it is killed.
 const stopGrace = 10 * time.Second
 
-// Deploy deploys team on project with goal and starts its instances.
+// Deploy deploys team on project with goal and starts its lead; the other
+// members sleep until woken.
 func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (store.Deployment, error) {
 	team, project, err := m.deployable(teamID, projectID)
 	if err != nil {
@@ -105,16 +110,33 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	for _, agent := range team.Config.Roster() {
 		soul := team.Config.Agents[agent]
 		inst := store.Instance{
-			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Queued,
+			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Asleep,
 			SandboxPath: filepath.Join(m.Root, project.ID, ".sandboxes", agent), Harness: soul.Harness,
 		}
 		if err := m.Instances.Put(ctx, inst); err != nil {
 			return dep, err
 		}
-		m.enqueue(inst.ID)
+		if agent == team.Config.Lead {
+			m.enqueue(inst.ID)
+		}
 	}
 	m.startQueued()
 	return dep, nil
+}
+
+// Wake starts an asleep instance: the CEO's Start (later, work arriving for
+// it). An instance that is up or on its way is left as it is.
+func (m *Manager) Wake(ctx context.Context, id string) error {
+	inst, err := m.Instances.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if inst.Status != Asleep {
+		return nil
+	}
+	m.enqueue(id)
+	m.startQueued()
+	return nil
 }
 
 // deployable checks what deploying needs: a valid team and project, and an
@@ -214,7 +236,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 			return err
 		}
 		for _, inst := range insts {
-			if inst.Status == Stopped {
+			if inst.Status == Stopped || inst.Status == Asleep {
 				continue
 			}
 			if p, ok := byID[inst.ID]; ok {
@@ -376,13 +398,20 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 
 	text := m.compose(inst, dep, team, project)
 	settings := m.Config.Settings().Settings
-	l, err := adapter.Launch(harness.Session{
+	first := inst.StartedAt.IsZero()
+	session := harness.Session{
 		Instance: id, Sandbox: inst.SandboxPath, Prompt: text,
 		Command: settings.Harnesses[inst.Harness].Command,
 		// A restart (after a crash, or a Foreman restart) picks up its conversation;
 		// a new deployment starts fresh.
-		Continue: !inst.StartedAt.IsZero(),
-	})
+		Continue: !first,
+	}
+	if lead && first && dep.Goal != "" {
+		// The kickoff (journey G1): the lead starts on the goal at once. Only on
+		// its first start, so a restart doesn't give the goal twice.
+		session.Opener = fmt.Sprintf("Your goal on %s: %s", project.ID, dep.Goal)
+	}
+	l, err := adapter.Launch(session)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 
 ## Instance lifecycle
 
-1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then for each team member create an instance in the `starting` state.
+1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then an instance for each team member: the lead `starting` (or `queued`), every other member `asleep` ([Lazy starts](#lazy-starts)). Steps 2–3 happen when an instance starts, so an asleep member has no sandbox yet.
 2. **Sandbox**: `Git.Prepare` makes a git worktree of each code repo at `<project>/.sandboxes/<agent>/<repo>` if it doesn't exist yet ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
    - lead: `lead/<team>/integration` (created from `main` if missing)
    - members: their home branch `wt/<agent>/main` (created from `main`). They create `wt/<agent>/<topic>` when assigned a card.
@@ -24,15 +24,26 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 6. **Stop deployment**: terminate the processes (containers) and keep worktrees on disk; `Git.Prune` deletes the agents' `wt/*` branches already merged into `main` ([Branches](./sandboxes-and-git.md#branches)). Other deployments of the same team are not affected.
 7. **Soul edit**: when a [team definition](../models/team-definition.md) changes, each running instance gets a context-update message on its next turn (injected at its next idle prompt, like a queued team message). A full re-prompt happens at the next restart.
 
-Status values: `starting | running | idle | awaiting | done | stopped | queued`.
+Status values: `asleep | queued | starting | running | idle | awaiting | done | stopped`.
 
-**Phasing:** in epic 1 there are no hooks yet (the agent link is epic 2), so statuses are the lifecycle's own: `queued`, `starting`, `running` (the process is alive), `stopped`.
+**Phasing:** in epic 1 there are no hooks yet (the agent link is epic 2), so statuses are the lifecycle's own: `asleep`, `queued`, `starting`, `running` (the process is alive), `stopped`.
+
+### Lazy starts
+
+A container runs only for an agent that has work (the CEO's decision, 2026-10-15): starting five containers when one agent is doing anything is waste.
+
+- **On deploy only the lead starts.** Its harness starts with the goal as its **opening message**, `Your goal on <project>: <goal>`, and stays an interactive session ([Harness adapters](./harness-adapters.md): opener); the goal is in its session prompt too. Only on its first start: a restart continues the conversation and never gives the goal twice.
+- **The other members are `asleep`:** an instance with no container, no sandbox yet, and no session slot.
+- **Waking** an asleep instance queues it and starts it like any other (`POST /api/instances/:id/wake`). In epic 1 the CEO wakes one with **Start** in its pane ([Sessions](../features/sessions.md#panes)); from epic 2 a delivery to it (an `ask`, a handoff, a reply) wakes it first ([Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md)). Waking any other status does nothing.
+- After a Foreman restart, an asleep instance stays asleep.
+- **Later:** an agent that is done and waits for nothing goes back to `asleep`, its harness exited so that waking it resumes its conversation (native resume). It needs idle detection (epic 2) and resume per harness; see the backlog's *Not yet scheduled*.
 
 ### Status transitions
 
 | From | Event | To |
 |---|---|---|
-| — | deployment created / agent hired | `queued` if no slot, else `starting` |
+| — | deployment created / agent hired | the lead on deploy: `queued` if no slot, else `starting`; every other member, and a hire, `asleep` |
+| `asleep` | woken: the CEO's Start, or (epic 2) a delivery to it | `queued` if no slot, else `starting` |
 | `queued` | a slot frees | `starting` |
 | `starting` | sandbox ready and harness spawned | `running` (lead with a goal) or `idle` |
 | `running` | harness idle signal ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)) | `idle`, or `done` if it handed off and has nothing assigned |
@@ -46,7 +57,7 @@ Status values: `starting | running | idle | awaiting | done | stopped | queued`.
 ## Concurrency
 
 - Workspace setting `max running sessions` (default 12, 1–64; [Workspace settings](../models/workspace-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up.
-- A slot is held by every instance whose container is running, including one waiting on an approval or a reply. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the [Prove epic](../../backlog/epics/prove.md) shows which harnesses support it.
+- A slot is held by every instance whose container is running, including one waiting on an approval or a reply. An `asleep` instance holds none. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the [Prove epic](../../backlog/epics/prove.md) shows which harnesses support it.
 - The Chief of Staff session does not count towards the limit (it is Foreman's own, and the CEO must always be able to reach it).
 
 ## Recovery

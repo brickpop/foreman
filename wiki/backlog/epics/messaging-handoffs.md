@@ -6,7 +6,7 @@ order: 2
 
 # Messaging and hand-offs
 
-**Goal:** agents work together. `foreman-agent` and the agent link carry team-tool calls and hook events; `foreman-agent` is added to the agent image ([Image builder](../image-builder.md)); agents `ask`, `reply`, `handoff` and `contribute`, and write git through `switch`, `commit` and `update`; Messaging delivers to idle agents; the UI shows markers and the Messages drawer.
+**Goal:** agents work together. `foreman-agent` and the agent link carry team-tool calls and hook events; `foreman-agent` is added to the agent image ([Image builder](../image-builder.md)); agents `ask`, `reply`, `handoff` and `contribute`, and write git through `switch`, `commit` and `update`; Messaging delivers to idle agents, waking an asleep one first ([Lazy starts](../../product/architecture/agent-runtime.md#lazy-starts)); the UI shows markers and the Messages drawer.
 
 From the Claude Code adapter (epic 1 built `Launch`): `Deliver`, `Interpret` and `Diagnose`, shaped by [experiment D](../prove-d-claude-delivery-hooks.md) (multi-line messages are not pasted; questions come through `AskUserQuestion` then `Notification`; `Stop` carries `last_assistant_message`). D's checks become the adapter's integration tests (`just test-claude`, needing the CEO's login), and `cmd/prove` and `cmd/proveagent` go.
 

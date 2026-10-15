@@ -17,7 +17,7 @@ Table `instances`.
 | `id` | String | yes | | `agent@project`, unique | Can't collide: agent ids are unique across the workspace ([Team definition](./team-definition.md#schema)) |
 | `deployment_id` | String → Deployment | yes | | | |
 | `agent_id` | String | yes | | an agent of the deployment's team | |
-| `status` | String | yes | `starting` | enum below | |
+| `status` | String | yes | `starting` | enum below | Set at creation: `asleep`, or `queued` for the lead on deploy |
 | `task` | String | | | | Current task note (e.g. "Waiting for a card"). Used to restart after a server restart |
 | `pid` | Number | | | | Harness process id (inside the container, or the container's) |
 | `pty_id` | String | | | | Handle of the attached terminal in the session runner (e.g. container id) |
@@ -32,6 +32,7 @@ Table `instances`.
 
 | Status | Meaning | Color ([Design system](../design/design-system.md)) |
 |---|---|---|
+| `asleep` | No container: a member with no work yet (only the lead starts on deploy). Woken by the CEO's Start, or by a delivery to it ([Agent runtime → Lazy starts](../architecture/agent-runtime.md#lazy-starts)) | grey solid outline (`--tx4`) |
 | `queued` | Waiting for a free slot (max running sessions reached) | grey dashed outline (`--tx4`) |
 | `starting` | Container, worktrees and harness being set up | violet (`--team`) |
 | `running` | Working | green (`--ok`) |

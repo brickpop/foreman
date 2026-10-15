@@ -115,6 +115,11 @@ func TestLaunchOptions(t *testing.T) {
 	if !reflect.DeepEqual(l.Command, []string{"/opt/claude", "--dangerously-skip-permissions", "--continue"}) {
 		t.Errorf("command %v", l.Command)
 	}
+	// The opener is the last argument, a prompt: interactive, never -p.
+	s.Opener = "Your goal on ledger: -v ship it"
+	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"/opt/claude", "--dangerously-skip-permissions", "--continue", s.Opener}) {
+		t.Errorf("with an opener: %v", l.Command)
+	}
 	if last := l.Mounts[len(l.Mounts)-1]; last != (runner.Mount{Source: gitconfig, Target: "/home/node/.gitconfig", ReadOnly: true}) {
 		t.Errorf("gitconfig mount %+v", last)
 	}

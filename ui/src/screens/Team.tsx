@@ -59,7 +59,7 @@ export function Team() {
                 : `Deployed on ${mine.length} project${mine.length === 1 ? "" : "s"}`}
             </p>
           </div>
-          <Button onClick={openChiefOfStaff}>Hire</Button>
+          <Button onClick={() => openChiefOfStaff({ flow: "hire", team: id })}>Hire</Button>
           <Button variant="primary" onClick={() => setDeploy(true)}>
             Deploy to a project
           </Button>

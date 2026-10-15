@@ -225,7 +225,10 @@ function Configuration({ project }: { project: Project }) {
             <span className="font-mono text-[12.5px] text-tx3">
               {project.id}/project/project.toml · read-only
             </span>
-            <Button variant="tiny" onClick={openChiefOfStaff}>
+            <Button
+              variant="tiny"
+              onClick={() => openChiefOfStaff({ flow: "project-config", project: project.id })}
+            >
               Change with Chief of Staff
             </Button>
           </span>

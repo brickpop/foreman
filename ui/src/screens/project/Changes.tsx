@@ -191,7 +191,7 @@ function ChangesRequest({
         }
         onAnswer={(text) => answer.mutate({ id: r.id, answer: text })}
         onOpenSession={openSession}
-        onOpenChiefOfStaff={openChiefOfStaff}
+        onOpenChiefOfStaff={() => openChiefOfStaff()}
         actions={
           review ? (
             <>

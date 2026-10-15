@@ -105,3 +105,16 @@ describe("browser notifications", () => {
     expect(notifiesBrowser(notice, toggles, true)).toBe(false);
   });
 });
+
+describe("noticeFor the Chief of Staff", () => {
+  it("names it, and leaves out the project of a team change", () => {
+    const team = noticeFor(
+      request({ kind: "review", source: "cos", instanceId: "", projectId: "" }),
+      [],
+      [],
+    );
+    expect(team?.title).toBe("Chief of Staff requested a merge");
+    const config = noticeFor(request({ kind: "review", source: "cos", instanceId: "" }), [], []);
+    expect(config?.title).toBe("Chief of Staff requested a merge on ledger");
+  });
+});

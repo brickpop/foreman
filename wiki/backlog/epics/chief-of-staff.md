@@ -14,4 +14,6 @@ order: 5
 
 **Blocked by:** [Workflow with the CEO](./workflow.md), and the decision on how the Chief of Staff runs (gap G2 of the journey).
 
+**Also:** the server side of the drawer's client area, which only the demo client serves today ([technical debt](../../technical-debt.md#the-chief-of-staff-is-typed-in-the-ui-only)).
+
 **Exit criteria:** the steps above work end to end; until then, teams are created by editing team files by hand.

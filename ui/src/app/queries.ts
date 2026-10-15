@@ -19,6 +19,7 @@ export const keys = {
   forge: ["forge"],
   maintenance: ["maintenance"],
   messages: ["messages"],
+  chiefOfStaff: ["chief-of-staff"],
 } as const;
 
 export function useWorkspace() {
@@ -76,6 +77,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [["wiki", String((e.data as { project?: string }).project ?? "")]];
     case "pipeline.changed":
       return [["pipeline"]];
+    case "cos.changed":
+      return [keys.chiefOfStaff];
     default:
       return [];
   }

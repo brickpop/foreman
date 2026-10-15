@@ -29,6 +29,7 @@ const client: ForemanClient = {
   messages: demo.messages,
   pipeline: demo.pipeline,
   wiki: demo.wiki,
+  chiefOfStaff: demo.chiefOfStaff,
   events: demo.events,
 };
 

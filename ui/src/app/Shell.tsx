@@ -1,9 +1,16 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import type { Instance, Project, Request, Team } from "../api/client";
+import {
+  type CosEntry,
+  type Instance,
+  type Project,
+  type Request,
+  type Team,
+  useClient,
+} from "../api/client";
 import { AddProject } from "../components/AddProject";
+import { ChiefOfStaffDrawer } from "../components/ChiefOfStaffDrawer";
 import { DemoBadge } from "../components/DemoBadge";
-import { Drawer } from "../components/Overlays";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { ChiefOfStaffContext } from "./chiefOfStaff";
@@ -21,12 +28,18 @@ import {
 // sidebar, the main area, and the overlays.
 
 export function Shell() {
+  const client = useClient();
   const [chiefOfStaff, setChiefOfStaff] = useState(false);
+  const openChiefOfStaff = (entry: CosEntry = { flow: "open" }) => {
+    setChiefOfStaff(true);
+    // A failure shows in the drawer, where the conversation fails to load too.
+    client.chiefOfStaff.start(entry).catch(() => {});
+  };
   // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
   const [addProject, setAddProject] = useState(false);
   return (
-    <ChiefOfStaffContext.Provider value={() => setChiefOfStaff(true)}>
+    <ChiefOfStaffContext.Provider value={openChiefOfStaff}>
       <Toasts>
         <LiveEvents />
         <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
@@ -39,7 +52,7 @@ export function Shell() {
             ☰
           </button>
           <Sidebar
-            onChiefOfStaff={() => setChiefOfStaff(true)}
+            onChiefOfStaff={openChiefOfStaff}
             onAddProject={() => setAddProject(true)}
             open={menu}
             onClose={() => setMenu(false)}
@@ -48,15 +61,7 @@ export function Shell() {
             <Outlet />
           </main>
         </div>
-        <Drawer
-          open={chiefOfStaff}
-          onClose={() => setChiefOfStaff(false)}
-          title="Chief of Staff"
-          width={420}
-          layer={45}
-        >
-          <p className="p-5 text-tx3">The Chief of Staff comes with its own card.</p>
-        </Drawer>
+        <ChiefOfStaffDrawer open={chiefOfStaff} onClose={() => setChiefOfStaff(false)} />
         <AddProject open={addProject} onClose={() => setAddProject(false)} />
       </Toasts>
     </ChiefOfStaffContext.Provider>
@@ -109,7 +114,7 @@ function Sidebar({
   open,
   onClose,
 }: {
-  onChiefOfStaff: () => void;
+  onChiefOfStaff: (entry?: CosEntry) => void;
   onAddProject: () => void;
   /** Open as an overlay, on narrow screens. */
   open: boolean;
@@ -188,7 +193,7 @@ function Sidebar({
           ))}
           <button
             type="button"
-            onClick={onChiefOfStaff}
+            onClick={() => onChiefOfStaff({ flow: "create-team" })}
             className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
           >
             + New team
@@ -201,7 +206,7 @@ function Sidebar({
       <footer className="flex flex-col gap-1 border-t border-line px-2.5 py-3">
         <button
           type="button"
-          onClick={onChiefOfStaff}
+          onClick={() => onChiefOfStaff()}
           className="flex items-center gap-2.5 rounded-lg border border-accLine bg-accSoft px-2.5 py-[9px] text-left"
         >
           <span className="grid size-6 place-items-center rounded-md bg-acc font-mono text-xs font-bold text-accInk">
@@ -236,11 +241,11 @@ function LiveEvents() {
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
     if (!n) return;
+    // No instance (the Chief of Staff, Foreman itself): the request waits on Home.
     const open = () =>
-      navigate({
-        to: "/sessions",
-        search: { deployment: n.deployment || undefined, agent: n.instance || undefined },
-      });
+      n.instance
+        ? navigate({ to: "/sessions", search: { deployment: n.deployment, agent: n.instance } })
+        : navigate({ to: "/" });
     toast({ title: n.title, body: n.body, color: n.color, onOpen: open });
     const toggles = settings.data?.settings.notifications;
     if (toggles && notifiesBrowser(n, toggles, document.hidden)) showBrowserNotification(n, open);

@@ -300,7 +300,9 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
       </Section>
 
       <div>
-        <Button onClick={openChiefOfStaff}>Refine with Chief of Staff</Button>
+        <Button onClick={() => openChiefOfStaff({ flow: "refine", team: team.id, agent: id })}>
+          Refine with Chief of Staff
+        </Button>
       </div>
     </div>
   );

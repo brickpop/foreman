@@ -9,6 +9,7 @@ import type {
 import type { EventHandlers } from "../events";
 import type { PtyConnection, PtyHandlers } from "../pty";
 import type { Event } from "../types/events";
+import { demoChiefOfStaff } from "./chiefOfStaff";
 import type { Seed } from "./seed";
 
 // The demo client (wiki/backlog/demo-client.md): the prototype's data in
@@ -28,6 +29,8 @@ export type DemoOptions = {
   now?: () => Date;
   /** How long a demo image rebuild takes. */
   rebuildMs?: number;
+  /** How long the demo Chief of Staff takes to answer. */
+  replyMs?: number;
 };
 
 class Conflict extends Error {
@@ -68,6 +71,7 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
   let timer: ReturnType<typeof setInterval> | undefined;
   let step = 0;
   const simulate = () => simulateTeam(state, setStatus, emit, iso, step++);
+  const cos = demoChiefOfStaff(state, emit, { iso, replyMs: options.replyMs ?? 900 });
 
   return {
     workspace: {
@@ -209,6 +213,9 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
         r.answer = answer;
         r.resolvedAt = iso();
         emit("request.resolved", r);
+        cos.resolved(r);
+        // A merged team change: the team files as they now read.
+        for (const t of state.teams) t.source = teamToml(t.config);
       },
     },
     messages: {
@@ -273,6 +280,7 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
         emit("wiki.changed", { project, paths: [path], versions: [card.version] });
       },
     },
+    chiefOfStaff: cos.area,
     events: {
       demo: true,
       subscribe: (h) => {

@@ -93,10 +93,9 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
   const answer = useAnswer();
   const openChiefOfStaff = useOpenChiefOfStaff();
   const agent = agentOf(teams, r.instanceId);
-  const context =
-    r.source === "cos" || !agent
-      ? `on ${r.projectId}`
-      : `${agent.team.config.name} on ${r.projectId}`;
+  // A Chief of Staff change to a team file belongs to no project.
+  const where = r.projectId ? `on ${r.projectId}` : "";
+  const context = r.source === "cos" || !agent ? where : `${agent.team.config.name} ${where}`;
   return (
     <RequestPanel
       request={r}
@@ -107,14 +106,18 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
       onOpenSession={() =>
         navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } })
       }
-      onReview={() =>
-        navigate({
-          to: "/projects/$project",
-          params: { project: r.projectId },
-          search: { tab: "changes" },
-        })
+      onReview={
+        // A Chief of Staff item shows its options right here (home.md#request-list).
+        r.source === "cos"
+          ? undefined
+          : () =>
+              navigate({
+                to: "/projects/$project",
+                params: { project: r.projectId },
+                search: { tab: "changes" },
+              })
       }
-      onOpenChiefOfStaff={openChiefOfStaff}
+      onOpenChiefOfStaff={() => openChiefOfStaff()}
     />
   );
 }

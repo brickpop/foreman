@@ -140,6 +140,43 @@ export interface WikiArea extends Area {
   ): Promise<void>;
 }
 
+// The Chief of Staff's conversation, as the drawer shows it
+// (wiki/product/features/chief-of-staff.md#how-the-drawer-is-fed). Typed here,
+// not generated: its server side waits on how the Chief of Staff runs
+// (wiki/technical-debt.md).
+
+/** A result panel: show_panel(title, rows). */
+export type CosPanel = { title: string; rows: [string, string][] };
+
+/** A bubble (say, or the CEO's line), or a panel. */
+export type CosItem = { id: number; from: "cos" | "ceo"; text: string; panel?: CosPanel };
+
+export type CosConversation = {
+  /** `<harness> · <folder>`. */
+  session: string;
+  items: CosItem[];
+  /** present_choices: chips under the last message. */
+  choices: string[];
+  /** The Chief of Staff is working on an answer. */
+  working: boolean;
+};
+
+/** Where the drawer was opened from: each entry point starts its flow. */
+export type CosEntry =
+  | { flow: "open" }
+  | { flow: "hire"; team?: string }
+  | { flow: "create-team" }
+  | { flow: "refine"; team: string; agent: string }
+  | { flow: "project-config"; project: string };
+
+export interface ChiefOfStaffArea extends Area {
+  conversation(): Promise<CosConversation>;
+  /** Starts an entry point's flow in the same conversation. */
+  start(entry: CosEntry): Promise<void>;
+  /** The CEO's line, typed or a chip. */
+  send(text: string): Promise<void>;
+}
+
 export interface EventsArea extends Area {
   /** Follows the events until the returned function is called. */
   subscribe(handlers: EventHandlers): () => void;
@@ -155,6 +192,7 @@ export interface ForemanClient {
   messages: MessagesArea;
   pipeline: PipelineArea;
   wiki: WikiArea;
+  chiefOfStaff: ChiefOfStaffArea;
   events: EventsArea;
 }
 
@@ -265,12 +303,20 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
           version,
         }),
     },
+    chiefOfStaff: {
+      demo: false,
+      conversation: () => Promise.reject(noChiefOfStaff),
+      start: () => Promise.reject(noChiefOfStaff),
+      send: () => Promise.reject(noChiefOfStaff),
+    },
     events: {
       demo: false,
       subscribe: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),
     },
   };
 }
+
+const noChiefOfStaff = new Error("The Chief of Staff doesn't run on the server yet");
 
 export const ClientContext = createContext<ForemanClient | null>(null);
 

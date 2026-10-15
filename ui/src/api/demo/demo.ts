@@ -74,6 +74,16 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
       teams: () => reply(state.teams),
       team: async (id) => reply(find(state.teams, (t) => t.id === id, "team")),
       settings: () => reply(state.settings),
+      candidates: () => reply(state.candidates),
+      addProject: async (folder) => {
+        const candidate = find(state.candidates, (c) => c.folder === folder, "folder");
+        const project = newProject(folder, candidate.repos);
+        state.projects = [...state.projects, project];
+        state.candidates = state.candidates.filter((c) => c.folder !== folder);
+        state.wiki[folder] = starterWiki(folder);
+        emit("workspace.changed", {});
+        return structuredClone(project);
+      },
     },
     agents: {
       demo: true,
@@ -83,6 +93,7 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
             state.deployments.some((d) => d.id === i.deploymentId && d.status === "active"),
           ),
         ),
+      deployments: () => reply(state.deployments.filter((d) => d.status === "active")),
       deploy: async (team, project, goal) => {
         const t = find(state.teams, (x) => x.id === team, "team");
         const id = `${team}@${project}`;
@@ -183,12 +194,13 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
       demo: true,
       tree: async (project) => reply(wiki(state, project).tree),
       entry: async (project, path) => {
-        const e = wiki(state, project).entries[path];
+        const w = wiki(state, project);
+        const e = w.entries[path];
         if (!e) throw new NotFound("entry");
+        markSeen(w.tree, path); // what the reader shows counts as seen
         return reply(e);
       },
-      board: async (project, id) =>
-        reply(find(wiki(state, project).boards, (b) => b.id === id, "board")),
+      boards: async (project) => reply(wiki(state, project).boards),
       setCheckbox: async (project, path, line, done, v) => {
         const e = wiki(state, project).entries[path];
         if (!e) throw new NotFound("entry");
@@ -308,5 +320,79 @@ function simulateTeam(
     case 3:
       setStatus(inst, "done");
       break;
+  }
+}
+
+/** A new project's defaults (wiki/product/features/add-project.md#effect). */
+function newProject(folder: string, repos: string[]): Seed["projects"][number] {
+  const source =
+    `project = "${folder}"\n` +
+    `repos = [${repos.map((r) => `"${r}"`).join(", ")}]\n` +
+    `main = "main"\nmerge_to_main = "ceo"\nchecks = ""\n` +
+    `# always_ask_ceo = ["new dependency", "touches shared staging"]\n\n` +
+    `[forge]\nkind = "none"\n`;
+  return {
+    id: folder,
+    config: {
+      project: folder,
+      description: "",
+      repos,
+      main: "main",
+      checks: "",
+      mergeToMain: "ceo",
+      alwaysAskCeo: [],
+      forge: { kind: "none", url: "", projectRepo: "" },
+    },
+    repos,
+    version: Math.random().toString(16).slice(2, 10),
+    problems: [],
+    source,
+  };
+}
+
+/** The starter wiki: an index and an empty Backlog board. */
+function starterWiki(folder: string): Seed["wiki"][string] {
+  return {
+    tree: [
+      {
+        path: "index.md",
+        title: folder,
+        folder: false,
+        hasIndex: false,
+        changed: false,
+        children: [],
+      },
+    ],
+    entries: {
+      "index.md": {
+        path: "index.md",
+        title: folder,
+        version: "v1",
+        frontmatter: {},
+        html: `<h1>${folder}</h1>\n<p>Deploy a team from this project's Settings tab.</p>\n`,
+        headings: [],
+        checkboxes: [],
+        backlinks: [],
+      },
+    },
+    boards: [
+      {
+        id: "backlog",
+        name: "Backlog",
+        columns: ["todo", "in-progress", "done"],
+        laneField: "",
+        lanes: [],
+        cards: [],
+        declaration: `[[tool.wikiview.board]]\nid = "backlog"\npath = "/backlog"\nname = "Backlog"\n`,
+        problems: [],
+      },
+    ],
+  };
+}
+
+function markSeen(nodes: Seed["wiki"][string]["tree"], path: string) {
+  for (const n of nodes) {
+    if (n.path === path) n.changed = false;
+    markSeen(n.children, path);
   }
 }

@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
 import type { Look } from "../api/types/workspace";
 import { Avatar, chiefOfStaffLook } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
-// One request to the CEO (wiki/product/features/home.md#request-list). Home
-// and a project's Changes tab use this same panel, so they can't drift: only
-// the extra context Changes adds differs (passed as children).
+// One request to the CEO. Home and a project's Changes tab use this same panel,
+// so they can't drift; the variant only changes what the specs say differs
+// (wiki/product/features/home.md#request-list, wiki/product/features/changes.md#1-needs-you).
 
 type Props = {
   request: Request;
@@ -18,11 +18,17 @@ type Props = {
   reviewText?: string;
   onAnswer: (answer: string) => void;
   onOpenSession: () => void;
-  onReview: () => void;
+  /** Home: a review's Review button (opens Changes). */
+  onReview?: () => void;
   onOpenChiefOfStaff: () => void;
-  /** Home 16px, Changes 15.5px. */
-  size?: "home" | "changes";
-  children?: React.ReactNode;
+  /** Home: avatar 32 with the amber ring. Changes: kind chip first, avatar 24, the source. */
+  variant?: "home" | "changes";
+  /** Changes: where it came from (`escalate(approval)`, `request_merge()`…). */
+  source?: string;
+  /** Under the text: e.g. the link line. */
+  children?: ReactNode;
+  /** Replaces the option buttons (Changes: a review's merge actions). */
+  actions?: ReactNode;
 };
 
 export function RequestPanel({
@@ -34,46 +40,54 @@ export function RequestPanel({
   onOpenSession,
   onReview,
   onOpenChiefOfStaff,
-  size = "home",
+  variant = "home",
+  source,
   children,
+  actions,
 }: Props) {
   const fromChiefOfStaff = r.source === "cos";
+  const changes = variant === "changes";
   const [answer, setAnswer] = useState("");
   const freeText = r.kind === "approval" || r.kind === "question";
+  const look = fromChiefOfStaff ? chiefOfStaffLook : who?.look;
   return (
-    <article className="flex flex-col gap-3.5 rounded-xl border border-line bg-panel px-5 py-[18px]">
+    <article
+      className={`flex flex-col rounded-xl border border-line bg-panel ${changes ? "gap-3 px-[18px] py-4" : "gap-3.5 px-5 py-[18px]"}`}
+    >
       <header className="flex items-center gap-2.5">
-        <Avatar
-          look={fromChiefOfStaff ? chiefOfStaffLook : who?.look}
-          size={32}
-          ring="var(--acc)"
-        />
+        {changes && <KindChip kind={r.kind} />}
+        <Avatar look={look} size={changes ? 24 : 32} ring={changes ? undefined : "var(--acc)"} />
         <span className="font-semibold">{fromChiefOfStaff ? "Chief of Staff" : who?.name}</span>
         <span className="text-[13px] text-tx4">{context}</span>
         <span className="flex-1" />
-        <KindChip kind={r.kind} />
+        {changes ? (
+          <span className="font-mono text-[11.5px] text-tx4">{source}</span>
+        ) : (
+          <KindChip kind={r.kind} />
+        )}
       </header>
-      <p className={`leading-[1.5] text-pretty ${size === "home" ? "text-base" : "text-[15.5px]"}`}>
+      <p className={`leading-[1.5] text-pretty ${changes ? "text-[15.5px]" : "text-base"}`}>
         {r.kind === "review" && reviewText ? reviewText : r.summary}
       </p>
       {children}
       <div className="flex flex-wrap items-center gap-2">
-        {r.kind === "review" && !fromChiefOfStaff ? (
-          <Button variant="primary" onClick={onReview}>
-            Review
-          </Button>
-        ) : (
-          r.options.map((option, i) => (
-            <Button
-              key={option}
-              variant={i === 0 ? "primary" : "secondary"}
-              className={i === 1 ? "!text-tx" : ""}
-              onClick={() => onAnswer(option)}
-            >
-              {option}
+        {actions ??
+          (r.kind === "review" && onReview ? (
+            <Button variant="primary" onClick={onReview}>
+              Review
             </Button>
-          ))
-        )}
+          ) : (
+            r.options.map((option, i) => (
+              <Button
+                key={option}
+                variant={i === 0 ? "primary" : "secondary"}
+                className={i === 1 ? "!text-tx" : ""}
+                onClick={() => onAnswer(option)}
+              >
+                {option}
+              </Button>
+            ))
+          ))}
         {fromChiefOfStaff ? (
           <Button variant="ghost" onClick={onOpenChiefOfStaff}>
             Open Chief of Staff

@@ -10,8 +10,8 @@ import type {
   TeamMessage,
   WorkItem,
 } from "./types/store";
-import type { Board, Entry, Node } from "./types/wiki";
-import type { Project, SettingsFile, Team } from "./types/workspace";
+import type { Board, Card, Entry, Node } from "./types/wiki";
+import type { Candidate, Project, SettingsFile, Team } from "./types/workspace";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -21,6 +21,8 @@ import type { Project, SettingsFile, Team } from "./types/workspace";
 
 export type {
   Board,
+  Candidate,
+  Card,
   Deployment,
   Entry,
   HarnessStatus,
@@ -49,10 +51,16 @@ export interface WorkspaceArea extends Area {
   teams(): Promise<Team[]>;
   team(id: string): Promise<Team>;
   settings(): Promise<SettingsFile>;
+  /** Folders that aren't projects yet. */
+  candidates(): Promise<Candidate[]>;
+  /** Turns a candidate folder into a project: its project repo and starter wiki. */
+  addProject(folder: string): Promise<Project>;
 }
 
 export interface AgentsArea extends Area {
   instances(): Promise<Instance[]>;
+  /** The active deployments. */
+  deployments(): Promise<Deployment[]>;
   deploy(team: string, project: string, goal: string): Promise<Deployment>;
   stop(deployment: string): Promise<void>;
   openTerminal(id: string, handlers: PtyHandlers): PtyConnection;
@@ -85,7 +93,8 @@ export interface PipelineArea extends Area {
 export interface WikiArea extends Area {
   tree(project: string): Promise<Node[]>;
   entry(project: string, path: string): Promise<Entry>;
-  board(project: string, id: string): Promise<Board>;
+  /** Every board declared in the project's wiki.toml, with its cards. */
+  boards(project: string): Promise<Board[]>;
   setCheckbox(
     project: string,
     path: string,
@@ -150,10 +159,14 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       teams: () => getJSON("/api/teams"),
       team: (team) => getJSON(`/api/teams/${id(team)}`),
       settings: () => getJSON("/api/settings"),
+      candidates: () => getJSON("/api/candidates"),
+      addProject: async (folder) =>
+        (await request("POST", "/api/projects", { folder })).json() as Promise<Project>,
     },
     agents: {
       demo: false,
       instances: () => getJSON("/api/instances"),
+      deployments: () => getJSON("/api/deployments"),
       deploy: async (team, project, goal) =>
         (
           await request("POST", "/api/deployments", { team, project, goal })
@@ -189,7 +202,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       demo: false,
       tree: (project) => getJSON(`/api/wiki/${id(project)}/tree`),
       entry: (project, path) => getJSON(`/api/wiki/${id(project)}/entry/${path}`),
-      board: (project, board) => getJSON(`/api/wiki/${id(project)}/board/${id(board)}`),
+      boards: (project) => getJSON(`/api/wiki/${id(project)}/boards`),
       setCheckbox: (project, path, line, done, version) =>
         send("PUT", `/api/wiki/${id(project)}/checkbox/${path}`, { line, done, version }),
       moveCard: (project, board, path, column, lane, version) =>

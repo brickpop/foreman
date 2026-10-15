@@ -101,3 +101,15 @@ func TestDeployErrors(t *testing.T) {
 		}
 	}
 }
+
+func (f *fakeAgents) ActiveDeployments(context.Context) ([]store.Deployment, error) {
+	return []store.Deployment{{ID: "atlas@ledger", Goal: "Ship it", Status: "active"}}, nil
+}
+
+func TestDeploymentsAreListed(t *testing.T) {
+	var list []map[string]any
+	decodeBody(t, get(t, withAgents(&fakeAgents{}), "/api/deployments"), &list)
+	if len(list) != 1 || list[0]["goal"] != "Ship it" {
+		t.Errorf("deployments %v", list)
+	}
+}

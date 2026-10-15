@@ -1,6 +1,7 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Instance, Project, Request, Team } from "../api/client";
+import { AddProject } from "../components/AddProject";
 import { DemoBadge } from "../components/DemoBadge";
 import { Drawer } from "../components/Overlays";
 import { Toasts } from "../components/Toasts";
@@ -23,6 +24,7 @@ export function Shell() {
   const [chiefOfStaff, setChiefOfStaff] = useState(false);
   // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
+  const [addProject, setAddProject] = useState(false);
   return (
     <ChiefOfStaffContext.Provider value={() => setChiefOfStaff(true)}>
       <Toasts>
@@ -37,6 +39,7 @@ export function Shell() {
           </button>
           <Sidebar
             onChiefOfStaff={() => setChiefOfStaff(true)}
+            onAddProject={() => setAddProject(true)}
             open={menu}
             onClose={() => setMenu(false)}
           />
@@ -53,6 +56,7 @@ export function Shell() {
         >
           <p className="p-5 text-tx3">The Chief of Staff comes with its own card.</p>
         </Drawer>
+        <AddProject open={addProject} onClose={() => setAddProject(false)} />
       </Toasts>
     </ChiefOfStaffContext.Provider>
   );
@@ -100,10 +104,12 @@ const rowItem =
 
 function Sidebar({
   onChiefOfStaff,
+  onAddProject,
   open,
   onClose,
 }: {
   onChiefOfStaff: () => void;
+  onAddProject: () => void;
   /** Open as an overlay, on narrow screens. */
   open: boolean;
   onClose: () => void;
@@ -156,7 +162,13 @@ function Sidebar({
               {p.needsYou && <Dot title="Needs you" />}
             </Link>
           ))}
-          <span className="px-2.5 py-1.5 text-[13px] text-tx4">+ New project</span>
+          <button
+            type="button"
+            onClick={onAddProject}
+            className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
+          >
+            + New project
+          </button>
         </section>
         <section className="flex flex-col gap-0.5">
           <Label>Teams</Label>

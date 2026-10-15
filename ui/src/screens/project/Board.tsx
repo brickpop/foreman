@@ -1,0 +1,346 @@
+import * as Menu from "@radix-ui/react-dropdown-menu";
+import { useNavigate } from "@tanstack/react-router";
+import { type DragEvent, useState } from "react";
+import type { Board as BoardData, Card } from "../../api/client";
+import { agentOf } from "../../app/model";
+import { useBoards, useEntry, useMoveCard, useTeams, useTick } from "../../app/queries";
+import { Avatar } from "../../components/Avatar";
+import { Drawer } from "../../components/Overlays";
+import { useToast } from "../../components/Toasts";
+import { Button, Segmented } from "../../components/ui";
+import { WikiArticle } from "../../components/WikiArticle";
+
+// A kanban over wiki entries (wiki/product/features/board.md). A move rewrites
+// one or two frontmatter lines, version-guarded.
+
+const columnLabels: Record<string, string> = {
+  todo: "To do",
+  "in-progress": "In progress",
+  review: "Review",
+  done: "Done",
+};
+
+export function columnLabel(value: string): string {
+  return columnLabels[value] ?? titleCase(value);
+}
+
+function titleCase(s: string): string {
+  const words = s.replaceAll("-", " ").replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Columns and lanes as shown: the declared ones, plus "Other" when a card fits none. */
+export function layout(board: BoardData): { columns: string[]; lanes: string[] } {
+  const columns = [...board.columns];
+  if (board.cards.some((c) => !board.columns.includes(c.column))) columns.push("Other");
+  const lanes = [...board.lanes];
+  if (lanes.length > 0 && board.cards.some((c) => !board.lanes.includes(c.lane)))
+    lanes.push("Other");
+  return { columns, lanes };
+}
+
+/** Where a card sits: its column (or Other), its lane (or Other). */
+export function cell(board: BoardData, card: Card): { column: string; lane: string } {
+  return {
+    column: board.columns.includes(card.column) ? card.column : "Other",
+    lane: board.lanes.length === 0 ? "" : board.lanes.includes(card.lane) ? card.lane : "Other",
+  };
+}
+
+const priorityColor: Record<string, string> = {
+  high: "text-err",
+  medium: "text-accTx",
+  low: "text-tx4",
+};
+
+export function Board({ project }: { project: string }) {
+  const boards = useBoards(project);
+  const [chosen, setChosen] = useState<string>();
+  const [toml, setToml] = useState(false);
+  const [sheet, setSheet] = useState<string>();
+  const toast = useToast();
+  const move = useMoveCard(project, (e) =>
+    toast({ title: "Card not moved", body: e.message, color: "var(--err)" }),
+  );
+  const list = boards.data ?? [];
+  const board = list.find((b) => b.id === chosen) ?? list[0];
+  if (!board) return <p className="px-10 pt-5 text-tx3">No board is declared in wiki.toml.</p>;
+  const { columns, lanes } = layout(board);
+
+  const drop = (card: Card, column: string, lane: string) => {
+    if (column === "Other" || lane === "Other") return; // not a value to write
+    const now = cell(board, card);
+    if (now.column === column && now.lane === lane) return;
+    move.mutate(
+      { board: board.id, path: card.path, column, lane, version: card.version },
+      {
+        onSuccess: () =>
+          toast({
+            title: card.path,
+            body: `status: ${column}${lane !== now.lane && lane ? ` · ${board.laneField}: ${lane}` : ""}`,
+            color: "var(--info)",
+          }),
+      },
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-4 px-10 pt-5 pb-16">
+      <div className="flex items-center gap-3">
+        {list.length > 1 && (
+          <Segmented
+            label="Boards"
+            value={board.id}
+            onChange={setChosen}
+            options={list.map((b) => ({ value: b.id, label: b.name }))}
+          />
+        )}
+        <span className="flex-1" />
+        <Button variant="muted" className="font-mono" onClick={() => setToml(!toml)}>
+          {toml ? "Hide wiki.toml" : "wiki.toml"}
+        </Button>
+      </div>
+      {toml && (
+        <pre className="max-w-[620px] rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2">
+          {board.declaration}
+        </pre>
+      )}
+      {board.problems.length > 0 && (
+        <p className="text-[13px] text-err">{board.problems.join(" · ")}</p>
+      )}
+      <div className="overflow-x-auto">
+        <div className="min-w-[880px]">
+          <div
+            className="grid gap-2"
+            style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+          >
+            {columns.map((c) => (
+              <div key={c} className="px-1 pb-1 text-[13px]">
+                <span className="font-medium text-tx3">{columnLabel(c)}</span>{" "}
+                <span className="text-tx4">
+                  {board.cards.filter((x) => cell(board, x).column === c).length}
+                </span>
+              </div>
+            ))}
+          </div>
+          {(lanes.length > 0 ? lanes : [""]).map((lane) => (
+            <div key={lane} className="mt-3 flex flex-col gap-1.5">
+              {lane && (
+                <span className="text-xs text-tx4">
+                  {titleCase(lane)} {lane === "Other" ? "" : board.laneField}
+                </span>
+              )}
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+              >
+                {columns.map((column) => (
+                  <Cell
+                    key={column}
+                    cards={board.cards.filter((x) => {
+                      const at = cell(board, x);
+                      return at.column === column && at.lane === lane;
+                    })}
+                    onDrop={(card) => drop(card, column, lane)}
+                    allCards={board.cards}
+                    menu={(card) => (
+                      <MoveMenu board={board} card={card} onMove={(c, l) => drop(card, c, l)} />
+                    )}
+                    onOpen={setSheet}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="text-[12.5px] text-tx4">
+        Drag a card to change its status (and its lane). Only those lines of the task's frontmatter
+        are rewritten.
+      </p>
+      <SideSheet project={project} path={sheet} onClose={() => setSheet(undefined)} />
+    </div>
+  );
+}
+
+function Cell({
+  cards,
+  allCards,
+  onDrop,
+  menu,
+  onOpen,
+}: {
+  cards: Card[];
+  allCards: Card[];
+  onDrop: (card: Card) => void;
+  menu: (card: Card) => React.ReactNode;
+  onOpen: (path: string) => void;
+}) {
+  const [over, setOver] = useState(false);
+  const teams = useTeams();
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: a drop target; the keyboard path is each card's status menu
+    <div
+      onDragOver={(e: DragEvent) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e: DragEvent) => {
+        e.preventDefault();
+        setOver(false);
+        const card = allCards.find((c) => c.path === e.dataTransfer.getData("text/plain"));
+        if (card) onDrop(card);
+      }}
+      className={`flex min-h-[72px] flex-col gap-2 rounded-[10px] border bg-side p-2 ${over ? "border-acc" : "border-line"}`}
+    >
+      {cards.map((card) => {
+        const assignee = card.assignee ? agentOf(teams.data ?? [], `${card.assignee}@`) : undefined;
+        return (
+          // biome-ignore lint/a11y/noStaticElementInteractions: dragged; the keyboard path is the status menu
+          <div
+            key={card.path}
+            draggable
+            onDragStart={(e) => e.dataTransfer.setData("text/plain", card.path)}
+            className="group flex cursor-grab flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 py-2.5 hover:border-line3"
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[11.5px] font-medium text-tx4">{card.id}</span>
+              {card.priority && (
+                <span
+                  className={`font-mono text-[11.5px] font-medium ${priorityColor[card.priority] ?? "text-tx4"}`}
+                >
+                  {card.priority}
+                </span>
+              )}
+              <span className="flex-1" />
+              {menu(card)}
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpen(card.path)}
+              className="text-left text-sm leading-[1.4] text-tx"
+            >
+              {card.title}
+            </button>
+            {assignee && (
+              <span className="flex items-center gap-1.5 text-[12.5px] text-tx3">
+                <Avatar look={assignee.soul.look} size={20} />
+                {assignee.soul.name}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The keyboard and touch way to move a card: the same as a drag. */
+function MoveMenu({
+  board,
+  card,
+  onMove,
+}: {
+  board: BoardData;
+  card: Card;
+  onMove: (column: string, lane: string) => void;
+}) {
+  const at = cell(board, card);
+  const item =
+    "cursor-pointer rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover";
+  return (
+    <Menu.Root>
+      <Menu.Trigger aria-label={`Move ${card.id}`} className="rounded px-1 text-tx4 hover:text-tx2">
+        ⋯
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content className="z-50 flex min-w-40 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay">
+          <Menu.Label className="px-2 py-1 text-xs text-tx4">Status</Menu.Label>
+          {board.columns.map((c) => (
+            <Menu.Item
+              key={c}
+              className={item}
+              onSelect={() => onMove(c, at.lane === "Other" ? board.lanes[0] : at.lane)}
+            >
+              {columnLabel(c)}
+            </Menu.Item>
+          ))}
+          {board.lanes.length > 0 && (
+            <>
+              <Menu.Label className="px-2 py-1 text-xs text-tx4">
+                {titleCase(board.laneField)}
+              </Menu.Label>
+              {board.lanes.map((l) => (
+                <Menu.Item
+                  key={l}
+                  className={item}
+                  onSelect={() => onMove(at.column === "Other" ? board.columns[0] : at.column, l)}
+                >
+                  {titleCase(l)}
+                </Menu.Item>
+              ))}
+            </>
+          )}
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+/** A card's entry, beside the board (wiki/product/features/board.md#side-sheet). */
+function SideSheet({
+  project,
+  path,
+  onClose,
+}: {
+  project: string;
+  path?: string;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const entry = useEntry(project, path ?? "");
+  const tick = useTick(project, (e) =>
+    toast({ title: path ?? "", body: e.message, color: "var(--err)" }),
+  );
+  const open = (p: string) => {
+    onClose();
+    navigate({
+      to: "/projects/$project",
+      params: { project },
+      search: { tab: "overview", entry: p },
+    });
+  };
+  return (
+    <Drawer
+      open={path !== undefined}
+      onClose={onClose}
+      width={460}
+      layer={44}
+      title={
+        <span className="flex items-center gap-3">
+          <span className="font-mono text-[12.5px] font-normal text-tx3">
+            {project}/project/wiki/{path}
+          </span>
+          <Button variant="tiny" onClick={() => path && open(path)}>
+            Open in wiki
+          </Button>
+        </span>
+      }
+    >
+      <div className="px-[22px] pt-5 pb-8">
+        {entry.data && (
+          <WikiArticle
+            entry={entry.data}
+            size="sheet"
+            onOpen={open}
+            onTick={(line, done) =>
+              path && tick.mutate({ path, line, done, version: entry.data.version })
+            }
+          />
+        )}
+      </div>
+    </Drawer>
+  );
+}

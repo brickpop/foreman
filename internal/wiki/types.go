@@ -45,8 +45,9 @@ type Checkbox struct {
 type Board struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
-	Columns     []string `json:"columns"` // "Other" last when an entry fits none
-	Lanes       []string `json:"lanes"`   // empty without a lane field
+	Columns     []string `json:"columns"`   // "Other" last when an entry fits none
+	Lanes       []string `json:"lanes"`     // empty without a lane field
+	LaneField   string   `json:"laneField"` // the field the lanes come from, e.g. priority
 	Cards       []Card   `json:"cards"`
 	Declaration string   `json:"declaration"` // quoted from wiki.toml
 	Problems    []string `json:"problems"`

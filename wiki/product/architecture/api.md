@@ -24,6 +24,7 @@ GET    /api/teams | /api/teams/:id            definitions, with version and prob
 PUT    /api/teams/:id/agents/:agent           update soul (writes team file)
 POST   /api/teams/:id/agents                  hire (from CoS)
 
+GET    /api/deployments                       the active deployments
 POST   /api/deployments                       {team, project, goal}
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status
@@ -42,7 +43,7 @@ POST   /api/merge-requests/:id/reject         {reason}: close its PR if any, del
 POST   /api/repos/workspace/sync              Sync: fetch, merge in and push the workspace repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 
-GET    /api/wiki/:project/tree | /entry/:path | /board/:id
+GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry (reading it marks it seen); every board with its cards
 PUT    /api/wiki/:project/checkbox/:path      {line, version}
 PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
 

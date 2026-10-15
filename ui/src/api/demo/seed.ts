@@ -14,7 +14,7 @@ import type {
   WorkItem,
 } from "../types/store";
 import type { Board, Entry, Node } from "../types/wiki";
-import type { Project, SettingsFile, Team } from "../types/workspace";
+import type { Candidate, Project, SettingsFile, Team } from "../types/workspace";
 
 export interface Seed {
   workspace: { path: string };
@@ -28,6 +28,8 @@ export interface Seed {
   messages: TeamMessage[];
   workItems: WorkItem[];
   mergeRequests: MergeRequest[];
+  /** Folders that aren't projects yet (Add a project). */
+  candidates: Candidate[];
   /** Per project id. */
   wiki: Record<string, { tree: Node[]; entries: Record<string, Entry>; boards: Board[] }>;
 }
@@ -56,6 +58,11 @@ const REVIEWER =
 // its Quill and Pike are reviewers here.
 
 export const seed: Seed = {
+  // invented: two folders with repos cloned but no project yet.
+  candidates: [
+    { folder: "billing", repos: ["billing-api", "billing-web"] },
+    { folder: "scratch", repos: [] },
+  ],
   workspace: { path: "~/agents-ws" },
 
   // Prototype: `projects` (lines 914-918).
@@ -84,6 +91,21 @@ export const seed: Seed = {
       repos: ["ledger-api", "ledger-web"],
       version: "84862373137c6b55",
       problems: [],
+      source: `project = "ledger"
+description = "Settlement and reconciliation service."
+repos = ["ledger-api", "ledger-web"]
+checks = "npm test"
+always_ask_ceo = [
+  "new dependency",
+  "touches shared staging",
+  "scope change vs an accepted ADR",
+]
+
+[forge]
+kind = "forgejo"
+url = "https://localhost:3000/ledger"
+project_repo = "https://localhost:3000/ledger/ledger-project"
+`,
     },
     {
       id: "relay",
@@ -105,6 +127,17 @@ export const seed: Seed = {
       repos: ["relay-core"],
       version: "6a674502691ad312",
       problems: [],
+      source: `project = "relay"
+description = "Event routing between internal services."
+repos = ["relay-core"]
+checks = "cargo test"
+always_ask_ceo = ["adds a paid service"]
+
+[forge]
+kind = "github"
+url = "https://github.com/acme"
+project_repo = "https://github.com/acme/relay-project"
+`,
     },
     {
       id: "harbor",
@@ -121,6 +154,12 @@ export const seed: Seed = {
       repos: ["harbor-infra", "harbor-modules"],
       version: "d1610f71061f5470",
       problems: [],
+      source: `project = "harbor"
+description = "Infrastructure as code for the fleet."
+repos = ["harbor-infra", "harbor-modules"]
+checks = "terraform validate"
+always_ask_ceo = ["any apply outside sandbox accounts"]
+`,
     },
   ],
 
@@ -1612,6 +1651,7 @@ export const seed: Seed = {
           id: "sprint",
           name: "Sprint 07",
           columns: ["todo", "in-progress", "review", "done"],
+          laneField: "priority",
           lanes: ["high", "medium", "low"],
           cards: [
             {
@@ -1702,6 +1742,7 @@ lanes   = ["high", "medium", "low"]`,
           id: "findings",
           name: "Findings",
           columns: ["todo", "in-progress", "review", "done"],
+          laneField: "",
           lanes: [],
           cards: [
             {
@@ -2033,6 +2074,7 @@ columns = ["todo", "in-progress", "review", "done"]`,
           id: "adr",
           name: "ADR track",
           columns: ["todo", "in-progress", "review", "done"],
+          laneField: "",
           lanes: [],
           cards: [
             {
@@ -2152,6 +2194,7 @@ columns = ["todo", "in-progress", "review", "done"]`,
           id: "backlog",
           name: "Backlog",
           columns: ["todo", "in-progress", "review", "done"],
+          laneField: "",
           lanes: [],
           cards: [],
           declaration: `[[tool.wikiview.board]]

@@ -58,6 +58,7 @@ export interface Board {
   name: string;
   columns: string[]; // "Other" last when an entry fits none
   lanes: string[]; // empty without a lane field
+  laneField: string; // the field the lanes come from, e.g. priority
   cards: Card[];
   declaration: string; // quoted from wiki.toml
   problems: string[];

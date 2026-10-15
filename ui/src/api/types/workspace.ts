@@ -127,6 +127,7 @@ export interface Project {
   repos: string[]; // the code repos agents get worktrees of
   version: string; // of project.toml
   problems: string[]; // what is wrong with project.toml; Config is then the last good one
+  source: string; // project.toml as it is on disk, shown read-only
 }
 /**
  * Team is a team file.
@@ -154,4 +155,12 @@ export interface Change {
   id?: string; // the project or team, for "project" and "team"
   version?: string; // the file's new version ("" once it is gone)
   problems?: string[]; // what is wrong with it now
+}
+/**
+ * Candidate is a workspace folder that isn't a project yet: Add a project
+ * turns it into one (wiki/product/features/add-project.md).
+ */
+export interface Candidate {
+  folder: string;
+  repos: string[]; // the git repos found in it
 }

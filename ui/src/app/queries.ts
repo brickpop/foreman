@@ -1,6 +1,6 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { useClient } from "../api/client";
+import { type Board, useClient } from "../api/client";
 import type { Event } from "../api/types/events";
 
 // Server state, through TanStack Query: one hook per query, and server events
@@ -13,6 +13,7 @@ export const keys = {
   teams: ["teams"],
   settings: ["settings"],
   instances: ["instances"],
+  deployments: ["deployments"],
   requests: ["requests"],
   harnesses: ["harnesses"],
   messages: ["messages"],
@@ -60,14 +61,19 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "workspace.changed":
       return [keys.projects];
     case "instance.status":
+      return [keys.instances];
     case "deployment.created":
     case "deployment.stopped":
-      return [keys.instances];
+      return [keys.instances, keys.deployments];
     case "request.created":
     case "request.resolved":
       return [keys.requests];
     case "team.message":
       return [keys.messages];
+    case "wiki.changed":
+      return [["wiki", String((e.data as { project?: string }).project ?? "")]];
+    case "pipeline.changed":
+      return [["pipeline"]];
     default:
       return [];
   }
@@ -129,4 +135,89 @@ export function useMessages(deployment: string) {
     queryFn: () => c.messages.list(deployment),
     enabled: deployment !== "",
   });
+}
+
+const wikiKey = (project: string) => ["wiki", project] as const;
+
+export function useTree(project: string) {
+  const c = useClient();
+  return useQuery({ queryKey: [...wikiKey(project), "tree"], queryFn: () => c.wiki.tree(project) });
+}
+
+/** An entry; reading it marks it seen, so the tree's dots refresh. */
+export function useEntry(project: string, path: string) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useQuery({
+    queryKey: [...wikiKey(project), "entry", path],
+    queryFn: async () => {
+      const e = await c.wiki.entry(project, path);
+      queries.invalidateQueries({ queryKey: [...wikiKey(project), "tree"] });
+      return e;
+    },
+    enabled: path !== "",
+  });
+}
+
+export function useBoards(project: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...wikiKey(project), "boards"],
+    queryFn: () => c.wiki.boards(project),
+  });
+}
+
+/** Ticks a checkbox; on a conflict the box reverts (the entry refetches) and onError says why. */
+export function useTick(project: string, onError: (e: Error) => void) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { path: string; line: number; done: boolean; version: string }) =>
+      c.wiki.setCheckbox(project, v.path, v.line, v.done, v.version),
+    onError,
+    onSettled: () => queries.invalidateQueries({ queryKey: wikiKey(project) }),
+  });
+}
+
+/** Moves a card: shown at once, put back if the write fails. */
+export function useMoveCard(project: string, onError: (e: Error) => void) {
+  const c = useClient();
+  const queries = useQueryClient();
+  const key = [...wikiKey(project), "boards"];
+  return useMutation({
+    mutationFn: (v: {
+      board: string;
+      path: string;
+      column: string;
+      lane: string;
+      version: string;
+    }) => c.wiki.moveCard(project, v.board, v.path, v.column, v.lane, v.version),
+    onMutate: async (v) => {
+      await queries.cancelQueries({ queryKey: key });
+      const before = queries.getQueryData<Board[]>(key);
+      queries.setQueryData<Board[]>(key, (boards) =>
+        boards?.map((b) =>
+          b.id !== v.board
+            ? b
+            : {
+                ...b,
+                cards: b.cards.map((card) =>
+                  card.path === v.path ? { ...card, column: v.column, lane: v.lane } : card,
+                ),
+              },
+        ),
+      );
+      return { before };
+    },
+    onError: (e, _v, context) => {
+      queries.setQueryData(key, context?.before);
+      onError(e);
+    },
+    onSettled: () => queries.invalidateQueries({ queryKey: wikiKey(project) }),
+  });
+}
+
+export function useDeployments() {
+  const c = useClient();
+  return useQuery({ queryKey: keys.deployments, queryFn: () => c.agents.deployments() });
 }

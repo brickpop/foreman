@@ -104,6 +104,9 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 		t.Errorf("projects %v", ids)
 	}
 	ledger, _ := ws.Project("ledger")
+	if ledger.Source != `project = "ledger"` {
+		t.Errorf("source %q: the file as on disk", ledger.Source)
+	}
 	if strings.Join(ledger.Repos, ",") != "ledger-api,ledger-web" || len(ledger.Problems) > 0 {
 		t.Errorf("ledger repos %v, problems %v", ledger.Repos, ledger.Problems)
 	}

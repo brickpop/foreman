@@ -359,3 +359,20 @@ func TestListShowsActiveDeploymentsOnly(t *testing.T) {
 		t.Errorf("after stop: %+v", list)
 	}
 }
+
+func TestActiveDeployments(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if list, err := f.m.ActiveDeployments(ctx); err != nil || len(list) != 0 {
+		t.Errorf("none yet: %v %v", list, err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "Ship it"); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := f.m.ActiveDeployments(ctx); len(list) != 1 || list[0].Goal != "Ship it" {
+		t.Errorf("active: %+v", list)
+	}
+	_ = f.m.Stop(ctx, "atlas@ledger")
+	if list, _ := f.m.ActiveDeployments(ctx); len(list) != 0 {
+		t.Errorf("after stop: %+v", list)
+	}
+}

@@ -25,8 +25,10 @@ const tiny: Seed = {
       repos: ["ledger-api"],
       version: "v1",
       problems: [],
+      source: `project = "ledger"\n`,
     },
   ],
+  candidates: [{ folder: "billing", repos: ["billing-api"] }],
   teams: [
     {
       id: "atlas",
@@ -108,7 +110,16 @@ const tiny: Seed = {
   ],
   wiki: {
     ledger: {
-      tree: [],
+      tree: [
+        {
+          path: "index.md",
+          title: "Ledger",
+          folder: false,
+          hasIndex: false,
+          changed: true,
+          children: [],
+        },
+      ],
       entries: {
         "index.md": {
           path: "index.md",
@@ -126,6 +137,7 @@ const tiny: Seed = {
           id: "sprint",
           name: "Sprint",
           columns: ["todo", "done"],
+          laneField: "priority",
           lanes: ["high", "low"],
           cards: [
             {
@@ -221,11 +233,32 @@ describe("demoClient", () => {
     expect(entry.version).not.toBe("e1");
 
     await c.wiki.moveCard("ledger", "sprint", "backlog/LED-44.md", "done", "low", "c1");
-    const card = (await c.wiki.board("ledger", "sprint")).cards[0];
+    const card = (await c.wiki.boards("ledger"))[0].cards[0];
     expect(card).toMatchObject({ column: "done", lane: "low" });
     await expect(
       c.wiki.moveCard("ledger", "sprint", "backlog/LED-44.md", "todo", "high", "c1"),
     ).rejects.toThrow("changed since");
+  });
+
+  it("adds a project from a candidate, with a starter wiki", async () => {
+    const { c, events } = client();
+    expect(await c.workspace.candidates()).toHaveLength(1);
+    const p = await c.workspace.addProject("billing");
+    expect(p).toMatchObject({ id: "billing", repos: ["billing-api"] });
+    expect(p.source).toContain(`project = "billing"`);
+    expect(p.source).toContain("# always_ask_ceo");
+    expect(await c.workspace.candidates()).toEqual([]);
+    expect((await c.wiki.entry("billing", "index.md")).html).toContain("Settings tab");
+    expect((await c.wiki.boards("billing"))[0].cards).toEqual([]);
+    expect(events.map((e) => e.type)).toContain("workspace.changed");
+    await expect(c.workspace.addProject("nope")).rejects.toThrow("no such folder");
+  });
+
+  it("marks an entry seen when it is read", async () => {
+    const { c } = client();
+    expect((await c.wiki.tree("ledger"))[0].changed).toBe(true);
+    await c.wiki.entry("ledger", "index.md");
+    expect((await c.wiki.tree("ledger"))[0].changed).toBe(false);
   });
 
   it("hands out copies: a caller can't change the demo's memory", async () => {

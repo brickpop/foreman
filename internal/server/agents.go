@@ -17,6 +17,7 @@ type Agents interface {
 	Deploy(ctx context.Context, team, project, goal string) (store.Deployment, error)
 	Stop(ctx context.Context, deployment string) error
 	List(ctx context.Context) ([]store.Instance, error)
+	ActiveDeployments(ctx context.Context) ([]store.Deployment, error)
 }
 
 // deployRequest is the body of POST /api/deployments.
@@ -29,6 +30,14 @@ type deployRequest struct {
 func agentRoutes(mux *http.ServeMux, a Agents) {
 	mux.HandleFunc("GET /api/instances", func(w http.ResponseWriter, r *http.Request) {
 		list, err := a.List(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, list)
+	})
+	mux.HandleFunc("GET /api/deployments", func(w http.ResponseWriter, r *http.Request) {
+		list, err := a.ActiveDeployments(r.Context())
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 			return

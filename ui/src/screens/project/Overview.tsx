@@ -1,0 +1,161 @@
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import type { Node } from "../../api/client";
+import { useEntry, useTick, useTree } from "../../app/queries";
+import { useToast } from "../../components/Toasts";
+import { Button, Dot } from "../../components/ui";
+import { WikiArticle } from "../../components/WikiArticle";
+
+// The project's Overview: a reader for its wiki (wiki/product/features/wiki-reader.md).
+
+export function Overview({ project, entry }: { project: string; entry?: string }) {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [files, setFiles] = useState(false); // closed by default
+  const tree = useTree(project);
+  const path = entry ?? "index.md";
+  const current = useEntry(project, path);
+  const tick = useTick(project, (e) =>
+    toast({ title: path, body: e.message, color: "var(--err)" }),
+  );
+  const open = (p: string) => {
+    navigate({
+      to: "/projects/$project",
+      params: { project },
+      search: { tab: "overview", entry: p },
+    });
+    window.scrollTo({ top: 0 });
+  };
+  // An unknown path falls back to index.md.
+  const missing = current.isError && path !== "index.md";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the entry turns out missing
+  useEffect(() => {
+    if (missing) open("index.md");
+  }, [missing]);
+  const anyChanged = hasChanged(tree.data ?? []);
+  return (
+    <div className="flex flex-col gap-5 px-8 pt-6 pb-16">
+      <div className="flex items-center gap-3">
+        <Button variant={files ? "raised" : "secondary"} onClick={() => setFiles(!files)}>
+          <span className="flex items-center gap-2">
+            {files ? "Hide files" : "Files"}
+            {!files && anyChanged && <Dot size={6} title="Changed since you last looked" />}
+          </span>
+        </Button>
+        <span className="truncate font-mono text-xs text-tx4">
+          {project}/project/wiki/{path}
+        </span>
+      </div>
+      <div
+        className={`mx-auto grid w-full gap-8 ${files ? "grid-cols-[minmax(150px,200px)_minmax(0,760px)]" : "grid-cols-[minmax(0,760px)]"} justify-center`}
+      >
+        {files && (
+          <nav className="sticky top-4 self-start">
+            <Tree nodes={tree.data ?? []} current={path} depth={0} onOpen={open} />
+          </nav>
+        )}
+        <div className="max-w-[720px]">
+          {current.data && (
+            <WikiArticle
+              entry={current.data}
+              onOpen={open}
+              onTick={(line, done) =>
+                tick.mutate({ path, line, done, version: current.data.version })
+              }
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function hasChanged(nodes: Node[]): boolean {
+  return nodes.some((n) => n.changed || hasChanged(n.children));
+}
+
+/** Whether a folder holds the current entry: those start expanded. */
+function holds(n: Node, path: string): boolean {
+  return n.children.some((c) => c.path === path || holds(c, path));
+}
+
+function Tree({
+  nodes,
+  current,
+  depth,
+  onOpen,
+}: {
+  nodes: Node[];
+  current: string;
+  depth: number;
+  onOpen: (path: string) => void;
+}) {
+  return (
+    <ul className="m-0 list-none p-0">
+      {nodes.map((n) =>
+        n.folder ? (
+          <Folder key={n.path} node={n} current={current} depth={depth} onOpen={onOpen} />
+        ) : (
+          <li key={n.path}>
+            <button
+              type="button"
+              onClick={() => onOpen(n.path)}
+              style={{ paddingLeft: 10 + 14 * depth }}
+              className={`flex w-full items-center gap-2 rounded-md py-[5px] pr-2.5 text-left text-[13.5px] ${
+                n.path === current ? "bg-raised text-tx" : "text-tx3 hover:bg-hover"
+              }`}
+            >
+              <span className="truncate">{n.title || n.path}</span>
+              {n.changed && <Dot size={6} title="Changed since you last looked" />}
+            </button>
+          </li>
+        ),
+      )}
+    </ul>
+  );
+}
+
+function Folder({
+  node,
+  current,
+  depth,
+  onOpen,
+}: {
+  node: Node;
+  current: string;
+  depth: number;
+  onOpen: (path: string) => void;
+}) {
+  const [open, setOpen] = useState(holds(node, current));
+  const index = `${node.path}/index.md`;
+  return (
+    <li>
+      <div
+        style={{ paddingLeft: 10 + 14 * depth }}
+        className={`flex items-center gap-1 rounded-md py-[5px] pr-2.5 text-[13.5px] font-medium ${
+          current === index ? "bg-raised text-tx" : "text-tx2"
+        }`}
+      >
+        <button
+          type="button"
+          aria-label={open ? "Collapse" : "Expand"}
+          onClick={() => setOpen(!open)}
+          className="w-3 text-tx4"
+        >
+          {open ? "▾" : "▸"}
+        </button>
+        {node.hasIndex ? (
+          <button type="button" onClick={() => onOpen(index)} className="truncate text-left">
+            {node.title || node.path}
+          </button>
+        ) : (
+          <span className="truncate">{node.title || node.path}</span>
+        )}
+        {!open && hasChanged(node.children) && (
+          <Dot size={6} title="Changed since you last looked" />
+        )}
+      </div>
+      {open && <Tree nodes={node.children} current={current} depth={depth + 1} onOpen={onOpen} />}
+    </li>
+  );
+}

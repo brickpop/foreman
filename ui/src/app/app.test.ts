@@ -56,6 +56,14 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
     expect(staleKeys({ type: "request.created", data: {} })).toEqual([keys.requests]);
     expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages]);
+    expect(staleKeys({ type: "deployment.created", data: {} })).toEqual([
+      keys.instances,
+      keys.deployments,
+    ]);
+    expect(staleKeys({ type: "wiki.changed", data: { project: "ledger" } })).toEqual([
+      ["wiki", "ledger"],
+    ]);
+    expect(staleKeys({ type: "pipeline.changed", data: {} })).toEqual([["pipeline"]]);
     expect(staleKeys({ type: "something.else", data: {} })).toEqual([]);
   });
 });

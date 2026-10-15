@@ -20,6 +20,7 @@ type Project struct {
 	Repos    []string      `json:"repos"`    // the code repos agents get worktrees of
 	Version  string        `json:"version"`  // of project.toml
 	Problems []string      `json:"problems"` // what is wrong with project.toml; Config is then the last good one
+	Source   string        `json:"source"`   // project.toml as it is on disk, shown read-only
 }
 
 // Team is a team file.
@@ -112,7 +113,7 @@ func (w *Workspace) scan(prev snapshot) snapshot {
 		if err != nil {
 			continue // not a project (yet): a candidate for Add a project
 		}
-		p := Project{ID: e.Name(), Version: Version(data)}
+		p := Project{ID: e.Name(), Version: Version(data), Source: string(data)}
 		p.Config, p.Problems = ParseProject(p.ID, data)
 		if old, ok := prev.projects[p.ID]; ok && len(p.Problems) > 0 && len(old.Problems) == 0 {
 			p.Config = old.Config
@@ -314,4 +315,11 @@ func union[V any](a, b map[string]V) map[string]V {
 		m[k] = v
 	}
 	return m
+}
+
+// Candidate is a workspace folder that isn't a project yet: Add a project
+// turns it into one (wiki/product/features/add-project.md).
+type Candidate struct {
+	Folder string   `json:"folder"`
+	Repos  []string `json:"repos"` // the git repos found in it
 }

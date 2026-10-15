@@ -18,9 +18,8 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 ┌──────────────────────────────── Browser ──────────────────────────────────┐
 │ Screens: Home · Sessions · Project · Team · Agent · Settings · Chief of Staff│
 │                 │ never talk to the network themselves                       │
-│ ForemanClient ──┼── real client: HTTP + event stream + terminal WebSockets   │
-│ (per area,      └── demo client: seed data + simulated events, "demo data"   │
-│  in main.tsx)        badge (until that area's backend exists)              │
+│ ForemanClient ──── real client: HTTP + event stream + terminal WebSockets    │
+│ (main.tsx)          (an area not built yet refuses: "Not built yet")        │
 └───────────────────────────────────┬────────────────────────────────────────┘
                                     │ 127.0.0.1:8888, access token
 ┌───────────────────────── foreman (one Go binary) ──────────────────────────┐
@@ -372,7 +371,7 @@ Implementations: GitHub, Gitea (also Forgejo), none. Used only on the CEO's Crea
 ### Web server + UI (`server`, `access`, `ui/`)
 
 - **Web server**: the API, the event stream, the terminal WebSockets, behind the **Access guard** (token, Host and Origin checks). It holds no logic of its own: it calls the blocks above. Details: [API](./api.md), [Security](./security.md).
-- **UI**: screens use only the `ForemanClient` interface. `ui/src/main.tsx`, the UI's composition root, chooses per area between the **real client** (HTTP, events, WebSockets) and the **demo client** (in-memory seed data from the prototype, simulated events, a visible "demo data" badge). As each area's backend lands, its line switches to the real client ([Full UI on a demo client](../../backlog/epics/full-ui-demo.md)).
+- **UI**: screens use only the `ForemanClient` interface. `ui/src/main.tsx`, the UI's composition root, provides the **real client** (HTTP, events, WebSockets). An area whose server side isn't built yet refuses every call with `NOT_BUILT`, and its screen says "Not built yet" ([Full UI on a demo client](../../backlog/epics/full-ui-demo.md#going-live)).
 
 ```ts
 interface ForemanClient {
@@ -445,11 +444,11 @@ CEO: Merge to main ──▶ Workflow ──▶ Git.Merge  │  Create PR ──
 (after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
 ```
 
-**6. A screen whose backend isn't built yet** (Full UI on a demo client)
+**6. A screen whose backend isn't built yet**
 
 ```
-Screen ──▶ ForemanClient ──▶ demo client: seed data, simulated events ──▶ the screen shows a "demo data" badge
-                          ╲─▶ real client (once that area's backend lands; one line in main.tsx)
+Screen ──▶ ForemanClient (real client) ──▶ that area refuses with NOT_BUILT, no request sent ──▶ the screen says "Not built yet"
+                                        ╲─▶ the endpoints, once that area's backend lands (its lines in client.ts)
 ```
 
 ## What is proven, and what isn't
@@ -475,6 +474,6 @@ A–E are proven before the blocks that depend on them are built: one small expe
 - `internal/instances`: the Instance manager.
 - `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
-- `cmd/foreman/sessions.go`: a start-by-instance map, scaffolding for `--demo-session` until the Instance manager exists ([technical debt](../../technical-debt.md)).
+- `cmd/foreman/sessions.go`: the harnesses' login terminals, by id (instances' terminals are the Instance manager's).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.
 - `internal/server`, `internal/access`, `ui/` (with `ForemanClient` and its real implementation): the Web server and UI.

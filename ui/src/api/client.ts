@@ -18,8 +18,8 @@ import type { Candidate, Project, Settings, SettingsFile, Soul, Team } from "./t
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
 // WebSocket themselves, so the transport can change and tests can hand
-// components an in-memory client. main.tsx picks the real or the demo client
-// per area, one line each (wiki/product/architecture/overview.md#in-the-ui).
+// components an in-memory client. main.tsx hands the screens the real one
+// (wiki/product/architecture/overview.md#in-the-ui).
 
 export type {
   Board,
@@ -44,14 +44,9 @@ export type {
   WorkItem,
 };
 
-/** Every area says whether it serves demo data, for the "demo data" badge. */
-interface Area {
-  readonly demo: boolean;
-}
-
 export type Workspace = { path: string };
 
-export interface WorkspaceArea extends Area {
+export interface WorkspaceArea {
   workspace(): Promise<Workspace>;
   projects(): Promise<Project[]>;
   project(id: string): Promise<Project>;
@@ -70,7 +65,7 @@ export interface WorkspaceArea extends Area {
   promptTemplate(team: string, agent: string): Promise<string>;
 }
 
-export interface AgentsArea extends Area {
+export interface AgentsArea {
   instances(): Promise<Instance[]>;
   /** The active deployments. */
   deployments(): Promise<Deployment[]>;
@@ -83,37 +78,37 @@ export interface AgentsArea extends Area {
   openTerminal(id: string, handlers: PtyHandlers): PtyConnection;
 }
 
-export interface HarnessesArea extends Area {
+export interface HarnessesArea {
   list(): Promise<HarnessStatus[]>;
   /** Starts the harness's login; returns the terminal to open with agents.openTerminal. */
   connect(harness: string): Promise<string>;
 }
 
-export interface MaintenanceArea extends Area {
+export interface MaintenanceArea {
   /** The engine's state and its images. */
   status(): Promise<Maintenance>;
   /** Starts rebuilding the images without cache; status shows the progress. */
   rebuild(): Promise<void>;
 }
 
-export interface ForgeArea extends Area {
+export interface ForgeArea {
   accounts(): Promise<ForgeAccount[]>;
   /** Checks the token against the forge, then stores it with the host. */
   connect(kind: string, url: string, token: string): Promise<void>;
 }
 
-export interface RequestsArea extends Area {
+export interface RequestsArea {
   list(): Promise<Request[]>;
   resolve(id: string, answer: string): Promise<void>;
 }
 
-export interface MessagesArea extends Area {
+export interface MessagesArea {
   list(deployment: string): Promise<TeamMessage[]>;
 }
 
 export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
 
-export interface PipelineArea extends Area {
+export interface PipelineArea {
   list(project: string): Promise<Pipeline>;
   /** One merge request, wherever it is (a Chief of Staff change to the workspace repo has no project). */
   mergeRequest(id: string): Promise<MergeRequest>;
@@ -124,7 +119,7 @@ export interface PipelineArea extends Area {
   reject(mergeRequest: string, reason: string): Promise<void>;
 }
 
-export interface WikiArea extends Area {
+export interface WikiArea {
   tree(project: string): Promise<Node[]>;
   entry(project: string, path: string): Promise<Entry>;
   /** Every board declared in the project's wiki.toml, with its cards. */
@@ -175,7 +170,7 @@ export type CosEntry =
   | { flow: "refine"; team: string; agent: string }
   | { flow: "project-config"; project: string };
 
-export interface ChiefOfStaffArea extends Area {
+export interface ChiefOfStaffArea {
   conversation(): Promise<CosConversation>;
   /** Starts an entry point's flow in the same conversation. */
   start(entry: CosEntry): Promise<void>;
@@ -183,7 +178,7 @@ export interface ChiefOfStaffArea extends Area {
   send(text: string): Promise<void>;
 }
 
-export interface EventsArea extends Area {
+export interface EventsArea {
   /** Follows the events until the returned function is called. */
   subscribe(handlers: EventHandlers): () => void;
 }
@@ -226,7 +221,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
   const id = encodeURIComponent;
   return {
     workspace: {
-      demo: false,
       workspace: () => getJSON("/api/workspace"),
       projects: () => getJSON("/api/projects"),
       project: (project) => getJSON(`/api/projects/${id(project)}`),
@@ -237,9 +231,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/settings", { settings, version })
         ).json() as Promise<SettingsFile>,
-      candidates: () => getJSON("/api/candidates"),
-      addProject: async (folder) =>
-        (await request("POST", "/api/projects", { folder })).json() as Promise<Project>,
+      // Add a project waits on its server side.
+      candidates: notBuilt("adding projects"),
+      addProject: notBuilt("adding projects"),
       saveSoul: async (team, agent, soul, version) =>
         (
           await request("PUT", `/api/teams/${id(team)}/agents/${id(agent)}`, { soul, version })
@@ -249,7 +243,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
           .prompt,
     },
     agents: {
-      demo: false,
       instances: () => getJSON("/api/instances"),
       deployments: () => getJSON("/api/deployments"),
       prompt: async (instance) =>
@@ -263,7 +256,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       openTerminal: (instance, handlers) => openPty(`${wsOrigin}/ws/pty/${id(instance)}`, handlers),
     },
     harnesses: {
-      demo: false,
       list: () => getJSON("/api/harnesses"),
       connect: async (harness) => {
         const r = await request("POST", `/api/harnesses/${id(harness)}/connect`);
@@ -271,62 +263,53 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       },
     },
     maintenance: {
-      demo: false,
       status: () => getJSON("/api/maintenance"),
       rebuild: () => send("POST", "/api/maintenance/rebuild"),
     },
+    // The areas below wait on their server side: each screen says "Not built yet".
     forge: {
-      demo: false,
-      accounts: () => getJSON("/api/secrets/forge"),
-      connect: (kind, url, token) => send("PUT", `/api/secrets/forge/${id(kind)}`, { url, token }),
+      accounts: notBuilt("forge accounts"),
+      connect: notBuilt("forge accounts"),
     },
     requests: {
-      demo: false,
-      list: () => getJSON("/api/requests?status=open"),
-      resolve: (req, answer) => send("POST", `/api/requests/${id(req)}/resolve`, { answer }),
+      list: notBuilt("requests"),
+      resolve: notBuilt("requests"),
     },
     messages: {
-      demo: false,
-      list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
+      list: notBuilt("team messages"),
     },
     pipeline: {
-      demo: false,
-      list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
-      mergeRequest: (mr) => getJSON(`/api/merge-requests/${id(mr)}`),
-      diff: async (mr) =>
-        (await getJSON<{ diff: string }>(`/api/merge-requests/${id(mr)}/diff`)).diff,
-      merge: (mr) => send("POST", `/api/merge-requests/${id(mr)}/merge`),
-      createPr: (mr) => send("POST", `/api/merge-requests/${id(mr)}/create-pr`),
-      reject: (mr, reason) => send("POST", `/api/merge-requests/${id(mr)}/reject`, { reason }),
+      list: notBuilt("the pipeline"),
+      mergeRequest: notBuilt("the pipeline"),
+      diff: notBuilt("the pipeline"),
+      merge: notBuilt("the pipeline"),
+      createPr: notBuilt("the pipeline"),
+      reject: notBuilt("the pipeline"),
     },
     wiki: {
-      demo: false,
-      tree: (project) => getJSON(`/api/wiki/${id(project)}/tree`),
-      entry: (project, path) => getJSON(`/api/wiki/${id(project)}/entry/${path}`),
-      boards: (project) => getJSON(`/api/wiki/${id(project)}/boards`),
-      setCheckbox: (project, path, line, done, version) =>
-        send("PUT", `/api/wiki/${id(project)}/checkbox/${path}`, { line, done, version }),
-      moveCard: (project, board, path, column, lane, version) =>
-        send("PUT", `/api/wiki/${id(project)}/card/${id(board)}/${path}`, {
-          value: column,
-          lane,
-          version,
-        }),
+      tree: notBuilt("the wiki"),
+      entry: notBuilt("the wiki"),
+      boards: notBuilt("the wiki"),
+      setCheckbox: notBuilt("the wiki"),
+      moveCard: notBuilt("the wiki"),
     },
     chiefOfStaff: {
-      demo: false,
-      conversation: () => Promise.reject(noChiefOfStaff),
-      start: () => Promise.reject(noChiefOfStaff),
-      send: () => Promise.reject(noChiefOfStaff),
+      conversation: notBuilt("the Chief of Staff"),
+      start: notBuilt("the Chief of Staff"),
+      send: notBuilt("the Chief of Staff"),
     },
     events: {
-      demo: false,
       subscribe: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),
     },
   };
 }
 
-const noChiefOfStaff = new Error("The Chief of Staff doesn't run on the server yet");
+/** An area the server doesn't serve yet: every call is refused with NOT_BUILT. */
+const notBuilt = (what: string) => (): Promise<never> =>
+  Promise.reject(new ApiError(`The server doesn't serve ${what} yet`, "NOT_BUILT"));
+
+/** Whether a failure is an area that isn't built yet, which a screen shows as "Not built yet". */
+export const isNotBuilt = (e: unknown): boolean => e instanceof ApiError && e.code === "NOT_BUILT";
 
 /** A refused request, with the API's machine code (CONFLICT, INVALID, …). */
 export class ApiError extends Error {

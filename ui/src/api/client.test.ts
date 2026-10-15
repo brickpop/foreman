@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { httpClient } from "./client";
+import { ApiError, httpClient, isNotBuilt } from "./client";
 
 type Call = { url: string; method: string; body?: string; headers?: Record<string, string> };
 
@@ -64,5 +64,35 @@ describe("httpClient", () => {
     await expect(httpClient("http://x").agents.instances()).rejects.toThrow(
       "/api/instances: HTTP 500",
     );
+  });
+
+  it("wakes an instance with POST", async () => {
+    const calls = stubFetch(204, undefined);
+    await httpClient("http://x").agents.wake("tove@ledger");
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/instances/tove%40ledger/wake",
+      method: "POST",
+    });
+  });
+
+  it("refuses the areas the server doesn't serve yet, without asking it", async () => {
+    const calls = stubFetch(200, []);
+    const c = httpClient("http://x");
+    for (const call of [
+      () => c.requests.list(),
+      () => c.pipeline.merge("mr-1"),
+      () => c.wiki.tree("ledger"),
+      () => c.chiefOfStaff.send("hi"),
+    ]) {
+      const e = await call().catch((e: unknown) => e);
+      expect(isNotBuilt(e)).toBe(true);
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it("tells a refusal that isn't NOT_BUILT apart", () => {
+    expect(isNotBuilt(new ApiError("taken", "CONFLICT"))).toBe(false);
+    expect(isNotBuilt(new Error("NOT_BUILT"))).toBe(false);
+    expect(isNotBuilt(undefined)).toBe(false);
   });
 });

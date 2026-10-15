@@ -8,7 +8,7 @@ import (
 
 func TestFakeHarness(t *testing.T) {
 	var out bytes.Buffer
-	code := run(strings.NewReader("hello\n\nspam 3\nexit 7\nnever reached\n"), &out)
+	code := run("", strings.NewReader("hello\n\nspam 3\nexit 7\nnever reached\n"), &out)
 	if code != 7 {
 		t.Errorf("exit code %d, want 7", code)
 	}
@@ -24,7 +24,7 @@ func TestFakeHarness(t *testing.T) {
 }
 
 func TestFakeHarnessEndOfInput(t *testing.T) {
-	if code := run(strings.NewReader("hi\n"), &bytes.Buffer{}); code != 0 {
+	if code := run("", strings.NewReader("hi\n"), &bytes.Buffer{}); code != 0 {
 		t.Errorf("exit code %d at end of input, want 0", code)
 	}
 }
@@ -32,12 +32,23 @@ func TestFakeHarnessEndOfInput(t *testing.T) {
 // A trailing `\` continues the input on the next line, as in Claude Code.
 func TestFakeHarnessContinuesLines(t *testing.T) {
 	var out bytes.Buffer
-	run(strings.NewReader("first\\\nsecond\\\nthird\nalone\n"), &out)
+	run("", strings.NewReader("first\\\nsecond\\\nthird\nalone\n"), &out)
 	got := out.String()
 	if !strings.Contains(got, "you said: first\nsecond\nthird\n") || !strings.Contains(got, "you said: alone\n") {
 		t.Errorf("got %q", got)
 	}
 	if strings.Count(got, "you said:") != 2 {
 		t.Errorf("a continued line was answered on its own: %q", got)
+	}
+}
+
+// The opener is answered before any input, as if typed.
+func TestFakeHarnessAnswersTheOpener(t *testing.T) {
+	var out bytes.Buffer
+	run("Your goal on ledger: ship", strings.NewReader("hi\n"), &out)
+	got := out.String()
+	opener, typed := strings.Index(got, "you said: Your goal on ledger: ship\n"), strings.Index(got, "you said: hi\n")
+	if opener < 0 || typed < opener {
+		t.Errorf("got %q", got)
 	}
 }

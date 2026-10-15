@@ -1,9 +1,9 @@
 # Backlog
 
-**Current epics, side by side:** [Prove](./epics/prove.md) (the CEO runs the experiments that settle the five runtime facts) and [Full UI on a demo client](./epics/full-ui-demo.md) (the whole UI, on demo data where the server isn't ready). Then [Terminal multiplexer](./epics/terminal-multiplexer.md).
+**Current epics, side by side:** [Prove](./epics/prove.md) (the CEO runs the experiments that settle the five runtime facts) and [Terminal multiplexer](./epics/terminal-multiplexer.md). [Full UI on a demo client](./epics/full-ui-demo.md) is done: the UI went live on 2026-10-15, and what the server doesn't serve yet says "Not built yet".
 
 The epics, in order:
-0. [Prove](./epics/prove.md) and, alongside it, [Full UI on a demo client](./epics/full-ui-demo.md)
+0. [Prove](./epics/prove.md) and, alongside it, [Full UI on a demo client](./epics/full-ui-demo.md) (done)
 1. [Terminal multiplexer](./epics/terminal-multiplexer.md)
 2. [Messaging and hand-offs](./epics/messaging-handoffs.md)
 3. [Git](./epics/git.md)

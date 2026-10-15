@@ -10,7 +10,6 @@ import {
 } from "../api/client";
 import { AddProject } from "../components/AddProject";
 import { ChiefOfStaffDrawer } from "../components/ChiefOfStaffDrawer";
-import { DemoBadge } from "../components/DemoBadge";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { ChiefOfStaffContext } from "./chiefOfStaff";
@@ -221,9 +220,6 @@ function Sidebar({
             + New team
           </button>
         </section>
-        <div className="px-2.5">
-          <DemoBadge areas={["workspace", "agents", "requests"]} />
-        </div>
       </div>
       <footer className="flex flex-col gap-1 border-t border-line px-2.5 py-3">
         <button

@@ -13,7 +13,6 @@ import {
   useWorkspace,
 } from "../app/queries";
 import { Avatar } from "../components/Avatar";
-import { DemoBadge } from "../components/DemoBadge";
 import { DeployDialog } from "../components/DeployDialog";
 import { Modal } from "../components/Overlays";
 import { useToast } from "../components/Toasts";
@@ -46,10 +45,7 @@ export function Team() {
       <header className="flex flex-col gap-4 px-12 pt-10">
         <div className="flex items-end gap-4">
           <div className="flex flex-1 flex-col gap-1">
-            <h1 className="m-0 flex items-center gap-3 text-[30px] font-semibold tracking-[-0.02em]">
-              {team.config.name}
-              <DemoBadge areas={["workspace", "agents"]} />
-            </h1>
+            <h1 className="m-0 text-[30px] font-semibold tracking-[-0.02em]">{team.config.name}</h1>
             {team.config.purpose && (
               <p className="m-0 text-[15px] text-tx3">{team.config.purpose}</p>
             )}

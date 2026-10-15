@@ -1,7 +1,6 @@
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { useProjects, useRequests, useWorkspace } from "../app/queries";
-import { DemoBadge } from "../components/DemoBadge";
 import { DeployDialog } from "../components/DeployDialog";
 import { CountBadge } from "../components/ui";
 import { Board } from "./project/Board";
@@ -35,10 +34,7 @@ export function Project() {
       <header className="flex flex-col gap-4 px-12 pt-10">
         <div className="flex items-end gap-4">
           <div className="flex flex-1 flex-col gap-1">
-            <h1 className="m-0 flex items-center gap-3 text-[30px] font-semibold tracking-[-0.02em]">
-              {project.id}
-              <DemoBadge areas={["workspace", "wiki", "pipeline", "requests"]} />
-            </h1>
+            <h1 className="m-0 text-[30px] font-semibold tracking-[-0.02em]">{project.id}</h1>
             {project.config.description && (
               <p className="m-0 text-[15px] text-tx3">{project.config.description}</p>
             )}

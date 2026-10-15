@@ -40,6 +40,7 @@ foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
 - `--port` sets the UI port (default `8888`); the interface it binds to follows the `listen` [setting](./workspace-settings.md).
 - `--new-token` replaces the access token before starting, which logs every browser out.
 - `--ui-dir <folder>` (development only) serves the web UI from a folder instead of the embedded build; `just dev` uses it.
+- `--fake-harness <program>` (development only) runs agents and harness logins on that program (`cmd/fakeharness`) instead of Claude Code, so a team deploys without a login. Direct engine only: on Podman, Foreman refuses to start with it (a container can't run a host binary). `just dev` uses it unless given `harness=real`.
 
 ## Layout
 

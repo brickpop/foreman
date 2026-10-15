@@ -2,7 +2,8 @@
 // it prints a coloured banner, shows a prompt, and answers each input line.
 // Commands: `spam N` prints N numbered lines, `exit N` exits with code N.
 // Anything else is echoed back; a line ending in `\` continues on the next
-// (as in Claude Code), so one input can span lines. It writes plain "\n", as real programs do (the
+// (as in Claude Code), so one input can span lines. An argument is the
+// session's opener, answered first (as Claude Code's prompt argument). It writes plain "\n", as real programs do (the
 // terminal adds the "\r"). It grows with the features that need it (calling
 // team tools, going idle); see wiki/product/architecture/tech-stack.md.
 package main
@@ -17,14 +18,17 @@ import (
 )
 
 func main() {
-	os.Exit(run(os.Stdin, os.Stdout))
+	os.Exit(run(strings.Join(os.Args[1:], " "), os.Stdin, os.Stdout))
 }
 
 const prompt = "\x1b[38;5;214m❯\x1b[0m "
 
 // run is the harness loop; it returns the exit code.
-func run(in io.Reader, out io.Writer) int {
+func run(opener string, in io.Reader, out io.Writer) int {
 	fmt.Fprint(out, "\x1b[1mfake harness\x1b[0m · \x1b[32mready\x1b[0m\n"+prompt)
+	if opener != "" {
+		fmt.Fprintf(out, "%s\nyou said: %s\n%s", opener, opener, prompt)
+	}
 	lines := bufio.NewScanner(in)
 	var held []string // the lines so far of an input continued with a trailing `\`
 	for lines.Scan() {

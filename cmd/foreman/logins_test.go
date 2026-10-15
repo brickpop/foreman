@@ -55,27 +55,20 @@ func TestConnectStartsTheLoginTerminalOnce(t *testing.T) {
 	_ = a.Input([]byte("\x04")) // end the login (cat ends on EOF)
 }
 
-// A terminal id is looked for among the instances, then the logins, then the demo.
+// A terminal id is looked for among the instances, then the logins.
 func TestTerminalsAreFoundWhereverTheyRun(t *testing.T) {
 	l := testLogins(t)
 	ctx := context.Background()
 	if _, err := l.Connect(ctx, "fake"); err != nil {
 		t.Fatal(err)
 	}
-	demo := newSessions(direct.Runner{}, l.terms.openLog)
-	if err := demo.start(ctx, "demo", sh("cat")); err != nil {
+	views := agents{Manager: instances.New(instances.Deps{}), logins: l.terms}
+	a, err := views.Attach("connect:fake")
+	if err != nil {
 		t.Fatal(err)
 	}
-	views := agents{Manager: instances.New(instances.Deps{}), demo: demo, logins: l.terms}
-	for _, id := range []string{"connect:fake", "demo"} {
-		a, err := views.Attach(id)
-		if err != nil {
-			t.Errorf("%s: %v", id, err)
-			continue
-		}
-		_ = a.Input([]byte("\x04"))
-		a.Close()
-	}
+	_ = a.Input([]byte("\x04"))
+	a.Close()
 	if _, err := views.Attach("nobody@ledger"); !errors.Is(err, server.ErrNoTerminal) {
 		t.Errorf("unknown terminal: %v", err)
 	}

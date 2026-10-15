@@ -4,6 +4,7 @@ import {
   type ForgeAccount,
   type HarnessStatus,
   type ImageStatus,
+  isNotBuilt,
   type Settings as SettingsData,
   useClient,
 } from "../api/client";
@@ -18,11 +19,10 @@ import {
   useWorkspace,
 } from "../app/queries";
 import { applyTheme, savedTheme, type Theme } from "../app/theme";
-import { DemoBadge } from "../components/DemoBadge";
 import { Modal } from "../components/Overlays";
 import { Terminal } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, PageTitle, Segmented, Switch } from "../components/ui";
+import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
 // Workspace-wide settings (wiki/product/features/settings.md). Every change
 // saves at once, guarded by the version read.
@@ -32,10 +32,7 @@ export function Settings() {
   const s = file.data?.settings;
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-9 px-12 pt-12 pb-16">
-      <PageTitle
-        title="Settings"
-        subtitle={<DemoBadge areas={["workspace", "harnesses", "forge", "maintenance"]} />}
-      />
+      <PageTitle title="Settings" />
       {file.data && file.data.problems.length > 0 && (
         <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
           settings.toml: {file.data.problems.join(" · ")}
@@ -403,19 +400,20 @@ function ForgeSection({ settings }: { settings: SettingsData }) {
       label="Forge accounts"
       intro="Tokens Foreman uses when you ask it to create a PR or sync a repo, and to watch those PRs. They stay on this machine. Each project’s config names its forge."
     >
-      {forges.map((f) => {
-        const account = accounts.data?.find((a) => a.kind === f.kind);
-        return (
+      {isNotBuilt(accounts.error) ? (
+        <NotBuilt what="forge accounts" />
+      ) : (
+        forges.map((f) => (
           <ForgeRow
             key={f.kind}
             forge={f}
-            account={account}
+            account={accounts.data?.find((a) => a.kind === f.kind)}
             url={settings.forges?.[f.kind]?.url ?? ""}
             editing={editing === f.kind}
             onEdit={(on) => setEditing(on ? f.kind : undefined)}
           />
-        );
-      })}
+        ))
+      )}
       <WorkspaceRepo settings={settings} connected={connected} />
     </Section>
   );

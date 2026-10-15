@@ -1,13 +1,13 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useState } from "react";
-import type { Board as BoardData, Card } from "../../api/client";
+import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client";
 import { agentOf } from "../../app/model";
 import { useBoards, useEntry, useMoveCard, useTeams, useTick } from "../../app/queries";
 import { Avatar } from "../../components/Avatar";
 import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
-import { Button, Segmented } from "../../components/ui";
+import { Button, NotBuilt, Segmented } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 
 // A kanban over wiki entries (wiki/product/features/board.md). A move rewrites
@@ -66,6 +66,12 @@ export function Board({ project }: { project: string }) {
   const list = boards.data ?? [];
   const board = list.find((b) => b.id === chosen) ?? list[0];
   if (boards.isPending) return null;
+  if (isNotBuilt(boards.error))
+    return (
+      <div className="px-10 pt-5">
+        <NotBuilt what="the wiki" />
+      </div>
+    );
   if (!board) return <p className="px-10 pt-5 text-tx3">No board is declared in wiki.toml.</p>;
   const { columns, lanes } = layout(board);
 

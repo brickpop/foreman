@@ -22,9 +22,8 @@ import (
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/claudecode"
+	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/instances"
-	"github.com/brickpop/foreman/internal/runner"
-	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
@@ -48,7 +47,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	port := flags.String("port", "8888", "port for the web UI")
 	newToken := flags.Bool("new-token", false, "replace the access token (logs every browser out)")
 	uiDir := flags.String("ui-dir", "", "development: serve the web UI from this folder instead of the embedded build")
-	demo := flags.String("demo-session", "", "development: start one session running this command (space-separated, no quoting) as instance \"demo\"")
+	fakeHarness := flags.String("fake-harness", "", "development: run agents and logins on this program (cmd/fakeharness) instead of Claude Code")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "Usage: foreman [<workspace-dir>] [flags]")
 		flags.PrintDefaults()
@@ -74,6 +73,10 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	// Before listening: Podman may have to start, and an error must come first.
 	// The engine is chosen once: a change of the setting takes effect on restart.
 	running := ws.Settings().Settings.Engine
+	// The fake harness is a host binary: a container can't run it.
+	if *fakeHarness != "" && running != "direct" {
+		return fmt.Errorf("--fake-harness needs engine = \"direct\" (this workspace runs %s): set it in Settings or settings.toml", running)
+	}
 	engineRunner, engineImages, closeEngine, err := engine(ctx, running, stdout)
 	if err != nil {
 		return err
@@ -110,6 +113,13 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	adapters := map[string]harness.Adapter{
 		"claude-code": claudecode.Adapter{Credentials: ws.Path("credentials", "claude-code"), GitConfig: homeGitConfig()},
 	}
+	if *fakeHarness != "" {
+		program, err := resolveProgram(*fakeHarness)
+		if err != nil {
+			return fmt.Errorf("fake harness: %w", err)
+		}
+		adapters["claude-code"] = fake.Adapter{Program: program}
+	}
 	manager := instances.New(instances.Deps{
 		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters,
@@ -118,20 +128,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := manager.Restore(ctx); err != nil {
 		return fmt.Errorf("restoring the instances: %w", err)
 	}
-	terms := newSessions(direct.Runner{}, openLog)
 	login := logins{adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog)}
-	views := agents{Manager: manager, demo: terms, logins: login.terms}
-	if fields := strings.Fields(*demo); len(fields) > 0 {
-		// Scaffolding until deployments start sessions (wiki/technical-debt.md).
-		fields[0], err = resolveProgram(fields[0])
-		if err != nil {
-			return fmt.Errorf("demo session: %w", err)
-		}
-		spec := runner.Spec{Name: "demo", Command: fields, Dir: ws.Root()}
-		if err := terms.start(ctx, "demo", spec); err != nil {
-			return fmt.Errorf("demo session: %w", err)
-		}
-	}
+	views := agents{Manager: manager, logins: login.terms}
 	handler := server.New(server.Options{
 		Guard:       access.NewTokenGuard(token, access.LocalHosts(*port), *port),
 		Workspace:   ws,
@@ -197,7 +195,7 @@ func openBrowser(url string, stdout io.Writer) {
 }
 
 // resolveProgram makes a relative program path ("bin/x", "./x") absolute,
-// against the folder foreman was started in: sessions run in another working
+// against the folder foreman was started in: agents run in another working
 // directory, where the relative path would point somewhere else. Bare names
 // ("bash") are left for the PATH lookup.
 func resolveProgram(program string) (string, error) {

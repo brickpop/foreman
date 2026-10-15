@@ -28,7 +28,7 @@ The first time, Foreman asks before creating `.foreman/` in the folder. It then 
 ## Develop
 
 ```sh
-just dev       # rebuild the UI on change and serve a scratch workspace (.dev/workspace)
+just dev       # rebuild the UI on change and serve a scratch workspace (.dev/workspace) with a sample team and project, agents on the fake harness
 just test      # all tests
 just lint      # gofmt, go vet, staticcheck, Biome
 just check     # wiki health check

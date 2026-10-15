@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useClient } from "../api/client";
+import { isNotBuilt, useClient } from "../api/client";
 import { keys, useWorkspace } from "../app/queries";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
-import { Button } from "./ui";
+import { Button, NotBuilt } from "./ui";
 
 // Turns a workspace folder into a project (wiki/product/features/add-project.md).
 // Foreman never clones: the CEO puts the repos in the folder first.
@@ -55,6 +55,12 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
   const root = workspace.data?.path ?? "the workspace";
   const list = candidates.data ?? [];
   const selected = list.find((c) => c.folder === chosen);
+  if (isNotBuilt(candidates.error))
+    return (
+      <Modal open={open} onClose={onClose} title="Add a project">
+        <NotBuilt what="adding projects" />
+      </Modal>
+    );
   return (
     <Modal open={open} onClose={onClose} title="Add a project">
       <div className="flex flex-col gap-4">

@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: full-ui-demo
@@ -19,4 +19,4 @@ Unblocked: [API types](./api-types.md) is done.
 - [x] primitives (`components/ui.tsx`, `Overlays.tsx`, `Toasts.tsx`): buttons (every variant, real disabled), kind chip, count badge, dots (queued dashed), field chip, lead tag, panel, empty state, segmented (Radix ToggleGroup), modal and drawer (Radix Dialog: focus trap, Escape), toasts (6.5 s, click goes somewhere)
 - [x] Avatar with status dot and ring, every trait of the spec; placeholder screens naming the card that builds each
 - [x] the one breakpoint: under ~760px the sidebar collapses behind a menu button and opens as an overlay
-- [ ] the CEO looks at it on the Mac (`just setup`, then `just dev`)
+- [x] the CEO looks at it on the Mac (`just setup`, then `just dev`): approved 2026-10-15

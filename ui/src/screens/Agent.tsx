@@ -6,7 +6,6 @@ import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import { palettes, randomLook, roleLabel } from "../app/model";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
-import { DemoBadge } from "../components/DemoBadge";
 import { useToast } from "../components/Toasts";
 import { Button, Dot } from "../components/ui";
 
@@ -105,10 +104,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
       <header className="flex items-center gap-4">
         <Avatar look={draft.look} size={72} />
         <div className="flex flex-col gap-1">
-          <h1 className="m-0 flex items-center gap-3 text-[26px] font-semibold tracking-[-0.02em]">
-            {draft.name}
-            <DemoBadge areas={["workspace"]} />
-          </h1>
+          <h1 className="m-0 text-[26px] font-semibold tracking-[-0.02em]">{draft.name}</h1>
           <Link
             to="/teams/$team"
             params={{ team: team.id }}

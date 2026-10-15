@@ -77,7 +77,7 @@ Resource ids: project = folder name; team = team id; instance = `agent@project` 
 | 200 / 201 / 204 | Success / created / no content |
 | 400 `VALIDATION_ERROR` | Malformed body or parameters |
 | 403 `FORBIDDEN_ORIGIN` / 401 `UNAUTHORIZED` | Failed Host/Origin check or missing access token ([Security](./security.md)) |
-| 404 `NOT_FOUND` | Unknown project, team, instance, entry… |
+| 404 `NOT_FOUND` | Unknown project, team, instance, entry…, or an endpoint the server doesn't have (never the web app's page) |
 | 409 `VERSION_CONFLICT` | Guarded write against a stale version |
 | 409 `ALREADY_DEPLOYED` | Deploying a team to a project it's already on |
 | 500 `SERVER_ERROR` | Anything unexpected (logged with details server-side) |

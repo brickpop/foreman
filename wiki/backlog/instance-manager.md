@@ -19,4 +19,4 @@ Blocked by [Podman engine](./podman-engine.md), [Worktrees per instance](./workt
 - [x] deploy and stop through the API (`POST /api/deployments`, `DELETE /api/deployments/:id`, `GET /api/instances` with statuses) and the client; the dialogs are the UI cards' ([Team and Agent pages](./ui-teams-agents.md), wired in [Teams and agents](./teams-and-agents.md))
 - [x] restart policy (a crash restarts once, continuing its conversation; a second stops it) and the concurrency queue (`max_sessions`)
 - [x] re-attach on boot (running containers by label; live instances without one restart; orphans stopped)
-- Not here: why an instance stopped reaches only the server log until blocked requests exist ([Workflow](./epics/workflow.md)); `--demo-session` goes with the Deploy dialog ([technical debt](../technical-debt.md))
+- Not here: why an instance stopped reaches only the server log until blocked requests exist ([Workflow](./epics/workflow.md))

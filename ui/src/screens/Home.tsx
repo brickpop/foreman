@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import type { Request, Team } from "../api/client";
+import { isNotBuilt, type Request, type Team } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import {
   agentOf,
@@ -20,10 +20,9 @@ import {
   useSettings,
   useTeams,
 } from "../app/queries";
-import { DemoBadge } from "../components/DemoBadge";
 import { RequestPanel } from "../components/RequestPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
-import { Empty, PageTitle, SectionLabel } from "../components/ui";
+import { Empty, NotBuilt, PageTitle, SectionLabel } from "../components/ui";
 
 // The CEO's inbox (wiki/product/features/home.md): every open request across
 // projects, then one line per project.
@@ -42,16 +41,13 @@ export function Home() {
   return (
     <div className="mx-auto flex w-full max-w-[920px] flex-col gap-10 px-12 pt-12 pb-16">
       <PageTitle
-        title={
-          <span className="flex items-center gap-3">
-            {homeTitle(open.length)}
-            <DemoBadge areas={["requests", "agents", "workspace"]} />
-          </span>
-        }
+        title={isNotBuilt(requests.error) ? "Home" : homeTitle(open.length)}
         subtitle={homeSubtitle(instances.data ?? [])}
       />
       <section className="flex flex-col gap-2.5">
-        {open.length === 0 ? (
+        {isNotBuilt(requests.error) ? (
+          <NotBuilt what="requests" />
+        ) : open.length === 0 ? (
           <Empty>Nothing needs you. You'll get a browser notification when something does.</Empty>
         ) : (
           open.map((r) => <HomeRequest key={r.id} request={r} teams={teams.data ?? []} />)

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { type Instance, type Team, type TeamMessage, useClient } from "../api/client";
+import { type Instance, isNotBuilt, type Team, type TeamMessage, useClient } from "../api/client";
 import { agentOf, harnessLabel } from "../app/model";
 import {
   keys,
@@ -26,10 +26,9 @@ import {
   typedLine,
 } from "../app/sessions";
 import { Avatar } from "../components/Avatar";
-import { DemoBadge } from "../components/DemoBadge";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, Dot, LeadTag, Segmented, Toggle } from "../components/ui";
+import { Button, Dot, LeadTag, NotBuilt, Segmented, Toggle } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
 // tabs, agent tabs, one or two panes of real terminals, markers and the
@@ -93,7 +92,6 @@ export function Sessions() {
             ),
           }))}
         />
-        <DemoBadge areas={["agents", "messages"]} />
         <span className="flex-1" />
         <Toggle on={panes.open.length === 2} onChange={() => setPanes(toggleSplit(panes, roster))}>
           {panes.open.length === 2 ? "Single" : "Split"}
@@ -443,6 +441,11 @@ function MessagesDrawer({
         </button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto">
+        {isNotBuilt(messages.error) && (
+          <div className="p-4">
+            <NotBuilt what="team messages" />
+          </div>
+        )}
         {rows.map((m) => (
           <button
             key={m.id}

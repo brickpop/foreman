@@ -91,3 +91,14 @@ func TestRelativeProgramsResolveAgainstTheStartFolder(t *testing.T) {
 		}
 	}
 }
+
+// The fake harness runs on the host only, so a workspace on Podman refuses
+// it before starting anything.
+func TestFakeHarnessNeedsTheDirectEngine(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	dir := t.TempDir()
+	err := run([]string{dir, "--yes", "--no-open", "--fake-harness", "/bin/true"}, strings.NewReader(""), &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), `needs engine = "direct"`) {
+		t.Errorf("on podman: %v", err)
+	}
+}

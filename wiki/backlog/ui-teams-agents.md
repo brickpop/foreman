@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: medium
 tags: [feature]
 epic: full-ui-demo
@@ -18,4 +18,4 @@ Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.m
 - [x] Agent page: Running on, the Look editor (swatches, traits, Shuffle), harness with the custom command, personality, skills, job description; choices save at once, text on blur or Enter; "Saved" for 3 s; a conflicting save keeps the edit and offers Keep mine / Take theirs
 - [x] session prompt view: per deployment with its switcher (`GET /api/instances/:id/prompt`, composed by the server), or the template with highlighted placeholders (`GET /api/teams/:id/agents/:agent/prompt`); both endpoints built
 - [x] Deploy dialog (team or project preset, already-there disabled, goal required; opens Sessions on the lead; toast), from the Team page and Project settings
-- [ ] the CEO looks at it on the Mac (`just dev`)
+- [x] the CEO looks at it on the Mac (`just dev`): approved 2026-10-15

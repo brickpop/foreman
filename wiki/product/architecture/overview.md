@@ -56,7 +56,7 @@ The same idea holds in the browser, scaled to it:
 
 1. **Screens never talk to the network.** All server access goes through typed client interfaces in `ui/src/api/` (one per area: workspace, sessions, requests…). The transport behind them (HTTP, SSE, WebSocket) can change without touching a component, and tests give components an in-memory client.
 2. **Third-party widgets sit behind our own component.** The terminal is our `Terminal` component with our props, not xterm.js used directly in screens; the same goes for the markdown view, drag and drop, and the Radix primitives. Replacing a library is then a change in one file.
-3. **Components get data through props or hooks, never through globals.** The composition root is `ui/src/main.tsx`, which picks the real clients and provides them to the tree.
+3. **Components get data through props or hooks, never through globals.** The composition root is `ui/src/main.tsx`, which picks the real clients and provides them to the tree. An area the server doesn't serve yet refuses every call with the code `NOT_BUILT` (`isNotBuilt`) without a request, and its screen shows the `NotBuilt` panel; it is never retried.
 4. **Design tokens, not literal values.** Colours, spacing and type come from the tokens in [Design system](../design/design-system.md), so the look can change in one place.
 
 ## Process model

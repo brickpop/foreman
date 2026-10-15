@@ -186,6 +186,15 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
+/** Where the server doesn't serve an area yet (isNotBuilt). */
+export function NotBuilt({ what }: { what: string }) {
+  return (
+    <Empty>
+      <span className="font-medium text-tx2">Not built yet.</span> The server doesn't serve {what}.
+    </Empty>
+  );
+}
+
 /** A section label ("Projects", "Needs you"). */
 export function SectionLabel({ children }: { children: ReactNode }) {
   return <div className="text-[13px] font-medium text-tx4">{children}</div>;

@@ -105,6 +105,7 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 - Default border: `1px solid var(--line)`. Inputs and buttons: `1px solid var(--line2)`.
 - **Panel**: `--panel` background, `--line` border, radius 12. A list inside a panel separates rows with a `--line` bottom border and clips with `overflow: hidden`.
 - **Empty state**: `1px dashed var(--line2)`, radius 12, `--tx3` text, centered copy.
+- **Not built yet**: an empty state where the server doesn't serve an area yet: "**Not built yet.** The server doesn't serve <the wiki>." ("Not built yet." in `--tx2`, 500), in place of what the area would show.
 - **Overlays** (drawers, side sheet, modals, toasts) use `--panel` and `--shadow`. Layering: side sheet 44, Chief of Staff drawer 45, modals 50, toasts 60. See [App shell](../features/app-shell.md).
 
 ## Status colors

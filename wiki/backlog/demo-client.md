@@ -20,4 +20,6 @@ Unblocked: [API types](./api-types.md) is done.
 - [x] the "demo data" badge (`DemoBadge`), on each screen for the areas it shows, and in the sidebar
 - [x] tests: the demo client satisfies the interface, its writes and events, its version guards, copies not shared memory, the simulation runs only while someone listens
 
+**Retired 2026-10-15:** the UI went live and the demo client, its seed and the badge were deleted ([Going live](./epics/full-ui-demo.md#going-live)); they stay in git history.
+
 **Gaps the seed extraction found, for the screen cards to settle:** the format of a request's links (a branch, a wiki entry) and the UI routes they open; the values of a checks result (`pass`, `fail`, empty, running?); how the server renders callouts and checkboxes in an entry's HTML; whether a folder's `index.md` also appears among the tree's children (the seed: no, the folder has `hasIndex`); where a board card's title comes from (H1, a `title` field, or the H1 without the id).

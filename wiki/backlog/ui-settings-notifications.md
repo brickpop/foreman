@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: medium
 tags: [feature]
 epic: full-ui-demo

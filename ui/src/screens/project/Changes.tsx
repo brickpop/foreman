@@ -1,5 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
-import type { MergeRequest, Project, Request, Team, WorkItem } from "../../api/client";
+import {
+  isNotBuilt,
+  type MergeRequest,
+  type Project,
+  type Request,
+  type Team,
+  type WorkItem,
+} from "../../api/client";
 import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
 import { agentOf, ordered } from "../../app/model";
 import {
@@ -13,7 +20,7 @@ import {
 import { Avatar } from "../../components/Avatar";
 import { RequestPanel } from "../../components/RequestPanel";
 import { ReviewPanel } from "../../components/ReviewPanel";
-import { Button, Empty, Panel, SectionLabel } from "../../components/ui";
+import { Button, Empty, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 
 // The project's actionable tab (wiki/product/features/changes.md): what needs
 // the CEO, work moving towards main, and what recently merged.
@@ -50,6 +57,12 @@ export function Changes({ project }: { project: Project }) {
   const carried = (w: (typeof items)[number]) =>
     mrs.some((m) => m.id === w.mergeRequestId && (m.state === "open" || m.state === "merged"));
   const loose = items.filter((w) => !carried(w));
+  if (isNotBuilt(pipeline.error))
+    return (
+      <div className="mx-auto w-full max-w-[860px] px-10 pt-7">
+        <NotBuilt what="requests or the pipeline" />
+      </div>
+    );
   return (
     <div className="mx-auto flex w-full max-w-[860px] flex-col gap-9 px-10 pt-7 pb-16">
       <section className="flex flex-col gap-2.5">

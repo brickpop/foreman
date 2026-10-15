@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: full-ui-demo
@@ -19,4 +19,4 @@ Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.m
 - [x] direct-line banner, line-input mode (the `Line` button; sent through the terminal connection)
 - [x] markers strip (for now derived from the team messages; `instance.marker` events replace it with Messaging) and the Messages drawer (newest first, click opens the sender)
 - [x] the real Terminal component in the panes (each demo agent shows the server's demo session)
-- [ ] the CEO looks at it on the Mac (`just dev`)
+- [x] the CEO looks at it on the Mac (`just dev`): approved 2026-10-15

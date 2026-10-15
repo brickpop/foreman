@@ -44,7 +44,7 @@ function setup() {
     exit: (c) => log.push(`exit:${c}`),
   };
   const conn = openPty(
-    "ws://x/ws/pty/demo",
+    "ws://x/ws/pty/mara%40ledger",
     handlers,
     (url) => {
       const s = new FakeSocket(url);

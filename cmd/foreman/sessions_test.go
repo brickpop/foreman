@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -84,21 +83,5 @@ func TestSessionsFailedStartLeavesNothingBehind(t *testing.T) {
 	noLog := newSessions(direct.Runner{}, func(string) (terminal.Log, error) { return nil, errors.New("disk full") })
 	if err := noLog.start(context.Background(), "x", sh("true")); err == nil {
 		t.Error("start succeeded without a log")
-	}
-}
-
-func TestSessionsListIsSortedAndKeepsExited(t *testing.T) {
-	s, _ := newTestSessions(t, direct.Runner{})
-	if got := s.List(); len(got) != 0 {
-		t.Errorf("empty List = %v", got)
-	}
-	for _, id := range []string{"tove@ledger", "mara@ledger"} {
-		if err := s.start(context.Background(), id, sh("true")); err != nil {
-			t.Fatal(err)
-		}
-		waitExit(t, s, id)
-	}
-	if got := strings.Join(s.List(), ","); got != "mara@ledger,tove@ledger" {
-		t.Errorf("List = %s", got)
 	}
 }

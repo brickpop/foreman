@@ -1,10 +1,10 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import type { Node } from "../../api/client";
+import { isNotBuilt, type Node } from "../../api/client";
 import { useEntry, useTick, useTree } from "../../app/queries";
 import { Chevron, TreeIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
-import { Button, Dot } from "../../components/ui";
+import { Button, Dot, NotBuilt } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 
 // The project's Overview: a reader for its wiki (wiki/product/features/wiki-reader.md).
@@ -32,11 +32,18 @@ export function Overview({ project, entry }: { project: string; entry?: string }
     document.querySelector("main")?.scrollTo({ top: 0 });
   }, [path]);
   // An unknown path falls back to index.md, replacing it so Back doesn't return to it.
-  const missing = current.isError && path !== "index.md";
+  const notBuilt = isNotBuilt(tree.error);
+  const missing = current.isError && !notBuilt && path !== "index.md";
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the entry turns out missing
   useEffect(() => {
     if (missing) open("index.md", true);
   }, [missing]);
+  if (notBuilt)
+    return (
+      <div className="px-8 pt-6">
+        <NotBuilt what="the wiki" />
+      </div>
+    );
   return (
     <div className="flex flex-col gap-5 px-8 pt-6 pb-16">
       <div className="flex items-center gap-3">

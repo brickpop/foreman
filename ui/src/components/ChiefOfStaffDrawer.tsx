@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { type CosItem, useClient } from "../api/client";
+import { type CosItem, isNotBuilt, useClient } from "../api/client";
 import { keys } from "../app/queries";
 import { Drawer } from "./Overlays";
+import { NotBuilt } from "./ui";
 
 // The Chief of Staff drawer (wiki/product/features/chief-of-staff.md#drawer):
 // its conversation, chips under the last message, and the input. Entry points
@@ -24,6 +25,7 @@ export function ChiefOfStaffDrawer({ open, onClose }: { open: boolean; onClose: 
   const end = useRef<HTMLDivElement>(null);
   const items = talk.data?.items ?? [];
   const working = talk.data?.working ?? false;
+  const notBuilt = isNotBuilt(talk.error);
   // Follow the conversation as it grows.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scrolls when the conversation changes
   useEffect(() => end.current?.scrollIntoView({ block: "end" }), [items.length, working]);
@@ -49,7 +51,10 @@ export function ChiefOfStaffDrawer({ open, onClose }: { open: boolean; onClose: 
     >
       <div className="flex h-full flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-auto p-[18px]">
-          {talk.error && <p className="m-0 text-[13px] text-err">{talk.error.message}</p>}
+          {notBuilt && <NotBuilt what="the Chief of Staff" />}
+          {talk.error && !notBuilt && (
+            <p className="m-0 text-[13px] text-err">{talk.error.message}</p>
+          )}
           {items.map((item) => (
             <Item key={item.id} item={item} />
           ))}
@@ -75,6 +80,7 @@ export function ChiefOfStaffDrawer({ open, onClose }: { open: boolean; onClose: 
           <div ref={end} />
         </div>
         <form
+          hidden={notBuilt}
           className="border-t border-line p-3.5"
           onSubmit={(e) => {
             e.preventDefault();

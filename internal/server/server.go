@@ -45,6 +45,12 @@ func New(o Options) http.Handler {
 	configRoutes(mux, o.Config)
 	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))
+	// An endpoint the server doesn't have is an API error, never the web app.
+	noEndpoint := func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "No such endpoint: "+r.Method+" "+r.URL.Path)
+	}
+	mux.HandleFunc("/api/", noEndpoint)
+	mux.HandleFunc("/ws/", noEndpoint)
 	mux.Handle("/", ui(o.UI))
 	return o.Guard.Wrap(mux)
 }

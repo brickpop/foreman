@@ -22,14 +22,15 @@ type Workspace interface {
 
 // Options are the parts the server is assembled from.
 type Options struct {
-	Guard     Guard
-	Workspace Workspace
-	Config    Config
-	Events    Events
-	Agents    Agents
-	Harnesses Harnesses
-	Terminals Terminals
-	UI        fs.FS // the built web app, index.html at its root
+	Guard       Guard
+	Workspace   Workspace
+	Config      Config
+	Events      Events
+	Agents      Agents
+	Harnesses   Harnesses
+	Maintenance Maintenance
+	Terminals   Terminals
+	UI          fs.FS // the built web app, index.html at its root
 }
 
 // New returns the HTTP handler, every route behind the guard.
@@ -40,6 +41,7 @@ func New(o Options) http.Handler {
 	})
 	agentRoutes(mux, o.Agents)
 	harnessRoutes(mux, o.Harnesses)
+	maintenanceRoutes(mux, o.Maintenance)
 	configRoutes(mux, o.Config)
 	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))

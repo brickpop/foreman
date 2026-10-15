@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,6 +21,8 @@ type Config interface {
 	Teams() []workspace.Team
 	Team(id string) (workspace.Team, error) // workspace.ErrNotFound
 	Settings() workspace.SettingsFile
+	// SaveSettings writes settings.toml if still at version; returns the new version.
+	SaveSettings(ctx context.Context, s workspace.Settings, version string) (string, error)
 }
 
 // Events is what the server streams to the browser (implemented by events.Bus).
@@ -49,6 +52,28 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"prompt": prompt.Template(t.Config, r.PathValue("agent"))})
+	})
+	mux.HandleFunc("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Settings workspace.Settings `json:"settings"`
+			Version  string             `json:"version"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {settings, version}")
+			return
+		}
+		_, err := c.SaveSettings(r.Context(), req.Settings, req.Version)
+		var invalid *workspace.InvalidError
+		switch {
+		case errors.Is(err, workspace.ErrConflict):
+			writeError(w, http.StatusConflict, "CONFLICT", "settings.toml changed since you read it")
+		case errors.As(err, &invalid):
+			writeError(w, http.StatusBadRequest, "INVALID", invalid.Error())
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		default:
+			writeJSON(w, http.StatusOK, c.Settings())
+		}
 	})
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, c.Settings())

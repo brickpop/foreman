@@ -48,10 +48,14 @@ GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry 
 PUT    /api/wiki/:project/checkbox/:path      {line, version}
 PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
 
-GET    /api/settings | PUT /api/settings       settings, version, problems
-GET    /api/harnesses                         the supported harnesses and their login (connected or not)
+GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
+| PUT /api/settings       settings, version, problems
+GET    /api/harnesses                         the supported harnesses: their default command and their login (connected or not)
 POST   /api/harnesses/:id/connect             start the harness's login in a terminal → {terminal}: open it with WS /ws/pty/:terminal
-PUT    /api/secrets/forge/:kind               write-only token
+GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
+PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
+GET    /api/maintenance                       {engine, images}: the engine's state; each image's name, ref, state, last build log
+POST   /api/maintenance/rebuild               202: rebuild the images without cache; GET /api/maintenance follows it
 GET    /api/events                            SSE: requests, status, file changes
 ```
 

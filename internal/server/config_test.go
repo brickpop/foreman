@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -39,6 +40,9 @@ func (f fakeConfig) Team(id string) (workspace.Team, error) {
 	return workspace.Team{}, workspace.ErrNotFound
 }
 func (f fakeConfig) Settings() workspace.SettingsFile { return f.settings }
+func (f fakeConfig) SaveSettings(context.Context, workspace.Settings, string) (string, error) {
+	return "", nil
+}
 
 var config = fakeConfig{
 	projects: []workspace.Project{{ID: "ledger", Repos: []string{"ledger-api"}, Version: "v1", Problems: []string{"checks: x"}}},
@@ -176,5 +180,44 @@ func TestPromptTemplateOfAnAgent(t *testing.T) {
 		if w := get(t, h, path); w.Code != http.StatusNotFound {
 			t.Errorf("%s: %d", path, w.Code)
 		}
+	}
+}
+
+// savingConfig is a config whose settings can be saved.
+type savingConfig struct {
+	fakeConfig
+	saved  *workspace.Settings
+	refuse error
+}
+
+func (s savingConfig) SaveSettings(_ context.Context, v workspace.Settings, version string) (string, error) {
+	if s.refuse != nil {
+		return "", s.refuse
+	}
+	*s.saved = v
+	return "v3", nil
+}
+
+func TestSaveSettings(t *testing.T) {
+	var saved workspace.Settings
+	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Config: savingConfig{fakeConfig: config, saved: &saved}, UI: builtUI})
+	w := send(h, "PUT", "/api/settings", `{"settings":{"maxSessions":4,"port":8888},"version":"v2"}`)
+	if w.Code != http.StatusOK || saved.MaxSessions != 4 {
+		t.Errorf("save: %d %s %+v", w.Code, w.Body, saved)
+	}
+	for _, tc := range []struct {
+		refuse error
+		status int
+	}{
+		{workspace.ErrConflict, http.StatusConflict},
+		{&workspace.InvalidError{Problems: []string{"port: 0 is not a port"}}, http.StatusBadRequest},
+	} {
+		h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Config: savingConfig{fakeConfig: config, saved: &saved, refuse: tc.refuse}, UI: builtUI})
+		if w := send(h, "PUT", "/api/settings", `{"settings":{},"version":"v2"}`); w.Code != tc.status {
+			t.Errorf("%v: %d %s", tc.refuse, w.Code, w.Body)
+		}
+	}
+	if w := send(h, "PUT", "/api/settings", `nope`); w.Code != http.StatusBadRequest {
+		t.Errorf("bad body: %d", w.Code)
 	}
 }

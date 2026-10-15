@@ -46,6 +46,8 @@ var ErrNotConnected = errors.New("harness: not connected (Settings → Harnesses
 // Adapter is one harness's adapter (claudecode.Adapter, fake.Adapter, …), as
 // runner.Runner is one engine (direct.Runner, podman.Runner).
 type Adapter interface {
+	// Command is what it runs when the settings name no command.
+	Command() string
 	Launch(Session) (Launch, error)
 	// Login is how to run the harness's own login (Settings → Harnesses →
 	// Connect), in a terminal the CEO types into.

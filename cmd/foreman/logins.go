@@ -23,7 +23,7 @@ var errUnknownHarness = errors.New("no such harness")
 func (l logins) Harnesses() []harness.Status {
 	list := []harness.Status{}
 	for id, a := range l.adapters {
-		list = append(list, harness.Status{ID: id, Connected: a.Connected()})
+		list = append(list, harness.Status{ID: id, Command: a.Command(), Connected: a.Connected()})
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
 	return list

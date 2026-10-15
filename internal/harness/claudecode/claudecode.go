@@ -53,7 +53,7 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 
 	command := s.Command
 	if command == "" {
-		command = "claude"
+		command = a.Command()
 	}
 	args := []string{command, "--dangerously-skip-permissions"}
 	if s.Continue && hasConversation(dir) {
@@ -120,6 +120,9 @@ func hasConversation(dir string) bool {
 	return len(found) > 0
 }
 
+// Command is Claude Code's CLI.
+func (Adapter) Command() string { return "claude" }
+
 // Connected reports whether the shared login exists.
 func (a Adapter) Connected() bool {
 	_, err := os.Stat(filepath.Join(a.Credentials, ".credentials.json"))
@@ -134,7 +137,7 @@ func (a Adapter) Login() (harness.Launch, error) {
 		return harness.Launch{}, err
 	}
 	return harness.Launch{
-		Command: []string{"claude"},
+		Command: []string{a.Command()},
 		Env:     []string{"CLAUDE_CONFIG_DIR=" + a.Credentials},
 		Mounts:  []runner.Mount{{Source: a.Credentials, Target: a.Credentials}},
 	}, nil

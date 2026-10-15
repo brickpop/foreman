@@ -26,6 +26,8 @@ export type DemoOptions = {
   tick?: number;
   /** The clock, for tests. */
   now?: () => Date;
+  /** How long a demo image rebuild takes. */
+  rebuildMs?: number;
 };
 
 class Conflict extends Error {
@@ -76,6 +78,12 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
       teams: () => reply(state.teams),
       team: async (id) => reply(find(state.teams, (t) => t.id === id, "team")),
       settings: () => reply(state.settings),
+      saveSettings: async (settings, v) => {
+        if (state.settings.version !== v) throw new Conflict("settings.toml");
+        state.settings = { settings: structuredClone(settings), version: version(), problems: [] };
+        emit("config.changed", { object: "settings", id: "", version: state.settings.version });
+        return structuredClone(state.settings);
+      },
       candidates: () => reply(state.candidates),
       saveSoul: async (teamId, agent, soul, v) => {
         const t = find(state.teams, (x) => x.id === teamId, "team");
@@ -167,6 +175,30 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
       demo: true,
       list: () => reply(state.harnesses),
       connect: async (harness) => `connect:${harness}`,
+    },
+    maintenance: {
+      demo: true,
+      status: () => reply(state.maintenance),
+      rebuild: async () => {
+        for (const image of state.maintenance.images) {
+          image.state = "building";
+          setTimeout(() => {
+            image.state = "ready";
+          }, options.rebuildMs ?? 4000);
+        }
+      },
+    },
+    forge: {
+      demo: true,
+      accounts: () => reply(state.forgeAccounts),
+      connect: async (kind, url, token) => {
+        const account = find(state.forgeAccounts, (a) => a.kind === kind, "forge");
+        if (token.trim() === "") throw new Error("The token is empty");
+        account.tokenSet = true;
+        state.settings.settings.forges = { ...state.settings.settings.forges, [kind]: { url } };
+        state.settings.version = version();
+        emit("config.changed", { object: "settings", id: "", version: state.settings.version });
+      },
     },
     requests: {
       demo: true,

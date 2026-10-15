@@ -33,7 +33,7 @@ func testLogins(t *testing.T) logins {
 func TestConnectStartsTheLoginTerminalOnce(t *testing.T) {
 	l := testLogins(t)
 	ctx := context.Background()
-	if got := l.Harnesses(); len(got) != 1 || got[0] != (harness.Status{ID: "fake", Connected: true}) {
+	if got := l.Harnesses(); len(got) != 1 || got[0] != (harness.Status{ID: "fake", Command: l.adapters["fake"].Command(), Connected: true}) {
 		t.Errorf("harnesses %+v", got)
 	}
 	id, err := l.Connect(ctx, "fake")

@@ -8,5 +8,6 @@
  */
 export interface Status {
   id: string; // claude-code, …
+  command: string; // what it runs when the settings name none
   connected: boolean; // it has a login
 }

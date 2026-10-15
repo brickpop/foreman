@@ -4,7 +4,9 @@
 // place carries a "spec:" comment. "invented:" marks data the prototype doesn't have.
 // "Now" in the demo is 2026-10-14T09:45:00Z.
 
+import type { Account } from "../types/forge";
 import type { Status } from "../types/harness";
+import type { Maintenance } from "../types/runner";
 import type {
   Deployment,
   Instance,
@@ -22,6 +24,8 @@ export interface Seed {
   teams: Team[];
   settings: SettingsFile;
   harnesses: Status[];
+  forgeAccounts: Account[];
+  maintenance: Maintenance;
   deployments: Deployment[];
   instances: Instance[];
   requests: Request[];
@@ -515,7 +519,11 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
       stuckAfterMinutes: 20,
       teamMessageMarkers: true,
       logCapMb: 50,
-      forges: {},
+      // invented: the hosts of the two forges the projects use.
+      forges: {
+        forgejo: { url: "https://localhost:3000" },
+        github: { url: "https://github.com/acme" },
+      },
       workspaceForge: { kind: "none", url: "" },
       notifications: { needsMe: true, finishes: true, mergeRequested: true },
     },
@@ -525,11 +533,31 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
 
   // invented: the prototype has no login state; every harness is connected.
   harnesses: [
-    { id: "claude-code", connected: true },
-    { id: "codex", connected: true },
-    { id: "pi", connected: true },
-    { id: "hermes", connected: true },
+    { id: "claude-code", command: "claude", connected: true },
+    { id: "codex", command: "codex", connected: true },
+    { id: "pi", command: "pi", connected: true },
+    { id: "hermes", command: "hermes", connected: true },
   ],
+
+  // invented: tokens for the forges the projects use; Gitea is not connected.
+  forgeAccounts: [
+    { kind: "github", tokenSet: true },
+    { kind: "forgejo", tokenSet: true },
+    { kind: "gitea", tokenSet: false },
+  ],
+
+  // invented: a healthy engine with its one image (phase 1).
+  maintenance: {
+    engine: "Podman 5.7.1 · running",
+    images: [
+      {
+        name: "localhost/foreman/harness",
+        ref: "localhost/foreman/harness:3f9c2a1b",
+        state: "ready",
+        log: "STEP 1/6: FROM docker.io/library/node:22-bookworm-slim\nSTEP 2/6: RUN apt-get update && apt-get install -y git ripgrep\nSTEP 3/6: RUN npm install -g @anthropic-ai/claude-code\nCOMMIT localhost/foreman/harness:3f9c2a1b\n",
+      },
+    ],
+  },
 
   // Prototype: `deps` (lines 967-972). invented: the times.
   deployments: [

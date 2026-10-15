@@ -1,7 +1,9 @@
 import { createContext, useContext } from "react";
 import { type EventHandlers, subscribeEvents } from "./events";
 import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
+import type { Account as ForgeAccount } from "./types/forge";
 import type { Status as HarnessStatus } from "./types/harness";
+import type { ImageStatus, Maintenance } from "./types/runner";
 import type {
   Deployment,
   Instance,
@@ -11,7 +13,7 @@ import type {
   WorkItem,
 } from "./types/store";
 import type { Board, Card, Entry, Node } from "./types/wiki";
-import type { Candidate, Project, SettingsFile, Soul, Team } from "./types/workspace";
+import type { Candidate, Project, Settings, SettingsFile, Soul, Team } from "./types/workspace";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -25,12 +27,16 @@ export type {
   Card,
   Deployment,
   Entry,
+  ForgeAccount,
   HarnessStatus,
+  ImageStatus,
   Instance,
+  Maintenance,
   MergeRequest,
   Node,
   Project,
   Request,
+  Settings,
   SettingsFile,
   Soul,
   Team,
@@ -52,6 +58,8 @@ export interface WorkspaceArea extends Area {
   teams(): Promise<Team[]>;
   team(id: string): Promise<Team>;
   settings(): Promise<SettingsFile>;
+  /** Saves settings.toml, guarded by the version read. */
+  saveSettings(settings: Settings, version: string): Promise<SettingsFile>;
   /** Folders that aren't projects yet. */
   candidates(): Promise<Candidate[]>;
   /** Turns a candidate folder into a project: its project repo and starter wiki. */
@@ -77,6 +85,19 @@ export interface HarnessesArea extends Area {
   list(): Promise<HarnessStatus[]>;
   /** Starts the harness's login; returns the terminal to open with agents.openTerminal. */
   connect(harness: string): Promise<string>;
+}
+
+export interface MaintenanceArea extends Area {
+  /** The engine's state and its images. */
+  status(): Promise<Maintenance>;
+  /** Starts rebuilding the images without cache; status shows the progress. */
+  rebuild(): Promise<void>;
+}
+
+export interface ForgeArea extends Area {
+  accounts(): Promise<ForgeAccount[]>;
+  /** Checks the token against the forge, then stores it with the host. */
+  connect(kind: string, url: string, token: string): Promise<void>;
 }
 
 export interface RequestsArea extends Area {
@@ -128,6 +149,8 @@ export interface ForemanClient {
   workspace: WorkspaceArea;
   agents: AgentsArea;
   harnesses: HarnessesArea;
+  maintenance: MaintenanceArea;
+  forge: ForgeArea;
   requests: RequestsArea;
   messages: MessagesArea;
   pipeline: PipelineArea;
@@ -166,6 +189,10 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       teams: () => getJSON("/api/teams"),
       team: (team) => getJSON(`/api/teams/${id(team)}`),
       settings: () => getJSON("/api/settings"),
+      saveSettings: async (settings, version) =>
+        (
+          await request("PUT", "/api/settings", { settings, version })
+        ).json() as Promise<SettingsFile>,
       candidates: () => getJSON("/api/candidates"),
       addProject: async (folder) =>
         (await request("POST", "/api/projects", { folder })).json() as Promise<Project>,
@@ -197,6 +224,16 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         const r = await request("POST", `/api/harnesses/${id(harness)}/connect`);
         return ((await r.json()) as { terminal: string }).terminal;
       },
+    },
+    maintenance: {
+      demo: false,
+      status: () => getJSON("/api/maintenance"),
+      rebuild: () => send("POST", "/api/maintenance/rebuild"),
+    },
+    forge: {
+      demo: false,
+      accounts: () => getJSON("/api/secrets/forge"),
+      connect: (kind, url, token) => send("PUT", `/api/secrets/forge/${id(kind)}`, { url, token }),
     },
     requests: {
       demo: false,

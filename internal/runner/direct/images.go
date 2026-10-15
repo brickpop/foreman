@@ -19,4 +19,4 @@ func (Images) Ensure(context.Context, string) (string, error) { return "", nil }
 func (Images) Refresh(context.Context) error { return nil }
 
 // Status lists no images.
-func (Images) Status(context.Context) []runner.ImageStatus { return nil }
+func (Images) Status(context.Context) []runner.ImageStatus { return []runner.ImageStatus{} }

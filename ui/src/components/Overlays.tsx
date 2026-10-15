@@ -10,11 +10,14 @@ export function Modal({
   onClose,
   title,
   children,
+  width = 520,
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Wider for a terminal; 520 by default. */
+  width?: number;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
@@ -25,7 +28,8 @@ export function Modal({
         >
           <Dialog.Content
             aria-describedby={undefined}
-            className="w-[min(520px,100%)] rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
+            style={{ width: `min(${width}px, 100%)` }}
+            className="rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
           >
             <Dialog.Title className="mb-4 text-xl font-semibold">{title}</Dialog.Title>
             {children}

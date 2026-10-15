@@ -25,6 +25,9 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	}, nil
 }
 
+// Command is the program.
+func (a Adapter) Command() string { return a.Program }
+
 // Connected is always true: the fake harness needs no login.
 func (Adapter) Connected() bool { return true }
 

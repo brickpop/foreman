@@ -66,7 +66,12 @@ const tiny: Seed = {
     version: "",
     problems: [],
   },
-  harnesses: [{ id: "claude-code", connected: true }],
+  harnesses: [{ id: "claude-code", command: "claude", connected: true }],
+  forgeAccounts: [{ kind: "github", tokenSet: false }],
+  maintenance: {
+    engine: "Podman 5.7.1 · running",
+    images: [{ name: "localhost/foreman/harness", ref: "h:1", state: "ready", log: "" }],
+  },
   deployments: [],
   instances: [],
   requests: [
@@ -311,5 +316,39 @@ describe("demoClient's teams", () => {
     await c.agents.deploy("atlas", "ledger", "Ship it");
     expect(await c.agents.prompt("tove@ledger")).toContain("Goal: Ship it");
     expect(await c.workspace.promptTemplate("atlas", "tove")).toContain("Goal: {goal}");
+  });
+});
+
+describe("demoClient's settings", () => {
+  it("saves settings: version-guarded, with the event", async () => {
+    const { c, events } = client();
+    const file = await c.workspace.settings();
+    const changed = { ...file.settings, maxSessions: 3 };
+    await expect(c.workspace.saveSettings(changed, "stale")).rejects.toThrow("changed since");
+    const saved = await c.workspace.saveSettings(changed, file.version);
+    expect(saved.settings.maxSessions).toBe(3);
+    expect(saved.version).not.toBe(file.version);
+    await expect(c.workspace.saveSettings(changed, file.version)).rejects.toThrow("changed since");
+    expect(events.at(-1)).toMatchObject({ type: "config.changed", data: { object: "settings" } });
+  });
+
+  it("connects a forge: the token is never returned, the host lands in the settings", async () => {
+    const { c } = client();
+    await expect(c.forge.connect("github", "https://github.com/me", " ")).rejects.toThrow("empty");
+    await c.forge.connect("github", "https://github.com/me", "ghp_secret");
+    expect(await c.forge.accounts()).toEqual([{ kind: "github", tokenSet: true }]);
+    const file = await c.workspace.settings();
+    expect(file.settings.forges.github).toEqual({ url: "https://github.com/me" });
+    expect(JSON.stringify(file)).not.toContain("ghp_secret");
+    await expect(c.forge.connect("bitbucket", "x", "t")).rejects.toThrow("no such forge");
+  });
+
+  it("rebuilds the image: building, then ready", async () => {
+    vi.useFakeTimers();
+    const c = demoClient(tiny, { tick: 0, rebuildMs: 1000 });
+    await c.maintenance.rebuild();
+    expect((await c.maintenance.status()).images[0].state).toBe("building");
+    vi.advanceTimersByTime(1000);
+    expect((await c.maintenance.status()).images[0].state).toBe("ready");
   });
 });

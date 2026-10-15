@@ -130,14 +130,15 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		}
 	}
 	handler := server.New(server.Options{
-		Guard:     access.NewTokenGuard(token, access.LocalHosts(*port), *port),
-		Workspace: ws,
-		Config:    ws,
-		Events:    bus,
-		Agents:    views,
-		Harnesses: login,
-		Terminals: views,
-		UI:        files,
+		Guard:       access.NewTokenGuard(token, access.LocalHosts(*port), *port),
+		Workspace:   ws,
+		Config:      ws,
+		Events:      bus,
+		Agents:      views,
+		Harnesses:   login,
+		Maintenance: maintenanceOf(engineRunner, engineImages),
+		Terminals:   views,
+		UI:          files,
 	})
 	return http.Serve(listener, handler)
 }

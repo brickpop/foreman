@@ -19,7 +19,9 @@ Foreman tells the CEO when something happens, so they don't have to watch the UI
 | An instance becomes `done` ([Instance](../models/instance.md)) | "An agent finishes" | `<Name> is done on <project>` / the handoff summary |
 | A review request is raised (a merge is requested) | "A merge is requested" | `<Lead> requested a merge on <project>` / the entry's title |
 
-The toggles gate browser notifications only; toasts always show.
+The toggles gate browser notifications only; toasts always show. A tab raises a browser notification only while it is hidden (`document.hidden`); while the CEO is looking at it, its toast says it already.
+
+A Foreman-raised request (no instance, e.g. a failed build) is titled `Foreman needs you on <project>`. The done notice's body is a fixed line until instance events carry the hand-off summary.
 
 ## Behaviour
 

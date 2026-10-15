@@ -16,3 +16,4 @@ epic: terminal-multiplexer
 - [ ] workspace and project overrides, `BASE` build argument, transparent tags
 - [ ] Refresh (rebuild without cache, then the layers below) with optional prune; Prune by label
 - [ ] the full Maintenance screen (chain rows, where a Containerfile would go)
+- [ ] each image's build time and the harness versions inside it (Maintenance rows, and `found · <version>` on Settings → Harnesses): phase 1 shows neither

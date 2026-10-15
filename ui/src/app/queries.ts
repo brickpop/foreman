@@ -1,5 +1,5 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { type Board, type Soul, useClient } from "../api/client";
 import type { Event } from "../api/types/events";
 
@@ -16,6 +16,8 @@ export const keys = {
   deployments: ["deployments"],
   requests: ["requests"],
   harnesses: ["harnesses"],
+  forge: ["forge"],
+  maintenance: ["maintenance"],
   messages: ["messages"],
 } as const;
 
@@ -79,14 +81,20 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
   }
 }
 
-/** Follows the server's events for as long as the app runs. */
-export function useLiveEvents() {
+/** Follows the server's events for as long as the app runs; listen also
+ * hears each one (notifications). */
+export function useLiveEvents(listen: (e: Event) => void = () => {}) {
   const c = useClient();
   const queries = useQueryClient();
+  const listener = useRef(listen);
+  listener.current = listen;
   useEffect(
     () =>
       c.events.subscribe({
-        event: (e) => invalidate(queries, staleKeys(e)),
+        event: (e) => {
+          invalidate(queries, staleKeys(e));
+          listener.current(e);
+        },
         // Events sent while away aren't replayed: refetch everything shown.
         reconnected: () => queries.invalidateQueries(),
       }),

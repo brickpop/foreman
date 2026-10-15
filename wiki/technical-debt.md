@@ -25,3 +25,9 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **State:** vt v0.1.0's `Emulator.Close` sets a `closed` flag without a lock, and `Emulator.Read` checks it, so closing while `internal/screen` drains the emulator's answers is a data race (found by `just race` on macOS). `screen.VT.Close` works around it: it ends the answers pipe first (through `InputPipe()`, which happens to be an `*io.PipeWriter`), waits for the drain to finish, then closes the emulator. If a vt upgrade changes `InputPipe()`, it falls back to the racy close.
 - **Why:** vt is pinned at v0.1.0 behind the `Screen` interface; the race is in its code, not ours.
 - **Fix:** report it upstream; drop the workaround once a vt release guards the flag.
+
+## The theme is kept in the browser only
+
+- **State:** Settings → Appearance stores the theme in this browser's `localStorage` (`ui/src/app/theme.ts`), so another browser starts on System.
+- **Why:** the `ui_prefs` API ([UI state](./product/models/ui-state.md)) isn't built yet; the spec already keeps a `localStorage` copy to paint the theme before the API answers.
+- **Fix:** with the `ui_prefs` API, save the theme there and keep `localStorage` as the paint-early cache only. The same API also keeps the Sessions panes across browsers ([Home and Sessions](./backlog/ui-home-sessions.md)).

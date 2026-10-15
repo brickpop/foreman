@@ -22,7 +22,9 @@ The **Settings** screen (sidebar footer): workspace-wide settings stored in `~/a
 
 "The command Foreman runs for each harness inside the agent image. Versions are what the image contains; see Maintenance."
 
-Rows (grid `130px 1fr auto`): the harness label, a Mono command input (defaults `claude`, `codex`, `pi`, `hermes`), and the detection status in the harness image: `found · <version>` (`--ok`) or `not set` / `not found` (`--err`). The prototype detected them on the host PATH; with every session in a container, the image is what counts. Custom harnesses are configured per agent and not listed here. See [Harness adapters](../architecture/harness-adapters.md).
+Rows (grid `130px 1fr auto`): the harness label, a Mono command input (defaults `claude`, `codex`, `pi`, `hermes`) (empty means the harness's own command, shown as the placeholder; typing it back stores nothing), and the detection status in the harness image: `found · <version>` (`--ok`) or `not set` / `not found` (`--err`). The prototype detected them on the host PATH; with every session in a container, the image is what counts. Custom harnesses are configured per agent and not listed here. See [Harness adapters](../architecture/harness-adapters.md).
+
+**Phasing:** the detection status comes with the [full image chain](../../backlog/image-chain.md); until then a row shows the command and the login only.
 
 Each row also shows the login: `connected` (`--ok`), `reconnect needed` (`--err`) or `not connected` (`--tx4`), with **`Connect`** / **`Reconnect`**, which opens the login container's terminal in a dialog running the harness's own login (for Claude Code: Claude Code itself, where the CEO types `/login`, since it never asks on its own). See [Session runner → Credentials](../architecture/session-runner.md#credentials).
 
@@ -36,12 +38,12 @@ Below the rows, **Workspace repo**: where the [workspace repo](../models/workspa
 
 ## Notifications
 
-- **Browser notifications**: the permission state, `on` (`--ok`), `blocked` (`--err`), `turn on` (`--accTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
+- **Browser notifications**: the permission state (raised only while the tab is hidden: when the CEO is looking, the toast says it already), `on` (`--ok`), `blocked` (`--err`), `turn on` (`--accTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
 - Toggles (default on): `An agent needs me`, `An agent finishes`, `A merge is requested` ([Notifications](./notifications.md)).
 
 ## Maintenance
 
-**Phasing:** phase 1 has one image for every project ([Agent images](../architecture/tech-stack.md#agent-images)), so the section shows Podman's state and that one image: its state, the harness version inside, its last build log, and **`Rebuild`** (without cache, picking up the latest Claude Code). The chain rows, Refresh with prune, Customize hints and Prune below are the target, built with the [full image chain](../../backlog/image-chain.md).
+**Phasing:** phase 1 has one image for every project ([Agent images](../architecture/tech-stack.md#agent-images)), so the section shows Podman's state and that one image: its state, its last build log, and **`Rebuild`** (without cache, picking up the latest Claude Code). Phase 1 shows the state without the build time, and no harness versions yet (neither here nor on the Harnesses rows). The chain rows, Refresh with prune, Customize hints and Prune below are the target, built with the [full image chain](../../backlog/image-chain.md).
 
 "The images agent sessions run in. Foreman builds them as a chain: base, harnesses, this workspace, each project. A layer without its own Containerfile simply passes the one above through."
 

@@ -171,3 +171,33 @@ export function PageTitle({ title, subtitle }: { title: ReactNode; subtitle?: Re
     </header>
   );
 }
+
+/** An on/off switch: saves at once, unlike a form checkbox. */
+export function Switch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (on: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc ${
+        checked ? "border-acc bg-acc" : "border-line3 bg-raised"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 size-3.5 rounded-full transition-[left] ${
+          checked ? "left-[18px] bg-accInk" : "left-0.5 bg-tx3"
+        }`}
+      />
+    </button>
+  );
+}

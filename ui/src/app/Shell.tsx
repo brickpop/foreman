@@ -1,12 +1,13 @@
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Instance, Project, Request, Team } from "../api/client";
 import { AddProject } from "../components/AddProject";
 import { DemoBadge } from "../components/DemoBadge";
 import { Drawer } from "../components/Overlays";
-import { Toasts } from "../components/Toasts";
+import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { ChiefOfStaffContext } from "./chiefOfStaff";
+import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
 import {
   useInstances,
   useLiveEvents,
@@ -20,7 +21,6 @@ import {
 // sidebar, the main area, and the overlays.
 
 export function Shell() {
-  useLiveEvents();
   const [chiefOfStaff, setChiefOfStaff] = useState(false);
   // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
@@ -28,6 +28,7 @@ export function Shell() {
   return (
     <ChiefOfStaffContext.Provider value={() => setChiefOfStaff(true)}>
       <Toasts>
+        <LiveEvents />
         <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
           <button
             type="button"
@@ -222,4 +223,27 @@ function Sidebar({
 
 function Label({ children }: { children: string }) {
   return <div className="px-2.5 pt-1 pb-1.5 text-xs font-medium text-tx4">{children}</div>;
+}
+
+/** Follows the server's events: caches refresh, and what the CEO should hear
+ * about becomes a toast, and a browser notification (notifications.md). */
+function LiveEvents() {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const teams = useTeams();
+  const instances = useInstances();
+  const settings = useSettings();
+  useLiveEvents((e) => {
+    const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
+    if (!n) return;
+    const open = () =>
+      navigate({
+        to: "/sessions",
+        search: { deployment: n.deployment || undefined, agent: n.instance || undefined },
+      });
+    toast({ title: n.title, body: n.body, color: n.color, onOpen: open });
+    const toggles = settings.data?.settings.notifications;
+    if (toggles && notifiesBrowser(n, toggles, document.hidden)) showBrowserNotification(n, open);
+  });
+  return null;
 }

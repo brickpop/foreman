@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"time"
 
@@ -23,6 +24,8 @@ type Config interface {
 	Settings() workspace.SettingsFile
 	// SaveSettings writes settings.toml if still at version; returns the new version.
 	SaveSettings(ctx context.Context, s workspace.Settings, version string) (string, error)
+	// SaveTeam writes a team file if still at version; returns the saved team.
+	SaveTeam(ctx context.Context, c workspace.TeamConfig, version string) (workspace.Team, error)
 }
 
 // Events is what the server streams to the browser (implemented by events.Bus).
@@ -62,18 +65,36 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {settings, version}")
 			return
 		}
-		_, err := c.SaveSettings(r.Context(), req.Settings, req.Version)
-		var invalid *workspace.InvalidError
-		switch {
-		case errors.Is(err, workspace.ErrConflict):
-			writeError(w, http.StatusConflict, "CONFLICT", "settings.toml changed since you read it")
-		case errors.As(err, &invalid):
-			writeError(w, http.StatusBadRequest, "INVALID", invalid.Error())
-		case err != nil:
-			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
-		default:
-			writeJSON(w, http.StatusOK, c.Settings())
+		if _, err := c.SaveSettings(r.Context(), req.Settings, req.Version); err != nil {
+			writeSaveError(w, err, "settings.toml")
+			return
 		}
+		writeJSON(w, http.StatusOK, c.Settings())
+	})
+	mux.HandleFunc("PUT /api/teams/{id}/agents/{agent}", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Soul    workspace.Soul `json:"soul"`
+			Version string         `json:"version"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {soul, version}")
+			return
+		}
+		t, err := c.Team(r.PathValue("id"))
+		agent := r.PathValue("agent")
+		if _, ok := t.Config.Agents[agent]; err != nil || !ok {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "no such agent")
+			return
+		}
+		// The team is the workspace's own: change a copy, so a refused save changes nothing.
+		t.Config.Agents = maps.Clone(t.Config.Agents)
+		t.Config.Agents[agent] = req.Soul
+		saved, err := c.SaveTeam(r.Context(), t.Config, req.Version)
+		if err != nil {
+			writeSaveError(w, err, "teams/"+t.ID+".toml")
+			return
+		}
+		writeJSON(w, http.StatusOK, saved)
 	})
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, c.Settings())
@@ -139,5 +160,18 @@ func handleEvents(bus Events) http.HandlerFunc {
 			}
 			flusher.Flush()
 		}
+	}
+}
+
+// writeSaveError answers a refused save of file: a stale version or invalid content.
+func writeSaveError(w http.ResponseWriter, err error, file string) {
+	var invalid *workspace.InvalidError
+	switch {
+	case errors.Is(err, workspace.ErrConflict):
+		writeError(w, http.StatusConflict, "CONFLICT", file+" changed since you read it")
+	case errors.As(err, &invalid):
+		writeError(w, http.StatusBadRequest, "INVALID", invalid.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 	}
 }

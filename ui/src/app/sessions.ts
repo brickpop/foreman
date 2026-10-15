@@ -1,4 +1,5 @@
 import type { Instance, Request, Team } from "../api/client";
+import { roster } from "./model";
 
 // The Sessions screen's logic (wiki/product/features/sessions.md), apart from
 // its components so it can be tested.
@@ -28,10 +29,7 @@ export function rosterOrder(deployment: string, instances: Instance[], teams: Te
   const team = teams.find((t) => t.id === deployment.split("@")[0]);
   const mine = instances.filter((i) => i.deploymentId === deployment);
   if (!team) return mine;
-  const order = [
-    team.config.lead,
-    ...Object.keys(team.config.agents).filter((a) => a !== team.config.lead),
-  ];
+  const order = roster(team.config);
   const rank = (i: Instance) => {
     const r = order.indexOf(i.agentId);
     return r < 0 ? order.length : r;

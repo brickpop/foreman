@@ -308,6 +308,7 @@ export function demoChiefOfStaff(
       "",
       () => {
         const id = name.toLowerCase();
+        team.config.order = [...team.config.order, id];
         team.config.agents[id] = {
           name,
           role: h.role ?? "engineer",
@@ -430,6 +431,7 @@ export function demoChiefOfStaff(
           playbook: draftPlaybook,
           escalate: [{ when: "a gate in project.toml", to: "ceo" }],
           agents,
+          order: members.map(([, n]) => n.toLowerCase()),
         },
         version: newVersion(),
         problems: [],

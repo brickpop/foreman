@@ -179,6 +179,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
         name: "Atlas",
         purpose: "Builds features end to end, tested and reviewed.",
         lead: "mara",
+        order: ["mara", "ilya", "tove", "rhea", "quill"],
         // spec: the team-definition.md Atlas example. The prototype had a first Scrum
         // Master step and "opens the PR to main" as the last one.
         playbook: [
@@ -291,6 +292,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
         name: "Vesper",
         purpose: "Tries to break what others built.",
         lead: "kestrel",
+        order: ["kestrel", "nyx", "bram"],
         playbook: [
           { lead: "Picks targets from what other teams hand off" },
           { qa: "Attack in their own sandbox. Every finding needs a repro" },
@@ -366,6 +368,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
         name: "Orion",
         purpose: "Designs: ADRs, spikes, reviews of designs.",
         lead: "lumen",
+        order: ["lumen", "arden", "pike"],
         // Only the lead writes the wiki, and ADRs live in it, not behind a PR (the
         // prototype had a Scrum Master write requirements and the lead open a PR).
         playbook: [
@@ -440,6 +443,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
         name: "Sentinel",
         purpose: "Reviews changes for security and correctness, then tries to break them.",
         lead: "hale",
+        order: ["hale", "petra", "odo"],
         // The prototype's "Scopes the review with you" reads wrong in a session prompt.
         playbook: [
           { lead: "Scopes the review with the CEO" },

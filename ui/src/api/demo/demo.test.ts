@@ -40,6 +40,7 @@ const tiny: Seed = {
         name: "Atlas",
         purpose: "",
         lead: "mara",
+        order: ["mara", "tove"],
         playbook: [],
         escalate: [],
         agents: {

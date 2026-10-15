@@ -35,6 +35,10 @@ export interface TeamConfig {
   playbook: PlaybookStep[];
   escalate: Escalation[];
   agents: { [key: string]: Soul};
+  /**
+   * Order is the agents in the file's order, which a map (and so JSON) loses.
+   */
+  order: string[];
 }
 /**
  * PlaybookStep is one `{ who = "text" }` step.

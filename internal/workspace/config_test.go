@@ -119,7 +119,7 @@ func TestTeamExampleParses(t *testing.T) {
 // What the UI saves comes back identical: nothing is lost in a rewrite.
 func TestTeamSurvivesARewrite(t *testing.T) {
 	c, _ := ParseTeam("atlas", []byte(teamExample))
-	data, err := encode(c)
+	data, err := encodeTeam(c)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,5 +184,61 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 		if _, p := ParseSettings([]byte(tc.toml)); !hasProblem(p, tc.want) {
 			t.Errorf("%s: problems %v, want one with %q", name, p, tc.want)
 		}
+	}
+}
+
+// The roster keeps the file's order through a parse and a save; the encoder
+// alone would sort it.
+func TestTeamKeepsItsRosterOrder(t *testing.T) {
+	file := `team = "atlas"
+name = "Atlas"
+lead = "zoe"
+
+[agents.zoe]
+name = "Zoe"
+role = "team_lead"
+harness = "claude-code"
+
+[agents.mara]
+name = "Mara"
+role = "engineer"
+harness = "claude-code"
+
+[agents.ivo]
+name = "Ivo"
+role = "qa"
+harness = "claude-code"
+`
+	c, p := ParseTeam("atlas", []byte(file))
+	if len(p) > 0 || !reflect.DeepEqual(c.Order, []string{"zoe", "mara", "ivo"}) {
+		t.Fatalf("order %v, problems %v", c.Order, p)
+	}
+	data, err := encodeTeam(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, p := ParseTeam("atlas", data)
+	if len(p) > 0 || !reflect.DeepEqual(again.Order, c.Order) {
+		t.Errorf("after a save: order %v, problems %v\n%s", again.Order, p, data)
+	}
+
+	// An agent the order doesn't name (a new hire) goes last; a name with no
+	// agent is dropped.
+	c.Order = []string{"ivo", "gone"}
+	data, _ = encodeTeam(c)
+	again, _ = ParseTeam("atlas", data)
+	if !reflect.DeepEqual(again.Order, []string{"ivo", "mara", "zoe"}) {
+		t.Errorf("order %v\n%s", again.Order, data)
+	}
+}
+
+func TestRosterPutsTheLeadFirstThenTheFileOrder(t *testing.T) {
+	c := TeamConfig{
+		Lead:   "mara",
+		Agents: map[string]Soul{"mara": {}, "tove": {}, "ivo": {}, "ada": {}},
+		Order:  []string{"tove", "mara", "ivo", "gone"},
+	}
+	if got := c.Roster(); !reflect.DeepEqual(got, []string{"mara", "tove", "ivo", "ada"}) {
+		t.Errorf("roster %v", got)
 	}
 }

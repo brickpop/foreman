@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { useState } from "react";
 import { type Deployment, type Team as TeamData, useClient } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { harnessLabel, resolveWho, roleLabel } from "../app/model";
+import { harnessLabel, resolveWho, roleLabel, roster } from "../app/model";
 import {
   keys,
   useDeployments,
@@ -179,10 +179,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
 
 function Members({ team, deployments }: { team: TeamData; deployments: Deployment[] }) {
   const instances = useInstances();
-  const ids = [
-    team.config.lead,
-    ...Object.keys(team.config.agents).filter((a) => a !== team.config.lead),
-  ];
+  const ids = roster(team.config);
   return (
     <section className="flex w-full max-w-[920px] flex-col px-12 pt-5 pb-16">
       {ids.map((agent) => {

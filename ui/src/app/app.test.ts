@@ -131,7 +131,7 @@ describe("Home's model", () => {
   });
 });
 
-import { palettes, randomLook, resolveWho, roleLabel } from "./model";
+import { palettes, randomLook, resolveWho, roleLabel, roster } from "./model";
 
 describe("teams", () => {
   const atlas = {
@@ -175,5 +175,16 @@ describe("teams", () => {
     const look = randomLook();
     expect(palettes.hair).toContain(look.hair);
     expect(palettes.color).toContain(look.color);
+  });
+});
+
+describe("roster", () => {
+  it("puts the lead first, then the file's order, then any it doesn't name, sorted", () => {
+    const c = {
+      lead: "mara",
+      agents: { mara: {}, tove: {}, ivo: {}, ada: {}, zed: {} },
+      order: ["tove", "mara", "ivo", "gone"],
+    } as unknown as Team["config"];
+    expect(roster(c)).toEqual(["mara", "tove", "ivo", "ada", "zed"]);
   });
 });

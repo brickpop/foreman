@@ -1,3 +1,4 @@
+import { roster } from "../../app/model";
 import type {
   Deployment,
   ForemanClient,
@@ -145,7 +146,7 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
         };
         state.deployments = [...state.deployments.filter((d) => d.id !== id), dep];
         emit("deployment.created", dep);
-        for (const agent of Object.keys(t.config.agents)) {
+        for (const agent of roster(t.config)) {
           const inst: Instance = {
             id: `${agent}@${project}`,
             deploymentId: id,
@@ -477,7 +478,8 @@ export function teamToml(c: TeamConfig): string {
   }
   for (const e of c.escalate)
     lines.push("", "[[escalate]]", `when = ${q(e.when)}`, `to = ${q(e.to)}`);
-  for (const [id, s] of Object.entries(c.agents)) {
+  for (const id of roster(c)) {
+    const s = c.agents[id];
     lines.push(
       "",
       `[agents.${id}]`,
@@ -501,8 +503,9 @@ export function teamToml(c: TeamConfig): string {
  * (internal/prompt); this keeps its outline so the Agent page has something to show. */
 function demoPrompt(c: TeamConfig, agent: string, project: string, goal: string): string {
   const soul = c.agents[agent];
-  const roster = Object.entries(c.agents).map(
-    ([id, s]) => `- ${s.name}, ${s.role.replaceAll("_", " ")}${id === c.lead ? " (lead)" : ""}`,
+  const members = roster(c).map(
+    (id) =>
+      `- ${c.agents[id].name}, ${c.agents[id].role.replaceAll("_", " ")}${id === c.lead ? " (lead)" : ""}`,
   );
   return [
     `# You are ${soul?.name ?? agent}, ${soul?.role.replaceAll("_", " ")} on team ${c.name}`,
@@ -517,7 +520,7 @@ function demoPrompt(c: TeamConfig, agent: string, project: string, goal: string)
     `Your sandbox: ${project}/.sandboxes/${agent} (a git worktree per repo)`,
     "",
     `## Your team on ${project}`,
-    ...roster,
+    ...members,
     "",
     "(demo data: the real prompt is composed by the server)",
   ].join("\n");

@@ -43,6 +43,9 @@ func (f fakeConfig) Settings() workspace.SettingsFile { return f.settings }
 func (f fakeConfig) SaveSettings(context.Context, workspace.Settings, string) (string, error) {
 	return "", nil
 }
+func (f fakeConfig) SaveTeam(context.Context, workspace.TeamConfig, string) (workspace.Team, error) {
+	return workspace.Team{}, nil
+}
 
 var config = fakeConfig{
 	projects: []workspace.Project{{ID: "ledger", Repos: []string{"ledger-api"}, Version: "v1", Problems: []string{"checks: x"}}},
@@ -187,7 +190,17 @@ func TestPromptTemplateOfAnAgent(t *testing.T) {
 type savingConfig struct {
 	fakeConfig
 	saved  *workspace.Settings
+	team   *workspace.TeamConfig
 	refuse error
+}
+
+// SaveTeam records what it was given, as the workspace would save it.
+func (s savingConfig) SaveTeam(_ context.Context, c workspace.TeamConfig, version string) (workspace.Team, error) {
+	if s.refuse != nil {
+		return workspace.Team{}, s.refuse
+	}
+	*s.team = c
+	return workspace.Team{ID: c.Team, Config: c, Version: "v4"}, nil
 }
 
 func (s savingConfig) SaveSettings(_ context.Context, v workspace.Settings, version string) (string, error) {
@@ -219,5 +232,48 @@ func TestSaveSettings(t *testing.T) {
 	}
 	if w := send(h, "PUT", "/api/settings", `nope`); w.Code != http.StatusBadRequest {
 		t.Errorf("bad body: %d", w.Code)
+	}
+}
+
+func TestSaveSoul(t *testing.T) {
+	agents := map[string]workspace.Soul{"mara": {Name: "Mara"}, "tove": {Name: "Tove"}}
+	c := fakeConfig{teams: []workspace.Team{{ID: "atlas", Config: workspace.TeamConfig{Team: "atlas", Agents: agents, Order: []string{"tove", "mara"}}}}}
+	var team workspace.TeamConfig
+	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Config: savingConfig{fakeConfig: c, team: &team}, UI: builtUI})
+
+	w := send(h, "PUT", "/api/teams/atlas/agents/tove", `{"soul":{"name":"Tove","personality":"Careful."},"version":"v3"}`)
+	if w.Code != http.StatusOK || team.Agents["tove"].Personality != "Careful." || team.Agents["mara"].Name != "Mara" {
+		t.Fatalf("save: %d %s %+v", w.Code, w.Body, team)
+	}
+	if strings.Join(team.Order, ",") != "tove,mara" {
+		t.Errorf("the roster order was lost: %v", team.Order)
+	}
+	// The workspace's own team is never changed in place.
+	if agents["tove"].Personality != "" {
+		t.Error("the loaded team was changed before the save")
+	}
+
+	for path, status := range map[string]int{
+		"/api/teams/atlas/agents/nobody": http.StatusNotFound,
+		"/api/teams/orion/agents/tove":   http.StatusNotFound,
+	} {
+		if w := send(h, "PUT", path, `{"soul":{},"version":"v3"}`); w.Code != status {
+			t.Errorf("%s: %d", path, w.Code)
+		}
+	}
+	if w := send(h, "PUT", "/api/teams/atlas/agents/tove", `nope`); w.Code != http.StatusBadRequest {
+		t.Errorf("bad body: %d", w.Code)
+	}
+	for _, tc := range []struct {
+		refuse error
+		status int
+	}{
+		{workspace.ErrConflict, http.StatusConflict},
+		{&workspace.InvalidError{Problems: []string{"agents.tove.name: required"}}, http.StatusBadRequest},
+	} {
+		h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Config: savingConfig{fakeConfig: c, team: &team, refuse: tc.refuse}, UI: builtUI})
+		if w := send(h, "PUT", "/api/teams/atlas/agents/tove", `{"soul":{},"version":"v3"}`); w.Code != tc.status {
+			t.Errorf("%v: %d %s", tc.refuse, w.Code, w.Body)
+		}
 	}
 }

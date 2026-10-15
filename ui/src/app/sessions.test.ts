@@ -14,7 +14,12 @@ const inst = (id: string, deploymentId: string) =>
   ({ id, deploymentId, agentId: id.split("@")[0] }) as Instance;
 const atlas = {
   id: "atlas",
-  config: { name: "Atlas", lead: "mara", agents: { ilya: {}, mara: {}, tove: {} } },
+  config: {
+    name: "Atlas",
+    lead: "mara",
+    agents: { ilya: {}, mara: {}, tove: {} },
+    order: ["tove", "mara", "ilya"],
+  },
 } as unknown as Team;
 
 const all = [
@@ -33,11 +38,11 @@ describe("Sessions", () => {
     ]);
   });
 
-  it("puts the lead first, then the roster's order", () => {
+  it("puts the lead first, then the team file's order", () => {
     expect(rosterOrder("atlas@ledger", all, [atlas]).map((i) => i.agentId)).toEqual([
       "mara",
-      "ilya",
       "tove",
+      "ilya",
     ]);
   });
 
@@ -46,13 +51,13 @@ describe("Sessions", () => {
     let p = initialPanes(roster);
     expect(p).toEqual({ open: ["mara@ledger"], active: 0 });
     p = toggleSplit(p, roster);
-    expect(p).toEqual({ open: ["mara@ledger", "ilya@ledger"], active: 1 });
+    expect(p).toEqual({ open: ["mara@ledger", "tove@ledger"], active: 1 });
     // A tab already in a pane activates it; another replaces the active pane.
-    expect(clickTab(p, "mara@ledger")).toEqual({ open: ["mara@ledger", "ilya@ledger"], active: 0 });
-    expect(clickTab(p, "tove@ledger")).toEqual({ open: ["mara@ledger", "tove@ledger"], active: 1 });
+    expect(clickTab(p, "mara@ledger")).toEqual({ open: ["mara@ledger", "tove@ledger"], active: 0 });
+    expect(clickTab(p, "ilya@ledger")).toEqual({ open: ["mara@ledger", "ilya@ledger"], active: 1 });
     // Single keeps the active pane's agent; closing a pane leaves pane 1 active.
-    expect(toggleSplit(p, roster)).toEqual({ open: ["ilya@ledger"], active: 0 });
-    expect(closePane(p, 0)).toEqual({ open: ["ilya@ledger"], active: 0 });
+    expect(toggleSplit(p, roster)).toEqual({ open: ["tove@ledger"], active: 0 });
+    expect(closePane(p, 0)).toEqual({ open: ["tove@ledger"], active: 0 });
     // A team of one can't split.
     expect(toggleSplit({ open: ["x"], active: 0 }, [inst("x", "d")])).toEqual({
       open: ["x"],

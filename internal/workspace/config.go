@@ -51,6 +51,8 @@ type TeamConfig struct {
 	Playbook []PlaybookStep  `toml:"playbook,omitempty" json:"playbook"`
 	Escalate []Escalation    `toml:"escalate,omitempty" json:"escalate"`
 	Agents   map[string]Soul `toml:"agents" json:"agents"`
+	// Order is the agents in the file's order, which a map (and so JSON) loses.
+	Order []string `toml:"-" json:"order"`
 }
 
 // PlaybookStep is one `{ who = "text" }` step.
@@ -155,23 +157,23 @@ func (p *problems) add(format string, a ...any) { *p = append(*p, fmt.Sprintf(fo
 
 // decode parses data into v, reporting a syntax error or unknown keys (which a
 // save would otherwise drop silently).
-func decode(data []byte, v any) problems {
+func decode(data []byte, v any) (toml.MetaData, problems) {
 	md, err := toml.Decode(string(data), v)
 	if err != nil {
-		return problems{err.Error()}
+		return md, problems{err.Error()}
 	}
 	var p problems
 	for _, key := range md.Undecoded() {
 		p.add("%s: unknown field", key)
 	}
-	return p
+	return md, p
 }
 
 // ParseProject parses the project.toml of the project folder named folder.
 // Defaults are applied (main = "main", merge_to_main = "ceo", forge none).
 func ParseProject(folder string, data []byte) (ProjectConfig, []string) {
 	var c ProjectConfig
-	p := decode(data, &c)
+	_, p := decode(data, &c)
 	if c.Main == "" {
 		c.Main = "main"
 	}
@@ -222,7 +224,8 @@ func checkURL(p *problems, field, value string) {
 // and names unique in the workspace) are checked when the workspace loads.
 func ParseTeam(id string, data []byte) (TeamConfig, []string) {
 	var c TeamConfig
-	p := decode(data, &c)
+	md, p := decode(data, &c)
+	c.Order = agentOrder(md)
 	c.Playbook, c.Escalate = normalize(c.Playbook), normalize(c.Escalate)
 	if c.Agents == nil {
 		c.Agents = map[string]Soul{}
@@ -308,7 +311,7 @@ func (s Soul) validate(at, id string) problems {
 // ParseSettings parses settings.toml over the defaults.
 func ParseSettings(data []byte) (Settings, []string) {
 	s := DefaultSettings()
-	p := decode(data, &s)
+	_, p := decode(data, &s)
 	p = append(p, s.validate()...)
 	return s, p
 }
@@ -355,7 +358,9 @@ func (s Settings) validate() problems {
 // by hand don't survive it; the workspace repo keeps the earlier versions.
 func encode(v any) ([]byte, error) {
 	var buf bytes.Buffer
-	if err := toml.NewEncoder(&buf).Encode(v); err != nil {
+	enc := toml.NewEncoder(&buf)
+	enc.Indent = "" // flush left, like a file written by hand
+	if err := enc.Encode(v); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -377,4 +382,61 @@ func normalize[T any](list []T) []T {
 		return []T{}
 	}
 	return list
+}
+
+// agentOrder is the agent ids in the order the file declares them.
+func agentOrder(md toml.MetaData) []string {
+	order := []string{}
+	for _, k := range md.Keys() {
+		if len(k) == 2 && k[0] == "agents" {
+			order = append(order, k[1])
+		}
+	}
+	return order
+}
+
+// encodeTeam encodes a team file with its agents in c.Order; the encoder
+// alone would sort them. Agents missing from Order follow, sorted.
+func encodeTeam(c TeamConfig) ([]byte, error) {
+	agents := c.Agents
+	c.Agents = nil
+	out, err := encode(c)
+	if err != nil {
+		return nil, err
+	}
+	ids := slices.DeleteFunc(slices.Clone(c.Order), func(id string) bool { _, ok := agents[id]; return !ok })
+	for _, id := range sortedKeys(agents) {
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	for _, id := range ids {
+		chunk, err := encode(map[string]map[string]Soul{"agents": {id: agents[id]}})
+		if err != nil {
+			return nil, err
+		}
+		// Each chunk opens with its parent table, [agents], which [agents.<id>]
+		// already implies.
+		out = append(append(out, '\n'), strings.TrimPrefix(string(chunk), "[agents]\n")...)
+	}
+	return out, nil
+}
+
+// Roster is the team's agent ids as the team presents them: the lead first,
+// then the file's order (agents it doesn't name follow, sorted).
+func (c TeamConfig) Roster() []string {
+	ids := []string{}
+	add := func(id string) {
+		if _, ok := c.Agents[id]; ok && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	add(c.Lead)
+	for _, id := range c.Order {
+		add(id)
+	}
+	for _, id := range sortedKeys(c.Agents) {
+		add(id)
+	}
+	return ids
 }

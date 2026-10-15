@@ -1,6 +1,6 @@
 ---
 type: task
-status: blocked
+status: in-progress
 priority: medium
 tags: [feature]
 epic: terminal-multiplexer
@@ -14,8 +14,8 @@ Blocked by [Team and Agent pages](./ui-teams-agents.md) and [Workspace and confi
 
 **Done when:** teams come from `.foreman/teams/*.toml`; soul edits are written back (version-guarded, one commit per save in the workspace repo); the session prompt is composed by the server; Deploy creates a real deployment (with the [Instance manager](./instance-manager.md)); these areas leave the demo client.
 
-- [ ] keep the roster order of the team file: `agents` reaches the UI as a JSON object, which Go writes in alphabetical order; Sessions tabs and rosters follow the file's order (e.g. send an `order` list beside the map)
-- [ ] teams and souls API (read, version-guarded write); a conflicting save prompts Keep mine / Take theirs instead of dropping the edit (low priority, [Agent page](../product/features/agent-page.md))
-- [ ] composed session prompt endpoint
+- [x] keep the roster order of the team file: `TeamConfig.Order` (decoded from the file, sent as `order`, written back in that order by `encodeTeam`); `TeamConfig.Roster()` (lead first, then the file's order) replaces the two sorted copies in `prompt` and `instances`, and the UI's `roster()` mirrors it for Sessions, Members and the demo
+- [x] teams and souls API: `GET /api/teams`, `PUT /api/teams/:id/agents/:agent` (version-guarded; 409 / 400 like settings, through one `writeSaveError`; the loaded team is copied before the change); the Agent page's Keep mine / Take theirs already handles a conflict
+- [x] composed session prompt endpoint (`GET /api/instances/:id/prompt`, and the template)
 - [ ] Deploy wired to the Instance manager (`ForemanClient.deploy` and `stop` exist; `POST /api/deployments`, `DELETE /api/deployments/:id`); then remove `--demo-session` ([technical debt](../technical-debt.md))
 - [ ] swap the areas in main.tsx; remove their badges

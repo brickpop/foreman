@@ -16,7 +16,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"sort"
 	"sync"
 	"time"
 
@@ -103,7 +102,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 		return store.Deployment{}, err
 	}
 	m.publish("deployment.created", dep)
-	for _, agent := range sortedAgents(team.Config) {
+	for _, agent := range team.Config.Roster() {
 		soul := team.Config.Agents[agent]
 		inst := store.Instance{
 			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Queued,
@@ -135,7 +134,7 @@ func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspac
 	if len(project.Problems) > 0 {
 		return team, project, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}
-	for _, agent := range sortedAgents(team.Config) {
+	for _, agent := range team.Config.Roster() {
 		if h := team.Config.Agents[agent].Harness; m.Adapters[h] == nil {
 			return team, project, fmt.Errorf("%w: %s's harness %q isn't supported yet", ErrInvalid, agent, h)
 		}
@@ -458,18 +457,6 @@ func (m *Manager) publish(typ string, data any) {
 	if m.Publish != nil {
 		m.Publish(events.Event{Type: typ, Data: data})
 	}
-}
-
-// sortedAgents lists a team's agent ids, the lead first.
-func sortedAgents(t workspace.TeamConfig) []string {
-	var ids []string
-	for id := range t.Agents {
-		if id != t.Lead {
-			ids = append(ids, id)
-		}
-	}
-	sort.Strings(ids)
-	return append([]string{t.Lead}, ids...)
 }
 
 func contains(list []string, v string) bool {

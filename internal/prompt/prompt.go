@@ -6,7 +6,6 @@ package prompt
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/brickpop/foreman/internal/workspace"
@@ -48,7 +47,7 @@ func Compose(in Input) string {
 	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(in, lead))
 	line("")
 	line("## Your team on %s", in.Project)
-	for _, id := range roster(in.Team) {
+	for _, id := range in.Team.Roster() {
 		s := in.Team.Agents[id]
 		switch {
 		case id == in.Team.Lead && in.TeamTools:
@@ -171,21 +170,6 @@ func tools(in Input, lead bool) string {
 		"from the same point with the CEO's answer.\n"
 }
 
-// roster lists the team's agent ids, the lead first, then by id.
-func roster(t workspace.TeamConfig) []string {
-	var ids []string
-	for id := range t.Agents {
-		if id != t.Lead {
-			ids = append(ids, id)
-		}
-	}
-	sort.Strings(ids)
-	if _, ok := t.Agents[t.Lead]; ok {
-		ids = append([]string{t.Lead}, ids...)
-	}
-	return ids
-}
-
 // Who resolves a playbook or escalation `who`
 // (wiki/product/models/team-definition.md#playbook-and-escalation).
 func Who(t workspace.TeamConfig, who string) string {
@@ -201,7 +185,7 @@ func Who(t workspace.TeamConfig, who string) string {
 		return s.Name
 	}
 	var names []string
-	for _, id := range roster(t) {
+	for _, id := range t.Roster() {
 		if t.Agents[id].Role == who {
 			names = append(names, t.Agents[id].Name)
 		}

@@ -34,7 +34,7 @@ func (w *Workspace) SaveTeam(ctx context.Context, c TeamConfig, version string) 
 	if p := teams[c.Team].Problems; len(p) > 0 {
 		return Team{}, &InvalidError{p}
 	}
-	data, err := encode(c)
+	data, err := encodeTeam(c)
 	if err != nil {
 		return Team{}, err
 	}

@@ -154,3 +154,16 @@ export function randomLook(
     beard: one(palettes.beard),
   };
 }
+
+/** A team's agent ids as the team presents them: the lead first, then the
+ * file's order, then any it doesn't name, sorted (as workspace.TeamConfig.Roster). */
+export function roster(c: Team["config"]): string[] {
+  const ids: string[] = [];
+  const add = (id: string) => {
+    if (c.agents[id] && !ids.includes(id)) ids.push(id);
+  };
+  add(c.lead);
+  for (const id of c.order ?? []) add(id);
+  for (const id of Object.keys(c.agents).sort()) add(id);
+  return ids;
+}

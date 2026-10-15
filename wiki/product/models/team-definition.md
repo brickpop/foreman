@@ -57,7 +57,7 @@ beard = "none"            # none | stubble | full | mustache
 | `name` | String | yes | | | Display name |
 | `purpose` | String | | | one line | What the team is for, shown under its name on the [Team page](../features/team-page.md). Free text; there are no team kinds |
 | `lead` | String | yes | | an id in `agents` | The team lead: the CEO's default contact, the only member who can call `request_merge` |
-| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across the workspace** (the slug of the display name, which is workspace-unique too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when two teams share a project |
+| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across the workspace** (the slug of the display name, which is workspace-unique too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when two teams share a project. Their order in the file is the roster's order everywhere, lead first: Sessions tabs, Members, the session prompt |
 | `playbook` | Array of single-key inline tables `{ who = "text" }` | | `[]` | | Ordered steps. `who` as in [Playbook and escalation](#playbook-and-escalation) |
 | `escalate` | Array of tables `[[escalate]]` with `when`, `to` | | `[]` | `to`: a `who` ([Playbook and escalation](#playbook-and-escalation)) | Escalation table. Project gates ([Project config](./project-config.md)) apply on top |
 
@@ -98,4 +98,4 @@ Each example carries a full roster with job descriptions, a playbook and an esca
 
 ## Writes
 
-The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the workspace repo, so hand-written comments don't survive a save, and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff never writes to the checked-out file: its edits land on a branch and come back to the CEO as a review.
+The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the workspace repo, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff never writes to the checked-out file: its edits land on a branch and come back to the CEO as a review.

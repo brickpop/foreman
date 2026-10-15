@@ -20,7 +20,7 @@ GET    /api/projects | /api/projects/:id      config (parsed), repos, version, p
 POST   /api/projects                          {folder} → create the project repo (adopt)
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
-GET    /api/teams | /api/teams/:id            definitions, with version and problems
+GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
 POST   /api/teams/:id/agents                  hire (from CoS)
 

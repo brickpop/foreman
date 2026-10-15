@@ -12,8 +12,15 @@ const buttonVariants = {
   muted: "border border-line2 bg-transparent font-medium text-tx3 hover:border-line3",
   danger: "border border-err bg-transparent font-medium text-err hover:bg-err/10",
   ghost: "border border-transparent bg-transparent font-medium text-tx3 hover:text-tx2",
-  tiny: "border border-line2 bg-transparent text-xs text-tx3 hover:border-line3",
+  small: "border border-line2 bg-transparent font-medium text-tx2 hover:border-line3",
+  tiny: "border border-line2 bg-transparent text-tx3 hover:border-line3",
 } as const;
+
+// Every other variant has the standard size.
+const buttonSizes: Partial<Record<keyof typeof buttonVariants, string>> = {
+  small: "rounded-[6px] px-2.5 py-1 text-[12.5px]",
+  tiny: "rounded-[5px] px-2 py-0.5 text-xs",
+};
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof buttonVariants;
@@ -21,11 +28,11 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 /** A button; disabled is real (not focusable as an action, dimmed). */
 export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
-  const size = variant === "tiny" ? "rounded-[5px] px-2 py-0.5" : "rounded-[7px] px-3.5 py-[7px]";
+  const size = buttonSizes[variant] ?? "rounded-[7px] px-3.5 py-[7px] text-[13px]";
   return (
     <button
       type="button"
-      className={`${size} text-[13px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-45 ${buttonVariants[variant]} ${className}`}
+      className={`${size} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-45 ${buttonVariants[variant]} ${className}`}
       {...props}
     />
   );
@@ -56,17 +63,38 @@ export function Segmented<T extends string>({
           key={o.value}
           value={o.value}
           disabled={o.disabled}
-          className={`rounded-[6px] border px-3 py-1 text-[13px] focus-visible:outline-2 focus-visible:outline-acc disabled:opacity-45 ${
-            o.value === value
-              ? "border-line2 bg-raised text-tx"
-              : "border-transparent bg-transparent text-tx3 hover:text-tx2"
-          }`}
+          className={segment(o.value === value)}
         >
           {o.label}
         </ToggleGroup.Item>
       ))}
     </ToggleGroup.Root>
   );
+}
+
+/** An on/off button with the segmented look (Split, Messages). */
+export function Toggle({
+  on,
+  onChange,
+  children,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" aria-pressed={on} onClick={() => onChange(!on)} className={segment(on)}>
+      {children}
+    </button>
+  );
+}
+
+function segment(on: boolean) {
+  return `rounded-[6px] border px-3 py-1 text-[13px] focus-visible:outline-2 focus-visible:outline-acc disabled:opacity-45 ${
+    on
+      ? "border-line2 bg-raised text-tx"
+      : "border-transparent bg-transparent text-tx3 hover:text-tx2"
+  }`;
 }
 
 const kindColors: Record<string, string> = {
@@ -190,13 +218,13 @@ export function Switch({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc ${
-        checked ? "border-acc bg-acc" : "border-line3 bg-raised"
+      className={`relative h-5 w-[34px] shrink-0 rounded-[10px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc ${
+        checked ? "bg-acc" : "bg-line3"
       }`}
     >
       <span
-        className={`absolute top-0.5 size-3.5 rounded-full transition-[left] ${
-          checked ? "left-[18px] bg-accInk" : "left-0.5 bg-tx3"
+        className={`absolute top-0.5 size-4 rounded-full bg-white transition-[left] duration-150 ${
+          checked ? "left-4" : "left-0.5"
         }`}
       />
     </button>

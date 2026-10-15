@@ -207,7 +207,7 @@ function Configuration({ project }: { project: Project }) {
           {forge.projectRepo && (
             <span className="flex items-center gap-3 text-[13px] text-tx3">
               <span className="font-mono">project repo → {forge.projectRepo}</span>
-              <Button variant="tiny" disabled title="Comes with the Git epic">
+              <Button variant="small" disabled title="Comes with the Git epic">
                 Sync
               </Button>
             </span>
@@ -219,7 +219,7 @@ function Configuration({ project }: { project: Project }) {
               {project.id}/project/project.toml · read-only
             </span>
             <Button
-              variant="tiny"
+              variant="small"
               onClick={() => openChiefOfStaff({ flow: "project-config", project: project.id })}
             >
               Change with Chief of Staff

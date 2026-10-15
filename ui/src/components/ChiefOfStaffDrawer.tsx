@@ -60,7 +60,7 @@ export function ChiefOfStaffDrawer({ open, onClose }: { open: boolean; onClose: 
                   key={c}
                   type="button"
                   onClick={() => send.mutate(c)}
-                  className="rounded-full border border-accLine px-3 py-1 text-[13px] text-accTx hover:bg-accSoft"
+                  className="rounded-2xl border border-line2 bg-raised px-3 py-1.5 text-[13px] font-medium text-tx hover:border-acc"
                 >
                   {c}
                 </button>

@@ -268,18 +268,18 @@ function Stepper({
     <fieldset className="m-0 flex items-center gap-1 border-0 p-0">
       <legend className="sr-only">{label}</legend>
       <Button
-        variant="muted"
+        className="!size-7 !p-0"
         aria-label="Fewer"
         disabled={value <= min}
         onClick={() => onChange(value - 1)}
       >
         −
       </Button>
-      <span className="w-8 text-center font-mono" aria-live="polite">
+      <span className="min-w-7 text-center font-mono text-sm font-medium" aria-live="polite">
         {value}
       </span>
       <Button
-        variant="muted"
+        className="!size-7 !p-0"
         aria-label="More"
         disabled={value >= max}
         onClick={() => onChange(value + 1)}
@@ -377,7 +377,7 @@ function HarnessRow({
         <span className={`text-[13px] ${harness.connected ? "text-ok" : "text-tx4"}`}>
           {harness.connected ? "connected" : "not connected"}
         </span>
-        <Button variant="tiny" onClick={onConnect}>
+        <Button variant="small" onClick={onConnect}>
           {harness.connected ? "Reconnect" : "Connect"}
         </Button>
       </span>
@@ -458,7 +458,7 @@ function ForgeRow({
           <span className={`text-[13px] ${account?.tokenSet ? "text-ok" : "text-tx4"}`}>
             {account?.tokenSet ? "token set" : "not connected"}
           </span>
-          <Button variant="tiny" onClick={() => onEdit(!editing)}>
+          <Button variant="small" onClick={() => onEdit(!editing)}>
             {editing ? "Cancel" : account?.tokenSet ? "Change" : "Connect"}
           </Button>
         </span>
@@ -549,7 +549,7 @@ function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connec
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
             className="flex-1 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
           />
-          <Button variant="tiny" disabled title="Comes with the Git epic">
+          <Button variant="small" disabled title="Comes with the Git epic">
             Sync
           </Button>
         </span>
@@ -583,7 +583,7 @@ function NotificationsSection({ settings }: { settings: SettingsData }) {
         <span className={`text-[13px] ${permissionColor[state]}`}>{state}</span>
         {state === "turn on" && (
           <Button
-            variant="tiny"
+            variant="small"
             onClick={async () => {
               await Notification.requestPermission();
               setState(permission());
@@ -679,10 +679,10 @@ function ImageRow({
           <span className={`text-[13px] ${state.color}`}>{state.label}</span>
         </span>
         <span className="flex gap-2">
-          <Button variant="tiny" disabled={image.log === ""} onClick={() => setLog(!log)}>
+          <Button variant="small" disabled={image.log === ""} onClick={() => setLog(!log)}>
             {log ? "Hide log" : "Log"}
           </Button>
-          <Button variant="tiny" disabled={busy} onClick={onRebuild}>
+          <Button variant="small" disabled={busy} onClick={onRebuild}>
             Rebuild
           </Button>
         </span>

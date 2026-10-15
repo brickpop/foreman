@@ -26,7 +26,7 @@ import {
 import { Avatar } from "../components/Avatar";
 import { DemoBadge } from "../components/DemoBadge";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
-import { Button, Dot, LeadTag, Segmented } from "../components/ui";
+import { Button, Dot, LeadTag, Segmented, Toggle } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
 // tabs, agent tabs, one or two panes of real terminals, markers and the
@@ -92,15 +92,12 @@ export function Sessions() {
         />
         <DemoBadge areas={["agents", "messages"]} />
         <span className="flex-1" />
-        <Button
-          variant={panes.open.length === 2 ? "raised" : "secondary"}
-          onClick={() => setPanes(toggleSplit(panes, roster))}
-        >
+        <Toggle on={panes.open.length === 2} onChange={() => setPanes(toggleSplit(panes, roster))}>
           {panes.open.length === 2 ? "Single" : "Split"}
-        </Button>
-        <Button variant={messages ? "raised" : "secondary"} onClick={() => setMessages(!messages)}>
+        </Toggle>
+        <Toggle on={messages} onChange={setMessages}>
           Messages
-        </Button>
+        </Toggle>
       </div>
       <AgentTabs
         roster={roster}

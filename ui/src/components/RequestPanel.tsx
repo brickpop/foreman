@@ -121,7 +121,7 @@ export function RequestPanel({
                 key={option}
                 variant={i === 0 ? "primary" : "secondary"}
                 disabled={answering}
-                className={i === 1 ? "!text-tx" : ""}
+                className={`${i === 1 ? "!text-tx" : ""} ${changes ? "" : "!text-[13.5px]"}`}
                 onClick={() => onAnswer(option)}
               >
                 {option}

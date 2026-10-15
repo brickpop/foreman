@@ -212,7 +212,7 @@ function WorkRow({
       </span>
       {live ? (
         <Button
-          variant="tiny"
+          variant="small"
           onClick={() =>
             navigate({
               to: "/sessions",
@@ -265,12 +265,12 @@ function MergeRow({
           {mr.forgePrNumber ? "PR open" : "merge requested"}
         </span>
         {mr.forgePrUrl ? (
-          <Button variant="tiny" onClick={() => window.open(mr.forgePrUrl, "_blank", "noopener")}>
+          <Button variant="small" onClick={() => window.open(mr.forgePrUrl, "_blank", "noopener")}>
             Open PR ↗
           </Button>
         ) : live ? (
           <Button
-            variant="tiny"
+            variant="small"
             onClick={() =>
               navigate({
                 to: "/sessions",

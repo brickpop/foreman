@@ -144,15 +144,16 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | Variant | Style | Used for |
 |---|---|---|
 | **Primary** | `--acc` background, no border (or 1px `--acc`), `--accInk`, 600 13px, radius 7, padding `7–8px 13–14px` | The main action of a view: Deploy, Add project, New team, Deploy to a project, Send to X, the first request option |
-| **Secondary** (outline) | Transparent, 1px `--line2`, `--tx2` (or `--tx`), 500 13px, radius 7, padding `6–8px 12–14px` | Cancel, Hire, Deploy a team, Session, Refine with Chief of Staff |
+| **Secondary** (outline) | Transparent, 1px `--line2`, `--tx2` (or `--tx`), 500 13px, radius 7, padding `6–8px 12–14px` | Cancel, Hire, Deploy a team, Refine with Chief of Staff, the stepper |
 | **Raised** | `--raised`, 1px `--line2`, `--tx` | Open sessions, Sessions |
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Reject. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on Home approval request panels |
-| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Split, Messages, Listen on, Theme |
+| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Listen on, Theme; and the on/off toggles Split and Messages, which look the same |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |
-| **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px | Pane Copy and × |
+| **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Change with Chief of Staff, Connect, Edit, Rebuild |
+| **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | Terminal pane header only: Line, Copy, × |
 
 **Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on Home and 13px on Changes.
 

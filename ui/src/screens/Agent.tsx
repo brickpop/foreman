@@ -165,7 +165,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
               <span className="font-semibold">{i.id.split("@")[1]}</span>
               <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
               <Button
-                variant="tiny"
+                variant="small"
                 onClick={() =>
                   navigate({ to: "/sessions", search: { deployment: i.deploymentId, agent: i.id } })
                 }
@@ -204,7 +204,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
                 aria-label={`${label} ${c}`}
                 aria-pressed={draft.look[key] === c}
                 onClick={() => setLook(key, c)}
-                className={`size-6 rounded-[6px] ${draft.look[key] === c ? "ring-2 ring-acc ring-offset-2 ring-offset-bg" : ""}`}
+                className={`size-[22px] rounded-[6px] ${draft.look[key] === c ? "shadow-[0_0_0_2px_var(--bg),0_0_0_3.5px_var(--tx)]" : ""}`}
                 style={{ background: c }}
               />
             ))}

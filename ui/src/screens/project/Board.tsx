@@ -332,7 +332,7 @@ function SideSheet({
           <span className="font-mono text-[12.5px] font-normal text-tx3">
             {project}/project/wiki/{path}
           </span>
-          <Button variant="tiny" onClick={() => path && open(path)}>
+          <Button variant="small" onClick={() => path && open(path)}>
             Open in wiki
           </Button>
         </span>

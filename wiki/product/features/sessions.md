@@ -13,7 +13,7 @@ The terminal multiplexer. Every agent [instance](../models/instance.md) is a liv
 Padding `10px 16px`, bottom border.
 
 - **Left: deployment tabs**, one per active [deployment](../models/deployment.md), labelled `<Team> · <project>` (segmented style). A tab whose deployment needs the CEO shows an amber needs-you dot. Selecting a tab shows that deployment's agents and loads the lead in a single pane.
-- **Right**: a **`Split`** / **`Single`** toggle (raised when split) and a **`Messages`** toggle (raised when open).
+- **Right**: a **`Split`** / **`Single`** toggle (on when split) and a **`Messages`** toggle (on when open), both in the segmented style ([Design system](../design/design-system.md#buttons)).
 - **Empty** (no deployments): centered on `--bg`, `No team is deployed yet, so there are no sessions.`
 
 ## Agent tabs

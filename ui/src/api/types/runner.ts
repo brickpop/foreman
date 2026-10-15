@@ -16,6 +16,8 @@ export interface ImageStatus {
  * Maintenance is the engine's state and its images, for Settings → Maintenance.
  */
 export interface Maintenance {
-  engine: string; // e.g. "Podman 5.7.1 · running", or "direct (no isolation)"
+  running: string; // the engine running now, "podman" or "direct": a change of the setting waits for a restart
+  engine: string; // its state, e.g. "Podman 5.7.1 · running", or "direct (no isolation)"
+  podman: string; // why Podman can't be chosen ("" when it is installed)
   images: ImageStatus[];
 }

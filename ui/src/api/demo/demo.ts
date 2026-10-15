@@ -198,6 +198,7 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
     },
     maintenance: {
       demo: true,
+      // What runs now; a change of the engine setting waits for a restart.
       status: () => reply(state.maintenance),
       rebuild: async () => {
         for (const image of state.maintenance.images) {

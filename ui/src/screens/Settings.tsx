@@ -9,7 +9,14 @@ import {
 } from "../api/client";
 import { harnessLabel } from "../app/model";
 import { permission } from "../app/notifications";
-import { keys, useHarnesses, useSaveSettings, useSettings, useWorkspace } from "../app/queries";
+import {
+  keys,
+  useHarnesses,
+  useMaintenance,
+  useSaveSettings,
+  useSettings,
+  useWorkspace,
+} from "../app/queries";
 import { applyTheme, savedTheme, type Theme } from "../app/theme";
 import { DemoBadge } from "../components/DemoBadge";
 import { Modal } from "../components/Overlays";
@@ -136,6 +143,7 @@ function Confirm({
 function WorkspaceSection({ settings }: { settings: SettingsData }) {
   const save = useSave();
   const workspace = useWorkspace();
+  const engine = useMaintenance();
   const [confirm, setConfirm] = useState<"lan" | "direct">();
   return (
     <Section label="Workspace">
@@ -176,8 +184,19 @@ function WorkspaceSection({ settings }: { settings: SettingsData }) {
         explanation={
           <>
             Containers isolate each agent from your machine. Without them, agents run as plain
-            processes with full access to it. Takes effect for sessions started afterwards.
-            {settings.engine === "direct" && (
+            processes with full access to it. Takes effect when Foreman restarts.
+            {engine.data?.podman && (
+              <span className="mt-1.5 block text-tx2">
+                Containers aren't available: {engine.data.podman}
+              </span>
+            )}
+            {engine.data && settings.engine !== engine.data.running && (
+              <span className="mt-1.5 block font-medium text-accTx">
+                Restart Foreman to switch: agents run{" "}
+                {engine.data.running === "direct" ? "directly" : "in containers"} until then.
+              </span>
+            )}
+            {engine.data?.running === "direct" && (
               <span className="mt-1.5 block font-medium text-err">
                 Agents run with no isolation: they can read and change anything your user can.
               </span>
@@ -192,7 +211,12 @@ function WorkspaceSection({ settings }: { settings: SettingsData }) {
             v === "direct" ? setConfirm("direct") : save((s) => ({ ...s, engine: v }))
           }
           options={[
-            { value: "podman", label: "Containers (Podman)" },
+            // Containers can't be chosen without Podman: Foreman wouldn't start.
+            {
+              value: "podman",
+              label: "Containers (Podman)",
+              disabled: !!engine.data?.podman && settings.engine !== "podman",
+            },
             { value: "direct", label: "Directly (no isolation)" },
           ]}
         />
@@ -600,13 +624,7 @@ const imageState: Record<string, { label: string; color: string }> = {
 function MaintenanceSection() {
   const client = useClient();
   const queries = useQueryClient();
-  const status = useQuery({
-    queryKey: keys.maintenance,
-    queryFn: () => client.maintenance.status(),
-    // A build reports no events: follow it while it runs.
-    refetchInterval: (q) =>
-      q.state.data?.images.some((i) => i.state === "building") ? 2000 : false,
-  });
+  const status = useMaintenance();
   const rebuild = useMutation({
     mutationFn: () => client.maintenance.rebuild(),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.maintenance }),

@@ -12,6 +12,8 @@ type ImageStatus struct {
 
 // Maintenance is the engine's state and its images, for Settings → Maintenance.
 type Maintenance struct {
-	Engine string        `json:"engine"` // e.g. "Podman 5.7.1 · running", or "direct (no isolation)"
-	Images []ImageStatus `json:"images"`
+	Running string        `json:"running"` // the engine running now, "podman" or "direct": a change of the setting waits for a restart
+	Engine  string        `json:"engine"`  // its state, e.g. "Podman 5.7.1 · running", or "direct (no isolation)"
+	Podman  string        `json:"podman"`  // why Podman can't be chosen ("" when it is installed)
+	Images  []ImageStatus `json:"images"`
 }

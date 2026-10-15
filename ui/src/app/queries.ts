@@ -343,3 +343,15 @@ export function useDiff(mergeRequest: string) {
     enabled: mergeRequest !== "",
   });
 }
+
+/** The engine running now and its images (Settings). */
+export function useMaintenance() {
+  const c = useClient();
+  return useQuery({
+    queryKey: keys.maintenance,
+    queryFn: () => c.maintenance.status(),
+    // A build reports no events: follow it while it runs.
+    refetchInterval: (q) =>
+      q.state.data?.images.some((i) => i.state === "building") ? 2000 : false,
+  });
+}

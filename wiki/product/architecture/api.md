@@ -56,7 +56,7 @@ GET    /api/harnesses                         the supported harnesses: their def
 POST   /api/harnesses/:id/connect             start the harness's login in a terminal → {terminal}: open it with WS /ws/pty/:terminal
 GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
 PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
-GET    /api/maintenance                       {engine, images}: the engine's state; each image's name, ref, state, last build log
+GET    /api/maintenance                       {running, engine, podman, images}: the engine running now (podman or direct) and its state; why Podman can't be chosen ("" when installed); each image's name, ref, state, last build log
 POST   /api/maintenance/rebuild               202: rebuild the images without cache; GET /api/maintenance follows it
 GET    /api/events                            SSE: requests, status, file changes
 ```

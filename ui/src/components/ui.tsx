@@ -38,7 +38,7 @@ export function Segmented<T extends string>({
   onChange,
   label,
 }: {
-  options: { value: T; label: ReactNode }[];
+  options: { value: T; label: ReactNode; disabled?: boolean }[];
   value: T;
   onChange: (value: T) => void;
   label: string;
@@ -55,7 +55,8 @@ export function Segmented<T extends string>({
         <ToggleGroup.Item
           key={o.value}
           value={o.value}
-          className={`rounded-[6px] border px-3 py-1 text-[13px] focus-visible:outline-2 focus-visible:outline-acc ${
+          disabled={o.disabled}
+          className={`rounded-[6px] border px-3 py-1 text-[13px] focus-visible:outline-2 focus-visible:outline-acc disabled:opacity-45 ${
             o.value === value
               ? "border-line2 bg-raised text-tx"
               : "border-transparent bg-transparent text-tx3 hover:text-tx2"

@@ -25,6 +25,7 @@ import (
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/direct"
+	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
 	"github.com/brickpop/foreman/internal/store"
@@ -71,7 +72,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return err
 	}
 	// Before listening: Podman may have to start, and an error must come first.
-	engineRunner, engineImages, closeEngine, err := engine(ctx, ws.Settings().Settings.Engine, stdout)
+	// The engine is chosen once: a change of the setting takes effect on restart.
+	running := ws.Settings().Settings.Engine
+	engineRunner, engineImages, closeEngine, err := engine(ctx, running, stdout)
 	if err != nil {
 		return err
 	}
@@ -136,7 +139,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Events:      bus,
 		Agents:      views,
 		Harnesses:   login,
-		Maintenance: maintenanceOf(engineRunner, engineImages),
+		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:   views,
 		UI:          files,
 	})

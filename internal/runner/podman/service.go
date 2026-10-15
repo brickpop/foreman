@@ -19,6 +19,24 @@ import (
 // ErrNoPodman means Podman isn't installed (or, on macOS, has no machine).
 var ErrNoPodman = errors.New("podman is not installed: see the README's prerequisites")
 
+// Installed reports whether Foreman could run agents in Podman: the CLI is on
+// the PATH and, on macOS, a machine exists. It starts nothing (Foreman starts
+// the service or machine itself when it launches with engine = "podman").
+func Installed(ctx context.Context) error {
+	if os.Getenv("FOREMAN_PODMAN_SOCKET") != "" {
+		return nil
+	}
+	if _, err := exec.LookPath("podman"); err != nil {
+		return ErrNoPodman
+	}
+	if runtime.GOOS == "darwin" {
+		if _, err := podmanOutput(ctx, "machine", "inspect", "--format", "{{.State}}"); err != nil {
+			return fmt.Errorf("%w (no podman machine: run `podman machine init` once)", ErrNoPodman)
+		}
+	}
+	return nil
+}
+
 // findSocket returns Podman's API socket, starting the service when nothing
 // answers. FOREMAN_PODMAN_SOCKET overrides the search. stop ends a service
 // Foreman started (nil when it was already running).

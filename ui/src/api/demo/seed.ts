@@ -554,7 +554,9 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
 
   // invented: a healthy engine with its one image (phase 1).
   maintenance: {
+    running: "podman",
     engine: "Podman 5.7.1 · running",
+    podman: "",
     images: [
       {
         name: "localhost/foreman/harness",

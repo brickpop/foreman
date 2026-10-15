@@ -70,7 +70,9 @@ const tiny: Seed = {
   harnesses: [{ id: "claude-code", command: "claude", newline: "\\\r", connected: true }],
   forgeAccounts: [{ kind: "github", tokenSet: false }],
   maintenance: {
+    running: "podman",
     engine: "Podman 5.7.1 · running",
+    podman: "",
     images: [{ name: "localhost/foreman/harness", ref: "h:1", state: "ready", log: "" }],
   },
   deployments: [],
@@ -361,5 +363,14 @@ describe("demoClient's pipeline, on the prototype's data", () => {
     expect(review?.status).toBe("open");
     await c.pipeline.merge("mr-2");
     expect((await c.requests.list()).some((r) => r.id === review?.id)).toBe(false);
+  });
+});
+
+describe("demoClient's maintenance", () => {
+  it("keeps telling the engine that runs: a new setting waits for a restart", async () => {
+    const c = demoClient(seed, { tick: 0 });
+    const file = await c.workspace.settings();
+    await c.workspace.saveSettings({ ...file.settings, engine: "direct" }, file.version);
+    expect(await c.maintenance.status()).toMatchObject({ running: "podman", podman: "" });
   });
 });

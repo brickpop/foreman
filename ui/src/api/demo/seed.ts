@@ -536,11 +536,13 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
   },
 
   // invented: the prototype has no login state; every harness is connected.
+  // invented: every harness's newline is Claude Code's (`\` then Enter), which the
+  // demo terminal (the fake harness) understands too.
   harnesses: [
-    { id: "claude-code", command: "claude", connected: true },
-    { id: "codex", command: "codex", connected: true },
-    { id: "pi", command: "pi", connected: true },
-    { id: "hermes", command: "hermes", connected: true },
+    { id: "claude-code", command: "claude", newline: "\\\r", connected: true },
+    { id: "codex", command: "codex", newline: "\\\r", connected: true },
+    { id: "pi", command: "pi", newline: "\\\r", connected: true },
+    { id: "hermes", command: "hermes", newline: "\\\r", connected: true },
   ],
 
   // invented: tokens for the forges the projects use; Gitea is not connected.

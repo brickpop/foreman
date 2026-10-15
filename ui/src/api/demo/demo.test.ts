@@ -67,7 +67,7 @@ const tiny: Seed = {
     version: "",
     problems: [],
   },
-  harnesses: [{ id: "claude-code", command: "claude", connected: true }],
+  harnesses: [{ id: "claude-code", command: "claude", newline: "\\\r", connected: true }],
   forgeAccounts: [{ kind: "github", tokenSet: false }],
   maintenance: {
     engine: "Podman 5.7.1 · running",

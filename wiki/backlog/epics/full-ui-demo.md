@@ -17,4 +17,6 @@ It runs **alongside [Prove](./prove.md)**: the CEO runs the experiments while th
 
 **Usable when done:** the CEO can walk every screen and flow of [the journey](../../product/journey.md) in the browser, with the terminal real and everything else on demo data, and judge the product before the backend exists.
 
+**Going live (the CEO's decision, 2026-10-15):** one mode, no parallel demo and real worlds. The CEO first reviews the whole UI on the demo client (`just dev`); once the screens are approved, areas start going live.
+
 **Exit criteria:** every screen of the [features](../../product/index.md#features) is navigable with the prototype's flows; the terminal is real; everything else is marked as demo data.

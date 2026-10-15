@@ -35,7 +35,7 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 - **Split** adds the first member not in pane 1 as pane 2 and makes it active. **Single** keeps the active pane's agent.
 - Clicking (mouse down) in a pane makes it active. When split, the active pane shows a 2px `--acc` top inset.
 
-**Pane header** (padding `9px 16px`, 13px): Avatar 26 with status dot (`dotBorder --term`); the name (600, opens the [Agent page](./agent-page.md) showing this deployment's prompt); `<Harness label> · <project>` (`--tx4`); a spacer; **`Copy`** (copies the whole buffer, scrollback included, as plain text; shows `Copied` for 1.4 s); **`×`** when split (closes the pane; pane 1 becomes active).
+**Pane header** (padding `9px 16px`, 13px): when split, Avatar 26 with status dot (`dotBorder --term`) and the name (600, opens the [Agent page](./agent-page.md) showing this deployment's prompt); in a single pane both are left out, since the active tab already names the agent. Then `<Harness label> · <project>` (`--tx4`); a spacer; **`Line`** (toggles the line input below); **`Copy`** (copies the whole buffer, scrollback included, as plain text; shows `Copied` for 1.4 s); **`×`** when split (closes the pane; pane 1 becomes active).
 
 **Direct-line banner** on every non-lead pane (padding `7px 16px`, 12.5px `--tx3`, `--side`, bottom border): `Direct line to <Name>. They'll tell <Lead>, the lead, if it matters.`
 
@@ -43,11 +43,12 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 - Full ANSI (colors, cursor movement, alternate screen), as the harness renders it.
 - Scrollback is replayed from the session log when a pane opens ([Persistence](../architecture/persistence.md)); the live stream follows.
 - Native text selection, copy and paste; clickable links.
+- **Shift+Enter** types the harness's newline keystroke (a new line without sending), the same as in the line input: a terminal alone can't tell it from Enter.
 - The pane size is propagated to the PTY on every resize. One PTY has one size, so when several panes or browser tabs show the same instance, **the most recently focused view sets it**; the others render that size (letterboxed or scrolled).
 - Auto-scroll follows output while the view is within 160px of the bottom; scrolling up stops following.
 - Keystrokes go straight to the PTY, raw, always ([API](../architecture/api.md), `WS /ws/pty/:instance`). Foreman doesn't interpret them.
 
-**Line input** (optional mode, for paste or mobile; padding `11px 18px`, top border): an amber `❯` (Mono 500 13px `--accTx`) and a borderless input; Enter sends the line through the pane's terminal connection (`WS /ws/pty/:instance`) as the same raw bytes typing it would produce (the text, then Enter). The mode is switched on by a **`Line`** button in the pane header. Placeholders:
+**Line input** (optional mode, for paste or mobile; padding `11px 18px`, top border): an amber `❯` (Mono 500 13px `--accTx`) and a borderless text box that grows with its lines (up to 8). Enter sends it through the pane's terminal connection (`WS /ws/pty/:instance`) as the same raw bytes typing it would produce: each line break as the harness's **newline keystroke** ([Harness adapters](../architecture/harness-adapters.md)), then Enter. Shift+Enter starts a new line; an empty input still sends Enter. The mode is switched on by a **`Line`** button in the pane header, or **Ctrl+Shift+L** (**Cmd+Shift+L** on a Mac), anywhere on the screen, for the active pane (caught before the terminal, so the agent never gets it; Ctrl+L alone, and on a Mac every Ctrl key, still reach the agent). Opening Line puts the keyboard in it. The shortcut from the terminal goes back into an open Line; from Line, it closes it. Escape or the button also close it. Closing puts the keyboard back in the terminal. Placeholders:
 
 | Situation | Placeholder |
 |---|---|

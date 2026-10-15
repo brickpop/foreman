@@ -28,6 +28,9 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 // Command is the program.
 func (a Adapter) Command() string { return a.Program }
 
+// Newline is `\` then Enter: the fake harness continues a line ending in `\`.
+func (Adapter) Newline() string { return "\\\r" }
+
 // Connected is always true: the fake harness needs no login.
 func (Adapter) Connected() bool { return true }
 

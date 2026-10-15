@@ -42,6 +42,11 @@ export function useSettings() {
   return useQuery({ queryKey: keys.settings, queryFn: () => c.workspace.settings() });
 }
 
+export function useHarnesses() {
+  const c = useClient();
+  return useQuery({ queryKey: keys.harnesses, queryFn: () => c.harnesses.list() });
+}
+
 export function useInstances() {
   const c = useClient();
   return useQuery({ queryKey: keys.instances, queryFn: () => c.agents.instances() });

@@ -48,6 +48,9 @@ var ErrNotConnected = errors.New("harness: not connected (Settings → Harnesses
 type Adapter interface {
 	// Command is what it runs when the settings name no command.
 	Command() string
+	// Newline is the keystroke that starts a new line in its input without
+	// sending it (the CEO's Shift+Enter).
+	Newline() string
 	Launch(Session) (Launch, error)
 	// Login is how to run the harness's own login (Settings → Harnesses →
 	// Connect), in a terminal the CEO types into.

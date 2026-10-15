@@ -17,5 +17,6 @@ Blocked by [Team and Agent pages](./ui-teams-agents.md) and [Workspace and confi
 - [x] keep the roster order of the team file: `TeamConfig.Order` (decoded from the file, sent as `order`, written back in that order by `encodeTeam`); `TeamConfig.Roster()` (lead first, then the file's order) replaces the two sorted copies in `prompt` and `instances`, and the UI's `roster()` mirrors it for Sessions, Members and the demo
 - [x] teams and souls API: `GET /api/teams`, `PUT /api/teams/:id/agents/:agent` (version-guarded; 409 / 400 like settings, through one `writeSaveError`; the loaded team is copied before the change); the Agent page's Keep mine / Take theirs already handles a conflict
 - [x] composed session prompt endpoint (`GET /api/instances/:id/prompt`, and the template)
+- [ ] waits for the CEO's review of the whole UI on the demo client ([Full UI demo](./epics/full-ui-demo.md)): no second, real mode meanwhile
 - [ ] Deploy wired to the Instance manager (`ForemanClient.deploy` and `stop` exist; `POST /api/deployments`, `DELETE /api/deployments/:id`); then remove `--demo-session` ([technical debt](../technical-debt.md))
 - [ ] swap the areas in main.tsx; remove their badges

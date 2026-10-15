@@ -9,7 +9,7 @@ import {
 } from "../api/client";
 import { harnessLabel } from "../app/model";
 import { permission } from "../app/notifications";
-import { keys, useSettings, useWorkspace } from "../app/queries";
+import { keys, useHarnesses, useSettings, useWorkspace } from "../app/queries";
 import { applyTheme, savedTheme, type Theme } from "../app/theme";
 import { DemoBadge } from "../components/DemoBadge";
 import { Modal } from "../components/Overlays";
@@ -279,7 +279,7 @@ function Stepper({
 function HarnessesSection({ settings }: { settings: SettingsData }) {
   const client = useClient();
   const queries = useQueryClient();
-  const harnesses = useQuery({ queryKey: keys.harnesses, queryFn: () => client.harnesses.list() });
+  const harnesses = useHarnesses();
   const [login, setLogin] = useState<{ harness: string; terminal: string }>();
   const toast = useToast();
   const connect = useMutation({

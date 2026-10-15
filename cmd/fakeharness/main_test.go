@@ -28,3 +28,16 @@ func TestFakeHarnessEndOfInput(t *testing.T) {
 		t.Errorf("exit code %d at end of input, want 0", code)
 	}
 }
+
+// A trailing `\` continues the input on the next line, as in Claude Code.
+func TestFakeHarnessContinuesLines(t *testing.T) {
+	var out bytes.Buffer
+	run(strings.NewReader("first\\\nsecond\\\nthird\nalone\n"), &out)
+	got := out.String()
+	if !strings.Contains(got, "you said: first\nsecond\nthird\n") || !strings.Contains(got, "you said: alone\n") {
+		t.Errorf("got %q", got)
+	}
+	if strings.Count(got, "you said:") != 2 {
+		t.Errorf("a continued line was answered on its own: %q", got)
+	}
+}

@@ -17,7 +17,7 @@ Shared by every project tab:
 
 ## Layout
 
-A centered grid (gap 32). Tree closed: one column `minmax(0, 760px)`. Tree open: `minmax(150px, 200px) minmax(0, 760px)`. Body padding `24px 32px 64px`.
+A grid (gap 32) using the full width. Tree closed: the article alone, `minmax(0, 1fr)`. Tree open: `minmax(150px, 200px) minmax(0, 1fr)`, so the article shrinks by the tree. Body padding `24px 32px 64px`.
 
 ## Toolbar
 
@@ -34,7 +34,7 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 
 ## Article
 
-Max width 720px, gap 14. Opens `index.md` by default.
+Full width of its column, gap 14. Opens `index.md` by default.
 
 1. **"On this page"** (12px `--tx4` label): the entry's H2 and H3 headings (13px `--tx3`, H3 indented 12px), each smooth-scrolling to its heading (24px offset). Shown only when there are any; bottom border.
 2. **Frontmatter chips**: one `key: value` chip per field; empty values hidden.

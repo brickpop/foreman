@@ -50,7 +50,7 @@ PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems
-GET    /api/harnesses                         the supported harnesses: their default command and their login (connected or not)
+GET    /api/harnesses                         the supported harnesses: their default command, newline keystroke and login (connected or not)
 POST   /api/harnesses/:id/connect             start the harness's login in a terminal → {terminal}: open it with WS /ws/pty/:terminal
 GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
 PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>

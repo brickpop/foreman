@@ -51,14 +51,14 @@ export function Overview({ project, entry }: { project: string; entry?: string }
         </span>
       </div>
       <div
-        className={`mx-auto grid w-full gap-8 ${files ? "grid-cols-[minmax(150px,200px)_minmax(0,760px)]" : "grid-cols-[minmax(0,760px)]"} justify-center`}
+        className={`grid w-full gap-8 ${files ? "grid-cols-[minmax(150px,200px)_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]"}`}
       >
         {files && (
           <nav className="sticky top-4 self-start">
             <Tree nodes={tree.data ?? []} current={path} depth={0} onOpen={open} />
           </nav>
         )}
-        <div className="max-w-[720px]">
+        <div className="min-w-0">
           {current.data && (
             <WikiArticle
               entry={current.data}

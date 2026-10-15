@@ -123,6 +123,10 @@ func hasConversation(dir string) bool {
 // Command is Claude Code's CLI.
 func (Adapter) Command() string { return "claude" }
 
+// Newline is Claude Code's documented quick escape, `\` then Enter, which works
+// in any terminal; Shift+Enter needs a terminal set up for it.
+func (Adapter) Newline() string { return "\\\r" }
+
 // Connected reports whether the shared login exists.
 func (a Adapter) Connected() bool {
 	_, err := os.Stat(filepath.Join(a.Credentials, ".credentials.json"))

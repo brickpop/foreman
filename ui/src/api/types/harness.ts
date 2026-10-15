@@ -9,5 +9,6 @@
 export interface Status {
   id: string; // claude-code, …
   command: string; // what it runs when the settings name none
+  newline: string; // the keystroke for a new line without sending
   connected: boolean; // it has a login
 }

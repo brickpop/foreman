@@ -14,13 +14,26 @@ export type TerminalHandle = {
   text(): string;
   /** Types text into the session, as the keyboard would (line input). */
   send(text: string): void;
+  /** Puts the keyboard in the terminal. */
+  focus(): void;
 };
 
 const token = (name: string) =>
   getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-export function Terminal({ instance, ref }: { instance: string; ref?: Ref<TerminalHandle> }) {
+export function Terminal({
+  instance,
+  newline,
+  ref,
+}: {
+  instance: string;
+  /** The harness's keystroke for a new line without sending: what Shift+Enter types. */
+  newline?: string;
+  ref?: Ref<TerminalHandle>;
+}) {
   const client = useClient();
+  const newlineKey = useRef(newline);
+  newlineKey.current = newline;
   const host = useRef<HTMLDivElement>(null);
   const xterm = useRef<XTerm | null>(null);
   const connection = useRef<PtyConnection | null>(null);
@@ -37,6 +50,9 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
     },
     send(text) {
       connection.current?.send(text);
+    },
+    focus() {
+      xterm.current?.focus();
     },
   }));
 
@@ -70,6 +86,14 @@ export function Terminal({ instance, ref }: { instance: string; ref?: Ref<Termin
     connection.current = conn;
     conn.resize(term.cols, term.rows);
     const typing = term.onData((data) => conn.send(data));
+    // A terminal can't tell Shift+Enter from Enter: type the harness's newline instead.
+    term.attachCustomKeyEventHandler((e) => {
+      const key = newlineKey.current;
+      if (!key || e.key !== "Enter" || !e.shiftKey || e.altKey || e.ctrlKey || e.metaKey)
+        return true;
+      if (e.type === "keydown") conn.send(key);
+      return false;
+    });
     const resizing = term.onResize(({ cols, rows }) => conn.resize(cols, rows));
     const observer = new ResizeObserver(() => fit.fit());
     observer.observe(host.current);

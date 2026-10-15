@@ -73,3 +73,30 @@ export function linePlaceholder(name: string, status: string, lead: boolean): st
   if (status === "awaiting") return `Reply to ${name}…`;
   return lead ? `Tell ${name} what you need. They’ll delegate.` : `Direct instruction to ${name}…`;
 }
+
+/** What the line input types into a session: each line break as the harness's
+ * newline keystroke (a new line without sending), then Enter. */
+export function typedLine(text: string, newline: string): string {
+  return `${text.split("\n").join(newline)}\r`;
+}
+/** Whether this is a Mac, where shortcuts use Cmd instead of Ctrl. */
+export const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+
+/** The line input's shortcut: Cmd+Shift+L on a Mac, Ctrl+Shift+L elsewhere.
+ * Ctrl+L alone (and on a Mac, every Ctrl key) still reaches the agent. */
+export function lineShortcut(mac = isMac): string {
+  return mac ? "⌘⇧L" : "Ctrl+Shift+L";
+}
+
+type Keys = {
+  code: string;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+};
+
+export function isLineShortcut(e: Keys, mac = isMac): boolean {
+  const mod = mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+  return e.code === "KeyL" && mod && e.shiftKey && !e.altKey;
+}

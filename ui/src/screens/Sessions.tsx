@@ -2,16 +2,26 @@ import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import type { Instance, Team, TeamMessage } from "../api/client";
 import { agentOf, harnessLabel } from "../app/model";
-import { useInstances, useMessages, useRequests, useSettings, useTeams } from "../app/queries";
+import {
+  useHarnesses,
+  useInstances,
+  useMessages,
+  useRequests,
+  useSettings,
+  useTeams,
+} from "../app/queries";
 import {
   clickTab,
   closePane,
   deploymentTabs,
   initialPanes,
+  isLineShortcut,
   linePlaceholder,
+  lineShortcut,
   type Panes,
   rosterOrder,
   toggleSplit,
+  typedLine,
 } from "../app/sessions";
 import { Avatar } from "../components/Avatar";
 import { DemoBadge } from "../components/DemoBadge";
@@ -106,7 +116,7 @@ export function Sessions() {
               instance={byId.get(id) as Instance}
               teams={teams.data ?? []}
               lead={team?.config.lead}
-              active={shown.length === 2 && index === panes.active}
+              active={index === panes.active}
               split={shown.length === 2}
               onActivate={() => setPanes({ ...panes, active: index })}
               onClose={() => setPanes(closePane(panes, index))}
@@ -193,8 +203,36 @@ function Pane({
 }) {
   const terminal = useRef<TerminalHandle>(null);
   const settings = useSettings();
+  const newline = useHarnesses().data?.find((h) => h.id === instance.harness)?.newline;
   const [copied, setCopied] = useState(false);
   const [lineMode, setLineMode] = useState(false);
+  const lineInput = useRef<HTMLTextAreaElement>(null);
+  // Line opens with the keyboard in it (autoFocus), and closes back to the terminal.
+  const closeLine = () => {
+    setLineMode(false);
+    terminal.current?.focus();
+  };
+  // The shortcut: open Line; from the terminal, back into Line; from Line, close it.
+  const toggleLine = () => {
+    if (!lineMode) setLineMode(true);
+    else if (document.activeElement !== lineInput.current) lineInput.current?.focus();
+    else closeLine();
+  };
+  // The shortcut works anywhere on the screen, for the active pane. Listening on
+  // the window's capture phase runs before the terminal, so the agent never gets it.
+  const toggle = useRef(toggleLine);
+  toggle.current = toggleLine;
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!isLineShortcut(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toggle.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [active]);
   const [line, setLine] = useState("");
   const agent = agentOf(teams, instance.id);
   const name = agent?.soul.name ?? instance.agentId;
@@ -211,31 +249,41 @@ function Pane({
     <section
       onMouseDown={onActivate}
       onFocusCapture={onActivate}
-      className={`flex min-h-0 min-w-0 flex-col bg-term ${active ? "shadow-[inset_0_2px_0_var(--acc)]" : ""}`}
+      className={`flex min-h-0 min-w-0 flex-col bg-term ${split && active ? "shadow-[inset_0_2px_0_var(--acc)]" : ""}`}
     >
       <header className="flex items-center gap-2.5 border-b border-line px-4 py-[9px] text-[13px]">
-        <Avatar
-          look={agent?.soul.look}
-          size={26}
-          status={instance.status}
-          dotBorder="var(--term)"
-        />
-        {agent ? (
-          <Link
-            to="/teams/$team/agents/$agent"
-            params={{ team: agent.team.id, agent: agent.id }}
-            className="font-semibold text-tx"
-          >
-            {name}
-          </Link>
-        ) : (
-          <span className="font-semibold">{name}</span>
+        {/* Single: the active tab already names the agent. Split: each pane says whose it is. */}
+        {split && (
+          <>
+            <Avatar
+              look={agent?.soul.look}
+              size={26}
+              status={instance.status}
+              dotBorder="var(--term)"
+            />
+            {agent ? (
+              <Link
+                to="/teams/$team/agents/$agent"
+                params={{ team: agent.team.id, agent: agent.id }}
+                className="font-semibold text-tx"
+              >
+                {name}
+              </Link>
+            ) : (
+              <span className="font-semibold">{name}</span>
+            )}
+          </>
         )}
         <span className="text-tx4">
           {harnessLabel(instance.harness)} · {project}
         </span>
         <span className="flex-1" />
-        <Button variant="tiny" onClick={() => setLineMode(!lineMode)} aria-pressed={lineMode}>
+        <Button
+          variant="tiny"
+          onClick={() => (lineMode ? closeLine() : setLineMode(true))}
+          aria-pressed={lineMode}
+          title={`Line input (${lineShortcut()})`}
+        >
           Line
         </Button>
         <Button variant="tiny" onClick={copy}>
@@ -254,30 +302,38 @@ function Pane({
       )}
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
-          <Terminal instance={instance.id} ref={terminal} />
+          <Terminal instance={instance.id} newline={newline} ref={terminal} />
         </div>
         {settings.data?.settings.teamMessageMarkers !== false && (
           <Markers deployment={instance.deploymentId} instance={instance.id} teams={teams} />
         )}
       </div>
       {lineMode && (
-        <form
-          className="flex items-center gap-2 border-t border-line px-[18px] py-[11px]"
-          onSubmit={(e) => {
-            e.preventDefault();
-            terminal.current?.send(`${line}\r`);
-            setLine("");
-          }}
-        >
-          <span className="font-mono text-[13px] font-medium text-accTx">❯</span>
-          <input
+        <div className="flex items-start gap-2 border-t border-line px-[18px] py-[11px]">
+          <span className="font-mono text-[13px] leading-[1.5] font-medium text-accTx">❯</span>
+          {/* Enter sends; Shift+Enter starts a new line, typed as the harness's newline. */}
+          <textarea
+            ref={lineInput}
+            // biome-ignore lint/a11y/noAutofocus: opening Line is asking to type in it
+            autoFocus
             value={line}
+            rows={Math.min(line.split("\n").length, 8)}
             onChange={(e) => setLine(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") return closeLine();
+              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+              if (e.shiftKey && newline) return; // the textarea adds the line
+              e.preventDefault();
+              // An empty line still sends Enter (it answers a harness's prompt).
+              // Without a known newline, each pasted line is sent on its own.
+              terminal.current?.send(typedLine(line, newline ?? "\r"));
+              setLine("");
+            }}
             placeholder={linePlaceholder(name, instance.status, isLead)}
             aria-label={`Line input to ${name}`}
-            className="flex-1 bg-transparent text-tx placeholder:text-tx4 focus:outline-none"
+            className="flex-1 resize-none bg-transparent leading-[1.5] text-tx placeholder:text-tx4 focus:outline-none"
           />
-        </form>
+        </div>
       )}
     </section>
   );

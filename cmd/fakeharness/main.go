@@ -1,7 +1,8 @@
 // Command fakeharness stands in for a coding harness in tests and development:
 // it prints a coloured banner, shows a prompt, and answers each input line.
 // Commands: `spam N` prints N numbered lines, `exit N` exits with code N.
-// Anything else is echoed back. It writes plain "\n", as real programs do (the
+// Anything else is echoed back; a line ending in `\` continues on the next
+// (as in Claude Code), so one input can span lines. It writes plain "\n", as real programs do (the
 // terminal adds the "\r"). It grows with the features that need it (calling
 // team tools, going idle); see wiki/product/architecture/tech-stack.md.
 package main
@@ -25,8 +26,14 @@ const prompt = "\x1b[38;5;214m❯\x1b[0m "
 func run(in io.Reader, out io.Writer) int {
 	fmt.Fprint(out, "\x1b[1mfake harness\x1b[0m · \x1b[32mready\x1b[0m\n"+prompt)
 	lines := bufio.NewScanner(in)
+	var held []string // the lines so far of an input continued with a trailing `\`
 	for lines.Scan() {
-		line := strings.TrimSpace(lines.Text())
+		if text, more := strings.CutSuffix(lines.Text(), "\\"); more {
+			held = append(held, text)
+			continue
+		}
+		line := strings.TrimSpace(strings.Join(append(held, lines.Text()), "\n"))
+		held = nil
 		cmd, arg, _ := strings.Cut(line, " ")
 		switch cmd {
 		case "exit":

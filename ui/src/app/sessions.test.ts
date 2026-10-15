@@ -5,9 +5,12 @@ import {
   closePane,
   deploymentTabs,
   initialPanes,
+  isLineShortcut,
   linePlaceholder,
+  lineShortcut,
   rosterOrder,
   toggleSplit,
+  typedLine,
 } from "./sessions";
 
 const inst = (id: string, deploymentId: string) =>
@@ -71,5 +74,41 @@ describe("Sessions", () => {
       "Tell Mara what you need. They’ll delegate.",
     );
     expect(linePlaceholder("Tove", "idle", false)).toBe("Direct instruction to Tove…");
+  });
+});
+
+describe("typedLine", () => {
+  it("types each line break as the harness's newline, then Enter", () => {
+    expect(typedLine("first\nsecond\nthird", "\\\r")).toBe("first\\\rsecond\\\rthird\r");
+  });
+  it("sends a single line, or an empty one, with Enter", () => {
+    expect(typedLine("go on", "\\\r")).toBe("go on\r");
+    expect(typedLine("", "\\\r")).toBe("\r");
+  });
+});
+
+describe("the line input's shortcut", () => {
+  const none = { code: "KeyL", ctrlKey: false, shiftKey: true, altKey: false, metaKey: false };
+  const ctrl = { ...none, ctrlKey: true };
+  const cmd = { ...none, metaKey: true };
+
+  it("is Ctrl+Shift+L on a PC and Cmd+Shift+L on a Mac, by key position (any layout)", () => {
+    expect(isLineShortcut(ctrl, false)).toBe(true);
+    expect(isLineShortcut(cmd, true)).toBe(true);
+    expect(lineShortcut(false)).toBe("Ctrl+Shift+L");
+    expect(lineShortcut(true)).toBe("⌘⇧L");
+  });
+
+  it("leaves the agent its own keys", () => {
+    // The other platform's combination, and Ctrl+Shift+L on a Mac (a terminal key there).
+    expect(isLineShortcut(cmd, false)).toBe(false);
+    expect(isLineShortcut(ctrl, true)).toBe(false);
+    for (const mac of [false, true]) {
+      const mod = mac ? cmd : ctrl;
+      expect(isLineShortcut({ ...mod, shiftKey: false }, mac)).toBe(false); // Ctrl+L / Cmd+L
+      expect(isLineShortcut({ ...mod, altKey: true }, mac)).toBe(false);
+      expect(isLineShortcut({ ...mod, code: "KeyK" }, mac)).toBe(false);
+      expect(isLineShortcut({ ...mod, ctrlKey: true, metaKey: true }, mac)).toBe(false);
+    }
   });
 });

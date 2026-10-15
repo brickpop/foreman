@@ -113,3 +113,22 @@ func TestDeploymentsAreListed(t *testing.T) {
 		t.Errorf("deployments %v", list)
 	}
 }
+
+func (f *fakeAgents) Prompt(_ context.Context, id string) (string, error) {
+	if id != "mara@ledger" {
+		return "", store.ErrNotFound
+	}
+	return "# You are Mara", nil
+}
+
+func TestInstancePrompt(t *testing.T) {
+	h := withAgents(&fakeAgents{})
+	var body map[string]string
+	decodeBody(t, get(t, h, "/api/instances/mara@ledger/prompt"), &body)
+	if body["prompt"] != "# You are Mara" {
+		t.Errorf("prompt %v", body)
+	}
+	if w := get(t, h, "/api/instances/nobody@ledger/prompt"); w.Code != http.StatusNotFound {
+		t.Errorf("unknown instance: %d", w.Code)
+	}
+}

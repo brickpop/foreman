@@ -140,3 +140,13 @@ func TestRoleLabels(t *testing.T) {
 		}
 	}
 }
+
+// Before any deployment the prompt keeps the deployment's parts as placeholders.
+func TestTemplateShowsThePlaceholders(t *testing.T) {
+	got := Template(atlas, "tove")
+	for _, want := range []string{"Project: {project}  ({path})", "Goal: {goal}", "made for you from {main}", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}

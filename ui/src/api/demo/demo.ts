@@ -42,6 +42,8 @@ class NotFound extends Error {
 
 export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient {
   const state: Seed = structuredClone(seed);
+  // The seed has no team files: write them out, as the server reads them.
+  for (const t of state.teams) t.source ||= teamToml(t.config);
   const now = options.now ?? (() => new Date());
   const iso = () => now().toISOString();
   const handlers = new Set<EventHandlers>();
@@ -75,6 +77,20 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
       team: async (id) => reply(find(state.teams, (t) => t.id === id, "team")),
       settings: () => reply(state.settings),
       candidates: () => reply(state.candidates),
+      saveSoul: async (teamId, agent, soul, v) => {
+        const t = find(state.teams, (x) => x.id === teamId, "team");
+        if (t.version !== v) throw new Conflict(`teams/${teamId}.toml`);
+        if (!t.config.agents[agent]) throw new NotFound("agent");
+        t.config.agents[agent] = structuredClone(soul);
+        t.source = teamToml(t.config);
+        t.version = version();
+        emit("config.changed", { object: "team", id: teamId, version: t.version });
+        return structuredClone(t);
+      },
+      promptTemplate: async (teamId, agent) => {
+        const t = find(state.teams, (x) => x.id === teamId, "team");
+        return demoPrompt(t.config, agent, "{project}", "{goal}");
+      },
       addProject: async (folder) => {
         const candidate = find(state.candidates, (c) => c.folder === folder, "folder");
         const project = newProject(folder, candidate.repos);
@@ -94,6 +110,12 @@ export function demoClient(seed: Seed, options: DemoOptions = {}): ForemanClient
           ),
         ),
       deployments: () => reply(state.deployments.filter((d) => d.status === "active")),
+      prompt: async (instance) => {
+        const inst = find(state.instances, (i) => i.id === instance, "instance");
+        const dep = find(state.deployments, (d) => d.id === inst.deploymentId, "deployment");
+        const t = find(state.teams, (x) => x.id === dep.teamId, "team");
+        return demoPrompt(t.config, inst.agentId, dep.projectId, dep.goal);
+      },
       deploy: async (team, project, goal) => {
         const t = find(state.teams, (x) => x.id === team, "team");
         const id = `${team}@${project}`;
@@ -395,4 +417,68 @@ function markSeen(nodes: Seed["wiki"][string]["tree"], path: string) {
     if (n.path === path) n.changed = false;
     markSeen(n.children, path);
   }
+}
+
+type TeamConfig = Seed["teams"][number]["config"];
+
+const q = (s: string) => JSON.stringify(s);
+
+/** A team file as TOML, for the File tab (the server shows the real file). */
+export function teamToml(c: TeamConfig): string {
+  const lines = [`team = ${q(c.team)}`, `name = ${q(c.name)}`];
+  if (c.purpose) lines.push(`purpose = ${q(c.purpose)}`);
+  lines.push(`lead = ${q(c.lead)}`);
+  if (c.playbook.length > 0) {
+    lines.push("playbook = [");
+    for (const step of c.playbook) {
+      for (const [who, text] of Object.entries(step)) lines.push(`  { ${who} = ${q(text)} },`);
+    }
+    lines.push("]");
+  }
+  for (const e of c.escalate)
+    lines.push("", "[[escalate]]", `when = ${q(e.when)}`, `to = ${q(e.to)}`);
+  for (const [id, s] of Object.entries(c.agents)) {
+    lines.push(
+      "",
+      `[agents.${id}]`,
+      `name = ${q(s.name)}`,
+      `role = ${q(s.role)}`,
+      `harness = ${q(s.harness)}`,
+    );
+    if (s.command) lines.push(`command = ${q(s.command)}`);
+    if (s.personality) lines.push(`personality = ${q(s.personality)}`);
+    if (s.skills.length > 0) lines.push(`skills = [${s.skills.map(q).join(", ")}]`);
+    if (s.instruction) lines.push(`instruction = """\n${s.instruction.trim()}\n"""`);
+    lines.push("", `[agents.${id}.look]`);
+    for (const [k, v] of Object.entries(s.look)) {
+      lines.push(`${k === "hairColor" ? "hair_color" : k} = ${q(v)}`);
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/** A session prompt for demo data. The real one is composed by the server only
+ * (internal/prompt); this keeps its outline so the Agent page has something to show. */
+function demoPrompt(c: TeamConfig, agent: string, project: string, goal: string): string {
+  const soul = c.agents[agent];
+  const roster = Object.entries(c.agents).map(
+    ([id, s]) => `- ${s.name}, ${s.role.replaceAll("_", " ")}${id === c.lead ? " (lead)" : ""}`,
+  );
+  return [
+    `# You are ${soul?.name ?? agent}, ${soul?.role.replaceAll("_", " ")} on team ${c.name}`,
+    soul?.personality ?? "",
+    "",
+    "## Your job",
+    soul?.instruction || "(the role's default job description)",
+    "",
+    "## This assignment",
+    `Project: ${project}`,
+    `Goal: ${goal}`,
+    `Your sandbox: ${project}/.sandboxes/${agent} (a git worktree per repo)`,
+    "",
+    `## Your team on ${project}`,
+    ...roster,
+    "",
+    "(demo data: the real prompt is composed by the server)",
+  ].join("\n");
 }

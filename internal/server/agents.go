@@ -18,6 +18,8 @@ type Agents interface {
 	Stop(ctx context.Context, deployment string) error
 	List(ctx context.Context) ([]store.Instance, error)
 	ActiveDeployments(ctx context.Context) ([]store.Deployment, error)
+	// Prompt is an instance's session prompt, exactly as composed for its harness.
+	Prompt(ctx context.Context, instance string) (string, error)
 }
 
 // deployRequest is the body of POST /api/deployments.
@@ -35,6 +37,17 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 			return
 		}
 		writeJSON(w, http.StatusOK, list)
+	})
+	mux.HandleFunc("GET /api/instances/{id}/prompt", func(w http.ResponseWriter, r *http.Request) {
+		text, err := a.Prompt(r.Context(), r.PathValue("id"))
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such instance")
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		default:
+			writeJSON(w, http.StatusOK, map[string]string{"prompt": text})
+		}
 	})
 	mux.HandleFunc("GET /api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		list, err := a.ActiveDeployments(r.Context())

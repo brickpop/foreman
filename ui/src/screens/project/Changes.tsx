@@ -66,7 +66,7 @@ export function Changes({ project }: { project: Project }) {
   const openMrs = mrs.filter((m) => m.state === "open");
   const loose = items.filter((w) => !openMrs.some((m) => m.id === w.mergeRequestId) && w.stage < 3);
   return (
-    <div className="mx-auto flex max-w-[860px] flex-col gap-9 px-10 pt-7 pb-16">
+    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-9 px-10 pt-7 pb-16">
       <section className="flex flex-col gap-2.5">
         <SectionLabel>Needs you</SectionLabel>
         {open.length === 0 ? (

@@ -160,3 +160,21 @@ func TestEventsStreamEndsWithItsSubscription(t *testing.T) {
 		t.Fatal("the stream outlived its subscription")
 	}
 }
+
+func TestPromptTemplateOfAnAgent(t *testing.T) {
+	c := config
+	c.teams = []workspace.Team{{ID: "atlas", Config: workspace.TeamConfig{
+		Name: "Atlas", Lead: "mara", Agents: map[string]workspace.Soul{"mara": {Name: "Mara", Role: "team_lead"}},
+	}}}
+	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Config: c, UI: builtUI})
+	var body map[string]string
+	decodeBody(t, get(t, h, "/api/teams/atlas/agents/mara/prompt"), &body)
+	if !strings.Contains(body["prompt"], "Goal: {goal}") {
+		t.Errorf("template %q", body["prompt"])
+	}
+	for _, path := range []string{"/api/teams/atlas/agents/ghost/prompt", "/api/teams/nope/agents/mara/prompt"} {
+		if w := get(t, h, path); w.Code != http.StatusNotFound {
+			t.Errorf("%s: %d", path, w.Code)
+		}
+	}
+}

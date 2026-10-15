@@ -2,9 +2,8 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { useProjects, useRequests, useWorkspace } from "../app/queries";
 import { DemoBadge } from "../components/DemoBadge";
-import { Modal } from "../components/Overlays";
+import { DeployDialog } from "../components/DeployDialog";
 import { CountBadge } from "../components/ui";
-import { ComingWith } from "./Placeholder";
 import { Board } from "./project/Board";
 import { Changes } from "./project/Changes";
 import { Overview } from "./project/Overview";
@@ -69,11 +68,7 @@ export function Project() {
       {tab === "changes" && <Changes project={project} />}
       {tab === "board" && <Board project={id} />}
       {tab === "settings" && <ProjectSettings project={project} onDeploy={() => setDeploy(true)} />}
-      <Modal open={deploy} onClose={() => setDeploy(false)} title="Deploy a team">
-        <ComingWith card="Team and Agent pages, and the Deploy dialog">
-          The Deploy dialog
-        </ComingWith>
-      </Modal>
+      <DeployDialog open={deploy} onClose={() => setDeploy(false)} project={id} />
     </div>
   );
 }

@@ -130,3 +130,50 @@ describe("Home's model", () => {
     ]);
   });
 });
+
+import { palettes, randomLook, resolveWho, roleLabel } from "./model";
+
+describe("teams", () => {
+  const atlas = {
+    id: "atlas",
+    config: {
+      lead: "mara",
+      agents: {
+        mara: { name: "Mara", role: "team_lead" },
+        tove: { name: "Tove", role: "engineer" },
+        ilya: { name: "Ilya", role: "engineer" },
+      },
+    },
+  } as unknown as Team;
+
+  it("resolves who a step names", () => {
+    expect(resolveWho(atlas, "lead")).toEqual({ text: "Mara", known: true });
+    expect(resolveWho(atlas, "members")).toEqual({ text: "Members", known: true });
+    expect(resolveWho(atlas, "ceo")).toEqual({ text: "You", known: true });
+    expect(resolveWho(atlas, "tove")).toEqual({ text: "Tove", known: true });
+    expect(resolveWho(atlas, "engineer")).toEqual({ text: "Tove, Ilya", known: true });
+    expect(resolveWho(atlas, "designer")).toEqual({ text: "designer", known: false });
+  });
+
+  it("labels roles", () => {
+    expect(["team_lead", "qa", "security_auditor"].map(roleLabel)).toEqual([
+      "Team Lead",
+      "QA / Tester",
+      "Security auditor",
+    ]);
+  });
+
+  it("draws a random look from the palettes", () => {
+    expect(randomLook(() => 0)).toEqual({
+      color: palettes.color[0],
+      skin: palettes.skin[0],
+      hair: "short",
+      hairColor: palettes.hairColor[0],
+      eyes: "dots",
+      beard: "none",
+    });
+    const look = randomLook();
+    expect(palettes.hair).toContain(look.hair);
+    expect(palettes.color).toContain(look.color);
+  });
+});

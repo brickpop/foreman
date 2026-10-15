@@ -37,7 +37,7 @@ export function Home() {
     requests.data ?? [],
   );
   return (
-    <div className="mx-auto flex max-w-[920px] flex-col gap-10 px-12 pt-12 pb-16">
+    <div className="mx-auto flex w-full max-w-[920px] flex-col gap-10 px-12 pt-12 pb-16">
       <PageTitle
         title={
           <span className="flex items-center gap-3">

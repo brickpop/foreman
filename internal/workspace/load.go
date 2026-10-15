@@ -29,6 +29,7 @@ type Team struct {
 	Config   TeamConfig `json:"config"`
 	Version  string     `json:"version"`
 	Problems []string   `json:"problems"`
+	Source   string     `json:"source"` // the team file as it is on disk, shown read-only
 }
 
 // SettingsFile is settings.toml, or the defaults while it doesn't exist
@@ -129,7 +130,7 @@ func (w *Workspace) scan(prev snapshot) snapshot {
 		if err != nil {
 			continue
 		}
-		t := Team{ID: strings.TrimSuffix(filepath.Base(f), ".toml"), Version: Version(data)}
+		t := Team{ID: strings.TrimSuffix(filepath.Base(f), ".toml"), Version: Version(data), Source: string(data)}
 		t.Config, t.Problems = ParseTeam(t.ID, data)
 		t.Problems = normalize(t.Problems)
 		if old, ok := prev.teams[t.ID]; ok && len(t.Problems) > 0 && len(old.Problems) == 0 {

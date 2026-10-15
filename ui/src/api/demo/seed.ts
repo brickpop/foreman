@@ -278,6 +278,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
       },
       version: "85c8f830451a06bf",
       problems: [],
+      source: "", // written out by the demo client
     },
     {
       id: "vesper",
@@ -352,6 +353,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
       },
       version: "58d401c99355845b",
       problems: [],
+      source: "", // written out by the demo client
     },
     {
       id: "orion",
@@ -425,6 +427,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
       },
       version: "6e64c84cb3ea1bc5",
       problems: [],
+      source: "", // written out by the demo client
     },
     {
       id: "sentinel",
@@ -497,6 +500,7 @@ always_ask_ceo = ["any apply outside sandbox accounts"]
       },
       version: "9e0b35d50b78d0c1",
       problems: [],
+      source: "", // written out by the demo client
     },
   ],
 

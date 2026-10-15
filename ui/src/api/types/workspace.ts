@@ -137,6 +137,7 @@ export interface Team {
   config: TeamConfig;
   version: string;
   problems: string[];
+  source: string; // the team file as it is on disk, shown read-only
 }
 /**
  * SettingsFile is settings.toml, or the defaults while it doesn't exist

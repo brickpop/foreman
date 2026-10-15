@@ -113,7 +113,10 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 		},
 	}
 	f.m = New(f.deps)
-	t.Cleanup(func() { f.stopAll() })
+	t.Cleanup(func() {
+		f.stopAll()
+		f.m.Wait()
+	})
 	return f
 }
 
@@ -374,5 +377,25 @@ func TestActiveDeployments(t *testing.T) {
 	_ = f.m.Stop(ctx, "atlas@ledger")
 	if list, _ := f.m.ActiveDeployments(ctx); len(list) != 0 {
 		t.Errorf("after stop: %+v", list)
+	}
+}
+
+// The prompt shown is the one the harness got.
+func TestPromptIsWhatTheHarnessGot(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "Ship invoices"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Running)
+	shown, err := f.m.Prompt(ctx, "tove@ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	given, _ := os.ReadFile(filepath.Join(f.root, "ledger", ".sandboxes", "tove", ".harness", "fake", "PROMPT.md"))
+	if shown != string(given) || !strings.Contains(shown, "Goal: Ship invoices") {
+		t.Errorf("shown:\n%s\ngiven:\n%s", shown, given)
+	}
+	if _, err := f.m.Prompt(ctx, "nobody@ledger"); err == nil {
+		t.Error("a prompt for no instance")
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/workspace"
 )
 
@@ -40,6 +41,14 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	mux.HandleFunc("GET /api/teams/{id}", func(w http.ResponseWriter, r *http.Request) {
 		t, err := c.Team(r.PathValue("id"))
 		writeFound(w, t, err, "team")
+	})
+	mux.HandleFunc("GET /api/teams/{id}/agents/{agent}/prompt", func(w http.ResponseWriter, r *http.Request) {
+		t, err := c.Team(r.PathValue("id"))
+		if _, ok := t.Config.Agents[r.PathValue("agent")]; err != nil || !ok {
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such agent")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"prompt": prompt.Template(t.Config, r.PathValue("agent"))})
 	})
 	mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, c.Settings())

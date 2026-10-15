@@ -67,9 +67,10 @@ type Deps struct {
 // Manager runs the instances of every active deployment.
 type Manager struct {
 	Deps
-	mu    sync.Mutex
-	live  map[string]*live // instances with a process or a start under way
-	queue []string         // queued instances, in creation order
+	mu     sync.Mutex
+	starts sync.WaitGroup   // starts under way
+	live   map[string]*live // instances with a process or a start under way
+	queue  []string         // queued instances, in creation order
 }
 
 type live struct {
@@ -279,8 +280,12 @@ func (m *Manager) startQueued() {
 		m.queue = m.queue[1:]
 		l := &live{}
 		m.live[id] = l
+		m.starts.Add(1)
 		m.mu.Unlock()
-		go m.start(id, l)
+		go func() {
+			defer m.starts.Done()
+			m.start(id, l)
+		}()
 	}
 }
 
@@ -370,10 +375,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		mounts = append(mounts, runner.Mount{Source: filepath.Join(projectRepo, ".git"), Target: filepath.Join(inSandbox, ".git"), ReadOnly: true})
 	}
 
-	text := prompt.Compose(prompt.Input{
-		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Path: projectDir,
-		Config: project.Config, Goal: dep.Goal,
-	})
+	text := m.compose(inst, dep, team, project)
 	settings := m.Config.Settings().Settings
 	l, err := adapter.Launch(harness.Session{
 		Instance: id, Sandbox: inst.SandboxPath, Prompt: text,
@@ -523,3 +525,37 @@ func (m *Manager) ActiveDeployments(ctx context.Context) ([]store.Deployment, er
 	}
 	return active, nil
 }
+
+// compose is an instance's session prompt: launch writes it, Prompt shows it.
+func (m *Manager) compose(inst store.Instance, dep store.Deployment, team workspace.Team, project workspace.Project) string {
+	return prompt.Compose(prompt.Input{
+		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Path: filepath.Join(m.Root, project.ID),
+		Config: project.Config, Goal: dep.Goal,
+	})
+}
+
+// Prompt is the session prompt an instance runs with, exactly as composed for
+// its harness (the Agent page shows it).
+func (m *Manager) Prompt(ctx context.Context, id string) (string, error) {
+	inst, err := m.Instances.Get(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	dep, err := m.Deployments.Get(ctx, inst.DeploymentID)
+	if err != nil {
+		return "", err
+	}
+	team, err := m.Config.Team(dep.TeamID)
+	if err != nil {
+		return "", err
+	}
+	project, err := m.Config.Project(dep.ProjectID)
+	if err != nil {
+		return "", err
+	}
+	return m.compose(inst, dep, team, project), nil
+}
+
+// Wait waits for the starts under way to finish (at shutdown, and in tests:
+// a start may be writing worktrees).
+func (m *Manager) Wait() { m.starts.Wait() }

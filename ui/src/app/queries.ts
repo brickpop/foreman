@@ -1,6 +1,6 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { type Board, useClient } from "../api/client";
+import { type Board, type Soul, useClient } from "../api/client";
 import type { Event } from "../api/types/events";
 
 // Server state, through TanStack Query: one hook per query, and server events
@@ -220,4 +220,24 @@ export function useMoveCard(project: string, onError: (e: Error) => void) {
 export function useDeployments() {
   const c = useClient();
   return useQuery({ queryKey: keys.deployments, queryFn: () => c.agents.deployments() });
+}
+
+/** Saves a soul in its team file; the teams refetch. */
+export function useSaveSoul(team: string) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { agent: string; soul: Soul; version: string }) =>
+      c.workspace.saveSoul(team, v.agent, v.soul, v.version),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.teams }),
+  });
+}
+
+/** An instance's session prompt, or the agent's template when not deployed. */
+export function usePrompt(team: string, agent: string, instance?: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: ["prompt", team, agent, instance ?? ""],
+    queryFn: () => (instance ? c.agents.prompt(instance) : c.workspace.promptTemplate(team, agent)),
+  });
 }

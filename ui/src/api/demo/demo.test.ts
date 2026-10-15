@@ -34,6 +34,7 @@ const tiny: Seed = {
       id: "atlas",
       version: "v1",
       problems: [],
+      source: "",
       config: {
         team: "atlas",
         name: "Atlas",
@@ -282,5 +283,33 @@ describe("demoClient", () => {
     const count = events.length;
     vi.advanceTimersByTime(5000);
     expect(events.length).toBe(count); // no subscriber, no simulation
+  });
+});
+
+describe("demoClient's teams", () => {
+  it("saves a soul: version-guarded, the file and the event follow", async () => {
+    const { c, events } = client();
+    const [t] = await c.workspace.teams();
+    expect(t.source).toContain('[agents.mara]\nname = "Mara"');
+    const soul = { ...t.config.agents.tove, personality: "Careful." };
+    await expect(c.workspace.saveSoul("atlas", "tove", soul, "stale")).rejects.toThrow(
+      "changed since",
+    );
+    const saved = await c.workspace.saveSoul("atlas", "tove", soul, t.version);
+    expect(saved.config.agents.tove.personality).toBe("Careful.");
+    expect(saved.source).toContain('personality = "Careful."');
+    expect(saved.version).not.toBe(t.version);
+    expect(events.at(-1)).toMatchObject({
+      type: "config.changed",
+      data: { object: "team", id: "atlas" },
+    });
+  });
+
+  it("gives prompts: per instance, and a template with placeholders", async () => {
+    vi.useFakeTimers();
+    const { c } = client();
+    await c.agents.deploy("atlas", "ledger", "Ship it");
+    expect(await c.agents.prompt("tove@ledger")).toContain("Goal: Ship it");
+    expect(await c.workspace.promptTemplate("atlas", "tove")).toContain("Goal: {goal}");
   });
 });

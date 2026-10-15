@@ -21,14 +21,15 @@ POST   /api/projects                          {folder} → create the project re
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems
-PUT    /api/teams/:id/agents/:agent           update soul (writes team file)
+PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
 POST   /api/teams/:id/agents                  hire (from CoS)
 
 GET    /api/deployments                       the active deployments
 POST   /api/deployments                       {team, project, goal}
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status
-GET    /api/instances/:id/prompt              composed session prompt
+GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness
+GET    /api/teams/:id/agents/:agent/prompt    {prompt}: the template before any deployment, {placeholders} for its parts
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
 (line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
 POST   /api/instances/:id/restart

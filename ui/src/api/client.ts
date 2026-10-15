@@ -11,7 +11,7 @@ import type {
   WorkItem,
 } from "./types/store";
 import type { Board, Card, Entry, Node } from "./types/wiki";
-import type { Candidate, Project, SettingsFile, Team } from "./types/workspace";
+import type { Candidate, Project, SettingsFile, Soul, Team } from "./types/workspace";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -32,6 +32,7 @@ export type {
   Project,
   Request,
   SettingsFile,
+  Soul,
   Team,
   TeamMessage,
   WorkItem,
@@ -55,12 +56,18 @@ export interface WorkspaceArea extends Area {
   candidates(): Promise<Candidate[]>;
   /** Turns a candidate folder into a project: its project repo and starter wiki. */
   addProject(folder: string): Promise<Project>;
+  /** Saves one agent's soul in its team file, guarded by the version read. */
+  saveSoul(team: string, agent: string, soul: Soul, version: string): Promise<Team>;
+  /** An agent's prompt before any deployment, with {placeholders}. */
+  promptTemplate(team: string, agent: string): Promise<string>;
 }
 
 export interface AgentsArea extends Area {
   instances(): Promise<Instance[]>;
   /** The active deployments. */
   deployments(): Promise<Deployment[]>;
+  /** An instance's session prompt, exactly as composed for its harness. */
+  prompt(instance: string): Promise<string>;
   deploy(team: string, project: string, goal: string): Promise<Deployment>;
   stop(deployment: string): Promise<void>;
   openTerminal(id: string, handlers: PtyHandlers): PtyConnection;
@@ -162,11 +169,20 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       candidates: () => getJSON("/api/candidates"),
       addProject: async (folder) =>
         (await request("POST", "/api/projects", { folder })).json() as Promise<Project>,
+      saveSoul: async (team, agent, soul, version) =>
+        (
+          await request("PUT", `/api/teams/${id(team)}/agents/${id(agent)}`, { soul, version })
+        ).json() as Promise<Team>,
+      promptTemplate: async (team, agent) =>
+        (await getJSON<{ prompt: string }>(`/api/teams/${id(team)}/agents/${id(agent)}/prompt`))
+          .prompt,
     },
     agents: {
       demo: false,
       instances: () => getJSON("/api/instances"),
       deployments: () => getJSON("/api/deployments"),
+      prompt: async (instance) =>
+        (await getJSON<{ prompt: string }>(`/api/instances/${id(instance)}/prompt`)).prompt,
       deploy: async (team, project, goal) =>
         (
           await request("POST", "/api/deployments", { team, project, goal })

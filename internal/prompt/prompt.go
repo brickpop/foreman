@@ -251,3 +251,12 @@ func instruction(s workspace.Soul, teamTools bool) string {
 	}
 	return defaultInstructions[s.Role]
 }
+
+// Template is an agent's prompt before any deployment: the deployment's and
+// the project's parts stay as {placeholders}, so the whole shape shows.
+func Template(team workspace.TeamConfig, agent string) string {
+	return Compose(Input{
+		Agent: agent, Team: team, Project: "{project}", Path: "{path}", Goal: "{goal}",
+		Config: workspace.ProjectConfig{Main: "{main}", Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
+	})
+}

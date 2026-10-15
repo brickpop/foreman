@@ -1,5 +1,5 @@
 import type { Instance, Project, Request, Team } from "../api/client";
-import type { Soul } from "../api/types/workspace";
+import type { Look, Soul } from "../api/types/workspace";
 
 // Pure derivations the screens share: who an instance is, how requests are
 // ordered, what a project's state is. Kept apart from components to be tested.
@@ -98,4 +98,59 @@ const harnessLabels: Record<string, string> = {
 /** A harness's label (wiki/product/models/agent-soul.md). */
 export function harnessLabel(harness: string): string {
   return harnessLabels[harness] ?? harness;
+}
+
+const roleLabels: Record<string, string> = {
+  team_lead: "Team Lead",
+  architect: "Architect",
+  engineer: "Engineer",
+  qa: "QA / Tester",
+  reviewer: "Reviewer",
+};
+
+/** A role as it reads: a built-in label, or a custom one with spaces and a capital. */
+export function roleLabel(role: string): string {
+  if (roleLabels[role]) return roleLabels[role];
+  const words = role.replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Who a playbook step or escalation names, as the Team page shows it
+ * (wiki/product/models/team-definition.md#playbook-and-escalation). Unknown
+ * is shown as written, flagged. */
+export function resolveWho(team: Team, who: string): { text: string; known: boolean } {
+  const agents = team.config.agents;
+  if (who === "lead") return { text: agents[team.config.lead]?.name ?? who, known: true };
+  if (who === "members") return { text: "Members", known: true };
+  if (who === "ceo") return { text: "You", known: true };
+  if (agents[who]) return { text: agents[who].name, known: true };
+  const names = Object.values(agents)
+    .filter((s) => s.role === who)
+    .map((s) => s.name);
+  return names.length > 0 ? { text: names.join(", "), known: true } : { text: who, known: false };
+}
+
+/** The avatar's palettes and traits (wiki/product/design/avatar.md#palettes). */
+export const palettes = {
+  color: ["#D9825B", "#8DB86B", "#6FA8DC", "#B48BD6", "#E07A9A", "#4FB3A9", "#CDB46B", "#8E9AAF"],
+  skin: ["#F1C9A5", "#E2AE85", "#C38A62", "#8D5A3B", "#5E3B26"],
+  hairColor: ["#2B2420", "#6B4A2F", "#D8B46A", "#A8A8A8", "#A4482C"],
+  hair: ["short", "long", "curly", "bun", "bald"],
+  eyes: ["dots", "glasses", "shades", "sleepy"],
+  beard: ["none", "stubble", "full", "mustache"],
+} as const;
+
+/** A random face and background (Shuffle, and a new hire). */
+export function randomLook(
+  pick: (n: number) => number = (n) => Math.floor(Math.random() * n),
+): Look {
+  const one = <T>(list: readonly T[]) => list[pick(list.length)];
+  return {
+    color: one(palettes.color),
+    skin: one(palettes.skin),
+    hair: one(palettes.hair),
+    hairColor: one(palettes.hairColor),
+    eyes: one(palettes.eyes),
+    beard: one(palettes.beard),
+  };
 }

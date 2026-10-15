@@ -62,7 +62,6 @@ export function Drawer({
       <Dialog.Portal>
         <Dialog.Content
           aria-describedby={undefined}
-          onInteractOutside={(e) => e.preventDefault()}
           className="fixed top-0 right-0 flex h-full flex-col border-l border-line2 bg-panel shadow-overlay focus:outline-none"
           style={{ width: `min(${width}px, 100vw)`, zIndex: layer }}
         >

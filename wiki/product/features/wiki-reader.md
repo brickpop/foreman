@@ -21,15 +21,15 @@ A centered grid (gap 32). Tree closed: one column `minmax(0, 760px)`. Tree open:
 
 ## Toolbar
 
-- **`Files`** / **`Hide files`** toggle (raised when open). **Closed by default.** While closed, it shows an amber dot if any entry changed since the CEO last looked.
+- **`Files`** toggle, a file-tree icon on its left (raised when open). **Closed by default.** It carries no changed dot: those sit on the entries and folders in the tree.
 - The current entry path (Mono 12px `--tx4`, ellipsis): `<project>/project/wiki/<path>`.
 
 ## File tree
 
-Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` first, then subfolders, then entries, alphabetically. Folders are collapsed except those on the path to the current entry; a click on the chevron expands one.
+Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` first, then subfolders, then entries, alphabetically. Folders are collapsed except those on the path to the current entry. A click anywhere on a folder's row expands or collapses it; expanding a folder that has an `index.md` also opens it.
 
 - Indentation: `10 + 14 × depth` px left padding; padding `5px 10px`; 13.5px; ellipsis on overflow.
-- Folders: 500, `--tx2`; clickable only when the folder has an `index.md` (it opens). Entries: 400, `--tx3`. The current entry: `--raised`, `--tx`.
+- Folders: 500, `--tx2`, led by a chevron (`--tx4`, turned down when open). Entries: 400, `--tx3`, their text in line with the folder names. The current entry: `--raised`, `--tx`.
 - A 6px amber **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").
 
 ## Article

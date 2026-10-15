@@ -41,7 +41,7 @@ Data: projects, teams and deployments from the workspace ([Workspace](../models/
 | Modals ([Deploy](./deploy-team.md), [Add project](./add-project.md)) | Centered panel `min(520px, 100%)`, padding 24, radius 14, on a `rgba(5,6,7,0.55)` backdrop with 20px padding | 50 |
 | Toasts | Fixed top 20px, right 20px, 320px wide, gap 8 | 60 |
 
-Drawers and the side sheet overlay the content; they don't push it. Clicking a modal backdrop closes the modal. Escape closes the topmost overlay, and modals trap focus ([Design system](../design/design-system.md#accessibility-v1-scope)).
+Drawers and the side sheet overlay the content; they don't push it. Clicking outside a drawer or the side sheet closes it, and clicking a modal backdrop closes the modal. Escape closes the topmost overlay, and modals trap focus ([Design system](../design/design-system.md#accessibility-v1-scope)).
 
 ## Toasts
 

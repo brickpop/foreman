@@ -4,8 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -16,7 +17,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -131,33 +131,6 @@ func (p *podman) version() (string, error) {
 	return v.Version, err
 }
 
-// pull fetches an image; the API streams progress as JSON lines.
-func (p *podman) pull(ref string) error {
-	resp, err := p.http.Post("http://d"+apiPrefix+"/images/pull?reference="+url.QueryEscape(ref), "", nil)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, b)
-	}
-	dec := json.NewDecoder(resp.Body)
-	for {
-		var line struct {
-			Error string `json:"error"`
-		}
-		if err := dec.Decode(&line); err == io.EOF {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		if line.Error != "" {
-			return errors.New(line.Error)
-		}
-	}
-}
-
 type mount struct {
 	Destination string   `json:"destination"`
 	Source      string   `json:"source"`
@@ -205,23 +178,8 @@ func (p *podman) resize(id string, cols, rows int) error {
 	return p.call("POST", "/containers/"+id+"/resize", q, nil, nil)
 }
 
-func (p *podman) stop(id string, timeout int) error {
-	return p.call("POST", "/containers/"+id+"/stop", url.Values{"timeout": {fmt.Sprint(timeout)}}, nil, nil)
-}
-
 func (p *podman) remove(id string) error {
 	return p.call("DELETE", "/containers/"+id, url.Values{"force": {"true"}}, nil, nil)
-}
-
-type containerState struct {
-	Running  bool
-	ExitCode int
-}
-
-func (p *podman) inspect(id string) (containerState, error) {
-	var out struct{ State containerState }
-	err := p.call("GET", "/containers/"+id+"/json", nil, nil, &out)
-	return out.State, err
 }
 
 // listByLabel returns the ids of the containers (running or not) carrying label=value.
@@ -237,19 +195,6 @@ func (p *podman) listByLabel(label, value string) ([]string, error) {
 		ids = append(ids, c.ID)
 	}
 	return ids, err
-}
-
-// attach opens the container's terminal as a raw two-way stream. detachKeys is
-// empty so that no key sequence (Podman's default is Ctrl-P Ctrl-Q) is ever
-// swallowed: an agent's terminal must get every keystroke.
-func (p *podman) attach(id string) (*stream, error) {
-	conn, br, err := p.attachRaw(id)
-	if err != nil {
-		return nil, err
-	}
-	s := &stream{conn: conn}
-	go s.pump(br)
-	return s, nil
 }
 
 // attachRaw opens the attach stream: writes go to the conn, reads come from the reader.
@@ -276,62 +221,6 @@ func (p *podman) attachRaw(id string) (net.Conn, *bufio.Reader, error) {
 	}
 	return conn, br, nil
 }
-
-// stream is an attached terminal: everything read is kept, so checks can wait
-// for a string to appear and measure when it did.
-type stream struct {
-	conn net.Conn
-	mu   sync.Mutex
-	buf  []byte
-}
-
-func (s *stream) pump(r io.Reader) {
-	chunk := make([]byte, 4096)
-	for {
-		n, err := r.Read(chunk)
-		s.mu.Lock()
-		s.buf = append(s.buf, chunk[:n]...)
-		s.mu.Unlock()
-		if err != nil {
-			return
-		}
-	}
-}
-
-func (s *stream) write(text string) error {
-	_, err := s.conn.Write([]byte(text))
-	return err
-}
-
-// waitFor waits for want to appear in the output after offset `from` and
-// returns the offset just past it.
-func (s *stream) waitFor(want string, from int, timeout time.Duration) (int, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		s.mu.Lock()
-		i := bytes.Index(s.buf[min(from, len(s.buf)):], []byte(want))
-		n := len(s.buf)
-		s.mu.Unlock()
-		if i >= 0 {
-			return from + i + len(want), nil
-		}
-		if time.Now().After(deadline) {
-			s.mu.Lock()
-			tail := s.buf[max(0, n-200):]
-			s.mu.Unlock()
-			return n, fmt.Errorf("%q didn't appear within %v (last output: %q)", want, timeout, tail)
-		}
-		time.Sleep(2 * time.Millisecond)
-	}
-}
-
-func (s *stream) len() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.buf)
-}
-
-func (s *stream) close() { s.conn.Close() }
 
 // wait blocks until the container exits and returns its exit code.
 func (p *podman) wait(id string) (int, error) {
@@ -362,4 +251,58 @@ func (p *podman) logs(id string) (string, error) {
 		data = data[8+n:]
 	}
 	return out.String(), nil
+}
+
+func connectPodman(r *report) *podman {
+	socket, err := findSocket(r)
+	if !r.check(err, "found the Podman API socket") {
+		return nil
+	}
+	r.info("socket: %s", socket)
+	p := newPodman(socket)
+	v, err := p.version()
+	if !r.check(err, "talked to the REST API") {
+		return nil
+	}
+	r.info("Podman %s, %s/%s", v, runtime.GOOS, runtime.GOARCH)
+	return p
+}
+
+func removeLabelled(r *report, p *podman, value string) {
+	if old, _ := p.listByLabel("foreman.prove", value); len(old) > 0 {
+		for _, id := range old {
+			_ = p.remove(id)
+		}
+		r.info("removed %d leftover container(s) from an earlier run", len(old))
+	}
+}
+
+func newToken() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// runToEnd runs script in a fresh labelled container of image, waits for it to
+// exit, and returns its exit code and output; the container is removed.
+func runToEnd(p *podman, image, label, script string) (int, string, error) {
+	id, err := p.create(createSpec{
+		Name:    fmt.Sprintf("foreman-prove-%s-%s", label, newToken()[:8]),
+		Image:   image,
+		Command: []string{"/bin/sh", "-c", script},
+		Labels:  map[string]string{"foreman.prove": label},
+	})
+	if err != nil {
+		return 0, "", err
+	}
+	defer func() { _ = p.remove(id) }()
+	if err := p.start(id); err != nil {
+		return 0, "", err
+	}
+	code, err := p.wait(id)
+	if err != nil {
+		return 0, "", err
+	}
+	logs, _ := p.logs(id)
+	return code, logs, nil
 }

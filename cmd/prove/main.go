@@ -2,9 +2,8 @@
 // (wiki/backlog/epics/prove.md): small, standalone checks of the runtime facts
 // the design depends on, run on the CEO's machines. Each check prints PASS or
 // FAIL with what it observed. Throwaway: removed when the epic ends.
-//
-//	go run ./cmd/prove a start      # experiment A, first process
-//	go run ./cmd/prove a reattach   # experiment A, a second process
+// What is left serves experiment D until its checks become the Claude Code
+// adapter's integration tests (wiki/backlog/epics/messaging-handoffs.md).
 package main
 
 import (
@@ -19,39 +18,18 @@ func main() {
 	}
 	r := &report{}
 	switch os.Args[1] + " " + os.Args[2] {
-	case "a start":
-		proveAStart(r)
-	case "a reattach":
-		proveAReattach(r)
-	case "c run":
-		proveC(r)
 	case "image build":
 		proveImage(r)
 	case "b login":
 		proveBLogin(r)
 	case "e run":
 		proveE(r)
-	case "storm run":
-		n := 12
-		if len(os.Args) > 3 {
-			fmt.Sscan(os.Args[3], &n)
-		}
-		proveStorm(r, n)
 	case "d run":
 		seconds := 330
 		if len(os.Args) > 3 {
 			fmt.Sscan(os.Args[3], &seconds)
 		}
 		proveD(r, seconds)
-	case "b race":
-		variant, n := "file", 12
-		if len(os.Args) > 3 {
-			variant = os.Args[3]
-		}
-		if len(os.Args) > 4 {
-			fmt.Sscan(os.Args[4], &n)
-		}
-		proveBRace(r, variant, n)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown experiment step %q\n", os.Args[1]+" "+os.Args[2])
 		os.Exit(2)

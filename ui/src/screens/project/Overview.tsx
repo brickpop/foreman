@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { Node } from "../../api/client";
 import { useEntry, useTick, useTree } from "../../app/queries";
+import { Chevron, TreeIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
 import { Button, Dot } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
@@ -32,14 +33,17 @@ export function Overview({ project, entry }: { project: string; entry?: string }
   useEffect(() => {
     if (missing) open("index.md");
   }, [missing]);
-  const anyChanged = hasChanged(tree.data ?? []);
   return (
     <div className="flex flex-col gap-5 px-8 pt-6 pb-16">
       <div className="flex items-center gap-3">
-        <Button variant={files ? "raised" : "secondary"} onClick={() => setFiles(!files)}>
+        <Button
+          variant={files ? "raised" : "secondary"}
+          aria-pressed={files}
+          onClick={() => setFiles(!files)}
+        >
           <span className="flex items-center gap-2">
-            {files ? "Hide files" : "Files"}
-            {!files && anyChanged && <Dot size={6} title="Changed since you last looked" />}
+            <TreeIcon />
+            Files
           </span>
         </Button>
         <span className="truncate font-mono text-xs text-tx4">
@@ -101,10 +105,12 @@ function Tree({
               type="button"
               onClick={() => onOpen(n.path)}
               style={{ paddingLeft: 10 + 14 * depth }}
-              className={`flex w-full items-center gap-2 rounded-md py-[5px] pr-2.5 text-left text-[13.5px] ${
+              className={`flex w-full items-center gap-1.5 rounded-md py-[5px] pr-2.5 text-left text-[13.5px] ${
                 n.path === current ? "bg-raised text-tx" : "text-tx3 hover:bg-hover"
               }`}
             >
+              {/* In line with the folder names beside it. */}
+              <span className="w-3 shrink-0" />
               <span className="truncate">{n.title || n.path}</span>
               {n.changed && <Dot size={6} title="Changed since you last looked" />}
             </button>
@@ -128,33 +134,30 @@ function Folder({
 }) {
   const [open, setOpen] = useState(holds(node, current));
   const index = `${node.path}/index.md`;
+  // The whole row toggles; expanding a folder with an index.md also opens it.
+  const toggle = () => {
+    if (!open && node.hasIndex) onOpen(index);
+    setOpen(!open);
+  };
   return (
     <li>
-      <div
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
         style={{ paddingLeft: 10 + 14 * depth }}
-        className={`flex items-center gap-1 rounded-md py-[5px] pr-2.5 text-[13.5px] font-medium ${
-          current === index ? "bg-raised text-tx" : "text-tx2"
+        className={`flex w-full items-center gap-1.5 rounded-md py-[5px] pr-2.5 text-left text-[13.5px] font-medium ${
+          current === index ? "bg-raised text-tx" : "text-tx2 hover:bg-hover"
         }`}
       >
-        <button
-          type="button"
-          aria-label={open ? "Collapse" : "Expand"}
-          onClick={() => setOpen(!open)}
-          className="w-3 text-tx4"
-        >
-          {open ? "▾" : "▸"}
-        </button>
-        {node.hasIndex ? (
-          <button type="button" onClick={() => onOpen(index)} className="truncate text-left">
-            {node.title || node.path}
-          </button>
-        ) : (
-          <span className="truncate">{node.title || node.path}</span>
-        )}
+        <span className="text-tx4">
+          <Chevron open={open} />
+        </span>
+        <span className="truncate">{node.title || node.path}</span>
         {!open && hasChanged(node.children) && (
           <Dot size={6} title="Changed since you last looked" />
         )}
-      </div>
+      </button>
       {open && <Tree nodes={node.children} current={current} depth={depth + 1} onOpen={onOpen} />}
     </li>
   );

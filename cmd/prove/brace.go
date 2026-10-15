@@ -11,77 +11,16 @@ import (
 	"time"
 )
 
-// Experiment B (wiki/backlog/prove-b-shared-login.md), step 2: the refresh race.
-// Every refresh revokes the previous refresh token, so concurrent sessions
-// sharing one login can kill it. This marks the shared token as expired, then
-// starts N containers at once that all need it, for one way of pointing the
-// harness at the shared login file:
+// Experiment B (wiki/backlog/prove-b-shared-login.md): what is left of its
+// refresh race, which proved the design (prove-b-race is gone). raceRound
+// still checks a fresh login (prove-b-login), and experiment D shifts the
+// login's expiry. The ways of pointing the harness at the shared login file:
 //
 //	file     the file alone, bind-mounted into each private config dir (the design)
 //	dir      the whole shared folder as the config dir
 //	symlink  a link in each private config dir to the shared file
 //
 // Print mode (`claude -p`) is fine here: this measures the login, not sessions.
-
-func proveBRace(r *report, variant string, n int) {
-	if variant != "file" && variant != "dir" && variant != "symlink" {
-		r.fail("unknown variant %q: file, dir or symlink", variant)
-		return
-	}
-	p := connectPodman(r)
-	if p == nil {
-		return
-	}
-	var info struct {
-		Host struct {
-			MemTotal int64 `json:"memTotal"`
-			CPUs     int   `json:"cpus"`
-		} `json:"host"`
-	}
-	if err := p.call("GET", "/info", nil, nil, &info); err == nil {
-		r.info("Podman host: %d CPUs, %.1f GB memory (each Claude process needs roughly 200-300 MB)",
-			info.Host.CPUs, float64(info.Host.MemTotal)/(1<<30))
-	}
-	shared := credentialsDir()
-	credsPath := filepath.Join(shared, ".credentials.json")
-	before, err := readExpiry(credsPath)
-	if !r.check(err, "read the shared login") {
-		r.info("run `just prove-b-login` first")
-		return
-	}
-	r.info("token currently expires %s", before.Format(time.RFC3339))
-	removeLabelled(r, p, "b-race")
-
-	// Round 0: the login must work before the race, or the race proves nothing.
-	if raceRound(r, p, variant, 1, "round 0, baseline: one container on the current login") != 1 {
-		r.fail("the shared login doesn't work even before the race: log in again (`just prove-b-login`), then re-run")
-		return
-	}
-	r.pass("the login works before the race")
-
-	// Round 1: the token is expired for everyone at once.
-	if !r.check(setExpiry(credsPath, time.Now().Add(-time.Minute)), "marked the shared token as expired") {
-		return
-	}
-	ok1 := raceRound(r, p, variant, n, "round 1, expired token, "+strconv.Itoa(n)+" containers at once")
-	after, err := readExpiry(credsPath)
-	if err == nil && after.After(time.Now()) {
-		r.pass("the shared file now holds a refreshed token (expires %s)", after.Format(time.RFC3339))
-	} else {
-		r.fail("the shared file still holds the expired token: refreshes didn't reach it (%v)", err)
-	}
-
-	// Round 2: is the login still alive for everyone?
-	ok2 := raceRound(r, p, variant, n, "round 2, the login after the race")
-	switch {
-	case ok1 == n && ok2 == n:
-		r.pass("variant %q survives the refresh race: %d/%d, then %d/%d", variant, ok1, n, ok2, n)
-	case ok2 == 0:
-		r.fail("variant %q KILLED the shared login (round 2: 0/%d). Log in again (`just prove-b-login`) before trying another variant", variant, n)
-	default:
-		r.fail("variant %q: round 1 %d/%d, round 2 %d/%d", variant, ok1, n, ok2, n)
-	}
-}
 
 // raceRound starts n containers at once, each asking Claude for one word, and
 // returns how many succeeded.

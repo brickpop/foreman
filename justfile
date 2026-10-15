@@ -1,5 +1,5 @@
 # Go packages: explicit, so stray .go files elsewhere (e.g. tmp/) are never picked up.
-go_pkgs := "./cmd/... ./internal/... ./ui ./images"
+go_pkgs := "./cmd/... ./internal/... ./ui ./images ./agentbin"
 
 [private]
 default: help
@@ -13,32 +13,74 @@ help:
 setup:
     cd ui && bun install
 
-# Run Foreman on a workspace with one demo session (the fake harness, or the command you pass), rebuilding the UI on every change (reload the page to see it)
+# Run Foreman on .dev/workspace (or the folder given second), rebuilding the UI on every change (reload the page to see it). `just dev`: agents on the fake harness, Direct engine. `just dev real`: Claude Code, Podman engine. A new workspace starts with team atlas and project sample, on the engine its harness needs
 [group('dev')]
-dev workspace=".dev/workspace" session="":
+dev harness="fake" workspace=".dev/workspace":
     #!/usr/bin/env bash
     set -euo pipefail
+    case "{{harness}}" in fake|real) ;; *) echo "just dev: the harness is fake or real, not '{{harness}}' (just dev real [workspace])" >&2; exit 1;; esac
     mkdir -p "{{workspace}}/.foreman"
-    # Development runs agents as host processes: no Podman machine to start.
-    [ -f "{{workspace}}/.foreman/settings.toml" ] || echo 'engine = "direct"' > "{{workspace}}/.foreman/settings.toml"
-    session="{{session}}"
-    if [ -z "$session" ]; then go build -o .dev/fakeharness ./cmd/fakeharness; session=.dev/fakeharness; fi
+    # A new workspace: the fake harness runs as host processes (no Podman machine
+    # to start); Claude Code runs in Podman.
+    engine=direct; [ "{{harness}}" = real ] && engine=podman
+    [ -f "{{workspace}}/.foreman/settings.toml" ] || echo "engine = \"$engine\"" > "{{workspace}}/.foreman/settings.toml"
+    teams="{{workspace}}/.foreman/teams"
+    if [ ! -d "$teams" ]; then
+        mkdir -p "$teams"
+        printf '%s\n' 'team = "atlas"' 'name = "Atlas"' 'lead = "mara"' '' \
+            '[agents.mara]' 'name = "Mara"' 'role = "team_lead"' 'harness = "claude-code"' '' \
+            '[agents.tove]' 'name = "Tove"' 'role = "engineer"' 'harness = "claude-code"' > "$teams/atlas.toml"
+    fi
+    sample="{{workspace}}/sample"
+    if [ ! -d "$sample" ]; then
+        mkdir -p "$sample/project" "$sample/sample-app"
+        echo 'project = "sample"' > "$sample/project/project.toml"
+        git -C "$sample/project" init --quiet --initial-branch=main
+        app="$sample/sample-app"
+        echo "# Sample app" > "$app/README.md"
+        git -C "$app" init --quiet --initial-branch=main
+        git -C "$app" add README.md
+        git -C "$app" -c user.name=dev -c user.email=dev@localhost -c commit.gpgsign=false commit --quiet -m "First commit"
+    fi
+    # The fake harness is a host program, which a container can't run; Claude Code
+    # gets its login through a mount, which the Direct engine ignores.
+    settings="{{workspace}}/.foreman/settings.toml"
+    direct=no; grep -Eq '^engine *= *"direct"' "$settings" && direct=yes
+    if [ "{{harness}}" = fake ] && [ $direct = no ]; then
+        echo "just dev: {{workspace}} runs on Podman, where the fake harness can't run. Use \`just dev real\` for Claude Code, or set engine = \"direct\" in $settings." >&2
+        exit 1
+    fi
+    if [ "{{harness}}" = real ] && [ $direct = yes ]; then
+        echo "just dev real: {{workspace}} runs on the Direct engine, where Claude Code can't get its login. Set engine = \"podman\" in $settings (or in Settings, then restart), or use \`just dev\` for the fake harness." >&2
+        exit 1
+    fi
+    fake=""
+    if [ "{{harness}}" = "fake" ]; then
+        go build -o .dev/fakeharness ./cmd/fakeharness
+        fake="--fake-harness .dev/fakeharness"
+    fi
+    just agent
     # Build once in the foreground, so a broken UI toolchain stops here with its own error.
     (cd ui && bun run build)
     (cd ui && bun run watch) &
     trap 'kill $! 2>/dev/null' EXIT
-    go run ./cmd/foreman "{{workspace}}" --yes --ui-dir ui/dist/app --demo-session "$session"
+    go run ./cmd/foreman "{{workspace}}" --yes --ui-dir ui/dist/app $fake
 
 # Regenerate the UI's TypeScript types from the Go structs (tygo.yaml); commit the result
 [group('build')]
 types:
     go tool tygo generate
 
-# Build the single `foreman` binary, with the web UI embedded, into bin/
+# Build the single `foreman` binary, with the web UI and foreman-agent embedded, into bin/
 [group('build')]
-build:
+build: agent
     cd ui && bun run build
     go build -o bin/foreman ./cmd/foreman
+
+# Build foreman-agent for the agent containers (Linux, this machine's CPU type), to embed in foreman
+[group('build')]
+agent:
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o agentbin/dist/foreman-agent ./cmd/foreman-agent
 
 # Run every test
 [group('quality')]

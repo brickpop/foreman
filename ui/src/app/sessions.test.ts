@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Instance, Request, Team } from "../api/client";
 import {
+  applyMention,
   clickTab,
   closePane,
   countdown,
@@ -9,6 +10,8 @@ import {
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
+  mentionAt,
+  mentionMatches,
   rosterOrder,
   toggleSplit,
 } from "./sessions";
@@ -110,5 +113,24 @@ describe("the line input's shortcut", () => {
       expect(isLineShortcut({ ...mod, code: "KeyK" }, mac)).toBe(false);
       expect(isLineShortcut({ ...mod, ctrlKey: true, metaKey: true }, mac)).toBe(false);
     }
+  });
+});
+
+describe("mentions in the line input", () => {
+  it("finds the mention being typed before the caret", () => {
+    expect(mentionAt("ask @Ta", 7)).toEqual({ start: 4, query: "Ta" });
+    expect(mentionAt("@", 1)).toEqual({ start: 0, query: "" });
+    expect(mentionAt("ask @Tac to", 11)).toBeNull(); // past it
+    expect(mentionAt("mail me@host", 12)).toBeNull(); // not after a space
+    expect(mentionAt("ask @Tö", 7)).toEqual({ start: 4, query: "Tö" });
+  });
+  it("offers the names that start with it, any case", () => {
+    expect(mentionMatches(["Tic", "Tac", "Toe"], "t")).toEqual(["Tic", "Tac", "Toe"]);
+    expect(mentionMatches(["Tic", "Tac", "Toe"], "TA")).toEqual(["Tac"]);
+    expect(mentionMatches(["Tic"], "x")).toEqual([]);
+  });
+  it("puts the plain name in, then a space, keeping what follows", () => {
+    expect(applyMention("ask @Ta now", 7, 4, "Tac")).toEqual({ text: "ask Tac  now", caret: 8 });
+    expect(applyMention("@", 1, 0, "Toe")).toEqual({ text: "Toe ", caret: 4 });
   });
 });

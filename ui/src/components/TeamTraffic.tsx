@@ -1,8 +1,9 @@
 import { useState } from "react";
-import type { Instance, Team, TeamMessage } from "../api/client";
+import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
 import { agentOf } from "../app/model";
-import { useMessages } from "../app/queries";
-import { type Filter, links, matches, type Thread, threads } from "../app/traffic";
+import { useActions, useMessages } from "../app/queries";
+import { entries, type Filter, links, shows, type Thread } from "../app/traffic";
+import { CodeText } from "./CodeText";
 import { Dot } from "./ui";
 
 // The Team traffic panel (wiki/product/features/sessions.md#team-traffic): a
@@ -40,7 +41,8 @@ export function TeamTraffic({
     if (id === "ceo") return "You";
     return agentOf(teams, id)?.soul.name ?? id.split("@")[0];
   };
-  const shown = threads(messages).filter((t) => matches(t, filter));
+  const actions = useActions(deployment).data ?? [];
+  const shown = entries(messages, actions).filter((e) => shows(e, filter));
   return (
     <aside className="flex w-[360px] shrink-0 flex-col border-l border-line bg-panel">
       <header className="flex items-start justify-between border-b border-line px-4 py-3">
@@ -87,12 +89,21 @@ export function TeamTraffic({
       <div className="min-h-0 flex-1 overflow-auto">
         {shown.length === 0 && (
           <p className="m-0 px-4 py-6 text-center text-[13px] text-tx4">
-            {messages.length === 0 ? "No messages yet." : "Nothing here."}
+            {messages.length + actions.length === 0 ? "Nothing yet." : "Nothing here."}
           </p>
         )}
-        {shown.map((t) => (
-          <ThreadRow key={t.message.id} thread={t} name={name} onOpen={onOpen} />
-        ))}
+        {shown.map((e) =>
+          "thread" in e ? (
+            <ThreadRow
+              key={`m${e.thread.message.id}`}
+              thread={e.thread}
+              name={name}
+              onOpen={onOpen}
+            />
+          ) : (
+            <ActionRow key={`a${e.action.id}`} action={e.action} name={name} />
+          ),
+        )}
       </div>
     </aside>
   );
@@ -117,24 +128,18 @@ function NameTag({ id, name }: { id: string; name: Names }) {
 }
 
 // What each kind of message does, as a verb, and its colour.
-const actions: Record<string, { verb: string; tone: string }> = {
-  ask: { verb: "asks", tone: "text-info" },
-  reply: { verb: "replies", tone: "text-ok" },
-  handoff: { verb: "hands off", tone: "text-tx" },
-  contribute: { verb: "contributes", tone: "text-tx3" },
-  notice: { verb: "notifies", tone: "text-tx3" },
+const verbs: Record<string, { verb: string; tone: string }> = {
+  ask: { verb: "asked", tone: "text-info" },
+  reply: { verb: "replied to", tone: "text-ok" },
+  handoff: { verb: "handed off to", tone: "text-tx2" },
+  contribute: { verb: "wrote to", tone: "text-tx3" },
+  notice: { verb: "notified", tone: "text-tx3" },
 };
 
-/** The action between two names: a small chip in the kind's colour. */
+/** The action between two names: a verb in the past tense, in the kind's colour. */
 function Action({ kind }: { kind: string }) {
-  const a = actions[kind] ?? { verb: kind, tone: "text-tx3" };
-  return (
-    <span
-      className={`rounded-full border border-current/40 px-1.5 text-[11px] leading-[16px] font-medium ${a.tone}`}
-    >
-      {a.verb}
-    </span>
-  );
+  const a = verbs[kind] ?? { verb: kind, tone: "text-tx3" };
+  return <span className={`text-[12px] font-medium ${a.tone}`}>{a.verb}</span>;
 }
 
 /** Who did what to whom: <agent> <action> → <agent>. */
@@ -143,7 +148,6 @@ function Exchange({ message: m, name }: { message: TeamMessage; name: Names }) {
     <span className="flex min-w-0 items-center gap-1.5">
       <NameTag id={m.fromInstance} name={name} />
       <Action kind={m.kind} />
-      <span className="text-[12px] text-tx4">→</span>
       <NameTag id={m.toInstance} name={name} />
     </span>
   );
@@ -333,14 +337,15 @@ function Bubble({
     >
       <span className="flex items-center gap-1.5">
         <NameTag id={m.fromInstance} name={name} />
-        <Action kind={m.kind} />
-        <span className="font-mono text-[10.5px] text-tx4">{m.ref}</span>
+        <span className="font-mono text-[10.5px] text-tx4">
+          {m.kind} · {m.ref}
+        </span>
         <span className="flex-1" />
         <span className="text-[11px] text-tx4">{time(m)}</span>
       </span>
-      <p className="m-0 text-[13px] leading-[1.5] whitespace-pre-wrap text-tx2 select-text">
-        {m.body}
-      </p>
+      <div className="text-[13px] leading-[1.5] whitespace-pre-wrap text-tx2 select-text">
+        <CodeText text={m.body} />
+      </div>
       {m.artifactRef && (
         <span className="font-mono text-[11.5px] text-tx3">Artifact: {m.artifactRef}</span>
       )}
@@ -348,6 +353,81 @@ function Bubble({
         <span className="text-[11.5px] text-accTx">Waiting to be delivered</span>
       )}
       {m.reason && <span className="text-[11.5px] text-err">{m.reason}</span>}
+    </div>
+  );
+}
+
+/** A branch or a commit, as git shows it. */
+function Ref({ children }: { children: React.ReactNode }) {
+  return <span className="font-mono text-[11.5px] text-tx2">{children}</span>;
+}
+
+/** What a git tool did, in a few words: the verb and its object. */
+function ActionText({ action: a }: { action: TeamAction }) {
+  const refused = a.error !== "";
+  switch (a.tool) {
+    case "commit":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? "tried to commit" : "committed"} <span className="text-tx">“{a.message}”</span>
+        </span>
+      );
+    case "switch":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? "tried to switch to" : "switched to"} <Ref>{a.branch}</Ref>
+          {a.repos.some((r) => r.created) && <span className="text-tx4"> (new)</span>}
+        </span>
+      );
+    case "merge":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? "tried to merge" : "merged"} <Ref>{a.branch}</Ref>
+        </span>
+      );
+    case "abort_merge":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? "tried to abort a merge" : "aborted a merge"}
+        </span>
+      );
+    default:
+      return <span className="text-[12.5px] text-tx2">{a.tool}</span>;
+  }
+}
+
+/** One git tool call: who did what, then what happened in each repo (or why
+ * it was refused). */
+function ActionRow({ action: a, name }: { action: TeamAction; name: Names }) {
+  const time = a.createdAt.slice(11, 16);
+  return (
+    <div className="flex flex-col gap-1 border-b border-line bg-side/40 px-4 py-2">
+      <span className="flex min-w-0 items-center gap-1.5">
+        <NameTag id={a.instance} name={name} />
+        <span className="min-w-0 truncate">
+          <ActionText action={a} />
+        </span>
+        <span className="flex-1" />
+        {a.error !== "" && <span className="text-[11.5px] text-err">refused</span>}
+        <span className="text-[11.5px] text-tx4">{time}</span>
+      </span>
+      {a.error !== "" ? (
+        <span className="line-clamp-2 text-[12px] text-tx3">{a.error}</span>
+      ) : (
+        a.repos.map((r) => (
+          <span key={r.repo} className="flex flex-wrap items-center gap-x-2 text-[11.5px] text-tx3">
+            <span className="font-mono">{r.repo}</span>
+            {r.branch && <Ref>{r.branch}</Ref>}
+            {r.commit && <Ref>{r.commit.slice(0, 7)}</Ref>}
+            {(r.conflicts ?? []).length > 0 && (
+              <span className="text-accTx">
+                {r.conflicts.length === 1 ? "1 conflict" : `${r.conflicts.length} conflicts`}:{" "}
+                {r.conflicts.join(", ")}
+              </span>
+            )}
+          </span>
+        ))
+      )}
     </div>
   );
 }

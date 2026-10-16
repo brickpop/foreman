@@ -28,6 +28,7 @@ type Options struct {
 	Events      Events
 	Agents      Agents
 	Messages    Messages
+	Actions     Actions
 	Harnesses   Harnesses
 	Maintenance Maintenance
 	Terminals   Terminals
@@ -42,6 +43,7 @@ func New(o Options) http.Handler {
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
+	actionRoutes(mux, o.Actions)
 	harnessRoutes(mux, o.Harnesses)
 	maintenanceRoutes(mux, o.Maintenance)
 	configRoutes(mux, o.Config)

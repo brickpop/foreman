@@ -41,6 +41,7 @@ PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countd
 GET    /api/requests?project=&status=open
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
+GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge), oldest first
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/merge-requests/:id                one merge request, wherever it is (a Chief of Staff change to the workspace repo has no project)
 GET    /api/merge-requests/:id/diff           {diff}: its branch against main, as a unified diff
@@ -107,6 +108,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |
 | `team.message` | a message is routed | the message |
+| `team.action` | an agent called a git tool | the action |
 | `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
 | `wiki.changed` | files in a project wiki changed | project, paths, versions |
 | `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |

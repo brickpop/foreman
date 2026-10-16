@@ -30,6 +30,7 @@ export const keys = {
   forge: ["forge"],
   maintenance: ["maintenance"],
   messages: ["messages"],
+  actions: ["actions"],
   chiefOfStaff: ["chief-of-staff"],
 } as const;
 
@@ -90,6 +91,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [keys.requests];
     case "team.message":
       return [keys.messages];
+    case "team.action":
+      return [keys.actions];
     case "wiki.changed":
       return [["wiki", String((e.data as { project?: string }).project ?? "")]];
     case "pipeline.changed":
@@ -198,6 +201,15 @@ export function useAnswer() {
     onError: (e: Error) =>
       toast({ title: "Answer not sent", body: e.message, color: "var(--err)" }),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),
+  });
+}
+
+export function useActions(deployment: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.actions, deployment],
+    queryFn: () => c.messages.actions(deployment),
+    enabled: deployment !== "",
   });
 }
 

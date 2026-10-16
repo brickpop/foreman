@@ -377,3 +377,60 @@ func TestAbortMerge(t *testing.T) {
 	}
 	f.refused("mara", "abort_merge", nil, "no_merge")
 }
+
+// actions records what Workflow keeps.
+type actions struct{ kept []store.TeamAction }
+
+func (a *actions) Add(_ context.Context, x store.TeamAction) (store.TeamAction, error) {
+	a.kept = append(a.kept, x)
+	return x, nil
+}
+func (a *actions) List(context.Context, string) ([]store.TeamAction, error) { return a.kept, nil }
+
+// Each git tool call is kept with what it did in each repo, refusals
+// included; a hand-off is a message, not an action.
+func TestGitToolsAreKeptAsActions(t *testing.T) {
+	f := newFixture(t)
+	kept := &actions{}
+	f.w.Actions = kept
+	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
+	f.ok("tove", "commit", map[string]string{"message": "cal v0"})
+	f.refused("tove", "switch", map[string]string{"branch": "main"}, "branch_not_allowed")
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "done"})
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
+	f.ok("mara", "commit", map[string]string{"message": "mara's readme"})
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "README"), "tove\n")
+	f.ok("tove", "commit", map[string]string{"message": "tove's readme"})
+	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
+	f.ok("mara", "abort_merge", nil)
+
+	var tools []string
+	for _, a := range kept.kept {
+		tools = append(tools, a.Tool)
+	}
+	if strings.Join(tools, " ") != "switch commit switch commit commit merge abort_merge" {
+		t.Fatalf("kept %v", tools)
+	}
+	sw, commit, refused, merge, abort := kept.kept[0], kept.kept[1], kept.kept[2], kept.kept[5], kept.kept[6]
+	if sw.Instance != "tove@ledger" || sw.DeploymentID != "atlas@ledger" || sw.Branch != "wt/tove/LED-44" || len(sw.Repos) != 2 || !sw.Repos[0].Created {
+		t.Errorf("switch %+v", sw)
+	}
+	if commit.Message != "cal v0" || len(commit.Repos) != 1 || commit.Repos[0].Repo != "api" || commit.Repos[0].Branch != "wt/tove/LED-44" || len(commit.Repos[0].Commit) != 40 {
+		t.Errorf("commit %+v", commit)
+	}
+	if !strings.HasPrefix(refused.Error, "branch_not_allowed:") || len(refused.Repos) != 0 {
+		t.Errorf("refused %+v", refused)
+	}
+	if merge.Branch != "wt/tove/LED-44" || merge.Error != "" || len(merge.Repos) != 2 {
+		t.Fatalf("merge %+v", merge)
+	}
+	for _, r := range merge.Repos {
+		if r.Branch != "lead/atlas/integration" || (r.Repo == "api") != (len(r.Conflicts) == 1) {
+			t.Errorf("merge in %+v", r)
+		}
+	}
+	if len(abort.Repos) != 1 || abort.Repos[0].Repo != "api" {
+		t.Errorf("abort %+v", abort)
+	}
+}

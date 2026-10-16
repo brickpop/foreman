@@ -13,6 +13,7 @@ import {
   useTeams,
 } from "../app/queries";
 import {
+  applyMention,
   clickTab,
   closePane,
   countdown,
@@ -21,6 +22,8 @@ import {
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
+  mentionAt,
+  mentionMatches,
   type Panes,
   rosterOrder,
   toggleSplit,
@@ -276,6 +279,22 @@ function Pane({
     onSuccess: () => setLine(""),
   });
   const agent = agentOf(teams, instance.id);
+  // @ in the line offers the teammates' names (the agent's own left out).
+  const teammates = Object.entries(agent?.team.config.agents ?? {})
+    .filter(([id]) => id !== instance.agentId)
+    .map(([, soul]) => soul.name);
+  const [mention, setMention] = useState<{ start: number; query: string; index: number } | null>(
+    null,
+  );
+  const options = mention ? mentionMatches(teammates, mention.query) : [];
+  const pick = (choice: string) => {
+    const el = lineInput.current;
+    if (!mention || !el) return;
+    const next = applyMention(line, el.selectionStart, mention.start, choice);
+    setLine(next.text);
+    setMention(null);
+    requestAnimationFrame(() => el.setSelectionRange(next.caret, next.caret));
+  };
   const name = agent?.soul.name ?? instance.agentId;
   const isLead = instance.agentId === lead;
   const leadName = lead ? (agentOf(teams, `${lead}@`)?.soul.name ?? lead) : "the lead";
@@ -376,7 +395,33 @@ function Pane({
       {lineMode && !asleep && (
         // A light box with room to breathe; its 1px border brightens on focus,
         // instead of the heavier focus ring.
-        <div className="px-3 pt-1 pb-3">
+        <div className="relative px-3 pt-1 pb-3">
+          {options.length > 0 && mention && (
+            <div
+              role="listbox"
+              aria-label="Teammates"
+              className="absolute bottom-full left-6 z-10 mb-1 flex min-w-40 flex-col rounded-lg border border-line3 bg-panel p-1 shadow-overlay"
+            >
+              {options.map((o, i) => (
+                <button
+                  key={o}
+                  type="button"
+                  role="option"
+                  aria-selected={i === mention.index}
+                  // mousedown, not click: the textarea keeps the keyboard.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pick(o);
+                  }}
+                  className={`rounded-md px-2.5 py-1.5 text-left text-[13px] font-semibold ${
+                    i === mention.index ? "bg-accSoft text-accTx" : "text-tx2 hover:bg-hover"
+                  }`}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex items-start gap-2.5 rounded-lg border border-line2 bg-term px-4 py-3 focus-within:border-line3">
             <span className="font-mono text-[13px] leading-[1.6] font-medium text-accTx">❯</span>
             {/* Enter sends; Shift+Enter starts a new line, typed as the harness's newline. */}
@@ -386,8 +431,31 @@ function Pane({
               autoFocus
               value={line}
               rows={Math.min(line.split("\n").length, 8)}
-              onChange={(e) => setLine(e.target.value)}
+              onChange={(e) => {
+                setLine(e.target.value);
+                const at = mentionAt(e.target.value, e.target.selectionStart);
+                setMention(at && { ...at, index: 0 });
+              }}
               onKeyDown={(e) => {
+                // While names are offered, the arrows choose, Enter or Tab takes one,
+                // Escape closes the list (not the line).
+                if (options.length > 0 && mention) {
+                  const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+                  if (step) {
+                    e.preventDefault();
+                    const index = (mention.index + step + options.length) % options.length;
+                    setMention({ ...mention, index });
+                    return;
+                  }
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    return pick(options[mention.index]);
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    return setMention(null);
+                  }
+                }
                 if (e.key === "Escape") return closeLine();
                 if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
                 if (e.shiftKey) return; // the textarea adds the line
@@ -396,6 +464,7 @@ function Pane({
                 if (!sendLine.isPending) sendLine.mutate(line);
               }}
               placeholder={linePlaceholder(name, instance.status, isLead)}
+              aria-autocomplete="list"
               aria-label={`Line input to ${name}`}
               className="flex-1 resize-none bg-transparent leading-[1.6] text-tx placeholder:text-tx4 focus-visible:outline-none"
             />

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
@@ -55,7 +57,11 @@ type Deps struct {
 	Git      Git
 	Config   Config
 	Messages Messages
-	Now      func() time.Time // the contributions' dates; time.Now when nil
+	// Actions keeps each git tool call and what it did (the Team traffic
+	// panel); Publish announces it (team.action). Either may be nil.
+	Actions store.Actions
+	Publish func(events.Event)
+	Now     func() time.Time // the contributions' dates; time.Now when nil
 }
 
 // Workflow serves its team tools.
@@ -116,28 +122,57 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	if err != nil {
 		return teamtools.Refusal("git_error", "the project: %v", err)
 	}
-	t := tool{w: w, c: c, project: project}
+	act := &store.TeamAction{DeploymentID: c.Deployment.ID, Instance: c.Instance.ID, Tool: name}
+	t := tool{w: w, c: c, project: project, act: act}
+	var res agentlink.Result
 	switch name {
 	case "switch":
-		return t.switchTo(ctx, strings.TrimSpace(a.Branch))
+		act.Branch = strings.TrimSpace(a.Branch)
+		res = t.switchTo(ctx, act.Branch)
 	case "commit":
-		return t.commit(ctx, strings.TrimSpace(a.Message))
+		act.Message = strings.TrimSpace(a.Message)
+		res = t.commit(ctx, act.Message)
 	case "merge":
-		return t.merge(ctx, strings.TrimSpace(a.Branch))
+		act.Branch = strings.TrimSpace(a.Branch)
+		res = t.merge(ctx, act.Branch)
 	case "abort_merge":
-		return t.abortMerge(ctx)
+		res = t.abortMerge(ctx)
 	case "handoff":
 		return t.handoff(ctx, a.Teammate, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Summary))
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
+	// The git tools are kept as actions, refusals included (a hand-off and a
+	// contribution are messages already).
+	if res.Error {
+		act.Error = res.Text
+	}
+	w.record(ctx, *act)
+	return res
 }
 
-// tool is one call: the caller and its project.
+// record keeps an action and announces it.
+func (w *Workflow) record(ctx context.Context, a store.TeamAction) {
+	if w.Actions == nil {
+		return
+	}
+	saved, err := w.Actions.Add(ctx, a)
+	if err != nil {
+		slog.Warn("keeping an action", "instance", a.Instance, "tool", a.Tool, "err", err)
+		return
+	}
+	if w.Publish != nil {
+		w.Publish(events.Event{Type: "team.action", Data: saved})
+	}
+}
+
+// tool is one call: the caller and its project, and, for a git tool, the
+// action it records.
 type tool struct {
 	w       *Workflow
 	c       teamtools.Caller
 	project workspace.Project
+	act     *store.TeamAction
 }
 
 // repo is one of the caller's worktrees, or the live project repo.
@@ -226,6 +261,7 @@ func (t tool) switchTo(ctx context.Context, branch string) agentlink.Result {
 		if err != nil {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		}
+		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, Created: made})
 		if made {
 			created = append(created, r.name)
 		}
@@ -250,6 +286,7 @@ func (t tool) commitAll(ctx context.Context, message string) (done []string, con
 		switch {
 		case errors.Is(err, git.ErrNothingToCommit):
 		case errors.As(err, &left):
+			t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Conflicts: left.Files})
 			for _, f := range left.Files {
 				conflicts = append(conflicts, r.name+"/"+f)
 			}
@@ -257,6 +294,7 @@ func (t tool) commitAll(ctx context.Context, message string) (done []string, con
 			return done, conflicts, fmt.Errorf("%s: %w", r.name, err)
 		default:
 			branch, _ := t.w.Git.Branch(ctx, r.dir)
+			t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, Commit: sha})
 			done = append(done, fmt.Sprintf("%s (%s, %.8s)", r.name, branch, sha))
 		}
 	}
@@ -307,6 +345,8 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 		if err != nil {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		}
+		into, _ := t.w.Git.Branch(ctx, r.dir)
+		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: into, Conflicts: files})
 		if len(files) > 0 {
 			conflicted = append(conflicted, fmt.Sprintf("%s (%s)", r.name, strings.Join(files, ", ")))
 		} else {
@@ -468,6 +508,8 @@ func (t tool) abortMerge(ctx context.Context) agentlink.Result {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		}
 		aborted = append(aborted, r.name)
+		into, _ := t.w.Git.Branch(ctx, r.dir)
+		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: into})
 	}
 	if len(aborted) == 0 {
 		return teamtools.Refusal("no_merge", "no merge is under way in your repos")

@@ -6,10 +6,12 @@ import type { Status as HarnessStatus } from "./types/harness";
 import type { Draft } from "./types/messaging";
 import type { ImageStatus, Maintenance } from "./types/runner";
 import type {
+  ActionRepo,
   Deployment,
   Instance,
   MergeRequest,
   Request,
+  TeamAction,
   TeamMessage,
   WorkItem,
 } from "./types/store";
@@ -23,6 +25,7 @@ import type { Candidate, Project, Settings, SettingsFile, Soul, Team } from "./t
 // (wiki/product/architecture/overview.md#in-the-ui).
 
 export type {
+  ActionRepo,
   Board,
   Candidate,
   Card,
@@ -42,6 +45,7 @@ export type {
   SettingsFile,
   Soul,
   Team,
+  TeamAction,
   TeamMessage,
   WorkItem,
 };
@@ -116,6 +120,8 @@ export interface RequestsArea {
 
 export interface MessagesArea {
   list(deployment: string): Promise<TeamMessage[]>;
+  /** The git tools the deployment's agents called, oldest first. */
+  actions(deployment: string): Promise<TeamAction[]>;
 }
 
 export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
@@ -297,6 +303,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
+      actions: (deployment) => getJSON(`/api/actions?deployment=${id(deployment)}`),
     },
     pipeline: {
       list: notBuilt("the pipeline"),

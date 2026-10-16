@@ -184,7 +184,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
 		Config: ws, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
 	})
-	flow := workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger})
+	flow := workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger,
+		Actions: state.Actions(), Publish: bus.Publish})
 	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: ws,
 		Blocks: []teamtools.Block{messenger, flow}}
 	link = agentlink.New(secret, manager.Live, router, manager)
@@ -208,6 +209,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Events:      bus,
 		Agents:      views,
 		Messages:    messenger,
+		Actions:     state.Actions(),
 		Harnesses:   login,
 		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:   views,

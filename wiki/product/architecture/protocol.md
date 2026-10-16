@@ -270,7 +270,7 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 
 ## Messages
 
-Messaging's unit: one `ask`, `reply`, `handoff` or `contribute` notice between two instances of one deployment, or a delivery Foreman originates. Stored as a [team message](../models/team-message.md) (agent-to-agent kinds) for the Messages drawer.
+Messaging's unit: one `ask`, `reply`, `handoff` or `contribute` notice between two instances of one deployment, or a delivery Foreman originates. Stored as a [team message](../models/team-message.md) (agent-to-agent kinds) for the Team traffic panel.
 
 ```go
 type Message struct {
@@ -302,6 +302,27 @@ Lifecycle:
 - **Ordering:** per recipient, FIFO by creation. When the recipient becomes idle, every queued message for it is delivered **in one input**, in order, so a burst of messages costs one turn and never interleaves with a turn in progress. One message is its notice; several are one line naming each: `3 new messages: msg-41 from Mara (ask), msg-42 from Rhea (reply to msg-40), msg-43 from Tove (handoff of wt/tove/LED-44). Read each with read_message.`
 - **Recipient state:** `idle` → delivered now · `running` or `awaiting` → queued until the next `idle` · `queued` or `starting` → queued; delivered after the first `idle` · `stopped` within an active deployment → queued, and the sender gets the marker "Tove is stopped; msg-41 will be delivered when it restarts" (the stop already raised a blocked request) · deployment stopped → expired.
 - **Scope:** `From` and `To` are always instances of `Deployment` (or Foreman/CEO). Names in `ask`, `reply` and `handoff` resolve only within the caller's deployment.
+
+## Team actions
+
+What the git tools did, for the CEO to follow (the CEO's decision, 2026-10-16): each call of `switch`, `commit`, `merge` or `abort_merge` is kept in `team_actions`, refusals included (a hand-off and a contribution are messages already). Workflow records it after the call and publishes `team.action`.
+
+```go
+type TeamAction struct {
+    ID           int64
+    DeploymentID string
+    Instance     string        // who called it
+    Tool         string        // switch, commit, merge, abort_merge
+    Branch       string        // switch: to; merge: from
+    Message      string        // commit
+    Repos        []ActionRepo  // what happened in each repo
+    Error        string        // the refusal the agent got; "" when it went through
+    CreatedAt    time.Time
+}
+type ActionRepo struct { Repo, Branch, Commit string; Created bool; Conflicts []string }
+```
+
+Shown in the [Team traffic](../features/sessions.md#team-traffic) panel, between the threads.
 
 ## Requests
 
@@ -403,6 +424,7 @@ Every state change is published on the in-process event bus; the web server stre
 | `instance.line` | instance id, last output line (throttled) | Terminal | Project settings rows |
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Team traffic panel |
+| `team.action` | an [action](#team-actions), once recorded | Workflow | Team traffic panel |
 | `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, Changes, sidebar badges, notifications |
 | `pipeline.changed` | the work item or merge request | Workflow | Changes |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |

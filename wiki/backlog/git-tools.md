@@ -23,4 +23,5 @@ Unblocked: [Agent link](./agent-link.md) and [Messaging](./messaging-delivery.md
 - [x] decided with the CEO (2026-10-16): `update` became `merge` (the git word) with `abort_merge` to back out; agents never rebase (shared branches, tracking by commit); `handoff` no longer commits: `commit` is the one way
 - [x] the team-tools router (`internal/teamtools`): caller from the token, the tools offered by role, one block per tool (Messaging, Workflow); its test keeps the served tools and the prompt in step
 - [x] found on the way and fixed: a stop while an agent was still starting kept its slot, so a redeploy right after never started it (the flaky `TestStopKeepsTheWorktrees`); now reproduced exactly by a test
+- [x] every git tool call is kept as a team action (migration 004, `GET /api/actions`, `team.action`) and shown in Team traffic, refusals included (the CEO's decision, 2026-10-16)
 - [ ] the CEO sees Tove commit and hand off to Mara, and Mara merge it with `merge` (`just dev`)

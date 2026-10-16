@@ -100,3 +100,28 @@ export function isLineShortcut(e: Keys, mac = isMac): boolean {
   const mod = mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
   return e.code === "KeyL" && mod && e.shiftKey && !e.altKey;
 }
+
+/** The @mention being typed just before the caret, if any: where its `@` is,
+ * and what follows it so far. */
+export function mentionAt(text: string, caret: number): { start: number; query: string } | null {
+  const m = /(^|\s)@([\p{L}\p{N}_-]*)$/u.exec(text.slice(0, caret));
+  return m ? { start: caret - m[2].length - 1, query: m[2] } : null;
+}
+
+/** The names a mention could be, in order: those that start with what is typed. */
+export function mentionMatches(names: string[], query: string): string[] {
+  const q = query.toLowerCase();
+  return names.filter((n) => n.toLowerCase().startsWith(q));
+}
+
+/** The text with the mention replaced by the plain name (no `@`: a harness may
+ * read `@` as its own file mention) and a space; and where the caret goes. */
+export function applyMention(
+  text: string,
+  caret: number,
+  start: number,
+  name: string,
+): { text: string; caret: number } {
+  const before = `${text.slice(0, start)}${name} `;
+  return { text: before + text.slice(caret), caret: before.length };
+}

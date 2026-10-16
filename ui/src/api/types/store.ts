@@ -79,6 +79,31 @@ export interface TeamMessage {
   deliveredAt: string /* RFC 3339 */; // zero while queued
 }
 /**
+ * TeamAction is one git tool an agent called (switch, commit, merge,
+ * abort_merge) and what it did (wiki/product/architecture/protocol.md#team-actions).
+ */
+export interface TeamAction {
+  id: number /* int64 */;
+  deploymentId: string;
+  instance: string;
+  tool: string;
+  branch: string; // switch: to; merge: from
+  message: string; // commit
+  repos: ActionRepo[];
+  error: string; // the refusal the agent got; "" when it went through
+  createdAt: string /* RFC 3339 */;
+}
+/**
+ * ActionRepo is what a git tool did in one repo.
+ */
+export interface ActionRepo {
+  repo: string;
+  branch: string; // checked out there after it
+  commit: string; // a commit made
+  created: boolean; // switch: the branch was new
+  conflicts: string[]; // merge: files left with markers
+}
+/**
  * WorkItem is a member's piece of work on its way to main
  * (wiki/product/models/work-item.md).
  */

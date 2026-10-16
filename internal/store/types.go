@@ -77,6 +77,29 @@ type TeamMessage struct {
 	DeliveredAt  time.Time `json:"deliveredAt"` // zero while queued
 }
 
+// TeamAction is one git tool an agent called (switch, commit, merge,
+// abort_merge) and what it did (wiki/product/architecture/protocol.md#team-actions).
+type TeamAction struct {
+	ID           int64        `json:"id"`
+	DeploymentID string       `json:"deploymentId"`
+	Instance     string       `json:"instance"`
+	Tool         string       `json:"tool"`
+	Branch       string       `json:"branch"`  // switch: to; merge: from
+	Message      string       `json:"message"` // commit
+	Repos        []ActionRepo `json:"repos"`
+	Error        string       `json:"error"` // the refusal the agent got; "" when it went through
+	CreatedAt    time.Time    `json:"createdAt"`
+}
+
+// ActionRepo is what a git tool did in one repo.
+type ActionRepo struct {
+	Repo      string   `json:"repo"`
+	Branch    string   `json:"branch"`    // checked out there after it
+	Commit    string   `json:"commit"`    // a commit made
+	Created   bool     `json:"created"`   // switch: the branch was new
+	Conflicts []string `json:"conflicts"` // merge: files left with markers
+}
+
 // WorkItem is a member's piece of work on its way to main
 // (wiki/product/models/work-item.md).
 type WorkItem struct {

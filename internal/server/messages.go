@@ -21,6 +21,27 @@ type Messages interface {
 	PauseCountdown(instance string, paused bool)
 }
 
+// Actions is the git tools agents called (implemented by the state store).
+type Actions interface {
+	List(ctx context.Context, deployment string) ([]store.TeamAction, error)
+}
+
+func actionRoutes(mux *http.ServeMux, a Actions) {
+	mux.HandleFunc("GET /api/actions", func(w http.ResponseWriter, r *http.Request) {
+		deployment := r.URL.Query().Get("deployment")
+		if deployment == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?deployment=<team@project>")
+			return
+		}
+		list, err := a.List(r.Context(), deployment)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, list)
+	})
+}
+
 func messageRoutes(mux *http.ServeMux, m Messages) {
 	mux.HandleFunc("GET /api/messages", func(w http.ResponseWriter, r *http.Request) {
 		deployment := r.URL.Query().Get("deployment")

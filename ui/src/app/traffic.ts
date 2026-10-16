@@ -1,4 +1,4 @@
-import type { TeamMessage } from "../api/client";
+import type { TeamAction, TeamMessage } from "../api/client";
 
 // The Team traffic panel's model (wiki/product/features/sessions.md#team-traffic):
 // who calls whom, and the exchanges as threads, newest first.
@@ -62,4 +62,26 @@ export function matches(t: Thread, f: Filter): boolean {
       ? m.fromInstance === f.agent || m.toInstance === f.agent
       : [m.fromInstance, m.toInstance].sort().join(" ") === [f.a, f.b].sort().join(" "),
   );
+}
+
+/** One line of the panel: a thread, or an action (a git tool an agent called). */
+export type Entry = { thread: Thread } | { action: TeamAction };
+
+/** Threads and actions together, newest activity first. */
+export function entries(messages: TeamMessage[], actions: TeamAction[]): Entry[] {
+  const at = (e: Entry) =>
+    "thread" in e
+      ? Math.max(...[e.thread.message, ...e.thread.replies].map((m) => Date.parse(m.createdAt)))
+      : Date.parse(e.action.createdAt);
+  return [
+    ...threads(messages).map((thread) => ({ thread })),
+    ...actions.map((action) => ({ action })),
+  ].sort((a, b) => at(b) - at(a));
+}
+
+/** Whether an entry shows under a filter: an action is one agent's, so a
+ * pair filter leaves it out. */
+export function shows(e: Entry, f: Filter): boolean {
+  if ("thread" in e) return matches(e.thread, f);
+  return !f || ("agent" in f && f.agent === e.action.instance);
 }

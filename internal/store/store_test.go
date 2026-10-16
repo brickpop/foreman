@@ -49,7 +49,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 3 {
+	if v := version(t, db.sql); v != 4 {
 		t.Errorf("version %d after the first open", v)
 	}
 	var mode string
@@ -536,5 +536,37 @@ func TestMessageRules(t *testing.T) {
 		if _, err := db.Messages().Add(ctx, msg); err == nil {
 			t.Errorf("%s accepted", what)
 		}
+	}
+}
+
+func TestActions(t *testing.T) {
+	db := open(t)
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	a := db.Actions()
+	if list, err := a.List(ctx, "atlas@ledger"); err != nil || len(list) != 0 {
+		t.Fatalf("empty: %v %v", list, err)
+	}
+	commit, err := a.Add(ctx, TeamAction{DeploymentID: "atlas@ledger", Instance: "tove@ledger", Tool: "commit", Message: "cal v0",
+		Repos: []ActionRepo{{Repo: "api", Branch: "wt/tove/main", Commit: "1a2b3c4d"}}})
+	if err != nil || commit.ID == 0 || commit.CreatedAt.IsZero() {
+		t.Fatalf("%+v %v", commit, err)
+	}
+	if _, err := a.Add(ctx, TeamAction{DeploymentID: "atlas@ledger", Instance: "tove@ledger", Tool: "switch", Branch: "main", Error: "branch_not_allowed: …"}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := a.List(ctx, "atlas@ledger")
+	if err != nil || len(list) != 2 {
+		t.Fatalf("%v %v", list, err)
+	}
+	if got := list[0]; got.Message != "cal v0" || len(got.Repos) != 1 || got.Repos[0].Commit != "1a2b3c4d" || got.Error != "" {
+		t.Errorf("commit %+v", got)
+	}
+	if got := list[1]; got.Tool != "switch" || got.Branch != "main" || got.Error == "" || got.Repos == nil {
+		t.Errorf("refused switch %+v", got)
+	}
+	if _, err := a.Add(ctx, TeamAction{DeploymentID: "nope", Instance: "x", Tool: "commit"}); err == nil {
+		t.Error("an action of no deployment was stored")
 	}
 }

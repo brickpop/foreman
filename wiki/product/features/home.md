@@ -13,6 +13,10 @@ The CEO's inbox: everything that needs a decision across all projects, then a on
 - Title (page H1): `N things need you`, `1 thing needs you`, or `All clear` when there are no open requests.
 - Subtitle: `<running> sessions working across <deployments> deployments.` Running = instances with status `running` ([Instance](../models/instance.md)); deployments = active [deployments](../models/deployment.md).
 
+## Setup checklist
+
+While any setup step is left, Home starts with the setup checklist, above the requests: Podman, its machine (macOS), the agent image, each harness login, a team, a project, a code repo per project, each with its button ([First run](./first-run.md#the-checklist)). It goes away once every step is done.
+
 ## Request list
 
 One **request panel** per open [request](../models/request.md), across all projects (gap 10). The kinds, their actions and their effect are defined in [Requests](./requests.md). Home and [Changes](./changes.md) use the same request panel component, so they can't drift: approvals and questions carry the free-text answer field here too. The differences below are only the extra context Changes adds (source line, PR link).

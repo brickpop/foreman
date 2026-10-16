@@ -1,0 +1,314 @@
+// Package setup is the setup checklist and keeps the engine connected: Foreman
+// starts whatever is missing, reaches Podman once it is there, and says what
+// is left to do (wiki/product/features/first-run.md).
+package setup
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"runtime"
+	"sort"
+	"sync"
+	"time"
+
+	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/runner"
+	"github.com/brickpop/foreman/internal/runner/podman"
+	"github.com/brickpop/foreman/internal/workspace"
+)
+
+// Engine is the Podman engine as setup needs it.
+type Engine interface {
+	State(ctx context.Context) podman.State
+	// Connect reaches Podman; start also starts a stopped machine (macOS).
+	Connect(ctx context.Context, start bool) error
+	CreateMachine(ctx context.Context, cpus, memory int) error
+}
+
+// Config is the workspace's teams and projects.
+type Config interface {
+	Teams() []workspace.Team
+	Projects() []workspace.Project
+}
+
+// Deps is what the checklist reads and the watcher drives.
+type Deps struct {
+	Engine    Engine // nil for the Direct engine: no Podman or image steps
+	Images    runner.Images
+	Harnesses func() []harness.Status
+	Config    Config
+	// Ready runs once, the first time the engine answers: restoring the
+	// instances and delivering what waited. Retried while it fails.
+	Ready func(ctx context.Context) error
+	// Reconnected runs each time the engine answers again after being away:
+	// delivering what waited meanwhile.
+	Reconnected func(ctx context.Context)
+	Publish     func(events.Event)
+	Every       time.Duration // how often the watcher checks Podman (default 3 s)
+}
+
+// ErrNotReady means agents can't start yet: Podman isn't there or isn't
+// running, or the instances aren't restored yet.
+var ErrNotReady = errors.New("podman isn't running")
+
+// Setup is the checklist and the engine's watcher.
+type Setup struct {
+	Deps
+	poke chan struct{}
+
+	mu    sync.Mutex
+	ready bool         // Ready ran
+	last  podman.State // what the last check saw, to publish changes
+}
+
+// New returns the setup block; Run starts watching.
+func New(d Deps) *Setup {
+	if d.Every == 0 {
+		d.Every = 3 * time.Second
+	}
+	return &Setup{Deps: d, poke: make(chan struct{}, 1)}
+}
+
+// Run keeps the engine connected until ctx ends: at once (starting a stopped
+// macOS machine, as Foreman's launch always has), then every Every, or sooner
+// when poked. The first time the engine answers, it runs Ready and builds the
+// agent image in the background.
+func (s *Setup) Run(ctx context.Context) {
+	start := true
+	for {
+		s.check(ctx, start)
+		start = false
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.poke:
+		case <-time.After(s.Every):
+		}
+	}
+}
+
+func (s *Setup) check(ctx context.Context, start bool) {
+	if s.Engine == nil {
+		s.becomeReady(ctx, false)
+		return
+	}
+	err := s.Engine.Connect(ctx, start)
+	state := s.Engine.State(ctx)
+	s.mu.Lock()
+	changed := state.Installed != s.last.Installed || state.Machine != s.last.Machine ||
+		state.Running != s.last.Running || state.Error != s.last.Error
+	connected := err == nil && !s.last.Running
+	s.last = state
+	s.mu.Unlock()
+	if changed {
+		s.changed()
+	}
+	if err != nil {
+		return
+	}
+	if connected {
+		go s.build(context.WithoutCancel(ctx))
+	}
+	s.becomeReady(ctx, connected)
+}
+
+// becomeReady runs Ready until it succeeds once; after that, Reconnected runs
+// whenever the engine answers again (again).
+func (s *Setup) becomeReady(ctx context.Context, again bool) {
+	s.mu.Lock()
+	ready := s.ready
+	s.mu.Unlock()
+	if ready {
+		if again && s.Reconnected != nil {
+			s.Reconnected(ctx)
+		}
+		return
+	}
+	if err := s.Ready(ctx); err != nil {
+		slog.Error("restoring after the engine came up", "err", err)
+		return
+	}
+	s.mu.Lock()
+	s.ready = true
+	s.mu.Unlock()
+	s.changed()
+}
+
+// build makes sure the agent image exists, so the first deploy doesn't wait.
+func (s *Setup) build(ctx context.Context) {
+	s.changed()
+	if _, err := s.Images.Ensure(ctx, ""); err != nil {
+		slog.Error("building the agent image", "err", err)
+	}
+	s.changed()
+}
+
+func (s *Setup) changed() {
+	s.Publish(events.Event{Type: "setup.changed", Data: struct{}{}})
+}
+
+// Poke makes the watcher check now.
+func (s *Setup) Poke() {
+	select {
+	case s.poke <- struct{}{}:
+	default:
+	}
+}
+
+// Blocked is nil when agents can start, or why they can't: deploying and
+// waking an agent wait for it.
+func (s *Setup) Blocked() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch {
+	case s.Deps.Engine != nil && !s.last.Running:
+		return fmt.Errorf("%w: see the setup checklist on Home", ErrNotReady)
+	case !s.ready:
+		return errors.New("foreman is still restoring the agents")
+	}
+	return nil
+}
+
+// StartPodman starts the stopped macOS machine (the CEO's Start), in the
+// background: the checklist follows through setup.changed.
+func (s *Setup) StartPodman(ctx context.Context) {
+	if s.Deps.Engine == nil {
+		return
+	}
+	go func() {
+		if err := s.Deps.Engine.Connect(context.WithoutCancel(ctx), true); err != nil {
+			slog.Error("starting Podman", "err", err)
+		}
+		s.Poke()
+	}()
+}
+
+// CreateMachine creates the macOS Podman machine with cpus and memory (GiB).
+func (s *Setup) CreateMachine(ctx context.Context, cpus, memory int) error {
+	if s.Deps.Engine == nil {
+		return errors.New("setup: the Direct engine has no machine")
+	}
+	if err := s.Deps.Engine.CreateMachine(ctx, cpus, memory); err != nil {
+		return err
+	}
+	s.Poke()
+	return nil
+}
+
+// Steps is the checklist now, in order.
+func (s *Setup) Steps(ctx context.Context) []Step {
+	var steps []Step
+	if s.Deps.Engine != nil {
+		s.mu.Lock()
+		ready := s.ready
+		s.mu.Unlock()
+		for _, step := range podmanSteps(s.Deps.Engine.State(ctx), runtime.GOOS) {
+			if step.Kind == "running" && step.State == "done" && !ready {
+				step.State, step.Detail = "working", "Restoring the agents"
+			}
+			steps = append(steps, step)
+		}
+	}
+	for _, im := range s.Images.Status(ctx) {
+		steps = append(steps, imageStep(im))
+	}
+	teams, projects := s.Config.Teams(), s.Config.Projects()
+	for _, h := range s.Harnesses() {
+		if used(h.ID, teams) {
+			step := Step{Kind: "harness", Subject: h.ID, State: "done"}
+			if !h.Connected {
+				step.State, step.Detail = "todo", "Not logged in yet: its agents can't start"
+			}
+			steps = append(steps, step)
+		}
+	}
+	steps = append(steps, presence("team", len(teams), "Create a team"))
+	steps = append(steps, presence("project", len(projects), "Add a project"))
+	sort.Slice(projects, func(i, j int) bool { return projects[i].ID < projects[j].ID })
+	for _, p := range projects {
+		if len(p.Repos) == 0 && len(p.Problems) == 0 {
+			steps = append(steps, Step{Kind: "repo", Subject: p.ID, State: "todo",
+				Detail: p.ID + " has no code repo for agents to work in (New repo)"})
+		}
+	}
+	return steps
+}
+
+// used reports whether a team uses harness h; with no team yet, every
+// supported harness is listed, since the first team will need one.
+func used(h string, teams []workspace.Team) bool {
+	if len(teams) == 0 {
+		return true
+	}
+	for _, t := range teams {
+		for _, a := range t.Config.Agents {
+			if a.Harness == h {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func presence(kind string, n int, todo string) Step {
+	if n > 0 {
+		return Step{Kind: kind, State: "done"}
+	}
+	return Step{Kind: kind, State: "todo", Detail: todo}
+}
+
+func podmanSteps(st podman.State, goos string) []Step {
+	install := "Install Podman: sudo dnf install podman (or your distribution's package)"
+	if goos == "darwin" {
+		install = "Install Podman: brew install podman"
+	}
+	steps := []Step{{Kind: "podman", State: "done", Detail: st.Version}}
+	if !st.Installed {
+		steps[0].State, steps[0].Detail = "todo", install
+	}
+	if goos == "darwin" {
+		machine := Step{Kind: "machine", State: "done", Log: st.Log}
+		switch st.Machine {
+		case "":
+			machine.State, machine.Detail = "todo", "Needs Podman installed first"
+		case "none":
+			machine.State, machine.Detail = "todo", "Create the Podman machine, where agents run"
+			if b := st.Bounds; b != nil {
+				machine.Machine = &MachineSize{MinMemory: b.MinMemory, MaxMemory: b.MaxMemory,
+					Memory: b.Memory, MaxCPUs: b.MaxCPUs, CPUs: b.CPUs}
+			}
+		case "creating":
+			machine.State, machine.Detail = "working", "Creating the Podman machine"
+		}
+		steps = append(steps, machine)
+	}
+	running := Step{Kind: "running", State: "done", Detail: st.Version}
+	switch {
+	case st.Running:
+	case !st.Installed || st.Machine == "none" || st.Machine == "creating":
+		running.State, running.Detail = "todo", "Waits for the steps above"
+	case st.Machine == "stopped":
+		running.State, running.Detail = "todo", "The Podman machine is stopped (Start)"
+	default:
+		running.State, running.Detail = "failed", st.Error
+	}
+	return append(steps, running)
+}
+
+func imageStep(im runner.ImageStatus) Step {
+	step := Step{Kind: "image", Subject: im.Name, Log: im.Log}
+	switch im.State {
+	case "ready":
+		step.State = "done"
+	case "building":
+		step.State, step.Detail = "working", "Building the agent image (a few minutes, once)"
+	case "failed":
+		step.State, step.Detail = "failed", "The agent image didn't build (Settings → Maintenance: Rebuild)"
+	default:
+		step.State, step.Detail = "todo", "Builds once Podman runs"
+	}
+	return step
+}

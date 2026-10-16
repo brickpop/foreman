@@ -28,3 +28,6 @@ packages:
   - path: github.com/brickpop/foreman/internal/messaging
     output_path: ui/src/api/types/messaging.ts
     include_files: [types.go]
+  - path: github.com/brickpop/foreman/internal/setup
+    output_path: ui/src/api/types/setup.ts
+    include_files: [types.go]

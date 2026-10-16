@@ -35,8 +35,8 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 - **On deploy only the lead starts.** Its harness starts with the goal as its **opening message**, `Your goal on <project>: <goal>`, and stays an interactive session ([Harness adapters](./harness-adapters.md): opener); the goal is in its session prompt too. Only on its first start: a restart continues the conversation and never gives the goal twice.
 - **The other members are `asleep`:** an instance with no container, no sandbox yet, and no session slot.
 - **Waking** an asleep instance queues it and starts it like any other (`POST /api/instances/:id/wake`). In epic 1 the CEO wakes one with **Start** in its pane ([Sessions](../features/sessions.md#panes)); from epic 2 a delivery to it (an `ask`, a handoff, a reply) wakes it first ([Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md)). Waking any other status does nothing.
-- After a Foreman restart, an asleep instance stays asleep.
-- **Later:** an agent that is done and waits for nothing goes back to `asleep`, its harness exited so that waking it resumes its conversation (native resume). It needs idle detection (epic 2) and resume per harness; see the backlog's *Not yet scheduled*.
+- After a Foreman restart, an asleep instance stays asleep. The restore itself waits until Podman first answers ([First run](../features/first-run.md#foreman-always-starts)): Foreman serves before that.
+- **Later:** an agent that is done and waits for nothing goes back to `asleep`, its harness exited so that waking it resumes its conversation (native resume). It needs idle detection (epic 2) and resume per harness; see the [Idle sleep](../../backlog/idle-sleep.md) card (a setting, off by default; Foreman asks the agent, which calls `idle()`).
 
 ### Status transitions
 

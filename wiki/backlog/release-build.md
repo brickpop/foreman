@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: install-first-run
@@ -31,4 +31,4 @@ epic: install-first-run
 - [x] old copies: refreshed at start, removed after 7 unused days (`TestWriteAgent`)
 - [x] the release binary, run from an empty folder, serves the UI and writes its foreman-agent (checked by hand on Linux arm64); the Containerfile was already embedded, and `just test-podman` builds images from it
 - [x] the README's install section: one binary, plus Podman
-- [ ] on the Mac: `just build`, and `just test-podman` (its new test: a container runs on Foreman's CPU type)
+- [x] on the Mac: `just build`, and `just test-podman` (its new test: a container runs on Foreman's CPU type)

@@ -23,8 +23,8 @@ import (
 // The tag is a hash of the Containerfile, so the image is rebuilt only when
 // the file changes.
 type Images struct {
-	c             *client
-	name          string // e.g. localhost/foreman/harness
+	r             *Runner // reached through the engine, so a reconnection is followed
+	name          string  // e.g. localhost/foreman/harness
 	containerfile []byte
 
 	build sync.Mutex // one build at a time; concurrent Ensures share it
@@ -39,7 +39,7 @@ var _ runner.Images = (*Images)(nil)
 
 // Images returns the image builder for the image name, built from containerfile.
 func (r *Runner) Images(name string, containerfile []byte) *Images {
-	return &Images{c: r.c, name: name, containerfile: containerfile}
+	return &Images{r: r, name: name, containerfile: containerfile}
 }
 
 // maxLog bounds the build log kept for Settings → Maintenance (its end).
@@ -114,7 +114,11 @@ func (im *Images) appendLog(s string) {
 }
 
 func (im *Images) exists(ctx context.Context, ref string) (bool, error) {
-	err := im.c.call(ctx, "GET", "/images/"+url.PathEscape(ref)+"/exists", nil, nil, nil)
+	c, err := im.r.client()
+	if err != nil {
+		return false, err
+	}
+	err = c.call(ctx, "GET", "/images/"+url.PathEscape(ref)+"/exists", nil, nil, nil)
 	var api *apiError
 	switch {
 	case err == nil:
@@ -155,6 +159,10 @@ func (im *Images) post(ctx context.Context, ref string, fresh bool) error {
 	if err := tw.Close(); err != nil {
 		return err
 	}
+	c, err := im.r.client()
+	if err != nil {
+		return err
+	}
 	labels, _ := json.Marshal(map[string]string{"foreman.image": im.name})
 	q := url.Values{"t": {ref, im.name + ":latest"}, "dockerfile": {"Containerfile"}, "labels": {string(labels)}}
 	if fresh {
@@ -166,7 +174,7 @@ func (im *Images) post(ctx context.Context, ref string, fresh bool) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/x-tar")
-	resp, err := im.c.http.Do(req)
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return err
 	}

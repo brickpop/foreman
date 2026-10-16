@@ -64,6 +64,10 @@ GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges h
 PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
 GET    /api/maintenance                       {running, engine, podman, images}: the engine running now (podman or direct) and its state; why Podman can't be chosen ("" when installed); each image's name, ref, state, last build log
 POST   /api/maintenance/rebuild               202: rebuild the images without cache; GET /api/maintenance follows it
+
+GET    /api/setup                            the setup checklist: [{kind, subject, state, detail, log, machine?}] in order ([First run](../features/first-run.md))
+POST   /api/setup/podman/start               202: start the stopped Podman machine (macOS); the checklist follows it
+POST   /api/setup/podman/machine             {cpus, memory (GiB)}: 202, create and start the Podman machine (macOS) in the background; 409 CANT_CREATE when out of bounds or a machine exists
 GET    /api/events                            SSE: requests, status, file changes
 ```
 
@@ -85,6 +89,7 @@ Resource ids: project = folder name; team = team id; instance = `agent@project` 
 | 404 `NOT_FOUND` | Unknown project, team, instance, entry…, or an endpoint the server doesn't have (never the web app's page) |
 | 409 `VERSION_CONFLICT` | Guarded write against a stale version |
 | 409 `ALREADY_DEPLOYED` | Deploying a team to a project it's already on |
+| 409 `NOT_READY` | Deploying or waking an agent before Podman runs and the instances are restored ([First run](../features/first-run.md)) |
 | 500 `SERVER_ERROR` | Anything unexpected (logged with details server-side) |
 
 ## Version-guarded writes
@@ -113,6 +118,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `wiki.changed` | files in a project wiki changed | project, paths, versions |
 | `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |
 | `workspace.changed` | projects or repos appeared or disappeared | `{}`: refetch the project list |
+| `setup.changed` | Podman appeared, started, stopped or failed; the instances were restored; the background image build started or ended | `{}`: refetch the checklist |
 
 The notifier also derives browser notifications and toasts from these events on the client ([Notifications](../features/notifications.md)). On reconnect, the client refetches what it shows (SSE `Last-Event-ID` replay is not required).
 

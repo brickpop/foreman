@@ -771,3 +771,40 @@ func TestProcessesNameTheirWorkspace(t *testing.T) {
 		t.Errorf("names %q %q", a.processName("mara@ledger"), b.processName("mara@ledger"))
 	}
 }
+
+// While the engine isn't ready (Podman not running), deploying and the CEO's
+// Start refuse, and nothing is created or started; once it is, both work.
+func TestDeployAndWakeWaitForTheEngine(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	var blocked atomic.Bool
+	blocked.Store(true)
+	f.m.Blocked = func() error {
+		if blocked.Load() {
+			return errors.New("podman isn't running")
+		}
+		return nil
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); !errors.Is(err, ErrNotReady) || !strings.Contains(err.Error(), "podman isn't running") {
+		t.Fatalf("deploy: %v", err)
+	}
+	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
+		t.Fatalf("deployed anyway: %+v", deps)
+	}
+	blocked.Store(false)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	blocked.Store(true)
+	if err := f.m.Wake(ctx, "tove@ledger"); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("wake: %v", err)
+	}
+	if inst, _ := f.db.Instances().Get(ctx, "tove@ledger"); inst.Status != Asleep {
+		t.Errorf("woken anyway: %s", inst.Status)
+	}
+	blocked.Store(false)
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Running)
+}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
 
@@ -15,16 +14,14 @@ import (
 const harnessImage = "localhost/foreman/harness"
 
 // engine picks the execution engine and its image builder from the `engine`
-// setting (wiki/product/models/workspace-settings.md). close ends what it
-// started (a Podman service on Linux); containers keep running.
-func engine(ctx context.Context, choice string, stdout io.Writer) (runner.Runner, runner.Images, func(), error) {
+// setting (wiki/product/models/workspace-settings.md). pod is the Podman
+// engine, not connected yet (the setup watcher reaches it), or nil for the
+// Direct engine.
+func engine(choice string, stdout io.Writer) (r runner.Runner, im runner.Images, pod *podman.Runner) {
 	if choice == "direct" {
 		fmt.Fprintln(stdout, "WARNING: engine = \"direct\": agents run as plain processes on this machine, with NO isolation (development only)")
-		return direct.Runner{}, direct.Images{}, func() {}, nil
+		return direct.Runner{}, direct.Images{}, nil
 	}
-	r, err := podman.New(ctx)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("podman: %w", err)
-	}
-	return r, r.Images(harnessImage, images.Harness), r.Close, nil
+	pod = podman.Open()
+	return pod, pod.Images(harnessImage, images.Harness), pod
 }

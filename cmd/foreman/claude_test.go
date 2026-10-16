@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/agentbin"
+	"github.com/brickpop/foreman/internal/setup"
 	"github.com/brickpop/foreman/internal/store"
 )
 
@@ -152,6 +153,14 @@ func startClaudeWorkspace(t *testing.T, login string) *claudeWorkspace {
 		}
 		if time.Now().After(deadline) {
 			t.Fatalf("Foreman didn't start:\n%s", out.String())
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	// Foreman serves before Podman answers: agents start once the checklist
+	// says Podman runs and the instances are restored.
+	for !c.podmanRuns() {
+		if time.Now().After(deadline) {
+			t.Fatalf("Podman never ran:\n%s", out.String())
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
@@ -379,4 +388,23 @@ func (c *claudeWorkspace) toolCalls(agent, tool string) int {
 		}
 	}
 	return n
+}
+
+// podmanRuns reports whether the setup checklist says Podman runs.
+func (c *claudeWorkspace) podmanRuns() bool {
+	res, err := c.do(http.MethodGet, "/api/setup", nil)
+	if err != nil {
+		return false
+	}
+	defer res.Body.Close()
+	var steps []setup.Step
+	if json.NewDecoder(res.Body).Decode(&steps) != nil {
+		return false
+	}
+	for _, s := range steps {
+		if s.Kind == "running" {
+			return s.State == "done"
+		}
+	}
+	return false
 }

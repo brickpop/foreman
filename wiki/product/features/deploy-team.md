@@ -20,7 +20,7 @@ A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project 
 
 `POST /api/deployments {team, project, goal}` ([API](../architecture/api.md)). Existing deployments are untouched.
 
-It is refused, with the reason shown in the dialog and nothing created, when the team or project has problems, when a member's harness isn't supported yet, or when a member's harness has no login yet (`claude-code isn't connected yet: log in under Settings → Harnesses → Connect`).
+It is refused, with the reason shown in the dialog and nothing created, before Podman runs (`409 NOT_READY`; the dialog says so beforehand, linking to the setup on Home, [First run](./first-run.md#deploying)), when the team or project has problems, when a member's harness isn't supported yet, or when a member's harness has no login yet (`claude-code isn't connected yet: log in under Settings → Harnesses → Connect`).
 
 The dialog doesn't wait for that refusal: once a team is chosen, each of its harnesses without a login gets a row, `<Harness> isn't connected yet, so this team's agents can't start.`, with a small **`Connect`** button that opens the Connect dialog ([Settings → Harnesses](./settings.md#harnesses)) over this one. Deploy stays disabled until every one is connected.
 

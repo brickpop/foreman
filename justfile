@@ -74,16 +74,17 @@ dev harness="real" workspace="":
 types:
     go tool tygo generate
 
-# Build the single `foreman` binary, with the web UI and foreman-agent embedded, into bin/
+# Build the single `foreman` binary, with the web UI and foreman-agent embedded, into bin/ (the release build: it refuses to compile without them)
 [group('build')]
 build: agent
     cd ui && bun run build
-    go build -o bin/foreman ./cmd/foreman
+    go test -tags release ./agentbin ./ui
+    go build -tags release -o bin/foreman ./cmd/foreman
 
-# Build foreman-agent for the agent containers (Linux, this machine's CPU type), to embed in foreman
+# Build foreman-agent for the agent containers (Linux, both CPU types), to embed in foreman
 [group('build')]
 agent:
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags "-s -w" -o agentbin/dist/foreman-agent ./cmd/foreman-agent
+    for arch in amd64 arm64; do CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w" -o agentbin/dist/foreman-agent-$arch ./cmd/foreman-agent || exit 1; done
 
 # Run every test
 [group('quality')]
@@ -104,7 +105,7 @@ race:
 # Format check, vet, staticcheck, generated types up to date, and the web linter
 [group('quality')]
 lint:
-    @test -z "$(gofmt -l cmd internal ui/embed.go images)" || (gofmt -l cmd internal ui/embed.go images && echo "gofmt: files above need formatting" && exit 1)
+    @test -z "$(gofmt -l cmd internal ui/*.go images agentbin)" || (gofmt -l cmd internal ui/*.go images agentbin && echo "gofmt: files above need formatting" && exit 1)
     go vet {{go_pkgs}}
     go tool staticcheck {{go_pkgs}}
     @before="$(cat ui/src/api/types/*.ts | cksum)"; go tool tygo generate; [ "$before" = "$(cat ui/src/api/types/*.ts | cksum)" ] || (echo "ui/src/api/types was stale: regenerated it, review the change" && exit 1)

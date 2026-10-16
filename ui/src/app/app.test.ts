@@ -48,14 +48,17 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "config.changed", data: { object: "team" } })).toEqual([
       keys.teams,
       ["prompt"],
+      keys.setup,
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "settings" } })).toEqual([
       keys.settings,
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "project" } })).toEqual([
       keys.projects,
+      keys.setup,
     ]);
-    expect(staleKeys({ type: "workspace.changed", data: {} })).toEqual([keys.projects]);
+    expect(staleKeys({ type: "workspace.changed", data: {} })).toEqual([keys.projects, keys.setup]);
+    expect(staleKeys({ type: "setup.changed", data: {} })).toEqual([keys.setup, keys.maintenance]);
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
     expect(staleKeys({ type: "request.created", data: {} })).toEqual([keys.requests]);
     expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages]);

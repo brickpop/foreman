@@ -5,6 +5,7 @@ import type { Account as ForgeAccount } from "./types/forge";
 import type { Status as HarnessStatus } from "./types/harness";
 import type { Draft } from "./types/messaging";
 import type { ImageStatus, Maintenance } from "./types/runner";
+import type { MachineSize, Step as SetupStep } from "./types/setup";
 import type {
   ActionRepo,
   Deployment,
@@ -36,6 +37,7 @@ export type {
   HarnessStatus,
   ImageStatus,
   Instance,
+  MachineSize,
   Maintenance,
   MergeRequest,
   Node,
@@ -43,6 +45,7 @@ export type {
   Request,
   Settings,
   SettingsFile,
+  SetupStep,
   Soul,
   Team,
   TeamAction,
@@ -105,6 +108,15 @@ export interface MaintenanceArea {
   status(): Promise<Maintenance>;
   /** Starts rebuilding the images without cache; status shows the progress. */
   rebuild(): Promise<void>;
+}
+
+/** The setup checklist on Home (first-run.md). */
+export interface SetupArea {
+  steps(): Promise<SetupStep[]>;
+  /** Starts the stopped Podman machine; the steps follow its progress. */
+  startPodman(): Promise<void>;
+  /** Creates the Podman machine (macOS), memory in GiB. */
+  createMachine(size: { cpus: number; memory: number }): Promise<void>;
 }
 
 export interface ForgeArea {
@@ -206,6 +218,7 @@ export interface ForemanClient {
   agents: AgentsArea;
   harnesses: HarnessesArea;
   maintenance: MaintenanceArea;
+  setup: SetupArea;
   forge: ForgeArea;
   requests: RequestsArea;
   messages: MessagesArea;
@@ -291,6 +304,11 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     maintenance: {
       status: () => getJSON("/api/maintenance"),
       rebuild: () => send("POST", "/api/maintenance/rebuild"),
+    },
+    setup: {
+      steps: () => getJSON("/api/setup"),
+      startPodman: () => send("POST", "/api/setup/podman/start"),
+      createMachine: (size) => send("POST", "/api/setup/podman/machine", size),
     },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {

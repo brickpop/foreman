@@ -18,10 +18,13 @@ import {
   useProjects,
   useRequests,
   useSettings,
+  useSetup,
   useTeams,
 } from "../app/queries";
+import { setupPending } from "../app/setup";
 import { RequestPanel } from "../components/RequestPanel";
 import { ReviewPanel } from "../components/ReviewPanel";
+import { SetupChecklist } from "../components/SetupChecklist";
 import { Empty, NotBuilt, PageTitle, SectionLabel } from "../components/ui";
 
 // The CEO's inbox (wiki/product/features/home.md): every open request across
@@ -31,6 +34,7 @@ export function Home() {
   const instances = useInstances();
   const projects = useProjects();
   const teams = useTeams();
+  const setup = useSetup();
   const open = ordered((requests.data ?? []).filter((r) => r.status === "open"));
   const rows = projectRows(
     projects.data ?? [],
@@ -44,6 +48,7 @@ export function Home() {
         title={isNotBuilt(requests.error) ? "Home" : homeTitle(open.length)}
         subtitle={homeSubtitle(instances.data ?? [])}
       />
+      {setup.data && setupPending(setup.data) && <SetupChecklist steps={setup.data} />}
       <section className="flex flex-col gap-2.5">
         {isNotBuilt(requests.error) ? (
           <NotBuilt what="requests" />

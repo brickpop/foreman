@@ -29,6 +29,7 @@ export const keys = {
   harnesses: ["harnesses"],
   forge: ["forge"],
   maintenance: ["maintenance"],
+  setup: ["setup"],
   messages: ["messages"],
   actions: ["actions"],
   chiefOfStaff: ["chief-of-staff"],
@@ -75,12 +76,12 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "config.changed": {
       const object = (e.data as { object?: string }).object;
       // A team change also changes its members' prompts.
-      if (object === "team") return [keys.teams, ["prompt"]];
+      if (object === "team") return [keys.teams, ["prompt"], keys.setup];
       if (object === "settings") return [keys.settings];
-      return [keys.projects];
+      return [keys.projects, keys.setup];
     }
     case "workspace.changed":
-      return [keys.projects];
+      return [keys.projects, keys.setup];
     case "instance.status":
       return [keys.instances];
     case "deployment.created":
@@ -99,6 +100,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [["pipeline"]];
     case "cos.changed":
       return [keys.chiefOfStaff];
+    case "setup.changed":
+      return [keys.setup, keys.maintenance];
     default:
       return [];
   }
@@ -397,5 +400,21 @@ export function useMaintenance() {
     // A build reports no events: follow it while it runs.
     refetchInterval: (q) =>
       q.state.data?.images.some((i) => i.state === "building") ? 2000 : false,
+  });
+}
+
+/** The setup checklist (Home). Polled while anything is left: installing
+ * Podman or logging in happens outside Foreman, and a machine's creation or
+ * an image build reports its output only when asked. */
+export function useSetup() {
+  const c = useClient();
+  return useQuery({
+    queryKey: keys.setup,
+    queryFn: () => c.setup.steps(),
+    refetchInterval: (q) => {
+      const steps = q.state.data ?? [];
+      if (steps.some((s) => s.state === "working")) return 1000;
+      return steps.some((s) => s.state !== "done") ? 3000 : false;
+    },
   });
 }

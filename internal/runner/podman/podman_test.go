@@ -57,3 +57,22 @@ func TestCreateSpec(t *testing.T) {
 		t.Errorf("a spec label unmarked the container: %v", cs.Labels)
 	}
 }
+
+func TestMachineBounds(t *testing.T) {
+	for _, c := range []struct {
+		hostGiB, cpus int
+		want          MachineBounds
+	}{
+		// Half the Mac, within 4 GiB and 60%.
+		{32, 10, MachineBounds{MinMemory: 4, MaxMemory: 19, Memory: 16, MaxCPUs: 10, CPUs: 5}},
+		{16, 8, MachineBounds{MinMemory: 4, MaxMemory: 9, Memory: 8, MaxCPUs: 8, CPUs: 4}},
+		// Half is under the minimum: the minimum.
+		{7, 1, MachineBounds{MinMemory: 4, MaxMemory: 4, Memory: 4, MaxCPUs: 1, CPUs: 1}},
+		// Too small for 4 GiB within 60%: MaxMemory < MinMemory.
+		{6, 4, MachineBounds{MinMemory: 4, MaxMemory: 3, Memory: 4, MaxCPUs: 4, CPUs: 2}},
+	} {
+		if got := machineBounds(uint64(c.hostGiB)<<10, c.cpus); got != c.want {
+			t.Errorf("%d GiB, %d CPUs: %+v, want %+v", c.hostGiB, c.cpus, got, c.want)
+		}
+	}
+}

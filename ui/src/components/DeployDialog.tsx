@@ -1,9 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
 import { harnessLabel } from "../app/model";
-import { keys, useDeployments, useHarnesses, useProjects, useTeams } from "../app/queries";
+import {
+  keys,
+  useDeployments,
+  useHarnesses,
+  useProjects,
+  useSetup,
+  useTeams,
+} from "../app/queries";
 import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
@@ -52,6 +59,9 @@ export function DeployDialog({
     ),
   );
   const unconnected = (harnesses.data ?? []).filter((h) => used.has(h.id) && !h.connected);
+  // Agents start only once Podman runs (and the instances are restored).
+  const running = useSetup().data?.find((s) => s.kind === "running");
+  const engineDown = running !== undefined && running.state !== "done";
   const already = (p: string) =>
     (deployments.data ?? []).some((d) => d.teamId === team && d.projectId === p);
   const teamName = teams.data?.find((t) => t.id === team)?.config.name ?? team;
@@ -74,7 +84,8 @@ export function DeployDialog({
       });
     },
   });
-  const ready = team && project && goal.trim() && !already(project) && unconnected.length === 0;
+  const ready =
+    team && project && goal.trim() && !already(project) && unconnected.length === 0 && !engineDown;
   return (
     <Modal
       open={open}
@@ -141,6 +152,14 @@ export function DeployDialog({
             </Button>
           </div>
         ))}
+        {engineDown && (
+          <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
+            <span className="flex-1">Podman isn’t running yet, so agents can’t start.</span>
+            <Link to="/" onClick={onClose} className="text-accTx hover:underline">
+              Setup on Home
+            </Link>
+          </div>
+        )}
         {deploy.error && <p className="m-0 text-[13px] text-err">{deploy.error.message}</p>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>

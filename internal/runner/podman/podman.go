@@ -32,11 +32,17 @@ var imageUser = &namespace{Nsmode: "keep-id", Value: "uid=1000,gid=1000"}
 // defaultSize is the terminal size until the first resize, like runner/direct.
 var defaultSize = runner.Size{Cols: 120, Rows: 40}
 
-// Runner is the Podman execution engine.
+// Runner is the Podman execution engine. It exists before Podman answers
+// (Open); Connect reaches it, and every call meanwhile fails with ErrNotRunning.
 type Runner struct {
-	c           *client
-	stopService func() // ends a Podman service Foreman started; nil otherwise
-	selinux     bool   // the host labels bind mounts (Fedora): mounts get :z
+	selinux bool // the host labels bind mounts (Fedora): mounts get :z
+
+	connecting  sync.Mutex // one Connect at a time
+	mu          sync.Mutex // guards the fields below
+	c           *client    // nil until Connect succeeds
+	stopService func()     // ends a Podman service Foreman started; nil otherwise
+	lastErr     error      // why the last Connect failed
+	machine     machineJob // a machine being created (macOS)
 
 	// Creating and starting many keep-id containers at once races inside
 	// Podman's runtime ("write to ping_group_range"); one at a time is
@@ -46,31 +52,39 @@ type Runner struct {
 
 var _ runner.Runner = (*Runner)(nil)
 
-// New connects to Podman, starting its service (or, on macOS, its machine)
-// if needed.
-func New(ctx context.Context) (*Runner, error) {
-	socket, stop, err := findSocket(ctx)
-	if err != nil {
-		return nil, err
+// Open returns the engine without reaching Podman: Foreman starts whether or
+// not Podman is there, and Connect reaches it once it is.
+func Open() *Runner {
+	_, err := os.Stat("/sys/fs/selinux/enforce")
+	return &Runner{selinux: err == nil}
+}
+
+// client is the connection to Podman, or ErrNotRunning before Connect.
+func (r *Runner) client() (*client, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.c == nil {
+		return nil, ErrNotRunning
 	}
-	c := newClient(socket)
-	if _, err := c.version(ctx); err != nil {
-		if stop != nil {
-			stop()
-		}
-		return nil, fmt.Errorf("podman API on %s: %w", socket, err)
-	}
-	_, err = os.Stat("/sys/fs/selinux/enforce")
-	return &Runner{c: c, stopService: stop, selinux: err == nil}, nil
+	return r.c, nil
 }
 
 // Version is Podman's version, for Settings → Maintenance.
-func (r *Runner) Version(ctx context.Context) (string, error) { return r.c.version(ctx) }
+func (r *Runner) Version(ctx context.Context) (string, error) {
+	c, err := r.client()
+	if err != nil {
+		return "", err
+	}
+	return c.version(ctx)
+}
 
 // Close ends the Podman service if Foreman started it. Containers keep running.
 func (r *Runner) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.stopService != nil {
 		r.stopService()
+		r.stopService = nil
 	}
 }
 
@@ -83,28 +97,32 @@ func (r *Runner) Start(ctx context.Context, spec runner.Spec) (runner.Process, e
 	if spec.Image == "" {
 		return nil, errors.New("podman: no image")
 	}
+	c, err := r.client()
+	if err != nil {
+		return nil, err
+	}
 	cs := r.createSpec(spec)
 	r.starting.Lock()
 	defer r.starting.Unlock()
-	if err := r.clearStale(ctx, cs.Name); err != nil {
+	if err := clearStale(ctx, c, cs.Name); err != nil {
 		return nil, err
 	}
-	id, err := r.c.create(ctx, cs)
+	id, err := c.create(ctx, cs)
 	if err != nil {
 		return nil, err
 	}
 	bg := context.Background() // the process outlives ctx
-	conn, out, err := r.c.attach(ctx, id)
+	conn, out, err := c.attach(ctx, id)
 	if err != nil {
-		_ = r.c.remove(bg, id)
+		_ = c.remove(bg, id)
 		return nil, err
 	}
-	if err := r.c.start(ctx, id); err != nil {
+	if err := c.start(ctx, id); err != nil {
 		conn.Close()
-		_ = r.c.remove(bg, id)
+		_ = c.remove(bg, id)
 		return nil, err
 	}
-	p := newProcess(r.c, id, conn, out, cs.Labels)
+	p := newProcess(c, id, conn, out, cs.Labels)
 	size := spec.Size
 	if size.Cols == 0 || size.Rows == 0 {
 		size = defaultSize
@@ -115,9 +133,9 @@ func (r *Runner) Start(ctx context.Context, spec runner.Spec) (runner.Process, e
 
 // clearStale removes a stopped container left with this name (its process
 // exited while Foreman was down). A running one is a live process: an error.
-func (r *Runner) clearStale(ctx context.Context, name string) error {
+func clearStale(ctx context.Context, c *client, name string) error {
 	var out struct{ State struct{ Running bool } }
-	err := r.c.call(ctx, "GET", "/containers/"+name+"/json", nil, nil, &out)
+	err := c.call(ctx, "GET", "/containers/"+name+"/json", nil, nil, &out)
 	var api *apiError
 	switch {
 	case errors.As(err, &api) && api.Status == 404:
@@ -127,22 +145,26 @@ func (r *Runner) clearStale(ctx context.Context, name string) error {
 	case out.State.Running:
 		return fmt.Errorf("podman: %s is already running", name)
 	}
-	return r.c.remove(ctx, name)
+	return c.remove(ctx, name)
 }
 
 // List re-attaches to the running containers Foreman started.
 func (r *Runner) List(ctx context.Context) ([]runner.Process, error) {
-	running, err := r.c.listRunning(ctx, managedLabel, "true")
+	c, err := r.client()
+	if err != nil {
+		return nil, err
+	}
+	running, err := c.listRunning(ctx, managedLabel, "true")
 	if err != nil {
 		return nil, err
 	}
 	var list []runner.Process
 	for _, l := range running {
-		conn, out, err := r.c.attach(ctx, l.ID)
+		conn, out, err := c.attach(ctx, l.ID)
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, newProcess(r.c, l.ID, conn, out, l.Labels))
+		list = append(list, newProcess(c, l.ID, conn, out, l.Labels))
 	}
 	return list, nil
 }

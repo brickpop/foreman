@@ -33,6 +33,7 @@ import (
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
+	"github.com/brickpop/foreman/internal/setup"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/terminal"
@@ -78,18 +79,16 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err := ws.Load(ctx, gitCLI); err != nil {
 		return err
 	}
-	// Before listening: Podman may have to start, and an error must come first.
 	// The engine is chosen once: a change of the setting takes effect on restart.
 	running := ws.Settings().Settings.Engine
 	// The fake harness is a host binary: a container can't run it.
 	if *fakeHarness != "" && running != "direct" {
 		return fmt.Errorf("this workspace runs on %s, where --fake-harness can't run (it is a host program): drop --fake-harness to run Claude Code, or set engine = \"direct\" in settings.toml", running)
 	}
-	engineRunner, engineImages, closeEngine, err := engine(ctx, running, stdout)
-	if err != nil {
-		return err
+	engineRunner, engineImages, pod := engine(running, stdout)
+	if pod != nil {
+		defer pod.Close()
 	}
-	defer closeEngine()
 
 	// Listen before printing the URL, so a busy port fails before the browser opens.
 	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", *port))
@@ -166,6 +165,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	// Messaging hears every status change and stop from the manager itself,
 	// never through the bus, which drops a subscriber that falls behind.
 	var messenger *messaging.Messenger
+	var checklist *setup.Setup
 	publish := func(e events.Event) {
 		bus.Publish(e)
 		switch d := e.Data.(type) {
@@ -181,6 +181,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters,
 		OpenLog: openLog, Publish: publish, Agent: agent,
+		Blocked: func() error { return checklist.Blocked() },
 	})
 	messenger = messaging.New(messaging.Deps{
 		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
@@ -196,13 +197,30 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			slog.Error("the agent port stopped", "err", err)
 		}
 	}()
-	if err := manager.Restore(ctx); err != nil {
-		return fmt.Errorf("restoring the instances: %w", err)
-	}
-	if err := messenger.Sweep(ctx); err != nil {
-		return fmt.Errorf("delivering what waited: %w", err)
-	}
 	login := logins{adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog)}
+	// Foreman serves whether or not Podman is there: the setup watcher reaches
+	// it, then restores the instances and delivers what waited.
+	var podEngine setup.Engine
+	if pod != nil {
+		podEngine = pod
+	}
+	sweep := func(ctx context.Context) {
+		if err := messenger.Sweep(ctx); err != nil {
+			slog.Error("delivering what waited", "err", err)
+		}
+	}
+	checklist = setup.New(setup.Deps{
+		Engine: podEngine, Images: engineImages, Harnesses: login.Harnesses, Config: ws, Publish: bus.Publish,
+		Ready: func(ctx context.Context) error {
+			if err := manager.Restore(ctx); err != nil {
+				return fmt.Errorf("restoring the instances: %w", err)
+			}
+			sweep(ctx)
+			return nil
+		},
+		Reconnected: sweep,
+	})
+	go checklist.Run(ctx)
 	views := agents{Manager: manager, logins: login.terms, typed: messenger.Typed}
 	handler := server.New(server.Options{
 		Guard:       access.NewTokenGuard(token, access.LocalHosts(*port), *port),
@@ -213,6 +231,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages:    messenger,
 		Actions:     state.Actions(),
 		Harnesses:   login,
+		Setup:       checklist,
 		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:   views,
 		UI:          files,

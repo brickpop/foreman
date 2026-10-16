@@ -30,6 +30,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
 
 - [App shell](./features/app-shell.md): sidebar, toasts, drawers, dialogs
 - [Home](./features/home.md)
+- [First run](./features/first-run.md): Foreman starts whatever is missing; the setup checklist on Home
 - [Sessions](./features/sessions.md): the terminal multiplexer
 - Project
   - [Wiki reader](./features/wiki-reader.md) (Overview tab)

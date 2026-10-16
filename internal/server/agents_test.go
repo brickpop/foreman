@@ -26,6 +26,8 @@ func (f *fakeAgents) Deploy(_ context.Context, team, project, goal string) (stor
 		return store.Deployment{}, store.ErrActive
 	case "broken":
 		return store.Deployment{}, fmt.Errorf("%w: project broken has problems", instances.ErrInvalid)
+	case "early":
+		return store.Deployment{}, fmt.Errorf("%w: podman isn't running", instances.ErrNotReady)
 	}
 	f.deployed = append(f.deployed, deployRequest{team, project, goal})
 	return store.Deployment{ID: team + "@" + project, Status: store.DeploymentActive}, nil
@@ -92,6 +94,8 @@ func TestDeployErrors(t *testing.T) {
 		{"POST", "/api/deployments", `{"team":"atlas","project":"ledger","goal":"  "}`, 400, "BAD_REQUEST"},
 		{"POST", "/api/deployments", `{"team":"atlas","project":"busy","goal":"g"}`, 409, "ALREADY_DEPLOYED"},
 		{"POST", "/api/deployments", `{"team":"atlas","project":"broken","goal":"g"}`, 400, "CANT_DEPLOY"},
+		{"POST", "/api/deployments", `{"team":"atlas","project":"early","goal":"g"}`, 409, "NOT_READY"},
+		{"POST", "/api/instances/early@ledger/wake", ``, 409, "NOT_READY"},
 		{"DELETE", "/api/deployments/nope@x", ``, 404, "NOT_FOUND"},
 	} {
 		w := send(h, tc.method, tc.path, tc.body)
@@ -135,6 +139,9 @@ func TestInstancePrompt(t *testing.T) {
 }
 
 func (f *fakeAgents) Wake(_ context.Context, id string) error {
+	if id == "early@ledger" {
+		return fmt.Errorf("%w: podman isn't running", instances.ErrNotReady)
+	}
 	if id != "tove@ledger" {
 		return store.ErrNotFound
 	}

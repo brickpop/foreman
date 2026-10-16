@@ -30,6 +30,7 @@ type Options struct {
 	Messages    Messages
 	Actions     Actions
 	Harnesses   Harnesses
+	Setup       Setup
 	Maintenance Maintenance
 	Terminals   Terminals
 	UI          fs.FS // the built web app, index.html at its root
@@ -46,6 +47,7 @@ func New(o Options) http.Handler {
 	actionRoutes(mux, o.Actions)
 	harnessRoutes(mux, o.Harnesses)
 	maintenanceRoutes(mux, o.Maintenance)
+	setupRoutes(mux, o.Setup)
 	configRoutes(mux, o.Config)
 	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))

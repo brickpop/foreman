@@ -70,6 +70,9 @@ type Deps struct {
 	OpenLog     func(instance string) (terminal.Log, error)
 	Publish     func(events.Event)
 	Agent       AgentLink
+	// Blocked is nil when agents can start, or why not (Podman isn't running);
+	// deploying and waking refuse meanwhile. nil: always ready.
+	Blocked func() error
 }
 
 // AgentLink is foreman-agent as the instances get it: mounted into each
@@ -105,6 +108,8 @@ var (
 	ErrNotRunning = errors.New("instances: not running")
 	// ErrInvalid means the team or project can't be deployed as it is.
 	ErrInvalid = errors.New("instances: can't deploy")
+	// ErrNotReady means agents can't start yet (Deps.Blocked).
+	ErrNotReady = errors.New("agents can't start yet")
 )
 
 // stopGrace is how long a harness gets to end before it is killed.
@@ -113,6 +118,9 @@ const stopGrace = 10 * time.Second
 // Deploy deploys team on project with goal and starts its lead; the other
 // members sleep until woken.
 func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (store.Deployment, error) {
+	if err := m.blocked(); err != nil {
+		return store.Deployment{}, err
+	}
 	team, project, err := m.deployable(teamID, projectID)
 	if err != nil {
 		return store.Deployment{}, err
@@ -154,6 +162,9 @@ func (m *Manager) Wake(ctx context.Context, id string) error {
 	if dep, err := m.Deployments.Get(ctx, inst.DeploymentID); err != nil || dep.Status != store.DeploymentActive {
 		return nil // a stopped deployment's instances start only with a redeploy
 	}
+	if err := m.blocked(); err != nil {
+		return err
+	}
 	if inst.Restarts != 0 {
 		inst.Restarts = 0 // the CEO's start: a later crash gets its one restart again
 		if err := m.Instances.Put(ctx, inst); err != nil {
@@ -162,6 +173,17 @@ func (m *Manager) Wake(ctx context.Context, id string) error {
 	}
 	m.enqueue(id)
 	m.startQueued()
+	return nil
+}
+
+// blocked is why agents can't start now, wrapping ErrNotReady, or nil.
+func (m *Manager) blocked() error {
+	if m.Blocked == nil {
+		return nil
+	}
+	if err := m.Blocked(); err != nil {
+		return fmt.Errorf("%w: %v", ErrNotReady, err)
+	}
 	return nil
 }
 

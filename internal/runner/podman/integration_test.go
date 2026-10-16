@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -30,8 +31,8 @@ var ctx = context.Background()
 
 func engine(t *testing.T) *Runner {
 	t.Helper()
-	r, err := New(ctx)
-	if err != nil {
+	r := Open()
+	if err := r.Connect(ctx, true); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(r.Close)
@@ -303,4 +304,31 @@ func TestContainersRunOnForemansCPUType(t *testing.T) {
 		t.Skipf("Foreman ships no foreman-agent for %s", runtime.GOARCH)
 	}
 	collect(start(t, engine(t), runner.Spec{Command: sh("uname -m")})).waitFor(t, machine)
+}
+
+// Before Connect every call says Podman isn't running; Connect is idempotent,
+// and State reports what it reached.
+func TestOpenThenConnect(t *testing.T) {
+	r := Open()
+	t.Cleanup(r.Close)
+	if _, err := r.List(ctx); !errors.Is(err, ErrNotRunning) {
+		t.Errorf("List before Connect: %v", err)
+	}
+	if _, err := r.Start(ctx, runner.Spec{Image: testImage, Command: sh("true")}); !errors.Is(err, ErrNotRunning) {
+		t.Errorf("Start before Connect: %v", err)
+	}
+	if s := r.State(ctx); s.Running || !s.Installed {
+		t.Errorf("before Connect: %+v", s)
+	}
+	for range 2 {
+		if err := r.Connect(ctx, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if s := r.State(ctx); !s.Running || s.Version == "" || s.Error != "" {
+		t.Errorf("after Connect: %+v", s)
+	}
+	if _, err := r.List(ctx); err != nil {
+		t.Errorf("List after Connect: %v", err)
+	}
 }

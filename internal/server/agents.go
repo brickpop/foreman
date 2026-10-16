@@ -56,6 +56,8 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such instance")
+		case errors.Is(err, instances.ErrNotReady):
+			writeError(w, http.StatusConflict, "NOT_READY", err.Error())
 		case err != nil:
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 		default:
@@ -84,6 +86,8 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 		switch {
 		case errors.Is(err, store.ErrActive):
 			writeError(w, http.StatusConflict, "ALREADY_DEPLOYED", "This team is already deployed on this project")
+		case errors.Is(err, instances.ErrNotReady):
+			writeError(w, http.StatusConflict, "NOT_READY", err.Error())
 		case errors.Is(err, instances.ErrInvalid):
 			writeError(w, http.StatusBadRequest, "CANT_DEPLOY", err.Error())
 		case err != nil:

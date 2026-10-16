@@ -26,4 +26,4 @@ where   = ["type=task"]
 status  = "status"
 columns = ["todo", "blocked", "in-progress", "done"]
 lane    = "epic"
-lanes   = ["prove", "full-ui-demo", "terminal-multiplexer", "messaging-handoffs", "git", "workflow", "chief-of-staff"]
+lanes   = ["prove", "full-ui-demo", "terminal-multiplexer", "messaging-handoffs", "install-first-run", "git", "workflow", "chief-of-staff"]

@@ -19,6 +19,6 @@ epic: messaging-handoffs
 - [x] `Interpret`: `UserPromptSubmit`/`PreToolUse` → `running`; `Stop` → `idle`; `PreToolUse` of `AskUserQuestion`, or `Notification` with `permission_prompt` → `awaiting` ([experiment D](./prove-d-claude-delivery-hooks.md)); statuses as `instance.status` events
 - [x] tests: the relay both ways, tokens (a wrong or revoked one is refused; no "from" is trusted), the hook-to-status mapping (tools by role come with the tools)
 - [x] end to end on the real server (Direct engine): the real foreman-agent's hook and MCP `tools/list` reach the agent port with the lead's token; a forged token gets 401
-- [ ] the CEO sees a real Claude Code's status move (running, idle, awaiting) in Sessions (`just dev real`)
+- [ ] the CEO sees a real Claude Code's status move (running, idle, awaiting) in Sessions (`just dev`)
 
 Not here: the tools themselves ([Messaging](./messaging-delivery.md), [Git tools](./git-tools.md)).

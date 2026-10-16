@@ -13,25 +13,27 @@ help:
 setup:
     cd ui && bun install
 
-# Run Foreman on .dev/workspace (or the folder given second), rebuilding the UI on every change (reload the page to see it). `just dev`: agents on the fake harness, Direct engine. `just dev real`: Claude Code, Podman engine. A new workspace starts with team atlas and project sample, on the engine its harness needs
+# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, in .dev/real. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake. Each starts with team atlas and project sample. A workspace given second is used instead (it must be on the engine its harness needs)
 [group('dev')]
-dev harness="fake" workspace=".dev/workspace":
+dev harness="real" workspace="":
     #!/usr/bin/env bash
     set -euo pipefail
-    case "{{harness}}" in fake|real) ;; *) echo "just dev: the harness is fake or real, not '{{harness}}' (just dev real [workspace])" >&2; exit 1;; esac
-    mkdir -p "{{workspace}}/.foreman"
+    case "{{harness}}" in fake|real) ;; *) echo "just dev: the harness is fake or real, not '{{harness}}' (just dev [real|fake] [workspace])" >&2; exit 1;; esac
+    # One workspace per harness, so each is always on the engine it needs.
+    ws="{{workspace}}"; [ -n "$ws" ] || ws=".dev/{{harness}}"
+    mkdir -p "$ws/.foreman"
     # A new workspace: the fake harness runs as host processes (no Podman machine
     # to start); Claude Code runs in Podman.
     engine=direct; [ "{{harness}}" = real ] && engine=podman
-    [ -f "{{workspace}}/.foreman/settings.toml" ] || echo "engine = \"$engine\"" > "{{workspace}}/.foreman/settings.toml"
-    teams="{{workspace}}/.foreman/teams"
+    [ -f "$ws/.foreman/settings.toml" ] || echo "engine = \"$engine\"" > "$ws/.foreman/settings.toml"
+    teams="$ws/.foreman/teams"
     if [ ! -d "$teams" ]; then
         mkdir -p "$teams"
         printf '%s\n' 'team = "atlas"' 'name = "Atlas"' 'lead = "mara"' '' \
             '[agents.mara]' 'name = "Mara"' 'role = "team_lead"' 'harness = "claude-code"' '' \
             '[agents.tove]' 'name = "Tove"' 'role = "engineer"' 'harness = "claude-code"' > "$teams/atlas.toml"
     fi
-    sample="{{workspace}}/sample"
+    sample="$ws/sample"
     if [ ! -d "$sample" ]; then
         mkdir -p "$sample/project" "$sample/sample-app"
         echo 'project = "sample"' > "$sample/project/project.toml"
@@ -44,14 +46,14 @@ dev harness="fake" workspace=".dev/workspace":
     fi
     # The fake harness is a host program, which a container can't run; Claude Code
     # gets its login through a mount, which the Direct engine ignores.
-    settings="{{workspace}}/.foreman/settings.toml"
+    settings="$ws/.foreman/settings.toml"
     direct=no; grep -Eq '^engine *= *"direct"' "$settings" && direct=yes
     if [ "{{harness}}" = fake ] && [ $direct = no ]; then
-        echo "just dev: {{workspace}} runs on Podman, where the fake harness can't run. Use \`just dev real\` for Claude Code, or set engine = \"direct\" in $settings." >&2
+        echo "just dev fake: $ws runs on Podman, where the fake harness can't run. Use \`just dev\` for Claude Code, or set engine = \"direct\" in $settings." >&2
         exit 1
     fi
     if [ "{{harness}}" = real ] && [ $direct = yes ]; then
-        echo "just dev real: {{workspace}} runs on the Direct engine, where Claude Code can't get its login. Set engine = \"podman\" in $settings (or in Settings, then restart), or use \`just dev\` for the fake harness." >&2
+        echo "just dev: $ws runs on the Direct engine, where Claude Code can't get its login. Set engine = \"podman\" in $settings (or in Settings, then restart), or use \`just dev fake\` for the fake harness." >&2
         exit 1
     fi
     fake=""
@@ -64,7 +66,7 @@ dev harness="fake" workspace=".dev/workspace":
     (cd ui && bun run build)
     (cd ui && bun run watch) &
     trap 'kill $! 2>/dev/null' EXIT
-    go run ./cmd/foreman "{{workspace}}" --yes --ui-dir ui/dist/app $fake
+    go run ./cmd/foreman "$ws" --yes --ui-dir ui/dist/app $fake
 
 # Regenerate the UI's TypeScript types from the Go structs (tygo.yaml); commit the result
 [group('build')]

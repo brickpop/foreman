@@ -28,8 +28,8 @@ The first time, Foreman asks before creating `.foreman/` in the folder. It then 
 ## Develop
 
 ```sh
-just dev       # rebuild the UI on change and serve a scratch workspace (.dev/workspace) with a sample team and project, agents on the fake harness
-just dev real  # the same with Claude Code (log in under Settings → Harnesses; Podman engine)
+just dev       # rebuild the UI on change and serve a scratch workspace (.dev/real) with a sample team and project, agents on Claude Code (Podman; log in under Settings → Harnesses)
+just dev fake  # the same on the fake harness, a stand-in that echoes (.dev/fake; no Podman, no login, no tokens)
 just test      # all tests
 just lint      # gofmt, go vet, staticcheck, Biome
 just check     # wiki health check

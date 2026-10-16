@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -35,7 +36,7 @@ func TestClaudeCode(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(login, ".credentials.json")); err != nil {
 		t.Fatalf("no login in %s: connect Claude Code under Settings → Harnesses first", login)
 	}
-	if agentbin.Binary() == nil {
+	if agentbin.Binary(runtime.GOARCH) == nil {
 		t.Fatal("foreman-agent isn't built: run just agent")
 	}
 	c := startClaudeWorkspace(t, login)

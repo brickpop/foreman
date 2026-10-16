@@ -210,7 +210,7 @@ Details: [Harness adapters](./harness-adapters.md), [Session prompt](./session-p
 
 How an agent inside a container talks to Foreman. Structured only: Foreman never infers events by reading terminal output, except inside a harness adapter as a last resort for a harness without hooks.
 
-- **`foreman-agent`**: a tiny static binary, mounted read-only into every container when it starts (decided 2026-10-15): Foreman carries a Linux build for its own CPU type inside its binary, so it always matches the running Foreman, and upgrading Foreman never rebuilds the image. The harness starts `foreman-agent mcp` as a local (stdio) MCP server, which every harness supports; hooks run `foreman-agent hook <event>`. It relays both to Foreman.
+- **`foreman-agent`**: a tiny static binary, mounted read-only into every container when it starts (decided 2026-10-15): Foreman carries a Linux build for each CPU type (amd64, arm64) inside its binary and mounts the one for its own, so it always matches the running Foreman, and upgrading Foreman never rebuilds the image. The harness starts `foreman-agent mcp` as a local (stdio) MCP server, which every harness supports; hooks run `foreman-agent hook <event>`. It relays both to Foreman.
 - **The agent port**: **one** port that Foreman opens on the host's loopback, separate from the UI's. Every container connects to it through Podman's host alias (`host.containers.internal`); none exposes a port. Each instance has its own token (container environment), which is its identity: an agent can't speak for another.
 - `foreman-agent` reaches Foreman through one address (`tcp://…` today), so another transport (a mounted Unix socket on Linux, say) is a change in one place.
 
@@ -479,7 +479,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 - `internal/instances`: the Instance manager.
 - `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
-- `internal/agentlink` (the agent port: tokens, the tool and hook relay, and the client), `cmd/foreman-agent` (the stdio MCP server and hook forwarder), `agentbin/` (its Linux build, embedded in `foreman` and written to the user's cache folder to be mounted): the Agent link. `internal/teamtools`: the team-tools router; `internal/messaging` and `internal/workflow`: the blocks behind it.
+- `internal/agentlink` (the agent port: tokens, the tool and hook relay, and the client), `cmd/foreman-agent` (the stdio MCP server and hook forwarder), `agentbin/` (its Linux builds, embedded in `foreman`; the one for Foreman's CPU type is written to the user's cache folder to be mounted, and copies no Foreman has started with for a week are removed): the Agent link. `internal/teamtools`: the team-tools router; `internal/messaging` and `internal/workflow`: the blocks behind it.
 - `cmd/foreman/sessions.go`: the harnesses' login terminals, by id (instances' terminals are the Instance manager's).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.
 - `internal/server`, `internal/access`, `ui/` (with `ForemanClient` and its real implementation): the Web server and UI.

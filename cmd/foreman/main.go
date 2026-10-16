@@ -5,8 +5,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -145,12 +143,16 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("agent link: %w", err)
 	}
-	agentHost, err := writeAgent()
+	cache, err := os.UserCacheDir()
+	if err != nil {
+		return fmt.Errorf("foreman-agent: %w", err)
+	}
+	agentHost, err := writeAgent(filepath.Join(cache, "foreman"), agentbin.Binary(runtime.GOARCH), time.Now())
 	if err != nil {
 		return fmt.Errorf("foreman-agent: %w", err)
 	}
 	if agentHost == "" {
-		fmt.Fprintln(stdout, "foreman-agent isn't built (just build): agents start without the team tools")
+		fmt.Fprintf(stdout, "foreman-agent isn't built for %s (just agent): agents start without the team tools\n", runtime.GOARCH)
 	}
 	var link *agentlink.Link
 	agent := instances.AgentLink{
@@ -286,34 +288,6 @@ func nextPort(port string) (string, error) {
 		return "", fmt.Errorf("--port %q: not a port with a free one after it", port)
 	}
 	return strconv.Itoa(n + 1), nil
-}
-
-// writeAgent puts the embedded foreman-agent where containers can mount it:
-// the user's cache folder, which Podman's machine shares on macOS, named by
-// its content so Foreman versions don't overwrite each other's. "" when the
-// binary isn't built.
-func writeAgent() (string, error) {
-	data := agentbin.Binary()
-	if data == nil {
-		return "", nil
-	}
-	cache, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
-	}
-	sum := sha256.Sum256(data)
-	path := filepath.Join(cache, "foreman", "foreman-agent-"+hex.EncodeToString(sum[:6]))
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o755); err != nil {
-		return "", err
-	}
-	return path, os.Rename(tmp, path)
 }
 
 // configEvent turns a change on disk into the event the browser gets

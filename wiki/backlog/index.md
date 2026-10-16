@@ -41,7 +41,7 @@ Raised during design, no cards yet; they get one when an epic needs them.
     - On the Direct engine (the fake harness) there is no container to inspect, so agents there never sleep.
     - A lead waiting on a teammate's reply sleeps too, and the reply wakes it.
     - The CEO watching a pane sees it turn into the asleep view; the Line or Start wakes it.
-  - **Still to decide:** the default idle time (proposed 60 min, past the prompt-cache lifetime, so a wake costs nothing extra) and whether it's on by default (a workspace setting, 0 = never).
+  - **Decided (the CEO, 2026-10-16):** on by default, after **20 minutes** of clean idle; a workspace setting, 0 = never. A wake after the prompt cache has expired re-reads the conversation at full price; accepted.
 - **Containers when Foreman stops**: a setting to stop or remove the agents' containers when Foreman shuts down, instead of leaving them running for the next start to resume ([Agent runtime → Restarts](../product/architecture/agent-runtime.md#restarts)).
 - **CI pipeline and how Foreman is installed** (release binaries, Homebrew): tests on every push, and a setup that doesn't require building from source. The binary itself (everything embedded, both CPU types) is the [Release build](./release-build.md) card.
 - **History and debugging views** (past requests, past messages): when an agent misbehaves, the CEO needs to look back at what happened.

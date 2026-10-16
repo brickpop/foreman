@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -292,4 +293,14 @@ func TestNoImageOrCommandIsAnError(t *testing.T) {
 	if _, err := r.Start(ctx, runner.Spec{Image: testImage}); err == nil {
 		t.Error("started without a command")
 	}
+}
+
+// Containers run on Foreman's own CPU type (on macOS, the Podman machine's is the
+// Mac's), so Foreman mounts the foreman-agent built for runtime.GOARCH.
+func TestContainersRunOnForemansCPUType(t *testing.T) {
+	machine := map[string]string{"arm64": "aarch64", "amd64": "x86_64"}[runtime.GOARCH]
+	if machine == "" {
+		t.Skipf("Foreman ships no foreman-agent for %s", runtime.GOARCH)
+	}
+	collect(start(t, engine(t), runner.Spec{Command: sh("uname -m")})).waitFor(t, machine)
 }

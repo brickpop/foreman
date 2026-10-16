@@ -2,6 +2,7 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tansta
 import { useEffect, useRef } from "react";
 import {
   type Board,
+  type Draft,
   type ForemanClient,
   type Request,
   type Settings,
@@ -111,6 +112,11 @@ export function useLiveEvents(listen: (e: Event) => void = () => {}) {
     () =>
       c.events.subscribe({
         event: (e) => {
+          // A draft's countdown is pushed, not fetched: the event is the state.
+          if (e.type === "instance.draft") {
+            const d = e.data as Draft;
+            queries.setQueryData(draftKey(d.id), d.waiting > 0 ? d : null);
+          }
           invalidate(queries, staleKeys(e));
           listener.current(e);
         },
@@ -119,6 +125,19 @@ export function useLiveEvents(listen: (e: Event) => void = () => {}) {
       }),
     [c, queries],
   );
+}
+
+const draftKey = (instance: string) => ["draft", instance] as const;
+
+/** Messages waiting on the CEO's draft in an agent's terminal, with their
+ * countdown; null when nothing waits. Fed by instance.draft events only. */
+export function useDraft(instance: string) {
+  return useQuery<Draft | null>({
+    queryKey: draftKey(instance),
+    queryFn: () => null,
+    enabled: false,
+    initialData: null,
+  }).data;
 }
 
 function invalidate(queries: QueryClient, stale: readonly (readonly string[])[]) {

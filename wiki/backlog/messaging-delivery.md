@@ -20,6 +20,8 @@ epic: messaging-handoffs
 - [x] the fake harness reports its turns as Claude Code's hooks do and calls tools (`tool ask {…}`), so `just dev fake` runs the real path
 - [x] end to end on the real server: Mara asks the asleep Tove; Tove is woken, gets the line when idle, replies; Mara gets hers and reads it in full; Tove can't read Mara's message
 - [x] found on the way and fixed: a stopped run's late end could free the run a redeploy started in its place (a flaky redeploy test)
+- [x] the CEO's draft (the CEO's request, 2026-10-16): messages wait while the CEO has unsent text in the terminal, on a 60 s countdown that runs only after 5 s without a key, with Pause; at zero, after the draft with a separator and `The CEO's text above is an unfinished draft`; the Line goes through Foreman (`POST /api/instances/:id/line`), typed like a delivery, which fixes its Enter arriving as a line break
+- [ ] the CEO checks with Claude Code: a message waits on a draft and follows the send; the Line sends; at zero the separator's line breaks stay line breaks (the newline keystroke typed on its own, not taken as a paste)
 - [ ] the CEO sees Mara and Tove (Claude Code) exchange a message (`just dev`)
 
 Moved to [Git tools](./git-tools.md): `handoff`, which needs `commit` (a member's branch has nothing to hand off without it).

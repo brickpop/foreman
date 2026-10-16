@@ -33,6 +33,9 @@ type Sessions interface {
 	Wake(ctx context.Context, id string) error
 	// Type writes into an instance's terminal, as if typed.
 	Type(id string, p []byte) error
+	// Newline is the keystroke that starts a new line in the instance's
+	// harness without sending.
+	Newline(id string) string
 }
 
 // Deps are the blocks Messaging is assembled from.
@@ -46,16 +49,35 @@ type Deps struct {
 	// Pause is how long to wait between typing a delivery and pressing Enter,
 	// so the harness doesn't take the Enter as part of a paste.
 	Pause time.Duration
+	// Hold is how long messages wait on the CEO's draft, counted only while
+	// the CEO isn't typing (Quiet since the last key); Tick is the countdown's
+	// step. Zero means the defaults: 60 s, 5 s (so the CEO isn't rushed), 250 ms.
+	Hold, Quiet, Tick time.Duration
 }
 
 // Messenger serves the messaging tools and delivers their messages.
 type Messenger struct {
 	Deps
 	delivering sync.Mutex // one delivery at a time: a line is never typed into another
+	mu         sync.Mutex // guards drafts
+	drafts     map[string]*draft
 }
 
 // New returns a messenger.
-func New(d Deps) *Messenger { return &Messenger{Deps: d} }
+func New(d Deps) *Messenger {
+	if d.Hold == 0 {
+		d.Hold = time.Minute
+	}
+	if d.Quiet == 0 {
+		d.Quiet = 5 * time.Second
+	}
+	if d.Tick == 0 {
+		d.Tick = 250 * time.Millisecond
+	}
+	return &Messenger{Deps: d, drafts: map[string]*draft{}}
+}
+
+func (m *Messenger) now() time.Time { return time.Now() }
 
 var _ teamtools.Block = (*Messenger)(nil)
 
@@ -212,6 +234,16 @@ func (m *Messenger) Deliver(id string) {
 	if err != nil {
 		return
 	}
+	// The CEO is writing in its prompt: the messages wait, unless the
+	// countdown ran out, when they go after the draft, marked as unfinished.
+	wait, after := m.hold(id, len(queued))
+	if wait {
+		return
+	}
+	lines := []string{Notice(team, queued)}
+	if after {
+		lines = []string{"", "", "---", "", draftNote, "", lines[0]}
+	}
 	ids := make([]int64, len(queued))
 	for i, msg := range queued {
 		ids[i] = msg.ID
@@ -220,11 +252,12 @@ func (m *Messenger) Deliver(id string) {
 	if err := m.Messages.SetState(ctx, ids, store.MessageDelivered, ""); err != nil {
 		return
 	}
-	if err := m.typeLine(id, Notice(team, queued)); err != nil {
+	if err := m.typeLines(id, lines); err != nil {
 		slog.Warn("delivering", "instance", id, "err", err)
 		_ = m.Messages.SetState(ctx, ids, store.MessageQueued, "")
 		return
 	}
+	m.forget(id) // the prompt was sent: a draft before the delivery went with it
 	for _, msg := range queued {
 		if got, err := m.Messages.Get(ctx, msg.DeploymentID, msg.Ref); err == nil {
 			m.publish(got)
@@ -232,16 +265,39 @@ func (m *Messenger) Deliver(id string) {
 	}
 }
 
-func (m *Messenger) typeLine(id, line string) error {
-	if err := m.Sessions.Type(id, []byte(line)); err != nil {
-		return err
+// typeLines types lines into an instance's prompt, joined by its harness's
+// newline keystroke, then sends them with Enter. Each newline and the Enter
+// come after a pause, typed on their own, so the harness takes them as keys,
+// not as part of a paste.
+func (m *Messenger) typeLines(id string, lines []string) error {
+	for i, line := range lines {
+		if line != "" {
+			if err := m.Sessions.Type(id, []byte(line)); err != nil {
+				return err
+			}
+		}
+		if i < len(lines)-1 {
+			time.Sleep(m.Pause)
+			if err := m.Sessions.Type(id, []byte(m.Sessions.Newline(id))); err != nil {
+				return err
+			}
+		}
 	}
 	time.Sleep(m.Pause)
 	return m.Sessions.Type(id, []byte("\r"))
 }
 
+// splitLines is text as lines, whatever its line endings.
+func splitLines(text string) []string {
+	return strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+}
+
 // StatusChanged hears every instance status: an idle one gets its messages.
 func (m *Messenger) StatusChanged(id, status string) {
+	switch status {
+	case "starting", "stopped", "asleep", "queued":
+		m.forget(id) // a new session starts with an empty prompt
+	}
 	if status == "idle" {
 		go m.Deliver(id)
 	}

@@ -35,6 +35,8 @@ WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
 (line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
 POST   /api/instances/:id/restart
 POST   /api/instances/:id/wake            starts an asleep instance (204; any other status is left as it is)
+POST   /api/instances/:id/line            {text}: types the CEO's line into the session and sends it (204; 409 NOT_RUNNING)
+PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countdown of messages waiting on the CEO's draft (204)
 
 GET    /api/requests?project=&status=open
 POST   /api/requests/:id/resolve              {answer}
@@ -100,6 +102,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 |---|---|---|
 | `request.created` / `request.resolved` | Workflow creates or resolves a request | the request |
 | `instance.status` | an instance changes status or task | id, status, task |
+| `instance.draft` | messages wait on the CEO's draft in an agent's terminal, each countdown step, and when they stop waiting | id, waiting (0: the notice goes), leftMs, counting, paused |
 | `instance.line` | throttled "last output line" updates (for Settings rows) | id, line |
 | `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |

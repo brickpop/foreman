@@ -3,6 +3,7 @@ import { type EventHandlers, subscribeEvents } from "./events";
 import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
 import type { Account as ForgeAccount } from "./types/forge";
 import type { Status as HarnessStatus } from "./types/harness";
+import type { Draft } from "./types/messaging";
 import type { ImageStatus, Maintenance } from "./types/runner";
 import type {
   Deployment,
@@ -26,6 +27,7 @@ export type {
   Candidate,
   Card,
   Deployment,
+  Draft,
   Entry,
   ForgeAccount,
   HarnessStatus,
@@ -78,6 +80,11 @@ export interface AgentsArea {
   stop(deployment: string): Promise<void>;
   /** Starts an asleep instance; any other is left as it is. */
   wake(instance: string): Promise<void>;
+  /** Types the CEO's line into the agent's session and sends it (the same
+   * typing as a delivery, so the harness takes the Enter as sending). */
+  line(instance: string, text: string): Promise<void>;
+  /** Pauses or resumes the countdown of messages waiting on the CEO's draft. */
+  pauseCountdown(instance: string, paused: boolean): Promise<void>;
   openTerminal(id: string, handlers: PtyHandlers): PtyConnection;
 }
 
@@ -262,6 +269,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         ).json() as Promise<Deployment>,
       stop: (deployment) => send("DELETE", `/api/deployments/${id(deployment)}`),
       wake: (instance) => send("POST", `/api/instances/${id(instance)}/wake`),
+      line: (instance, text) => send("POST", `/api/instances/${id(instance)}/line`, { text }),
+      pauseCountdown: (instance, paused) =>
+        send("PUT", `/api/instances/${id(instance)}/countdown`, { paused }),
       openTerminal: (instance, handlers) => openPty(`${wsOrigin}/ws/pty/${id(instance)}`, handlers),
     },
     harnesses: {

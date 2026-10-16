@@ -93,6 +93,17 @@ describe("httpClient", () => {
     });
   });
 
+  it("sends the CEO's line and pauses the countdown", async () => {
+    const calls = stubFetch(204, undefined);
+    const client = httpClient("http://x");
+    await client.agents.line("mara@ledger", "two\nlines");
+    await client.agents.pauseCountdown("mara@ledger", true);
+    expect(calls.map((c) => [c.method, c.url, JSON.parse(c.body ?? "")])).toEqual([
+      ["POST", "http://x/api/instances/mara%40ledger/line", { text: "two\nlines" }],
+      ["PUT", "http://x/api/instances/mara%40ledger/countdown", { paused: true }],
+    ]);
+  });
+
   it("adds a project with an optional first repo, and a repo to a project", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");

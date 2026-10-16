@@ -3,6 +3,7 @@ import type { Instance, Request, Team } from "../api/client";
 import {
   clickTab,
   closePane,
+  countdown,
   deploymentTabs,
   initialPanes,
   isLineShortcut,
@@ -10,7 +11,6 @@ import {
   lineShortcut,
   rosterOrder,
   toggleSplit,
-  typedLine,
 } from "./sessions";
 
 const inst = (id: string, deploymentId: string) =>
@@ -77,13 +77,13 @@ describe("Sessions", () => {
   });
 });
 
-describe("typedLine", () => {
-  it("types each line break as the harness's newline, then Enter", () => {
-    expect(typedLine("first\nsecond\nthird", "\\\r")).toBe("first\\\rsecond\\\rthird\r");
-  });
-  it("sends a single line, or an empty one, with Enter", () => {
-    expect(typedLine("go on", "\\\r")).toBe("go on\r");
-    expect(typedLine("", "\\\r")).toBe("\r");
+describe("countdown", () => {
+  it("shows m:ss, rounded up", () => {
+    expect(countdown(60_000)).toBe("1:00");
+    expect(countdown(41_200)).toBe("0:42");
+    expect(countdown(1)).toBe("0:01");
+    expect(countdown(0)).toBe("0:00");
+    expect(countdown(-5)).toBe("0:00");
   });
 });
 

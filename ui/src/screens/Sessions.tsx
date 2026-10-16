@@ -6,6 +6,7 @@ import { agentOf, harnessLabel } from "../app/model";
 import {
   keys,
   useDeployments,
+  useDraft,
   useHarnesses,
   useInstances,
   useMessages,
@@ -16,6 +17,7 @@ import {
 import {
   clickTab,
   closePane,
+  countdown,
   deploymentTabs,
   initialPanes,
   isLineShortcut,
@@ -24,7 +26,6 @@ import {
   type Panes,
   rosterOrder,
   toggleSplit,
-  typedLine,
 } from "../app/sessions";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
@@ -220,6 +221,8 @@ function Pane({
   onClose: () => void;
 }) {
   const terminal = useRef<TerminalHandle>(null);
+  const client = useClient();
+  const draft = useDraft(instance.id);
   const settings = useSettings();
   const newline = useHarnesses().data?.find((h) => h.id === instance.harness)?.newline;
   const [copied, setCopied] = useState(false);
@@ -254,6 +257,12 @@ function Pane({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [active]);
   const [line, setLine] = useState("");
+  // The line goes through Foreman: typed, then sent after a pause, like a
+  // delivery (never mixed with one), so the harness takes the Enter as sending.
+  const sendLine = useMutation({
+    mutationFn: (text: string) => client.agents.line(instance.id, text),
+    onSuccess: () => setLine(""),
+  });
   const agent = agentOf(teams, instance.id);
   const name = agent?.soul.name ?? instance.agentId;
   const isLead = instance.agentId === lead;
@@ -336,6 +345,24 @@ function Pane({
           )}
         </div>
       )}
+      {draft && !asleep && (
+        <div className="flex items-center gap-3 border-t border-line bg-side px-4 py-[7px] text-[12.5px] text-tx2">
+          <span className="flex-1">
+            {draft.waiting === 1 ? "1 message" : `${draft.waiting} messages`} waiting for your line:
+            send or clear it.{" "}
+            <span className="font-mono text-tx">
+              {draft.paused ? "Paused" : countdown(draft.leftMs)}
+            </span>
+            {!draft.paused && !draft.counting && " (waits while you type)"}
+          </span>
+          <Button
+            variant="tiny"
+            onClick={() => client.agents.pauseCountdown(instance.id, !draft.paused)}
+          >
+            {draft.paused ? "Resume" : "Pause"}
+          </Button>
+        </div>
+      )}
       {lineMode && !asleep && (
         <div className="flex items-start gap-2 border-t border-line px-[18px] py-[11px]">
           <span className="font-mono text-[13px] leading-[1.5] font-medium text-accTx">❯</span>
@@ -353,14 +380,15 @@ function Pane({
               if (e.shiftKey) return; // the textarea adds the line
               e.preventDefault();
               // An empty line still sends Enter (it answers a harness's prompt).
-              // Without a known newline, each pasted line is sent on its own.
-              terminal.current?.send(typedLine(line, newline ?? "\r"));
-              setLine("");
+              if (!sendLine.isPending) sendLine.mutate(line);
             }}
             placeholder={linePlaceholder(name, instance.status, isLead)}
             aria-label={`Line input to ${name}`}
             className="flex-1 resize-none bg-transparent leading-[1.5] text-tx placeholder:text-tx4"
           />
+          {sendLine.error && (
+            <span className="text-[12.5px] text-err">{sendLine.error.message}</span>
+          )}
         </div>
       )}
     </section>

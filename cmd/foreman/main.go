@@ -200,7 +200,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return fmt.Errorf("delivering what waited: %w", err)
 	}
 	login := logins{adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog)}
-	views := agents{Manager: manager, logins: login.terms}
+	views := agents{Manager: manager, logins: login.terms, typed: messenger.Typed}
 	handler := server.New(server.Options{
 		Guard:       access.NewTokenGuard(token, access.LocalHosts(*port), *port),
 		Workspace:   ws,

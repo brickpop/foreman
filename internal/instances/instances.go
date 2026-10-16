@@ -263,6 +263,16 @@ func (m *Manager) Type(id string, p []byte) error {
 	return term.Input(p)
 }
 
+// Newline is the keystroke that starts a new line in the instance's harness
+// without sending; Enter when the harness isn't known.
+func (m *Manager) Newline(id string) string {
+	inst, err := m.Instances.Get(context.Background(), id)
+	if err != nil || m.Adapters[inst.Harness] == nil {
+		return "\r"
+	}
+	return m.Adapters[inst.Harness].Newline()
+}
+
 // Terminal returns a running instance's terminal.
 func (m *Manager) Terminal(id string) (*terminal.Terminal, error) {
 	m.mu.Lock()

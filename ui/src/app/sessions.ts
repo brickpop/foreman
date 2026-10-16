@@ -74,10 +74,10 @@ export function linePlaceholder(name: string, status: string, lead: boolean): st
   return lead ? `Tell ${name} what you need. They’ll delegate.` : `Direct instruction to ${name}…`;
 }
 
-/** What the line input types into a session: each line break as the harness's
- * newline keystroke (a new line without sending), then Enter. */
-export function typedLine(text: string, newline: string): string {
-  return `${text.split("\n").join(newline)}\r`;
+/** A countdown as m:ss, rounded up (it reaches 0:00 only at the end). */
+export function countdown(ms: number): string {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 /** Whether this is a Mac, where shortcuts use Cmd instead of Ctrl. */
 export const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);

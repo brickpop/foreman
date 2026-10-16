@@ -12,6 +12,9 @@ import (
 type agents struct {
 	*instances.Manager
 	logins *sessions
+	// typed hears what the CEO types into an agent's terminal (Messaging
+	// holds deliveries while it is an unsent draft).
+	typed func(instance string, p []byte)
 }
 
 // Attach implements server.Terminals: an instance's terminal, else a login's.
@@ -27,5 +30,22 @@ func (a agents) Attach(id string) (server.Terminal, error) {
 	if err != nil {
 		return nil, err
 	}
-	return attachment{View: v, term: term}, nil
+	return agentAttachment{attachment: attachment{View: v, term: term}, id: id, typed: a.typed}, nil
+}
+
+// agentAttachment is an agent's terminal as the CEO types into it.
+type agentAttachment struct {
+	attachment
+	id    string
+	typed func(instance string, p []byte)
+}
+
+func (a agentAttachment) Input(p []byte) error {
+	if err := a.attachment.Input(p); err != nil {
+		return err
+	}
+	if a.typed != nil {
+		a.typed(a.id, p)
+	}
+	return nil
 }

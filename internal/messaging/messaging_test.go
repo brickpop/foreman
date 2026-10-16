@@ -63,6 +63,8 @@ func (s *sessions) Type(id string, p []byte) error {
 	return nil
 }
 
+func (s *sessions) Newline(string) string { return "\\\r" }
+
 func (s *sessions) setFail(fail bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

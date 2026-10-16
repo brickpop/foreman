@@ -90,12 +90,22 @@ func TestTerminalsAreFoundWhereverTheyRun(t *testing.T) {
 	if _, err := l.Connect(ctx, "fake"); err != nil {
 		t.Fatal(err)
 	}
-	views := agents{Manager: instances.New(instances.Deps{}), logins: l.terms}
+	var typed []string
+	views := agents{Manager: instances.New(instances.Deps{}), logins: l.terms,
+		typed: func(id string, p []byte) { typed = append(typed, id+": "+string(p)) }}
 	a, err := views.Attach("connect:fake")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// What the CEO types into an agent's terminal is heard (drafts); a login's isn't.
+	agent := agentAttachment{attachment: a.(attachment), id: "mara@ledger", typed: views.typed}
+	if err := agent.Input([]byte("hi")); err != nil {
+		t.Fatal(err)
+	}
 	_ = a.Input([]byte("\x04"))
+	if len(typed) != 1 || typed[0] != "mara@ledger: hi" {
+		t.Errorf("typed %q", typed)
+	}
 	a.Close()
 	if _, err := views.Attach("nobody@ledger"); !errors.Is(err, server.ErrNoTerminal) {
 		t.Errorf("unknown terminal: %v", err)

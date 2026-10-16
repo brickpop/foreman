@@ -57,8 +57,11 @@ export interface WorkspaceArea {
   saveSettings(settings: Settings, version: string): Promise<SettingsFile>;
   /** Folders that aren't projects yet. */
   candidates(): Promise<Candidate[]>;
-  /** Turns a candidate folder into a project: its project repo and starter wiki. */
-  addProject(folder: string): Promise<Project>;
+  /** Turns a candidate folder into a project: its project repo and starter
+   * wiki; with repo, also a first empty code repo of that name. */
+  addProject(folder: string, repo?: string): Promise<Project>;
+  /** Creates an empty code repo in a project (Foreman never clones). */
+  addRepo(project: string, name: string): Promise<Project>;
   /** Saves one agent's soul in its team file, guarded by the version read. */
   saveSoul(team: string, agent: string, soul: Soul, version: string): Promise<Team>;
   /** An agent's prompt before any deployment, with {placeholders}. */
@@ -233,9 +236,13 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/settings", { settings, version })
         ).json() as Promise<SettingsFile>,
-      // Add a project waits on its server side.
-      candidates: notBuilt("adding projects"),
-      addProject: notBuilt("adding projects"),
+      candidates: () => getJSON("/api/candidates"),
+      addProject: async (folder, repo) =>
+        (await request("POST", "/api/projects", { folder, repo })).json() as Promise<Project>,
+      addRepo: async (project, name) =>
+        (
+          await request("POST", `/api/projects/${id(project)}/repos`, { name })
+        ).json() as Promise<Project>,
       saveSoul: async (team, agent, soul, version) =>
         (
           await request("PUT", `/api/teams/${id(team)}/agents/${id(agent)}`, { soul, version })

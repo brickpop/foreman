@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/brickpop/foreman/internal/events"
@@ -26,6 +27,12 @@ type Config interface {
 	SaveSettings(ctx context.Context, s workspace.Settings, version string) (string, error)
 	// SaveTeam writes a team file if still at version; returns the saved team.
 	SaveTeam(ctx context.Context, c workspace.TeamConfig, version string) (workspace.Team, error)
+	// Candidates are the folders Add a project can turn into projects.
+	Candidates() []workspace.Candidate
+	// AddProject makes a folder a project, with an optional first (empty) repo.
+	AddProject(ctx context.Context, folder, repo string) (workspace.Project, error)
+	// AddRepo creates an empty code repo in a project.
+	AddRepo(ctx context.Context, project, name string) (workspace.Project, error)
 }
 
 // Events is what the server streams to the browser (implemented by events.Bus).
@@ -40,6 +47,32 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	mux.HandleFunc("GET /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) {
 		p, err := c.Project(r.PathValue("id"))
 		writeFound(w, p, err, "project")
+	})
+	mux.HandleFunc("GET /api/candidates", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, c.Candidates())
+	})
+	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Folder string `json:"folder"`
+			Repo   string `json:"repo"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {folder, repo?}")
+			return
+		}
+		p, err := c.AddProject(r.Context(), req.Folder, req.Repo)
+		writeCreated(w, p, err)
+	})
+	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name}")
+			return
+		}
+		p, err := c.AddRepo(r.Context(), r.PathValue("id"), req.Name)
+		writeCreated(w, p, err)
 	})
 	mux.HandleFunc("GET /api/teams", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, c.Teams())
@@ -109,6 +142,18 @@ func writeFound(w http.ResponseWriter, v any, err error, what string) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 	default:
 		writeJSON(w, http.StatusOK, v)
+	}
+}
+
+// writeCreated answers a request that created a project or a repo.
+func writeCreated(w http.ResponseWriter, p workspace.Project, err error) {
+	switch {
+	case errors.Is(err, workspace.ErrInvalid):
+		writeError(w, http.StatusBadRequest, "INVALID", strings.TrimPrefix(err.Error(), workspace.ErrInvalid.Error()+": "))
+	case errors.Is(err, workspace.ErrExists):
+		writeError(w, http.StatusConflict, "EXISTS", strings.TrimPrefix(err.Error(), workspace.ErrExists.Error()+": ")+" already exists")
+	default:
+		writeFound(w, p, err, "project")
 	}
 }
 

@@ -1,8 +1,10 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import type { Project } from "../../api/client";
+import { useState } from "react";
+import { type Project, useClient } from "../../api/client";
 import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
 import { agentOf, forgeLabel } from "../../app/model";
-import { useDeployments, useInstances, useTeams, useWorkspace } from "../../app/queries";
+import { keys, useDeployments, useInstances, useTeams, useWorkspace } from "../../app/queries";
 import { rosterOrder } from "../../app/sessions";
 import { Avatar } from "../../components/Avatar";
 import { Button, Empty, Panel } from "../../components/ui";
@@ -157,6 +159,7 @@ function Configuration({ project }: { project: Project }) {
         </Block>
       </div>
       <div className="flex flex-col gap-6">
+        <CodeRepos project={project} />
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
             {[
@@ -240,6 +243,59 @@ function Configuration({ project }: { project: Project }) {
         </Block>
       </div>
     </section>
+  );
+}
+
+/** The project's code repos, and a new empty one (Foreman never clones). */
+function CodeRepos({ project }: { project: Project }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const [name, setName] = useState("");
+  const add = useMutation({
+    mutationFn: () => client.workspace.addRepo(project.id, name.trim()),
+    onSuccess: () => {
+      setName("");
+      queries.invalidateQueries({ queryKey: keys.projects });
+    },
+  });
+  const listed = project.config.repos.length > 0;
+  return (
+    <Block title="Code repos">
+      {project.repos.length === 0 ? (
+        <p className="m-0 text-[13.5px] text-err">
+          None yet: agents need at least one repo to work on. Clone one into {project.id}/, or
+          create an empty one here.
+        </p>
+      ) : (
+        <span className="font-mono text-[13.5px]">{project.repos.join(" · ")}</span>
+      )}
+      {listed ? (
+        <p className="m-0 text-[13px] text-tx3">
+          project.toml lists its repos: add a new one there, after creating it in {project.id}/.
+        </p>
+      ) : (
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            add.mutate();
+          }}
+        >
+          <input
+            aria-label="New repo name"
+            placeholder="new-repo"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            spellCheck={false}
+            className="w-48 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx placeholder:text-tx4"
+          />
+          <Button type="submit" variant="small" disabled={!name.trim() || add.isPending}>
+            New repo
+          </Button>
+        </form>
+      )}
+      {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}
+    </Block>
   );
 }
 

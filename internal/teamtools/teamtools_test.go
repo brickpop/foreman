@@ -1,0 +1,123 @@
+package teamtools_test
+
+import (
+	"context"
+	"encoding/json"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/messaging"
+	"github.com/brickpop/foreman/internal/prompt"
+	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/teamtools"
+	"github.com/brickpop/foreman/internal/workflow"
+	"github.com/brickpop/foreman/internal/workspace"
+)
+
+var ctx = context.Background()
+
+var atlas = workspace.Team{ID: "atlas", Config: workspace.TeamConfig{
+	Team: "atlas", Lead: "mara", Agents: map[string]workspace.Soul{"mara": {Name: "Mara"}, "tove": {Name: "Tove"}},
+}}
+
+type config struct{}
+
+func (config) Team(string) (workspace.Team, error) { return atlas, nil }
+func (config) Project(id string) (workspace.Project, error) {
+	return workspace.Project{ID: id, Config: workspace.ProjectConfig{Main: "main"}}, nil
+}
+
+// spy is a block that records the calls that reach it.
+type spy struct{ calls []string }
+
+func (s *spy) Tools() []agentlink.Tool { return []agentlink.Tool{{Name: "ask"}, {Name: "handoff"}} }
+func (s *spy) Call(_ context.Context, c teamtools.Caller, name string, args json.RawMessage) agentlink.Result {
+	s.calls = append(s.calls, c.Instance.ID+" "+name+" "+string(args))
+	return agentlink.Result{Text: "done"}
+}
+
+func newStore(t *testing.T) *store.DB {
+	t.Helper()
+	db, err := store.Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "ship"); err != nil {
+		t.Fatal(err)
+	}
+	for _, a := range []string{"mara", "tove"} {
+		if err := db.Instances().Put(ctx, store.Instance{ID: a + "@ledger", DeploymentID: "atlas@ledger", AgentID: a, Status: "idle", SandboxPath: "/s", Harness: "claude-code"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return db
+}
+
+// The router serves exactly what the session prompt describes, per role,
+// with the real blocks: the two can't drift.
+func TestEveryOfferedToolIsServed(t *testing.T) {
+	db := newStore(t)
+	r := &teamtools.Router{Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}, Blocks: []teamtools.Block{
+		messaging.New(messaging.Deps{Messages: db.Messages(), Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}}),
+		workflow.New(workflow.Deps{Config: config{}}),
+	}}
+	for _, id := range []string{"mara@ledger", "tove@ledger"} {
+		var names []string
+		for _, tool := range r.List(id) {
+			names = append(names, tool.Name)
+			if !json.Valid(tool.InputSchema) || tool.Description == "" {
+				t.Errorf("%s: a bad definition", tool.Name)
+			}
+		}
+		if want := prompt.Offered(id == "mara@ledger"); !slices.Equal(names, want) {
+			t.Errorf("%s served %v, the prompt says %v", id, names, want)
+		}
+	}
+	if tools := r.List("nobody@ledger"); tools != nil {
+		t.Errorf("an unknown instance got %v", tools)
+	}
+}
+
+func TestTheRouterChecksBeforeAnyBlock(t *testing.T) {
+	db := newStore(t)
+	s := &spy{}
+	r := &teamtools.Router{Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}, Blocks: []teamtools.Block{s}}
+	for _, tc := range []struct{ from, tool, code string }{
+		{"nobody@ledger", "ask", "unknown_caller:"},
+		{"mara@ledger", "handoff", "unknown_tool:"}, // a lead isn't offered handoff
+		{"tove@ledger", "rm_rf", "unknown_tool:"},
+	} {
+		if res := r.Call(ctx, tc.from, tc.tool, nil); !res.Error || !strings.HasPrefix(res.Text, tc.code) {
+			t.Errorf("%s %s: %+v", tc.from, tc.tool, res)
+		}
+	}
+	if res := r.Call(ctx, "tove@ledger", "handoff", nil); res.Error || len(s.calls) != 1 || s.calls[0] != "tove@ledger handoff {}" {
+		t.Errorf("a member's handoff: %+v, calls %v", res, s.calls)
+	}
+	if err := db.Deployments().Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if res := r.Call(ctx, "tove@ledger", "ask", nil); !strings.HasPrefix(res.Text, "deployment_stopped:") || len(s.calls) != 1 {
+		t.Errorf("a stopped deployment: %+v", res)
+	}
+}
+
+func TestTeammate(t *testing.T) {
+	c := teamtools.Caller{Instance: store.Instance{ID: "tove@ledger", AgentID: "tove"}, Deployment: store.Deployment{ProjectID: "ledger"}, Team: atlas}
+	if to, _, ok := c.Teammate(" MARA "); !ok || to != "mara@ledger" {
+		t.Errorf("by name: %q %v", to, ok)
+	}
+	if _, res, ok := c.Teammate("tove"); ok || !strings.HasPrefix(res.Text, "self:") {
+		t.Errorf("self: %+v", res)
+	}
+	if _, res, ok := c.Teammate("rhea"); ok || res.Text != `unknown_teammate: no "rhea" on this team; your teammates: Mara` {
+		t.Errorf("unknown: %+v", res)
+	}
+	if c.LeadInstance() != "mara@ledger" || c.Name() != "Tove" {
+		t.Errorf("lead %q, name %q", c.LeadInstance(), c.Name())
+	}
+}

@@ -41,7 +41,7 @@ Table `merge_requests`.
 - Creating it raises exactly one **review** request (its `merge_request_id`). The request is resolved when the merge request leaves `open`.
 - **Foreman merges only on the CEO's Merge to main**, never on its own; afterwards merged branches are deleted under the existing rule ([Sandboxes and git policy → Branches](../architecture/sandboxes-and-git.md#branches)).
 - **Nothing goes to a forge automatically.** Only Create PR pushes the branch and opens a PR; from then on Foreman watches it, and a merge or a close on the forge ends the merge request.
-- When a merge request is merged, the lead of every other `open` merge request on the same `repo` is told that `main` moved and asked to merge it in with `update("main")` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)). Nothing is ever rebased.
+- When a merge request is merged, the lead of every other `open` merge request on the same `repo` is told that `main` moved and asked to merge it in with `merge("main")` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)). Nothing is ever rebased.
 - `merged` and `rejected` are final. Merged: its work items are merged with it, the lead is told, and both show under "Merged" in [Changes](../features/changes.md). Rejected (by Reject, or its PR closed on the forge): the reason is delivered to the lead, its work items lose their `merge_request_id` and return to stage 0, and the branch stays, so the lead can `switch` back to it and request again.
 - The note's tone is derived, as for [work items](./work-item.md#invariants).
 - A Chief of Staff change has no work items and no deployment; its request has `source: cos`.

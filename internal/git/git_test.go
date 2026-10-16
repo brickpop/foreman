@@ -29,7 +29,7 @@ func repo(t *testing.T) string {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	dir := t.TempDir()
-	if err := (New()).Init(ctx, dir); err != nil {
+	if err := (New()).Init(ctx, dir, "main"); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -89,7 +89,7 @@ func TestInitIsIdempotent(t *testing.T) {
 	if err := (New()).Commit(ctx, dir, "m", "f"); err != nil {
 		t.Fatal(err)
 	}
-	if err := (New()).Init(ctx, dir); err != nil {
+	if err := (New()).Init(ctx, dir, "main"); err != nil {
 		t.Fatal(err)
 	}
 	if log, _ := run(ctx, dir, "log", "--oneline"); !strings.Contains(log, "m") {

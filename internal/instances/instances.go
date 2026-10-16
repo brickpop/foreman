@@ -169,6 +169,9 @@ func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspac
 	if len(project.Problems) > 0 {
 		return team, project, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}
+	if len(project.Repos) == 0 {
+		return team, project, fmt.Errorf("%w: project %s has no code repo for agents to work in: create one in its Settings (New repo), or clone one into its folder", ErrInvalid, projectID)
+	}
 	for _, agent := range team.Config.Roster() {
 		h := team.Config.Agents[agent].Harness
 		adapter := m.Adapters[h]
@@ -206,8 +209,10 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 			if err := l.proc.Stop(stopGrace); err != nil {
 				slog.Warn("stopping an instance", "instance", inst.ID, "err", err)
 			}
-			// Gone now: free its slot at once, so a redeploy right after starts it
-			// (watch, which also releases it, may not have run yet).
+		}
+		// Its slot is free at once, also mid-start, so a redeploy right after
+		// starts a new run; the old run's late end then changes nothing.
+		if l != nil {
 			m.release(inst.ID, l)
 		}
 		m.setStatus(ctx, inst.ID, Stopped)
@@ -217,6 +222,7 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 	}
 	dep.Status = store.DeploymentStopped
 	m.publish("deployment.stopped", dep)
+	m.startQueued() // its slots go to whoever waits
 	return nil
 }
 
@@ -400,8 +406,12 @@ func (m *Manager) start(id string, l *live) {
 	}
 	if err != nil {
 		slog.Warn("starting an instance", "instance", id, "err", err)
-		m.release(id, l)
-		m.setStatus(ctx, id, Stopped)
+		// A stop already freed the slot and set the status; a run may have
+		// replaced this one since.
+		if m.release(id, l) {
+			m.setStatus(ctx, id, Stopped)
+		}
+		m.startQueued()
 		return
 	}
 	inst, _ := m.Instances.Get(ctx, id)
@@ -527,13 +537,16 @@ func (m *Manager) watch(id string, l *live) {
 }
 
 // release frees the slot of one run of the instance: only its own, so the late
-// end of a stopped run never frees the run that replaced it (a redeploy).
-func (m *Manager) release(id string, l *live) {
+// end of a stopped run never frees the run that replaced it (a redeploy). It
+// says whether the slot was still that run's.
+func (m *Manager) release(id string, l *live) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.live[id] == l {
-		delete(m.live, id)
+	if m.live[id] != l {
+		return false
 	}
+	delete(m.live, id)
+	return true
 }
 
 // StatusChange is the instance.status event's data.

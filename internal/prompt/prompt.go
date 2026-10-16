@@ -28,7 +28,7 @@ type Input struct {
 
 // built are the team tools that exist so far (the Messaging and hand-offs
 // epic brings them in steps), in the order the prompt lists them.
-var built = []string{"ask", "reply", "read_message"}
+var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "handoff", "contribute"}
 
 // Offered is the team tools an agent gets: what is built, as its role allows
 // (handoff for members, request_merge for the lead). The team-tool router
@@ -69,7 +69,7 @@ func Compose(in Input) string {
 	line("Project: %s  (%s)", in.Project, in.Path)
 	line("Goal: %s", strings.TrimSpace(in.Goal))
 	line("Your sandbox: %s/.sandboxes/%s (a git worktree per repo)", in.Project, in.Agent)
-	line("Branches: %s", branches(in, lead, has("switch")))
+	line("Branches: %s", branches(in, lead, has))
 	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	line("")
@@ -133,16 +133,21 @@ func Compose(in Input) string {
 	return b.String()
 }
 
-func branches(in Input, lead, switching bool) string {
+func branches(in Input, lead bool, has func(string) bool) string {
+	switching := has("switch")
 	switch {
 	case !switching && lead:
 		return fmt.Sprintf("you work on lead/%s/integration, made for you from %s.", in.Team.Team, in.Config.Main)
 	case !switching:
 		return fmt.Sprintf("you work on wt/%s/main, made for you from %s.", in.Agent, in.Config.Main)
+	case lead && has("request_merge"):
+		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
+			"Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with merge(\"main\"), "+
+			"resolve any conflicts and commit(), then call request_merge again.", in.Team.Team, in.Team.Team)
 	case lead:
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
-			"Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with update(\"main\"), "+
-			"resolve any conflicts and commit(), then call request_merge again.", in.Team.Team, in.Team.Team)
+			"Merge the hand-offs you accept into it with merge(branch). When main moves, merge it in with merge(\"main\"). "+
+			"Tell the CEO which lead branch is ready for review.", in.Team.Team, in.Team.Team)
 	default:
 		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch). No push to main.", in.Agent)
 	}
@@ -180,12 +185,13 @@ var toolRows = map[string][]string{
 	"read_message": {"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."},
 	"switch":       {"switch(branch)                      Go to one of your branches (made from main if new)."},
 	"commit":       {"commit(message)                     Commit your changes, in every repo, on your branch."},
-	"update": {
-		"update(branch)                      Merge a branch (the lead's, main, a teammate's) into yours.",
+	"merge": {
+		"merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.",
 		"                                    On conflicts: resolve the markers, then commit().",
 	},
-	"handoff":    {"handoff(teammate, branch, summary)  Pass finished work on (commits first). Your part ends."},
-	"contribute": {"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."},
+	"abort_merge": {"abort_merge()                       Back out of an unfinished merge."},
+	"handoff":     {"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."},
+	"contribute":  {"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."},
 	"escalate": {
 		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
 		"                                    For an approval, wait for the answer before that step.",
@@ -195,7 +201,7 @@ var toolRows = map[string][]string{
 // tools is the Tools section: a row per tool offered, then how they work.
 func tools(in Input, lead bool, has func(string) bool) string {
 	var rows []string
-	for _, t := range []string{"ask", "reply", "read_message", "switch", "commit", "update", "handoff", "contribute", "escalate"} {
+	for _, t := range []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "handoff", "contribute", "escalate"} {
 		if has(t) {
 			rows = append(rows, toolRows[t]...)
 		}
@@ -210,12 +216,16 @@ func tools(in Input, lead bool, has func(string) bool) string {
 	notes := ""
 	if has("commit") {
 		notes += "Git is read-only for you (status, diff, log, blame work); branch, commit\n" +
-			"and merge only through switch(), commit() and update().\n"
+			"and merge only through switch(), commit() and merge().\n"
 	}
 	if has("read_message") {
 		notes += "Messages arrive in this session as one line, \"Message msg-N from <name> (<kind>): …\".\n" +
-			"Read the whole message with read_message(\"msg-N\"). After a reply, resume the task\n" +
-			"that asked for it; after an approval, wait for the CEO's answer, then resume.\n"
+			"Read the whole message with read_message(\"msg-N\"). After a reply, resume the task\n"
+		if has("escalate") {
+			notes += "that asked for it; after an approval, wait for the CEO's answer, then resume.\n"
+		} else {
+			notes += "that asked for it.\n"
+		}
 	}
 	if has("reply") {
 		notes += "A reply (or a handoff) is its outcome: the result, the decisions you took, what is\n" +

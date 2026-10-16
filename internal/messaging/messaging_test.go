@@ -14,6 +14,7 @@ import (
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/workspace"
 )
 
@@ -79,6 +80,7 @@ type fixture struct {
 	db *store.DB
 	s  *sessions
 	m  *Messenger
+	r  *teamtools.Router // the tools as agents reach them
 }
 
 // newFixture: atlas on ledger; mara idle, tove running, ivo asleep.
@@ -97,6 +99,7 @@ func newFixture(t *testing.T) *fixture {
 		f.setStatus(agent+"@ledger", status)
 	}
 	f.m = New(Deps{Messages: db.Messages(), Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}, Sessions: f.s})
+	f.r = &teamtools.Router{Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}, Blocks: []teamtools.Block{f.m}}
 	return f
 }
 
@@ -111,7 +114,7 @@ func (f *fixture) setStatus(id, status string) {
 func (f *fixture) call(from, tool string, args map[string]string) agentlink.Result {
 	f.t.Helper()
 	raw, _ := json.Marshal(args)
-	return f.m.Call(ctx, from, tool, raw)
+	return f.r.Call(ctx, from, tool, raw)
 }
 
 // eventually waits for the deliveries started in the background.
@@ -134,22 +137,13 @@ func (f *fixture) state(ref string) string {
 	return msg.State
 }
 
-func TestEveryOfferedToolIsServed(t *testing.T) {
-	f := newFixture(t)
-	for _, id := range []string{"mara@ledger", "tove@ledger"} {
-		var names []string
-		for _, tool := range f.m.List(id) {
-			names = append(names, tool.Name)
-			if !json.Valid(tool.InputSchema) || tool.Description == "" {
-				t.Errorf("%s: a bad definition", tool.Name)
-			}
+// Each tool is defined well enough for a harness to call it; that the router
+// serves exactly what the prompt describes is teamtools' test.
+func TestToolDefinitions(t *testing.T) {
+	for _, tool := range newFixture(t).m.Tools() {
+		if !json.Valid(tool.InputSchema) || tool.Description == "" || !slices.Contains(prompt.Offered(false), tool.Name) {
+			t.Errorf("%s: a bad definition, or a tool no one is offered", tool.Name)
 		}
-		if want := prompt.Offered(id == "mara@ledger"); !slices.Equal(names, want) {
-			t.Errorf("%s offered %v, the prompt says %v", id, names, want)
-		}
-	}
-	if tools := f.m.List("nobody@ledger"); tools != nil {
-		t.Errorf("an unknown instance got %v", tools)
 	}
 }
 
@@ -243,7 +237,7 @@ func TestRefusals(t *testing.T) {
 		{"mara@ledger", "ask", map[string]string{"teammate": "rhea", "request": "x"}, "unknown_teammate: no \"rhea\" on this team; your teammates: Tove, Ivo"},
 		{"mara@ledger", "ask", map[string]string{"teammate": "Mara", "request": "x"}, "self:"},
 		{"mara@ledger", "ask", map[string]string{"teammate": "tove", "request": "  "}, "empty:"},
-		{"mara@ledger", "ask", map[string]string{"teammate": "tove", "request": strings.Repeat("x", maxBody+1)}, "too_long:"},
+		{"mara@ledger", "ask", map[string]string{"teammate": "tove", "request": strings.Repeat("x", teamtools.MaxBody+1)}, "too_long:"},
 		{"mara@ledger", "handoff", map[string]string{"teammate": "tove"}, "unknown_tool:"},
 		{"tove@ledger", "reply", map[string]string{"request_id": "msg-9", "output": "x"}, "unknown_request:"},
 		{"ivo@ledger", "reply", map[string]string{"request_id": "msg-1", "output": "x"}, "not_addressee:"},

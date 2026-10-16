@@ -82,7 +82,7 @@ func (w *Workspace) ensureRepo(ctx context.Context) error {
 	if _, err := os.Stat(w.Path(".git")); err == nil {
 		return nil
 	}
-	if err := w.git.Init(ctx, w.Path()); err != nil {
+	if err := w.git.Init(ctx, w.Path(), "main"); err != nil {
 		return err
 	}
 	if _, err := os.Stat(w.Path(".gitignore")); errors.Is(err, os.ErrNotExist) {

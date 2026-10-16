@@ -60,9 +60,10 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 	return out.String(), nil
 }
 
-// Init makes dir a git repo, if it isn't one already.
-func (g *CLI) Init(ctx context.Context, dir string) error {
-	_, err := run(ctx, dir, "init", "--quiet", "--initial-branch=main")
+// Init makes dir a git repo whose first branch is branch, if it isn't a repo
+// already.
+func (g *CLI) Init(ctx context.Context, dir, branch string) error {
+	_, err := run(ctx, dir, "init", "--quiet", "--initial-branch="+branch)
 	return err
 }
 
@@ -70,8 +71,14 @@ func (g *CLI) Init(ctx context.Context, dir string) error {
 var ErrNothingToCommit = errors.New("git: nothing to commit")
 
 // Commit commits exactly the given files (relative to dir), as they are on
-// disk, leaving anything else staged or changed alone.
+// disk, leaving anything else staged or changed alone: by the CEO's git
+// identity, or Foreman's when there is none.
 func (g *CLI) Commit(ctx context.Context, dir, message string, files ...string) error {
+	return g.CommitAs(ctx, dir, message, Author{}, files...)
+}
+
+// CommitAs is Commit by the author (the zero Author: as Commit).
+func (g *CLI) CommitAs(ctx context.Context, dir, message string, by Author, files ...string) error {
 	defer g.lock(ctx, dir)()
 	if _, err := run(ctx, dir, append([]string{"add", "--"}, files...)...); err != nil {
 		return err
@@ -82,7 +89,10 @@ func (g *CLI) Commit(ctx context.Context, dir, message string, files ...string) 
 		return ErrNothingToCommit
 	}
 	args := append([]string{"commit", "--quiet", "--no-verify", "-m", message, "--"}, files...)
-	if !hasIdentity(ctx, dir) {
+	switch {
+	case by != Author{}:
+		args = append(by.config(), args...)
+	case !hasIdentity(ctx, dir):
 		args = append(fallbackIdentity, args...)
 	}
 	_, err := run(ctx, dir, args...)

@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { isNotBuilt, useClient } from "../api/client";
+import { useClient } from "../api/client";
 import { keys, useWorkspace } from "../app/queries";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
-import { Button, NotBuilt } from "./ui";
+import { Button } from "./ui";
 
 // Turns a workspace folder into a project (wiki/product/features/add-project.md).
-// Foreman never clones: the CEO puts the repos in the folder first.
+// Foreman never clones: the CEO puts the repos in the folder first, or has
+// Foreman create an empty one for a folder that has none.
 
 export function repoDetail(repos: string[]): string {
   if (repos.length === 0) return "No git repos yet";
@@ -22,13 +23,15 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
   const toast = useToast();
   const workspace = useWorkspace();
   const [chosen, setChosen] = useState<string>();
+  const [repo, setRepo] = useState("");
   const candidates = useQuery({
     queryKey: ["candidates"],
     queryFn: () => client.workspace.candidates(),
     enabled: open,
   });
   const add = useMutation({
-    mutationFn: (folder: string) => client.workspace.addProject(folder),
+    mutationFn: ({ folder, repo }: { folder: string; repo: string }) =>
+      client.workspace.addProject(folder, repo.trim() || undefined),
     onSuccess: (p) => {
       queries.invalidateQueries({ queryKey: keys.projects });
       queries.invalidateQueries({ queryKey: ["candidates"] });
@@ -55,12 +58,6 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
   const root = workspace.data?.path ?? "the workspace";
   const list = candidates.data ?? [];
   const selected = list.find((c) => c.folder === chosen);
-  if (isNotBuilt(candidates.error))
-    return (
-      <Modal open={open} onClose={onClose} title="Add a project">
-        <NotBuilt what="adding projects" />
-      </Modal>
-    );
   return (
     <Modal open={open} onClose={onClose} title="Add a project">
       <div className="flex flex-col gap-4">
@@ -85,7 +82,10 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
                   name="folder"
                   value={c.folder}
                   checked={c.folder === chosen}
-                  onChange={() => setChosen(c.folder)}
+                  onChange={() => {
+                    setChosen(c.folder);
+                    setRepo(c.repos.length === 0 ? c.folder : "");
+                  }}
                   className="sr-only"
                 />
                 <span className="font-mono text-sm font-medium">{c.folder}/</span>
@@ -97,8 +97,19 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
         {selected && (
           <p className="m-0 text-[13px] text-tx2">
             Creates {selected.folder}/project/: a git repo with project.toml and a starter wiki.
-            {selected.repos.length === 0 && " Agents need at least one repo to work on."}
           </p>
+        )}
+        {selected && selected.repos.length === 0 && (
+          <label className="flex flex-col gap-1 text-[13px] text-tx3">
+            New repo (agents need one to work on; Foreman creates it empty, with a first commit.
+            Leave it blank to add one later.)
+            <input
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+              spellCheck={false}
+              className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
+            />
+          </label>
         )}
         {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}
         <div className="flex justify-end gap-2">
@@ -106,7 +117,7 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
           <Button
             variant="primary"
             disabled={!chosen || add.isPending}
-            onClick={() => chosen && add.mutate(chosen)}
+            onClick={() => chosen && add.mutate({ folder: chosen, repo })}
           >
             Add project
           </Button>

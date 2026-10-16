@@ -8,7 +8,7 @@ tags: [architecture, git, security, agents, pipeline]
 
 Each [instance](../models/instance.md) works in its **own git worktree** of each code repo of the project, on its own branch, never in the CEO's checkout. Only a team lead's branches (`lead/<team>/*`) can be requested for merging into `main`, and only the CEO's action merges them. The [Git block](./building-blocks.md#8-git-git) creates the worktrees on the host; the [session runner](./session-runner.md) mounts them into the instance's container. **Git belongs to Foreman: agents only read it.** Every git write (a commit, a merge, a new branch) is a team tool that Foreman runs on the host ([below](#agents-and-git)). The project's knowledge base is different: one live checkout of the [project repo](../models/project-config.md), shared by every agent ([below](#project-knowledge-base)).
 
-**Phasing:** worktrees and branches per agent arrive in [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md) (epic 1); the `switch`, `commit` and `update` tools, and hand-offs that name a branch, in [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) (they need the agent link). **Decided: in epic 1 agents can't commit**: the CEO drives each session by hand and looks at the uncommitted work in each worktree; integration detection, checks and pushes to the forge in the [Git epic](../../backlog/epics/git.md).
+**Phasing:** worktrees and branches per agent arrive in [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md) (epic 1); the `switch`, `commit` and `merge` tools, and hand-offs that name a branch, in [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) (they need the agent link). **Decided: in epic 1 agents can't commit**: the CEO drives each session by hand and looks at the uncommitted work in each worktree; integration detection, checks and pushes to the forge in the [Git epic](../../backlog/epics/git.md).
 
 ## Layout
 
@@ -44,9 +44,10 @@ A worktree's `.git` is a file pointing at `<project>/<repo>/.git/worktrees/<name
 **Agents read git; Foreman writes it.** Every repo's `.git`, the project repo's included, is mounted read-only, so inside the container `git status`, `diff`, `log`, `blame` and `show` work, and every git write (`commit`, `checkout`, `branch`, `merge`, `rebase`, `push`) fails. Writes go through [team tools](./team-tools.md#tools), which Foreman runs on the host in the caller's own worktrees:
 
 - **`switch(branch)`**: switches the agent's worktrees in each of its code repos to one of its own branches (`wt/<agent>/<topic>`, or `lead/<team>/<topic>` for the lead), creating it from `main` if it doesn't exist yet; so an agent can also go back to earlier work. A lead can keep several lead branches, and so several merge requests, at once.
-- **`commit(message)`**: stages everything in each of the agent's worktrees that has changes and commits it on the branch checked out there, authored as the agent. For the lead it also commits its changes in the live project repo.
-- **`update(branch)`**: merges a named branch (the lead's, `main`, a teammate's) into the agent's worktrees. On a conflict the markers stay in the files; the agent resolves them and calls `commit`, which concludes the merge.
-- **`handoff`** commits pending work first, so a hand-off never misses the last changes.
+- **`commit(message)`**: stages everything in each of the agent's worktrees that has changes and commits it on the branch checked out there, authored as the agent (`<Name> <agent.invalid>`, author and committer: the CEO's identity never signs an agent's work). For the lead it also commits its changes in the live project repo.
+- **`merge(branch)`**: merges a named branch (the lead's, `main`, a teammate's) into the agent's worktrees. On a conflict the markers stay in the files; the agent resolves them and calls `commit`, which concludes the merge. Agents never rebase: branches are shared, and tracking follows commits.
+- **`abort_merge()`**: backs out of an unfinished merge, branch and files as before it.
+- **`handoff`** never commits: it names a committed branch, and refuses while the agent has uncommitted changes. `commit` is the one way to commit.
 
 Foreman runs one git command at a time per repo, so git's own lock never collides, and its git runs with the repo's hooks and fsmonitor turned off, so nothing configured in a repo runs a program on the host when Foreman acts. Its commits are unsigned, even where the CEO's git signs by default: they are automatic, and a signing agent would prompt, or fail, on every one. The [session prompt](./session-prompt.md) tells agents that git writes go through the tools.
 
@@ -56,21 +57,21 @@ What this buys: no agent can damage refs, or plant a hook or a `.git/config` set
 
 ## Hand-offs
 
-A hand-off is a message naming a branch: `handoff(mara, "wt/tove/LED-44", summary)`. Every worktree shares the repo, so the lead can review the branch at once (`git diff` in its own worktree) and merge it with `update`; nothing is fetched or copied, and agents never push anywhere.
+A hand-off is a message naming a branch: `handoff(mara, "wt/tove/LED-44", summary)`. Every worktree shares the repo, so the lead can review the branch at once (`git diff` in its own worktree) and merge it with `merge`; nothing is fetched or copied, and agents never push anywhere.
 
 ## Branch policy
 
 | Who | May hand off or request a merge of |
 |---|---|
 | Member | `wt/<self>/*` only |
-| Lead | `lead/<team>/*` only: the lead works only on its lead branches, never on `wt/` ones; it catches up with a newer `main` by merging it in (`update("main")`), never by rewriting the branch |
+| Lead | `lead/<team>/*` only: the lead works only on its lead branches, never on `wt/` ones; it catches up with a newer `main` by merging it in (`merge("main")`), never by rewriting the branch |
 | Nobody | `main`: it changes only by the CEO's merge |
 
 ### Where the policy is enforced
 
 By Foreman, never by hooks in the repo: agents can't write `.git` at all, and Foreman is the only one that writes it, through the tools:
 
-- **`switch`**, **`commit`** and **`update`** act only on the caller's own worktrees and the branches checked out there; **`handoff`** accepts only `wt/<self>/*`; **`request_merge`** only the caller's own `lead/<team>/*` ([Protocol → Team tools](./protocol.md#team-tools)).
+- **`switch`**, **`commit`**, **`merge`** and **`abort_merge`** act only on the caller's own worktrees and the branches checked out there; **`handoff`** accepts only `wt/<self>/*`; **`request_merge`** only the caller's own `lead/<team>/*` ([Protocol → Team tools](./protocol.md#team-tools)).
 - **Agents never push, and nothing is pushed on its own.** Only the CEO's **Create PR** on a merge request makes Foreman push the lead branch to the **forge** from the host, with the workspace token ([Forge adapters](./forge-adapters.md)); agents never receive forge tokens. Calling `request_merge` again on a lead branch whose merge request is still open refreshes it (after merging `main` in, or new integrations): Foreman reruns the checks, and pushes again if it has a PR. Lead branches only ever move forward: nothing is rebased.
 - **Merge to main** is Foreman merging the branch into `main` on the host, on the CEO's click; with or without a forge ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 

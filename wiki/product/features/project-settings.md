@@ -52,6 +52,7 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 
 **Right column**:
 
+- **"Code repos"** (first in the right column): the repos, Mono, joined with ` · `; with none, in `--err`: `None yet: agents need at least one repo to work on. Clone one into <project>/, or create an empty one here.` Then a Mono input (placeholder `new-repo`) and a small **`New repo`** button: `POST /api/projects/:id/repos {name}` creates it as [Add a project](./add-project.md) does (empty, a first commit, on the project's `main`); a refusal (a bad or taken name) shows under it. When `project.toml` lists its `repos`, a new folder wouldn't count, so the form is replaced by `project.toml lists its repos: add a new one there, after creating it in <project>/.`
 - **"What comes to you"**: grid `84px 1fr`, the kind label (colored, Mono uppercase, no border) and a line:
   - Approval: "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer."
   - Question: "An agent needs information only you have. It keeps working on other things meanwhile."

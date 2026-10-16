@@ -6,7 +6,7 @@ tags: [model, workspace, config]
 
 # Workspace
 
-The root folder Foreman runs on (e.g. `~/agents-ws`). It holds Foreman's own data in `.foreman/` and one subfolder per project. Foreman never clones or provisions code repositories: the CEO puts them in project folders by hand. The only repos Foreman creates are the **workspace repo** (`.foreman/`) and each project's **project repo** (`<project>/project/`).
+The root folder Foreman runs on (e.g. `~/agents-ws`). It holds Foreman's own data in `.foreman/` and one subfolder per project. Foreman never clones code repositories: the CEO puts them in project folders by hand. The repos Foreman creates are the **workspace repo** (`.foreman/`), each project's **project repo** (`<project>/project/`), and, on the CEO's request, a new **empty code repo** (a README in a first commit, on the project's `main`) for greenfield work ([Add a project](../features/add-project.md), [Project settings](../features/project-settings.md)).
 
 ## Config vs. state vs. content
 

@@ -38,7 +38,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 
 ## Part 2: put the team to work
 
-> **Phasing.** Every agent has its own worktree from epic 1 ([Terminal multiplexer](../backlog/epics/terminal-multiplexer.md)); the `switch`, `commit` and `update` tools and hand-offs that name a branch come with epic 2 ([Messaging and hand-offs](../backlog/epics/messaging-handoffs.md)). Work items, checks and integration detection (16, 17) and the merge and PR in 19 rely on the [Git epic](../backlog/epics/git.md).
+> **Phasing.** Every agent has its own worktree from epic 1 ([Terminal multiplexer](../backlog/epics/terminal-multiplexer.md)); the `switch`, `commit` and `merge` tools and hand-offs that name a branch come with epic 2 ([Messaging and hand-offs](../backlog/epics/messaging-handoffs.md)). Work items, checks and integration detection (16, 17) and the merge and PR in 19 rely on the [Git epic](../backlog/epics/git.md).
 
 **9. Deploy.** Team → **Deploy to a project** → `ledger`, goal "Add idempotency keys to POST /settle" → **Deploy**.
 - *Under the hood:* the deployment is stored (State store). Instance manager `Ensure(deployment)`, for each member:
@@ -71,14 +71,14 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **16. Hand-off.** Tove calls `handoff(mara, "wt/tove/LED-44", "Idempotency keys, tests pass")`.
 - *Under the hood:* Workflow commits anything Tove left uncommitted, checks the branch against the policy and creates a work item (stage *handed to lead*). Nothing is fetched: Tove's and Mara's worktrees share the repo, so Mara sees the branch at once (agents never push anywhere, and nothing goes to the forge yet). Messaging delivers "Tove handed off wt/tove/LED-44: …" to Mara at her next idle; marker shown; Changes → In flight shows the item.
 
-**17. Integration.** Mara reviews the branch (`git diff` in her worktree) and merges it into `lead/atlas/integration` with `update("wt/tove/LED-44")`.
-- *Under the hood:* `update` → Workflow → Git merges the branch on the host, in Mara's worktree (a conflict would leave markers for her to resolve, then `commit`). Workflow notices the integration through Git (the branch is contained in a `lead/atlas/*` branch) when Mara next goes idle: the work item moves to *integrated*. (If she wanted changes instead: an `ask` back to Tove; see the open question in [Protocol](./architecture/protocol.md#open-questions).)
+**17. Integration.** Mara reviews the branch (`git diff` in her worktree) and merges it into `lead/atlas/integration` with `merge("wt/tove/LED-44")`.
+- *Under the hood:* `merge` → Workflow → Git merges the branch on the host, in Mara's worktree (a conflict would leave markers for her to resolve, then `commit`). Workflow notices the integration through Git (the branch is contained in a `lead/atlas/*` branch) when Mara next goes idle: the work item moves to *integrated*. (If she wanted changes instead: an `ask` back to Tove; see the open question in [Protocol](./architecture/protocol.md#open-questions).)
 
 **18. The merge request.** Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`: the card explains what was done.
 - *Under the hood:* Workflow checks the branch and the entry, runs the project checks (in a throwaway container from the project image), creates the merge request for `ledger-api` (titled from the card, carrying the integrated work items) and a **review request**. Nothing is pushed. Home shows it, the browser notifies, Mara receives "Merge requested".
 
 **19. The CEO merges.** Home → the review → Changes. The CEO picks **Create PR on GitHub**, then **Open PR ↗**, reviews and merges on GitHub. (Or **Merge to main**, and Foreman merges locally; or **Reject** with a reason, which goes back to Mara.)
-- *Under the hood:* Create PR: Git pushes the branch to GitHub from the host, with the workspace token, and the Forge adapter opens PR #128. Forge adapter polling then sees `merged`; Workflow resolves the request, marks the merge request and its work items merged, delivers "merged into main" to Mara, and tells the leads of other open merge requests on `ledger-api` to merge `main` in (`update("main")`). Git fetches the new `main` into `ledger-api` (`Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. (With Merge to main, Git merges on the host instead, and nothing reaches GitHub.)
+- *Under the hood:* Create PR: Git pushes the branch to GitHub from the host, with the workspace token, and the Forge adapter opens PR #128. Forge adapter polling then sees `merged`; Workflow resolves the request, marks the merge request and its work items merged, delivers "merged into main" to Mara, and tells the leads of other open merge requests on `ledger-api` to merge `main` in (`merge("main")`). Git fetches the new `main` into `ledger-api` (`Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. (With Merge to main, Git merges on the host instead, and nothing reaches GitHub.)
 
 ## Part 3: intervene
 

@@ -78,12 +78,12 @@ Every arrow, in words:
 | Web server | Workspace & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
 | Workflow | Messaging | Deliver answers, notices ("PR #128 opened", "main moved") to agents |
-| Workflow | Git | Switch, commit and update an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge to main, push a branch for a PR, or Sync a reserved repo (Git epic) |
+| Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge to main, push a branch for a PR, or Sync a reserved repo (Git epic) |
 | Workflow | Forge adapter | On the CEO's Create PR: open, then poll, comment on and close pull requests |
 | Workflow | Workspace & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
-| Agent link | Workflow | `switch`, `commit`, `update`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
+| Agent link | Workflow | `switch`, `commit`, `merge`, `abort_merge`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
 | Agent link | Instance manager | Hook events (busy, idle, waiting for the CEO) |
 | Instance manager | Git | The instance's worktrees, before it starts |
 | Instance manager | Image builder | The project's image |
@@ -99,7 +99,7 @@ Every arrow, in words:
 │                                                                                     │
 │  harness TUI (Claude Code / Pi / Hermes)         reads ──▶ CLAUDE.md / AGENTS.md     │
 │     │  stdio MCP: ask · reply · handoff · contribute · escalate · request_merge     │
-│     │             switch · commit · update (git writes, run by Foreman on the host) │
+│     │             switch · commit · merge (git writes, run by Foreman on the host)  │
 │     │  hooks: "foreman-agent hook stop | notification | …"                          │
 │     ▼                                                                               │
 │  foreman-agent ──────────── tcp: host.containers.internal:<agent port>, token ──────┼──▶ Agent link
@@ -221,6 +221,8 @@ type HookEvent struct { Instance; Event string; Data json.RawMessage }  // → I
 type Tokens interface { Register(instance) (token string); Revoke(instance) }  // used by the Instance manager
 ```
 
+**The team-tools router** (`internal/teamtools`) sits between the agent port and the blocks: it knows the caller from its token (instance, deployment, team, lead or not), serves exactly the tools `prompt.Offered` gives the caller's role (a test with the real blocks keeps the two in step), refuses a call from a stopped deployment, and hands each call to the block that owns the tool: Messaging (`ask`, `reply`, `read_message`) or Workflow (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`).
+
 Details: [Team tools](./team-tools.md#transport). Schema: [Protocol → Envelopes](./protocol.md#envelopes).
 
 ### 5. Instance manager (`instances`)
@@ -243,7 +245,7 @@ Details: [Agent runtime](./agent-runtime.md).
 
 ### 6. Messaging (`messaging`)
 
-Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`msg-N` per deployment), stores them, queues them per recipient and delivers them when the recipient is idle: one plain line typed into its terminal (`Instances.Type`), then Enter after a short pause, so the harness doesn't take the Enter as part of a paste. Every harness so far takes a typed line and Enter, so there is no per-harness `Deliver` yet: an adapter gets one when its harness needs other keystrokes. Messaging hears every status change and deployment stop straight from the instance manager, not through the event bus (which drops a subscriber that falls behind), and sweeps once at startup. Built: `internal/messaging` (`ask`, `reply`, `read_message`). Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
+Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `handoff` and `contribute` notices, CEO answers. It numbers them (`msg-N` per deployment), stores them, queues them per recipient and delivers them when the recipient is idle: one plain line typed into its terminal (`Instances.Type`), then Enter after a short pause, so the harness doesn't take the Enter as part of a paste. Every harness so far takes a typed line and Enter, so there is no per-harness `Deliver` yet: an adapter gets one when its harness needs other keystrokes. Messaging hears every status change and deployment stop straight from the instance manager, not through the event bus (which drops a subscriber that falls behind), and sweeps once at startup. Built: `internal/messaging` (`ask`, `reply`, `read_message`, and `Send`, which Workflow uses for hand-offs and contributions). Every delivery also produces a **marker** for the UI (shown beside the terminal, never written into it). A message to an agent that isn't running asks the instance manager to start it. It knows nothing about git, PRs or approvals.
 
 ```go
 type Messaging interface {
@@ -256,15 +258,17 @@ Details: [Team tools](./team-tools.md), [Team message](../models/team-message.md
 
 ### 7. Workflow (`workflow`)
 
-Gives events their meaning: `switch`, `commit` and `update` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on Home (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's Merge to main, Create PR or Reject → Git and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
+Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on Home (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's Merge to main, Create PR or Reject → Git and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
 
 ```go
 type Workflow interface {
-    Handle(ToolCall) (Result, error)   // switch, commit, update, escalate, handoff, contribute, request_merge, Chief of Staff tools
+    Handle(ToolCall) (Result, error)   // switch, commit, merge, abort_merge, escalate, handoff, contribute, request_merge, Chief of Staff tools
     Resolve(request, answer) error     // the CEO answers a request
     Requests(filter) []Request
 }
 ```
+
+Built so far (`internal/workflow`): `switch`, `commit`, `merge` and `abort_merge` in the caller's worktrees (and, for the lead's `commit`, the live project repo), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in `project/wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
 
 Details: [Requests](../features/requests.md), [Pipeline and merges](../features/pipeline-and-merges.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and merge requests](./protocol.md#work-items-and-merge-requests).
 
@@ -277,16 +281,17 @@ type Git interface {
     Prepare(instance, repo) (path string, err error) // the instance's worktree of the repo, made if missing
     Switch(instance, repo, branch) error             // switch its worktree to the branch, made from main if missing
     Commit(instance, repo, message) (commit string, err error) // everything changed in its worktree (or the live project repo, for its writers), on its branch, authored as the agent
-    Update(instance, repo, branch) (conflicts []string, err error) // merge a branch into its worktree; conflicts stay as markers
+    Merge(instance, repo, branch) (conflicts []string, err error) // merge a branch into its worktree; conflicts stay as markers
+    AbortMerge(instance, repo) error                 // back out of an unfinished merge
     Prune(instance, repo) error                      // its deployment ended: delete its wt/* branches already merged into main
     Contains(repo, branch, into string) (bool, error) // integration detection: is the work in a lead branch?
-    Merge(repo, branch) error                        // the CEO's Merge to main: merge the branch into main on the host
+    MergeToMain(repo, branch) error                  // the CEO's Merge to main: merge the branch into main on the host
     Push(repo, branch, remote) error                 // on the CEO's Create PR (the branch) or Sync (a reserved repo's main), with Foreman's token
     Fetch(repo) error                                // after a merge on the forge, and as Sync's first step: fetch the forge's main into the repo
 }
 ```
 
-**Phasing.** `Prepare` (a worktree and home branch per agent) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit` and `Update`, behind the `switch`, `commit` and `update` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `Merge`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
+**Phasing.** `Prepare` (a worktree and home branch per agent) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit`, `Merge` and `AbortMerge`, behind the `switch`, `commit`, `merge` and `abort_merge` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `MergeToMain`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
 
 ## The foundation blocks
 
@@ -438,9 +443,9 @@ CEO answers in the UI ──▶ Workflow.Resolve ──▶ the open tool call re
 Member ── switch(branch), then commit(message) ──▶ Workflow: Git.Switch, Git.Commit in its worktrees
 Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pending work), policy check, work item (one repo: nothing to fetch)
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
-Lead ── update(branch) ──▶ Workflow: Git.Update into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
+Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
 Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Home
-CEO: Merge to main ──▶ Workflow ──▶ Git.Merge  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Reject ──▶ reason delivered to the lead
+CEO: Merge to main ──▶ Workflow ──▶ Git.MergeToMain  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Reject ──▶ reason delivered to the lead
 (after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
 ```
 
@@ -469,12 +474,12 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 - `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
-- `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher.
-- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the start of the Git block: `Init`, `Commit`, `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager), `Exclude`.
+- `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher, Add a project and new empty code repos.
+- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager), `Exclude`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
 - `internal/instances`: the Instance manager.
 - `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
 - `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
-- `internal/agentlink` (the agent port: tokens, the tool and hook relay, and the client), `cmd/foreman-agent` (the stdio MCP server and hook forwarder), `agentbin/` (its Linux build, embedded in `foreman` and written to the user's cache folder to be mounted): the Agent link. The tools themselves join with Messaging.
+- `internal/agentlink` (the agent port: tokens, the tool and hook relay, and the client), `cmd/foreman-agent` (the stdio MCP server and hook forwarder), `agentbin/` (its Linux build, embedded in `foreman` and written to the user's cache folder to be mounted): the Agent link. `internal/teamtools`: the team-tools router; `internal/messaging` and `internal/workflow`: the blocks behind it.
 - `cmd/foreman/sessions.go`: the harnesses' login terminals, by id (instances' terminals are the Instance manager's).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.
 - `internal/server`, `internal/access`, `ui/` (with `ForemanClient` and its real implementation): the Web server and UI.

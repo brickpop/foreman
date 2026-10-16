@@ -14,7 +14,7 @@ Three actors, and every interaction enters through exactly one channel:
 
 | Actor | Channel | Struct | Received by |
 |---|---|---|---|
-| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `update`, `handoff`, `contribute`, `escalate`, `request_merge`) |
+| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `request_merge`) |
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "switch" | "commit" | "update" | "handoff" | "contribute" | "escalate" | "request_merge"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "handoff" | "contribute" | "escalate" | "request_merge"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -107,7 +107,8 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `read_message` | anyone, for a message to it | no | Messaging |
 | `switch` | anyone | until the worktrees are switched (seconds) | Workflow (+ Git) |
 | `commit` | anyone | until the commit is made (seconds) | Workflow (+ Git) |
-| `update` | anyone | until the merge is done (seconds) | Workflow (+ Git) |
+| `merge` | anyone | until the merge is done (seconds) | Workflow (+ Git) |
+| `abort_merge` | anyone | until the merge is backed out (seconds) | Workflow (+ Git) |
 | `handoff` | members (the lead has no `wt/` branch to hand off) | no: returns once the branch is checked; checks run after | Workflow (+ Messaging for the delivery) |
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
 | `escalate` | anyone | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
@@ -167,21 +168,33 @@ type CommitResult struct { Commits []RepoCommit }        // one per repo that ha
 type RepoCommit   struct { Repo string; Branch string; Commit string }
 ```
 
-- Effect: Workflow asks Git to stage everything in each of the caller's worktrees that has changes and commit it on the branch checked out there, authored as the agent (from its token). For the lead it also commits its changes in the live project repo, on its `main` (other agents can't write that checkout). Agents can't commit themselves: every repo's `.git`, the project repo's included, is mounted read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). After an `update` with conflicts, the commit concludes the merge.
+- Effect: Workflow asks Git to stage everything in each of the caller's worktrees that has changes and commit it on the branch checked out there, authored as the agent (from its token). For the lead it also commits its changes in the live project repo, on its `main` (other agents can't write that checkout). Agents can't commit themselves: every repo's `.git`, the project repo's included, is mounted read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). After an `merge` with conflicts, the commit concludes the merge.
 - Nothing is delivered; no marker.
 - Errors: `nothing_to_commit`, `conflicts_left` (conflict markers still in a file of an unfinished merge), `git_error` (with git's message).
 
-### `update`
+### `merge`
 
 ```go
-type UpdateArgs   struct { Branch string }               // e.g. "lead/atlas/integration", "main", "wt/tove/LED-44"
-type UpdateResult struct { Repos []RepoUpdate }
-type RepoUpdate   struct { Repo string; Merged bool; Conflicts []string } // files left with conflict markers
+type MergeArgs   struct { Branch string }               // e.g. "lead/atlas/integration", "main", "wt/tove/LED-44"
+type MergeResult struct { Repos []RepoMerge }
+type RepoMerge   struct { Repo string; Merged bool; Conflicts []string } // files left with conflict markers
 ```
 
-- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and calls `commit`.
+- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and calls `commit`, which finishes the merge (it refuses while markers are left), or backs out with `abort_merge`. Agents never rebase: branches are shared from their first commit (a teammate may already have merged one), and integration detection and the forge's PRs follow commits, which a rebase would replace (decided 2026-10-16).
 - Nothing is delivered; a merge into a lead branch may let Workflow detect an integration ([Work items and merge requests](#work-items-and-merge-requests)).
 - Errors: `branch_not_found` (in none of the caller's repos), `uncommitted_changes` (commit first, so a merge never mixes with unsaved work), `git_error`.
+- `merge` was called `update` until 2026-10-16: the git word, which agents already know.
+
+### `abort_merge`
+
+```go
+type AbortMergeArgs   struct {}
+type AbortMergeResult struct { Repos []string } // where a merge was backed out
+```
+
+- Effect: Workflow asks Git to back out of the unfinished merge in each of the caller's worktrees that has one (`git merge --abort`): the branch and its files are as they were before the merge. A repo whose merge finished cleanly keeps it.
+- Nothing is delivered; no marker.
+- Errors: `no_merge` (no merge under way in the caller's repos), `git_error`.
 
 ### `handoff`
 
@@ -190,11 +203,11 @@ type HandoffArgs   struct { Teammate string; Branch string; Summary string } // 
 type HandoffResult struct { WorkItem string; Checks string }                  // checks: "running"
 ```
 
-- Effect: Workflow first commits any pending changes in the caller's worktrees, as `commit` does with the summary as the message, so a hand-off never misses the last changes. It then checks `Branch` against the policy (a member may hand off only `wt/<self>/*`; [Sandboxes and git policy](./sandboxes-and-git.md#branch-policy)). Every worktree shares the repo, so nothing is fetched: the lead sees the branch at once. Workflow then runs the project checks in a throwaway container ([Checks](./sandboxes-and-git.md#checks)), creating or advancing the [work item](#work-items-and-merge-requests).
+- Effect: a hand-off is an ask that Foreman understands: it names a committed branch, so Foreman can track it. It never commits: committing has one way, `commit` (decided 2026-10-16), and a caller with uncommitted changes is refused, so what is handed off is exactly what was committed. Workflow checks `Branch` against the policy (a member may hand off only `wt/<self>/*`; [Sandboxes and git policy](./sandboxes-and-git.md#branch-policy)). Every worktree shares the repo, so nothing is fetched: the lead sees the branch at once. Workflow then runs the project checks in a throwaway container ([Checks](./sandboxes-and-git.md#checks)), creating or advancing the [work item](#work-items-and-merge-requests).
 - Checks pass: the hand-off is delivered to the teammate: `Message msg-43 from Tove (handoff of wt/tove/LED-44): <the summary's start>… Read it with read_message("msg-43").` The caller gets `From Foreman: checks pass, wt/tove/LED-44 was handed to Mara.` as a delivery when idle.
 - Checks fail: nothing goes to the teammate; the caller gets `From Foreman: checks fail on wt/tove/LED-44: <first line>. Fix it and hand off again.`
 - Markers: `Tove → Mara · handoff · wt/tove/LED-44`, then the checks outcome.
-- Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
+- Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `uncommitted_changes` (commit first), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
 - Phasing: in [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) a hand-off is the policy check and the delivery only; checks and work items arrive with the [Git](../../backlog/epics/git.md) epic.
 
 ### `contribute`
@@ -204,9 +217,9 @@ type ContributeArgs   struct { Kind string; Title string; Body string } // kind:
 type ContributeResult struct { Path string }                            // "project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md"
 ```
 
-- Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `Body`. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
+- Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter; a taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in project/wiki/inbox/<file>.` The lead decides what becomes of it.
-- Markers: `Tove → Mara · contribute · <title>`.
+- Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the Messages drawer shows the title.
 - Errors: `bad_kind`, `too_long`.
 
 ### `escalate`
@@ -247,7 +260,7 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 | When | To | Delivered text |
 |---|---|---|
 | A merge request is merged (Merge to main, or on the forge) | its lead | `From Foreman: lead/atlas/integration was merged into main in ledger-api.` |
-| Another merge request on the same repo is merged | the lead of every other open one | `From Foreman: main moved (lead/atlas/integration was merged). Merge it into lead/atlas/settlement-v2 with update("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
+| Another merge request on the same repo is merged | the lead of every other open one | `From Foreman: main moved (lead/atlas/integration was merged). Merge it into lead/atlas/settlement-v2 with merge("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
 | Merge to main finds a conflict, or the forge reports one | that merge request's lead | the same notice |
 | The CEO chooses Create PR | the merge request's lead | `From Foreman: the CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
 | Review comments on the forge (after Create PR) | the merge request's lead | `From Foreman: a review comment on PR #128 by <user>: <its start>… Read it with read_message("msg-N").` (stored as a message, kind `notice`) |

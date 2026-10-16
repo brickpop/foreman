@@ -77,7 +77,7 @@ func TestUIServesFilesAndFallsBackToIndex(t *testing.T) {
 // An unknown API path answers with the API's error format, not index.html.
 func TestUnknownEndpointsAreAPIErrors(t *testing.T) {
 	h := open(builtUI)
-	for _, path := range []string{"/api/candidates", "/api/workspace/extra", "/ws/nothing"} {
+	for _, path := range []string{"/api/nothing", "/api/workspace/extra", "/ws/nothing"} {
 		w := get(t, h, path)
 		if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), `"code":"NOT_FOUND"`) {
 			t.Errorf("%s: got %d %q", path, w.Code, w.Body.String())

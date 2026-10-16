@@ -6,12 +6,12 @@ order: 3
 
 # Git
 
-**Goal:** the plumbing merges need. Worktrees and branches per agent already exist since [Terminal multiplexer](./terminal-multiplexer.md), and the git tools (`switch`, `commit`, `update`) and hand-offs that name a branch since [Messaging and hand-offs](./messaging-handoffs.md); this epic turns hand-offs and integrations into tracked work on their way to `main`.
+**Goal:** the plumbing merges need. Worktrees and branches per agent already exist since [Terminal multiplexer](./terminal-multiplexer.md), and the git tools (`switch`, `commit`, `merge`) and hand-offs that name a branch since [Messaging and hand-offs](./messaging-handoffs.md); this epic turns hand-offs and integrations into tracked work on their way to `main`.
 
 What it builds ([Sandboxes and git policy](../../product/architecture/sandboxes-and-git.md); [Building blocks → Git](../../product/architecture/building-blocks.md#8-git-git); [Pipeline and merges](../../product/features/pipeline-and-merges.md)):
 - **work items** from hand-offs, and **integration detection**: an engineer's branch contained in a lead branch (`Git.Contains`);
 - the project **checks**, run in a throwaway container before a hand-off is accepted and on `request_merge`;
-- **local merge**: the CEO's Merge to main (`Git.Merge`), then deleting merged branches under the existing rule (`Git.Prune`, when a deployment stops);
+- **local merge**: the CEO's Merge to main (`Git.MergeToMain`), then deleting merged branches under the existing rule (`Git.Prune`, when a deployment stops);
 - the **optional forge PR**: the CEO's Create PR pushes the branch and opens it (`Git.Push`, the Forge adapter), and fetching `main` back after a merge there (`Git.Fetch`);
 - **merged detection**: a merge request is merged when `main` contains its branch head, whoever merged it (Foreman, the forge, or the CEO's own git);
 - **Sync** for the reserved repos: on the CEO's click, fetch the forge's `main`, merge it in, then push the workspace repo's or the project repo's `main`; on a conflict, stop and tell the CEO;

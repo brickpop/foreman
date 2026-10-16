@@ -50,7 +50,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 | `idle` / `done` | CEO input, team message or reply delivered | `running` |
 | any live | `escalate(approval)` or blocking `escalate(question)` | `awaiting` |
 | `awaiting` | request resolved | `running` |
-| any live | process exit, crash, rate limit, no output for N min (default 20, see below), sandbox or git error (a merge conflict from `update` is not one: it goes back to the agent, who resolves it and commits) | `stopped` + blocked request; a crash first gets one automatic restart (see below) |
+| any live | process exit, crash, rate limit, no output for N min (default 20, see below), sandbox or git error (a merge conflict from `merge` is not one: it goes back to the agent, who resolves it and commits) | `stopped` + blocked request; a crash first gets one automatic restart (see below) |
 | `stopped` | CEO picks Retry / Switch harness | `starting` |
 | any | deployment stopped | `stopped` (no request) |
 

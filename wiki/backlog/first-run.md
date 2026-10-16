@@ -15,7 +15,7 @@ epic: install-first-run
 - **The engine is Podman**, never switched on its own. `direct` stays an explicit setting for development, with its warning. Foreman notices Podman once it is installed or its machine is running, with no restart.
 - **On macOS, Foreman offers to create and start the Podman machine** (one button, with Podman's own output shown), since that is the step people miss.
 - **The agent image builds in the background as soon as Podman is ready**, not on the first deploy; its progress shows in the checklist and in Settings → Maintenance.
-- **A setup checklist on Home** while anything is missing, in order: Podman (installed, and running), the agent image, each harness the workspace's teams use (Connect), a project, a team. Each row says what to do and has its button; it goes away when everything is done, and comes back if something breaks (Podman stopped, logged out).
+- **A setup checklist on Home** while anything is missing, in order: Podman (installed, and running), the agent image, each harness the workspace's teams use (Connect), a project, a team. A project without a code repo is a step too (its button: New repo, built 2026-10-16). Each row says what to do and has its button; it goes away when everything is done, and comes back if something breaks (Podman stopped, logged out).
 - **Deploy refuses with the first missing step**, linking to it (it already does so for a harness login).
 - **Development stays out of the way:** `--fake-harness` and `--ui-dir` are development flags only, and `just dev` (Claude Code) and `just dev fake` each have their own workspace (done 2026-10-16).
 

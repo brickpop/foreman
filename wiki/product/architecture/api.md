@@ -17,7 +17,8 @@ The PRD's surface (indicative; names may still change during implementation, thi
 ```
 GET    /api/workspace                         the workspace folder
 GET    /api/projects | /api/projects/:id      config (parsed), repos, version, problems (deployments join with the Instance manager)
-POST   /api/projects                          {folder} → create the project repo (adopt)
+POST   /api/projects                          {folder, repo?} → create the project repo (adopt); with repo, also a first empty code repo
+POST   /api/projects/:id/repos                {name} → create an empty code repo in the project (400 INVALID, 409 EXISTS)
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems

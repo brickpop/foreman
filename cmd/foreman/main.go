@@ -36,7 +36,9 @@ import (
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/terminal"
+	"github.com/brickpop/foreman/internal/workflow"
 	"github.com/brickpop/foreman/internal/workspace"
 	"github.com/brickpop/foreman/ui"
 )
@@ -182,7 +184,10 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
 		Config: ws, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
 	})
-	link = agentlink.New(secret, manager.Live, messenger, manager)
+	flow := workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger})
+	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: ws,
+		Blocks: []teamtools.Block{messenger, flow}}
+	link = agentlink.New(secret, manager.Live, router, manager)
 	go func() {
 		if err := http.Serve(agentListener, link.Handler()); err != nil {
 			slog.Error("the agent port stopped", "err", err)

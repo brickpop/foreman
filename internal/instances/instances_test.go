@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -585,5 +586,76 @@ func TestARunReleasesOnlyItsOwnSlot(t *testing.T) {
 	m.release("mara@ledger", current)
 	if m.Live("mara@ledger") {
 		t.Error("the run's own release didn't free it")
+	}
+}
+
+// slowGit holds the first Prepare until released: a start still under way.
+type slowGit struct {
+	Git
+	calls   atomic.Int32
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (g *slowGit) Prepare(ctx context.Context, repo, worktree, branch, base string) error {
+	if g.calls.Add(1) == 1 {
+		close(g.entered)
+		<-g.release
+	}
+	return g.Git.Prepare(ctx, repo, worktree, branch, base)
+}
+
+// A stop while the lead is still starting, then a redeploy at once: the new
+// run starts, and the old start's late end changes nothing.
+func TestRedeployWhileTheStoppedRunIsStillStarting(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	slow := &slowGit{Git: f.deps.Git, entered: make(chan struct{}), release: make(chan struct{})}
+	f.deps.Git = slow
+	f.m = New(f.deps)
+	t.Cleanup(func() { closeOnce(slow.release) })
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	<-slow.entered
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	closeOnce(slow.release)
+	f.m.Wait()
+	if s := f.status("mara@ledger"); s.Status != Running {
+		t.Errorf("after the old start ended: %+v", s)
+	}
+	if _, err := f.m.Terminal("mara@ledger"); err != nil {
+		t.Errorf("the new run lost its terminal: %v", err)
+	}
+}
+
+func closeOnce(c chan struct{}) {
+	select {
+	case <-c:
+	default:
+		close(c)
+	}
+}
+
+// Without a code repo agents would have nothing to work in: refused, with
+// what to do.
+func TestDeployRefusesAProjectWithoutRepos(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if err := os.RemoveAll(filepath.Join(f.root, "ledger", "ledger-api")); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.ws.Load(ctx, git.New()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no code repo") {
+		t.Errorf("%v", err)
+	}
+	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
+		t.Errorf("deployed anyway: %+v", deps)
 	}
 }

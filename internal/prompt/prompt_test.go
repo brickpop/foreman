@@ -26,7 +26,7 @@ var atlas = workspace.TeamConfig{
 }
 
 // every team tool, as the finished epic will offer them
-var every = []string{"ask", "reply", "read_message", "switch", "commit", "update", "handoff", "contribute", "escalate", "request_merge"}
+var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "handoff", "contribute", "escalate", "request_merge"}
 
 func input(agent string, tools []string) Input {
 	return Input{
@@ -141,26 +141,36 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	}
 }
 
-// Today's step: the messaging tools, with git still read-only.
-func TestMessagingToolsOnly(t *testing.T) {
+// Today's step: messaging and the git tools; no escalate or request_merge yet.
+func TestTodaysTools(t *testing.T) {
 	for _, agent := range []string{"mara", "ilya"} {
 		got := Compose(input(agent, Offered(agent == "mara")))
 		for _, want := range []string{
 			"Work with them only through the tools below.",
 			"ask(teammate, request)", "reply(request_id, output)", "read_message(id)",
+			"switch(branch)", "commit(message)", "merge(branch)", "abort_merge()", "contribute(kind, title, body)",
+			"branch, commit\nand merge only through switch(), commit() and merge().",
 			"Messages arrive in this session as one line",
+			"resume the task\nthat asked for it.\n",
 			"A reply (or a handoff) is its outcome: the result, the decisions you took",
-			"## Git\nGit is read-only for you",
 		} {
 			if !strings.Contains(got, want) {
 				t.Errorf("%s: missing %q in:\n%s", agent, want, got)
 			}
 		}
-		for _, absent := range []string{"switch(", "commit(", "handoff(", "request_merge", "contribute", "requests merges", "the CEO relays"} {
+		for _, absent := range []string{"## Git\n", "request_merge", "escalate(", "approval", "requests merges", "the CEO relays", "made for you"} {
 			if strings.Contains(got, absent) {
-				t.Errorf("%s: offers %q, which isn't built:\n%s", agent, absent, got)
+				t.Errorf("%s: mentions %q, which isn't built:\n%s", agent, absent, got)
 			}
 		}
+	}
+	lead := Compose(input("mara", Offered(true)))
+	if !strings.Contains(lead, "Merge the hand-offs you accept into it with merge(branch).") || !strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
+		t.Errorf("lead:\n%s", lead)
+	}
+	member := Compose(input("ilya", Offered(false)))
+	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only: use contribute)") {
+		t.Errorf("member:\n%s", member)
 	}
 }
 
@@ -187,7 +197,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove")
-	for _, want := range []string{"Project: {project}  ({path})", "Goal: {goal}", "made for you from {main}", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}  ({path})", "Goal: {goal}", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}

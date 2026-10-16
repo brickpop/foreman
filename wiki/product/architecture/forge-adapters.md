@@ -50,6 +50,6 @@ The workspace repo and the project repo never push on their own: Foreman commits
 
 ## Rules
 
-- **Merge method** is the forge's business: the CEO merges there with whatever method the repo allows. **Conflicts** are the lead's: Foreman reports them and asks the lead to merge `main` in (`update("main")`) and resolve them; it never resolves them itself; the CEO can also reject the merge request with a reason.
+- **Merge method** is the forge's business: the CEO merges there with whatever method the repo allows. **Conflicts** are the lead's: Foreman reports them and asks the lead to merge `main` in (`merge("main")`) and resolve them; it never resolves them itself; the CEO can also reject the merge request with a reason.
 - **Tokens:** the token needs to push branches, open, read, comment on and close PRs; the minimal scopes per forge are documented here with each adapter. An expired or revoked token makes the CEO's action fail with a message naming it (on a PR being watched: a **blocked** request on the lead instance), linking to [Settings](../features/settings.md#forge-accounts). The token is set in Settings as host URL + token, checked against the forge on save, and never shown again.
 - **Check status** shown on a merge request is Foreman's own run of the project `checks`, plus the forge's CI statuses alongside when a forge is configured ([Sandboxes and git policy](./sandboxes-and-git.md#checks)).

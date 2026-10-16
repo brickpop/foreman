@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -45,6 +46,29 @@ func (f fakeConfig) SaveSettings(context.Context, workspace.Settings, string) (s
 }
 func (f fakeConfig) SaveTeam(context.Context, workspace.TeamConfig, string) (workspace.Team, error) {
 	return workspace.Team{}, nil
+}
+func (f fakeConfig) Candidates() []workspace.Candidate {
+	return []workspace.Candidate{{Folder: "cal", Repos: []string{}}}
+}
+
+// AddProject and AddRepo answer by name: "bad" is invalid, "taken" exists.
+func (f fakeConfig) AddProject(_ context.Context, folder, repo string) (workspace.Project, error) {
+	return f.added(folder, repo)
+}
+func (f fakeConfig) AddRepo(_ context.Context, project, name string) (workspace.Project, error) {
+	if project != "ledger" {
+		return workspace.Project{}, workspace.ErrNotFound
+	}
+	return f.added(project, name)
+}
+func (f fakeConfig) added(id, name string) (workspace.Project, error) {
+	switch name {
+	case "bad":
+		return workspace.Project{}, fmt.Errorf("%w: a repo name is lowercase", workspace.ErrInvalid)
+	case "taken":
+		return workspace.Project{}, fmt.Errorf("%w: %s/taken", workspace.ErrExists, id)
+	}
+	return workspace.Project{ID: id, Repos: []string{name}}, nil
 }
 
 var config = fakeConfig{
@@ -274,6 +298,45 @@ func TestSaveSoul(t *testing.T) {
 		h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Config: savingConfig{fakeConfig: c, team: &team, refuse: tc.refuse}, UI: builtUI})
 		if w := send(h, "PUT", "/api/teams/atlas/agents/tove", `{"soul":{},"version":"v3"}`); w.Code != tc.status {
 			t.Errorf("%v: %d %s", tc.refuse, w.Code, w.Body)
+		}
+	}
+}
+
+func TestAddingProjectsAndRepos(t *testing.T) {
+	h := withConfig(events.New())
+	post := func(path, body string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, path, strings.NewReader(body)))
+		return w
+	}
+	var candidates []workspace.Candidate
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/candidates", nil))
+	decodeBody(t, w, &candidates)
+	if len(candidates) != 1 || candidates[0].Folder != "cal" {
+		t.Errorf("candidates %+v", candidates)
+	}
+	var p workspace.Project
+	decodeBody(t, post("/api/projects", `{"folder":"cal","repo":"cal-go"}`), &p)
+	if p.ID != "cal" || p.Repos[0] != "cal-go" {
+		t.Errorf("added %+v", p)
+	}
+	decodeBody(t, post("/api/projects/ledger/repos", `{"name":"web"}`), &p)
+	if p.ID != "ledger" || p.Repos[0] != "web" {
+		t.Errorf("repo %+v", p)
+	}
+	for _, tc := range []struct {
+		path, body string
+		status     int
+		want       string
+	}{
+		{"/api/projects", `{"folder":"cal","repo":"bad"}`, http.StatusBadRequest, `{"code":"INVALID","error":"a repo name is lowercase"}`},
+		{"/api/projects/ledger/repos", `{"name":"taken"}`, http.StatusConflict, `{"code":"EXISTS","error":"ledger/taken already exists"}`},
+		{"/api/projects/nope/repos", `{"name":"x"}`, http.StatusNotFound, `"NOT_FOUND"`},
+		{"/api/projects", `not json`, http.StatusBadRequest, `"BAD_REQUEST"`},
+	} {
+		if w := post(tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
+			t.Errorf("%s %s: %d %s", tc.path, tc.body, w.Code, w.Body)
 		}
 	}
 }

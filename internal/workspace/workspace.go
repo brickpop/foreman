@@ -129,6 +129,6 @@ func secret(path string, rotate bool) (string, error) {
 // Git is what the workspace needs of git: the workspace repo
 // (wiki/product/models/workspace.md#the-workspace-repo).
 type Git interface {
-	Init(ctx context.Context, dir string) error
+	Init(ctx context.Context, dir, branch string) error
 	Commit(ctx context.Context, dir, message string, files ...string) error
 }

@@ -40,9 +40,10 @@ reply(request_id, output)           Answer a request. Only `output` is returned.
 read_message(id)                    Read a message to you in full (a delivery quotes only its start).
 switch(branch)                      Go to one of your branches (made from main if new).
 commit(message)                     Commit your changes, in every repo, on your branch.
-update(branch)                      Merge a branch (the lead's, main, a teammate's) into yours.
+merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.
                                     On conflicts: resolve the markers, then commit().
-handoff(teammate, branch, summary)  Pass finished work on (commits first). Your part ends. (members only)
+abort_merge()                       Back out of an unfinished merge.
+handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends. (members only)
 contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note.
 escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.
                                     For an approval, wait for the answer before that step.
@@ -50,7 +51,7 @@ request_merge(branch, entry)        Ask the CEO to merge one of your lead/{team}
                                     entry: the wiki card that explains the work. Only you can.
                                     Call it again on the same branch to refresh it. (lead only)
 Git is read-only for you (status, diff, log, blame work); branch, commit
-and merge only through switch(), commit() and update().
+and merge only through switch(), commit() and merge().
 Messages arrive in this session as one line, "Message msg-N from <name> (<kind>): …".
 Read the whole message with read_message("msg-N"). After a reply, resume the task
 that asked for it; after an approval, wait for the CEO's answer, then resume.
@@ -70,7 +71,7 @@ left open, and how you checked it. A few lines, never a transcript.
 Before any handoff, run: {checks}         (the lead: "Before you request a merge, run: {checks}")
 ```
 
-**Phasing:** the prompt describes exactly the team tools Foreman offers the agent (`prompt.Offered`, which the team-tool router serves too, so the two can't drift), and none when the agent started without `foreman-agent`. The [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) epic brings them in steps: today `ask`, `reply` and `read_message`. Each piece of the prompt follows its tool: without `ask`, teammates can't be reached and the CEO relays; without `commit`, a Git section says git is read-only and the CEO reviews the uncommitted work; without `switch`, the agent's branch was made for it; without `request_merge`, the lead's default job doesn't end with merges. The checks line says "Before any handoff" for a member with `handoff`, "Before you request a merge" for the lead with `request_merge`, else "Before you tell the CEO you're done". The outcome rule (two lines under the tools) comes with `reply`, since an agent otherwise tends to paste a transcript.
+**Phasing:** the prompt describes exactly the team tools Foreman offers the agent (`prompt.Offered`, which the team-tool router serves too, so the two can't drift), and none when the agent started without `foreman-agent`. The [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) epic brings them in steps: today `ask`, `reply`, `read_message`, `switch`, `commit`, `merge`, `abort_merge`, `handoff` (members) and `contribute`; `escalate` and `request_merge` are still to come. Each piece of the prompt follows its tool: without `ask`, teammates can't be reached and the CEO relays; without `commit`, a Git section says git is read-only and the CEO reviews the uncommitted work; without `switch`, the agent's branch was made for it; without `request_merge`, the lead's default job doesn't end with merges, and its branches line says to merge accepted hand-offs with `merge` and to tell the CEO which lead branch is ready for review; without `escalate`, the messages note says nothing about approvals. The checks line says "Before any handoff" for a member with `handoff`, "Before you request a merge" for the lead with `request_merge`, else "Before you tell the CEO you're done". The outcome rule (two lines under the tools) comes with `reply`, since an agent otherwise tends to paste a transcript.
 
 ## Delivery
 
@@ -88,7 +89,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 
 | Placeholder | Lead | Member |
 |---|---|---|
-| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch). Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with update("main"), resolve any conflicts and commit(), then call request_merge again.` | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch). No push to main.` |
+| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch). Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with merge("main"), resolve any conflicts and commit(), then call request_merge again.` | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch). No push to main.` |
 | `{wiki access}` | `read and write: edit, then commit()` | `read only: use contribute` |
 | tools | all but `handoff`, including `request_merge` | all but `request_merge` |
 | `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask() or handoff()." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it, and tell {lead} if it's relevant to the team." |

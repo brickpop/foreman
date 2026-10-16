@@ -62,7 +62,7 @@ Acceptance:
 - [ ] Reject asks for a reason, delivers it to the lead (typed into its session when idle), closes the PR if there is one, returns the work items to stage 0, and keeps the branch, so the lead can `switch` back to it.
 - [ ] A non-lead calling `request_merge` is refused; so is an entry that doesn't exist in the wiki.
 - [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<own team>/*` is refused.
-- [ ] When one merge request is merged, the lead of every other open one on the same repo gets a "main moved" line asking it to merge `main` in with `update("main")`; after that, `request_merge` on the same branch refreshes the existing merge request (checks rerun, its PR pushed again if it has one) instead of creating a new one.
+- [ ] When one merge request is merged, the lead of every other open one on the same repo gets a "main moved" line asking it to merge `main` in with `merge("main")`; after that, `request_merge` on the same branch refreshes the existing merge request (checks rerun, its PR pushed again if it has one) instead of creating a new one.
 
 ## 6. Challenge team finding
 

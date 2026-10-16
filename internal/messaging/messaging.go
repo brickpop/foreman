@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,8 +17,8 @@ import (
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
-	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/workspace"
 )
 
@@ -58,88 +57,33 @@ type Messenger struct {
 // New returns a messenger.
 func New(d Deps) *Messenger { return &Messenger{Deps: d} }
 
-var _ agentlink.Tools = (*Messenger)(nil)
-
-// maxBody caps a request or an output: longer work belongs in a branch or a
-// wiki entry, named as the artifact.
-const maxBody = 8000
+var _ teamtools.Block = (*Messenger)(nil)
 
 // previewLength is how much of a message its notice quotes.
 const previewLength = 120
 
-var definitions = map[string]agentlink.Tool{
-	"ask": {Name: "ask", Description: "Send a request to a teammate in this deployment: a question, or work to do. You get its msg id at once and keep working; their reply arrives in your session.",
+var definitions = []agentlink.Tool{
+	{Name: "ask", Description: "Send a request to a teammate in this deployment: a question, or work to do. You get its msg id at once and keep working; their reply arrives in your session.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 			`"teammate":{"type":"string","description":"A teammate's name or id"},` +
 			`"request":{"type":"string","description":"What you need, complete enough to act on alone"}},` +
 			`"required":["teammate","request"]}`)},
-	"reply": {Name: "reply", Description: "Answer an ask that was sent to you. Only the output (and the artifact) reaches the asker: give the outcome, the decisions you took, what is left open and how you checked it, in a few lines, never a transcript.",
+	{Name: "reply", Description: "Answer an ask that was sent to you. Only the output (and the artifact) reaches the asker: give the outcome, the decisions you took, what is left open and how you checked it, in a few lines, never a transcript.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 			`"request_id":{"type":"string","description":"The ask's id, e.g. msg-41"},` +
 			`"output":{"type":"string","description":"The outcome"},` +
 			`"artifact":{"type":"string","description":"Optional: a branch or a wiki path with the work"}},` +
 			`"required":["request_id","output"]}`)},
-	"read_message": {Name: "read_message", Description: "Read a message to you in full: a delivery in your session quotes only its start.",
+	{Name: "read_message", Description: "Read a message to you in full: a delivery in your session quotes only its start.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{` +
 			`"id":{"type":"string","description":"The message's id, e.g. msg-41"}},"required":["id"]}`)},
 }
 
-// List implements agentlink.Tools: the tools the instance's role is offered.
-func (m *Messenger) List(instance string) []agentlink.Tool {
-	c, err := m.caller(context.Background(), instance)
-	if err != nil {
-		return nil
-	}
-	var tools []agentlink.Tool
-	for _, name := range prompt.Offered(c.lead) {
-		if d, ok := definitions[name]; ok {
-			tools = append(tools, d)
-		}
-	}
-	return tools
-}
+// Tools implements teamtools.Block.
+func (m *Messenger) Tools() []agentlink.Tool { return definitions }
 
-// caller is who calls a tool: its instance, deployment and team.
-type caller struct {
-	inst store.Instance
-	dep  store.Deployment
-	team workspace.Team
-	lead bool
-}
-
-func (m *Messenger) caller(ctx context.Context, instance string) (caller, error) {
-	inst, err := m.Instances.Get(ctx, instance)
-	if err != nil {
-		return caller{}, err
-	}
-	dep, err := m.Deployments.Get(ctx, inst.DeploymentID)
-	if err != nil {
-		return caller{}, err
-	}
-	team, err := m.Config.Team(dep.TeamID)
-	if err != nil {
-		return caller{}, err
-	}
-	return caller{inst: inst, dep: dep, team: team, lead: inst.AgentID == team.Config.Lead}, nil
-}
-
-// refusal is a tool error the agent reads: a code, then what to do.
-func refusal(code, format string, a ...any) agentlink.Result {
-	return agentlink.Result{Text: code + ": " + fmt.Sprintf(format, a...), Error: true}
-}
-
-// Call implements agentlink.Tools.
-func (m *Messenger) Call(ctx context.Context, instance, name string, args json.RawMessage) agentlink.Result {
-	c, err := m.caller(ctx, instance)
-	if err != nil {
-		return refusal("unknown_caller", "%v", err)
-	}
-	if !slices.Contains(prompt.Offered(c.lead), name) {
-		return refusal("unknown_tool", "%q isn't one of your tools", name)
-	}
-	if c.dep.Status != store.DeploymentActive {
-		return refusal("deployment_stopped", "this deployment was stopped")
-	}
+// Call implements teamtools.Block.
+func (m *Messenger) Call(ctx context.Context, c teamtools.Caller, name string, args json.RawMessage) agentlink.Result {
 	var a struct {
 		Teammate  string `json:"teammate"`
 		Request   string `json:"request"`
@@ -148,10 +92,8 @@ func (m *Messenger) Call(ctx context.Context, instance, name string, args json.R
 		Artifact  string `json:"artifact"`
 		ID        string `json:"id"`
 	}
-	if len(args) > 0 {
-		if err := json.Unmarshal(args, &a); err != nil {
-			return refusal("bad_arguments", "%v", err)
-		}
+	if res, ok := teamtools.Args(args, &a); !ok {
+		return res
 	}
 	switch name {
 	case "ask":
@@ -163,60 +105,60 @@ func (m *Messenger) Call(ctx context.Context, instance, name string, args json.R
 	}
 }
 
-func (m *Messenger) ask(ctx context.Context, c caller, teammate, request string) agentlink.Result {
-	to, res, ok := teammateOf(c, teammate)
+func (m *Messenger) ask(ctx context.Context, c teamtools.Caller, teammate, request string) agentlink.Result {
+	to, res, ok := c.Teammate(teammate)
 	if !ok {
 		return res
 	}
 	if strings.TrimSpace(request) == "" {
-		return refusal("empty", "say what you need in request")
+		return teamtools.Refusal("empty", "say what you need in request")
 	}
-	if len(request) > maxBody {
-		return refusal("too_long", "a request is at most %d characters; put the rest in a wiki entry or a branch and name it", maxBody)
+	if len(request) > teamtools.MaxBody {
+		return teamtools.Refusal("too_long", "a request is at most %d characters; put the rest in a wiki entry or a branch and name it", teamtools.MaxBody)
 	}
-	msg, err := m.send(ctx, store.TeamMessage{DeploymentID: c.dep.ID, FromInstance: c.inst.ID, ToInstance: to, Kind: "ask", Body: request})
+	msg, err := m.Send(ctx, store.TeamMessage{DeploymentID: c.Deployment.ID, FromInstance: c.Instance.ID, ToInstance: to, Kind: "ask", Body: request})
 	if err != nil {
-		return refusal("internal", "%v", err)
+		return teamtools.Refusal("internal", "%v", err)
 	}
-	return agentlink.Result{Text: fmt.Sprintf("%s sent to %s. Their reply will arrive in this session.", msg.Ref, nameOf(c.team, to))}
+	return agentlink.Result{Text: fmt.Sprintf("%s sent to %s. Their reply will arrive in this session.", msg.Ref, nameOf(c.Team, to))}
 }
 
-func (m *Messenger) reply(ctx context.Context, c caller, ref, output, artifact string) agentlink.Result {
-	ask, err := m.Messages.Get(ctx, c.dep.ID, ref)
+func (m *Messenger) reply(ctx context.Context, c teamtools.Caller, ref, output, artifact string) agentlink.Result {
+	ask, err := m.Messages.Get(ctx, c.Deployment.ID, ref)
 	if err != nil || ask.Kind != "ask" {
-		return refusal("unknown_request", "no ask %q in this deployment", ref)
+		return teamtools.Refusal("unknown_request", "no ask %q in this deployment", ref)
 	}
-	if ask.ToInstance != c.inst.ID {
-		return refusal("not_addressee", "%s wasn't sent to you", ref)
+	if ask.ToInstance != c.Instance.ID {
+		return teamtools.Refusal("not_addressee", "%s wasn't sent to you", ref)
 	}
-	if _, err := m.Messages.ReplyTo(ctx, c.dep.ID, ref); err == nil {
-		return refusal("already_replied", "%s has its reply; for more, ask again", ref)
+	if _, err := m.Messages.ReplyTo(ctx, c.Deployment.ID, ref); err == nil {
+		return teamtools.Refusal("already_replied", "%s has its reply; for more, ask again", ref)
 	}
 	if strings.TrimSpace(output) == "" {
-		return refusal("empty", "give the outcome in output")
+		return teamtools.Refusal("empty", "give the outcome in output")
 	}
-	if len(output) > maxBody {
-		return refusal("too_long", "an output is at most %d characters: give the outcome, and put the rest in a branch or a wiki entry named as the artifact", maxBody)
+	if len(output) > teamtools.MaxBody {
+		return teamtools.Refusal("too_long", "an output is at most %d characters: give the outcome, and put the rest in a branch or a wiki entry named as the artifact", teamtools.MaxBody)
 	}
 	if artifact != "" && (len(artifact) > 200 || strings.ContainsAny(artifact, " \t\n") || strings.Contains(artifact, "..")) {
-		return refusal("bad_artifact", "an artifact is a branch name or a wiki path")
+		return teamtools.Refusal("bad_artifact", "an artifact is a branch name or a wiki path")
 	}
-	msg, err := m.send(ctx, store.TeamMessage{DeploymentID: c.dep.ID, FromInstance: c.inst.ID, ToInstance: ask.FromInstance,
+	msg, err := m.Send(ctx, store.TeamMessage{DeploymentID: c.Deployment.ID, FromInstance: c.Instance.ID, ToInstance: ask.FromInstance,
 		Kind: "reply", InReplyTo: ref, Body: output, ArtifactRef: artifact})
 	if err != nil {
-		return refusal("internal", "%v", err)
+		return teamtools.Refusal("internal", "%v", err)
 	}
-	return agentlink.Result{Text: fmt.Sprintf("%s sent to %s.", msg.Ref, nameOf(c.team, ask.FromInstance))}
+	return agentlink.Result{Text: fmt.Sprintf("%s sent to %s.", msg.Ref, nameOf(c.Team, ask.FromInstance))}
 }
 
-func (m *Messenger) read(ctx context.Context, c caller, ref string) agentlink.Result {
-	msg, err := m.Messages.Get(ctx, c.dep.ID, ref)
-	if err != nil || msg.ToInstance != c.inst.ID {
+func (m *Messenger) read(ctx context.Context, c teamtools.Caller, ref string) agentlink.Result {
+	msg, err := m.Messages.Get(ctx, c.Deployment.ID, ref)
+	if err != nil || msg.ToInstance != c.Instance.ID {
 		// The same answer either way, so no one can probe others' messages.
-		return refusal("unknown_message", "no message %q to you", ref)
+		return teamtools.Refusal("unknown_message", "no message %q to you", ref)
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s from %s (%s). Its text, as they wrote it:\n\n%s\n", msg.Ref, nameOf(c.team, msg.FromInstance), kindText(msg), msg.Body)
+	fmt.Fprintf(&b, "%s from %s (%s). Its text, as they wrote it:\n\n%s\n", msg.Ref, nameOf(c.Team, msg.FromInstance), kindText(msg), msg.Body)
 	if msg.ArtifactRef != "" {
 		fmt.Fprintf(&b, "\nArtifact: %s\n", msg.ArtifactRef)
 	}
@@ -226,28 +168,8 @@ func (m *Messenger) read(ctx context.Context, c caller, ref string) agentlink.Re
 	return agentlink.Result{Text: b.String()}
 }
 
-// teammateOf resolves a teammate, by id or name, to its instance in the
-// caller's deployment.
-func teammateOf(c caller, teammate string) (string, agentlink.Result, bool) {
-	want := strings.TrimSpace(teammate)
-	var names []string
-	for _, id := range c.team.Config.Roster() {
-		soul := c.team.Config.Agents[id]
-		if strings.EqualFold(want, id) || strings.EqualFold(want, soul.Name) {
-			if id == c.inst.AgentID {
-				return "", refusal("self", "that is you"), false
-			}
-			return id + "@" + c.dep.ProjectID, agentlink.Result{}, true
-		}
-		if id != c.inst.AgentID {
-			names = append(names, soul.Name)
-		}
-	}
-	return "", refusal("unknown_teammate", "no %q on this team; your teammates: %s", want, strings.Join(names, ", ")), false
-}
-
-// send stores a message and tries to deliver it.
-func (m *Messenger) send(ctx context.Context, msg store.TeamMessage) (store.TeamMessage, error) {
+// Send stores a message and delivers it when its recipient is idle.
+func (m *Messenger) Send(ctx context.Context, msg store.TeamMessage) (store.TeamMessage, error) {
 	msg, err := m.Messages.Add(ctx, msg)
 	if err != nil {
 		return msg, err

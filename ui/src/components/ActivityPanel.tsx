@@ -1,12 +1,12 @@
 import { useState } from "react";
 import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
+import { entries, type Filter, links, shows, type Thread } from "../app/activity";
 import { agentOf } from "../app/model";
 import { useActions, useMessages } from "../app/queries";
-import { entries, type Filter, links, shows, type Thread } from "../app/traffic";
 import { CodeText } from "./CodeText";
 import { Dot } from "./ui";
 
-// The Team traffic panel (wiki/product/features/sessions.md#team-traffic): a
+// The Activity panel (wiki/product/features/sessions.md#activity): a
 // small map of who calls whom, then the exchanges, newest first: one row per
 // thread, which opens into a chat. One per deployment; the panes stay
 // terminals only.
@@ -19,7 +19,7 @@ const ry = 50;
 
 type Names = (id: string) => string;
 
-export function TeamTraffic({
+export function ActivityPanel({
   deployment,
   roster,
   teams,
@@ -47,7 +47,7 @@ export function TeamTraffic({
     <aside className="flex w-[360px] shrink-0 flex-col border-l border-line bg-panel">
       <header className="flex items-start justify-between border-b border-line px-4 py-3">
         <span className="flex flex-col">
-          <span className="font-semibold">Team traffic</span>
+          <span className="font-semibold">Activity</span>
           <span className="text-[12.5px] text-tx4">
             {teamName} on {project} only
           </span>
@@ -55,7 +55,7 @@ export function TeamTraffic({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close team traffic"
+          aria-label="Close activity"
           className="text-[18px] text-tx3 hover:text-tx"
         >
           ×

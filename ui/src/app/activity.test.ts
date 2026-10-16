@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TeamMessage } from "../api/client";
-import { entries, links, matches, shows, threads } from "./traffic";
+import { entries, links, matches, shows, threads } from "./activity";
 
 let next = 0;
 function msg(

@@ -40,11 +40,6 @@ export function rosterOrder(deployment: string, instances: Instance[], teams: Te
 /** The panes of one deployment: one or two instance ids, and the active one. */
 export type Panes = { open: string[]; active: number };
 
-/** A deployment opens on its lead, in a single pane. */
-export function initialPanes(roster: Instance[]): Panes {
-  return { open: roster.length > 0 ? [roster[0].id] : [], active: 0 };
-}
-
 /** Clicking an agent tab: activate its pane, or show it in the active pane. */
 export function clickTab(p: Panes, id: string): Panes {
   const at = p.open.indexOf(id);
@@ -66,6 +61,48 @@ export function toggleSplit(p: Panes, roster: Instance[]): Panes {
 /** Closing a pane (when split): the other stays, and pane 1 is active. */
 export function closePane(p: Panes, index: number): Panes {
   return { open: p.open.filter((_, i) => i !== index), active: 0 };
+}
+
+/** What the Sessions URL says (wiki/product/features/sessions.md#the-url): the
+ * deployment, its active agent, both agents when split (left, right), and
+ * whether Activity is open. Agents are named by their id; a full instance id
+ * (agent@project) is read too. */
+export type SessionsSearch = {
+  deployment?: string;
+  agent?: string;
+  panes?: string;
+  view?: "activity";
+};
+
+const agentOfId = (id: string) => id.split("@")[0];
+
+/** The panes the URL describes, checked against the roster: an agent that
+ * isn't in it falls back to the lead, a split that can't be made to one pane. */
+export function panesFrom(search: SessionsSearch, roster: Instance[]): Panes {
+  const find = (agent?: string) => roster.find((i) => agent && i.agentId === agentOfId(agent))?.id;
+  const active = find(search.agent) ?? roster[0]?.id;
+  if (!active) return { open: [], active: 0 };
+  const [left, right] = (search.panes ?? "").split(",").map((a) => find(a));
+  if (left && right && left !== right) {
+    const open = [left, right];
+    const at = open.indexOf(active);
+    // An agent asked for outside the split takes the left pane.
+    return at >= 0
+      ? { open, active: at }
+      : { open: [active, right === active ? left : right], active: 0 };
+  }
+  return { open: [active], active: 0 };
+}
+
+/** The URL for these panes: what panesFrom reads back. */
+export function searchFor(deployment: string, p: Panes, activity: boolean): SessionsSearch {
+  const ids = p.open.map(agentOfId);
+  return {
+    deployment,
+    agent: ids[p.active],
+    panes: ids.length === 2 ? ids.join(",") : undefined,
+    view: activity ? "activity" : undefined,
+  };
 }
 
 /** The line input's placeholder (wiki/product/features/sessions.md#panes). */

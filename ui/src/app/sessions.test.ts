@@ -6,13 +6,14 @@ import {
   closePane,
   countdown,
   deploymentTabs,
-  initialPanes,
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
+  panesFrom,
   rosterOrder,
+  searchFor,
   toggleSplit,
 } from "./sessions";
 
@@ -54,7 +55,7 @@ describe("Sessions", () => {
 
   it("opens on the lead, splits with the first other member, and goes back", () => {
     const roster = rosterOrder("atlas@ledger", all, [atlas]);
-    let p = initialPanes(roster);
+    let p = panesFrom({}, roster);
     expect(p).toEqual({ open: ["mara@ledger"], active: 0 });
     p = toggleSplit(p, roster);
     expect(p).toEqual({ open: ["mara@ledger", "tove@ledger"], active: 1 });
@@ -132,5 +133,59 @@ describe("mentions in the line input", () => {
   it("puts the plain name in, then a space, keeping what follows", () => {
     expect(applyMention("ask @Ta now", 7, 4, "Tac")).toEqual({ text: "ask Tac  now", caret: 8 });
     expect(applyMention("@", 1, 0, "Toe")).toEqual({ text: "Toe ", caret: 4 });
+  });
+});
+
+describe("the Sessions URL", () => {
+  const inst = (agent: string) => ({ id: `${agent}@ledger`, agentId: agent }) as Instance;
+  const roster = [inst("tic"), inst("tac"), inst("toe")];
+  it("opens the lead when it names no agent, or one that isn't there", () => {
+    expect(panesFrom({}, roster)).toEqual({ open: ["tic@ledger"], active: 0 });
+    expect(panesFrom({ agent: "gone" }, roster)).toEqual({ open: ["tic@ledger"], active: 0 });
+    expect(panesFrom({}, [])).toEqual({ open: [], active: 0 });
+  });
+  it("reads the active agent, by id or full instance id", () => {
+    expect(panesFrom({ agent: "tac" }, roster)).toEqual({ open: ["tac@ledger"], active: 0 });
+    expect(panesFrom({ agent: "toe@ledger" }, roster)).toEqual({ open: ["toe@ledger"], active: 0 });
+  });
+  it("reads a split, left and right, with its active side", () => {
+    expect(panesFrom({ agent: "toe", panes: "tic,toe" }, roster)).toEqual({
+      open: ["tic@ledger", "toe@ledger"],
+      active: 1,
+    });
+    // An agent outside the split (a notification's link) takes the left pane.
+    expect(panesFrom({ agent: "tac", panes: "tic,toe" }, roster)).toEqual({
+      open: ["tac@ledger", "toe@ledger"],
+      active: 0,
+    });
+    // A split that can't be made is one pane.
+    expect(panesFrom({ agent: "tic", panes: "tic,gone" }, roster)).toEqual({
+      open: ["tic@ledger"],
+      active: 0,
+    });
+    expect(panesFrom({ agent: "tic", panes: "tic,tic" }, roster)).toEqual({
+      open: ["tic@ledger"],
+      active: 0,
+    });
+  });
+  it("writes what it reads back", () => {
+    for (const p of [
+      { open: ["tic@ledger"], active: 0 },
+      { open: ["tic@ledger", "toe@ledger"], active: 1 },
+    ]) {
+      for (const activity of [false, true]) {
+        const s = searchFor("atlas@ledger", p, activity);
+        expect(panesFrom(s, roster)).toEqual(p);
+        expect(s.view).toBe(activity ? "activity" : undefined);
+      }
+    }
+    expect(
+      searchFor("atlas@ledger", { open: ["tic@ledger", "toe@ledger"], active: 1 }, false),
+    ).toEqual({
+      deployment: "atlas@ledger",
+      agent: "toe",
+      panes: "tic,toe",
+      view: undefined,
+    });
   });
 });

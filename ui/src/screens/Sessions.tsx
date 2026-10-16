@@ -18,32 +18,34 @@ import {
   closePane,
   countdown,
   deploymentTabs,
-  initialPanes,
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
   type Panes,
+  panesFrom,
   rosterOrder,
+  type SessionsSearch,
+  searchFor,
   toggleSplit,
 } from "../app/sessions";
+import { ActivityPanel } from "../components/ActivityPanel";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
 import { CheckIcon, CopyIcon, PromptIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
-import { TeamTraffic } from "../components/TeamTraffic";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
 import { Button, Dot, LeadTag, Segmented } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
-// tabs, agent tabs, one or two panes of real terminals, and the Team traffic
+// tabs, agent tabs, one or two panes of real terminals, and the Activity
 // panel.
 
-// The panes of each deployment, kept while the app runs (the server-side
-// ui_prefs that keep them across browsers come with the UI state API).
-const remembered = new Map<string, Panes>();
+// Each deployment's last view, so switching deployment tabs comes back to it
+// (while the app runs; across browsers, with the UI state API).
+const lastView = new Map<string, SessionsSearch>();
 
 export function Sessions() {
   const search = useSearch({ from: "/sessions" });
@@ -56,27 +58,19 @@ export function Sessions() {
   const asked = tabs.some((t) => t.id === search.deployment) ? search.deployment : undefined;
   const deployment = asked ?? tabs[0]?.id ?? "";
   const roster = rosterOrder(deployment, instances.data ?? [], teams.data ?? []);
-  const [panes, setPanesState] = useState<Panes>(
-    () => remembered.get(deployment) ?? initialPanes(roster),
-  );
-  const [messages, setMessages] = useState(false);
+  // The URL is the view: a reload, a link or Back shows the same panes.
+  const panes = panesFrom(search, roster);
+  const activity = search.view === "activity";
   const [stopping, setStopping] = useState<string>(); // a deployment id
   const deployments = useDeployments();
   const toStop = deployments.data?.find((d) => d.id === stopping);
-  const setPanes = (p: Panes) => {
-    remembered.set(deployment, p);
-    setPanesState(p);
+  const show = (p: Panes, withActivity: boolean) => {
+    const next = searchFor(deployment, p, withActivity);
+    lastView.set(deployment, next);
+    navigate({ to: "/sessions", search: next, replace: true });
   };
-
-  // A deployment switch restores its panes; ?agent= opens that agent.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on deployment, agent or data changes only
-  useEffect(() => {
-    let p = remembered.get(deployment) ?? initialPanes(roster);
-    if (p.open.length === 0 && roster.length > 0) p = initialPanes(roster);
-    if (search.agent && roster.some((i) => i.id === search.agent)) p = clickTab(p, search.agent);
-    remembered.set(deployment, p);
-    setPanesState(p);
-  }, [deployment, search.agent, roster.length]);
+  const setPanes = (p: Panes) => show(p, activity);
+  const setActivity = (on: boolean) => show(panes, on);
 
   if (instances.isPending) return <Centered>…</Centered>;
   if (tabs.length === 0)
@@ -95,7 +89,9 @@ export function Sessions() {
         <Segmented
           label="Deployments"
           value={deployment}
-          onChange={(d) => navigate({ to: "/sessions", search: { deployment: d } })}
+          onChange={(d) =>
+            navigate({ to: "/sessions", search: lastView.get(d) ?? { deployment: d } })
+          }
           onClose={{ label: "Stop", close: setStopping }}
           options={tabs.map((t) => ({
             value: t.id,
@@ -108,20 +104,22 @@ export function Sessions() {
           }))}
         />
         <span className="flex-1" />
-        {/* One view at a time: one terminal, two, or one beside the traffic. */}
+        {/* One view at a time: one terminal, two, or one beside the activity. */}
         <span className="rounded-lg border border-line p-0.5">
           <Segmented
             label="View"
-            value={messages ? "traffic" : panes.open.length === 2 ? "split" : "single"}
+            value={activity ? "activity" : panes.open.length === 2 ? "split" : "single"}
             options={[
               { value: "single", label: "Single" },
               { value: "split", label: "Split" },
-              { value: "traffic", label: "Traffic" },
+              { value: "activity", label: "Activity" },
             ]}
             onChange={(view) => {
               const split = panes.open.length === 2;
-              if ((view === "split") !== split) setPanes(toggleSplit(panes, roster));
-              setMessages(view === "traffic");
+              show(
+                (view === "split") !== split ? toggleSplit(panes, roster) : panes,
+                view === "activity",
+              );
             }}
           />
         </span>
@@ -156,12 +154,12 @@ export function Sessions() {
             />
           ))}
         </div>
-        {messages && (
-          <TeamTraffic
+        {activity && (
+          <ActivityPanel
             deployment={deployment}
             roster={roster}
             teams={teams.data ?? []}
-            onClose={() => setMessages(false)}
+            onClose={() => setActivity(false)}
             onOpen={(id) => setPanes(clickTab(panes, id))}
           />
         )}
@@ -373,7 +371,7 @@ function Pane({
         </div>
       )}
       {draft && !asleep && (
-        // A box inset from the pane's edges, so a neighbour (the traffic panel, the
+        // A box inset from the pane's edges, so a neighbour (the Activity panel, the
         // other pane) never hides a side of its border.
         <div className="mx-3 my-2 flex items-center gap-3 rounded-lg border-2 border-acc bg-accSoft px-3.5 py-2 text-[12.5px] text-accTx">
           <span className="flex-1">
@@ -502,8 +500,6 @@ function Asleep({ instance, name, stopped }: { instance: string; name: string; s
     </div>
   );
 }
-
-/** The ⇄ markers of this agent's traffic, beside its terminal (newest last). */
 
 /** Nothing deployed: deploy from here, choosing the team and the project. */
 function NoSessions() {

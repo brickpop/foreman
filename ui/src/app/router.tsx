@@ -6,6 +6,7 @@ import { Sessions } from "../screens/Sessions";
 import { Settings } from "../screens/Settings";
 import { Team, type TeamTab } from "../screens/Team";
 import { Shell } from "./Shell";
+import type { SessionsSearch } from "./sessions";
 
 // One route per screen (wiki/product/features/app-shell.md), with typed path
 // and search params: project / tab / entry, team / tab.
@@ -17,9 +18,11 @@ const home = createRoute({ getParentRoute: () => root, path: "/", component: Hom
 const sessions = createRoute({
   getParentRoute: () => root,
   path: "sessions",
-  validateSearch: (s: Record<string, unknown>): { deployment?: string; agent?: string } => ({
+  validateSearch: (s: Record<string, unknown>): SessionsSearch => ({
     deployment: typeof s.deployment === "string" ? s.deployment : undefined,
     agent: typeof s.agent === "string" ? s.agent : undefined,
+    panes: typeof s.panes === "string" ? s.panes : undefined,
+    view: s.view === "activity" ? "activity" : undefined,
   }),
   component: Sessions,
 });

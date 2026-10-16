@@ -1,6 +1,6 @@
 import type { TeamAction, TeamMessage } from "../api/client";
 
-// The Team traffic panel's model (wiki/product/features/sessions.md#team-traffic):
+// The Activity panel's model (wiki/product/features/sessions.md#activity):
 // who calls whom, and the exchanges as threads, newest first.
 
 /** One exchange: a message, and the replies to it when it is an ask. */
@@ -25,7 +25,7 @@ export function threads(messages: TeamMessage[]): Thread[] {
   return all.sort((a, b) => latest(b) - latest(a));
 }
 
-/** A pair of agents and their traffic, both ways. */
+/** A pair of agents and the messages between them, both ways. */
 export type Link = {
   a: string;
   b: string;
@@ -52,7 +52,7 @@ export function links(messages: TeamMessage[]): Link[] {
   return [...pairs.values()];
 }
 
-/** What the list shows: everything, one agent's traffic, or one pair's. */
+/** What the list shows: everything, one agent's activity, or one pair's messages. */
 export type Filter = { agent: string } | { a: string; b: string } | null;
 
 export function matches(t: Thread, f: Filter): boolean {

@@ -73,7 +73,7 @@ Every arrow, in words:
 | From | To | Why |
 |---|---|---|
 | Web server | Instance manager | Open a terminal view, type into it, deploy, stop |
-| Web server | Messaging | The CEO's Line; the Team traffic panel; the countdown on the CEO's draft |
+| Web server | Messaging | The CEO's Line; the Activity panel; the countdown on the CEO's draft |
 | Web server | Workflow | Answer a request; Merge to main, Create PR or Reject a merge request; Sync a reserved repo |
 | Web server | Workspace & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
@@ -250,7 +250,7 @@ Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `
 ```go
 type Messaging interface {
     Send(Message) (ID, error)          // from an agent's tool call, or from the CEO
-    Log(deployment) []Message          // the Team traffic panel
+    Log(deployment) []Message          // the Activity panel
 }
 ```
 

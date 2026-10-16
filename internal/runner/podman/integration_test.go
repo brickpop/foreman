@@ -12,7 +12,9 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -233,7 +235,8 @@ func TestListReattaches(t *testing.T) {
 
 func TestStopEndsAProgramThatIgnoresTERM(t *testing.T) {
 	r := engine(t)
-	p := start(t, r, runner.Spec{Command: sh(`trap "" TERM; echo ready; while true; do sleep 1; done`)})
+	name := "stop-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	p := start(t, r, runner.Spec{Name: name, Command: sh(`trap "" TERM; echo ready; while true; do sleep 1; done`)})
 	out := collect(p)
 	out.waitFor(t, "ready")
 	begin := time.Now()
@@ -242,6 +245,10 @@ func TestStopEndsAProgramThatIgnoresTERM(t *testing.T) {
 	}
 	if took := time.Since(begin); took > 10*time.Second {
 		t.Errorf("Stop took %v", took)
+	}
+	// Gone once Stop returns: Foreman exiting right after leaves no container.
+	if err := exec.Command("podman", "container", "exists", containerName(name)).Run(); err == nil {
+		t.Error("the container is still there after Stop")
 	}
 	if err := p.Stop(time.Second); err != nil {
 		t.Errorf("stopping twice: %v", err)

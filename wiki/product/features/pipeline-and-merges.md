@@ -21,7 +21,7 @@ Approvals, questions, findings and blocked requests are independent of the pipel
 |---|---|---|
 | 0 | in worktree | A member works on `wt/<agent>/<card>`, the branch for one board card |
 | 1 | handed to lead | The member calls `handoff(lead, branch, summary)` ([Team tools](../architecture/team-tools.md)) |
-| 2 | lead reviewing | The handoff is delivered into the lead's session. Whether requesting changes (an `ask` to the author) sends the work item back to stage 0 is undecided ([Protocol → Open questions](../architecture/protocol.md#open-questions)) |
+| 2 | lead reviewing | The handoff is delivered into the lead's session. Requesting changes (an `ask` to the author) moves nothing; the author's next hand-off of the branch brings it back to stage 1 ([Protocol → Work items and merge requests](../architecture/protocol.md#work-items-and-merge-requests)) |
 | 3 | integrated | Merged into one of the lead's `lead/<team>/*` branches in the lead's worktree; checks run |
 
 Each work item carries a short **note**. Changes colors it by a **tone** (`ok`, `err`, `ask`, neutral) derived from the work item's state, never stored, e.g. "checks pass" (`ok`) or "2 review comments" (`ask`).

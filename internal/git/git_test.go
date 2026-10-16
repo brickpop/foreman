@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -271,7 +272,7 @@ func TestExcludeKeepsTheSandboxesOutOfAnEnclosingRepo(t *testing.T) {
 		}
 	}
 	data, _ := os.ReadFile(filepath.Join(outer, ".git", "info", "exclude"))
-	if strings.Count(string(data), "/ledger/.sandboxes/\n") != 1 {
+	if lines := strings.Split(string(data), "\n"); slices.Index(lines, "/ledger/.sandboxes/") < 0 || strings.Count(string(data), ".sandboxes") != 1 {
 		t.Errorf("exclude file:\n%s", data)
 	}
 	if status, _ := run(ctx, outer, "status", "--porcelain", "--untracked-files=all"); strings.Contains(status, ".sandboxes") {

@@ -66,9 +66,9 @@ Instances survive UI disconnects: the Terminal, not the browser, holds the proce
 
 On server restart:
 1. Load deployments and instances from `state.db` ([Persistence](./persistence.md)).
-2. Ask the runner which containers are still running (`List`). Re-attach to each one whose instance is live; scrollback is replayed from Foreman's own session log, so nothing printed while Foreman was down is visible (an accepted gap, marked in the pane: [Session runner](./session-runner.md#podman-engine-production)).
+2. Ask the runner which containers are still running (`List`), and keep only this workspace's: every container is labelled `foreman.workspace` with the workspace's path, and named with a short hash of it (`foreman-19269e-mara-ledger`), because every workspace on the machine shares one Podman and two may both have a `mara@ledger` (found 2026-10-16: a second workspace stopped the first one's agents). Re-attach to each one whose instance is live; scrollback is replayed from Foreman's own session log, so nothing printed while Foreman was down is visible (an accepted gap, marked in the pane: [Session runner](./session-runner.md#podman-engine-production)).
 3. Instances that should be live but whose container is gone are restarted (see Restarts below).
-4. Containers that belong to no live instance are orphans: stopped and reported in the server log.
+4. This workspace's containers that belong to no live instance are orphans: stopped and reported in the server log. Another workspace's are never touched. Containers from before the label existed are adopted when one of this workspace's instances matches them, and otherwise left alone.
 
 ## Restarts
 

@@ -146,7 +146,14 @@ func (g *CLI) Exclude(ctx context.Context, path string) error {
 		return nil // not inside a repo: nothing to exclude from
 	}
 	defer g.lock(ctx, dir)()
-	rel, err := filepath.Rel(strings.TrimSpace(top), path)
+	// git names the top by its real path: so must we, or a folder reached
+	// through a symlink (macOS's /var is /private/var) makes a line that
+	// matches nothing.
+	real, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	rel, err := filepath.Rel(strings.TrimSpace(top), filepath.Join(real, filepath.Base(path)))
 	if err != nil {
 		return err
 	}

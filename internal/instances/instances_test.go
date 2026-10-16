@@ -433,15 +433,29 @@ func TestRestore(t *testing.T) {
 			SandboxPath: filepath.Join(f.root, "ledger", ".sandboxes", agent), StartedAt: time.Now().Add(-time.Hour),
 		})
 	}
-	start := func(id string) runner.Process {
-		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: map[string]string{"foreman.instance": id}})
+	start := func(id, workspace string) runner.Process {
+		labels := map[string]string{"foreman.instance": id}
+		if workspace != "" {
+			labels[workspaceLabel] = workspace
+		}
+		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: labels})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return p
 	}
-	survivor, orphan := start("mara@ledger"), start("ghost@ledger")
-	f.deps.Runner = listing{listed: []runner.Process{survivor, orphan}}
+	survivor, orphan := start("mara@ledger", f.root), start("ghost@ledger", f.root)
+	// Another workspace on the machine, with the same names: never touched.
+	theirs, theirOrphan := start("tove@ledger", "/elsewhere"), start("ghost2@ledger", "/elsewhere")
+	// From before processes named their workspace: adopted when it matches one
+	// of ours, never stopped.
+	older, olderUnknown := start("tove@ledger", ""), start("ghost3@ledger", "")
+	t.Cleanup(func() {
+		for _, p := range []runner.Process{theirs, theirOrphan, olderUnknown} {
+			_ = p.Stop(time.Second)
+		}
+	})
+	f.deps.Runner = listing{listed: []runner.Process{survivor, orphan, theirs, theirOrphan, older, olderUnknown}}
 	m := New(f.deps)
 	f.m = m
 	if err := m.Restore(ctx); err != nil {
@@ -452,7 +466,10 @@ func TestRestore(t *testing.T) {
 	} else {
 		_ = term.Input([]byte("still here\n"))
 	}
-	f.waitStatus("tove@ledger", Running) // restarted
+	if term, err := m.Terminal("tove@ledger"); err != nil || term == nil {
+		t.Errorf("the unlabelled process wasn't adopted: %v", err)
+	}
+	f.waitStatus("tove@ledger", Running)
 	if s := f.status("ivo@ledger"); s.Status != Asleep {
 		t.Errorf("an asleep instance after a restore: %+v", s)
 	}
@@ -710,5 +727,47 @@ func TestStartAgainAfterTwoCrashes(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if s := f.status("mara@ledger"); s.Status != Stopped {
 		t.Errorf("a stopped deployment's instance started: %s", s.Status)
+	}
+}
+
+// Processes of another workspace, and old unlabelled ones that match nothing,
+// are left running by a restore.
+func TestRestoreLeavesOtherWorkspacesAlone(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	start := func(id, workspace string) runner.Process {
+		labels := map[string]string{"foreman.instance": id}
+		if workspace != "" {
+			labels[workspaceLabel] = workspace
+		}
+		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: labels})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = p.Stop(time.Second) })
+		return p
+	}
+	theirs, older := start("mara@ledger", "/elsewhere"), start("ghost@ledger", "")
+	f.deps.Runner = listing{listed: []runner.Process{theirs, older}}
+	f.m = New(f.deps)
+	if err := f.m.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for name, p := range map[string]runner.Process{"another workspace's": theirs, "an unlabelled": older} {
+		done := make(chan struct{})
+		go func() { _, _ = p.Wait(); close(done) }()
+		select {
+		case <-done:
+			t.Errorf("%s process was stopped", name)
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+// Every process names its workspace, and its name is unique on the machine.
+func TestProcessesNameTheirWorkspace(t *testing.T) {
+	a := New(Deps{Root: "/ws/a"})
+	b := New(Deps{Root: "/ws/b"})
+	if a.processName("mara@ledger") == b.processName("mara@ledger") || !strings.HasSuffix(a.processName("mara@ledger"), "-mara@ledger") {
+		t.Errorf("names %q %q", a.processName("mara@ledger"), b.processName("mara@ledger"))
 	}
 }

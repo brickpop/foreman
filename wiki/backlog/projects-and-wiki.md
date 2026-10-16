@@ -1,6 +1,6 @@
 ---
 type: task
-status: blocked
+status: todo
 priority: medium
 tags: [feature]
 epic: terminal-multiplexer
@@ -10,7 +10,7 @@ epic: terminal-multiplexer
 
 **Why:** the project pages exist and say "Not built yet" for Add a project, Overview, Board and Changes ([Project pages](./ui-project-pages.md)); this card serves them from the real workspace and wikis ([Add a project](../product/features/add-project.md), [Wiki reader](../product/features/wiki-reader.md), [Board](../product/features/board.md), [Project settings](../product/features/project-settings.md), [Wiki engine](../product/architecture/wiki-engine.md)).
 
-Blocked by [Project pages](./ui-project-pages.md) and [Workspace and config](./workspace-config-events.md).
+Was blocked by [Project pages](./ui-project-pages.md) and [Workspace and config](./workspace-config-events.md), both done (2026-10-16).
 
 **Done when:** Add a project creates the project repo (`project/`: `git init`, `project.toml`, a starter wiki, first commit); Overview renders real entries (server-side markdown, links through the engine, changed dots); Board shows the boards from `wiki.toml` with version-guarded drags; Settings shows the real config; these areas leave "Not built yet" (Changes waits for epics 3–4).
 

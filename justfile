@@ -13,7 +13,7 @@ help:
 setup:
     cd ui && bun install
 
-# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, in .dev/real. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake. Each starts with team atlas and project sample. A workspace given second is used instead (it must be on the engine its harness needs)
+# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, in .dev/real. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake. Each starts with team dev-team (Tic leads, Tac and Toe) and project DevProject (one code repo, some-app). A workspace given second is used instead (it must be on the engine its harness needs)
 [group('dev')]
 dev harness="real" workspace="":
     #!/usr/bin/env bash
@@ -29,17 +29,18 @@ dev harness="real" workspace="":
     teams="$ws/.foreman/teams"
     if [ ! -d "$teams" ]; then
         mkdir -p "$teams"
-        printf '%s\n' 'team = "atlas"' 'name = "Atlas"' 'lead = "mara"' '' \
-            '[agents.mara]' 'name = "Mara"' 'role = "team_lead"' 'harness = "claude-code"' '' \
-            '[agents.tove]' 'name = "Tove"' 'role = "engineer"' 'harness = "claude-code"' > "$teams/atlas.toml"
+        printf '%s\n' 'team = "dev-team"' 'name = "DevTeam"' 'lead = "tic"' '' \
+            '[agents.tic]' 'name = "Tic"' 'role = "team_lead"' 'harness = "claude-code"' '' \
+            '[agents.tac]' 'name = "Tac"' 'role = "engineer"' 'harness = "claude-code"' '' \
+            '[agents.toe]' 'name = "Toe"' 'role = "reviewer"' 'harness = "claude-code"' > "$teams/dev-team.toml"
     fi
-    sample="$ws/sample"
-    if [ ! -d "$sample" ]; then
-        mkdir -p "$sample/project" "$sample/sample-app"
-        echo 'project = "sample"' > "$sample/project/project.toml"
-        git -C "$sample/project" init --quiet --initial-branch=main
-        app="$sample/sample-app"
-        echo "# Sample app" > "$app/README.md"
+    dev_project="$ws/DevProject"
+    if [ ! -d "$dev_project" ]; then
+        mkdir -p "$dev_project/project" "$dev_project/some-app"
+        echo 'project = "DevProject"' > "$dev_project/project/project.toml"
+        git -C "$dev_project/project" init --quiet --initial-branch=main
+        app="$dev_project/some-app"
+        echo "# Some app repo" > "$app/README.md"
         git -C "$app" init --quiet --initial-branch=main
         git -C "$app" add README.md
         git -C "$app" -c user.name=dev -c user.email=dev@localhost -c commit.gpgsign=false commit --quiet -m "First commit"

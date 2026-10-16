@@ -40,7 +40,7 @@ type Runner struct {
 
 	// Creating and starting many keep-id containers at once races inside
 	// Podman's runtime ("write to ping_group_range"); one at a time is
-	// reliable and takes about 0.2 s each (just prove-storm, 2026-10-14).
+	// reliable and takes about 0.2 s each (measured 2026-10-14).
 	starting sync.Mutex
 }
 
@@ -207,15 +207,16 @@ func newProcess(c *client, id string, conn net.Conn, out *bufio.Reader, labels m
 }
 
 // reap waits for the container to exit, then removes it, so its name is free
-// for the next start.
+// for the next start, and only then says it is done: a Stop returns once the
+// container is gone, so Foreman exiting right after leaves nothing behind.
 func (p *process) reap() {
 	bg := context.Background()
 	p.exitCode, p.waitErr = p.c.wait(bg, p.id)
-	close(p.done)
 	// Let the reader drain the last output before the stream goes away.
 	time.Sleep(time.Second)
 	p.conn.Close()
 	_ = p.c.remove(bg, p.id)
+	close(p.done)
 }
 
 func (p *process) Read(b []byte) (int, error) {

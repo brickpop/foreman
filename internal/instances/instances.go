@@ -14,6 +14,8 @@ package instances
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -294,17 +296,27 @@ func (m *Manager) Terminal(id string) (*terminal.Terminal, error) {
 	return nil, ErrNotRunning
 }
 
-// Restore picks up after a Foreman restart: running containers are
-// re-attached, live instances whose process is gone restart (continuing their
-// conversation), and processes that belong to nothing are stopped.
+// Restore picks up after a Foreman restart: this workspace's running
+// containers are re-attached, live instances whose process is gone restart
+// (continuing their conversation), and this workspace's processes that belong
+// to nothing are stopped. Another workspace's processes are left alone.
 func (m *Manager) Restore(ctx context.Context) error {
 	procs, err := m.Runner.List(ctx)
 	if err != nil {
 		return err
 	}
-	byID := map[string]runner.Process{}
+	byID := map[string]runner.Process{} // this workspace's
+	unlabelled := map[string]runner.Process{}
 	for _, p := range procs {
-		byID[p.Labels()["foreman.instance"]] = p
+		id := p.Labels()["foreman.instance"]
+		switch p.Labels()[workspaceLabel] {
+		case m.Root:
+			byID[id] = p
+		case "":
+			// From before processes named their workspace: adopted when one of
+			// ours matches, never stopped (it may be another workspace's).
+			unlabelled[id] = p
+		}
 	}
 	deps, err := m.Deployments.List(ctx)
 	if err != nil {
@@ -322,7 +334,11 @@ func (m *Manager) Restore(ctx context.Context) error {
 			if inst.Status == Stopped || inst.Status == Asleep {
 				continue
 			}
-			if p, ok := byID[inst.ID]; ok {
+			p, ok := byID[inst.ID]
+			if !ok {
+				p, ok = unlabelled[inst.ID]
+			}
+			if ok {
 				delete(byID, inst.ID)
 				if err := m.adopt(ctx, inst.ID, p); err != nil {
 					slog.Warn("re-attaching", "instance", inst.ID, "err", err)
@@ -524,10 +540,22 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		return nil, err
 	}
 	return m.Runner.Start(ctx, runner.Spec{
-		Name: id, Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: l.Env,
+		Name: m.processName(id), Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: l.Env,
 		Mounts: append(mounts, l.Mounts...),
-		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID},
+		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, workspaceLabel: m.Root},
 	})
+}
+
+// workspaceLabel names the workspace a process belongs to. Every workspace on
+// a machine shares one Podman, so each touches only its own: two workspaces
+// may well have an agent mara on a project ledger.
+const workspaceLabel = "foreman.workspace"
+
+// processName is the instance's process name, unique on the machine: the
+// workspace's short hash, then the instance id.
+func (m *Manager) processName(id string) string {
+	sum := sha256.Sum256([]byte(m.Root))
+	return hex.EncodeToString(sum[:3]) + "-" + id
 }
 
 // watch waits for the instance's process to end: a stop asked for, or a crash

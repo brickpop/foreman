@@ -22,6 +22,6 @@ From the Claude Code adapter (epic 1 built `Launch`): `Deliver`, `Interpret` and
 
 **Blocked by:** [Prove](./prove.md) (experiments C and D) and [Terminal multiplexer](./terminal-multiplexer.md).
 
-**Open decision to take in this epic:** whether a lead's change request moves a work item back to the author ([Protocol → Open questions](../../product/architecture/protocol.md#open-questions)). It gets a `decision` card when this epic's cards are written.
+**Decided in this epic (2026-10-16):** a lead's change request moves no work item; the author's next hand-off does ([Protocol → Work items and merge requests](../../product/architecture/protocol.md#work-items-and-merge-requests)).
 
 **Exit criteria:** the steps above work end to end with the fake harness in tests and with Claude Code on both machines.

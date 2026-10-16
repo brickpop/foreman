@@ -379,22 +379,22 @@ Work item:
   handoff,       delivered       head found in a         request_merge  its merge request
   checks pass    to the lead     lead/<team>/* branch    includes it    is merged
  ────────────▶ 1 handed ────▶ 2 reviewing ────────────▶ 3 integrated ────▶ requested ──▶ merged
-                  ▲                │                                        │
-                  │      lead asks │ the author (?)                         │ rejected
-                  │                ▼                                        ▼
+                  ▲                                                         │
+                  │  handoff again, checks pass (from 0 or 2)               │ rejected
+                  │                                                         ▼
                   └───────── 0 in worktree ◀───────────────────────────────┘
-          handoff again, checks pass      ▲
+                                          ▲
                                           └── a handoff whose checks fail (note "checks fail")
 ```
 
-(?) Whether a change request from the lead moves a work item back is undecided: [open question 1](#open-questions).
+**A change request moves nothing** (the CEO's decision, 2026-10-16). When the lead asks the author for changes, that is a plain `ask`, and the item stays where it is; the author's next `handoff` of the same branch moves it back to "handed". Rows move only on hand-offs, integration and merge request events, so the list never depends on an agent naming the right branch, and `ask` keeps no extra field.
 
 | Transition | Trigger | Detected by |
 |---|---|---|
 | → 1 handed | `handoff` whose checks pass | Workflow |
 | (stays 0, note "checks fail") | `handoff` whose checks fail | Workflow |
 | 1 → 2 reviewing | the handoff delivery's `DeliveredAt` | Messaging event |
-| 2 → 0 (undecided) | a change request from the lead to the author while the item is in review | [open question 1](#open-questions) |
+| 2 → 1 handed | the author hands the same branch off again (after a change request, a plain `ask`) | Workflow |
 | 2 → 3 integrated | the item's branch head is an ancestor of one of the lead's `lead/<team>/*` heads | Git, checked when the lead goes `idle` and on `request_merge` |
 | 3 → requested | `request_merge` on a branch containing it | Workflow |
 | requested → merged / → 0 | its merge request merged / rejected | Workflow |
@@ -441,14 +441,3 @@ Every state change is published on the in-process event bus; the web server stre
 - **Every request has exactly one way back**: a tool result, a delivery, a forge event or an instance action (see [Requests](#requests)).
 - **Every state change is an event**, so the UI never polls for it.
 
-## Open questions
-
-1. **Does a change request move a work item back?** The scenario: Changes → In flight shows each work item and its stage, e.g.
-   - "Idempotency keys · Tove · `wt/tove/LED-44` · handed to lead"
-   - "Rate limits · Tove · `wt/tove/LED-51` · handed to lead"
-
-   The lead messages Tove: "fix the rounding in LED-44". Tove receives the message either way; that part isn't in question. The question is only what the **In flight** list shows afterwards:
-   - **Option A: the LED-44 row goes back to "with the author"** automatically. Foreman can only know which row is meant if the lead names the branch when asking (an extra, optional `about: wt/tove/LED-44` on `ask`); without it, nothing moves.
-   - **Option B: the rows stay as they are** until Tove hands LED-44 off again (a new `handoff` of the same branch moves that row back to "handed to lead"). Change requests are then plain messages, and the list only moves on handoffs, integration and PR events.
-
-   Not decided.

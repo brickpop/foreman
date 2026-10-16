@@ -165,7 +165,7 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 	}
 	// A field set keeps the others at their defaults, booleans included.
 	s, p = ParseSettings([]byte("port = 9000\n[notifications]\nfinishes = false"))
-	if len(p) > 0 || s.Port != 9000 || s.MaxSessions != 12 || s.Notifications.Finishes || !s.Notifications.NeedsMe || !s.TeamMessageMarkers {
+	if len(p) > 0 || s.Port != 9000 || s.MaxSessions != 12 || s.Notifications.Finishes || !s.Notifications.NeedsMe {
 		t.Errorf("partial settings: %+v %v", s, p)
 	}
 	for name, tc := range map[string]struct{ toml, want string }{

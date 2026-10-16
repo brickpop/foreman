@@ -84,7 +84,6 @@ export interface Settings {
   maxSessions: number /* int */;
   engine: string;
   stuckAfterMinutes: number /* int */;
-  teamMessageMarkers: boolean;
   logCapMb: number /* int */;
   forges: { [key: string]: ForgeAccount};
   workspaceForge: WorkspaceForge;

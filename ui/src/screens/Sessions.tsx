@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { type Instance, type Team, type TeamMessage, useClient } from "../api/client";
+import { type Instance, type Team, useClient } from "../api/client";
 import { agentOf, harnessLabel } from "../app/model";
 import {
   keys,
@@ -9,9 +9,7 @@ import {
   useDraft,
   useHarnesses,
   useInstances,
-  useMessages,
   useRequests,
-  useSettings,
   useTeams,
 } from "../app/queries";
 import {
@@ -29,14 +27,16 @@ import {
 } from "../app/sessions";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
+import { CheckIcon, CopyIcon, PromptIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
+import { TeamTraffic } from "../components/TeamTraffic";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, Dot, LeadTag, Segmented, Toggle } from "../components/ui";
+import { Button, Dot, LeadTag, Segmented } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
-// tabs, agent tabs, one or two panes of real terminals, markers and the
-// Messages drawer.
+// tabs, agent tabs, one or two panes of real terminals, and the Team traffic
+// panel.
 
 // The panes of each deployment, kept while the app runs (the server-side
 // ui_prefs that keep them across browsers come with the UI state API).
@@ -105,12 +105,23 @@ export function Sessions() {
           }))}
         />
         <span className="flex-1" />
-        <Toggle on={panes.open.length === 2} onChange={() => setPanes(toggleSplit(panes, roster))}>
-          {panes.open.length === 2 ? "Single" : "Split"}
-        </Toggle>
-        <Toggle on={messages} onChange={setMessages}>
-          Messages
-        </Toggle>
+        {/* One view at a time: one terminal, two, or one beside the traffic. */}
+        <span className="rounded-lg border border-line p-0.5">
+          <Segmented
+            label="View"
+            value={messages ? "traffic" : panes.open.length === 2 ? "split" : "single"}
+            options={[
+              { value: "single", label: "Single" },
+              { value: "split", label: "Split" },
+              { value: "traffic", label: "Traffic" },
+            ]}
+            onChange={(view) => {
+              const split = panes.open.length === 2;
+              if ((view === "split") !== split) setPanes(toggleSplit(panes, roster));
+              setMessages(view === "traffic");
+            }}
+          />
+        </span>
         {toStop && (
           <StopDialog
             deployment={toStop}
@@ -143,8 +154,9 @@ export function Sessions() {
           ))}
         </div>
         {messages && (
-          <MessagesDrawer
+          <TeamTraffic
             deployment={deployment}
+            roster={roster}
             teams={teams.data ?? []}
             onClose={() => setMessages(false)}
             onOpen={(id) => setPanes(clickTab(panes, id))}
@@ -223,7 +235,6 @@ function Pane({
   const terminal = useRef<TerminalHandle>(null);
   const client = useClient();
   const draft = useDraft(instance.id);
-  const settings = useSettings();
   const newline = useHarnesses().data?.find((h) => h.id === instance.harness)?.newline;
   const [copied, setCopied] = useState(false);
   const [lineMode, setLineMode] = useState(false);
@@ -309,24 +320,23 @@ function Pane({
         </span>
         <span className="flex-1" />
         {!asleep && (
-          <>
-            <Button
-              variant="tiny"
-              onClick={() => (lineMode ? closeLine() : setLineMode(true))}
-              aria-pressed={lineMode}
-              title={`Line input (${lineShortcut()})`}
-            >
-              Line
-            </Button>
-            <Button variant="tiny" onClick={copy}>
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          </>
+          <IconButton onClick={copy} label={copied ? "Copied" : "Copy the whole buffer"}>
+            {copied ? <CheckIcon /> : <CopyIcon />}
+          </IconButton>
         )}
         {split && (
-          <Button variant="tiny" onClick={onClose} aria-label={`Close ${name}'s pane`}>
-            ×
-          </Button>
+          <IconButton onClick={onClose} label={`Close ${name}'s pane`}>
+            <span className="text-[16px] leading-4">×</span>
+          </IconButton>
+        )}
+        {!asleep && (
+          <IconButton
+            onClick={() => (lineMode ? closeLine() : setLineMode(true))}
+            pressed={lineMode}
+            label={`Line input (${lineShortcut()})`}
+          >
+            <PromptIcon />
+          </IconButton>
         )}
       </header>
       {!isLead && (
@@ -341,13 +351,12 @@ function Pane({
           <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
             <Terminal instance={instance.id} newline={newline} ref={terminal} />
           </div>
-          {settings.data?.settings.teamMessageMarkers !== false && (
-            <Markers deployment={instance.deploymentId} instance={instance.id} teams={teams} />
-          )}
         </div>
       )}
       {draft && !asleep && (
-        <div className="flex items-center gap-3 border-t border-line bg-side px-4 py-[7px] text-[12.5px] text-tx2">
+        // A box inset from the pane's edges, so a neighbour (the traffic panel, the
+        // other pane) never hides a side of its border.
+        <div className="mx-3 my-2 flex items-center gap-3 rounded-lg border-2 border-acc bg-accSoft px-3.5 py-2 text-[12.5px] text-accTx">
           <span className="flex-1">
             {draft.waiting === 1 ? "1 message" : `${draft.waiting} messages`} waiting for your line:
             send or clear it.{" "}
@@ -365,30 +374,34 @@ function Pane({
         </div>
       )}
       {lineMode && !asleep && (
-        <div className="flex items-start gap-2 border-t border-line px-[18px] py-[11px]">
-          <span className="font-mono text-[13px] leading-[1.5] font-medium text-accTx">❯</span>
-          {/* Enter sends; Shift+Enter starts a new line, typed as the harness's newline. */}
-          <textarea
-            ref={lineInput}
-            // biome-ignore lint/a11y/noAutofocus: opening Line is asking to type in it
-            autoFocus
-            value={line}
-            rows={Math.min(line.split("\n").length, 8)}
-            onChange={(e) => setLine(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") return closeLine();
-              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-              if (e.shiftKey) return; // the textarea adds the line
-              e.preventDefault();
-              // An empty line still sends Enter (it answers a harness's prompt).
-              if (!sendLine.isPending) sendLine.mutate(line);
-            }}
-            placeholder={linePlaceholder(name, instance.status, isLead)}
-            aria-label={`Line input to ${name}`}
-            className="flex-1 resize-none bg-transparent leading-[1.5] text-tx placeholder:text-tx4"
-          />
+        // A light box with room to breathe; its 1px border brightens on focus,
+        // instead of the heavier focus ring.
+        <div className="px-3 pt-1 pb-3">
+          <div className="flex items-start gap-2.5 rounded-lg border border-line2 bg-term px-4 py-3 focus-within:border-line3">
+            <span className="font-mono text-[13px] leading-[1.6] font-medium text-accTx">❯</span>
+            {/* Enter sends; Shift+Enter starts a new line, typed as the harness's newline. */}
+            <textarea
+              ref={lineInput}
+              // biome-ignore lint/a11y/noAutofocus: opening Line is asking to type in it
+              autoFocus
+              value={line}
+              rows={Math.min(line.split("\n").length, 8)}
+              onChange={(e) => setLine(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") return closeLine();
+                if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                if (e.shiftKey) return; // the textarea adds the line
+                e.preventDefault();
+                // An empty line still sends Enter (it answers a harness's prompt).
+                if (!sendLine.isPending) sendLine.mutate(line);
+              }}
+              placeholder={linePlaceholder(name, instance.status, isLead)}
+              aria-label={`Line input to ${name}`}
+              className="flex-1 resize-none bg-transparent leading-[1.6] text-tx placeholder:text-tx4 focus-visible:outline-none"
+            />
+          </div>
           {sendLine.error && (
-            <span className="text-[12.5px] text-err">{sendLine.error.message}</span>
+            <p className="m-0 mt-1.5 px-1 text-[12.5px] text-err">{sendLine.error.message}</p>
           )}
         </div>
       )}
@@ -422,101 +435,6 @@ function Asleep({ instance, name, stopped }: { instance: string; name: string; s
 }
 
 /** The ⇄ markers of this agent's traffic, beside its terminal (newest last). */
-function Markers({
-  deployment,
-  instance,
-  teams,
-}: {
-  deployment: string;
-  instance: string;
-  teams: Team[];
-}) {
-  const messages = useMessages(deployment);
-  const mine = (messages.data ?? [])
-    .filter((m) => m.fromInstance === instance || m.toInstance === instance)
-    .slice(-8);
-  if (mine.length === 0) return null;
-  return (
-    <aside className="flex w-[220px] shrink-0 flex-col justify-end gap-1 border-l border-line px-3 py-3 font-mono text-[11.5px] text-team">
-      {mine.map((m) => (
-        <div key={m.id} className="truncate" title={m.body}>
-          ⇄ {markerText(m, teams)}
-        </div>
-      ))}
-    </aside>
-  );
-}
-
-function markerText(m: TeamMessage, teams: Team[]): string {
-  const name = (id: string) => agentOf(teams, id)?.soul.name ?? id;
-  if (m.kind === "handoff")
-    return `${name(m.fromInstance)} handed off ${m.artifactRef} to ${name(m.toInstance)}`;
-  // A reply is shown with its ask's id, so the pair reads as one exchange.
-  return `${name(m.fromInstance)} → ${name(m.toInstance)} · ${m.kind} · ${m.kind === "reply" ? m.inReplyTo : m.ref}`;
-}
-
-/** The team-message traffic of the deployment, newest first. It narrows the
- * panes rather than covering them. */
-function MessagesDrawer({
-  deployment,
-  teams,
-  onClose,
-  onOpen,
-}: {
-  deployment: string;
-  teams: Team[];
-  onClose: () => void;
-  onOpen: (instance: string) => void;
-}) {
-  const messages = useMessages(deployment);
-  const [teamId, project] = deployment.split("@");
-  const teamName = teams.find((t) => t.id === teamId)?.config.name ?? teamId;
-  const name = (id: string) => agentOf(teams, id)?.soul.name ?? id;
-  const rows = [...(messages.data ?? [])].reverse();
-  return (
-    <aside className="flex w-[340px] shrink-0 flex-col border-l border-line bg-panel">
-      <header className="flex items-start justify-between border-b border-line px-4 py-3">
-        <span className="flex flex-col">
-          <span className="font-semibold">Messages between agents</span>
-          <span className="text-[12.5px] text-tx4">
-            {teamName} on {project} only
-          </span>
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close messages"
-          className="text-[18px] text-tx3 hover:text-tx"
-        >
-          ×
-        </button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-auto">
-        {rows.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => onOpen(m.fromInstance)}
-            className="flex w-full flex-col gap-1 border-b border-line px-4 py-3 text-left hover:bg-hover"
-          >
-            <span className="flex items-center gap-1.5 text-[13px]">
-              <span className="font-semibold">{name(m.fromInstance)}</span>
-              <span className="text-team">→</span>
-              <span className="font-semibold">{name(m.toInstance)}</span>
-              <span className="font-mono text-[11.5px] text-tx4">
-                {m.ref} · {m.kind}
-                {m.state !== "delivered" && ` · ${m.state}`}
-              </span>
-              <span className="flex-1" />
-              <span className="text-xs text-tx4">{m.createdAt.slice(11, 16)}</span>
-            </span>
-            <span className="text-[13px] leading-[1.45] text-tx2">{m.body}</span>
-          </button>
-        ))}
-      </div>
-    </aside>
-  );
-}
 
 /** Nothing deployed: deploy from here, choosing the team and the project. */
 function NoSessions() {
@@ -535,4 +453,32 @@ function NoSessions() {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="grid h-full place-items-center bg-bg p-12 text-tx3">{children}</div>;
+}
+
+/** A small square button holding an icon, labelled for screen readers and on hover. */
+function IconButton({
+  onClick,
+  label,
+  pressed,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  pressed?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={pressed}
+      title={label}
+      className={`flex size-7 items-center justify-center rounded-md ${
+        pressed ? "bg-accSoft text-accTx" : "text-tx3 hover:bg-hover hover:text-tx"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }

@@ -115,29 +115,42 @@ export function useLiveEvents(listen: (e: Event) => void = () => {}) {
           // A draft's countdown is pushed, not fetched: the event is the state.
           if (e.type === "instance.draft") {
             const d = e.data as Draft;
-            queries.setQueryData(draftKey(d.id), d.waiting > 0 ? d : null);
+            queries.setQueryData<Drafts>(draftsKey, (all = {}) => {
+              const { [d.id]: _, ...rest } = all;
+              return d.waiting > 0 ? { ...rest, [d.id]: d } : rest;
+            });
           }
           invalidate(queries, staleKeys(e));
           listener.current(e);
         },
         // Events sent while away aren't replayed: refetch everything shown.
-        reconnected: () => queries.invalidateQueries(),
+        reconnected: () => {
+          // Drafts are pushed each countdown step: start over from the next one.
+          queries.setQueryData(draftsKey, {});
+          queries.invalidateQueries();
+        },
       }),
     [c, queries],
   );
 }
 
-const draftKey = (instance: string) => ["draft", instance] as const;
+/** Messages waiting on the CEO's draft, by instance, with their countdown.
+ * Fed by instance.draft events only: nothing to fetch. */
+type Drafts = Record<string, Draft>;
+const draftsKey = ["drafts"] as const;
 
-/** Messages waiting on the CEO's draft in an agent's terminal, with their
- * countdown; null when nothing waits. Fed by instance.draft events only. */
-export function useDraft(instance: string) {
-  return useQuery<Draft | null>({
-    queryKey: draftKey(instance),
-    queryFn: () => null,
+export function useDrafts(): Drafts {
+  return useQuery<Drafts>({
+    queryKey: draftsKey,
+    queryFn: () => ({}),
     enabled: false,
-    initialData: null,
+    initialData: {},
   }).data;
+}
+
+/** The messages waiting on the CEO's draft in one agent's terminal. */
+export function useDraft(instance: string): Draft | undefined {
+  return useDrafts()[instance];
 }
 
 function invalidate(queries: QueryClient, stale: readonly (readonly string[])[]) {

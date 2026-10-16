@@ -37,7 +37,7 @@ The **team tools** are the tools Foreman exposes to every harness, as an MCP ser
 
 ### Markers: notes for the CEO, never in the terminal
 
-Anything written into a session's terminal is typed input to the agent ([Protocol → Deliveries and markers](./protocol.md#text-into-a-session-deliveries-and-markers)). So Foreman's notes for the CEO about agent traffic are **markers**: UI events (`instance.marker`) shown **beside** the terminal, in a thin strip on the session pane and in the Messages drawer ([Sessions](../features/sessions.md)), never written into the PTY. The terminal shows only what the agent's program prints, plus the deliveries it receives.
+Anything written into a session's terminal is typed input to the agent ([Protocol → Deliveries and markers](./protocol.md#text-into-a-session-deliveries-and-markers)). So Foreman's notes for the CEO about agent traffic are **markers**: UI events (`instance.marker`) shown **beside** the terminal, in the Team traffic panel ([Sessions](../features/sessions.md#team-traffic)), never written into the PTY. The terminal shows only what the agent's program prints, plus the deliveries it receives.
 
 Marker glyphs (the UI colours them):
 
@@ -50,7 +50,6 @@ Marker glyphs (the UI colours them):
 
 Deliveries don't use these glyphs: what the agent reads is plain words (`Message msg-41 from Mara (ask): …`, `From the CEO, on …`, `From Foreman: …`).
 
-A workspace setting toggles the marker strip on the session panes ([Workspace settings](../models/workspace-settings.md#schema)); the Messages drawer always lists the traffic.
 
 ## Transport
 

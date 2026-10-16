@@ -92,7 +92,7 @@ Whenever the harness reports it is waiting for the user, Workflow raises a reque
 Anything Foreman writes into a session's terminal is **typed input**: harnesses are full-screen programs that read the terminal as their keyboard. So there are two different things, never mixed:
 
 - A **delivery** is text the agent must read: a teammate's ask, a reply, a handoff to the lead, the CEO's answer, a "main moved" notice. Messaging hands it to `Instances.Deliver`, which waits until the recipient is `idle` and then calls the harness adapter's `Deliver` (type the text, then submit). It starts a turn. **A delivery is always one line of plain words, with no symbols** (the CEO's decisions, 2026-10-15): a multi-line paste reaches Claude Code wrapped as pasted content, which it treats as possibly not the user's ([experiment D](../../backlog/prove-d-claude-delivery-hooks.md)). A message's notice names it and quotes its start; the agent reads the whole message with `read_message`. Foreman's own notices are short sentences that fit the line.
-- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (msg-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) shown **beside** the terminal: a thin strip on the session pane, and the Messages drawer. It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
+- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (msg-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) shown **beside** the terminal, in the Team traffic panel ([Sessions](../features/sessions.md#team-traffic)). It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
 
 Every delivery is also shown as a marker. Delivered text is untrusted data: it is framed with its sender and capped ([Team tools → Delivery](./team-tools.md#delivery)).
 
@@ -219,7 +219,7 @@ type ContributeResult struct { Path string }                            // "proj
 
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter; a taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in project/wiki/inbox/<file>.` The lead decides what becomes of it.
-- Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the Messages drawer shows the title.
+- Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the Team traffic panel shows the title.
 - Errors: `bad_kind`, `too_long`.
 
 ### `escalate`
@@ -402,7 +402,7 @@ Every state change is published on the in-process event bus; the web server stre
 | `instance.status` | instance id, status, task | Instance manager | Sessions tabs, Home, Project and Team rows, avatars |
 | `instance.line` | instance id, last output line (throttled) | Terminal | Project settings rows |
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
-| `team.message` | the [message](#messages), on creation and on each state change | Messaging | Messages drawer |
+| `team.message` | the [message](#messages), on creation and on each state change | Messaging | Team traffic panel |
 | `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, Changes, sidebar badges, notifications |
 | `pipeline.changed` | the work item or merge request | Workflow | Changes |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |

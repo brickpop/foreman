@@ -88,16 +88,15 @@ type Look struct {
 
 // Settings is settings.toml. Absent fields keep their defaults.
 type Settings struct {
-	Listen             string                  `toml:"listen" json:"listen"`
-	Port               int                     `toml:"port" json:"port"`
-	MaxSessions        int                     `toml:"max_sessions" json:"maxSessions"`
-	Engine             string                  `toml:"engine" json:"engine"`
-	StuckAfterMinutes  int                     `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
-	TeamMessageMarkers bool                    `toml:"team_message_markers" json:"teamMessageMarkers"`
-	LogCapMB           int                     `toml:"log_cap_mb" json:"logCapMb"`
-	Forges             map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
-	WorkspaceForge     WorkspaceForge          `toml:"workspace_forge" json:"workspaceForge"`
-	Notifications      Notifications           `toml:"notifications" json:"notifications"`
+	Listen            string                  `toml:"listen" json:"listen"`
+	Port              int                     `toml:"port" json:"port"`
+	MaxSessions       int                     `toml:"max_sessions" json:"maxSessions"`
+	Engine            string                  `toml:"engine" json:"engine"`
+	StuckAfterMinutes int                     `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
+	LogCapMB          int                     `toml:"log_cap_mb" json:"logCapMb"`
+	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
+	WorkspaceForge    WorkspaceForge          `toml:"workspace_forge" json:"workspaceForge"`
+	Notifications     Notifications           `toml:"notifications" json:"notifications"`
 }
 
 // ForgeAccount is a forge account's host or owner; its token is a secret.
@@ -122,7 +121,7 @@ type Notifications struct {
 func DefaultSettings() Settings {
 	return Settings{
 		Listen: "local", Port: 8888, MaxSessions: 12, Engine: "podman",
-		StuckAfterMinutes: 20, TeamMessageMarkers: true, LogCapMB: 50,
+		StuckAfterMinutes: 20, LogCapMB: 50,
 		WorkspaceForge: WorkspaceForge{Kind: "none"},
 		Notifications:  Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
 	}

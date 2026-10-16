@@ -78,9 +78,30 @@ export function Terminal({
     term.open(host.current);
     fit.fit();
 
+    // The replay (the screen and its scrollback, sent first on every connect)
+    // is drawn hidden, then shown at once: no flash of it scrolling by.
+    const view = host.current;
+    let replaying = true;
+    const show = () => {
+      replaying = false;
+      view.style.opacity = "1";
+    };
+    let fallback = setTimeout(show, 600); // nothing came: show what there is
     const conn = client.agents.openTerminal(instance, {
-      output: (data) => term.write(data),
-      reset: () => term.reset(),
+      output: (data) => {
+        if (!replaying) return term.write(data);
+        term.write(data, () => {
+          term.scrollToBottom();
+          show();
+        });
+      },
+      reset: () => {
+        replaying = true;
+        view.style.opacity = "0";
+        clearTimeout(fallback);
+        fallback = setTimeout(show, 600);
+        term.reset();
+      },
       exit: (code) => term.write(`\r\n\x1b[90m[session exited with code ${code}]\x1b[0m\r\n`),
     });
     connection.current = conn;
@@ -99,6 +120,7 @@ export function Terminal({
     observer.observe(host.current);
 
     return () => {
+      clearTimeout(fallback);
       observer.disconnect();
       typing.dispose();
       resizing.dispose();
@@ -109,5 +131,5 @@ export function Terminal({
     };
   }, [client, instance]);
 
-  return <div ref={host} className="h-full w-full" />;
+  return <div ref={host} className="h-full w-full opacity-0 transition-opacity duration-150" />;
 }

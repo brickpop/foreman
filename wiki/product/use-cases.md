@@ -24,7 +24,7 @@ In Sessions, open the Atlas · ledger tab and type to Mara: "Add idempotency key
 
 Acceptance:
 - [ ] Text typed in Mara's pane reaches Mara's harness stdin.
-- [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the Messages drawer, and as a team-message marker line in both panes.
+- [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the Team traffic panel (who calls whom, and the exchange).
 - [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
 - [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in [Changes](./features/changes.md) → In flight.

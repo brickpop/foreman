@@ -217,16 +217,6 @@ function WorkspaceSection({ settings }: { settings: SettingsData }) {
           ]}
         />
       </Row>
-      <Row
-        title="Show agent messages beside terminals"
-        explanation="The marker strip (⇄ team traffic, escalations, notes) along each session pane. The Messages drawer always lists the traffic."
-      >
-        <Switch
-          label="Show agent messages beside terminals"
-          checked={settings.teamMessageMarkers}
-          onChange={(on) => save((s) => ({ ...s, teamMessageMarkers: on }))}
-        />
-      </Row>
       <Confirm
         open={confirm === "lan"}
         onClose={() => setConfirm(undefined)}

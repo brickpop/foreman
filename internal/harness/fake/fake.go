@@ -16,7 +16,8 @@ type Adapter struct {
 var _ harness.Adapter = Adapter{}
 
 // Launch runs the program, with its session prompt in a file it is told about
-// and the opener, if any, as its argument.
+// and the opener, if any, as its argument. It keeps no conversation, so every
+// start is fresh (and gets the opener).
 func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	prompt := filepath.Join(s.Sandbox, ".harness", "fake", "PROMPT.md")
 	command := []string{a.Program}

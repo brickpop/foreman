@@ -118,10 +118,10 @@ func TestLaunchOptions(t *testing.T) {
 	if !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue"}) {
 		t.Errorf("command %v", l.Command)
 	}
-	// The opener is the last argument, a prompt: interactive, never -p.
+	// A session that continues doesn't get the opener again.
 	s.Opener = "Your goal on ledger: -v ship it"
-	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue", s.Opener}) {
-		t.Errorf("with an opener: %v", l.Command)
+	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue"}) {
+		t.Errorf("continuing, with an opener: %v", l.Command)
 	}
 	if last := l.Mounts[len(l.Mounts)-1]; last != (runner.Mount{Source: gitconfig, Target: "/home/node/.gitconfig", ReadOnly: true}) {
 		t.Errorf("gitconfig mount %+v", last)
@@ -238,6 +238,50 @@ func TestInterpret(t *testing.T) {
 	} {
 		if got := a.Interpret(tc.event, []byte(tc.payload)); got != tc.want {
 			t.Errorf("%s %s: %q, want %q", tc.event, tc.payload, got, tc.want)
+		}
+	}
+}
+
+// writeFiles writes a launch's files, as the session runner does.
+func writeFiles(t *testing.T, l harness.Launch) {
+	t.Helper()
+	for _, f := range l.Files {
+		write(t, f.Path, string(f.Data))
+	}
+}
+
+// The config dir outlives deployments: a restart continues only a
+// conversation of this deployment, and a session that starts fresh gets the
+// opener (the lead's goal), as an argument: interactive, never -p.
+func TestARestartContinuesOnlyThisDeploymentsConversation(t *testing.T) {
+	a, s := setup(t)
+	dir := ConfigDir(s.Sandbox)
+	write(t, filepath.Join(dir, "projects", "-ws-ledger", "last-deployment.jsonl"), "{}\n")
+	s.Opener = "Your goal on ledger: ship it"
+	// The deployment's first start: fresh, with the goal, whatever is there.
+	l, err := a.Launch(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", s.Opener}) {
+		t.Errorf("first start %v", l.Command)
+	}
+	writeFiles(t, l)
+	// It exited before saving a conversation: the restart is fresh again,
+	// with the goal, and never picks up the last deployment's conversation.
+	s.Continue = true
+	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", s.Opener}) {
+		t.Errorf("restart with nothing of this deployment: %v", l.Command)
+	}
+	write(t, filepath.Join(dir, "projects", "-ws-ledger", "this-deployment.jsonl"), "{}\n")
+	restart, _ := a.Launch(s)
+	if !reflect.DeepEqual(restart.Command, []string{"claude", "--dangerously-skip-permissions", "--continue"}) {
+		t.Errorf("restart with a conversation: %v", restart.Command)
+	}
+	// A restart doesn't rewrite the list of what was there before.
+	for _, f := range restart.Files {
+		if filepath.Base(f.Path) == freshStart {
+			t.Error("a restart rewrote the fresh-start list")
 		}
 	}
 }

@@ -373,7 +373,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 
 // Beyond max_sessions, instances wait their turn.
 func TestTheConcurrencyLimitQueues(t *testing.T) {
-	f := newFixture(t, `read line; exit 0`, 1)
+	f := newFixture(t, `read line; exit 1`, 1)
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestTheConcurrencyLimitQueues(t *testing.T) {
 	if s := f.status("tove@ledger"); s.Status != Queued {
 		t.Fatalf("tove is %s with one slot taken", s.Status)
 	}
-	// The lead's program ends: its slot goes to tove (the lead queues behind for its restart).
+	// The lead's program crashes: its slot goes to tove (the lead queues behind for its restart).
 	term, _ := f.m.Terminal("mara@ledger")
 	_ = term.Input([]byte("bye\n"))
 	f.waitStatus("tove@ledger", Running)
@@ -392,7 +392,9 @@ func TestTheConcurrencyLimitQueues(t *testing.T) {
 	}
 }
 
-// A crash restarts once, without the opener again; a second one stops the instance.
+// A crash restarts once; a second one stops the instance. The fake harness
+// keeps no conversation, so its restart starts fresh and gets the goal again
+// (Claude Code's continues instead: its adapter's tests).
 func TestACrashRestartsOnceThenStops(t *testing.T) {
 	f := newFixture(t, `echo "[$1]" >> "$FOREMAN_PROMPT_FILE.openers"; sleep 0.2; exit 3`, 12)
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
@@ -403,7 +405,7 @@ func TestACrashRestartsOnceThenStops(t *testing.T) {
 		t.Errorf("restarts %d, want 1", inst.Restarts)
 	}
 	openers, _ := os.ReadFile(filepath.Join(f.root, "ledger", ".sandboxes", "mara", ".harness", "fake", "PROMPT.md.openers"))
-	if string(openers) != "[Your goal on ledger: g]\n[]\n" {
+	if string(openers) != "[Your goal on ledger: g]\n[Your goal on ledger: g]\n" {
 		t.Errorf("openers per start: %q", openers)
 	}
 }
@@ -657,5 +659,56 @@ func TestDeployRefusesAProjectWithoutRepos(t *testing.T) {
 	}
 	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
 		t.Errorf("deployed anyway: %+v", deps)
+	}
+}
+
+// A clean exit (the CEO's /exit) is done for now: asleep, holding no slot,
+// until the CEO's Start (or work) wakes it, picking up its conversation.
+func TestACleanExitSleepsAndStartResumes(t *testing.T) {
+	f := newFixture(t, `echo "[$1]" >> "$FOREMAN_PROMPT_FILE.openers"; read line; exit 0`, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	term, _ := f.m.Terminal("mara@ledger")
+	_ = term.Input([]byte("/exit\n"))
+	inst := f.waitStatus("mara@ledger", Asleep)
+	if inst.Restarts != 0 || f.m.Live("mara@ledger") {
+		t.Errorf("after /exit: %+v, live %v", inst, f.m.Live("mara@ledger"))
+	}
+	time.Sleep(200 * time.Millisecond) // no restart on its own
+	if s := f.status("mara@ledger"); s.Status != Asleep {
+		t.Fatalf("restarted on its own: %s", s.Status)
+	}
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+}
+
+// A stopped instance (two crashes) starts again on the CEO's Start, with its
+// one restart back; a stopped deployment's instances don't.
+func TestStartAgainAfterTwoCrashes(t *testing.T) {
+	f := newFixture(t, `sleep 0.2; exit 3`, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Stopped)
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if s := f.waitStatus("mara@ledger", Running); s.Restarts != 0 {
+		t.Errorf("restarts %d after Start again", s.Restarts)
+	}
+	f.waitStatus("mara@ledger", Stopped) // crashes twice again
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	if s := f.status("mara@ledger"); s.Status != Stopped {
+		t.Errorf("a stopped deployment's instance started: %s", s.Status)
 	}
 }

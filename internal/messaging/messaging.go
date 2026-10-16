@@ -292,13 +292,15 @@ func splitLines(text string) []string {
 	return strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 }
 
-// StatusChanged hears every instance status: an idle one gets its messages.
+// StatusChanged hears every instance status: an idle one gets its messages,
+// and one that went to sleep (a clean exit) with messages waiting is woken
+// for them. A stopped one isn't: its messages wait for the CEO's Start again.
 func (m *Messenger) StatusChanged(id, status string) {
 	switch status {
 	case "starting", "stopped", "asleep", "queued":
 		m.forget(id) // a new session starts with an empty prompt
 	}
-	if status == "idle" {
+	if status == "idle" || status == "asleep" {
 		go m.Deliver(id)
 	}
 }

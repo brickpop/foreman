@@ -137,15 +137,26 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	return dep, nil
 }
 
-// Wake starts an asleep instance: the CEO's Start (later, work arriving for
-// it). An instance that is up or on its way is left as it is.
+// Wake starts an asleep instance (the CEO's Start, or work arriving for it),
+// or, on the CEO's Start again, a stopped one of an active deployment: both
+// pick up their conversation. An instance that is up or on its way is left as
+// it is.
 func (m *Manager) Wake(ctx context.Context, id string) error {
 	inst, err := m.Instances.Get(ctx, id)
 	if err != nil {
 		return err
 	}
-	if inst.Status != Asleep {
+	if inst.Status != Asleep && inst.Status != Stopped {
 		return nil
+	}
+	if dep, err := m.Deployments.Get(ctx, inst.DeploymentID); err != nil || dep.Status != store.DeploymentActive {
+		return nil // a stopped deployment's instances start only with a redeploy
+	}
+	if inst.Restarts != 0 {
+		inst.Restarts = 0 // the CEO's start: a later crash gets its one restart again
+		if err := m.Instances.Put(ctx, inst); err != nil {
+			return err
+		}
 	}
 	m.enqueue(id)
 	m.startQueued()
@@ -494,9 +505,11 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 			"FOREMAN_AGENT_URL=" + m.Agent.URL, "FOREMAN_AGENT_TOKEN=" + m.Agent.Token(id),
 		}}
 	}
-	if lead && first && dep.Goal != "" {
-		// The kickoff (journey G1): the lead starts on the goal at once. Only on
-		// its first start, so a restart doesn't give the goal twice.
+	if lead && dep.Goal != "" {
+		// The kickoff (journey G1): the lead starts on the goal at once. The
+		// adapter gives it only to a session that starts fresh, so a restart
+		// that continues the conversation doesn't get the goal twice, and one
+		// with nothing to continue still gets it.
 		session.Opener = fmt.Sprintf("Your goal on %s: %s", project.ID, dep.Goal)
 	}
 	l, err := adapter.Launch(session)
@@ -534,6 +547,13 @@ func (m *Manager) watch(id string, l *live) {
 	code, _ := l.term.ExitCode()
 	switch {
 	case err != nil:
+	case code == 0:
+		// A clean exit (the CEO's /exit, say) is done for now, not a crash: it
+		// sleeps, holding no slot, until work or the CEO's Start wakes it, and
+		// then picks up its conversation.
+		inst.Status, inst.Restarts = Asleep, 0
+		_ = m.Instances.Put(ctx, inst)
+		m.publish("instance.status", StatusChange{ID: id, Status: Asleep})
 	case inst.Restarts == 0:
 		slog.Warn("instance exited; restarting it once", "instance", id, "code", code)
 		inst.Restarts++

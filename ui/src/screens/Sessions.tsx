@@ -234,7 +234,8 @@ function Pane({
     terminal.current?.focus();
   };
   // The shortcut: open Line; from the terminal, back into Line; from Line, close it.
-  const asleep = instance.status === "asleep";
+  // Asleep or stopped: no session runs, and the pane offers to start one.
+  const asleep = instance.status === "asleep" || instance.status === "stopped";
   const toggleLine = () => {
     if (asleep) return;
     if (!lineMode) setLineMode(true);
@@ -334,7 +335,7 @@ function Pane({
         </div>
       )}
       {asleep ? (
-        <Asleep instance={instance.id} name={name} />
+        <Asleep instance={instance.id} name={name} stopped={instance.status === "stopped"} />
       ) : (
         <div className="flex min-h-0 flex-1">
           <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
@@ -395,8 +396,9 @@ function Pane({
   );
 }
 
-/** An asleep agent's pane: no session runs until it is started. */
-function Asleep({ instance, name }: { instance: string; name: string }) {
+/** An asleep or stopped agent's pane: no session runs until it is started,
+ * and then it picks up its conversation. */
+function Asleep({ instance, name, stopped }: { instance: string; name: string; stopped: boolean }) {
   const client = useClient();
   const queries = useQueryClient();
   const toast = useToast();
@@ -408,10 +410,12 @@ function Asleep({ instance, name }: { instance: string; name: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
       <p className="m-0 max-w-[380px] text-[13.5px] text-tx3">
-        {name} is asleep: no session runs until there's work for them.
+        {stopped
+          ? `${name} stopped: it crashed twice, or couldn't start. Messages for them wait until you start them again; they pick up their conversation.`
+          : `${name} is asleep: no session runs until there's work for them.`}
       </p>
       <Button disabled={wake.isPending} onClick={() => wake.mutate()}>
-        Start {name}
+        {stopped ? `Start ${name} again` : `Start ${name}`}
       </Button>
     </div>
   );

@@ -18,11 +18,15 @@ type Session struct {
 	// Sandbox is the instance's folder on the host (<project>/.sandboxes/<agent>),
 	// its working directory, mounted at the same path. The adapter keeps the
 	// harness's private config inside it.
-	Sandbox  string
-	Prompt   string // the composed session prompt
-	Continue bool   // a restart: pick up the instance's previous conversation
-	// Opener is the session's first message, typed in as if by the CEO; the
-	// session stays interactive. "" for none.
+	Sandbox string
+	Prompt  string // the composed session prompt
+	// Continue: a restart within the deployment, which picks up the
+	// instance's conversation of this deployment if the harness kept one.
+	// False: the deployment's first start, always fresh.
+	Continue bool
+	// Opener is the first message of a session that starts fresh (not one
+	// that continues a conversation), typed in as if by the CEO; the session
+	// stays interactive. "" for none.
 	Opener string
 	// Link is how the harness reaches Foreman: the team tools and the hooks
 	// both go through foreman-agent. Zero when foreman-agent isn't built.

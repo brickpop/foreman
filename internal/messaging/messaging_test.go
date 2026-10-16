@@ -63,6 +63,12 @@ func (s *sessions) Type(id string, p []byte) error {
 	return nil
 }
 
+func (s *sessions) wokenList() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.woken...)
+}
+
 func (s *sessions) Newline(string) string { return "\\\r" }
 
 func (s *sessions) setFail(fail bool) {
@@ -303,4 +309,20 @@ func TestPreviewIsOneLineCutOnARune(t *testing.T) {
 	if got := preview("a\n\n  b\tc"); got != "a b c" {
 		t.Errorf("flattened: %q", got)
 	}
+}
+
+// An agent that goes to sleep with messages waiting (a clean exit mid-turn)
+// is woken for them; a stopped one waits for the CEO's Start again.
+func TestWaitingMessagesWakeASleeperNotAStoppedAgent(t *testing.T) {
+	f := newFixture(t)
+	f.call("mara@ledger", "ask", map[string]string{"teammate": "tove", "request": "build cal"}) // tove is running: queued
+	f.setStatus("tove@ledger", "stopped")
+	f.m.StatusChanged("tove@ledger", "stopped")
+	time.Sleep(50 * time.Millisecond)
+	if woken := f.s.wokenList(); len(woken) != 0 {
+		t.Errorf("a stopped agent was woken: %v", woken)
+	}
+	f.setStatus("tove@ledger", "asleep")
+	f.m.StatusChanged("tove@ledger", "asleep")
+	f.eventually("woken", func() bool { return len(f.s.wokenList()) == 1 })
 }

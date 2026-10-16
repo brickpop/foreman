@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/brickpop/foreman/internal/harness"
@@ -74,11 +75,17 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		args = append(args, "--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config")
 	}
 	settings, _ := json.MarshalIndent(config, "", "  ")
-	if s.Continue && hasConversation(dir) {
-		// The latest conversation in this config dir: always the instance's own.
-		args = append(args, "--continue")
+	// A restart continues the latest conversation of this deployment, if it
+	// has one; else the session starts fresh (with the opener, if any). The
+	// config dir outlives deployments, so a fresh start writes down the
+	// conversations already there: those are never continued.
+	continuing := s.Continue && hasConversation(dir)
+	if !s.Continue {
+		files = append(files, harness.File{Path: filepath.Join(dir, freshStart), Data: []byte(strings.Join(conversations(dir), "\n")), Mode: 0o600})
 	}
-	if s.Opener != "" {
+	if continuing {
+		args = append(args, "--continue")
+	} else if s.Opener != "" {
 		// A prompt argument opens an interactive session with it as the first message
 		// (only -p would make it one-shot).
 		args = append(args, s.Opener)
@@ -184,9 +191,30 @@ func (Adapter) Interpret(event string, payload []byte) harness.Activity {
 
 // hasConversation reports whether the config dir holds a conversation to
 // continue: `--continue` fails without one (a session that crashed at once).
-func hasConversation(dir string) bool {
+// freshStart lists, in the config dir, the conversations there when the
+// deployment's first session started.
+const freshStart = "foreman-fresh-start"
+
+// conversations are Claude Code's saved conversations in the config dir.
+func conversations(dir string) []string {
 	found, _ := filepath.Glob(filepath.Join(dir, "projects", "*", "*.jsonl"))
-	return len(found) > 0
+	for i, f := range found {
+		found[i], _ = filepath.Rel(dir, f)
+	}
+	return found
+}
+
+// hasConversation reports whether the config dir has a conversation from
+// this deployment: one that wasn't there at its fresh start.
+func hasConversation(dir string) bool {
+	before, _ := os.ReadFile(filepath.Join(dir, freshStart))
+	old := strings.Split(string(before), "\n")
+	for _, c := range conversations(dir) {
+		if !slices.Contains(old, c) {
+			return true
+		}
+	}
+	return false
 }
 
 // Command is Claude Code's CLI.

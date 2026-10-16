@@ -34,7 +34,7 @@ GET    /api/teams/:id/agents/:agent/prompt    {prompt}: the template before any 
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
 (line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
 POST   /api/instances/:id/restart
-POST   /api/instances/:id/wake            starts an asleep instance (204; any other status is left as it is)
+POST   /api/instances/:id/wake            starts an asleep instance, or a stopped one of an active deployment (Start again); both pick up their conversation (204; any other status is left as it is)
 POST   /api/instances/:id/line            {text}: types the CEO's line into the session and sends it (204; 409 NOT_RUNNING)
 PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countdown of messages waiting on the CEO's draft (204)
 

@@ -75,6 +75,9 @@ func TestLaunch(t *testing.T) {
 	if file(t, l, "settings.json")["skipDangerousModePermissionPrompt"] != true {
 		t.Error("the bypass-mode warning isn't skipped")
 	}
+	if file(t, l, "settings.json")["tui"] != "default" {
+		t.Error("the renderer isn't pinned to the classic one (the fullscreen dialog would eat a message)")
+	}
 	account := file(t, l, ".claude.json")
 	projects := account["projects"].(map[string]any)
 	if account["hasCompletedOnboarding"] != true || account["oauthAccount"] == nil ||

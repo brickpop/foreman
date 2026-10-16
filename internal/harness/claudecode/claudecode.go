@@ -50,6 +50,11 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	config := map[string]any{
 		// No bypass-mode warning at startup.
 		"skipDangerousModePermissionPrompt": true,
+		// The classic renderer: the fullscreen one takes the mouse (no plain
+		// copy in the terminal pane) and the alternate screen (no scrollback).
+		// Set explicitly, it also skips the "Try the new fullscreen renderer?"
+		// dialog, which would answer the first line typed in (a lost message).
+		"tui": "default",
 	}
 	args := []string{a.Command(), "--dangerously-skip-permissions"}
 	var files []harness.File

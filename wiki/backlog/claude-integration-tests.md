@@ -12,7 +12,7 @@ epic: messaging-handoffs
 
 Unblocked: [Messaging](./messaging-delivery.md) is done.
 
-**Done when:** `just test-claude` (needs the CEO's login and Podman) runs a real Claude Code through Foreman and checks: a one-line delivery is submitted once, the hooks give `running` → `idle` → `awaiting`, `read_message` and `reply` round-trip; `cmd/prove`, `cmd/proveagent` and their `just` recipes are deleted.
+**Done when:** `just test-claude` (needs the CEO's login and Podman) runs a real Claude Code through Foreman and checks: a fresh session (fresh config, as Foreman writes it) starts with no dialog, a delivered line reaches the prompt and is submitted once, the hooks give `running` → `idle` → `awaiting`, `read_message` and `reply` round-trip; `cmd/prove`, `cmd/proveagent` and their `just` recipes are deleted.
 
 - [ ] the test, skipped without a login
 - [ ] delete `cmd/prove`, `cmd/proveagent`, the `prove-*` recipes

@@ -192,12 +192,15 @@ export function filesChanged(diff: string): number {
 
 /** A merge request's link line: its PR, its branch, and its checks, or for a
  * Chief of Staff change (no checks) how many files it changes. */
-export function linkLine(mr: MergeRequest, forge: string, files?: number): string {
+export function linkLine(mr: MergeRequest, forge: string, files?: number, main = "main"): string {
   const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
+  // No checks status: the project has no checks (or they haven't run): nothing to say.
   const tail = mr.conflicting
-    ? "conflicts with main"
+    ? `conflicts with ${main}`
     : mr.authorInstance === "cos"
       ? `${plural(files ?? 0, "file")} changed`
-      : `checks ${mr.checksStatus || "running"}`;
-  return `${pr}${mr.branch} → main · ${tail}`;
+      : mr.checksStatus
+        ? `checks ${mr.checksStatus}`
+        : "";
+  return `${pr}${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
 }

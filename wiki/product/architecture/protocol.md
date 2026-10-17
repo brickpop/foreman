@@ -208,7 +208,7 @@ type HandoffResult struct { WorkItem string; Checks string }                  //
 - Checks fail: nothing goes to the teammate; the caller gets `From Foreman: checks fail on wt/tove/LED-44: <first line>. Fix it and hand off again.`
 - Markers: `Tove → Mara · handoff · wt/tove/LED-44`, then the checks outcome.
 - Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `uncommitted_changes` (commit first), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
-- Phasing: in [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) a hand-off is the policy check and the delivery only; checks and work items arrive with the [Git](../../backlog/epics/git.md) epic.
+- Phasing: since the [Git](../../backlog/epics/git.md) epic's first card (2026-10-17) a hand-off creates or advances its work item; the checks come with the next card, `git-checks`. Until then a hand-off goes to "handed to lead" at once, with no checks.
 
 ### `contribute`
 
@@ -253,7 +253,8 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 - Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`; the Chief of Staff: its own `foreman/config-N`) and that `Entry` exists in the project's wiki (a lead must name one; the Chief of Staff may leave it empty and describe the change in the request instead), runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
-- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`.
+- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `uncommitted_changes` (commit first).
+- Phasing (2026-10-17): built without the checks (`git-checks`) and without the review request (the Workflow epic); the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides from Changes.
 
 ### Deliveries Foreman originates
 
@@ -261,10 +262,10 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 |---|---|---|
 | A merge request is merged (Merge to main, or on the forge) | its lead | `From Foreman: lead/atlas/integration was merged into main in ledger-api.` |
 | Another merge request on the same repo is merged | the lead of every other open one | `From Foreman: main moved (lead/atlas/integration was merged). Merge it into lead/atlas/settlement-v2 with merge("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
-| Merge to main finds a conflict, or the forge reports one | that merge request's lead | the same notice |
+| Merge to main finds a conflict, or the forge reports one | that merge request's lead | `From Foreman: lead/atlas/settlement-v2 conflicts with main in ledger-api, so the CEO couldn't merge it. Merge main in with merge("main"), resolve the conflicts and commit(), then call request_merge again.` |
 | The CEO chooses Create PR | the merge request's lead | `From Foreman: the CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
 | Review comments on the forge (after Create PR) | the merge request's lead | `From Foreman: a review comment on PR #128 by <user>: <its start>… Read it with read_message("msg-N").` (stored as a message, kind `notice`) |
-| Reject, or its PR closed on the forge | the merge request's lead | `From the CEO: the merge of lead/atlas/settlement-v2 was rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it.` |
+| Reject, or its PR closed on the forge | the merge request's lead | `From the CEO: the merge of lead/atlas/settlement-v2 in ledger-api was rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` |
 | "Owning team fixes now" on a finding | the named team's lead | `From the CEO: <team> fixes "<finding>" now.` |
 | A soul or team edit | each running instance | `From Foreman: your definition changed. Read it with read_message("msg-N").` (the changed sections, stored as a message of kind `notice`; [Session prompt → Updates](./session-prompt.md#updates)) |
 
@@ -395,7 +396,7 @@ Work item:
 | (stays 0, note "checks fail") | `handoff` whose checks fail | Workflow |
 | 1 → 2 reviewing | the handoff delivery's `DeliveredAt` | Messaging event |
 | 2 → 1 handed | the author hands the same branch off again (after a change request, a plain `ask`) | Workflow |
-| 2 → 3 integrated | the item's branch head is an ancestor of one of the lead's `lead/<team>/*` heads | Git, checked when the lead goes `idle` and on `request_merge` |
+| 2 → 3 integrated | the item's branch head is an ancestor of one of the lead's `lead/<team>/*` heads | Git, checked right after the lead's `merge` or `commit` (which finishes a conflicted merge), the only ways a lead branch takes in work, and on `request_merge`; in every repo that has the branch |
 | 3 → requested | `request_merge` on a branch containing it | Workflow |
 | requested → merged / → 0 | its merge request merged / rejected | Workflow |
 

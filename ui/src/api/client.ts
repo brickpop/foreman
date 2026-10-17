@@ -352,6 +352,17 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
           version,
         }),
     },
+    pipeline: {
+      list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
+      mergeRequest: (mergeRequest) => getJSON(`/api/merge-requests/${id(mergeRequest)}`),
+      diff: async (mergeRequest) =>
+        (await getJSON<{ diff: string }>(`/api/merge-requests/${id(mergeRequest)}/diff`)).diff,
+      merge: (mergeRequest) => send("POST", `/api/merge-requests/${id(mergeRequest)}/merge`),
+      // Create PR comes with the Git epic's git-forge card.
+      createPr: notBuilt("pull requests"),
+      reject: (mergeRequest, reason) =>
+        send("POST", `/api/merge-requests/${id(mergeRequest)}/reject`, { reason }),
+    },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {
       accounts: notBuilt("forge accounts"),
@@ -364,14 +375,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
       actions: (deployment) => getJSON(`/api/actions?deployment=${id(deployment)}`),
-    },
-    pipeline: {
-      list: notBuilt("the pipeline"),
-      mergeRequest: notBuilt("the pipeline"),
-      diff: notBuilt("the pipeline"),
-      merge: notBuilt("the pipeline"),
-      createPr: notBuilt("the pipeline"),
-      reject: notBuilt("the pipeline"),
     },
     chiefOfStaff: {
       conversation: notBuilt("the Chief of Staff"),

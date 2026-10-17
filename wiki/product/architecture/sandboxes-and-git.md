@@ -37,7 +37,7 @@ Everything at the **same path as on the host** ([Session runner](./session-runne
 | `<project>/project/` (the live project repo) | `<project>/.sandboxes/<agent>/project` | rw for the lead, ro for the others |
 | `<project>/project/.git` | `<project>/.sandboxes/<agent>/project/.git`, over the mount above | **ro** for every agent |
 
-A worktree's `.git` is a file pointing at `<project>/<repo>/.git/worktrees/<name>` by host path, so git works inside the container only because the repo's `.git` is mounted at that same path. The CEO's working files (`<project>/<repo>/` outside `.git`) are never mounted, and no agent ever touches the CEO's checkout or checks out a branch there (how Foreman's own Merge to main relates to it is [open](../features/pipeline-and-merges.md#open-questions)).
+A worktree's `.git` is a file pointing at `<project>/<repo>/.git/worktrees/<name>` by host path, so git works inside the container only because the repo's `.git` is mounted at that same path. The CEO's working files (`<project>/<repo>/` outside `.git`) are never mounted, and no agent ever touches the CEO's checkout or checks out a branch there. Foreman's own Merge to main runs in it only when it has `main` checked out, so its files move with `main` ([Pipeline and merges → Merge to main](../features/pipeline-and-merges.md#merge-to-main)).
 
 ## Agents and git
 

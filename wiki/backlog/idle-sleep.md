@@ -3,7 +3,7 @@ type: task
 status: todo
 priority: low
 tags: [feature]
-epic: messaging-handoffs
+epic: workflow
 ---
 
 # Put idle agents to sleep (a setting, off by default)

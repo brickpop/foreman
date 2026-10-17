@@ -1,4 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   isNotBuilt,
   type MergeRequest,
@@ -18,6 +19,8 @@ import {
   useTeams,
 } from "../../app/queries";
 import { Avatar } from "../../components/Avatar";
+import { DiffView } from "../../components/DiffView";
+import { DecisionButtons, RejectForm, useMergeDecision } from "../../components/MergeDecision";
 import { RequestPanel } from "../../components/RequestPanel";
 import { ReviewPanel } from "../../components/ReviewPanel";
 import { Button, Empty, NotBuilt, Panel, SectionLabel } from "../../components/ui";
@@ -104,6 +107,12 @@ export function Changes({ project }: { project: Project }) {
                 key={m.id}
                 mr={m}
                 project={project.id}
+                main={project.config.main}
+                forge={
+                  m.repo === "project" && !project.config.forge.projectRepo
+                    ? "none"
+                    : project.config.forge.kind
+                }
                 teams={teams.data ?? []}
                 items={items.filter((w) => w.mergeRequestId === m.id)}
                 live={live.has(m.deploymentId)}
@@ -157,6 +166,7 @@ function ChangesRequest({
       <ReviewPanel
         request={r}
         mr={mr}
+        main={project.config.main}
         // The project repo's own forge for a config change, the code repo's otherwise.
         forge={
           mr.repo === "project" && !project.config.forge.projectRepo
@@ -245,12 +255,17 @@ function WorkRow({
 function MergeRow({
   mr,
   project,
+  main,
+  forge,
   teams,
   items,
   live,
 }: {
   mr: MergeRequest;
   project: string;
+  /** The project's protected branch, and its forge ("none": no Create PR). */
+  main: string;
+  forge: string;
   teams: Team[];
   items: WorkItem[];
   live: boolean;
@@ -258,6 +273,8 @@ function MergeRow({
   const navigate = useNavigate();
   const lead = agentOf(teams, mr.authorInstance);
   const title = useEntryTitle(project, mr.entry);
+  const decision = useMergeDecision(mr);
+  const [viewing, setViewing] = useState(false);
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
       <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3">
@@ -269,9 +286,9 @@ function MergeRow({
           </span>
           <span className="truncate text-[12.5px] text-tx3">
             {lead?.soul.name ?? mr.authorInstance} · {mr.repo} ·{" "}
-            <span className="font-mono">{mr.branch}</span> → main · checks{" "}
-            {mr.checksStatus || "running"}
-            {mr.note && ` · ${mr.note}`}
+            <span className="font-mono">{mr.branch}</span> → {main}
+            {mr.checksStatus && ` · checks ${mr.checksStatus}`}
+            {mr.note && <span className={mr.conflicting ? "text-err" : ""}> · {mr.note}</span>}
           </span>
         </span>
         <span className="rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx2">
@@ -297,6 +314,21 @@ function MergeRow({
           <span className="text-xs text-tx4">stopped</span>
         )}
       </div>
+      {/* The CEO's decision, right on the row (wiki/product/features/changes.md). */}
+      <span className="ml-9 flex flex-wrap items-center gap-2">
+        <DecisionButtons decision={decision} mr={mr} main={main} forge={forge} size="small" />
+        <button
+          type="button"
+          onClick={() => setViewing(true)}
+          className="text-[12.5px] text-accTx hover:underline"
+        >
+          See the change
+        </button>
+      </span>
+      <RejectForm decision={decision} author={lead?.soul.name ?? "the lead"} />
+      {viewing && (
+        <DiffView mergeRequest={mr.id} title={mr.branch} onClose={() => setViewing(false)} />
+      )}
       {items.map((w) => (
         <CarriedItem key={w.id} item={w} project={project} teams={teams} />
       ))}

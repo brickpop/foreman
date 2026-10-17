@@ -1,13 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { type MergeRequest, type Request, useClient } from "../api/client";
+import type { MergeRequest, Request } from "../api/client";
 import type { Look } from "../api/types/workspace";
-import { filesChanged, forgeLabel, linkLine } from "../app/model";
-import { keys, useDiff } from "../app/queries";
+import { filesChanged, linkLine } from "../app/model";
+import { useDiff } from "../app/queries";
 import { DiffView } from "./DiffView";
+import { DecisionButtons, RejectForm, useMergeDecision } from "./MergeDecision";
 import { RequestPanel } from "./RequestPanel";
-import { useToast } from "./Toasts";
-import { Button } from "./ui";
 
 // A review request with its merge request: what to look at (the link line
 // opens the change) and what to decide: Merge to main, Create PR on the forge,
@@ -17,6 +15,7 @@ import { Button } from "./ui";
 export function ReviewPanel({
   request: r,
   mr,
+  main = "main",
   forge,
   who,
   context,
@@ -29,6 +28,8 @@ export function ReviewPanel({
 }: {
   request: Request;
   mr: MergeRequest;
+  /** The branch it merges into: the project's protected branch (`main` in project.toml). */
+  main?: string;
   /** The forge of the repo it targets ("none": no Create PR). */
   forge: string;
   who?: { name: string; look: Look };
@@ -41,28 +42,11 @@ export function ReviewPanel({
   onOpenSession: () => void;
   onOpenChiefOfStaff: () => void;
 }) {
-  const client = useClient();
-  const queries = useQueryClient();
-  const toast = useToast();
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
+  const decision = useMergeDecision(mr);
   const [viewing, setViewing] = useState(false);
   // A Chief of Staff change has no checks: its line says how many files it changes.
   const diff = useDiff(mr.authorInstance === "cos" ? mr.id : "");
-  const act = useMutation({
-    mutationFn: async (action: "merge" | "createPr" | "reject") => {
-      if (action === "merge") await client.pipeline.merge(mr.id);
-      if (action === "createPr") await client.pipeline.createPr(mr.id);
-      if (action === "reject") await client.pipeline.reject(mr.id, reason.trim());
-      // Merging or rejecting resolves the review request on the server (pipeline-and-merges.md).
-    },
-    onError: (e: Error) => toast({ title: "Not done", body: e.message, color: "var(--err)" }),
-    onSettled: () => {
-      queries.invalidateQueries({ queryKey: ["pipeline"] });
-      queries.invalidateQueries({ queryKey: keys.requests });
-    },
-  });
-  const line = linkLine(mr, forge, diff.data ? filesChanged(diff.data) : undefined);
+  const line = linkLine(mr, forge, diff.data ? filesChanged(diff.data) : undefined, main);
   return (
     <div className="flex flex-col gap-2">
       <RequestPanel
@@ -75,36 +59,7 @@ export function ReviewPanel({
         onAnswer={() => {}}
         onOpenSession={onOpenSession}
         onOpenChiefOfStaff={onOpenChiefOfStaff}
-        actions={
-          <>
-            {mr.forgePrUrl ? (
-              <Button
-                variant="primary"
-                onClick={() => window.open(mr.forgePrUrl, "_blank", "noopener")}
-              >
-                Open PR ↗
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="primary"
-                  disabled={act.isPending}
-                  onClick={() => act.mutate("merge")}
-                >
-                  Merge to main
-                </Button>
-                {forge !== "none" && (
-                  <Button disabled={act.isPending} onClick={() => act.mutate("createPr")}>
-                    Create PR on {forgeLabel(forge)}
-                  </Button>
-                )}
-              </>
-            )}
-            <Button variant="danger" onClick={() => setRejecting(true)}>
-              Reject
-            </Button>
-          </>
-        }
+        actions={<DecisionButtons decision={decision} mr={mr} main={main} forge={forge} />}
       >
         {/* The change itself: the PR on the forge once there is one, its diff before. */}
         {mr.forgePrUrl ? (
@@ -130,31 +85,7 @@ export function ReviewPanel({
       {viewing && (
         <DiffView mergeRequest={mr.id} title={mr.branch} onClose={() => setViewing(false)} />
       )}
-      {rejecting && (
-        <div className="flex flex-col gap-2 rounded-xl border border-line bg-panel p-4">
-          <textarea
-            rows={3}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder={`What should ${author} change? (optional)`}
-            aria-label={`Message to ${author}`}
-            className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
-          />
-          <span className="flex justify-end gap-2">
-            <Button
-              onClick={() => {
-                setRejecting(false);
-                setReason("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button variant="danger" disabled={act.isPending} onClick={() => act.mutate("reject")}>
-              Reject and tell {author}
-            </Button>
-          </span>
-        </div>
-      )}
+      <RejectForm decision={decision} author={author} />
     </div>
   );
 }

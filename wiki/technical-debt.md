@@ -53,7 +53,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 
 - **State:** Messaging types a line when the hooks say the agent is idle (`SessionStart`, `Stop`). A startup dialog Foreman doesn't know about also comes after `SessionStart`, so the line answers the dialog, and the message is marked `delivered` but lost. Found live: Claude Code's "Try the new fullscreen renderer?" took Mara's first ask to Tove (fixed by pinning `tui`).
 - **Why:** a harness gives no acknowledgement that a line reached its prompt; each known dialog is switched off in the config Foreman writes.
-- **Fix:** the [Claude Code integration tests](./backlog/claude-integration-tests.md) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
+- **Fix:** the Claude Code integration tests (`just test-claude`) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
 
 ## The theme is kept in the browser only
 

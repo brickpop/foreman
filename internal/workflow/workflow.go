@@ -24,6 +24,7 @@ import (
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
+	"github.com/brickpop/foreman/internal/wiki"
 	"github.com/brickpop/foreman/internal/workspace"
 )
 
@@ -39,11 +40,20 @@ type Git interface {
 	Merge(ctx context.Context, dir, branch string, by git.Author) ([]string, error)
 	Merging(ctx context.Context, dir string) (bool, error)
 	AbortMerge(ctx context.Context, dir string) error
+	Branches(ctx context.Context, dir, prefix string) ([]string, error)
+	Contains(ctx context.Context, dir, into, branch string) (bool, error)
+	MergeInto(ctx context.Context, dir, target, branch, message string) error
+	Diff(ctx context.Context, dir, target, branch string) (string, error)
 }
 
 // Config is the projects, as loaded.
 type Config interface {
 	Project(id string) (workspace.Project, error)
+}
+
+// Wiki reads a project's wiki entries (the Wiki block).
+type Wiki interface {
+	Entry(project, path string) (wiki.Entry, error)
 }
 
 // Messages sends a message to a teammate (Messaging).
@@ -61,7 +71,13 @@ type Deps struct {
 	// panel); Publish announces it (team.action). Either may be nil.
 	Actions store.Actions
 	Publish func(events.Event)
-	Now     func() time.Time // the contributions' dates; time.Now when nil
+	// WorkItems tracks hand-offs on their way to the lead branch (pipeline.changed).
+	WorkItems store.WorkItems
+	// MergeRequests are the leads' requests to merge into main; Wiki names them
+	// (the title of the entry that explains the work).
+	MergeRequests store.MergeRequests
+	Wiki          Wiki
+	Now           func() time.Time // the contributions' dates; time.Now when nil
 }
 
 // Workflow serves its team tools.
@@ -99,6 +115,9 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"kind":{"type":"string","enum":["finding","proposal","note"]},`+
 			`"title":{"type":"string","description":"A short title"},`+
 			`"body":{"type":"string","description":"The contribution, in Markdown"}`, "kind", "title", "body")},
+	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into main, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Commit first. Call it again on the same branch to refresh it (after merging main in, say).",
+		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>"},`+
+			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"}`, "branch", "entry")},
 }
 
 // Tools implements teamtools.Block.
@@ -110,6 +129,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		Branch   string `json:"branch"`
 		Message  string `json:"message"`
 		Teammate string `json:"teammate"`
+		Entry    string `json:"entry"`
 		Summary  string `json:"summary"`
 		Kind     string `json:"kind"`
 		Title    string `json:"title"`
@@ -139,6 +159,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		res = t.abortMerge(ctx)
 	case "handoff":
 		return t.handoff(ctx, a.Teammate, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Summary))
+	case "request_merge":
+		return t.requestMerge(ctx, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Entry))
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
@@ -148,6 +170,11 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		act.Error = res.Text
 	}
 	w.record(ctx, *act)
+	// A merge into a lead branch (or the commit that finishes one) may
+	// integrate hand-offs: checked right then.
+	if (name == "merge" || name == "commit") && c.Lead && !res.Error {
+		t.integrate(ctx)
+	}
 	return res
 }
 
@@ -406,6 +433,7 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 	if err != nil {
 		return teamtools.Refusal("internal", "%v", err)
 	}
+	t.handed(ctx, branch)
 	name := t.c.Team.Config.Agents[strings.Split(to, "@")[0]].Name
 	return agentlink.Result{Text: fmt.Sprintf("%s: %s handed to %s. Your part ends here.", msg.Ref, branch, name)}
 }

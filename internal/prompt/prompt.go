@@ -28,7 +28,7 @@ type Input struct {
 
 // built are the team tools that exist so far (the Messaging and hand-offs
 // epic brings them in steps), in the order the prompt lists them.
-var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "handoff", "contribute"}
+var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "handoff", "contribute", "request_merge"}
 
 // Offered is the team tools an agent gets: what is built, as its role allows
 // (handoff for members, request_merge for the lead). The team-tool router

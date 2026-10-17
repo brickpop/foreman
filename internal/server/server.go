@@ -29,6 +29,7 @@ type Options struct {
 	Agents      Agents
 	Messages    Messages
 	Actions     Actions
+	Pipeline    Pipeline
 	Harnesses   Harnesses
 	Wiki        Wiki
 	Setup       Setup
@@ -46,6 +47,7 @@ func New(o Options) http.Handler {
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
 	actionRoutes(mux, o.Actions)
+	pipelineRoutes(mux, o.Pipeline)
 	harnessRoutes(mux, o.Harnesses)
 	maintenanceRoutes(mux, o.Maintenance)
 	setupRoutes(mux, o.Setup)

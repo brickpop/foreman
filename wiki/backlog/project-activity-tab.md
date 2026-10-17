@@ -3,7 +3,7 @@ type: task
 status: todo
 priority: medium
 tags: [feature]
-epic: messaging-handoffs
+epic: workflow
 ---
 
 # Project → Activity tab

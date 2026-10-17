@@ -3,6 +3,8 @@ package workflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,9 +14,11 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
+	"github.com/brickpop/foreman/internal/wiki"
 	"github.com/brickpop/foreman/internal/workspace"
 )
 
@@ -35,6 +39,16 @@ func (config) Project(id string) (workspace.Project, error) {
 	return workspace.Project{ID: id, Repos: []string{"api", "web"}, Config: workspace.ProjectConfig{Main: "main"}}, nil
 }
 
+// entries is a wiki: path to title.
+type entries map[string]string
+
+func (e entries) Entry(_, path string) (wiki.Entry, error) {
+	if title, ok := e[path]; ok {
+		return wiki.Entry{Path: path, Title: title}, nil
+	}
+	return wiki.Entry{}, wiki.ErrNotFound
+}
+
 // messages records what Workflow sends.
 type messages struct {
 	mu   sync.Mutex
@@ -50,10 +64,12 @@ func (m *messages) Send(_ context.Context, msg store.TeamMessage) (store.TeamMes
 }
 
 type fixture struct {
-	t    *testing.T
-	root string
-	w    *Workflow
-	m    *messages
+	t      *testing.T
+	root   string
+	w      *Workflow
+	m      *messages
+	db     *store.DB
+	events []events.Event
 }
 
 // newFixture: project ledger with code repos api and web and the project
@@ -87,7 +103,19 @@ func newFixture(t *testing.T) *fixture {
 	}
 	m := &messages{}
 	now := func() time.Time { return time.Date(2026, 10, 16, 9, 0, 0, 0, time.UTC) }
-	return &fixture{t: t, root: root, m: m, w: New(Deps{Root: root, Git: g, Config: config{}, Messages: m, Now: now})}
+	db, err := store.Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	f := &fixture{t: t, root: root, m: m, db: db}
+	f.w = New(Deps{Root: root, Git: g, Config: config{}, Messages: m, Now: now, WorkItems: db.WorkItems(),
+		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"},
+		Publish: func(e events.Event) { f.events = append(f.events, e) }})
+	return f
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -432,5 +460,263 @@ func TestGitToolsAreKeptAsActions(t *testing.T) {
 	}
 	if len(abort.Repos) != 1 || abort.Repos[0].Repo != "api" {
 		t.Errorf("abort %+v", abort)
+	}
+}
+
+// item is the work item of a branch, as stored.
+func (f *fixture) item(branch string) store.WorkItem {
+	f.t.Helper()
+	w, err := f.db.WorkItems().Find(ctx, "atlas@ledger", branch)
+	if err != nil {
+		f.t.Fatalf("work item of %s: %v", branch, err)
+	}
+	return w
+}
+
+// handOff commits a file on tove's branch, in the repos given, and hands it to mara.
+func (f *fixture) handOff(branch string, repos ...string) {
+	f.t.Helper()
+	f.ok("tove", "switch", map[string]string{"branch": branch})
+	for _, r := range repos {
+		writeFile(f.t, filepath.Join(f.wt("tove", r), branch[len("wt/tove/"):]+".go"), fmt.Sprintf("package x // %d\n", len(f.m.sent)))
+	}
+	f.ok("tove", "commit", map[string]string{"message": "work on " + branch})
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": branch, "summary": "done"})
+}
+
+func TestWorkItemsFollowHandoffDeliveryAndIntegration(t *testing.T) {
+	f := newFixture(t)
+	f.handOff("wt/tove/LED-44", "api", "web")
+	w := f.item("wt/tove/LED-44")
+	if w.ID != "wi-1" || w.Stage != store.StageHanded || w.AuthorInstance != "tove@ledger" {
+		t.Fatalf("after the hand-off: %+v", w)
+	}
+	if len(f.events) == 0 || f.events[len(f.events)-1].Type != "pipeline.changed" {
+		t.Errorf("no pipeline.changed: %v", f.events)
+	}
+
+	// Delivered into mara's session: she's reviewing it. Other deliveries move nothing.
+	delivered := store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "handoff", ArtifactRef: "wt/tove/LED-44", State: store.MessageDelivered}
+	f.w.Delivered(ctx, store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "handoff", ArtifactRef: "wt/tove/LED-44", State: store.MessageQueued})
+	f.w.Delivered(ctx, store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "ask", ArtifactRef: "wt/tove/LED-44", State: store.MessageDelivered})
+	if f.item("wt/tove/LED-44").Stage != store.StageHanded {
+		t.Error("a queued hand-off, or an ask, moved the work item")
+	}
+	f.w.Delivered(ctx, delivered)
+	if f.item("wt/tove/LED-44").Stage != store.StageReviewing {
+		t.Error("the delivery didn't move it to reviewing")
+	}
+
+	// Tove's own merges never integrate: only the lead's.
+	f.ok("tove", "merge", map[string]string{"branch": "main"})
+	if f.item("wt/tove/LED-44").Stage != store.StageReviewing {
+		t.Error("a member's merge integrated it")
+	}
+	// Merged into the lead branch in one repo only: not yet.
+	f.git(f.wt("mara", "api"), "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "api only", "wt/tove/LED-44")
+	f.ok("mara", "merge", map[string]string{"branch": "main"}) // any merge of hers checks
+	if f.item("wt/tove/LED-44").Stage != store.StageReviewing {
+		t.Error("integrated with web still missing")
+	}
+	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
+	if got := f.item("wt/tove/LED-44"); got.Stage != store.StageIntegrated {
+		t.Errorf("after the lead's merge: %+v", got)
+	}
+
+	// A new hand-off of the same branch (after a change request) brings it back.
+	f.handOff("wt/tove/LED-44", "api")
+	if got := f.item("wt/tove/LED-44"); got.ID != "wi-1" || got.Stage != store.StageHanded {
+		t.Errorf("handed again: %+v", got)
+	}
+}
+
+func TestIntegrationIsPerBranchAndInAnyLeadBranch(t *testing.T) {
+	f := newFixture(t)
+	f.handOff("wt/tove/a", "api")
+	f.handOff("wt/tove/b", "web")
+	// Mara merges b into another lead branch of hers: b is integrated, a isn't.
+	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/settlement"})
+	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/b"})
+	if a, b := f.item("wt/tove/a"), f.item("wt/tove/b"); a.Stage != store.StageHanded || b.Stage != store.StageIntegrated {
+		t.Errorf("a %+v, b %+v", a, b)
+	}
+	// The pipeline lists the project's work items.
+	p, err := f.w.Pipeline(ctx, "ledger")
+	if err != nil || len(p.WorkItems) != 2 || p.MergeRequests == nil {
+		t.Errorf("pipeline %+v %v", p, err)
+	}
+}
+
+// lastNotice is the latest notice Foreman sent, and to whom.
+func (f *fixture) lastNotice() store.TeamMessage {
+	f.t.Helper()
+	for i := len(f.m.sent) - 1; i >= 0; i-- {
+		if f.m.sent[i].Kind == "notice" {
+			return f.m.sent[i]
+		}
+	}
+	f.t.Fatal("no notice sent")
+	return store.TeamMessage{}
+}
+
+// integrated: tove's wt/tove/LED-44 (api only) handed off and merged by mara.
+func (f *fixture) integrated() {
+	f.t.Helper()
+	f.handOff("wt/tove/LED-44", "api")
+	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
+}
+
+func TestRequestMergeRefusals(t *testing.T) {
+	f := newFixture(t)
+	req := func(branch, entry string) map[string]string {
+		return map[string]string{"branch": branch, "entry": entry}
+	}
+	f.refused("tove", "request_merge", req("wt/tove/main", "backlog/led-44.md"), "not_lead")
+	f.refused("mara", "request_merge", req("wt/tove/main", "backlog/led-44.md"), "branch_not_allowed")
+	f.refused("mara", "request_merge", req("lead/orion/x", "backlog/led-44.md"), "branch_not_allowed")
+	f.refused("mara", "request_merge", req("lead/atlas/integration", ""), "entry_not_found")
+	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/nope.md"), "entry_not_found")
+	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/led-44.md"), "nothing_to_merge")
+	f.refused("mara", "request_merge", req("lead/atlas/none", "backlog/led-44.md"), "branch_not_found")
+	writeFile(t, filepath.Join(f.wt("mara", "web"), "wip"), "x\n")
+	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/led-44.md"), "uncommitted_changes")
+}
+
+func TestFromHandoffToMain(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	req := map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
+	// One merge request, in the one repo with new commits, carrying the hand-off.
+	if text := f.ok("mara", "request_merge", req); text != "Merge request mr-1 (api): waiting for the CEO." {
+		t.Fatalf("%q", text)
+	}
+	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-1" {
+		t.Errorf("work item %+v", w)
+	}
+	if text := f.ok("mara", "request_merge", req); text != "Merge request mr-1 (api), refreshed: waiting for the CEO." {
+		t.Errorf("again: %q", text)
+	}
+	p, _ := f.w.Pipeline(ctx, "ledger")
+	if len(p.MergeRequests) != 1 || p.MergeRequests[0].Entry != "backlog/led-44.md" || p.MergeRequests[0].AuthorInstance != "mara@ledger" {
+		t.Fatalf("pipeline %+v", p.MergeRequests)
+	}
+	if diff, err := f.w.Diff(ctx, "mr-1"); err != nil || !strings.Contains(diff, "LED-44.go") {
+		t.Errorf("diff %q %v", diff, err)
+	}
+
+	// The CEO's checkout of api is on main: the merge happens there.
+	api := filepath.Join(f.root, "ledger", "api")
+	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+		t.Fatal(err)
+	}
+	if subject := f.git(api, "log", "-1", "--format=%s", "main"); subject != "Merge Export invoices" {
+		t.Errorf("main's head %q", subject)
+	}
+	if _, err := os.Stat(filepath.Join(api, "LED-44.go")); err != nil {
+		t.Error("the CEO's checkout didn't move with main")
+	}
+	mr, _ := f.w.MergeRequest(ctx, "mr-1")
+	if mr.State != store.MergeMerged || mr.MergedAt.IsZero() {
+		t.Errorf("merge request %+v", mr)
+	}
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" || !strings.Contains(n.Body, "lead/atlas/integration was merged into main in api.") {
+		t.Errorf("notice %+v", n)
+	}
+	if err := f.w.MergeToMain(ctx, "mr-1"); !errors.Is(err, ErrNotOpen) {
+		t.Errorf("merged twice: %v", err)
+	}
+	if err := f.w.Reject(ctx, "mr-1", "x"); !errors.Is(err, ErrNotOpen) {
+		t.Errorf("rejected once merged: %v", err)
+	}
+}
+
+func TestMergeToMainConflicts(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "the lead's\n")
+	f.ok("mara", "commit", map[string]string{"message": "readme"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	api := filepath.Join(f.root, "ledger", "api")
+	writeFile(t, filepath.Join(api, "README"), "main's\n")
+	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "main moved")
+	head := f.git(api, "rev-parse", "main")
+	if err := f.w.MergeToMain(ctx, "mr-1"); !errors.Is(err, ErrConflict) {
+		t.Fatalf("err %v", err)
+	}
+	if f.git(api, "rev-parse", "main") != head {
+		t.Error("main moved on a conflict")
+	}
+	if mr, _ := f.w.MergeRequest(ctx, "mr-1"); !mr.Conflicting || mr.State != store.MergeOpen {
+		t.Errorf("merge request %+v", mr)
+	}
+	if n := f.lastNotice(); !strings.Contains(n.Body, `merge("main")`) {
+		t.Errorf("notice %+v", n)
+	}
+	// The lead merges main in, resolves, asks again: the conflict is gone, and the merge goes through.
+	f.ok("mara", "merge", map[string]string{"branch": "main"})
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "both\n")
+	f.ok("mara", "commit", map[string]string{"message": "main merged in"})
+	if text := f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}); !strings.Contains(text, "mr-1 (api), refreshed") {
+		t.Errorf("%q", text)
+	}
+	if mr, _ := f.w.MergeRequest(ctx, "mr-1"); mr.Conflicting {
+		t.Error("still marked conflicting")
+	}
+	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(api, "README")); string(data) != "both\n" {
+		t.Errorf("README %q", data)
+	}
+}
+
+func TestRejectReturnsTheWork(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	if err := f.w.Reject(ctx, "mr-1", "split it in two"); err != nil {
+		t.Fatal(err)
+	}
+	mr, _ := f.w.MergeRequest(ctx, "mr-1")
+	if mr.State != store.MergeRejected || mr.Note != "split it in two" || mr.RejectedAt.IsZero() {
+		t.Errorf("merge request %+v", mr)
+	}
+	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "" || w.Stage != store.StageInWorktree || w.Note != "rejected: split it in two" {
+		t.Errorf("work item %+v", w)
+	}
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "ceo" || !strings.Contains(n.Body, "the merge of lead/atlas/integration in api was rejected: split it in two") {
+		t.Errorf("notice %+v", n)
+	}
+	// The branch stays: the lead asks again, a new merge request.
+	if text := f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}); !strings.HasPrefix(text, "Merge request mr-2 (api)") {
+		t.Errorf("%q", text)
+	}
+}
+
+func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
+	f.ok("mara", "commit", map[string]string{"message": "second"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
+	// The CEO merges the first by hand, in their own checkout.
+	api := filepath.Join(f.root, "ledger", "api")
+	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "by hand", "lead/atlas/integration")
+	sent := len(f.m.sent)
+	f.w.Reconcile(ctx)
+	if mr, _ := f.w.MergeRequest(ctx, "mr-1"); mr.State != store.MergeMerged {
+		t.Errorf("not noticed: %+v", mr)
+	}
+	if mr, _ := f.w.MergeRequest(ctx, "mr-2"); mr.State != store.MergeOpen {
+		t.Errorf("the other one moved: %+v", mr)
+	}
+	// Its lead is told it's merged, and the other open one's that main moved.
+	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/atlas/integration was merged into main in api.") || !strings.Contains(news[1].Body, "main moved (lead/atlas/integration was merged). Merge it into lead/atlas/second") {
+		t.Errorf("notices %+v", news)
+	}
+	f.w.Reconcile(ctx)
+	if len(f.m.sent) != sent+2 {
+		t.Error("noticed twice")
 	}
 }

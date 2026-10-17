@@ -46,7 +46,7 @@ GET    /api/actions?deployment=               the git tools its agents called (s
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/merge-requests/:id                one merge request, wherever it is (a Chief of Staff change to the workspace repo has no project)
 GET    /api/merge-requests/:id/diff           {diff}: its branch against main, as a unified diff
-POST   /api/merge-requests/:id/merge          Merge to main: Foreman merges the branch locally
+POST   /api/merge-requests/:id/merge          Merge to main: Foreman merges the branch locally (Pipeline and merges → Merge to main); 204; 409 CONFLICT (the lead is told to merge main in), LOCAL_CHANGES (the CEO's checkout is in the way), NOT_OPEN
 POST   /api/merge-requests/:id/create-pr      Create PR on the repo's forge: push the branch, open the PR
 POST   /api/merge-requests/:id/reject         {reason}: close its PR if any, deliver the reason, work items back to stage 0
 POST   /api/repos/workspace/sync              Sync: fetch, merge in and push the workspace repo's main (stops on a conflict)

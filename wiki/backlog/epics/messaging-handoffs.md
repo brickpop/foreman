@@ -1,6 +1,6 @@
 ---
 type: epic
-status: in-progress
+status: done
 order: 2
 ---
 

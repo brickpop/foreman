@@ -46,6 +46,9 @@ type Deps struct {
 	Config      Config
 	Sessions    Sessions
 	Publish     func(events.Event)
+	// Delivered hears each message typed into its recipient's session
+	// (Workflow: a hand-off's work item moves to "lead reviewing"). May be nil.
+	Delivered func(ctx context.Context, msg store.TeamMessage)
 	// Pause is how long to wait between typing a delivery and pressing Enter,
 	// so the harness doesn't take the Enter as part of a paste.
 	Pause time.Duration
@@ -261,6 +264,9 @@ func (m *Messenger) Deliver(id string) {
 	for _, msg := range queued {
 		if got, err := m.Messages.Get(ctx, msg.DeploymentID, msg.Ref); err == nil {
 			m.publish(got)
+			if m.Delivered != nil {
+				m.Delivered(ctx, got)
+			}
 		}
 	}
 }

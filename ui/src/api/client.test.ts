@@ -135,6 +135,23 @@ describe("httpClient", () => {
     );
   });
 
+  it("decides on merge requests", async () => {
+    const calls = stubFetch(204, undefined);
+    const c = httpClient("http://x");
+    await c.pipeline.merge("mr-1");
+    await c.pipeline.reject("mr-1", "split it");
+    expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
+      ["POST", "http://x/api/merge-requests/mr-1/merge", undefined],
+      ["POST", "http://x/api/merge-requests/mr-1/reject", { reason: "split it" }],
+    ]);
+  });
+
+  it("reads a project's pipeline", async () => {
+    const calls = stubFetch(200, { workItems: [], mergeRequests: [] });
+    await httpClient("http://x").pipeline.list("my project");
+    expect(calls[0].url).toBe("http://x/api/pipeline?project=my%20project");
+  });
+
   it("writes the wiki with the version it read", async () => {
     const calls = stubFetch(204, undefined);
     const c = httpClient("http://x");
@@ -159,7 +176,7 @@ describe("httpClient", () => {
     const c = httpClient("http://x");
     for (const call of [
       () => c.requests.list(),
-      () => c.pipeline.merge("mr-1"),
+      () => c.pipeline.createPr("mr-1"),
       () => c.chiefOfStaff.send("hi"),
     ]) {
       const e = await call().catch((e: unknown) => e);

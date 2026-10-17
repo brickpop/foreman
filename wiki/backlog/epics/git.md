@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: in-progress
 order: 3
 ---
 
@@ -21,7 +21,7 @@ What it builds ([Sandboxes and git policy](../../product/architecture/sandboxes-
 
 **To decide in this epic:**
 
-- [ ] how Merge to main relates to the CEO's own checkout when it has `main` checked out ([Pipeline and merges → Open questions](../../product/features/pipeline-and-merges.md#open-questions))
+- [x] how Merge to main relates to the CEO's own checkout (decided 2026-10-17: [Pipeline and merges → Merge to main](../../product/features/pipeline-and-merges.md#merge-to-main))
 
 **Usable when done:** work items and branches show in Changes → In flight, with their checks; an integrated lead branch can be merged to `main` from Foreman, or sent to the forge as a PR.
 

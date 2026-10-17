@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -49,7 +50,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 5 {
+	if v := version(t, db.sql); v != 7 {
 		t.Errorf("version %d after the first open", v)
 	}
 	var mode string
@@ -610,5 +611,110 @@ func TestTheOptionalGoalMigrationKeepsTheDeployments(t *testing.T) {
 	var violations int
 	if err := s.sql.QueryRow("SELECT count(*) FROM pragma_foreign_key_check").Scan(&violations); err != nil || violations != 0 {
 		t.Errorf("foreign keys: %d %v", violations, err)
+	}
+}
+
+func TestWorkItems(t *testing.T) {
+	db := open(t)
+	deps := db.Deployments()
+	for _, p := range []struct{ team, project string }{{"atlas", "ledger"}, {"orion", "ledger"}, {"atlas", "relay"}} {
+		if _, err := deps.Deploy(ctx, p.team, p.project, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	items := db.WorkItems()
+	w, err := items.Save(ctx, WorkItem{DeploymentID: "atlas@ledger", AuthorInstance: "tove@ledger", Branch: "wt/tove/LED-44", Stage: StageHanded})
+	if err != nil || w.ID != "wi-1" {
+		t.Fatalf("saved %+v %v", w, err)
+	}
+	if _, err := items.Save(ctx, WorkItem{DeploymentID: "orion@ledger", AuthorInstance: "lumen@ledger", Branch: "wt/lumen/x"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := items.Save(ctx, WorkItem{DeploymentID: "atlas@relay", AuthorInstance: "tove@relay", Branch: "wt/tove/y"}); err != nil {
+		t.Fatal(err)
+	}
+	// One work item per branch of a deployment.
+	if _, err := items.Save(ctx, WorkItem{DeploymentID: "atlas@ledger", AuthorInstance: "tove@ledger", Branch: "wt/tove/LED-44"}); err == nil {
+		t.Error("a second work item for the same branch")
+	}
+	w.Stage, w.Note, w.ChecksStatus, w.CardRef = StageIntegrated, "tests pass", "pass", "backlog/LED-44.md"
+	if _, err := items.Save(ctx, w); err != nil {
+		t.Fatal(err)
+	}
+	got, err := items.Find(ctx, "atlas@ledger", "wt/tove/LED-44")
+	if err != nil || got != w {
+		t.Errorf("found %+v %v, want %+v", got, err, w)
+	}
+	if _, err := items.Find(ctx, "atlas@ledger", "wt/tove/nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("an unknown branch: %v", err)
+	}
+	for _, id := range []string{"wi-99", "x-1", "wi-"} {
+		if _, err := items.Save(ctx, WorkItem{ID: id, DeploymentID: "atlas@ledger", Branch: "b"}); !errors.Is(err, ErrNotFound) {
+			t.Errorf("saving %s: %v", id, err)
+		}
+	}
+	ids := func(list []WorkItem, err error) []string {
+		var out []string
+		for _, w := range list {
+			out = append(out, w.ID)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	if got := ids(items.ForProject(ctx, "ledger")); !slices.Equal(got, []string{"wi-1", "wi-2"}) {
+		t.Errorf("project ledger: %v", got)
+	}
+	if got := ids(items.ForDeployment(ctx, "atlas@relay")); !slices.Equal(got, []string{"wi-3"}) {
+		t.Errorf("deployment atlas@relay: %v", got)
+	}
+}
+
+func TestMergeRequests(t *testing.T) {
+	db := open(t)
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	mrs := db.MergeRequests()
+	m, err := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/integration", Entry: "backlog/led-44.md"})
+	if err != nil || m.ID != "mr-1" || m.State != MergeOpen || m.CreatedAt.IsZero() {
+		t.Fatalf("saved %+v %v", m, err)
+	}
+	// One open per (project, repo, branch); another repo or branch is another.
+	if _, err := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/integration"}); err == nil {
+		t.Error("a second open merge request for the same branch")
+	}
+	if _, err := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "web", Branch: "lead/atlas/integration"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := mrs.OpenFor(ctx, "ledger", "api", "lead/atlas/integration"); err != nil || got.ID != "mr-1" {
+		t.Errorf("open for api: %+v %v", got, err)
+	}
+	m.State, m.MergedAt, m.Conflicting, m.Note = MergeMerged, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC), true, "x"
+	if _, err := mrs.Save(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	got, err := mrs.Get(ctx, "mr-1")
+	if err != nil || got.State != MergeMerged || !got.MergedAt.Equal(m.MergedAt) || !got.Conflicting || got.Entry != "backlog/led-44.md" {
+		t.Errorf("got %+v %v", got, err)
+	}
+	// Once merged, the branch can be requested again.
+	if _, err := mrs.OpenFor(ctx, "ledger", "api", "lead/atlas/integration"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("a merged one is not open: %v", err)
+	}
+	if _, err := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/integration"}); err != nil {
+		t.Errorf("requested again after the merge: %v", err)
+	}
+	if list, _ := mrs.ForProject(ctx, "ledger"); len(list) != 3 {
+		t.Errorf("project: %d", len(list))
+	}
+	if list, _ := mrs.Open(ctx); len(list) != 2 {
+		t.Errorf("open: %d", len(list))
+	}
+	for _, id := range []string{"mr-9", "wi-1", ""} {
+		if _, err := mrs.Get(ctx, id); !errors.Is(err, ErrNotFound) {
+			t.Errorf("get %q: %v", id, err)
+		}
 	}
 }

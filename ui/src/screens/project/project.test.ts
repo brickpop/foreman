@@ -73,7 +73,13 @@ describe("Changes", () => {
     expect(linkLine({ ...mr, conflicting: true }, "none")).toBe(
       "lead/atlas/integration → main · conflicts with main",
     );
-    expect(linkLine({ ...mr, checksStatus: "" }, "none")).toContain("checks running");
+    expect(linkLine({ ...mr, checksStatus: "" }, "none")).toBe("lead/atlas/integration → main");
+    expect(linkLine({ ...mr, checksStatus: "running" }, "none", undefined, "develop")).toBe(
+      "lead/atlas/integration → develop · checks running",
+    );
+    expect(linkLine({ ...mr, conflicting: true }, "none", undefined, "develop")).toBe(
+      "lead/atlas/integration → develop · conflicts with develop",
+    );
     // A Chief of Staff change has no checks: it says how many files it changes.
     const cos = {
       branch: "foreman/config-1",

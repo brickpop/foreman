@@ -339,3 +339,33 @@ func TestTheSweepWakesASleeperWithMessagesWaiting(t *testing.T) {
 	}
 	f.eventually("woken", func() bool { return slices.Equal(f.s.wokenList(), []string{"tove@ledger"}) })
 }
+
+// Delivered hears each message once it is typed in, never one that failed.
+func TestDeliveredHearsWhatWasTypedIn(t *testing.T) {
+	f := newFixture(t)
+	var mu sync.Mutex
+	var heard []store.TeamMessage
+	f.m.Delivered = func(_ context.Context, msg store.TeamMessage) {
+		mu.Lock()
+		defer mu.Unlock()
+		heard = append(heard, msg)
+	}
+	count := func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(heard)
+	}
+	f.s.setFail(true)
+	f.call("tove@ledger", "ask", map[string]string{"teammate": "mara", "request": "x"})
+	time.Sleep(50 * time.Millisecond)
+	f.m.Deliver("mara@ledger")
+	if count() != 0 {
+		t.Fatalf("a failed delivery was heard: %+v", heard)
+	}
+	f.s.setFail(false)
+	f.m.Deliver("mara@ledger")
+	f.eventually("heard", func() bool { return count() == 1 })
+	if msg := heard[0]; msg.Ref != "msg-1" || msg.State != store.MessageDelivered || msg.DeliveredAt.IsZero() {
+		t.Errorf("heard %+v", msg)
+	}
+}

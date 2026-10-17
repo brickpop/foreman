@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [model, pipeline, git]
 ---
 
@@ -30,8 +30,12 @@ Table `work_items`.
 
 - `handoff(teammate, branch, summary)` creates the work item, or advances it, to stage 1 ([Team tools](../architecture/team-tools.md)).
 - Stage 2 ("lead reviewing") starts when the handoff message is delivered into the lead's session (its `delivered_at`; it is queued while the lead is busy, see [Team message](./team-message.md)). The lead sees the branch at once: every worktree shares the repo ([Sandboxes and git policy](../architecture/sandboxes-and-git.md#hand-offs)). A change request from the lead (an `ask` to the author) moves nothing; the author's next hand-off of the branch brings it back to stage 1 ([Protocol → Work items and merge requests](../architecture/protocol.md#work-items-and-merge-requests)).
-- Stage 3 ("integrated") is set when the branch is merged into any of the lead's `lead/<team>/*` branches in the lead's worktree.
+- Stage 3 ("integrated") is set when the branch is merged into any of the lead's `lead/<team>/*` branches in the lead's worktree: checked right after the lead's `merge` or `commit`, in every repo that has the branch.
 - `merge_request_id` is set only by the lead's `request_merge`, only on stage-3 work items of the same deployment that have no `merge_request_id` yet and whose branch head is contained in the merge request's branch (git ancestry), at creation or at a later refresh of it. A work item with a `merge_request_id` is listed under its merge request, not on its own.
 - A work item is merged when its merge request is merged; it has no merge time of its own.
 - Its merge request being rejected (Reject, or its PR closed on the forge) clears `merge_request_id` and resets the work item to stage 0 with the note; the lead decides who reworks.
 - The note's **tone** (`ok`, `err`, `ask`, neutral), which Changes colors it by, is derived from the work item's state (checks, stage), never stored.
+
+## Phasing
+
+Built (2026-10-17, the Git epic's `git-work-items`): the table, stages 1–3 from hand-offs, deliveries and the lead's merges, and Changes → In flight from `GET /api/pipeline` with `pipeline.changed`. Not yet: `checks_status` and the "checks fail" stay at 0 ([git-checks](../../backlog/git-checks.md)); `card_ref`, which nothing fills yet (Changes shows the branch instead).

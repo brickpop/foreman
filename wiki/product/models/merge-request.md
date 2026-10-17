@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [model, pipeline, git, forge]
 ---
 
@@ -45,3 +45,7 @@ Table `merge_requests`.
 - `merged` and `rejected` are final. Merged: its work items are merged with it, the lead is told, and both show under "Merged" in [Changes](../features/changes.md). Rejected (by Reject, or its PR closed on the forge): the reason is delivered to the lead, its work items lose their `merge_request_id` and return to stage 0, and the branch stays, so the lead can `switch` back to it and request again.
 - The note's tone is derived, as for [work items](./work-item.md#invariants).
 - A Chief of Staff change has no work items and no deployment; its request has `source: cos`.
+
+## Phasing
+
+Built (2026-10-17, the Git epic's `git-merge-to-main`): the table; the lead's `request_merge` (one per repo with new commits, refreshed when called again, carrying the integrated work items); Merge to main as [decided](../features/pipeline-and-merges.md#merge-to-main) and Reject, from the merge request's row in [Changes](../features/changes.md) → In flight, each telling the lead; noticing a merge made outside Foreman within 30 s (Workflow's `Reconcile`), and the "main moved" notice to the other open merge requests' leads. Not yet: the **review request** (the Workflow epic: until then the CEO decides from Changes, and nothing appears under "Needs you" or on Home); the checks (`git-checks`); Create PR and everything on the forge (`git-forge`). Merged branches are pruned under the existing rule, when the deployment stops.

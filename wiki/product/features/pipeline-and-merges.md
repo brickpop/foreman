@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, pipeline, git, forge]
 ---
 
@@ -8,7 +8,7 @@ tags: [feature, pipeline, git, forge]
 
 How work moves from a member's worktree to `main`. Only the team **lead** asks for changes to reach `main`, with a **merge request**; only the **CEO** decides: Merge to main (Foreman merges locally), Create PR on the forge, or Reject. Nothing reaches a forge unless the CEO asks. Branch rules: [Sandboxes and git policy](../architecture/sandboxes-and-git.md). Forge calls: [Forge adapters](../architecture/forge-adapters.md).
 
-The pipeline has two kinds of entries, both shown in [Changes](./changes.md):
+The pipeline has two kinds of entries, both shown in [Changes](./changes.md). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests, decided from Changes ([Merge request → Phasing](../models/merge-request.md#phasing)).
 
 - **Work items** ([model](../models/work-item.md)): one agent's branch on its way into the lead branch. Informational only: a handoff never creates a request and needs nothing from the CEO.
 - **Merge requests** ([model](../models/merge-request.md)): the lead's request to merge a lead branch into `main`, carrying every work item integrated since the last one. A merge request is the only pipeline entry that raises a [request](./requests.md): the **review**.
@@ -34,7 +34,7 @@ The review request shows the entry's title, the branch and repo, the checks, and
 
 | Action | What Foreman does |
 |---|---|
-| **`Merge to main`** (primary) | Merges the branch into `main` on the host, in the repo the merge request targets. (How this relates to the CEO's own checkout of `main` is [open](#open-questions).) The merge request and its work items move to "Merged", the request resolves, the lead is told, and merged branches are deleted under the existing rule ([Branches](../architecture/sandboxes-and-git.md#branches)). If the branch doesn't merge cleanly, nothing changes: the merge request is marked "conflicts with main" and the lead is asked to merge `main` in (*When main moves*) |
+| **`Merge to main`** (primary) | Merges the branch into `main` on the host, in the repo the merge request targets, as [below](#merge-to-main). The merge request and its work items move to "Merged", the request resolves, the lead is told, and merged branches are deleted under the existing rule ([Branches](../architecture/sandboxes-and-git.md#branches)). If the branch doesn't merge cleanly, nothing changes: the merge request is marked "conflicts with main" and the lead is asked to merge `main` in (*When main moves*) |
 | **`Create PR on <forge>`** (only when the repo has a forge) | Pushes the branch and opens a pull request on the forge, recording its URL and number; the request then shows **`Open PR ↗`** instead, and the CEO merges there. Foreman polls the PR ([Forge adapters](../architecture/forge-adapters.md#pr-state)), see below |
 | **`Reject`** | Asks for an optional message, delivers it to the author (the lead, typed into its session when idle; or the Chief of Staff, which answers in its conversation and offers to propose the change again), closes the forge PR if there is one (posting the reason as a comment), and returns the work items to stage 0. The branch stays: the lead can `switch` back to it, rework and request again |
 
@@ -58,6 +58,11 @@ Open merge requests on the same repo race each other: when one is merged, the ot
 - If the forge reports an open PR as conflicting with `main`, or Merge to main finds a conflict, the review request panel shows **conflicts with main** (`--err`) and the lead gets the same line.
 - The lead calls `merge("main")`: Foreman merges `main` into the lead branch in the lead's worktree ([Agents and git](../architecture/sandboxes-and-git.md#agents-and-git)). Conflicts go back to the lead, who resolves the markers and calls `commit`. Then it calls `request_merge` again on the same branch. Foreman reruns the checks, pushes the branch to its PR when there is one (a plain fast-forward: the branch history is never rewritten) and refreshes the request. The merge request and its review request stay the same.
 
-## Open questions
+### Merge to main
 
-1. **Merge to main and the CEO's own checkout** (decide later, tracked in the [backlog](../../backlog/index.md#not-yet-scheduled) and the [Git epic](../../backlog/epics/git.md)). Foreman merges into `main` on the host, but the CEO's own checkout of the repo often has `main` checked out: moving the branch under it would leave the CEO's files and index out of step. Agents never touch that checkout; how Foreman's merge relates to it is not decided yet.
+Decided by the CEO (2026-10-17). The CEO's own checkout of the repo (`<project>/<repo>/`) is never left out of step with `main`:
+
+- **Always a merge commit** (`--no-ff`), by the CEO's git identity, with the message `Merge <title of the merge request's wiki entry>`. Each accepted piece of work stays one unit in the history, revertable as one, and `main` contains the branch head, which is how Foreman (and anyone) sees it merged.
+- **When the CEO's checkout has `main` checked out**, Foreman runs the merge there, so its files move with the branch. If the CEO has uncommitted changes the merge would overwrite, git refuses on its own and nothing changes: the review request says to commit or stash, then merge again.
+- **Otherwise** (another branch, or detached), Foreman builds the merge commit without a working tree (`git merge-tree --write-tree`, `git commit-tree`, then moves `main`), so the CEO's files are not touched.
+- Either way, a conflict changes nothing: the merge request is marked "conflicts with main" and the lead is asked to merge `main` in.

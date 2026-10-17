@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, ui, requests, pipeline]
 ---
 
@@ -48,9 +48,10 @@ Label "In flight" with the subtitle `worktree → lead → main`. One panel list
 
 **Open merge requests** ([Merge request](../models/merge-request.md)), after the work items:
 
-- Avatar 26 of the lead, the entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → main · checks <status>` and the note.
+- Avatar 26 of the lead, the entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <main>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<main>` is the project's protected branch (`main` in `project.toml`), here and on every Merge button.
 - The stage chip `merge requested` (or `PR open`), and **`Open PR ↗`** (once a PR exists) or **`Session`**.
-- Under it, indented one step, a compact line per work item it carries: Avatar 20 of the author, the board card title, the branch (Mono `--tx4`).
+- Under it, indented one step, **the CEO's decision** (small buttons): **`Merge to <main>`**, **`Create PR on <forge>`** (with a forge) or **`Open PR ↗`**, **`Reject`** (opening the message to the lead below the row), and **`See the change`** (its diff). They are the review panel's, shared (the CEO, 2026-10-17: merging from Changes ships in the Git epic, before the review request of the Workflow epic exists).
+- Then a compact line per work item it carries: Avatar 20 of the author, the board card title, the branch (Mono `--tx4`).
 
 Entries of a stopped [deployment](../models/deployment.md) stay listed with a `stopped` chip (`--tx4`) instead of the Session button.
 

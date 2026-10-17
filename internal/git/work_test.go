@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -249,5 +250,42 @@ func TestAbortMergePutsTheBranchBack(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(wts["mara"], "README")); string(data) != "mara's line\n" {
 		t.Errorf("README is %q", data)
+	}
+}
+
+func TestBranchesAndContains(t *testing.T) {
+	dir := repo(t)
+	g := New()
+	write(t, filepath.Join(dir, "a"), "a\n")
+	if err := g.Commit(ctx, dir, "first", "a"); err != nil {
+		t.Fatal(err)
+	}
+	for _, b := range []string{"lead/atlas/integration", "lead/atlas/x", "lead/atlasy/z", "wt/tove/LED-44"} {
+		run(ctx, dir, "branch", b)
+	}
+	if got, err := g.Branches(ctx, dir, "lead/atlas/"); err != nil || !slices.Equal(got, []string{"lead/atlas/integration", "lead/atlas/x"}) {
+		t.Errorf("branches %v %v", got, err)
+	}
+	if got, _ := g.Branches(ctx, dir, "lead/nobody/"); len(got) != 0 {
+		t.Errorf("no such branches: %v", got)
+	}
+	// Tove commits on her branch: the lead's doesn't contain it until merged.
+	run(ctx, dir, "checkout", "-q", "wt/tove/LED-44")
+	write(t, filepath.Join(dir, "b"), "b\n")
+	if err := g.Commit(ctx, dir, "tove", "b"); err != nil {
+		t.Fatal(err)
+	}
+	if in, err := g.Contains(ctx, dir, "lead/atlas/integration", "wt/tove/LED-44"); err != nil || in {
+		t.Errorf("before the merge: %v %v", in, err)
+	}
+	run(ctx, dir, "checkout", "-q", "lead/atlas/integration")
+	if _, err := run(ctx, dir, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "merge", "wt/tove/LED-44"); err != nil {
+		t.Fatal(err)
+	}
+	if in, err := g.Contains(ctx, dir, "lead/atlas/integration", "wt/tove/LED-44"); err != nil || !in {
+		t.Errorf("after the merge: %v %v", in, err)
+	}
+	if _, err := g.Contains(ctx, dir, "lead/atlas/integration", "wt/tove/nope"); err == nil {
+		t.Error("an unknown branch is an error, not 'not contained'")
 	}
 }

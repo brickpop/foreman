@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -57,6 +59,37 @@ func (g *CLI) Ahead(ctx context.Context, dir, branch, base string) (int, error) 
 	var n int
 	_, err = fmt.Sscan(out, &n)
 	return n, err
+}
+
+// Branches lists the repo's branches whose names start with prefix
+// (lead/atlas/), sorted.
+func (g *CLI) Branches(ctx context.Context, dir, prefix string) ([]string, error) {
+	out, err := run(ctx, dir, "for-each-ref", "--format=%(refname:short)", "refs/heads/"+prefix)
+	if err != nil {
+		return nil, err
+	}
+	var list []string
+	for _, b := range strings.Fields(out) {
+		if strings.HasPrefix(b, prefix) {
+			list = append(list, b)
+		}
+	}
+	slices.Sort(list)
+	return list, nil
+}
+
+// Contains reports whether branch into has branch's head in its history:
+// branch was merged into it (or into is branch itself, or ahead of it).
+func (g *CLI) Contains(ctx context.Context, dir, into, branch string) (bool, error) {
+	_, err := run(ctx, dir, "merge-base", "--is-ancestor", "refs/heads/"+branch, "refs/heads/"+into)
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.As(err, &exit) && exit.ExitCode() == 1: // not an ancestor
+		return false, nil
+	}
+	return false, err
 }
 
 // Clean reports whether the worktree has no changes and no unfinished merge.

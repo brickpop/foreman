@@ -142,7 +142,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	}
 }
 
-// Today's step: messaging and the git tools; no escalate or request_merge yet.
+// Today's step: messaging, the git tools and request_merge (the lead's); no escalate yet.
 func TestTodaysTools(t *testing.T) {
 	for _, agent := range []string{"mara", "ilya"} {
 		got := Compose(input(agent, Offered(agent == "mara")))
@@ -159,18 +159,19 @@ func TestTodaysTools(t *testing.T) {
 				t.Errorf("%s: missing %q in:\n%s", agent, want, got)
 			}
 		}
-		for _, absent := range []string{"## Git\n", "request_merge", "escalate(", "approval", "requests merges", "the CEO relays", "made for you"} {
+		for _, absent := range []string{"## Git\n", "escalate(", "approval", "the CEO relays", "made for you"} {
 			if strings.Contains(got, absent) {
 				t.Errorf("%s: mentions %q, which isn't built:\n%s", agent, absent, got)
 			}
 		}
 	}
 	lead := Compose(input("mara", Offered(true)))
-	if !strings.Contains(lead, "Merge the hand-offs you accept into it with merge(branch).") || !strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
+	if !strings.Contains(lead, "request_merge(branch, entry)") || !strings.Contains(lead, "Ask for a merge to main with request_merge(branch, entry)") ||
+		!strings.Contains(lead, "requests merges") || strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
 		t.Errorf("lead:\n%s", lead)
 	}
 	member := Compose(input("ilya", Offered(false)))
-	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only: use contribute)") {
+	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only: use contribute)") || strings.Contains(member, "request_merge") {
 		t.Errorf("member:\n%s", member)
 	}
 }

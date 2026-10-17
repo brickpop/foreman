@@ -202,12 +202,31 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		OpenLog: openLog, Publish: publish, Agent: agent,
 		Blocked: func() error { return checklist.Blocked() },
 	})
+	// Messaging and Workflow need each other: a hand-off is a message, and its
+	// delivery moves the hand-off's work item.
+	var flow *workflow.Workflow
 	messenger = messaging.New(messaging.Deps{
 		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
 		Config: ws, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
+		Delivered: func(ctx context.Context, msg store.TeamMessage) { flow.Delivered(ctx, msg) },
 	})
-	flow := workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger,
-		Actions: state.Actions(), Publish: bus.Publish})
+	flow = workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger,
+		Actions: state.Actions(), Publish: bus.Publish, WorkItems: state.WorkItems(),
+		MergeRequests: state.MergeRequests(), Wiki: wikis})
+	// A merge request merged outside Foreman (the CEO's own git, a forge) is
+	// noticed within half a minute.
+	go func() {
+		tick := time.NewTicker(30 * time.Second)
+		defer tick.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				flow.Reconcile(ctx)
+			}
+		}
+	}()
 	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: ws,
 		Blocks: []teamtools.Block{messenger, flow}}
 	link = agentlink.New(secret, manager.Live, router, manager)
@@ -254,6 +273,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Agents:      views,
 		Messages:    messenger,
 		Actions:     state.Actions(),
+		Pipeline:    flow,
 		Harnesses:   login,
 		Wiki:        wikis,
 		Setup:       checklist,

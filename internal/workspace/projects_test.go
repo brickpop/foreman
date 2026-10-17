@@ -257,3 +257,47 @@ func TestNewProjectKeepsUppercase(t *testing.T) {
 		t.Errorf("the same name in another case: %v", err)
 	}
 }
+
+// A project from before the scaffold (like a wiki the agents filled without
+// wiki.toml) gets only what it lacks, committed on its own.
+func TestScaffoldFillsWhatIsMissing(t *testing.T) {
+	w := loaded(t, func(root string) {
+		repo := filepath.Join(root, "old", "project")
+		gitRepo(t, repo)
+		writeFile(t, filepath.Join(repo, "project.toml"), "project = \"old\"\n")
+		writeFile(t, filepath.Join(repo, "wiki", "spec.md"), "# Spec\n")
+		gitOut(t, repo, "add", ".")
+		gitOut(t, repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "agents")
+	})
+	repo := filepath.Join(w.Root(), "old", "project")
+	if got, err := w.Missing("old"); err != nil || !slices.Equal(got, []string{"wiki/index.md", "wiki/wiki.toml"}) {
+		t.Fatalf("missing %v %v", got, err)
+	}
+	// The CEO's own draft index stays: never overwritten.
+	writeFile(t, filepath.Join(repo, "wiki", "index.md"), "# Mine\n")
+	if err := w.Scaffold(ctx, "old"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := w.Missing("old"); len(got) != 0 {
+		t.Errorf("still missing %v", got)
+	}
+	if data, _ := os.ReadFile(filepath.Join(repo, "wiki", "index.md")); string(data) != "# Mine\n" {
+		t.Errorf("index.md overwritten: %q", data)
+	}
+	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "Project repo: add wiki/wiki.toml\n\nwiki/wiki.toml" {
+		t.Errorf("commit %q", log)
+	}
+	// Nothing missing: nothing written, nothing committed.
+	head := gitOut(t, repo, "rev-parse", "HEAD")
+	if err := w.Scaffold(ctx, "old"); err != nil || gitOut(t, repo, "rev-parse", "HEAD") != head {
+		t.Errorf("a second scaffold: %v", err)
+	}
+	for _, id := range []string{"nope", "../old"} {
+		if _, err := w.Missing(id); !errors.Is(err, ErrNotFound) {
+			t.Errorf("Missing(%q): %v", id, err)
+		}
+		if err := w.Scaffold(ctx, id); !errors.Is(err, ErrNotFound) {
+			t.Errorf("Scaffold(%q): %v", id, err)
+		}
+	}
+}

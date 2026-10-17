@@ -35,7 +35,7 @@ func watch(t *testing.T, projects ...string) *watching {
 			return "", errors.New("no such project")
 		}
 		return ws.dir(project), nil
-	})
+	}, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	follow, err := ws.wikis.Watch(ctx, func() []string {

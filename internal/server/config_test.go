@@ -67,6 +67,18 @@ func (f fakeConfig) AddRepo(_ context.Context, project, name string) (workspace.
 	}
 	return f.added(project, name)
 }
+
+// A project repo from before the scaffold: its wiki.toml is missing.
+func (f fakeConfig) Missing(project string) ([]string, error) {
+	if project != "ledger" {
+		return nil, workspace.ErrNotFound
+	}
+	return []string{"wiki/wiki.toml"}, nil
+}
+func (f fakeConfig) Scaffold(_ context.Context, project string) error {
+	_, err := f.Missing(project)
+	return err
+}
 func (f fakeConfig) added(id, name string) (workspace.Project, error) {
 	switch name {
 	case "bad":
@@ -330,6 +342,20 @@ func TestAddingProjectsAndRepos(t *testing.T) {
 	decodeBody(t, post("/api/projects", `{"folder":"cal","repo":"cal","new":true}`), &p)
 	if p.ID != "new:cal" || p.Repos[0] != "cal" {
 		t.Errorf("new %+v", p)
+	}
+	// What a project repo lacks, and creating it.
+	var missing []string
+	decodeBody(t, get(t, h, "/api/projects/ledger/scaffold"), &missing)
+	if len(missing) != 1 || missing[0] != "wiki/wiki.toml" {
+		t.Errorf("missing %v", missing)
+	}
+	if w := post("/api/projects/ledger/scaffold", ""); w.Code != http.StatusOK {
+		t.Errorf("scaffold: %d %s", w.Code, w.Body)
+	}
+	for _, w := range []*httptest.ResponseRecorder{get(t, h, "/api/projects/nope/scaffold"), post("/api/projects/nope/scaffold", "")} {
+		if w.Code != http.StatusNotFound {
+			t.Errorf("an unknown project's scaffold: %d %s", w.Code, w.Body)
+		}
 	}
 	decodeBody(t, post("/api/projects/ledger/repos", `{"name":"web"}`), &p)
 	if p.ID != "ledger" || p.Repos[0] != "web" {

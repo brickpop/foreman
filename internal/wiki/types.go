@@ -80,11 +80,12 @@ type Changed struct {
 // Board is a kanban over entries, declared in wiki.toml
 // (wiki/product/features/board.md).
 type Board struct {
-	ID          string   `json:"id"`
+	ID          string   `json:"id"` // "#n" when the declaration has none (or a taken one): moves refused
 	Name        string   `json:"name"`
-	Columns     []string `json:"columns"`   // "Other" last when an entry fits none
-	Lanes       []string `json:"lanes"`     // empty without a lane field
-	LaneField   string   `json:"laneField"` // the field the lanes come from, e.g. priority
+	Columns     []string `json:"columns"`     // declared, then found; "" (no status) last when a card has none
+	Lanes       []string `json:"lanes"`       // as Columns; empty without a lane field
+	StatusField string   `json:"statusField"` // the field the columns come from, e.g. status
+	LaneField   string   `json:"laneField"`   // the field the lanes come from, e.g. priority
 	Cards       []Card   `json:"cards"`
 	Declaration string   `json:"declaration"` // quoted from wiki.toml
 	Problems    []string `json:"problems"`
@@ -98,6 +99,6 @@ type Card struct {
 	Column   string `json:"column"`
 	Lane     string `json:"lane"`
 	Priority string `json:"priority"`
-	Assignee string `json:"assignee"` // an agent id, when it matches one
+	Assignee string `json:"assignee"` // the field as written; the UI shows the agent it names
 	Version  string `json:"version"`
 }

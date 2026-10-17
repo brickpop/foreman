@@ -96,10 +96,11 @@ export interface Changed {
  * (wiki/product/features/board.md).
  */
 export interface Board {
-  id: string;
+  id: string; // "#n" when the declaration has none (or a taken one): moves refused
   name: string;
-  columns: string[]; // "Other" last when an entry fits none
-  lanes: string[]; // empty without a lane field
+  columns: string[]; // declared, then found; "" (no status) last when a card has none
+  lanes: string[]; // as Columns; empty without a lane field
+  statusField: string; // the field the columns come from, e.g. status
   laneField: string; // the field the lanes come from, e.g. priority
   cards: Card[];
   declaration: string; // quoted from wiki.toml
@@ -115,6 +116,6 @@ export interface Card {
   column: string;
   lane: string;
   priority: string;
-  assignee: string; // an agent id, when it matches one
+  assignee: string; // the field as written; the UI shows the agent it names
   version: string;
 }

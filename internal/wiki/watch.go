@@ -133,7 +133,9 @@ func (w *Wikis) rebuild(project string) (Changed, bool) {
 	}
 	now := snapshot(old.dir, idx)
 	w.mu.Lock()
-	if w.watched[project] != old { // forgotten or replaced meanwhile
+	// Compared with what is there now: a write's refresh may have swapped in
+	// another index meanwhile, but it keeps the versions this compares.
+	if old = w.watched[project]; old == nil { // forgotten meanwhile
 		w.mu.Unlock()
 		return Changed{}, false
 	}

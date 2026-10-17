@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Request } from "../../api/client";
 import { filesChanged, linkLine } from "../../app/model";
 import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
-import { cell, columnLabel, layout } from "./Board";
+import { columnLabel, laneLabel, moveOf } from "./Board";
 import { sourceLabel } from "./Changes";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;
@@ -20,23 +20,25 @@ describe("Board", () => {
     ]);
   });
 
-  it("shows every card: unknown statuses and lanes go to Other", () => {
-    const b = board(
-      [card("a", "todo", "high"), card("b", "wontfix", "high"), card("c", "done", "urgent")],
-      ["high", "low"],
-    );
-    expect(layout(b)).toEqual({
-      columns: ["todo", "done", "Other"],
-      lanes: ["high", "low", "Other"],
-    });
-    expect(cell(b, b.cards[1])).toEqual({ column: "Other", lane: "high" });
-    expect(cell(b, b.cards[2])).toEqual({ column: "done", lane: "Other" });
+  it("labels the cells for no value", () => {
+    expect(columnLabel("")).toBe("No status");
+    expect(laneLabel("", "priority")).toBe("No priority");
+    expect(laneLabel("high", "priority")).toBe("High priority");
   });
 
-  it("adds no Other when everything fits, and no lanes without a lane field", () => {
-    const b = board([card("a", "todo", "")]);
-    expect(layout(b)).toEqual({ columns: ["todo", "done"], lanes: [] });
-    expect(cell(b, b.cards[0])).toEqual({ column: "todo", lane: "" });
+  it("writes what a drop changes, and nothing to a cell for no value", () => {
+    const flat = board([card("a", "todo", "")]);
+    expect(moveOf(flat, flat.cards[0], "done", "")).toEqual({ column: "done", lane: "" });
+    expect(moveOf(flat, flat.cards[0], "todo", "")).toBeUndefined(); // where it is
+    expect(moveOf(flat, flat.cards[0], "", "")).toBeUndefined(); // removing the status isn't a move
+
+    const lanes = board([card("a", "todo", "high"), card("b", "", "")], ["high", "low", ""]);
+    const [a, b] = lanes.cards;
+    expect(moveOf(lanes, a, "todo", "low")).toEqual({ column: "todo", lane: "low" });
+    expect(moveOf(lanes, a, "done", "high")).toEqual({ column: "done", lane: "" }); // lane kept
+    expect(moveOf(lanes, a, "done", "")).toBeUndefined(); // removing the lane isn't either
+    expect(moveOf(lanes, b, "todo", "")).toEqual({ column: "todo", lane: "" }); // gets a status
+    expect(moveOf(lanes, b, "todo", "high")).toEqual({ column: "todo", lane: "high" });
   });
 });
 

@@ -65,3 +65,7 @@ Full width of its column, gap 14. Opens `index.md` by default.
 - **Ticking a checkbox** writes that one character to the file atomically, guarded by the entry's version; on conflict the box reverts and an error toast explains it ([API](../architecture/api.md), `PUT /api/wiki/:project/checkbox/:path`).
 - **File changes** (agents or the CEO's editor) appear within about 1 s ([Persistence](../architecture/persistence.md)): the open entry re-renders, and changed entries get their dot.
 - Prose is read-only. The only writes are a checkbox tick here and a card move on the [Board](./board.md).
+
+## No wiki yet
+
+A project repo can lack the files the reader and the [Board](./board.md) need: a project made before Add a project wrote them (the agents may still have filled `wiki/`), or one whose files were deleted. Then **Overview and Board** show, instead of the reader or the board (the tree is irrelevant without a wiki; the CEO, 2026-10-17), a dashed placeholder: `This project's wiki isn't set up yet.`, `Foreman reads it once its project repo has:` and each missing file (Mono, `<project>/project/<file>`), then a primary **`Create them`** (`Create it` for one). It writes each missing file of the [scaffold](./add-project.md#effect), never over one that exists, and commits them in the project repo as the CEO (`Project repo: add …`); the wiki appears as the watcher picks it up. `GET` / `POST /api/projects/:id/scaffold` ([API](../architecture/api.md)). Any other failure to read the wiki shows its message, never a blank page.

@@ -69,6 +69,13 @@ func (g *CLI) Clean(ctx context.Context, dir string) (bool, error) {
 	return strings.TrimSpace(out) == "" && !merging, err
 }
 
+// Changed reports whether file (relative to dir) differs from what is
+// committed: edited, staged, or not committed yet at all.
+func (g *CLI) Changed(ctx context.Context, dir, file string) (bool, error) {
+	out, err := run(ctx, dir, "status", "--porcelain", "--", file)
+	return strings.TrimSpace(out) != "", err
+}
+
 // Merging reports whether the worktree is in an unfinished merge.
 func (g *CLI) Merging(ctx context.Context, dir string) (bool, error) {
 	head, err := run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-path", "MERGE_HEAD")

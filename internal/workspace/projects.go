@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -148,25 +149,85 @@ func (w *Workspace) makeProject(ctx context.Context, folder, repo string) error 
 	return nil
 }
 
+// createProjectRepo makes dir the project repo: project.toml and the
+// scaffold, in one first commit.
 func (w *Workspace) createProjectRepo(ctx context.Context, folder, dir string) error {
-	files := map[string]string{
-		"project.toml":         fmt.Sprintf(starterProject, folder),
-		wikiDir + "/wiki.toml": starterWiki,
-		wikiDir + "/index.md":  fmt.Sprintf(starterIndex, folder),
+	if err := makeFile(filepath.Join(dir, "project.toml"), fmt.Sprintf(starterProject, folder)); err != nil {
+		return err
 	}
-	for rel, content := range files {
-		path := filepath.Join(dir, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-			return err
-		}
+	created, err := writeScaffold(folder, dir)
+	if err != nil {
+		return err
 	}
 	if err := w.git.Init(ctx, dir, "main"); err != nil {
 		return err
 	}
-	return w.git.Commit(ctx, dir, "Project repo", "project.toml", wikiDir)
+	return w.git.Commit(ctx, dir, "Project repo", append([]string{"project.toml"}, created...)...)
+}
+
+// scaffold is what a project repo holds besides project.toml, by path in the
+// repo: what the wiki engine and the board need
+// (wiki/product/features/add-project.md#effect).
+func scaffold(project string) map[string]string {
+	return map[string]string{
+		wikiDir + "/wiki.toml": starterWiki,
+		wikiDir + "/index.md":  fmt.Sprintf(starterIndex, project),
+	}
+}
+
+// writeScaffold writes the scaffold files dir lacks, never overwriting one,
+// and returns those it wrote, sorted.
+func writeScaffold(project, dir string) ([]string, error) {
+	var created []string
+	for _, file := range missing(project, dir) {
+		if err := makeFile(filepath.Join(dir, file), scaffold(project)[file]); err != nil {
+			return created, err
+		}
+		created = append(created, file)
+	}
+	return created, nil
+}
+
+// missing lists the scaffold files dir lacks, sorted.
+func missing(project, dir string) []string {
+	out := []string{}
+	for file := range scaffold(project) {
+		if _, err := os.Lstat(filepath.Join(dir, file)); errors.Is(err, fs.ErrNotExist) {
+			out = append(out, file)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+func makeFile(path, content string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(content), 0o644)
+}
+
+// Missing lists the scaffold files the project's repo lacks: a project made
+// before the scaffold had them, or one whose files were deleted.
+func (w *Workspace) Missing(id string) ([]string, error) {
+	if _, err := w.Project(id); err != nil {
+		return nil, err
+	}
+	return missing(id, filepath.Join(w.root, id, projectRepo)), nil
+}
+
+// Scaffold writes the scaffold files the project's repo lacks and commits
+// them, by the CEO's identity. It never overwrites a file.
+func (w *Workspace) Scaffold(ctx context.Context, id string) error {
+	if _, err := w.Project(id); err != nil {
+		return err
+	}
+	dir := filepath.Join(w.root, id, projectRepo)
+	created, err := writeScaffold(id, dir)
+	if err != nil || len(created) == 0 {
+		return err
+	}
+	return w.git.Commit(ctx, dir, "Project repo: add "+strings.Join(created, ", "), created...)
 }
 
 // AddRepo creates an empty code repo in a project, on the project's main

@@ -111,11 +111,13 @@ describe("httpClient", () => {
     await client.workspace.addProject("ledger");
     await client.workspace.newProject("notes", "notes");
     await client.workspace.addRepo("my project", "web");
-    expect(calls.map((c) => [c.method, c.url, JSON.parse(c.body ?? "")])).toEqual([
+    await client.workspace.scaffold("my project");
+    expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["POST", "http://x/api/projects", { folder: "cal", repo: "cal-go" }],
       ["POST", "http://x/api/projects", { folder: "ledger" }],
       ["POST", "http://x/api/projects", { folder: "notes", repo: "notes", new: true }],
       ["POST", "http://x/api/projects/my%20project/repos", { name: "web" }],
+      ["POST", "http://x/api/projects/my%20project/scaffold", undefined],
     ]);
   });
 
@@ -133,13 +135,31 @@ describe("httpClient", () => {
     );
   });
 
+  it("writes the wiki with the version it read", async () => {
+    const calls = stubFetch(204, undefined);
+    const c = httpClient("http://x");
+    await c.wiki.setCheckbox("ledger", "backlog/a b.md", 12, true, "v1");
+    await c.wiki.moveCard("ledger", "sprint 7", "backlog/x.md", "done", "", "v2");
+    expect(calls.map((c) => [c.method, c.url, JSON.parse(c.body ?? "")])).toEqual([
+      [
+        "PUT",
+        "http://x/api/wiki/ledger/checkbox/backlog/a%20b.md",
+        { line: 12, done: true, version: "v1" },
+      ],
+      [
+        "PUT",
+        "http://x/api/wiki/ledger/card/sprint%207/backlog/x.md",
+        { value: "done", lane: "", version: "v2" },
+      ],
+    ]);
+  });
+
   it("refuses the areas the server doesn't serve yet, without asking it", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");
     for (const call of [
       () => c.requests.list(),
       () => c.pipeline.merge("mr-1"),
-      () => c.wiki.boards("ledger"),
       () => c.chiefOfStaff.send("hi"),
     ]) {
       const e = await call().catch((e: unknown) => e);

@@ -125,7 +125,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	defer state.Close()
 	bus := events.New()
-	wikis := wiki.New(ws.WikiDir)
+	wikis := wiki.New(ws.WikiDir, gitCLI)
 	followWikis, err := wikis.Watch(ctx, func() []string {
 		var ids []string
 		for _, p := range ws.Projects() {

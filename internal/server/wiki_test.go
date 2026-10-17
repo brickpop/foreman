@@ -1,12 +1,15 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/wiki"
 )
 
@@ -31,7 +34,7 @@ func TestWiki(t *testing.T) {
 			return "", errors.New("no such project")
 		}
 		return dir, nil
-	})
+	}, nil)
 	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Wiki: wk, UI: builtUI})
 
 	var tree []wiki.Node
@@ -64,6 +67,63 @@ func TestWiki(t *testing.T) {
 	} {
 		if w := send(h, "GET", path, ""); w.Code != http.StatusNotFound {
 			t.Errorf("%s: %d %s, want 404", path, w.Code, w.Body)
+		}
+	}
+}
+
+func TestWikiWrites(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "project", "wiki")
+	for name, content := range map[string]string{
+		"wiki.toml":    "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"b\"\npath = \"/backlog\"\ncolumns = [\"todo\", \"done\"]\n",
+		"backlog/x.md": "---\ntype: task\nstatus: todo\n---\n- [ ] one\n",
+	} {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		_ = os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	g := git.New()
+	if err := g.Init(context.Background(), filepath.Dir(dir), "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Commit(context.Background(), dir, "Wiki", "."); err != nil {
+		t.Fatal(err)
+	}
+	wk := wiki.New(func(string) (string, error) { return dir, nil }, g)
+	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Wiki: wk, UI: builtUI})
+
+	var boards []wiki.Board
+	decodeBody(t, get(t, h, "/api/wiki/ledger/boards"), &boards)
+	if len(boards) != 1 || len(boards[0].Cards) != 1 || boards[0].Cards[0].Column != "todo" {
+		t.Fatalf("boards %+v", boards)
+	}
+	version := boards[0].Cards[0].Version
+
+	if w := send(h, "PUT", "/api/wiki/ledger/checkbox/backlog/x.md", `{"line":5,"done":true,"version":"`+version+`"}`); w.Code != http.StatusNoContent {
+		t.Fatalf("tick: %d %s", w.Code, w.Body)
+	}
+	var e wiki.Entry
+	decodeBody(t, get(t, h, "/api/wiki/ledger/entry/backlog/x.md"), &e)
+	if !e.Checkboxes[0].Done {
+		t.Errorf("not ticked: %+v", e.Checkboxes)
+	}
+	if w := send(h, "PUT", "/api/wiki/ledger/card/b/backlog/x.md", `{"value":"done","version":"`+e.Version+`"}`); w.Code != http.StatusNoContent {
+		t.Fatalf("move: %d %s", w.Code, w.Body)
+	}
+
+	for _, c := range []struct{ method, path, body, code string }{
+		{"PUT", "/api/wiki/ledger/checkbox/backlog/x.md", `{"line":5,"done":false,"version":"` + version + `"}`, "CONFLICT"},
+		{"PUT", "/api/wiki/ledger/card/b/backlog/x.md", `{"value":"todo","version":"` + version + `"}`, "CONFLICT"},
+		{"PUT", "/api/wiki/ledger/card/b/backlog/x.md", `{"value":"","version":"x"}`, "INVALID"},
+		{"PUT", "/api/wiki/ledger/card/nope/backlog/x.md", `{"value":"todo","version":"x"}`, "NOT_FOUND"},
+		{"PUT", "/api/wiki/ledger/checkbox/backlog/x.md", `nope`, "BAD_REQUEST"},
+	} {
+		w := send(h, c.method, c.path, c.body)
+		var got map[string]string
+		_ = json.Unmarshal(w.Body.Bytes(), &got)
+		if got["code"] != c.code {
+			t.Errorf("%s %s: %d %s, want %s", c.path, c.body, w.Code, w.Body, c.code)
 		}
 	}
 }

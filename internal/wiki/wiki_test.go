@@ -1,26 +1,38 @@
 package wiki
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/brickpop/foreman/internal/git"
 )
 
-// fixture writes files under a fresh project folder's wiki and returns the
-// Wikis reading it as project "p".
+// fixture writes files under a fresh project folder's wiki, commits them in
+// its project repo, and returns the Wikis reading it as project "p".
 func fixture(t *testing.T, files map[string]string) (*Wikis, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "p", "project", "wiki")
-	files["wiki.toml"] = "spec = \"0.1\"\n"
+	if _, ok := files["wiki.toml"]; !ok {
+		files["wiki.toml"] = "spec = \"0.1\"\n"
+	}
 	write(t, dir, files)
+	g := git.New()
+	if err := g.Init(context.Background(), filepath.Dir(dir), "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Commit(context.Background(), dir, "Wiki", "."); err != nil {
+		t.Fatal(err)
+	}
 	return New(func(project string) (string, error) {
 		if project != "p" {
 			return "", errors.New("no such project")
 		}
 		return dir, nil
-	}), dir
+	}, git.New()), dir
 }
 
 func write(t *testing.T, dir string, files map[string]string) {
@@ -183,7 +195,7 @@ func TestNotFound(t *testing.T) {
 	write(t, outer, map[string]string{"wiki.toml": "spec = \"0.1\"\n", "index.md": "# Outer\n"})
 	inner := filepath.Join(outer, "p", "project", "wiki")
 	write(t, inner, map[string]string{"index.md": "# Inner\n"})
-	bare := New(func(string) (string, error) { return inner, nil })
+	bare := New(func(string) (string, error) { return inner, nil }, nil)
 	if _, err := bare.Tree("p"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("a wiki without wiki.toml: %v", err)
 	}

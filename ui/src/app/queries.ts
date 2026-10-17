@@ -227,6 +227,25 @@ export function useMessages(deployment: string) {
   });
 }
 
+/** The scaffold files the project repo lacks: under the wiki's key, so its files appearing refresh it. */
+export function useMissing(project: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...wikiKey(project), "missing"],
+    queryFn: () => c.workspace.missing(project),
+  });
+}
+
+/** Creates the missing scaffold files; the wiki refetches. */
+export function useScaffold(project: string) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: () => c.workspace.scaffold(project),
+    onSettled: () => queries.invalidateQueries({ queryKey: wikiKey(project) }),
+  });
+}
+
 export function useTree(project: string) {
   const c = useClient();
   return useQuery({ queryKey: [...wikiKey(project), "tree"], queryFn: () => c.wiki.tree(project) });
@@ -290,7 +309,10 @@ export function useMoveCard(project: string, onError: (e: Error) => void) {
             : {
                 ...b,
                 cards: b.cards.map((card) =>
-                  card.path === v.path ? { ...card, column: v.column, lane: v.lane } : card,
+                  // An empty lane leaves the card's lane as it is, as the server does.
+                  card.path === v.path
+                    ? { ...card, column: v.column, lane: v.lane || card.lane }
+                    : card,
                 ),
               },
         ),

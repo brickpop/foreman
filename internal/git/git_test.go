@@ -283,3 +283,22 @@ func TestExcludeKeepsTheSandboxesOutOfAnEnclosingRepo(t *testing.T) {
 		t.Errorf("outside a repo: %v", err)
 	}
 }
+
+func TestChanged(t *testing.T) {
+	dir := repo(t)
+	g := New()
+	write(t, filepath.Join(dir, "wiki", "a.md"), "a\n")
+	write(t, filepath.Join(dir, "wiki", "b.md"), "b\n")
+	if err := g.Commit(ctx, dir, "first", "wiki/a.md", "wiki/b.md"); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(dir, "wiki", "b.md"), "b, edited\n")
+	write(t, filepath.Join(dir, "wiki", "new.md"), "new\n")
+	// Asked from a folder inside the repo, as the wiki block does.
+	wiki := filepath.Join(dir, "wiki")
+	for file, want := range map[string]bool{"a.md": false, "b.md": true, "new.md": true} {
+		if got, err := g.Changed(ctx, wiki, file); err != nil || got != want {
+			t.Errorf("Changed(%s) = %v %v, want %v", file, got, err, want)
+		}
+	}
+}

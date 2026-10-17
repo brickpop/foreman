@@ -3,12 +3,13 @@ import { useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useState } from "react";
 import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client";
 import { agentOf } from "../../app/model";
-import { useBoards, useEntry, useMoveCard, useTeams, useTick } from "../../app/queries";
+import { useBoards, useEntry, useMissing, useMoveCard, useTeams, useTick } from "../../app/queries";
 import { Avatar } from "../../components/Avatar";
 import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
 import { Button, NotBuilt, Segmented } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
+import { WikiSetup } from "../../components/WikiSetup";
 
 // A kanban over wiki entries (wiki/product/features/board.md). A move rewrites
 // one or two frontmatter lines, version-guarded.
@@ -20,8 +21,15 @@ const columnLabels: Record<string, string> = {
   done: "Done",
 };
 
+/** A column's label; "" holds the cards with no status. */
 export function columnLabel(value: string): string {
+  if (value === "") return "No status";
   return columnLabels[value] ?? titleCase(value);
+}
+
+/** A lane's label; "" holds the cards without the lane field. */
+export function laneLabel(value: string, field: string): string {
+  return value === "" ? `No ${field}` : `${titleCase(value)} ${field}`;
 }
 
 function titleCase(s: string): string {
@@ -29,22 +37,23 @@ function titleCase(s: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** Columns and lanes as shown: the declared ones, plus "Other" when a card fits none. */
-export function layout(board: BoardData): { columns: string[]; lanes: string[] } {
-  const columns = [...board.columns];
-  if (board.cards.some((c) => !board.columns.includes(c.column))) columns.push("Other");
-  const lanes = [...board.lanes];
-  if (lanes.length > 0 && board.cards.some((c) => !board.lanes.includes(c.lane)))
-    lanes.push("Other");
-  return { columns, lanes };
-}
-
-/** Where a card sits: its column (or Other), its lane (or Other). */
-export function cell(board: BoardData, card: Card): { column: string; lane: string } {
-  return {
-    column: board.columns.includes(card.column) ? card.column : "Other",
-    lane: board.lanes.length === 0 ? "" : board.lanes.includes(card.lane) ? card.lane : "Other",
-  };
+/**
+ * What dropping a card in a cell writes: its status, and its lane when that
+ * changes (the server leaves an empty lane alone). Nothing when it stays put,
+ * or when the cell is a "no value" one: writing there would remove the field,
+ * which a move doesn't do. The columns and lanes come laid out from the server
+ * (declared, then found, then "" for none), so no card is ever hidden.
+ */
+export function moveOf(
+  board: BoardData,
+  card: Card,
+  column: string,
+  lane: string,
+): { column: string; lane: string } | undefined {
+  const hasLanes = board.lanes.length > 0;
+  if (column === "" || (hasLanes && lane === "" && card.lane !== "")) return undefined;
+  if (column === card.column && (!hasLanes || lane === card.lane)) return undefined;
+  return { column, lane: hasLanes && lane !== card.lane ? lane : "" };
 }
 
 const priorityColor: Record<string, string> = {
@@ -55,6 +64,7 @@ const priorityColor: Record<string, string> = {
 
 export function Board({ project }: { project: string }) {
   const navigate = useNavigate();
+  const unset = useMissing(project);
   const boards = useBoards(project);
   const [chosen, setChosen] = useState<string>();
   const [toml, setToml] = useState(false);
@@ -72,20 +82,28 @@ export function Board({ project }: { project: string }) {
         <NotBuilt what="the wiki" />
       </div>
     );
+  // Boards are declared in wiki.toml: without it there are none to show.
+  if (unset.data?.length)
+    return (
+      <div className="px-12 pt-6">
+        <WikiSetup project={project} missing={unset.data} />
+      </div>
+    );
+  if (boards.error)
+    return <p className="px-12 pt-6 text-[13px] text-err">{boards.error.message}</p>;
   if (!board) return <p className="px-12 pt-6 text-tx3">No board is declared in wiki.toml.</p>;
-  const { columns, lanes } = layout(board);
+  const { columns, lanes } = board;
 
   const drop = (card: Card, column: string, lane: string) => {
-    if (column === "Other" || lane === "Other") return; // not a value to write
-    const now = cell(board, card);
-    if (now.column === column && now.lane === lane) return;
+    const to = moveOf(board, card, column, lane);
+    if (!to) return;
     move.mutate(
-      { board: board.id, path: card.path, column, lane, version: card.version },
+      { board: board.id, path: card.path, column: to.column, lane: to.lane, version: card.version },
       {
         onSuccess: () =>
           toast({
             title: card.path,
-            body: `status: ${column}${lane !== now.lane && lane ? ` · ${board.laneField}: ${lane}` : ""}`,
+            body: `${board.statusField}: ${to.column}${to.lane ? ` · ${board.laneField}: ${to.lane}` : ""}`,
             color: "var(--info)",
             onOpen: () =>
               navigate({
@@ -131,18 +149,14 @@ export function Board({ project }: { project: string }) {
             {columns.map((c) => (
               <div key={c} className="px-1 pb-1 text-[13px]">
                 <span className="font-medium text-tx3">{columnLabel(c)}</span>{" "}
-                <span className="text-tx4">
-                  {board.cards.filter((x) => cell(board, x).column === c).length}
-                </span>
+                <span className="text-tx4">{board.cards.filter((x) => x.column === c).length}</span>
               </div>
             ))}
           </div>
           {(lanes.length > 0 ? lanes : [""]).map((lane) => (
             <div key={lane} className="mt-3 flex flex-col gap-1.5">
-              {lane && (
-                <span className="text-xs text-tx4">
-                  {titleCase(lane)} {lane === "Other" ? "" : board.laneField}
-                </span>
+              {lanes.length > 0 && (
+                <span className="text-xs text-tx4">{laneLabel(lane, board.laneField)}</span>
               )}
               <div
                 className="grid gap-2"
@@ -151,10 +165,9 @@ export function Board({ project }: { project: string }) {
                 {columns.map((column) => (
                   <Cell
                     key={column}
-                    cards={board.cards.filter((x) => {
-                      const at = cell(board, x);
-                      return at.column === column && at.lane === lane;
-                    })}
+                    cards={board.cards.filter((x) => x.column === column && x.lane === lane)}
+                    // A cell for no status (or no lane value) takes no drops: see moveOf.
+                    droppable={column !== "" && (lanes.length === 0 || lane !== "")}
                     onDrop={(card) => drop(card, column, lane)}
                     allCards={board.cards}
                     menu={(card) => (
@@ -180,12 +193,14 @@ export function Board({ project }: { project: string }) {
 function Cell({
   cards,
   allCards,
+  droppable,
   onDrop,
   menu,
   onOpen,
 }: {
   cards: Card[];
   allCards: Card[];
+  droppable: boolean;
   onDrop: (card: Card) => void;
   menu: (card: Card) => React.ReactNode;
   onOpen: (path: string) => void;
@@ -195,7 +210,9 @@ function Cell({
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a drop target; the keyboard path is each card's status menu
     <div
+      // Not cancelling dragover is how a cell says it takes no drop.
       onDragOver={(e: DragEvent) => {
+        if (!droppable) return;
         e.preventDefault();
         setOver(true);
       }}
@@ -274,27 +291,34 @@ function MoveMenu({
       </Menu.Trigger>
       <Menu.Portal>
         <Menu.Content className="z-50 flex min-w-40 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay">
-          <Menu.Label className="px-2 py-1 text-xs text-tx4">Status</Menu.Label>
-          {board.columns.map((c) => (
-            <Menu.Item
-              key={c}
-              className={item}
-              // Only the status changes: the lane keeps its value, even one the board doesn't declare.
-              onSelect={() => onMove(c, card.lane)}
-            >
-              {columnLabel(c)}
-            </Menu.Item>
-          ))}
+          <Menu.Label className="px-2 py-1 text-xs text-tx4">
+            {titleCase(board.statusField)}
+          </Menu.Label>
+          {/* "" (no value) isn't a value to move to: see moveOf. */}
+          {board.columns
+            .filter((c) => c !== "")
+            .map((c) => (
+              <Menu.Item
+                key={c}
+                className={item}
+                // Only the status changes: the lane keeps its value, even one the board doesn't declare.
+                onSelect={() => onMove(c, card.lane)}
+              >
+                {columnLabel(c)}
+              </Menu.Item>
+            ))}
           {board.lanes.length > 0 && (
             <>
               <Menu.Label className="px-2 py-1 text-xs text-tx4">
                 {titleCase(board.laneField)}
               </Menu.Label>
-              {board.lanes.map((l) => (
-                <Menu.Item key={l} className={item} onSelect={() => onMove(card.column, l)}>
-                  {titleCase(l)}
-                </Menu.Item>
-              ))}
+              {board.lanes
+                .filter((l) => l !== "")
+                .map((l) => (
+                  <Menu.Item key={l} className={item} onSelect={() => onMove(card.column, l)}>
+                    {titleCase(l)}
+                  </Menu.Item>
+                ))}
             </>
           )}
         </Menu.Content>

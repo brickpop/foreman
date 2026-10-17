@@ -74,6 +74,9 @@ export interface WorkspaceArea {
   newProject(name: string, repo?: string): Promise<Project>;
   /** Creates an empty code repo in a project (Foreman never clones). */
   addRepo(project: string, name: string): Promise<Project>;
+  /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
+  missing(project: string): Promise<string[]>;
+  scaffold(project: string): Promise<string[]>;
   /** Saves one agent's soul in its team file, guarded by the version read. */
   saveSoul(team: string, agent: string, soul: Soul, version: string): Promise<Team>;
   /** An agent's prompt before any deployment, with {placeholders}. */
@@ -280,6 +283,11 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("POST", `/api/projects/${id(project)}/repos`, { name })
         ).json() as Promise<Project>,
+      missing: (project) => getJSON(`/api/projects/${id(project)}/scaffold`),
+      scaffold: async (project) =>
+        (await request("POST", `/api/projects/${id(project)}/scaffold`)).json() as Promise<
+          string[]
+        >,
       saveSoul: async (team, agent, soul, version) =>
         (
           await request("PUT", `/api/teams/${id(team)}/agents/${id(agent)}`, { soul, version })
@@ -325,10 +333,15 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       tree: (project) => getJSON(`/api/wiki/${id(project)}/tree`),
       entry: (project, path) => getJSON(`/api/wiki/${id(project)}/entry/${wikiPath(path)}`),
       imageUrl: (project, path) => `${origin}/api/wiki/${id(project)}/image/${wikiPath(path)}`,
-      // Boards and the writes come with the rest of the Wiki block (projects-and-wiki card).
-      boards: notBuilt("the wiki"),
-      setCheckbox: notBuilt("the wiki"),
-      moveCard: notBuilt("the wiki"),
+      boards: (project) => getJSON(`/api/wiki/${id(project)}/boards`),
+      setCheckbox: (project, path, line, done, version) =>
+        send("PUT", `/api/wiki/${id(project)}/checkbox/${wikiPath(path)}`, { line, done, version }),
+      moveCard: (project, board, path, column, lane, version) =>
+        send("PUT", `/api/wiki/${id(project)}/card/${id(board)}/${wikiPath(path)}`, {
+          value: column,
+          lane,
+          version,
+        }),
     },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {

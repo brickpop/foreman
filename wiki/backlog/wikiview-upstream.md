@@ -16,3 +16,4 @@ epic: terminal-multiplexer
 - [ ] wikiview exports the view builders (entry, tree; the boards when Foreman has them) as a public Go package, and its renderer and callout plugin as a package the UI can install
 - [ ] wikiview gets a LICENSE
 - [ ] Foreman imports them, at pinned versions
+- [ ] report to wikiview: a board over `/backlog` also takes `/backlogs/…`, since the engine's `Filter` matches a plain string prefix (Foreman passes the folder with its trailing slash; found 2026-10-17)

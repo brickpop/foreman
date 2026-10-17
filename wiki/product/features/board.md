@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, ui, wiki]
 ---
 
@@ -24,24 +24,24 @@ lanes   = ["high", "medium", "low"]
 
 Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findings" with `where = ["type=task", "kind=finding"]`). A board shows exactly what its `where` selects: a sprint board filtering only `type=task` also shows findings, and the fix is a `kind` filter in `wiki.toml`, not special-casing in the UI.
 
-**Columns and lanes** come from `columns` and `lanes` in `wiki.toml` when declared; otherwise from the values found in the matching entries, in first-seen order. An entry whose status (or lane value) is missing or not in the list goes to an **Other** column (or lane) at the end, so no entry is ever invisible. Validation of the declaration lives in one place ([Wiki engine](../architecture/wiki-engine.md)).
+**Columns and lanes**, as wikiview lays them out (the CEO, 2026-10-17), built by the server: the values declared in `columns` (shown even while empty), then every other status the matching entries carry, each its own column, in a known order for common vocabularies (`todo` before `in-progress` before `review`… and `high` before `medium` before `low`), the rest alphabetically; then a **No status** column for entries without the field, only when there are some. Lanes alike from `lanes`, with a **No `<field>`** lane. So no entry is ever invisible, and an undeclared status is a real column a card can be dragged into. The cards come in path order. Validation of the declaration lives in one place ([Wiki engine](../architecture/wiki-engine.md)): an unknown key, a missing `id` or `path`, a taken `id`, a `where` that doesn't parse or a value of the wrong type is a **problem**, shown in red above the board. A board without an `id` (or with a taken one) is still listed, under `#<n>`, so its problems show; it can't be moved on.
 
 ## Layout
 
-Body padding `24px 48px 64px`, like every project tab.
+Body padding `24px 48px 64px`, like every project tab. Boards are declared in `wiki.toml`: while the project repo lacks it, the tab shows the [No wiki yet](./wiki-reader.md#no-wiki-yet) placeholder instead.
 
 - **Toolbar**: the **board switcher** (segmented, one button per declared board; on = raised with `--line3` border) and, right-aligned, a Mono **`wiki.toml`** / **`Hide wiki.toml`** button that reveals the board's declaration in a `<pre>` (max 620px), quoted from the file.
 - **Grid**, min width 880px, scrolling horizontally when narrower.
-  - Header row: one cell per column, `<Label> <count>` (label 500 `--tx3`, count `--tx4`). Labels come from the column values (`todo` → "To do", `in-progress` → "In progress", `review` → "Review", `done` → "Done"; others title-cased).
-  - **Lanes**: with a `lane` field, one row per lane value, labelled (12px `--tx4`) e.g. "High priority". Without one, a single unlabelled row.
+  - Header row: one cell per column, `<Label> <count>` (label 500 `--tx3`, count `--tx4`). Labels come from the column values (`todo` → "To do", `in-progress` → "In progress", `review` → "Review", `done` → "Done", none → "No status"; others title-cased).
+  - **Lanes**: with a `lane` field, one row per lane value, labelled (12px `--tx4`) e.g. "High priority", or "No priority" for the cards without it. Without a lane field, a single unlabelled row.
   - **Cell**: `--side`, `--line` border, radius 10, padding 8, min height 72px, gap 8.
   - **Card**: `--panel`, `--line` border, radius 8, padding `10px 12px`, grab cursor; hover border `--line3`. Top row: the id (the file's basename, Mono 500 11.5px `--tx4`) and the priority (colored, [Design system](../design/design-system.md#chips-and-badges)); the title (14px, line-height 1.4); Avatar 20 and the assignee's name (12.5px `--tx3`) when the entry has an `assignee` that matches an agent.
 - Footer note: `Drag a card to change its status (and its lane). Only those lines of the task's frontmatter are rewritten.`
 
 ## Interactions
 
-- **Drag** a card to another cell: sets the column field to the column value and, on a board with lanes, the lane field to the lane value. Only those frontmatter lines change, both in one write (a drop into another lane rewrites two lines, unlike the PRD's "only that line"). The write is guarded by the entry's version: on conflict the card snaps back and an error toast says the file changed. A drop target cell is highlighted while dragging. Success shows a toast ([App shell](./app-shell.md#toasts)). API: `PUT /api/wiki/:project/card/:board/:path` ([API](../architecture/api.md)).
-- **Status menu**: every card has a small menu (keyboard-reachable, and the way to move cards on touch screens) listing the columns (and lanes); choosing one does exactly what a drag does. Drag and drop is native HTML5 ([Tech stack](../architecture/tech-stack.md)).
+- **Drag** a card to another cell: sets the board's status field to the column value and, on a board with lanes, its lane field to the lane value when that changes. Only those frontmatter lines change, both in one write (a drop into another lane rewrites two lines, unlike the PRD's "only that line"). The **No status** column and the **No `<field>`** lane take no drops: writing there would remove the field, which isn't a move. The write is guarded by the entry's version: on conflict the card snaps back and an error toast says the file changed. A drop target cell is highlighted while dragging. Success shows a toast naming the fields written ([App shell](./app-shell.md#toasts)). The write is committed as described in [Sandboxes and git policy](../architecture/sandboxes-and-git.md#project-knowledge-base). API: `PUT /api/wiki/:project/card/:board/:path` ([API](../architecture/api.md)).
+- **Status menu**: every card has a small menu (keyboard-reachable, and the way to move cards on touch screens) listing the columns (and lanes) by the board's field names, without the no-value ones; choosing one does exactly what a drag does. Drag and drop is native HTML5 ([Tech stack](../architecture/tech-stack.md)).
 - **Click** a card: opens the **side sheet**.
 
 ## Side sheet

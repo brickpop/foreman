@@ -19,6 +19,7 @@ GET    /api/workspace                         the workspace folder
 GET    /api/projects | /api/projects/:id      config (parsed), repos, version, problems (deployments join with the Instance manager)
 POST   /api/projects                          {folder, repo?, new?} → create the project repo in an existing folder, or with new, in a new folder of that name; with repo, also a first empty code repo (400 INVALID, 409 EXISTS)
 POST   /api/projects/:id/repos                {name} → create an empty code repo in the project (400 INVALID, 409 EXISTS)
+GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
@@ -53,8 +54,8 @@ POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the
 
 GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry: its Markdown and lookup tables (Wiki engine → Rendering; reading it marks it seen); every board with its cards
 GET    /api/wiki/:project/image/:path         an image an entry links to, inside the wiki (Wiki engine → Rendering); 404 for anything else
-PUT    /api/wiki/:project/checkbox/:path      {line, version}
-PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}
+PUT    /api/wiki/:project/checkbox/:path      {line, done, version}: 204; 409 CONFLICT when the entry changed, 400 INVALID when there's no checkbox on that line
+PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to value, and lane when not empty; 204; 409 CONFLICT, 400 INVALID (no status, a lane on a board without lanes), 404 when the card isn't on that board
 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems

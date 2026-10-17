@@ -24,15 +24,34 @@ var ErrNotFound = errors.New("wiki: not found")
 // so nothing serves a stale index unnoticed.
 type Wikis struct {
 	dir func(project string) (string, error)
+	git Git
 
 	mu      sync.Mutex
 	watched map[string]*watched // by project, while Watch runs
+	writing sync.Mutex          // one write at a time: check, change, commit
 }
 
-// New reads the wiki that dir names for each project: its bundle folder, the
-// one holding wiki.toml.
-func New(dir func(project string) (string, error)) *Wikis {
-	return &Wikis{dir: dir, watched: map[string]*watched{}}
+// New reads the wiki that dir names for each project (its bundle folder, the
+// one holding wiki.toml), and commits its writes with git.
+func New(dir func(project string) (string, error), git Git) *Wikis {
+	return &Wikis{dir: dir, git: git, watched: map[string]*watched{}}
+}
+
+// refresh rebuilds a followed wiki's index after Foreman's own write, so the
+// next read sees it. Only the index: the versions stay, so the watcher still
+// finds the change and tells everyone else.
+func (w *Wikis) refresh(project string) {
+	_, idx, err := w.build(project)
+	if err != nil {
+		return
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if old := w.watched[project]; old != nil {
+		now := *old
+		now.idx = idx
+		w.watched[project] = &now
+	}
 }
 
 // open is the project wiki's index: the watcher's, else a fresh one.

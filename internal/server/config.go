@@ -35,6 +35,10 @@ type Config interface {
 	NewProject(ctx context.Context, name, repo string) (workspace.Project, error)
 	// AddRepo creates an empty code repo in a project.
 	AddRepo(ctx context.Context, project, name string) (workspace.Project, error)
+	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
+	// Scaffold creates them, never overwriting one.
+	Missing(project string) ([]string, error)
+	Scaffold(ctx context.Context, project string) error
 }
 
 // Events is what the server streams to the browser (implemented by events.Bus).
@@ -80,6 +84,18 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		}
 		p, err := c.AddRepo(r.Context(), r.PathValue("id"), req.Name)
 		writeCreated(w, p, err)
+	})
+	mux.HandleFunc("GET /api/projects/{id}/scaffold", func(w http.ResponseWriter, r *http.Request) {
+		m, err := c.Missing(r.PathValue("id"))
+		writeFound(w, m, err, "project")
+	})
+	mux.HandleFunc("POST /api/projects/{id}/scaffold", func(w http.ResponseWriter, r *http.Request) {
+		if err := c.Scaffold(r.Context(), r.PathValue("id")); err != nil {
+			writeFound(w, nil, err, "project")
+			return
+		}
+		m, err := c.Missing(r.PathValue("id"))
+		writeFound(w, m, err, "project")
 	})
 	mux.HandleFunc("GET /api/teams", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, c.Teams())

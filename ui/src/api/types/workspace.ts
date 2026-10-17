@@ -145,6 +145,14 @@ export interface SettingsFile {
   problems: string[];
 }
 /**
+ * Missing is a scaffold file a project repo lacks.
+ */
+export interface Missing {
+  file: string; // in the project repo, e.g. wiki/wiki.toml
+  why: string; // what goes wrong without it
+  required: boolean; // the wiki can't be read without it
+}
+/**
  * Change says what changed on disk, for the UI to refetch.
  */
 export interface Change {

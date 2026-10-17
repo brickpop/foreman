@@ -9,7 +9,7 @@ import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
 import { Button, NotBuilt, Segmented } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
-import { WikiSetup } from "../../components/WikiSetup";
+import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 
 // A kanban over wiki entries (wiki/product/features/board.md). A move rewrites
 // one or two frontmatter lines, version-guarded.
@@ -57,6 +57,7 @@ export function moveOf(
 }
 
 const priorityColor: Record<string, string> = {
+  quick: "text-ok",
   high: "text-err",
   medium: "text-accTx",
   low: "text-tx4",
@@ -64,7 +65,7 @@ const priorityColor: Record<string, string> = {
 
 export function Board({ project }: { project: string }) {
   const navigate = useNavigate();
-  const unset = useMissing(project);
+  const lacking = useMissing(project).data ?? [];
   const boards = useBoards(project);
   const [chosen, setChosen] = useState<string>();
   const [toml, setToml] = useState(false);
@@ -83,10 +84,10 @@ export function Board({ project }: { project: string }) {
       </div>
     );
   // Boards are declared in wiki.toml: without it there are none to show.
-  if (unset.data?.length)
+  if (lacking.some((m) => m.required))
     return (
       <div className="px-12 pt-6">
-        <WikiSetup project={project} missing={unset.data} />
+        <WikiSetup project={project} missing={lacking} />
       </div>
     );
   if (boards.error)
@@ -118,6 +119,7 @@ export function Board({ project }: { project: string }) {
 
   return (
     <div className="flex flex-col gap-4 px-12 pt-6 pb-16">
+      {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
       <div className="flex items-center gap-3">
         {list.length > 1 && (
           <Segmented

@@ -49,6 +49,7 @@ Your sandbox: ledger/.sandboxes/tove (a git worktree per repo)
 Branches: you work on wt/tove/main, made for you from main.
 Knowledge base: ledger/.sandboxes/tove/project/wiki (read only)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
+Read ledger/.sandboxes/tove/project/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on ledger
 - Mara, Team Lead (lead)

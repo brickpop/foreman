@@ -4,9 +4,35 @@ import { roster } from "./model";
 // The Sessions screen's logic (wiki/product/features/sessions.md), apart from
 // its components so it can be tested.
 
-export type DeploymentTab = { id: string; label: string; needsYou: boolean };
+export type DeploymentTab = {
+  id: string;
+  team: string; // its name
+  project: string;
+  label: string;
+  needsYou: boolean;
+  status: string;
+};
 
-/** One tab per active deployment: `<Team> · <project>`, with its needs-you dot. */
+// A team's state is its liveliest agent's: one awaiting the CEO in its
+// session first, then one at work, down to all asleep.
+const liveliness = [
+  "awaiting",
+  "running",
+  "starting",
+  "queued",
+  "idle",
+  "done",
+  "asleep",
+  "stopped",
+];
+
+/** A deployment's status, for its tab's dot: its liveliest agent's. */
+export function deploymentStatus(instances: Instance[]): string {
+  const ranks = instances.map((i) => liveliness.indexOf(i.status)).filter((r) => r >= 0);
+  return ranks.length > 0 ? liveliness[Math.min(...ranks)] : "asleep";
+}
+
+/** One tab per active deployment: `<Team> · <project>`, its needs-you dot and its status. */
 export function deploymentTabs(
   instances: Instance[],
   teams: Team[],
@@ -18,10 +44,41 @@ export function deploymentTabs(
     const name = teams.find((t) => t.id === team)?.config.name || team;
     return {
       id,
+      team: name,
+      project,
       label: `${name} · ${project}`,
       needsYou: requests.some((r) => r.status === "open" && r.deploymentId === id),
+      status: deploymentStatus(instances.filter((i) => i.deploymentId === id)),
     };
   });
+}
+
+/** Tabs in the order the CEO dragged them to; new ones keep their place at the end. */
+export function inOrder<T extends { id: string }>(tabs: T[], order: string[]): T[] {
+  const rank = (t: T) => {
+    const r = order.indexOf(t.id);
+    return r < 0 ? order.length : r;
+  };
+  return [...tabs].sort((a, b) => rank(a) - rank(b));
+}
+
+/** The order after dropping dragged on target: dragged takes target's place. */
+export function moved(ids: string[], dragged: string, target: string): string[] {
+  if (dragged === target || !ids.includes(dragged) || !ids.includes(target)) return ids;
+  const rest = ids.filter((id) => id !== dragged);
+  const at = rest.indexOf(target) + (ids.indexOf(dragged) < ids.indexOf(target) ? 1 : 0);
+  return [...rest.slice(0, at), dragged, ...rest.slice(at)];
+}
+
+/** The agent of a deployment with the latest output: where its work is. */
+export function mostRecentAgent(instances: Instance[], deployment: string): string | undefined {
+  const mine = instances.filter((i) => i.deploymentId === deployment && i.lastOutputAt);
+  const at = (i: Instance) => Date.parse(i.lastOutputAt) || 0;
+  const latest = mine.reduce<Instance | undefined>(
+    (a, i) => (!a || at(i) > at(a) ? i : a),
+    undefined,
+  );
+  return latest && at(latest) > 0 ? latest.agentId : undefined;
 }
 
 /** A deployment's instances in tab order: the lead first, then the roster's order. */

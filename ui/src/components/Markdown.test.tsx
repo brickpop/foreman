@@ -38,9 +38,9 @@ describe("Markdown", () => {
     const out = html(
       entry("# A\n\n## Goals\n\n## Goals\n", {
         headings: [
-          { level: 1, text: "A", id: "a", bodyLine: 1 },
-          { level: 2, text: "Goals", id: "goals", bodyLine: 3 },
-          { level: 2, text: "Goals", id: "goals-1", bodyLine: 5 },
+          { id: "a", bodyLine: 1 },
+          { id: "goals", bodyLine: 3 },
+          { id: "goals-1", bodyLine: 5 },
         ],
       }),
     );

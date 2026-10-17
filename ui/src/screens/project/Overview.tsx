@@ -6,7 +6,7 @@ import { Chevron, TreeIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
 import { Button, Dot, NotBuilt } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
-import { WikiSetup } from "../../components/WikiSetup";
+import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 
 // The project's Overview: a reader for its wiki (wiki/product/features/wiki-reader.md).
 
@@ -14,7 +14,7 @@ export function Overview({ project, entry }: { project: string; entry?: string }
   const navigate = useNavigate();
   const toast = useToast();
   const [files, setFiles] = useState(false); // closed by default
-  const unset = useMissing(project);
+  const lacking = useMissing(project).data ?? [];
   const tree = useTree(project);
   const path = entry ?? "index.md";
   const current = useEntry(project, path);
@@ -47,15 +47,16 @@ export function Overview({ project, entry }: { project: string; entry?: string }
       </div>
     );
   // Without its files there is no wiki to read: the tree is irrelevant.
-  if (unset.data?.length)
+  if (lacking.some((m) => m.required))
     return (
       <div className="px-12 pt-6">
-        <WikiSetup project={project} missing={unset.data} />
+        <WikiSetup project={project} missing={lacking} />
       </div>
     );
   if (tree.error) return <p className="px-12 pt-6 text-[13px] text-err">{tree.error.message}</p>;
   return (
     <div className="flex flex-col gap-5 px-12 pt-6 pb-16">
+      {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
       <div className="flex items-center gap-3">
         <Button
           variant={files ? "raised" : "secondary"}

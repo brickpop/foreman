@@ -5,12 +5,16 @@ import {
   clickTab,
   closePane,
   countdown,
+  deploymentStatus,
   deploymentTabs,
+  inOrder,
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
+  mostRecentAgent,
+  moved,
   panesFrom,
   rosterOrder,
   searchFor,
@@ -40,9 +44,59 @@ describe("Sessions", () => {
   it("has a tab per deployment, with its needs-you dot", () => {
     const open = { status: "open", deploymentId: "orion@relay" } as Request;
     expect(deploymentTabs(all, [atlas], [open])).toEqual([
-      { id: "atlas@ledger", label: "Atlas · ledger", needsYou: false },
-      { id: "orion@relay", label: "orion · relay", needsYou: true },
+      {
+        id: "atlas@ledger",
+        team: "Atlas",
+        project: "ledger",
+        label: "Atlas · ledger",
+        needsYou: false,
+        status: "asleep",
+      },
+      {
+        id: "orion@relay",
+        team: "orion",
+        project: "relay",
+        label: "orion · relay",
+        needsYou: true,
+        status: "asleep",
+      },
     ]);
+  });
+
+  it("shows a team's liveliest agent on its tab", () => {
+    const with_ = (...statuses: string[]) => statuses.map((status) => ({ status }) as Instance);
+    expect(deploymentStatus(with_("asleep", "running", "idle"))).toBe("running");
+    expect(deploymentStatus(with_("running", "awaiting"))).toBe("awaiting"); // waiting on the CEO first
+    expect(deploymentStatus(with_("idle", "done", "asleep"))).toBe("idle");
+    expect(deploymentStatus(with_("asleep", "stopped"))).toBe("asleep");
+    expect(deploymentStatus(with_("weird"))).toBe("asleep");
+    expect(deploymentStatus([])).toBe("asleep");
+  });
+
+  it("keeps the tabs in the order they were dragged to", () => {
+    const tabs = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "new" }];
+    expect(inOrder(tabs, ["c", "a", "b", "gone"]).map((t) => t.id)).toEqual(["c", "a", "b", "new"]);
+    expect(inOrder(tabs, []).map((t) => t.id)).toEqual(["a", "b", "c", "new"]);
+    expect(moved(["a", "b", "c"], "a", "c")).toEqual(["b", "c", "a"]); // rightwards: after the target
+    expect(moved(["a", "b", "c"], "c", "a")).toEqual(["c", "a", "b"]); // leftwards: before it
+    expect(moved(["a", "b", "c"], "b", "b")).toEqual(["a", "b", "c"]);
+    expect(moved(["a", "b", "c"], "x", "a")).toEqual(["a", "b", "c"]);
+  });
+
+  it("finds the agent whose output is the latest", () => {
+    const at = (id: string, deploymentId: string, lastOutputAt: string) =>
+      ({ ...inst(id, deploymentId), lastOutputAt }) as Instance;
+    const list = [
+      at("tove@ledger", "atlas@ledger", "2026-10-17T10:00:00Z"),
+      at("mara@ledger", "atlas@ledger", "2026-10-17T11:30:00Z"),
+      at("ilya@ledger", "atlas@ledger", "0001-01-01T00:00:00Z"),
+      at("lumen@relay", "orion@relay", "2026-10-17T12:00:00Z"),
+    ];
+    expect(mostRecentAgent(list, "atlas@ledger")).toBe("mara");
+    expect(
+      mostRecentAgent([at("ilya@ledger", "atlas@ledger", "")], "atlas@ledger"),
+    ).toBeUndefined();
+    expect(mostRecentAgent(list, "nope@x")).toBeUndefined();
   });
 
   it("puts the lead first, then the team file's order", () => {

@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -64,27 +65,6 @@ checks = ""
 
 [forge]
 kind = "none"
-`
-
-// starterWiki is the least the wiki engine and the board need.
-const starterWiki = `spec = "0.1"
-
-[[tool.wikiview.board]]
-id      = "backlog"
-path    = "/backlog"
-name    = "Backlog"
-where   = ["type=task"]
-status  = "status"
-columns = ["todo", "in-progress", "done"]
-`
-
-const starterIndex = `---
-okf_version: "0.1"
----
-
-# %s
-
-Deploy a team from this project's Settings tab.
 `
 
 // AddProject turns a candidate folder into a project: its project repo with
@@ -165,39 +145,54 @@ func (w *Workspace) createProjectRepo(ctx context.Context, folder, dir string) e
 	return w.git.Commit(ctx, dir, "Project repo", append([]string{"project.toml"}, created...)...)
 }
 
-// scaffold is what a project repo holds besides project.toml, by path in the
-// repo: what the wiki engine and the board need
-// (wiki/product/features/add-project.md#effect).
-func scaffold(project string) map[string]string {
-	return map[string]string{
-		wikiDir + "/wiki.toml": starterWiki,
-		wikiDir + "/index.md":  fmt.Sprintf(starterIndex, project),
-	}
+// starter is the scaffold: what a project repo holds besides project.toml,
+// laid out as in the repo, "{project}" standing for the project's name
+// (wiki/product/features/add-project.md#effect). The wiki follows the
+// conventions its AGENTS.md describes.
+//
+//go:embed starter
+var starter embed.FS
+
+// scaffold is the starter's files in order, each with what goes wrong
+// without it; the wiki can't be read without the required ones.
+var scaffold = []Missing{
+	{wikiDir + "/wiki.toml", "Foreman can't read the wiki or its boards without it", true},
+	{wikiDir + "/index.md", "the wiki has no home page", true},
+	{"AGENTS.md", "the agents don't know how this project's wiki and tasks work", false},
+	{wikiDir + "/product/index.md", "the specs have no map", false},
+	{wikiDir + "/backlog/index.md", "the backlog has no entry point", false},
+	{wikiDir + "/technical-debt.md", "technical debt has no page", false},
+}
+
+// starterFile is a scaffold file's content for the project.
+func starterFile(project, file string) (string, error) {
+	data, err := starter.ReadFile("starter/" + file)
+	return strings.ReplaceAll(string(data), "{project}", project), err
 }
 
 // writeScaffold writes the scaffold files dir lacks, never overwriting one,
-// and returns those it wrote, sorted.
+// and returns those it wrote.
 func writeScaffold(project, dir string) ([]string, error) {
 	var created []string
-	for _, file := range missing(project, dir) {
-		if err := makeFile(filepath.Join(dir, file), scaffold(project)[file]); err != nil {
+	for _, f := range scaffold {
+		if exists(filepath.Join(dir, f.File)) {
+			continue
+		}
+		content, err := starterFile(project, f.File)
+		if err != nil {
 			return created, err
 		}
-		created = append(created, file)
+		if err := makeFile(filepath.Join(dir, f.File), content); err != nil {
+			return created, err
+		}
+		created = append(created, f.File)
 	}
 	return created, nil
 }
 
-// missing lists the scaffold files dir lacks, sorted.
-func missing(project, dir string) []string {
-	out := []string{}
-	for file := range scaffold(project) {
-		if _, err := os.Lstat(filepath.Join(dir, file)); errors.Is(err, fs.ErrNotExist) {
-			out = append(out, file)
-		}
-	}
-	slices.Sort(out)
-	return out
+func exists(path string) bool {
+	_, err := os.Lstat(path)
+	return !errors.Is(err, fs.ErrNotExist)
 }
 
 func makeFile(path, content string) error {
@@ -209,11 +204,17 @@ func makeFile(path, content string) error {
 
 // Missing lists the scaffold files the project's repo lacks: a project made
 // before the scaffold had them, or one whose files were deleted.
-func (w *Workspace) Missing(id string) ([]string, error) {
+func (w *Workspace) Missing(id string) ([]Missing, error) {
 	if _, err := w.Project(id); err != nil {
 		return nil, err
 	}
-	return missing(id, filepath.Join(w.root, id, projectRepo)), nil
+	out := []Missing{}
+	for _, f := range scaffold {
+		if !exists(filepath.Join(w.root, id, projectRepo, f.File)) {
+			out = append(out, f)
+		}
+	}
+	return out, nil
 }
 
 // Scaffold writes the scaffold files the project's repo lacks and commits

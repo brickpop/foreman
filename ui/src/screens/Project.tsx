@@ -1,8 +1,9 @@
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { useProjects, useRequests, useWorkspace } from "../app/queries";
+import { useInstances, useProjects, useRequests, useTeams, useWorkspace } from "../app/queries";
+import { deploymentTabs, mostRecentAgent } from "../app/sessions";
 import { DeployDialog } from "../components/DeployDialog";
-import { CountBadge } from "../components/ui";
+import { Button, CountBadge, outlineLink } from "../components/ui";
 import { Board } from "./project/Board";
 import { Changes } from "./project/Changes";
 import { Overview } from "./project/Overview";
@@ -32,16 +33,17 @@ export function Project() {
   return (
     <div className="flex flex-col">
       <header className="flex flex-col gap-4 px-12 pt-10">
-        <div className="flex items-end gap-4">
+        <div className="flex items-start gap-4">
           <div className="flex flex-1 flex-col gap-1">
             <h1 className="m-0 text-[30px] font-semibold tracking-[-0.02em]">{project.id}</h1>
+            <span className="font-mono text-[12.5px] text-tx4">
+              {workspace.data?.path ?? "~"}/{project.id}
+            </span>
             {project.config.description && (
-              <p className="m-0 text-[15px] text-tx3">{project.config.description}</p>
+              <p className="m-0 mt-1 text-[15px] text-tx3">{project.config.description}</p>
             )}
           </div>
-          <span className="font-mono text-[12.5px] text-tx4">
-            {workspace.data?.path ?? "~"}/{project.id}
-          </span>
+          <ToTheWork project={id} onDeploy={() => setDeploy(true)} />
         </div>
         <nav className="flex border-b border-line">
           {tabs.map((t) => (
@@ -69,6 +71,42 @@ export function Project() {
       )}
       {/* Mounted only while open: each opening starts fresh, on this project. */}
       {deploy && <DeployDialog open onClose={() => setDeploy(false)} project={id} />}
+    </div>
+  );
+}
+
+/**
+ * The way to the work on this project, without thinking: one link per team
+ * with sessions here, as Sessions has one back to the project; Deploy when
+ * there is none (wiki/product/features/wiki-reader.md#project-header-and-tabs).
+ */
+function ToTheWork({ project, onDeploy }: { project: string; onDeploy: () => void }) {
+  const instances = useInstances();
+  const teams = useTeams();
+  if (!instances.data) return null;
+  // The same tabs Sessions shows, so a link here always has sessions there.
+  const here = deploymentTabs(instances.data, teams.data ?? [], []).filter(
+    (d) => d.project === project,
+  );
+  if (here.length === 0)
+    return (
+      <Button variant="primary" onClick={onDeploy}>
+        Deploy a team
+      </Button>
+    );
+  return (
+    <div className="flex gap-2">
+      {here.map((d) => (
+        <Link
+          key={d.id}
+          to="/sessions"
+          // Straight to where the work is: the agent with the latest output.
+          search={{ deployment: d.id, agent: mostRecentAgent(instances.data, d.id) }}
+          className={outlineLink}
+        >
+          {d.team} · Sessions
+        </Link>
+      ))}
     </div>
   );
 }

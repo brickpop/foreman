@@ -69,11 +69,11 @@ func (f fakeConfig) AddRepo(_ context.Context, project, name string) (workspace.
 }
 
 // A project repo from before the scaffold: its wiki.toml is missing.
-func (f fakeConfig) Missing(project string) ([]string, error) {
+func (f fakeConfig) Missing(project string) ([]workspace.Missing, error) {
 	if project != "ledger" {
 		return nil, workspace.ErrNotFound
 	}
-	return []string{"wiki/wiki.toml"}, nil
+	return []workspace.Missing{{File: "wiki/wiki.toml", Required: true}}, nil
 }
 func (f fakeConfig) Scaffold(_ context.Context, project string) error {
 	_, err := f.Missing(project)
@@ -344,9 +344,9 @@ func TestAddingProjectsAndRepos(t *testing.T) {
 		t.Errorf("new %+v", p)
 	}
 	// What a project repo lacks, and creating it.
-	var missing []string
+	var missing []workspace.Missing
 	decodeBody(t, get(t, h, "/api/projects/ledger/scaffold"), &missing)
-	if len(missing) != 1 || missing[0] != "wiki/wiki.toml" {
+	if len(missing) != 1 || missing[0].File != "wiki/wiki.toml" || !missing[0].Required {
 		t.Errorf("missing %v", missing)
 	}
 	if w := post("/api/projects/ledger/scaffold", ""); w.Code != http.StatusOK {

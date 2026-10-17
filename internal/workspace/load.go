@@ -40,6 +40,13 @@ type SettingsFile struct {
 	Problems []string `json:"problems"`
 }
 
+// Missing is a scaffold file a project repo lacks.
+type Missing struct {
+	File     string `json:"file"`     // in the project repo, e.g. wiki/wiki.toml
+	Why      string `json:"why"`      // what goes wrong without it
+	Required bool   `json:"required"` // the wiki can't be read without it
+}
+
 // Change says what changed on disk, for the UI to refetch.
 type Change struct {
 	Kind     string   `json:"object"`             // "projects" (a project or repo appeared or went), "project", "team" or "settings"

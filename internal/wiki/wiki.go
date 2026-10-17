@@ -255,7 +255,7 @@ func headings(e *index.Entry, offset int) []Heading {
 	ids := headingIDs(texts)
 	out := make([]Heading, len(e.Headings))
 	for i, h := range e.Headings {
-		out[i] = Heading{Level: h.Level, Text: h.Text, ID: ids[i], BodyLine: h.Line - offset}
+		out[i] = Heading{ID: ids[i], BodyLine: h.Line - offset}
 	}
 	return out
 }

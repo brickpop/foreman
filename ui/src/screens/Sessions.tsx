@@ -18,11 +18,13 @@ import {
   closePane,
   countdown,
   deploymentTabs,
+  inOrder,
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
+  moved,
   type Panes,
   panesFrom,
   rosterOrder,
@@ -37,7 +39,7 @@ import { CheckIcon, CopyIcon, PromptIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, Dot, LeadTag, Segmented } from "../components/ui";
+import { Button, Dot, LeadTag, outlineLink, Segmented } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
 // tabs, agent tabs, one or two panes of real terminals, and the Activity
@@ -46,6 +48,8 @@ import { Button, Dot, LeadTag, Segmented } from "../components/ui";
 // Each deployment's last view, so switching deployment tabs comes back to it
 // (while the app runs; across browsers, with the UI state API).
 const lastView = new Map<string, SessionsSearch>();
+// The deployment tabs' order as dragged, while the app runs (the CEO, 2026-10-17).
+let tabOrder: string[] = [];
 
 export function Sessions() {
   const search = useSearch({ from: "/sessions" });
@@ -53,7 +57,11 @@ export function Sessions() {
   const instances = useInstances();
   const teams = useTeams();
   const requests = useRequests();
-  const tabs = deploymentTabs(instances.data ?? [], teams.data ?? [], requests.data ?? []);
+  const [order, setOrder] = useState(tabOrder);
+  const tabs = inOrder(
+    deploymentTabs(instances.data ?? [], teams.data ?? [], requests.data ?? []),
+    order,
+  );
   // A deployment that is gone (stopped, mistyped) falls back to the first one.
   const asked = tabs.some((t) => t.id === search.deployment) ? search.deployment : undefined;
   const deployment = asked ?? tabs[0]?.id ?? "";
@@ -81,6 +89,7 @@ export function Sessions() {
     );
 
   const team = teams.data?.find((t) => t.id === deployment.split("@")[0]);
+  const project = deployment.split("@")[1] ?? "";
   const byId = new Map(roster.map((i) => [i.id, i]));
   const shown = panes.open.filter((id) => byId.has(id));
   return (
@@ -93,10 +102,19 @@ export function Sessions() {
             navigate({ to: "/sessions", search: lastView.get(d) ?? { deployment: d } })
           }
           onClose={{ label: "Stop", close: setStopping }}
+          onReorder={(dragged, target) => {
+            tabOrder = moved(
+              tabs.map((t) => t.id),
+              dragged,
+              target,
+            );
+            setOrder(tabOrder);
+          }}
           options={tabs.map((t) => ({
             value: t.id,
             label: (
               <span className="flex items-center gap-1.5">
+                <Dot status={t.status} title={t.status} />
                 {t.label}
                 {t.needsYou && <Dot title="Needs you" />}
               </span>
@@ -104,6 +122,15 @@ export function Sessions() {
           }))}
         />
         <span className="flex-1" />
+        {/* Back to what the team works on: the project's tasks and their status. */}
+        <Link
+          to="/projects/$project"
+          params={{ project }}
+          search={{ tab: "board" }}
+          className={outlineLink}
+        >
+          {project} · Board
+        </Link>
         {/* One view at a time: one terminal, two, or one beside the activity. */}
         <span className="rounded-lg border border-line p-0.5">
           <Segmented

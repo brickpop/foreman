@@ -51,12 +51,10 @@ export interface Link {
   outside: boolean; // resolves above the wiki: not navigable
 }
 /**
- * Heading is one heading, with the id its anchor links resolve against.
+ * Heading is the id one heading takes, which its anchor links resolve against.
  * BodyLine counts the body as served: what the renderer matches by.
  */
 export interface Heading {
-  level: number /* int */;
-  text: string;
   id: string;
   bodyLine: number /* int */;
 }

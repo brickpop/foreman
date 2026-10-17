@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,7 +56,7 @@ func TestAddProjectWithAFirstRepo(t *testing.T) {
 	}
 	dir := filepath.Join(w.Root(), "cal")
 	if log := gitOut(t, filepath.Join(dir, "project"), "log", "--format=%s", "--name-only"); !strings.Contains(log, "project.toml") ||
-		!strings.Contains(log, "wiki/wiki.toml") || !strings.Contains(log, "wiki/index.md") {
+		!strings.Contains(log, "wiki/wiki.toml") || !strings.Contains(log, "wiki/index.md") || !strings.Contains(log, "AGENTS.md") {
 		t.Errorf("project repo: %q", log)
 	}
 	if b := gitOut(t, filepath.Join(dir, "cal-go"), "branch", "--show-current"); b != "main" {
@@ -270,8 +271,18 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 		gitOut(t, repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "agents")
 	})
 	repo := filepath.Join(w.Root(), "old", "project")
-	if got, err := w.Missing("old"); err != nil || !slices.Equal(got, []string{"wiki/index.md", "wiki/wiki.toml"}) {
-		t.Fatalf("missing %v %v", got, err)
+	got, err := w.Missing("old")
+	if err != nil || len(got) != 6 {
+		t.Fatalf("missing %+v %v", got, err)
+	}
+	// The wiki can't be read without its files; it can without AGENTS.md.
+	for i, want := range []struct {
+		file     string
+		required bool
+	}{{"wiki/wiki.toml", true}, {"wiki/index.md", true}, {"AGENTS.md", false}, {"wiki/product/index.md", false}, {"wiki/backlog/index.md", false}, {"wiki/technical-debt.md", false}} {
+		if got[i].File != want.file || got[i].Required != want.required || got[i].Why == "" {
+			t.Errorf("missing[%d] = %+v, want %+v", i, got[i], want)
+		}
 	}
 	// The CEO's own draft index stays: never overwritten.
 	writeFile(t, filepath.Join(repo, "wiki", "index.md"), "# Mine\n")
@@ -284,7 +295,10 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(repo, "wiki", "index.md")); string(data) != "# Mine\n" {
 		t.Errorf("index.md overwritten: %q", data)
 	}
-	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "Project repo: add wiki/wiki.toml\n\nwiki/wiki.toml" {
+	if data, _ := os.ReadFile(filepath.Join(repo, "AGENTS.md")); !strings.Contains(string(data), "type: task") {
+		t.Errorf("AGENTS.md = %q", data)
+	}
+	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "Project repo: add wiki/wiki.toml, AGENTS.md, wiki/product/index.md, wiki/backlog/index.md, wiki/technical-debt.md\n\nAGENTS.md\nwiki/backlog/index.md\nwiki/product/index.md\nwiki/technical-debt.md\nwiki/wiki.toml" {
 		t.Errorf("commit %q", log)
 	}
 	// Nothing missing: nothing written, nothing committed.
@@ -299,5 +313,51 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 		if err := w.Scaffold(ctx, id); !errors.Is(err, ErrNotFound) {
 			t.Errorf("Scaffold(%q): %v", id, err)
 		}
+	}
+}
+
+// The scaffold list and the starter folder are one thing: neither has a file
+// the other lacks.
+func TestScaffoldIsTheStarterFolder(t *testing.T) {
+	var files []string
+	_ = fs.WalkDir(starter, "starter", func(p string, d fs.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			files = append(files, strings.TrimPrefix(p, "starter/"))
+		}
+		return err
+	})
+	var listed []string
+	for _, f := range scaffold {
+		listed = append(listed, f.File)
+	}
+	slices.Sort(files)
+	slices.Sort(listed)
+	if !slices.Equal(files, listed) {
+		t.Errorf("starter folder %v, scaffold %v", files, listed)
+	}
+}
+
+// A new project's wiki is named after it and passes the engine's check.
+func TestNewProjectWikiChecks(t *testing.T) {
+	w := loaded(t, nil)
+	if _, err := w.NewProject(ctx, "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	repo := filepath.Join(w.Root(), "ledger", "project")
+	for _, f := range scaffold {
+		data, err := os.ReadFile(filepath.Join(repo, f.File))
+		if err != nil || strings.Contains(string(data), "{project}") {
+			t.Errorf("%s: %v, unreplaced: %v", f.File, err, strings.Contains(string(data), "{project}"))
+		}
+	}
+	if data, _ := os.ReadFile(filepath.Join(repo, "wiki", "index.md")); !strings.Contains(string(data), "# ledger\n") {
+		t.Errorf("index.md = %q", data)
+	}
+	bin, err := exec.LookPath("wiki")
+	if err != nil {
+		t.Skip("the wiki CLI isn't installed")
+	}
+	if out, err := exec.Command(bin, "--root", filepath.Join(repo, "wiki"), "check").CombinedOutput(); err != nil || !strings.Contains(string(out), "no issues") {
+		t.Errorf("wiki check: %v\n%s", err, out)
 	}
 }

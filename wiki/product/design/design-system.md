@@ -139,7 +139,7 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | **"lead" tag** | 11.5px, `--accTx`, 1px `--accLine` border, radius 4, padding `0 5px` |
 | **Skill chip** | 13px, `--raised`, `--tx2`, padding `4px 6px 4px 10px`, radius 6, trailing `×` in `--tx4` (removes). The "+ add" input has a `1px dashed --line2` border and is 80px wide |
 | **Quick-reply chip** (CoS) | `--raised`, 1px `--line2`, radius 16, padding `6px 12px`, 500 13px; hover border `--acc` |
-| **Priority text** (board) | Mono 500 11.5px: high `--err`, medium `--accTx`, low `--tx4` |
+| **Priority text** (board) | Mono 500 11.5px: quick `--ok` (no uncertainty, doable right now), high `--err`, medium `--accTx`, low `--tx4`; any other value `--tx4` |
 
 ## Buttons
 

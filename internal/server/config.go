@@ -37,7 +37,7 @@ type Config interface {
 	AddRepo(ctx context.Context, project, name string) (workspace.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
 	// Scaffold creates them, never overwriting one.
-	Missing(project string) ([]string, error)
+	Missing(project string) ([]workspace.Missing, error)
 	Scaffold(ctx context.Context, project string) error
 }
 

@@ -17,7 +17,15 @@ import type {
   WorkItem,
 } from "./types/store";
 import type { Board, Card, Entry, Node } from "./types/wiki";
-import type { Candidate, Project, Settings, SettingsFile, Soul, Team } from "./types/workspace";
+import type {
+  Candidate,
+  Missing,
+  Project,
+  Settings,
+  SettingsFile,
+  Soul,
+  Team,
+} from "./types/workspace";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -40,6 +48,7 @@ export type {
   MachineSize,
   Maintenance,
   MergeRequest,
+  Missing,
   Node,
   Project,
   Request,
@@ -75,8 +84,8 @@ export interface WorkspaceArea {
   /** Creates an empty code repo in a project (Foreman never clones). */
   addRepo(project: string, name: string): Promise<Project>;
   /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
-  missing(project: string): Promise<string[]>;
-  scaffold(project: string): Promise<string[]>;
+  missing(project: string): Promise<Missing[]>;
+  scaffold(project: string): Promise<Missing[]>;
   /** Saves one agent's soul in its team file, guarded by the version read. */
   saveSoul(team: string, agent: string, soul: Soul, version: string): Promise<Team>;
   /** An agent's prompt before any deployment, with {placeholders}. */
@@ -286,7 +295,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       missing: (project) => getJSON(`/api/projects/${id(project)}/scaffold`),
       scaffold: async (project) =>
         (await request("POST", `/api/projects/${id(project)}/scaffold`)).json() as Promise<
-          string[]
+          Missing[]
         >,
       saveSoul: async (team, agent, soul, version) =>
         (

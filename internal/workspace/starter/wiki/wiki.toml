@@ -1,0 +1,40 @@
+spec = "0.1"
+
+# Entry kinds (AGENTS.md): `spec` (product/), `task` (backlog/), `epic` (backlog/epics/), `note` (inbox/, research/, anything else)
+types = ["spec", "task", "epic", "note"]
+
+# Files that are not wiki entries (globs supported); ../AGENTS.md is the project repo's, outside the wiki
+ignore = ["../AGENTS.md"]
+
+# Entries nothing has to link to: tasks, and contributions waiting for the lead
+ignore_orphans = ["backlog/**", "inbox/**"]
+
+# Scheduled tasks, one lane per priority (`quick`: no uncertainty, doable right now).
+[[tool.wikiview.board]]
+id      = "board"
+path    = "/backlog"
+name    = "Board"
+where   = ["type=task", "status!=backlog"]
+status  = "status"
+columns = ["todo", "blocked", "in-progress", "review", "done"]
+lane    = "priority"
+lanes   = ["quick", "high", "medium", "low"]
+
+# Unscheduled tasks. Moving one to `todo` schedules it: it leaves this board for the one above.
+[[tool.wikiview.board]]
+id      = "backlog"
+path    = "/backlog"
+name    = "Backlog"
+where   = ["type=task", "status=backlog"]
+status  = "status"
+columns = ["backlog", "todo"]
+lane    = "priority"
+lanes   = ["quick", "high", "medium", "low"]
+
+[[tool.wikiview.board]]
+id      = "epics"
+path    = "/backlog/epics"
+name    = "Epics"
+where   = ["type=epic"]
+status  = "status"
+columns = ["todo", "in-progress", "done"]

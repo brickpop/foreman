@@ -26,6 +26,7 @@ Your sandbox: {project}/.sandboxes/{agent} (a git worktree per repo)
 Branches: {branches}
 Knowledge base: {project}/.sandboxes/{agent}/project/wiki ({wiki access})
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
+Read {project}/.sandboxes/{agent}/project/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on {project}
 - {name}, {role} (lead: integrates, requests merges to main)

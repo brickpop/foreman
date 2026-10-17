@@ -72,6 +72,7 @@ func Compose(in Input) string {
 	line("Branches: %s", branches(in, lead, has))
 	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
+	line("Read %s/.sandboxes/%s/project/AGENTS.md first: how this project's wiki and tasks work.", in.Project, in.Agent)
 	line("")
 	line("## Your team on %s", in.Project)
 	for _, id := range in.Team.Roster() {

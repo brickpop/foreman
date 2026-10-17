@@ -42,11 +42,9 @@ type Link struct {
 	Outside bool   `json:"outside"` // resolves above the wiki: not navigable
 }
 
-// Heading is one heading, with the id its anchor links resolve against.
+// Heading is the id one heading takes, which its anchor links resolve against.
 // BodyLine counts the body as served: what the renderer matches by.
 type Heading struct {
-	Level    int    `json:"level"`
-	Text     string `json:"text"`
 	ID       string `json:"id"`
 	BodyLine int    `json:"bodyLine"`
 }

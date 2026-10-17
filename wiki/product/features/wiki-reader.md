@@ -12,7 +12,7 @@ The project's **Overview** tab: a reader for the project's wiki bundle (`<projec
 
 Shared by every project tab:
 
-- Header: the project name (H1), its description (15px `--tx3`) and, right-aligned and bottom-aligned, the folder path (Mono 12.5px `--tx4`, e.g. `~/agents-ws/ledger`). From [Project config](../models/project-config.md).
+- Header: the project name (H1), under it the folder path as its subtitle (Mono 12.5px `--tx4`, e.g. `~/agents-ws/ledger`; the CEO, 2026-10-17), then its description (15px `--tx3`), from [Project config](../models/project-config.md). Top right, the way **to the work**, so the CEO never has to look for it: one **`<Team> · Sessions`** link per team with sessions on the project (outline, as the [Sessions](./sessions.md) toolbar's `<project> · Board` link back; the CEO, 2026-10-17), opening that team's sessions on the agent with the latest output (where the work is; the lead when none has any). "With sessions" is what Sessions shows a tab for, so a link here always leads somewhere. With none, a primary **`Deploy a team`**, opening [Deploy a team](./deploy-team.md) for this project.
 - Tabs (padding `9px 14px`, 500): `Overview · Changes · Board · Settings`. Active: `--tx` with a 2px `--acc` bottom border over the 1px `--line` rule; inactive `--tx3`. **Changes** carries a count badge of the project's open requests ([Changes](./changes.md)). Switching tabs closes the side sheet. Every tab's body has the same sides as the header (48px) and uses the full width, so the four tabs line up.
 
 ## Layout
@@ -36,9 +36,10 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 
 Full width of its column, gap 14. Opens `index.md` by default.
 
-1. **"On this page"** (12px `--tx4` label): the entry's H2 and H3 headings (13px `--tx3`, H3 indented 12px), each smooth-scrolling to its heading (24px offset). Shown only when there are any; bottom border.
-2. **Frontmatter chips**: one `key: value` chip per field; empty values hidden, and so is the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17).
-3. **Body** rendered from Markdown:
+No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as wikiview has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them.
+
+1. **Frontmatter chips**: one `key: value` chip per field; empty values hidden, and so is the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17).
+2. **Body** rendered from Markdown:
 
 | Element | Rendering |
 |---|---|
@@ -69,3 +70,5 @@ Full width of its column, gap 14. Opens `index.md` by default.
 ## No wiki yet
 
 A project repo can lack the files the reader and the [Board](./board.md) need: a project made before Add a project wrote them (the agents may still have filled `wiki/`), or one whose files were deleted. Then **Overview and Board** show, instead of the reader or the board (the tree is irrelevant without a wiki; the CEO, 2026-10-17), a dashed placeholder: `This project's wiki isn't set up yet.`, `Foreman reads it once its project repo has:` and each missing file (Mono, `<project>/project/<file>`), then a primary **`Create them`** (`Create it` for one). It writes each missing file of the [scaffold](./add-project.md#effect), never over one that exists, and commits them in the project repo as the CEO (`Project repo: add …`); the wiki appears as the watcher picks it up. `GET` / `POST /api/projects/:id/scaffold` ([API](../architecture/api.md)). Any other failure to read the wiki shows its message, never a blank page.
+
+Only the files the wiki can't be read without (`wiki/wiki.toml`, `wiki/index.md`) bring up the placeholder. The rest of the scaffold (`AGENTS.md`, `product/index.md`, `backlog/index.md`, `technical-debt.md`) leaves the wiki and the board in place, with a one-line **notice** above them (the CEO, 2026-10-17): each missing file (Mono) and what goes wrong without it (`AGENTS.md is missing: the agents don't know how this project's wiki and tasks work.`), and a **`Create it`** / **`Create them`** button doing the same as the placeholder's. Each missing file's reason comes from the server, with whether it is required.

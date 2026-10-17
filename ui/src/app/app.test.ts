@@ -57,12 +57,20 @@ describe("staleKeys", () => {
       keys.projects,
       keys.setup,
     ]);
-    expect(staleKeys({ type: "workspace.changed", data: {} })).toEqual([keys.projects, keys.setup]);
+    expect(staleKeys({ type: "workspace.changed", data: {} })).toEqual([
+      keys.projects,
+      keys.setup,
+      keys.repos,
+    ]);
     expect(staleKeys({ type: "setup.changed", data: {} })).toEqual([keys.setup, keys.maintenance]);
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
     expect(staleKeys({ type: "request.created", data: {} })).toEqual([keys.requests]);
     expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages, keys.activity]);
-    expect(staleKeys({ type: "team.action", data: {} })).toEqual([keys.actions, keys.activity]);
+    expect(staleKeys({ type: "team.action", data: {} })).toEqual([
+      keys.actions,
+      keys.activity,
+      keys.repos,
+    ]);
     expect(staleKeys({ type: "deployment.created", data: {} })).toEqual([
       keys.instances,
       keys.deployments,
@@ -70,7 +78,7 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "wiki.changed", data: { project: "ledger" } })).toEqual([
       ["wiki", "ledger"],
     ]);
-    expect(staleKeys({ type: "pipeline.changed", data: {} })).toEqual([["pipeline"]]);
+    expect(staleKeys({ type: "pipeline.changed", data: {} })).toEqual([["pipeline"], keys.repos]);
     expect(staleKeys({ type: "something.else", data: {} })).toEqual([]);
   });
 });

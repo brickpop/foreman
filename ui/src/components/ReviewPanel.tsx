@@ -10,7 +10,7 @@ import { RequestPanel } from "./RequestPanel";
 // A review request with its merge request: what to look at (the link line
 // opens the change) and what to decide: Merge to main, Create PR on the forge,
 // or Reject with a message that goes back to its author. Home (Chief of Staff
-// changes) and Changes use this same panel (wiki/product/features/changes.md).
+// changes) and a project's Overview use this same panel (wiki/product/features/changes.md).
 
 export function ReviewPanel({
   request: r,
@@ -37,7 +37,7 @@ export function ReviewPanel({
   reviewText?: string;
   /** Who a rejection is sent to: the lead, or the Chief of Staff. */
   author: string;
-  variant: "home" | "changes";
+  variant: "home" | "project";
   source?: string;
   onOpenSession: () => void;
   onOpenChiefOfStaff: () => void;

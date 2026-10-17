@@ -83,7 +83,7 @@ From the [Agent page](./agent-page.md). "What should change about how <Name> wor
 
 ### Change project config
 
-From [Project settings](./project-settings.md). "What should change in <project>/project/project.toml? I’ll edit it on a branch and send it to you as a review." [Use GitHub as the forge, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` of the [project repo](../models/project-config.md#the-project-repo) and calls `request_merge`, which raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff proposes a change to <project>/project/project.toml: <summary>.` and the actions of any review: Merge to main, Create PR (when the project repo has a forge), Reject, plus Open Chief of Staff ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Changes."
+From [Project settings](./project-settings.md). "What should change in <project>/project/project.toml? I’ll edit it on a branch and send it to you as a review." [Use GitHub as the forge, Add a gate, Change the checks]. The CoS edits the file on branch `foreman/config-N` of the [project repo](../models/project-config.md#the-project-repo) and calls `request_merge`, which raises a **review** request ([Requests](./requests.md)) with the text `Chief of Staff proposes a change to <project>/project/project.toml: <summary>.` and the actions of any review: Merge to main, Create PR (when the project repo has a forge), Reject, plus Open Chief of Staff ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)). "Done: “<summary>”. It’s on branch foreman/config-N and waiting for you in <project> → Overview."
 
 ### Anything else
 

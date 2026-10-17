@@ -163,3 +163,32 @@ function withoutRenderedCheckbox(children: ReactNode): ReactNode {
   if (!Array.isArray(children)) return children;
   return children.filter((c) => !(c && typeof c === "object" && "type" in c && c.type === "input"));
 }
+
+/** A repo file's Markdown (a README), on the Repositories tab: rendered, and
+ * inert. Raw HTML stays off; a web link opens in a new tab, a relative one is
+ * text (nothing here serves it); an image shows its text, never loaded, since
+ * agents write these files and a remote image would call out. */
+export function FileMarkdown({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        a({ href, children }) {
+          if (href && /^https?:\/\//.test(href)) {
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
+          }
+          return <span className="outside">{children}</span>;
+        },
+        img({ alt }) {
+          return <span className="outside">{alt ? `[${alt}]` : "[image]"}</span>;
+        },
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}

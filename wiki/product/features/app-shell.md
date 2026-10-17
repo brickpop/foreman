@@ -14,7 +14,7 @@ A two-column grid: sidebar **220px**, main area `minmax(0, 1fr)`, full viewport 
 
 **One breakpoint** (basic responsiveness): under ~760px the sidebar collapses behind a menu button at the top left and opens as an overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)).
 
-Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./wiki-reader.md), [Changes](./changes.md), [Board](./board.md), [Project settings](./project-settings.md)), [Team](./team-page.md), [Agent](./agent-page.md), [Settings](./settings.md). The app opens on Home (or the last screen, see [UI state](../models/ui-state.md)).
+Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./wiki-reader.md) with the [project pipeline](./project-pipeline.md)'s Needs you, [Board](./board.md), [Repositories](./repositories.md), [Activity](./project-activity.md), [Project settings](./project-settings.md)), [Team](./team-page.md), [Agent](./agent-page.md), [Settings](./settings.md). The app opens on Home (or the last screen, see [UI state](../models/ui-state.md)).
 
 ## Sidebar
 

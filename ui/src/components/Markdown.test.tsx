@@ -140,3 +140,22 @@ describe("Markdown", () => {
     );
   });
 });
+
+import { FileMarkdown } from "./Markdown";
+
+describe("FileMarkdown (a repo file)", () => {
+  const out = (text: string) => renderToStaticMarkup(<FileMarkdown text={text} />);
+  it("links the web in a new tab, keeps relative links as text, loads no image", () => {
+    const got = out(
+      "[site](https://x.dev) [doc](docs/a.md) ![logo](https://t.dev/p.png) <b>raw</b> [js](javascript:alert(1))",
+    );
+    expect(got).toContain(
+      '<a href="https://x.dev" target="_blank" rel="noopener noreferrer">site</a>',
+    );
+    expect(got).toContain('<span class="outside">doc</span>');
+    expect(got).toContain('<span class="outside">[logo]</span>');
+    expect(got).not.toContain("<img");
+    expect(got).not.toContain("<b>");
+    expect(got).not.toContain("javascript:");
+  });
+});

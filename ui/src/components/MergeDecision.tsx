@@ -9,7 +9,7 @@ import { Button } from "./ui";
 // The CEO's decision on a merge request: Merge to main (the project's
 // protected branch), Create PR on its forge, or Reject with a message to its
 // author (wiki/product/features/pipeline-and-merges.md#review-and-merge). The
-// review panel and a merge request's row in Changes share it.
+// review panel and a merge request's row in Repositories (In flight) share it.
 
 export type Decision = ReturnType<typeof useMergeDecision>;
 

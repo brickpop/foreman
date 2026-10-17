@@ -2,8 +2,10 @@ import { createContext, useContext } from "react";
 import { type EventHandlers, subscribeEvents } from "./events";
 import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
 import type { Account as ForgeAccount } from "./types/forge";
+import type { Commit, TreeEntry } from "./types/git";
 import type { Status as HarnessStatus } from "./types/harness";
 import type { Draft } from "./types/messaging";
+import type { LogPage, Repo, Branch as RepoBranch, File as RepoFile } from "./types/repos";
 import type { ImageStatus, Maintenance } from "./types/runner";
 import type { MachineSize, Step as SetupStep } from "./types/setup";
 import type {
@@ -42,6 +44,7 @@ export type {
   Board,
   Candidate,
   Card,
+  Commit,
   Deployment,
   Draft,
   Entry,
@@ -49,12 +52,16 @@ export type {
   HarnessStatus,
   ImageStatus,
   Instance,
+  LogPage,
   MachineSize,
   Maintenance,
   MergeRequest,
   Missing,
   Node,
   Project,
+  Repo,
+  RepoBranch,
+  RepoFile,
   Request,
   Settings,
   SettingsFile,
@@ -63,6 +70,7 @@ export type {
   Team,
   TeamAction,
   TeamMessage,
+  TreeEntry,
   WorkItem,
 };
 
@@ -243,6 +251,17 @@ export interface EventsArea {
   subscribe(handlers: EventHandlers): () => void;
 }
 
+/** A project's repos, read-only, as committed (the Repositories tab). */
+export interface ReposArea {
+  /** The code repos, then the project repo, each with its branches. */
+  list(project: string): Promise<Repo[]>;
+  /** A folder at a ref ("" is the root). */
+  tree(project: string, repo: string, ref: string, path: string): Promise<TreeEntry[]>;
+  file(project: string, repo: string, ref: string, path: string): Promise<RepoFile>;
+  /** A page of a ref's history, newest first; skip is the previous page's next. */
+  log(project: string, repo: string, ref: string, skip?: number): Promise<LogPage>;
+}
+
 export interface ForemanClient {
   workspace: WorkspaceArea;
   agents: AgentsArea;
@@ -253,6 +272,7 @@ export interface ForemanClient {
   requests: RequestsArea;
   messages: MessagesArea;
   pipeline: PipelineArea;
+  repos: ReposArea;
   wiki: WikiArea;
   chiefOfStaff: ChiefOfStaffArea;
   events: EventsArea;
@@ -387,6 +407,21 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     forge: {
       accounts: notBuilt("forge accounts"),
       connect: notBuilt("forge accounts"),
+    },
+    repos: {
+      list: (project) => getJSON(`/api/projects/${id(project)}/repos`),
+      tree: (project, repo, ref, path) =>
+        getJSON(
+          `/api/projects/${id(project)}/repos/${id(repo)}/tree?${new URLSearchParams({ ref, path })}`,
+        ),
+      file: (project, repo, ref, path) =>
+        getJSON(
+          `/api/projects/${id(project)}/repos/${id(repo)}/file?${new URLSearchParams({ ref, path })}`,
+        ),
+      log: (project, repo, ref, skip = 0) =>
+        getJSON(
+          `/api/projects/${id(project)}/repos/${id(repo)}/log?${new URLSearchParams({ ref, skip: String(skip) })}`,
+        ),
     },
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),

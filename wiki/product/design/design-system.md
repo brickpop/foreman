@@ -65,7 +65,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (400/500/600) for c
 | Brand | 15px / 600 / -0.01em |
 | Nav item | 14px / 500 |
 | Sidebar project / team row | 13.5px |
-| Request text | Home 16px, Changes 15.5px; line-height 1.5; `text-wrap: pretty` |
+| Request text | Home 16px, project Overview (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
 | Kind chip | Mono 600 10.5px, `letter-spacing: .05em`, uppercase |
 | Meta mono (paths, branches) | Mono 400 11.5–12.5px, `--tx4` or `--tx3` |
 | Terminal | Mono 400 13px / line-height 1.6 |
@@ -94,10 +94,10 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 ## Spacing and layout
 
 - Page padding: Home, Settings `48px 48px 64px`; Project and Team header `40px 48px 0`; Agent `40px 48px 64px`.
-- Project tab bodies: Overview `24px 32px 64px`; Board `20px 40px 64px`; Changes `28px 40px 64px`; Settings, teams part `24px 40px 64px`, config part `28px 48px 64px`.
+- Project tab bodies: every tab `24px 48px 64px`, the full width, so each lines up with the project header ([Wiki reader](../features/wiki-reader.md#project-header-and-tabs)); the Settings tab's configuration part starts `28px` below its divider.
 - Team tab bodies: Deployments `24px 48px 64px`; Members `20px 48px 64px`; Playbook and File `28px 48px 64px`.
-- Max widths: Home and Team tabs 920px; Settings 760px; Changes 860px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
-- Vertical gaps: 40px between Home sections; 36px between Settings and Changes sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
+- Max widths: Home and Team tabs 920px; Settings 760px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
+- Vertical gaps: 40px between Home sections; 36px between Settings sections and between pipeline and Repositories sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
 - Row padding: list rows `14px 4px` or `16px 6px`; table-like rows `12px 16px`; settings rows `14px 0` or `12px 0` with a bottom border.
 
 ## Surfaces
@@ -157,7 +157,7 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Change with Chief of Staff, Connect, Edit, Rebuild |
 | **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | Terminal pane header only: Line, Copy, × |
 
-**Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on Home and 13px on Changes.
+**Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on Home and 13px on the project's Overview (Needs you).
 
 ## Form controls
 

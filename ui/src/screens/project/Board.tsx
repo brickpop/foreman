@@ -14,6 +14,10 @@ import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 // A kanban over wiki entries (wiki/product/features/board.md). A move rewrites
 // one or two frontmatter lines, version-guarded.
 
+// Every column 240–320px (the CEO, 2026-10-17): readable cards, never a
+// stretched one on a wide screen; the board scrolls sideways when it must.
+const columnTrack = "minmax(240px, 320px)";
+
 const columnLabels: Record<string, string> = {
   todo: "To do",
   "in-progress": "In progress",
@@ -143,10 +147,10 @@ export function Board({ project }: { project: string }) {
         <p className="text-[13px] text-err">{board.problems.join(" · ")}</p>
       )}
       <div className="overflow-x-auto">
-        <div className="min-w-[880px]">
+        <div className="min-w-fit">
           <div
             className="grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(${columns.length}, ${columnTrack})` }}
           >
             {columns.map((c) => (
               <div key={c} className="px-1 pb-1 text-[13px]">
@@ -162,7 +166,7 @@ export function Board({ project }: { project: string }) {
               )}
               <div
                 className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+                style={{ gridTemplateColumns: `repeat(${columns.length}, ${columnTrack})` }}
               >
                 {columns.map((column) => (
                   <Cell

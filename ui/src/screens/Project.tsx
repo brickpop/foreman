@@ -6,17 +6,18 @@ import { DeployDialog } from "../components/DeployDialog";
 import { Button, CountBadge, outlineLink } from "../components/ui";
 import { Activity } from "./project/Activity";
 import { Board } from "./project/Board";
-import { Changes } from "./project/Changes";
 import { Overview } from "./project/Overview";
+import { NeedsYou } from "./project/Pipeline";
 import { ProjectSettings } from "./project/ProjectSettings";
+import { Repositories } from "./project/Repositories";
 
-export type ProjectTab = "overview" | "activity" | "changes" | "board" | "settings";
+export type ProjectTab = "overview" | "board" | "repositories" | "activity" | "settings";
 
 const tabs: { tab: ProjectTab; label: string }[] = [
   { tab: "overview", label: "Overview" },
-  { tab: "activity", label: "Activity" },
-  { tab: "changes", label: "Changes" },
   { tab: "board", label: "Board" },
+  { tab: "repositories", label: "Repositories" },
+  { tab: "activity", label: "Activity" },
   { tab: "settings", label: "Settings" },
 ];
 
@@ -59,15 +60,20 @@ export function Project() {
               }`}
             >
               {t.label}
-              {t.tab === "changes" && <CountBadge count={open.length} small />}
+              {t.tab === "overview" && <CountBadge count={open.length} small />}
             </Link>
           ))}
         </nav>
       </header>
       {/* Keyed by project: switching projects starts each tab fresh (tree, board, editors). */}
-      {tab === "overview" && <Overview key={id} project={id} entry={entry} />}
+      {tab === "overview" && (
+        <>
+          <NeedsYou project={project} />
+          <Overview key={id} project={id} entry={entry} />
+        </>
+      )}
       {tab === "activity" && <Activity key={id} project={id} />}
-      {tab === "changes" && <Changes key={id} project={project} />}
+      {tab === "repositories" && <Repositories key={id} project={project} />}
       {tab === "board" && <Board key={id} project={id} />}
       {tab === "settings" && (
         <ProjectSettings key={id} project={project} onDeploy={() => setDeploy(true)} />

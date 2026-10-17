@@ -150,7 +150,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Enforced by Foreman",
-              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (that’s Changes), wakes requesters when replies land, sends escalations to Home, and only lets the lead request merges to main.",
+              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Repositories → In flight), wakes requesters when replies land, sends escalations to Home, and only lets the lead request merges to main.",
             ],
           ].map(([title, body]) => (
             <div key={title} className="flex flex-col gap-0.5">
@@ -206,8 +206,8 @@ function Configuration({ project }: { project: Project }) {
           <span className="font-medium">{forgeLabel(forge.kind)}</span>
           <span className="text-[13.5px] text-tx2">
             {forge.kind === "none"
-              ? "No forge. You merge requested branches into main from Changes; Foreman does the merge."
-              : `Merge to main from Changes, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file.`}
+              ? "No forge. You merge requested branches into main from the Overview, under Needs you; Foreman does the merge."
+              : `Merge to main from the Overview, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file.`}
           </span>
           {forge.projectRepo && (
             <span className="flex items-center gap-3 text-[13px] text-tx3">
@@ -232,7 +232,7 @@ function Configuration({ project }: { project: Project }) {
           </span>
           <p className="m-0 text-[13.5px] text-tx2">
             This file is config, committed in the project repo. Edit it in your editor, or have the
-            Chief of Staff edit it. Its change then comes back to you in Changes as a review.
+            Chief of Staff edit it. Its change then comes back to you on the Overview, as a review.
           </p>
           {project.problems.length > 0 && (
             <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">

@@ -40,6 +40,7 @@ export const keys = {
   messages: ["messages"],
   actions: ["actions"],
   activity: ["activity"],
+  repos: ["repos"],
   chiefOfStaff: ["chief-of-staff"],
 } as const;
 
@@ -89,7 +90,7 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [keys.projects, keys.setup];
     }
     case "workspace.changed":
-      return [keys.projects, keys.setup];
+      return [keys.projects, keys.setup, keys.repos];
     case "instance.status":
       return [keys.instances];
     case "deployment.created":
@@ -101,11 +102,11 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "team.message":
       return [keys.messages, keys.activity];
     case "team.action":
-      return [keys.actions, keys.activity];
+      return [keys.actions, keys.activity, keys.repos];
     case "wiki.changed":
       return [["wiki", String((e.data as { project?: string }).project ?? "")]];
     case "pipeline.changed":
-      return [["pipeline"]];
+      return [["pipeline"], keys.repos];
     case "cos.changed":
       return [keys.chiefOfStaff];
     case "setup.changed":
@@ -468,5 +469,39 @@ export function useActivity(scope: ActivityScope, enabled = true) {
     initialPageParam: "",
     getNextPageParam: (last) => last.next || undefined,
     enabled,
+  });
+}
+
+/** A project's repos and their branches (the Repositories tab). Under the
+ * repos' key: a commit, a merge or a new repo refreshes everything shown. */
+export function useRepos(project: string) {
+  const c = useClient();
+  return useQuery({ queryKey: [...keys.repos, project], queryFn: () => c.repos.list(project) });
+}
+
+export function useRepoTree(project: string, repo: string, ref: string, path: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.repos, project, repo, ref, "tree", path],
+    queryFn: () => c.repos.tree(project, repo, ref, path),
+  });
+}
+
+export function useRepoFile(project: string, repo: string, ref: string, path: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.repos, project, repo, ref, "file", path],
+    queryFn: () => c.repos.file(project, repo, ref, path),
+  });
+}
+
+/** A ref's history a page at a time, newest first. */
+export function useRepoLog(project: string, repo: string, ref: string) {
+  const c = useClient();
+  return useInfiniteQuery({
+    queryKey: [...keys.repos, project, repo, ref, "log"],
+    queryFn: ({ pageParam }) => c.repos.log(project, repo, ref, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next || undefined,
   });
 }

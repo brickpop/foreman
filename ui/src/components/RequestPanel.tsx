@@ -4,7 +4,7 @@ import type { Look } from "../api/types/workspace";
 import { Avatar, chiefOfStaffLook } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
-// One request to the CEO. Home and a project's Changes tab use this same panel,
+// One request to the CEO. Home and a project's Overview (Needs you) use this same panel,
 // so they can't drift; the variant only changes what the specs say differs
 // (wiki/product/features/home.md#request-list, wiki/product/features/changes.md#1-needs-you).
 
@@ -20,16 +20,16 @@ type Props = {
   /** An answer is on its way: the options wait. */
   answering?: boolean;
   onOpenSession: () => void;
-  /** Home: a review's Review button (opens Changes). */
+  /** Home: a review's Review button (opens the project's Overview). */
   onReview?: () => void;
   onOpenChiefOfStaff: () => void;
-  /** Home: avatar 32 with the amber ring. Changes: kind chip first, avatar 24, the source. */
-  variant?: "home" | "changes";
-  /** Changes: where it came from (`escalate(approval)`, `request_merge()`…). */
+  /** Home: avatar 32 with the amber ring. A project: kind chip first, avatar 24, the source. */
+  variant?: "home" | "project";
+  /** A project: where it came from (`escalate(approval)`, `request_merge()`…). */
   source?: string;
   /** Under the text: e.g. the link line. */
   children?: ReactNode;
-  /** Replaces the option buttons (Changes: a review's merge actions). */
+  /** Replaces the option buttons (a project: a review's merge actions). */
   actions?: ReactNode;
 };
 
@@ -49,13 +49,13 @@ export function RequestPanel({
   actions,
 }: Props) {
   const fromChiefOfStaff = r.source === "cos";
-  const changes = variant === "changes";
+  const onProject = variant === "project";
   const [answer, setAnswer] = useState("");
   const freeText = r.kind === "approval" || r.kind === "question";
   const look = fromChiefOfStaff ? chiefOfStaffLook : who?.look;
   // On Home the whole card opens who raised it (its session, or the Chief of
   // Staff); its controls keep their own action, and selecting text opens nothing.
-  const opens = !changes && (fromChiefOfStaff || r.instanceId !== "");
+  const opens = !onProject && (fromChiefOfStaff || r.instanceId !== "");
   const openCard = (e: MouseEvent<HTMLElement>) => {
     if (!opens || (e.target as HTMLElement).closest("a, button, input, textarea, label")) return;
     if (window.getSelection()?.toString()) return;
@@ -65,10 +65,10 @@ export function RequestPanel({
     // biome-ignore lint/a11y/useKeyWithClickEvents: the name button is the keyboard path
     <article
       onClick={openCard}
-      className={`flex flex-col rounded-xl border border-line bg-panel ${changes ? "gap-3 px-[18px] py-4" : "gap-3.5 px-5 py-[18px]"} ${opens ? "cursor-pointer hover:border-line3" : ""}`}
+      className={`flex flex-col rounded-xl border border-line bg-panel ${onProject ? "gap-3 px-[18px] py-4" : "gap-3.5 px-5 py-[18px]"} ${opens ? "cursor-pointer hover:border-line3" : ""}`}
     >
       <header className="flex items-center gap-2.5">
-        {changes && <KindChip kind={r.kind} />}
+        {onProject && <KindChip kind={r.kind} />}
         {/* Who raised it opens their session (the Chief of Staff: its drawer). With no
             agent behind it, Foreman raised it (a crash, a failed build): nothing to open. */}
         {fromChiefOfStaff || r.instanceId ? (
@@ -80,8 +80,8 @@ export function RequestPanel({
           >
             <Avatar
               look={look}
-              size={changes ? 24 : 32}
-              ring={changes ? undefined : "var(--acc)"}
+              size={onProject ? 24 : 32}
+              ring={onProject ? undefined : "var(--acc)"}
             />
             <span className="font-semibold">
               {fromChiefOfStaff ? "Chief of Staff" : (who?.name ?? r.instanceId)}
@@ -91,21 +91,21 @@ export function RequestPanel({
           <>
             <Avatar
               look={look}
-              size={changes ? 24 : 32}
-              ring={changes ? undefined : "var(--acc)"}
+              size={onProject ? 24 : 32}
+              ring={onProject ? undefined : "var(--acc)"}
             />
             <span className="font-semibold">Foreman</span>
           </>
         )}
         <span className="text-[13px] text-tx4">{context}</span>
         <span className="flex-1" />
-        {changes ? (
+        {onProject ? (
           <span className="font-mono text-[11.5px] text-tx4">{source}</span>
         ) : (
           <KindChip kind={r.kind} />
         )}
       </header>
-      <p className={`leading-[1.5] text-pretty ${changes ? "text-[15.5px]" : "text-base"}`}>
+      <p className={`leading-[1.5] text-pretty ${onProject ? "text-[15.5px]" : "text-base"}`}>
         {r.kind === "review" && reviewText ? reviewText : r.summary}
       </p>
       {children}
@@ -121,21 +121,21 @@ export function RequestPanel({
                 key={option}
                 variant={i === 0 ? "primary" : "secondary"}
                 disabled={answering}
-                className={`${i === 1 ? "!text-tx" : ""} ${changes ? "" : "!text-[13.5px]"}`}
+                className={`${i === 1 ? "!text-tx" : ""} ${onProject ? "" : "!text-[13.5px]"}`}
                 onClick={() => onAnswer(option)}
               >
                 {option}
               </Button>
             ))
           ))}
-        {/* On Home the card itself opens it; in Changes this button does. Nothing to
+        {/* On Home the card itself opens it; on a project this button does. Nothing to
             open for a Foreman-raised request. */}
-        {changes && fromChiefOfStaff && (
+        {onProject && fromChiefOfStaff && (
           <Button variant="ghost" onClick={onOpenChiefOfStaff}>
             Open Chief of Staff
           </Button>
         )}
-        {changes && !fromChiefOfStaff && r.instanceId !== "" && (
+        {onProject && !fromChiefOfStaff && r.instanceId !== "" && (
           <Button variant="ghost" onClick={onOpenSession}>
             Open session
           </Button>

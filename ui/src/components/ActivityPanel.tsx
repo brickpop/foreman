@@ -413,10 +413,10 @@ function ActionText({ action: a }: { action: TeamAction }) {
               <Link
                 to="/projects/$project"
                 params={{ project: a.instance.split("@")[1] ?? "" }}
-                search={{ tab: "changes" }}
+                search={{ tab: "overview" }}
                 className="font-medium text-accTx hover:underline"
               >
-                Review in Changes
+                Review it
               </Link>
             </>
           )}

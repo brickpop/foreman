@@ -4,9 +4,14 @@ status: partial
 tags: [feature, ui, requests, pipeline]
 ---
 
-# Changes
+# Project pipeline
 
-The project's actionable tab: what needs the CEO on this project, the work moving towards `main`, and what recently merged. Body padding `24px 48px 64px` (every project tab uses the header's 48px sides and the full width: [Wiki reader](./wiki-reader.md#project-header-and-tabs)), 36px between sections. The project header and tabs are described in [Wiki reader](./wiki-reader.md#project-header-and-tabs).
+What needs the CEO on a project, the work moving towards `main`, and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/project-code-tab.md)):
+
+- **Needs you** opens the project's **Overview**, above the wiki, only when something waits ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)). The Overview tab carries the count badge of open requests.
+- **In flight** and **Merged** open the **Repositories** tab, above the repos: they are git facts ([Repositories](./repositories.md)).
+
+Each section keeps the project tabs' 48px sides, with 36px between sections. An old link to `?tab=changes` lands on Overview.
 
 ## 1. Needs you
 
@@ -33,7 +38,7 @@ The **link line** of a review shows the change: clicking it opens its diff again
 
 **Reject** expands an inline editor under the request panel: a textarea (3 rows, placeholder `What should <Author> change? (optional)`), then `Cancel` and the danger-style `Reject and tell <Author>`. The message is optional; when given, it goes to the author (the lead, or the Chief of Staff, which answers in its conversation and offers to propose the change again). Only one editor is open at a time; closing it clears the reason. Effect: [Pipeline and merges](./pipeline-and-merges.md#review-and-merge).
 
-**Empty**: `Nothing needs you on this project.`
+**Empty**: the section is left out (the Overview opens with the wiki).
 
 ## 2. In flight
 

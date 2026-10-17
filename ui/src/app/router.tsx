@@ -27,7 +27,7 @@ const sessions = createRoute({
   component: Sessions,
 });
 
-const projectTabs: ProjectTab[] = ["overview", "activity", "changes", "board", "settings"];
+const projectTabs: ProjectTab[] = ["overview", "board", "repositories", "activity", "settings"];
 export const projectRoute = createRoute({
   getParentRoute: () => root,
   path: "projects/$project",

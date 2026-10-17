@@ -6,7 +6,7 @@ tags: [feature, ui, messaging]
 
 # Project activity
 
-A project's **Activity** tab ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)): what its teams did there, their messages and git actions, across every deployment on the project. [Changes](./changes.md) stays the pipeline (needs you, in flight, merged); this tab is the traffic. Decided by the CEO on 2026-10-16 and 2026-10-17 ([Project → Activity tab](../../backlog/project-activity-tab.md)).
+A project's **Activity** tab ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)): what its teams did there, their messages and git actions, across every deployment on the project. The [project pipeline](./project-pipeline.md) (needs you on Overview, in flight and merged on [Repositories](./repositories.md)) is what moves towards `main`; this tab is the traffic. Decided by the CEO on 2026-10-16 and 2026-10-17 ([Project → Activity tab](../../backlog/project-activity-tab.md)).
 
 ## The timeline
 

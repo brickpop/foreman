@@ -69,7 +69,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 - *Under the hood:* the work is plain tools inside her container (git there is read-only: `status`, `diff`, `log`), which the CEO can watch live in her pane. `switch` and `commit` go through the Agent link to Workflow, and Git makes the branch and the commit on the host in her worktree, authored as Tove. `contribute` goes through the Agent link to Workflow, which writes `project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md` (author from her token) and has Messaging deliver "⇄ Tove contributed: Flaky settle test (…)" to Mara at her next idle, with a marker.
 
 **16. Hand-off.** Tove calls `handoff(mara, "wt/tove/LED-44", "Idempotency keys, tests pass")`.
-- *Under the hood:* Workflow commits anything Tove left uncommitted, checks the branch against the policy and creates a work item (stage *handed to lead*). Nothing is fetched: Tove's and Mara's worktrees share the repo, so Mara sees the branch at once (agents never push anywhere, and nothing goes to the forge yet). Messaging delivers "Tove handed off wt/tove/LED-44: …" to Mara at her next idle; marker shown; Changes → In flight shows the item.
+- *Under the hood:* Workflow commits anything Tove left uncommitted, checks the branch against the policy and creates a work item (stage *handed to lead*). Nothing is fetched: Tove's and Mara's worktrees share the repo, so Mara sees the branch at once (agents never push anywhere, and nothing goes to the forge yet). Messaging delivers "Tove handed off wt/tove/LED-44: …" to Mara at her next idle; marker shown; the project's Repositories tab shows the item under In flight.
 
 **17. Integration.** Mara reviews the branch (`git diff` in her worktree) and merges it into `lead/atlas/integration` with `merge("wt/tove/LED-44")`.
 - *Under the hood:* `merge` → Workflow → Git merges the branch on the host, in Mara's worktree (a conflict would leave markers for her to resolve, then `commit`). Workflow notices the integration through Git (the branch is contained in a `lead/atlas/*` branch) when Mara next goes idle: the work item moves to *integrated*. (If she wanted changes instead: an `ask` back to Tove, which moves nothing; his next hand-off of the branch brings the work item back to her: [Protocol → Work items and merge requests](./architecture/protocol.md#work-items-and-merge-requests).)
@@ -77,7 +77,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **18. The merge request.** Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`: the card explains what was done.
 - *Under the hood:* Workflow checks the branch and the entry, runs the project checks (in a throwaway container from the project image), creates the merge request for `ledger-api` (titled from the card, carrying the integrated work items) and a **review request**. Nothing is pushed. Home shows it, the browser notifies, Mara receives "Merge requested".
 
-**19. The CEO merges.** Home → the review → Changes. The CEO picks **Create PR on GitHub**, then **Open PR ↗**, reviews and merges on GitHub. (Or **Merge to main**, and Foreman merges locally; or **Reject** with a reason, which goes back to Mara.)
+**19. The CEO merges.** The review waits on Home and on the project's Overview, under Needs you. The CEO picks **Create PR on GitHub**, then **Open PR ↗**, reviews and merges on GitHub. (Or **Merge to main**, and Foreman merges locally; or **Reject** with a reason, which goes back to Mara.)
 - *Under the hood:* Create PR: Git pushes the branch to GitHub from the host, with the workspace token, and the Forge adapter opens PR #128. Forge adapter polling then sees `merged`; Workflow resolves the request, marks the merge request and its work items merged, delivers "merged into main" to Mara, and tells the leads of other open merge requests on `ledger-api` to merge `main` in (`merge("main")`). Git fetches the new `main` into `ledger-api` (`Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. (With Merge to main, Git merges on the host instead, and nothing reaches GitHub.)
 
 ## Part 3: intervene
@@ -103,7 +103,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **26. Edit a soul while running.** The CEO edits Tove's job description. Running instances get a short context-update delivery at their next idle; the full prompt applies at their next start.
 - *Under the hood:* Workspace & config (team file) → Instance manager → Messaging delivery; the Harness adapter regenerates `CLAUDE.md` for the next start.
 
-**27. Change project config safely.** Project → Settings → **Change with Chief of Staff** → "Use GitHub as the forge". A review appears in Changes.
+**27. Change project config safely.** Project → Settings → **Change with Chief of Staff** → "Use GitHub as the forge". A review appears on the project's Overview, under Needs you.
 - *Under the hood:* the Chief of Staff edits `project.toml` on a branch `foreman/config-1` of the project repo `ledger/project/` (never in the live checkout) → `request_merge` → a review request (Merge to main, Create PR on the project repo's forge, or Reject).
 
 **28. Wiki and board.** In Overview, the CEO ticks a checkbox in a standup note; on the Board, drags LED-51 to "In progress".

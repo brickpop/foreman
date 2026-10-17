@@ -48,7 +48,7 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - **Team definition**: "Lives once in the workspace: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
   - **Deployment**: "A team on this project with a goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix."
   - **Session prompt**: "Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt."
-  - **Enforced by Foreman**: "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (that’s Changes), wakes requesters when replies land, sends escalations to Home, and only lets the lead request merges to main."
+  - **Enforced by Foreman**: "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (that’s In flight, in Repositories), wakes requesters when replies land, sends escalations to Home, and only lets the lead request merges to main."
 
 **Right column**:
 
@@ -60,9 +60,9 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - Finding: "A challenge team rates something high severity. You decide who fixes it, and when."
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
 - **"Merges"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:
-  - forge `none`: "No forge. You merge requested branches into main from Changes; Foreman does the merge."
-  - otherwise: "Merge to main from Changes, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file."
+  - forge `none`: "No forge. You merge requested branches into main from Home or the project's Overview; Foreman does the merge."
+  - otherwise: "Merge to main from Home or the project's Overview, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file."
   - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
-- **`project.toml`**: a row with `<project>/project/project.toml · read-only` (Mono 12.5px `--tx3`) and a small outline **`Change with Chief of Staff`** button ([Chief of Staff](./chief-of-staff.md), config flow). Below: "This file is config, committed in the project repo. Edit it in your editor, or have the Chief of Staff edit it. Its change then comes back to you in Changes as a review." Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
+- **`project.toml`**: a row with `<project>/project/project.toml · read-only` (Mono 12.5px `--tx3`) and a small outline **`Change with Chief of Staff`** button ([Chief of Staff](./chief-of-staff.md), config flow). Below: "This file is config, committed in the project repo. Edit it in your editor, or have the Chief of Staff edit it. Its change then comes back to you on the Overview as a review." Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 
 Everything in this block is read-only. Changes to `project.toml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

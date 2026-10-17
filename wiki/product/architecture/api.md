@@ -19,6 +19,10 @@ GET    /api/workspace                         the workspace folder
 GET    /api/projects | /api/projects/:id      config (parsed), repos, version, problems (deployments join with the Instance manager)
 POST   /api/projects                          {folder, repo?, new?} → create the project repo in an existing folder, or with new, in a new folder of that name; with repo, also a first empty code repo (400 INVALID, 409 EXISTS)
 POST   /api/projects/:id/repos                {name} → create an empty code repo in the project (400 INVALID, 409 EXISTS)
+GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
+GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
+GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)
+GET    /api/projects/:id/repos/:repo/log      ?ref=&skip= a page of history, newest first: {commits, next}, 50 commits; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
@@ -76,6 +80,7 @@ GET    /api/events                            SSE: requests, status, file change
 
 
 A project's Activity tab pages its traffic with `/api/activity` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
+Its Repositories tab reads its repos read-only with `/api/projects/:id/repos…` ([Repositories](../features/repositories.md)).
 Resource ids: project = folder name; team = team id; instance = `agent@project` (agent ids are workspace-unique, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
 ## Error format

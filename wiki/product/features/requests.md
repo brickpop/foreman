@@ -6,7 +6,7 @@ tags: [feature, requests, team-tools, runtime]
 
 # Requests
 
-Anything that needs the CEO arrives as a typed **request**. Requests are listed on [Home](./home.md) (all projects) and in a project's [Changes](./changes.md) tab, and each new one raises a [notification](./notifications.md). The stored shape is in [Request](../models/request.md); the agent side (`escalate`, `request_merge`) is in [Team tools](../architecture/team-tools.md).
+Anything that needs the CEO arrives as a typed **request**. Requests are listed on [Home](./home.md) (all projects) and on a project's Overview, under [Needs you](./project-pipeline.md#1-needs-you), and each new one raises a [notification](./notifications.md). The stored shape is in [Request](../models/request.md); the agent side (`escalate`, `request_merge`) is in [Team tools](../architecture/team-tools.md).
 
 Every request has: kind, source, the instance (who), project, deployment, summary, options (optional), links (optional), created time and status (`open`, `resolved`, `expired`).
 
@@ -24,8 +24,8 @@ Request kind chips and colors: [Design system](../design/design-system.md#chips-
 
 ## Rules
 
-- **"Needs you"** means any open request, everywhere: the Home title and sidebar badge, the Changes badge, project and deployment dots, and the Chief of Staff's "what needs me" answer all count the same set.
-- **Answering**: approvals and questions offer their options and a free-text answer field (e.g. "approve, but pin version 2.x"), on Home and in Changes alike: both use the same request panel.
+- **"Needs you"** means any open request, everywhere: the Home title and sidebar badge, the project's Overview tab badge, project and deployment dots, and the Chief of Staff's "what needs me" answer all count the same set.
+- **Answering**: approvals and questions offer their options and a free-text answer field (e.g. "approve, but pin version 2.x"), on Home and on the project's Overview alike: both use the same request panel.
 - **Waiting in its session**: whenever the harness reports it is waiting for the user (a permission dialog, a multiple-choice question, or its own "waiting for your input" signal), Foreman raises a request (`source: harness`): an approval with the harness's choices when it exposes them, otherwise a question, carrying the question text when available. The CEO's answer is typed into the session; answering in the terminal directly resolves the request too. The instance is `awaiting` meanwhile. An instance that is merely idle after finishing raises nothing ([Protocol → Waiting for the CEO](../architecture/protocol.md#waiting-for-the-ceo)).
 - **Resolving** delivers the answer into the agent's session as one plain line (`From the CEO, on <request>: <answer>.`; for an approval, `… Resume where you paused.`) and marks the request resolved. Nothing is held open: an approval's tool call returned at once ([Team tools → Waiting on approval](../architecture/team-tools.md#waiting-on-approval)).
 - **Deduplication**: a request with the same instance, kind and summary as an open one created within 10 minutes is merged into it (summaries compared case- and whitespace-insensitively; see [Request](../models/request.md#invariants)).

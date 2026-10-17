@@ -3,7 +3,7 @@ import type { Board, Card, MergeRequest, Project, Request } from "../../api/clie
 import { filesChanged, forgeOf, linkLine } from "../../app/model";
 import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
 import { columnLabel, laneLabel, moveOf } from "./Board";
-import { sourceLabel } from "./Changes";
+import { sourceLabel } from "./Pipeline";
 import { repoTree } from "./ProjectSettings";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;

@@ -18,7 +18,7 @@ Three actors, and every interaction enters through exactly one channel:
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
-| CEO | Answering a request (Home, Changes) | `Answer` | Web server → **Workflow** `Resolve` |
+| CEO | Answering a request (Home, project Overview) | `Answer` | Web server → **Workflow** `Resolve` |
 | CEO | Merge to main, Create PR on the forge, Reject (a merge request) | `MergeAction` | Web server → **Workflow** |
 | Foreman | Process exit, silence, rate limit, git or build error | internal | **Instance manager** / **Workflow** → blocked [request](#requests) |
 | Foreman | Forge poll, project-repo watch | internal | **Workflow** → [merge request](#work-items-and-merge-requests) transitions |
@@ -254,7 +254,7 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
 - Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `uncommitted_changes` (commit first).
-- Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on Home or in Changes.
+- Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on Home or on the project's Overview.
 
 ### Deliveries Foreman originates
 
@@ -426,8 +426,8 @@ Every state change is published on the in-process event bus; the web server stre
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity panel |
 | `team.action` | an [action](#team-actions), once recorded | Workflow | Activity panel |
-| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, Changes, sidebar badges, notifications |
-| `pipeline.changed` | the work item or merge request | Workflow | Changes |
+| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, project Overview, sidebar badges, notifications |
+| `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Repositories |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
 | `wiki.changed`, `config.changed`, `workspace.changed` | as in [API](./api.md#events) | Workspace & config, Wiki | Overview, Board, Settings |
 

@@ -32,6 +32,7 @@ import (
 	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/messaging"
+	"github.com/brickpop/foreman/internal/repos"
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
@@ -274,6 +275,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages:    messenger,
 		Actions:     state.Actions(),
 		Activity:    state.Activity(),
+		Repos:       repos.Browser{Config: ws, Git: gitCLI},
 		Pipeline:    flow,
 		Requests:    flow,
 		Harnesses:   login,

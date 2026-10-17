@@ -31,7 +31,7 @@ Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findi
 Body padding `24px 48px 64px`, like every project tab. Boards are declared in `wiki.toml`: while the project repo lacks it, the tab shows the [No wiki yet](./wiki-reader.md#no-wiki-yet) placeholder instead.
 
 - **Toolbar**: the **board switcher** (segmented, one button per declared board; on = raised with `--line3` border) and, right-aligned, a Mono **`wiki.toml`** / **`Hide wiki.toml`** button that reveals the board's declaration in a `<pre>` (max 620px), quoted from the file.
-- **Grid**, min width 880px, scrolling horizontally when narrower.
+- **Grid**: each column 240–320px (the CEO, 2026-10-17), narrowing towards 240px as the screen does, then scrolling horizontally; never wider than 320px, so a wide screen leaves room on the right rather than stretching the cards.
   - Header row: one cell per column, `<Label> <count>` (label 500 `--tx3`, count `--tx4`). Labels come from the column values (`todo` → "To do", `in-progress` → "In progress", `review` → "Review", `done` → "Done", none → "No status"; others title-cased).
   - **Lanes**: with a `lane` field, one row per lane value, labelled (12px `--tx4`) e.g. "High priority", or "No priority" for the cards without it. Without a lane field, a single unlabelled row.
   - **Cell**: `--side`, `--line` border, radius 10, padding 8, min height 72px, gap 8.

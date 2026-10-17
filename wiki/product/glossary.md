@@ -36,6 +36,6 @@ tags: [architecture, workspace]
 - **Card** (board card): a wiki task entry shown on a [board](./features/board.md). "Card" means only this; members usually work on one card per topic branch (`wt/<agent>/<card>`).
 - **Work item**: one agent's branch on its way into the lead branch (in worktree → handed to lead → lead reviewing → integrated). Informational: it never needs the CEO. See [Work item](./models/work-item.md).
 - **Merge request**: the lead's request, through `request_merge(branch, entry)`, to merge a lead branch into `main` of one repo, explained by a wiki entry and carrying the integrated work items; the only pipeline entry that raises a request (the review), whose actions are Merge to main, Create PR on the forge and Reject. A **pull request (PR)** is a merge request's forge side, made only by Create PR. See [Merge request](./models/merge-request.md) and [Pipeline and merges](./features/pipeline-and-merges.md).
-- **Request panel**: the UI component that shows one [request](./models/request.md) on Home and in Changes.
+- **Request panel**: the UI component that shows one [request](./models/request.md) on Home and on a project's Overview (Needs you).
 - **Chief of Staff (CoS)**: the built-in, Foreman-owned agent session that handles setup and anything the UI doesn't cover. See [Chief of Staff](./features/chief-of-staff.md).
 - **CEO**: the single human user of Foreman.

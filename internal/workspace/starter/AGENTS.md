@@ -74,7 +74,7 @@ Every piece of work is one **task entry** in `backlog/`. The project's boards sh
 ---
 type: task
 title: Export invoices as CSV
-status: backlog       # backlog | todo | blocked | in-progress | review | done
+status: backlog       # backlog | todo | blocked | in-progress | done
 priority: medium      # quick | high | medium | low
 assignee: tove        # the agent id of who does it; leave it out while unassigned
 epic: invoicing       # the epic's file name in backlog/epics/
@@ -87,7 +87,7 @@ What and why, and what "done" means. Link the specs it touches.
 - [ ] step
 ```
 
-- **`status`**: `backlog` (captured, not scheduled), `todo` (scheduled: ready to start), `blocked` (waiting: say on what, and link the task it waits on: `Blocked by [Title](./other-task.md)`), `in-progress` (its assignee is on it), `review` (done by its assignee, waiting for the lead or the CEO), `done` (merged or accepted). **Only `todo` tasks are picked up**: the lead (or the CEO, on the Backlog board) schedules a task by moving it from `backlog` to `todo`.
+- **`status`**: `backlog` (captured, not scheduled), `todo` (scheduled: ready to start), `blocked` (it can't move: say on what in its body, on a line of its own: `Blocked by [Title](./other-task.md)`, or the CEO's answer, a teammate's reply; remove the line when it moves again), `in-progress` (its assignee is on it, including while it is reviewed), `done` (merged or accepted). These five values, no others: a board shows any other value as a column of its own. **Only `todo` tasks are picked up**: the lead (or the CEO, on the Backlog board) schedules a task by moving it from `backlog` to `todo`.
 - **`priority`**: `quick` (no uncertainty: it can be done right now, without issue), then `high`, `medium`, `low`.
 - **`title`** is what the board shows; without it, the board shows the file name. **`assignee`** is an agent id, so the board shows who has it.
 - **Steps** are `- [ ]` checkboxes in the body; the CEO can tick them too.
@@ -116,7 +116,7 @@ An epic lives in `backlog/epics/<slug>.md`; its tasks name it in `epic: <slug>`.
 
 1. **Capture**: a new task in `backlog/` with `status: backlog` and a `priority`. Contributions in `inbox/` become tasks, specs, research notes, or nothing; then delete them.
 2. **Schedule**: the lead moves it to `todo` when it's next.
-3. **Work**: `in-progress`, then `review`, ticking its steps; `blocked` while waiting.
+3. **Work**: `in-progress`, ticking its steps, through review; `blocked`, with its `Blocked by` line, while it can't move.
 4. **Finish**: update the specs it touched (and their `status`), set `done`, then retire the task: delete it (git keeps it; remove links to it first, `wiki backlinks` finds them), or `wiki move` it to `backlog/archive/` when a browsable record is worth keeping.
 
 **Technical debt** (every workaround or `TODO`) is an item in `technical-debt.md`: what, why, how to fix. When one is scheduled, a task links to it; when fixed, the item goes.

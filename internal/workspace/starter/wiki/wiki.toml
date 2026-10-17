@@ -16,16 +16,25 @@ path    = "/backlog"
 name    = "Board"
 where   = ["type=task", "status!=backlog"]
 status  = "status"
-columns = ["todo", "blocked", "in-progress", "review", "done"]
+columns = ["todo", "blocked", "in-progress", "done"]
 lane    = "priority"
 lanes   = ["quick", "high", "medium", "low"]
 
-# Unscheduled tasks. Moving one to `todo` schedules it: it leaves this board for the one above.
+# Unscheduled tasks, and the scheduled ones not started yet. Moving one to `todo`
+# schedules it: it stays here under To do, and shows on the board above too.
+# Any status of work started or ended stays off it, the usual names included
+# in case one is used instead of ours.
 [[tool.wikiview.board]]
 id      = "backlog"
 path    = "/backlog"
 name    = "Backlog"
-where   = ["type=task", "status=backlog"]
+where   = [
+  "type=task",
+  "status!=blocked", "status!=in-progress", "status!=done",
+  "status!=doing", "status!=wip", "status!=review", "status!=in-review",
+  "status!=testing", "status!=closed", "status!=cancelled", "status!=canceled",
+  "status!=wontfix", "status!=archived",
+]
 status  = "status"
 columns = ["backlog", "todo"]
 lane    = "priority"

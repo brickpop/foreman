@@ -145,7 +145,7 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
         navigate({
           to: "/projects/$project",
           params: { project: r.projectId },
-          search: { tab: "changes" },
+          search: { tab: "overview" },
         })
       }
       onOpenChiefOfStaff={() => openChiefOfStaff()}

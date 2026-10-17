@@ -22,8 +22,9 @@ import { RequestPanel } from "../../components/RequestPanel";
 import { ReviewPanel } from "../../components/ReviewPanel";
 import { Button, Empty, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 
-// The project's actionable tab (wiki/product/features/changes.md): what needs
-// the CEO, work moving towards main, and what recently merged.
+// A project's pipeline (wiki/product/features/changes.md): what needs the CEO
+// opens its Overview; the work moving towards main, and what recently merged,
+// open its Repositories tab.
 
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
@@ -35,14 +36,39 @@ export function sourceLabel(r: Request): string {
 
 const stageLabels = ["in worktree", "handed to lead", "lead reviewing", "integrated"];
 
-export function Changes({ project }: { project: Project }) {
+/** What waits on the CEO on this project, first on its Overview; nothing when
+ * nothing does. */
+export function NeedsYou({ project }: { project: Project }) {
   const requests = useRequests();
   const pipeline = usePipeline(project.id);
   const teams = useTeams();
-  const instances = useInstances();
   const open = ordered(
     (requests.data ?? []).filter((r) => r.status === "open" && r.projectId === project.id),
   );
+  const mrs = pipeline.data?.mergeRequests ?? [];
+  if (open.length === 0) return null;
+  return (
+    <section className="flex flex-col gap-2.5 px-12 pt-6">
+      <SectionLabel>Needs you</SectionLabel>
+      {open.map((r) => (
+        <ProjectRequest
+          key={r.id}
+          request={r}
+          project={project}
+          teams={teams.data ?? []}
+          mr={mrs.find((m) => m.id === r.mergeRequestId)}
+        />
+      ))}
+    </section>
+  );
+}
+
+/** The work on its way to main, and what merged in the last 7 days: first on
+ * the Repositories tab. */
+export function InFlight({ project }: { project: Project }) {
+  const pipeline = usePipeline(project.id);
+  const teams = useTeams();
+  const instances = useInstances();
   const mrs = pipeline.data?.mergeRequests ?? [];
   const items = pipeline.data?.workItems ?? [];
   const live = new Set((instances.data ?? []).map((i) => i.deploymentId));
@@ -57,30 +83,9 @@ export function Changes({ project }: { project: Project }) {
   const carried = (w: (typeof items)[number]) =>
     mrs.some((m) => m.id === w.mergeRequestId && (m.state === "open" || m.state === "merged"));
   const loose = items.filter((w) => !carried(w));
-  if (isNotBuilt(pipeline.error))
-    return (
-      <div className="px-12 pt-6">
-        <NotBuilt what="requests or the pipeline" />
-      </div>
-    );
+  if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
   return (
-    <div className="flex flex-col gap-9 px-12 pt-6 pb-16">
-      <section className="flex flex-col gap-2.5">
-        <SectionLabel>Needs you</SectionLabel>
-        {open.length === 0 ? (
-          <Empty>Nothing needs you on this project.</Empty>
-        ) : (
-          open.map((r) => (
-            <ChangesRequest
-              key={r.id}
-              request={r}
-              project={project}
-              teams={teams.data ?? []}
-              mr={mrs.find((m) => m.id === r.mergeRequestId)}
-            />
-          ))
-        )}
-      </section>
+    <>
       <section className="flex flex-col gap-2.5">
         <div className="flex items-baseline gap-2">
           <SectionLabel>In flight</SectionLabel>
@@ -127,11 +132,11 @@ export function Changes({ project }: { project: Project }) {
           ))}
         </section>
       )}
-    </div>
+    </>
   );
 }
 
-function ChangesRequest({
+function ProjectRequest({
   request: r,
   project,
   teams,
@@ -170,7 +175,7 @@ function ChangesRequest({
             : `${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into main in ${mr.repo}.`
         }
         author={fromChiefOfStaff ? "the Chief of Staff" : (agent?.soul.name ?? "the lead")}
-        variant="changes"
+        variant="project"
         source={sourceLabel(r)}
         onOpenSession={openSession}
         onOpenChiefOfStaff={() => openChiefOfStaff()}
@@ -180,7 +185,7 @@ function ChangesRequest({
   return (
     <RequestPanel
       request={r}
-      variant="changes"
+      variant="project"
       source={sourceLabel(r)}
       who={who}
       context={context}

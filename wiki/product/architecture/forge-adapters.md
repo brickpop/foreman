@@ -28,14 +28,14 @@ Every adapter implements the same small set, so kinds are interchangeable. Forem
 | push branch | **Create PR**: Foreman pushes the merge request's branch to the forge (again, as a plain fast-forward, when the lead calls `request_merge` again after merging `main` in) with the workspace token. **Sync** on a reserved repo pushes its `main` the same way. Agents never push to the forge and never see the token ([Sandboxes and git policy](./sandboxes-and-git.md)) |
 | open PR (title, body, head, base = `main`) → URL, number | **Create PR**: the title and body come from the merge request's wiki entry |
 | read PR state | polling, below |
-| read check status | after opening and while polling; shown as "checks pass" on review request panels ([Changes](../features/changes.md)), next to Foreman's own run of the project `checks` |
+| read check status | after opening and while polling; shown as "checks pass" on review request panels ([Needs you](../features/project-pipeline.md#1-needs-you)), next to Foreman's own run of the project `checks` |
 | comment, close PR | CEO **Reject** on a merge request that has a PR: the reason is posted on the PR and the PR is closed (the reason is also delivered to the lead) |
 
 For `none` there is no PR and nothing to push: the CEO uses Merge to main, and Reject only reaches the lead's session.
 
 ### PR state
 
-While a [merge request](../models/merge-request.md) with a PR is open, Foreman polls the PR on the forge every 60 seconds (and when the CEO opens Changes): no webhooks, so nothing has to reach Foreman from outside. It reads:
+While a [merge request](../models/merge-request.md) with a PR is open, Foreman polls the PR on the forge every 60 seconds (and when the CEO opens the project's Overview): no webhooks, so nothing has to reach Foreman from outside. It reads:
 
 - **merged**: the merge request and its work items are marked merged, the review request resolves, the lead is told; Foreman fetches the new `main` from the forge into the repo (`Git.Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. The leads of the other open merge requests on the same repo are told to merge `main` in ([When main moves](../features/pipeline-and-merges.md#when-main-moves)).
 - **mergeability**: when the forge reports the PR as conflicting with `main`, `conflicting` is set (shown as "conflicts with main") and the lead is asked to merge `main` in; cleared when the forge reports it mergeable again.

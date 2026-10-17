@@ -1,6 +1,7 @@
 package wiki
 
 import (
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -119,5 +120,54 @@ func TestBoardsNoneDeclared(t *testing.T) {
 	w, _ := fixture(t, map[string]string{"index.md": "# Home\n"})
 	if got, err := w.Boards("p"); err != nil || got == nil || len(got) != 0 {
 		t.Errorf("boards %#v %v, want an empty list", got, err)
+	}
+}
+
+// The starter's two task boards (internal/workspace/starter): a task moved to
+// todo on Backlog stays there and shows on Board too; one at work only on
+// Board; an unscheduled one only on Backlog (the CEO, 2026-10-17).
+func TestTheStartersTaskBoards(t *testing.T) {
+	toml, err := os.ReadFile("../workspace/starter/wiki/wiki.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, _ := fixture(t, map[string]string{
+		"wiki.toml":            string(toml),
+		"backlog/idea.md":      task("status: backlog\npriority: high\n"),
+		"backlog/scheduled.md": task("status: todo\npriority: high\n"),
+		"backlog/working.md":   task("status: in-progress\npriority: high\n"),
+		"backlog/stuck.md":     task("status: blocked\npriority: high\n"),
+		"backlog/stray.md":     task("status: review\npriority: high\n"), // not ours: off Backlog
+		"backlog/epics/a.md":   "---\ntype: epic\nstatus: todo\n---\n",
+	})
+	got, err := w.Boards("p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards := func(id string) []string {
+		for _, b := range got {
+			if b.ID == id {
+				if id == "board" && !slices.Equal(b.Columns, []string{"todo", "blocked", "in-progress", "done", "review"}) {
+					t.Errorf("Board's columns %v", b.Columns)
+				}
+				if len(b.Problems) > 0 {
+					t.Errorf("%s: %v", id, b.Problems)
+				}
+				var list []string
+				for _, c := range b.Cards {
+					list = append(list, c.Path+":"+c.Column)
+				}
+				slices.Sort(list)
+				return list
+			}
+		}
+		t.Fatalf("no board %s", id)
+		return nil
+	}
+	if b, want := cards("board"), []string{"backlog/scheduled.md:todo", "backlog/stray.md:review", "backlog/stuck.md:blocked", "backlog/working.md:in-progress"}; !slices.Equal(b, want) {
+		t.Errorf("Board %v, want %v", b, want)
+	}
+	if b, want := cards("backlog"), []string{"backlog/idea.md:backlog", "backlog/scheduled.md:todo"}; !slices.Equal(b, want) {
+		t.Errorf("Backlog %v, want %v", b, want)
 	}
 }

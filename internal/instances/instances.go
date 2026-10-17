@@ -88,10 +88,11 @@ type AgentLink struct {
 // Manager runs the instances of every active deployment.
 type Manager struct {
 	Deps
-	mu     sync.Mutex
-	starts sync.WaitGroup   // starts under way
-	live   map[string]*live // instances with a process or a start under way
-	queue  []string         // queued instances, in creation order
+	mu      sync.Mutex
+	starts  sync.WaitGroup   // starts under way
+	live    map[string]*live // instances with a process or a start under way
+	queue   []string         // queued instances, in creation order
+	closing bool             // Foreman is exiting: nothing starts any more
 }
 
 type live struct {
@@ -178,6 +179,12 @@ func (m *Manager) Wake(ctx context.Context, id string) error {
 
 // blocked is why agents can't start now, wrapping ErrNotReady, or nil.
 func (m *Manager) blocked() error {
+	m.mu.Lock()
+	closing := m.closing
+	m.mu.Unlock()
+	if closing {
+		return fmt.Errorf("%w: foreman is stopping", ErrNotReady)
+	}
 	if m.Blocked == nil {
 		return nil
 	}
@@ -259,6 +266,49 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 	m.publish("deployment.stopped", dep)
 	m.startQueued() // its slots go to whoever waits
 	return nil
+}
+
+// Shutdown stops every instance's process as Foreman exits, all at once, each
+// with the usual grace. Each goes to sleep, not to stopped: work or the CEO's
+// Start wakes it on a later run, continuing its conversation. One whose stop
+// fails (Podman not answering) keeps its status, so the next start re-attaches
+// it as after a crash. Nothing starts after it
+// (wiki/product/architecture/agent-runtime.md#recovery).
+func (m *Manager) Shutdown(ctx context.Context) {
+	m.mu.Lock()
+	m.closing = true
+	ids := m.queue
+	m.queue = nil
+	procs := map[string]runner.Process{}
+	for id, l := range m.live {
+		// A start under way sees it and stops what it launched.
+		l.stopping = true
+		ids = append(ids, id)
+		if l.proc != nil {
+			procs[id] = l.proc
+		}
+	}
+	m.mu.Unlock()
+	var stops sync.WaitGroup
+	var failedMu sync.Mutex
+	failed := map[string]bool{}
+	for id, p := range procs {
+		stops.Go(func() {
+			if err := p.Stop(stopGrace); err != nil {
+				slog.Warn("stopping an instance; the next start re-attaches it", "instance", id, "err", err)
+				failedMu.Lock()
+				failed[id] = true
+				failedMu.Unlock()
+			}
+		})
+	}
+	stops.Wait()
+	m.Wait()
+	for _, id := range ids {
+		if !failed[id] {
+			m.setStatus(ctx, id, Asleep)
+		}
+	}
 }
 
 // Live reports whether the instance has a process or a start under way: the
@@ -387,6 +437,12 @@ func (m *Manager) adopt(ctx context.Context, id string, p runner.Process) error 
 	}
 	l := &live{proc: p, term: terminal.New(id, p, log)}
 	m.mu.Lock()
+	if m.closing {
+		// Exiting: left running, for the next start to re-attach.
+		m.mu.Unlock()
+		_ = log.Close()
+		return nil
+	}
 	m.live[id] = l
 	m.mu.Unlock()
 	// Its process lived on: what its hooks last said still holds (idle stays
@@ -418,7 +474,7 @@ func (m *Manager) startQueued() {
 	max := m.Config.Settings().Settings.MaxSessions
 	for {
 		m.mu.Lock()
-		if len(m.queue) == 0 || len(m.live) >= max {
+		if len(m.queue) == 0 || len(m.live) >= max || m.closing {
 			m.mu.Unlock()
 			return
 		}

@@ -24,7 +24,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **4. Connect the forge.** Settings → Forge accounts → GitHub → **Connect**: host and token, checked against GitHub, never shown again.
 - *Under the hood:* Forge adapter (validates the token); the secret store (`.foreman/secrets`, 0600, never mounted into containers).
 
-**5. Add the project.** Sidebar → **+ New project** lists the workspace folders that aren't projects yet, with their git repos. The CEO picks `ledger` → **Add project**.
+**5. Add the project.** Sidebar → **+ New project** asks for a name, and lists below it the workspace folders that aren't projects yet, with their git repos. The CEO picks `ledger` → **Add project**.
 - *Under the hood:* Workspace & config creates the project repo `ledger/project/`: `git init`, `project.toml` (repos found, `forge`), and a starter `wiki/` with `index.md` and `wiki.toml` (one Backlog board), as its first commit; `.sandboxes/` goes into the git excludes. The file watcher notices; the sidebar updates through the Event bus.
 
 **6. Read the project.** Project → **Overview** shows the wiki's `index.md`; **Board** shows the Backlog board (empty); **Settings** shows `project.toml` read-only.

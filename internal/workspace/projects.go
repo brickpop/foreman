@@ -95,21 +95,57 @@ func (w *Workspace) AddProject(ctx context.Context, folder, repo string) (Projec
 	if !slices.ContainsFunc(w.candidates(), func(c Candidate) bool { return c.Folder == folder }) {
 		return Project{}, fmt.Errorf("%w: %q isn't a folder of the workspace that could become a project", ErrInvalid, folder)
 	}
-	if repo != "" {
-		if err := w.checkRepoName(folder, repo); err != nil {
-			return Project{}, err
-		}
-	}
-	dir := filepath.Join(w.root, folder, projectRepo)
-	err := w.createProjectRepo(ctx, folder, dir)
-	if err == nil && repo != "" {
-		err = w.createRepo(ctx, filepath.Join(w.root, folder, repo), "main")
-	}
-	if err != nil {
-		_ = os.RemoveAll(dir)
+	if err := w.makeProject(ctx, folder, repo); err != nil {
 		return Project{}, err
 	}
 	return w.rescan(folder)
+}
+
+// NewProject creates the folder name in the workspace and makes it a project,
+// as AddProject does. The name follows a repo's rules and must be new, in
+// any case.
+func (w *Workspace) NewProject(ctx context.Context, name, repo string) (Project, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !validName(name) {
+		return Project{}, fmt.Errorf("%w: a project name is %s", ErrInvalid, nameRules)
+	}
+	if existing, ok := taken(w.root, name); ok {
+		return Project{}, fmt.Errorf("%w: %s", ErrExists, existing)
+	}
+	dir := filepath.Join(w.root, name)
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		return Project{}, err
+	}
+	if err := w.makeProject(ctx, name, repo); err != nil {
+		_ = os.RemoveAll(dir)
+		return Project{}, err
+	}
+	return w.rescan(name)
+}
+
+// makeProject creates folder's project repo and, with repo, its first code
+// repo, removing what it made if a step fails. Called with w.mu held.
+func (w *Workspace) makeProject(ctx context.Context, folder, repo string) error {
+	if repo != "" {
+		if err := w.checkRepoName(folder, repo); err != nil {
+			return err
+		}
+	}
+	dir := filepath.Join(w.root, folder, projectRepo)
+	if err := w.createProjectRepo(ctx, folder, dir); err != nil {
+		_ = os.RemoveAll(dir)
+		return err
+	}
+	if repo == "" {
+		return nil
+	}
+	if err := w.createRepo(ctx, filepath.Join(w.root, folder, repo), "main"); err != nil {
+		_ = os.RemoveAll(filepath.Join(w.root, folder, repo))
+		_ = os.RemoveAll(dir)
+		return err
+	}
+	return nil
 }
 
 func (w *Workspace) createProjectRepo(ctx context.Context, folder, dir string) error {
@@ -157,17 +193,39 @@ func (w *Workspace) AddRepo(ctx context.Context, project, name string) (Project,
 	return w.rescan(project)
 }
 
-var repoName = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
+var nameRule = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
+
+// nameRules says what validName accepts, for refusals.
+const nameRules = "letters, digits, dots, hyphens and underscores, starting with a letter or digit"
+
+// validName is the rule for the folders Foreman creates: code repos and
+// projects.
+func validName(name string) bool {
+	return nameRule.MatchString(name) && !strings.Contains(name, "..")
+}
+
+// taken finds an entry of dir named name in any case: a Mac's filesystem
+// takes them for one, and elsewhere they would be two names hard to tell
+// apart.
+func taken(dir, name string) (string, bool) {
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.EqualFold(e.Name(), name) {
+			return e.Name(), true
+		}
+	}
+	return "", false
+}
 
 func (w *Workspace) checkRepoName(folder, name string) error {
 	switch {
-	case !repoName.MatchString(name) || strings.Contains(name, ".."):
-		return fmt.Errorf("%w: a repo name is lowercase letters, digits, dots, hyphens and underscores, starting with a letter or digit", ErrInvalid)
-	case name == projectRepo:
+	case !validName(name):
+		return fmt.Errorf("%w: a repo name is %s", ErrInvalid, nameRules)
+	case strings.EqualFold(name, projectRepo):
 		return fmt.Errorf("%w: %q is the project repo's name", ErrInvalid, name)
 	}
-	if _, err := os.Lstat(filepath.Join(w.root, folder, name)); err == nil {
-		return fmt.Errorf("%w: %s/%s", ErrExists, folder, name)
+	if existing, ok := taken(filepath.Join(w.root, folder), name); ok {
+		return fmt.Errorf("%w: %s/%s", ErrExists, folder, existing)
 	}
 	return nil
 }

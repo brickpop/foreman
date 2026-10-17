@@ -14,10 +14,12 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/brickpop/foreman/agentbin"
@@ -192,8 +194,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: ws,
 		Blocks: []teamtools.Block{messenger, flow}}
 	link = agentlink.New(secret, manager.Live, router, manager)
+	agentServer := &http.Server{Handler: link.Handler()}
 	go func() {
-		if err := http.Serve(agentListener, link.Handler()); err != nil {
+		if err := agentServer.Serve(agentListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("the agent port stopped", "err", err)
 		}
 	}()
@@ -220,7 +223,11 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		},
 		Reconnected: sweep,
 	})
-	go checklist.Run(ctx)
+	// A clean exit (Ctrl-C, SIGTERM) stops the agents; a crash leaves them to
+	// the next start's restore.
+	quit, stopSignals := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	go checklist.Run(quit)
 	views := agents{Manager: manager, logins: login.terms, typed: messenger.Typed}
 	handler := server.New(server.Options{
 		Guard:       access.NewTokenGuard(token, access.LocalHosts(*port), *port),
@@ -236,7 +243,29 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Terminals:   views,
 		UI:          files,
 	})
-	return http.Serve(listener, handler)
+	return serveUntil(quit, stopSignals, stdout, &http.Server{Handler: handler}, listener, func() {
+		manager.Shutdown(context.Background())
+		login.terms.stopAll()
+		_ = agentServer.Close()
+	})
+}
+
+// serveUntil serves until quit, then stops serving and runs shutdown. A
+// second signal during it ends Foreman at once (release puts the signals
+// back to their default).
+func serveUntil(quit context.Context, release func(), stdout io.Writer, srv *http.Server, l net.Listener, shutdown func()) error {
+	served := make(chan error, 1)
+	go func() { served <- srv.Serve(l) }()
+	select {
+	case err := <-served:
+		return err
+	case <-quit.Done():
+	}
+	release()
+	fmt.Fprintln(stdout, "Stopping the agents (Ctrl-C again to leave them running)")
+	_ = srv.Close()
+	shutdown()
+	return nil
 }
 
 // parseArgs accepts flags before and after the workspace folder (the flag

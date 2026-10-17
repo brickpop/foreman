@@ -55,7 +55,9 @@ function Teams({ project, onDeploy }: { project: Project; onDeploy: () => void }
               <div className="flex items-center gap-4">
                 <div className="flex flex-1 flex-col">
                   <span className="text-base font-semibold">{team?.config.name ?? d.teamId}</span>
-                  <span className="text-[13.5px] text-tx3">{d.goal}</span>
+                  <span className={`text-[13.5px] ${d.goal ? "text-tx3" : "text-tx4"}`}>
+                    {d.goal || "No goal set"}
+                  </span>
                 </div>
                 <Button
                   variant="raised"

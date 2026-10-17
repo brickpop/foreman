@@ -2,41 +2,67 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { keys, useWorkspace } from "../app/queries";
+import { keys, useProjects } from "../app/queries";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
-// Turns a workspace folder into a project (wiki/product/features/add-project.md).
-// Foreman never clones: the CEO puts the repos in the folder first, or has
-// Foreman create an empty one for a folder that has none.
+// Creates a project in a new folder, or turns an existing workspace folder
+// into one (wiki/product/features/add-project.md). Foreman never clones: the
+// CEO puts the repos in a folder first, or has Foreman create an empty one.
 
 export function repoDetail(repos: string[]): string {
   if (repos.length === 0) return "No git repos yet";
   return `${repos.length} git repo${repos.length === 1 ? "" : "s"}: ${repos.join(", ")}`;
 }
 
+// nameClash says why a new project can't take name: a workspace folder has it
+// already, in any case. The server refuses too, and also knows the hidden
+// folders and plain files the dialog doesn't see.
+export function nameClash(name: string, projects: string[], candidates: string[]): string {
+  const lower = name.trim().toLowerCase();
+  if (!lower) return "";
+  const project = projects.find((p) => p.toLowerCase() === lower);
+  if (project) return `${project} is already a project.`;
+  const folder = candidates.find((c) => c.toLowerCase() === lower);
+  if (folder) return `${folder}/ already exists: pick it below to add it.`;
+  return "";
+}
+
+export function repoHint(folder: string, repo: string): string {
+  return `Creates ${folder || "<project>"}/${repo || "<repo>"}/ and initializes a git repo in it, with a first commit. Leave it blank to add one later.`;
+}
+
+// Fields as in the Deploy dialog: a short label, the input, a hint under it.
+const label = "text-[13px] font-medium text-tx4";
+const field =
+  "rounded-lg border border-line2 bg-term px-3 py-2 font-mono text-[13px] text-tx disabled:opacity-45";
+const hint = "text-[12.5px] text-tx4";
+
 export function AddProject({ open, onClose }: { open: boolean; onClose: () => void }) {
   const client = useClient();
   const queries = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
-  const workspace = useWorkspace();
+  const projects = useProjects();
+  const [name, setName] = useState("");
   const [chosen, setChosen] = useState<string>();
-  const [repo, setRepo] = useState("");
+  // undefined follows the new project's name until the CEO edits it.
+  const [repo, setRepo] = useState<string>();
   const candidates = useQuery({
     queryKey: ["candidates"],
     queryFn: () => client.workspace.candidates(),
     enabled: open,
   });
   const add = useMutation({
-    mutationFn: ({ folder, repo }: { folder: string; repo: string }) =>
-      client.workspace.addProject(folder, repo.trim() || undefined),
+    mutationFn: ({ folder, repo }: { folder?: string; repo: string }) =>
+      folder
+        ? client.workspace.addProject(folder, repo || undefined)
+        : client.workspace.newProject(name.trim(), repo || undefined),
     onSuccess: (p) => {
       queries.invalidateQueries({ queryKey: keys.projects });
       queries.invalidateQueries({ queryKey: ["candidates"] });
       onClose();
-      setChosen(undefined);
       navigate({
         to: "/projects/$project",
         params: { project: p.id },
@@ -55,71 +81,116 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
       });
     },
   });
-  const root = workspace.data?.path ?? "the workspace";
   const list = candidates.data ?? [];
   const selected = list.find((c) => c.folder === chosen);
+  const folder = selected?.folder ?? name.trim();
+  const repoValue = repo ?? (selected ? "" : name.trim());
+  // The top Repo name field is the new folder's; a selected row has its own.
+  const newRepo = selected ? "" : repoValue;
+  const clash = selected
+    ? ""
+    : nameClash(
+        name,
+        (projects.data ?? []).map((p) => p.id),
+        list.map((c) => c.folder),
+      );
   return (
-    <Modal open={open} onClose={onClose} title="Add a project">
+    <Modal open={open} onClose={onClose} title="New project">
       <div className="flex flex-col gap-4">
-        <p className="m-0 text-[13.5px] text-tx3">
-          Folders in {root} that aren’t projects yet. Clone your repos into a folder, then add it
-          here.
-        </p>
-        {list.length === 0 ? (
-          <p className="m-0 text-tx3">No new folders found in {root}.</p>
-        ) : (
+        <label className="flex flex-col gap-1.5">
+          <span className={label}>Project name</span>
+          <input
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              if (chosen) {
+                setChosen(undefined);
+                setRepo(undefined);
+              }
+            }}
+            spellCheck={false}
+            className={field}
+          />
+          {clash ? (
+            <span className="text-[12.5px] text-err">{clash}</span>
+          ) : (
+            <span className={hint}>
+              Only letters, digits, dots, hyphens and underscores, starting with a letter or digit.
+            </span>
+          )}
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className={label}>Repo name</span>
+          <input
+            value={newRepo}
+            onChange={(e) => setRepo(e.target.value)}
+            disabled={!!selected}
+            spellCheck={false}
+            className={field}
+          />
+          <span className={hint}>{repoHint(name.trim(), newRepo.trim())}</span>
+        </label>
+        {list.length > 0 && (
           <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-            <legend className="sr-only">Folders</legend>
-            {list.map((c) => (
-              <label
-                key={c.folder}
-                className={`flex cursor-pointer flex-col gap-0.5 rounded-[9px] border px-3.5 py-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-acc ${
-                  c.folder === chosen ? "border-acc bg-accSoft" : "border-line2 hover:border-line3"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="folder"
-                  value={c.folder}
-                  checked={c.folder === chosen}
-                  onChange={() => {
-                    setChosen(c.folder);
-                    setRepo(c.repos.length === 0 ? c.folder : "");
-                  }}
-                  className="sr-only"
-                />
-                <span className="font-mono text-sm font-medium">{c.folder}/</span>
-                <span className="text-[13px] text-tx3">{repoDetail(c.repos)}</span>
-              </label>
-            ))}
+            <legend className="mt-2 mb-1.5 text-[13px] font-medium text-tx4">
+              or add an existing folder (Foreman never clones: put your repos in it first)
+            </legend>
+            {list.map((c) => {
+              const on = c.folder === chosen;
+              return (
+                <div
+                  key={c.folder}
+                  className={`flex flex-col gap-3 rounded-[9px] border px-3.5 py-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-acc ${
+                    on ? "border-acc bg-accSoft" : "border-line2 hover:border-line3"
+                  }`}
+                >
+                  <label className="flex cursor-pointer flex-col gap-0.5">
+                    <input
+                      type="radio"
+                      name="folder"
+                      value={c.folder}
+                      checked={on}
+                      onChange={() => {
+                        setChosen(c.folder);
+                        setName("");
+                        setRepo(c.repos.length === 0 ? c.folder : "");
+                      }}
+                      className="sr-only"
+                    />
+                    <span className="font-mono text-sm font-medium">{c.folder}/</span>
+                    <span className="text-[13px] text-tx3">{repoDetail(c.repos)}</span>
+                  </label>
+                  {on && (
+                    <p className="m-0 text-[13px] text-tx2">
+                      Creates {c.folder}/project/: a git repo with project.toml and a starter wiki.
+                    </p>
+                  )}
+                  {on && c.repos.length === 0 && (
+                    <label className="flex flex-col gap-1.5">
+                      <span className={label}>Repo name</span>
+                      <input
+                        value={repoValue}
+                        onChange={(e) => setRepo(e.target.value)}
+                        spellCheck={false}
+                        className={field}
+                      />
+                      <span className={hint}>{repoHint(c.folder, repoValue.trim())}</span>
+                    </label>
+                  )}
+                </div>
+              );
+            })}
           </fieldset>
-        )}
-        {selected && (
-          <p className="m-0 text-[13px] text-tx2">
-            Creates {selected.folder}/project/: a git repo with project.toml and a starter wiki.
-          </p>
-        )}
-        {selected && selected.repos.length === 0 && (
-          <label className="flex flex-col gap-1 text-[13px] text-tx3">
-            New repo (agents need one to work on; Foreman creates it empty, with a first commit.
-            Leave it blank to add one later.)
-            <input
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-              spellCheck={false}
-              className="rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
-            />
-          </label>
         )}
         {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
           <Button
             variant="primary"
-            disabled={!chosen || add.isPending}
-            onClick={() => chosen && add.mutate({ folder: chosen, repo })}
+            disabled={!folder || !!clash || add.isPending}
+            onClick={() => add.mutate({ folder: selected?.folder, repo: repoValue.trim() })}
           >
-            Add project
+            {selected ? "Add project" : "Create project"}
           </Button>
         </div>
       </div>

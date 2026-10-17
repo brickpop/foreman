@@ -75,14 +75,15 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 	mux.HandleFunc("POST /api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		var req deployRequest
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {team, project, goal}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {team, project, goal?}")
 			return
 		}
-		if req.Team == "" || req.Project == "" || strings.TrimSpace(req.Goal) == "" {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "team, project and goal are required")
+		if req.Team == "" || req.Project == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "team and project are required")
 			return
 		}
-		dep, err := a.Deploy(r.Context(), req.Team, req.Project, req.Goal)
+		// The goal is optional: the CEO may give it in the lead's session.
+		dep, err := a.Deploy(r.Context(), req.Team, req.Project, strings.TrimSpace(req.Goal))
 		switch {
 		case errors.Is(err, store.ErrActive):
 			writeError(w, http.StatusConflict, "ALREADY_DEPLOYED", "This team is already deployed on this project")

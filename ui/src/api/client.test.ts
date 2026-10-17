@@ -104,15 +104,17 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("adds a project with an optional first repo, and a repo to a project", async () => {
+  it("adds or creates a project with an optional first repo, and a repo to a project", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
     await client.workspace.addProject("cal", "cal-go");
     await client.workspace.addProject("ledger");
+    await client.workspace.newProject("notes", "notes");
     await client.workspace.addRepo("my project", "web");
     expect(calls.map((c) => [c.method, c.url, JSON.parse(c.body ?? "")])).toEqual([
       ["POST", "http://x/api/projects", { folder: "cal", repo: "cal-go" }],
       ["POST", "http://x/api/projects", { folder: "ledger" }],
+      ["POST", "http://x/api/projects", { folder: "notes", repo: "notes", new: true }],
       ["POST", "http://x/api/projects/my%20project/repos", { name: "web" }],
     ]);
   });

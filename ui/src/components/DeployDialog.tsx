@@ -16,7 +16,8 @@ import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
-// Assigns a team to a project with a goal (wiki/product/features/deploy-team.md).
+// Assigns a team to a project, with an optional goal
+// (wiki/product/features/deploy-team.md).
 // Opened with a team preset (Team page), a project preset (Project settings),
 // or neither (empty Sessions). A harness without a login is connected from here.
 
@@ -84,8 +85,7 @@ export function DeployDialog({
       });
     },
   });
-  const ready =
-    team && project && goal.trim() && !already(project) && unconnected.length === 0 && !engineDown;
+  const ready = team && project && !already(project) && unconnected.length === 0 && !engineDown;
   return (
     <Modal
       open={open}
@@ -130,12 +130,12 @@ export function DeployDialog({
           })}
         </Group>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-tx4">Goal on this project</span>
+          <span className="text-[13px] font-medium text-tx4">Goal on this project (optional)</span>
           <textarea
             rows={3}
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
-            placeholder="What does done look like?"
+            placeholder="What does done look like? Or leave it empty and give it to the lead in its session."
             className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
           />
         </label>

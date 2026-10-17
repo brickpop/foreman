@@ -69,6 +69,9 @@ export interface WorkspaceArea {
   /** Turns a candidate folder into a project: its project repo and starter
    * wiki; with repo, also a first empty code repo of that name. */
   addProject(folder: string, repo?: string): Promise<Project>;
+  /** Creates the folder name in the workspace, then makes it a project as
+   * addProject does. */
+  newProject(name: string, repo?: string): Promise<Project>;
   /** Creates an empty code repo in a project (Foreman never clones). */
   addRepo(project: string, name: string): Promise<Project>;
   /** Saves one agent's soul in its team file, guarded by the version read. */
@@ -265,6 +268,10 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       candidates: () => getJSON("/api/candidates"),
       addProject: async (folder, repo) =>
         (await request("POST", "/api/projects", { folder, repo })).json() as Promise<Project>,
+      newProject: async (name, repo) =>
+        (
+          await request("POST", "/api/projects", { folder: name, repo, new: true })
+        ).json() as Promise<Project>,
       addRepo: async (project, name) =>
         (
           await request("POST", `/api/projects/${id(project)}/repos`, { name })

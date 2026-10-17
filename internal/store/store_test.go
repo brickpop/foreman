@@ -49,7 +49,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 4 {
+	if v := version(t, db.sql); v != 5 {
 		t.Errorf("version %d after the first open", v)
 	}
 	var mode string
@@ -203,9 +203,6 @@ func TestDeploymentLookupsAndRules(t *testing.T) {
 	}
 	if err := deps.Stop(ctx, "nobody@nowhere"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("stop unknown: %v", err)
-	}
-	if _, err := deps.Deploy(ctx, "atlas", "ledger", "   "); err == nil {
-		t.Error("a blank goal was accepted")
 	}
 	for _, pair := range [][2]string{{"atlas", "relay"}, {"atlas", "ledger"}, {"build", "ledger"}} {
 		if _, err := deps.Deploy(ctx, pair[0], pair[1], "goal"); err != nil {
@@ -568,5 +565,50 @@ func TestActions(t *testing.T) {
 	}
 	if _, err := a.Add(ctx, TeamAction{DeploymentID: "nope", Instance: "x", Tool: "commit"}); err == nil {
 		t.Error("an action of no deployment was stored")
+	}
+}
+
+// 005 makes the goal optional: existing deployments keep theirs, with the
+// rows that point at them, and a deployment without one can be made.
+func TestTheOptionalGoalMigrationKeepsTheDeployments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var before []string
+	for _, name := range []string{"001_deployments_instances.sql", "002_instance_asleep.sql", "003_team_messages.sql", "004_team_actions.sql"} {
+		body, err := migrationFiles.ReadFile("migrations/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before = append(before, name, string(body))
+	}
+	if err := migrate(ctx, db, migrations(before...)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES ('atlas@ledger', 'atlas', 'ledger', 'Ship it', '2026-10-16T10:00:00Z');
+		INSERT INTO instances (id, deployment_id, agent_id, status, sandbox_path, harness) VALUES ('mara@ledger', 'atlas@ledger', 'mara', 'asleep', '/s', 'claude-code')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	s, err := Open(ctx, path) // 005 runs as it does for real, foreign keys on
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	dep, err := s.Deployments().Get(ctx, "atlas@ledger")
+	if err != nil || dep.Goal != "Ship it" {
+		t.Fatalf("kept %+v %v", dep, err)
+	}
+	if inst, err := s.Instances().Get(ctx, "mara@ledger"); err != nil || inst.DeploymentID != "atlas@ledger" {
+		t.Errorf("instance %+v %v", inst, err)
+	}
+	if dep, err := s.Deployments().Deploy(ctx, "orion", "ledger", ""); err != nil || dep.Goal != "" {
+		t.Errorf("no goal: %+v %v", dep, err)
+	}
+	var violations int
+	if err := s.sql.QueryRow("SELECT count(*) FROM pragma_foreign_key_check").Scan(&violations); err != nil || violations != 0 {
+		t.Errorf("foreign keys: %d %v", violations, err)
 	}
 }

@@ -85,3 +85,21 @@ func TestSessionsFailedStartLeavesNothingBehind(t *testing.T) {
 		t.Error("start succeeded without a log")
 	}
 }
+
+func TestStopAllEndsTheTerminalsThatRun(t *testing.T) {
+	s, _ := newTestSessions(t, direct.Runner{})
+	ctx := context.Background()
+	for _, id := range []string{"a", "b"} {
+		if err := s.start(ctx, id, sh("read line")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.start(ctx, "done", sh("true")); err != nil {
+		t.Fatal(err)
+	}
+	waitExit(t, s, "done")
+	s.stopAll()
+	for _, id := range []string{"a", "b"} {
+		waitExit(t, s, id)
+	}
+}

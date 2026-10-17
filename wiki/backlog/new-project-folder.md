@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 priority: high
 tags: [feature]
 epic: install-first-run
@@ -16,5 +16,7 @@ epic: install-first-run
 - The empty-state complaint goes.
 - `POST /api/projects` takes a new folder name as well as an existing one. Foreman still never clones.
 
-- [ ] spec (Add a project), API, the dialog; the name's rules match a repo's (lowercase letters, digits, `.`, `-`, `_`; not hidden; must not exist)
-- [ ] tests: a new folder, its repos and first commits; a name that exists or is invalid is refused with nothing written
+- [x] spec (Add a project), API, the dialog; the name's rules match a repo's (lowercase letters, digits, `.`, `-`, `_`; not hidden; must not exist)
+- [x] tests: a new folder, its repos and first commits; a name that exists or is invalid is refused with nothing written
+
+**Built 2026-10-16:** `POST /api/projects {folder, repo?, new: true}` (the workspace's `NewProject`); the dialog leads with a name and lists the candidates below it, only when there are some. Building it showed that adding an existing folder whose new code repo failed left that half-made repo behind; both paths now share one step that removes what it made.

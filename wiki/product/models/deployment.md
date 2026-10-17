@@ -6,7 +6,7 @@ tags: [model, teams, runtime]
 
 # Deployment
 
-A [team](./team-definition.md) assigned to a project with a goal. Runtime state kept by Foreman in `state.db`, never in `project.toml` ([Persistence](../architecture/persistence.md)). A deployment gets its own [instances](./instance.md), worktrees and team-message channel: agents in two deployments never mix, even when they share a soul. Created from [Deploy a team](../features/deploy-team.md), stopped from the [Team page](../features/team-page.md).
+A [team](./team-definition.md) assigned to a project, with an optional goal. Runtime state kept by Foreman in `state.db`, never in `project.toml` ([Persistence](../architecture/persistence.md)). A deployment gets its own [instances](./instance.md), worktrees and team-message channel: agents in two deployments never mix, even when they share a soul. Created from [Deploy a team](../features/deploy-team.md), stopped from the [Team page](../features/team-page.md).
 
 ## Schema
 
@@ -17,7 +17,7 @@ Table `deployments`.
 | `id` | String | yes | | unique | The prototype keys it `team@project` |
 | `team_id` | String | yes | | a team file id | |
 | `project_id` | String | yes | | a project id | |
-| `goal` | String | yes | | non-blank | "What does done look like?" Part of every member's [session prompt](../architecture/session-prompt.md) |
+| `goal` | String | no | `""` | trimmed | "What does done look like?" Part of every member's [session prompt](../architecture/session-prompt.md). Empty when the CEO gives it in the lead's session instead (the CEO, 2026-10-16); the lists show `No goal set` |
 | `status` | String | yes | `active` | enum: `active`, `stopped` | |
 | `created_at` | Timestamp | yes | now | | |
 | `stopped_at` | Timestamp | | | set when stopped | |

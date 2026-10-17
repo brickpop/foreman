@@ -48,7 +48,7 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 **Body**: a real terminal emulator on `--term`, Geist Mono 13px / 1.6.
 - Full ANSI (colors, cursor movement, alternate screen), as the harness renders it.
 - Scrollback is replayed from the session log when a pane opens ([Persistence](../architecture/persistence.md)); the live stream follows.
-- Native text selection, copy and paste; clickable links.
+- Native text selection, copy and paste; clickable links. When the harness turns on mouse reporting (Claude Code does in some views), a drag goes to it rather than selecting: Option-drag on a Mac (Shift-drag elsewhere) still selects (found by the CEO, 2026-10-16).
 - **Shift+Enter** types the harness's newline keystroke (a new line without sending), the same as in the line input: a terminal alone can't tell it from Enter.
 - The pane size is propagated to the PTY on every resize. One PTY has one size, so when several panes or browser tabs show the same instance, **the most recently focused view sets it**; the others render that size (letterboxed or scrolled).
 - Opening a pane (or reconnecting) replays the screen and its scrollback; it is drawn hidden and shown at the bottom once drawn (a 150 ms fade), so it never flashes by scrolling (at most 600 ms hidden if nothing arrives).

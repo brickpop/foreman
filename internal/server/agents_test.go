@@ -81,6 +81,10 @@ func TestDeployAndStop(t *testing.T) {
 	if w := send(h, "DELETE", "/api/deployments/atlas@ledger", ""); w.Code != http.StatusNoContent || len(a.stopped) != 1 {
 		t.Errorf("stop: %d %+v", w.Code, a.stopped)
 	}
+	// Without a goal (the CEO gives it in the lead's session); blank is none.
+	if w := send(h, "POST", "/api/deployments", `{"team":"atlas","project":"cal","goal":"  "}`); w.Code != http.StatusCreated || a.deployed[1].Goal != "" {
+		t.Errorf("no goal: %d %s %+v", w.Code, w.Body, a.deployed)
+	}
 }
 
 func TestDeployErrors(t *testing.T) {
@@ -91,7 +95,7 @@ func TestDeployErrors(t *testing.T) {
 		code               string
 	}{
 		{"POST", "/api/deployments", `not json`, 400, "BAD_REQUEST"},
-		{"POST", "/api/deployments", `{"team":"atlas","project":"ledger","goal":"  "}`, 400, "BAD_REQUEST"},
+		{"POST", "/api/deployments", `{"project":"ledger","goal":"g"}`, 400, "BAD_REQUEST"},
 		{"POST", "/api/deployments", `{"team":"atlas","project":"busy","goal":"g"}`, 409, "ALREADY_DEPLOYED"},
 		{"POST", "/api/deployments", `{"team":"atlas","project":"broken","goal":"g"}`, 400, "CANT_DEPLOY"},
 		{"POST", "/api/deployments", `{"team":"atlas","project":"early","goal":"g"}`, 409, "NOT_READY"},

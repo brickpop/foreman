@@ -92,3 +92,16 @@ type attachment struct {
 func (a attachment) Input(p []byte) error          { return a.term.Input(p) }
 func (a attachment) Resize(size runner.Size) error { return a.term.Resize(size) }
 func (a attachment) Exit() (code int, exited bool) { return a.term.ExitCode() }
+
+// stopAll ends every terminal's process that still runs (Foreman exiting).
+func (s *sessions) stopAll() {
+	s.mu.Lock()
+	ids := make([]string, 0, len(s.terms))
+	for id := range s.terms {
+		ids = append(ids, id)
+	}
+	s.mu.Unlock()
+	for _, id := range ids {
+		_ = s.stop(id)
+	}
+}

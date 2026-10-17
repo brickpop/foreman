@@ -808,3 +808,142 @@ func TestDeployAndWakeWaitForTheEngine(t *testing.T) {
 	}
 	f.waitStatus("tove@ledger", Running)
 }
+
+// Foreman exiting cleanly puts every agent to sleep, a running one and a
+// queued one alike, with no process left and its restart untouched. Nothing
+// starts after it; on the next run, work wakes them as usual.
+func TestShutdownPutsEveryAgentToSleep(t *testing.T) {
+	f := newFixture(t, keepsRunning, 1)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Queued) // the one slot is mara's
+	term, err := f.m.Terminal("mara@ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.m.Shutdown(ctx)
+	select {
+	case <-term.Done():
+	default:
+		t.Error("mara's process outlived the shutdown")
+	}
+	for _, id := range []string{"mara@ledger", "tove@ledger"} {
+		if s := f.status(id); s.Status != Asleep || s.Restarts != 0 || f.m.Live(id) {
+			t.Errorf("%s after the shutdown: %+v, live %v", id, s, f.m.Live(id))
+		}
+	}
+	if err := f.m.Wake(ctx, "tove@ledger"); !errors.Is(err, ErrNotReady) {
+		t.Errorf("woken while stopping: %v", err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); !errors.Is(err, ErrNotReady) {
+		t.Errorf("deployed while stopping: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond) // nothing starts on its own
+	if s := f.status("tove@ledger"); s.Status != Asleep {
+		t.Fatalf("tove started: %s", s.Status)
+	}
+
+	// The next run: nothing to re-attach, and work wakes them.
+	f.m = New(f.deps)
+	if err := f.m.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if s := f.status("mara@ledger"); s.Status != Asleep {
+		t.Fatalf("restored as %s", s.Status)
+	}
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+}
+
+// An agent still starting when Foreman exits ends asleep too, its process
+// stopped as soon as it is launched.
+func TestShutdownWhileStarting(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	slow := &slowGit{Git: f.deps.Git, entered: make(chan struct{}), release: make(chan struct{})}
+	f.deps.Git = slow
+	f.m = New(f.deps)
+	t.Cleanup(func() { closeOnce(slow.release) })
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	<-slow.entered
+	done := make(chan struct{})
+	go func() { f.m.Shutdown(ctx); close(done) }()
+	select {
+	case <-done:
+		t.Fatal("the shutdown didn't wait for the start under way")
+	case <-time.After(100 * time.Millisecond):
+	}
+	closeOnce(slow.release)
+	select {
+	case <-done:
+	case <-time.After(15 * time.Second):
+		t.Fatal("the shutdown never ended")
+	}
+	if s := f.status("mara@ledger"); s.Status != Asleep || f.m.Live("mara@ledger") {
+		t.Errorf("after the shutdown: %+v, live %v", s, f.m.Live("mara@ledger"))
+	}
+}
+
+// Deployed without a goal, the lead starts with no opener: the CEO gives the
+// goal in its session.
+func TestNoGoalNoOpener(t *testing.T) {
+	f := newFixture(t, `echo "opener: [$1]"; `+keepsRunning, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	f.output("mara@ledger", "opener: []")
+}
+
+// unstoppable starts real processes whose Stop fails, as when Podman stops
+// answering; it keeps them to end at cleanup.
+type unstoppable struct {
+	runner.Runner
+	mu    sync.Mutex
+	procs []runner.Process
+}
+
+type stuck struct{ runner.Process }
+
+func (stuck) Stop(time.Duration) error { return errors.New("podman isn't answering") }
+
+func (u *unstoppable) Start(ctx context.Context, spec runner.Spec) (runner.Process, error) {
+	p, err := u.Runner.Start(ctx, spec)
+	if err != nil {
+		return nil, err
+	}
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	u.procs = append(u.procs, p)
+	return stuck{p}, nil
+}
+
+// An agent whose stop fails keeps its status, so the next start re-attaches
+// it as after a crash rather than leave it running unseen as asleep.
+func TestShutdownKeepsWhatItCouldntStop(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	u := &unstoppable{Runner: f.deps.Runner}
+	t.Cleanup(func() {
+		for _, p := range u.procs {
+			_ = p.Stop(time.Second)
+		}
+	})
+	f.deps.Runner = u
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	f.m.Shutdown(ctx)
+	if s := f.status("mara@ledger"); s.Status != Running {
+		t.Errorf("after a failed stop: %s", s.Status)
+	}
+}

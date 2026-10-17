@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 priority: medium
 tags: [feature]
 epic: install-first-run
@@ -22,6 +22,10 @@ epic: install-first-run
 - **The Podman machine (macOS) and a Linux Podman service** the CEO started stay up. A service Foreman started ends with it, as today.
 - **Messages waiting** for an agent at exit wake it on the next start, through the startup delivery (`Sweep`).
 
-- [ ] signal handling in `cmd/foreman` (a graceful HTTP shutdown, then the manager stops every live instance as asleep)
-- [ ] the specs: agent runtime (restarts), session runner (containers outlive Foreman only after a crash)
-- [ ] tests: a clean exit leaves no container and every agent asleep, with its conversation continued on wake; messages waiting at exit wake their agent on the next start; a crash (containers still running) still re-attaches
+- [x] signal handling in `cmd/foreman` (a graceful HTTP shutdown, then the manager stops every live instance as asleep)
+- [x] the specs: agent runtime (restarts), session runner (containers outlive Foreman only after a crash)
+- [x] tests: a clean exit leaves no container and every agent asleep, with its conversation continued on wake; messages waiting at exit wake their agent on the next start; a crash (containers still running) still re-attaches
+
+**Built 2026-10-16:** `Manager.Shutdown` (every live instance stopped in parallel and set asleep, queued ones too; deploy, wake, starts and re-attaching refuse meanwhile), and `serveUntil` in `cmd/foreman`, which stops serving, puts the signals back and then shuts down the manager, the login terminals and the agent port. Checked end to end with the fake harness: two idle agents, Ctrl-C, no harness process left, both asleep on the next start.
+
+Found while building it: the Linux Podman service Foreman starts was in Foreman's process group, so the terminal's Ctrl-C would have killed it at once and every stop would have failed. It now has its own group, and `Pdeathsig` still ends it if Foreman dies. The crash case still re-attaches (`TestRestore`).

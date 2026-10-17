@@ -67,7 +67,7 @@ func Compose(in Input) string {
 	line("")
 	line("## This assignment")
 	line("Project: %s  (%s)", in.Project, in.Path)
-	line("Goal: %s", strings.TrimSpace(in.Goal))
+	line("Goal: %s", goal(in.Goal, lead))
 	line("Your sandbox: %s/.sandboxes/%s (a git worktree per repo)", in.Project, in.Agent)
 	line("Branches: %s", branches(in, lead, has))
 	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(lead, has))
@@ -308,4 +308,17 @@ func Template(team workspace.TeamConfig, agent string) string {
 		Config: workspace.ProjectConfig{Main: "{main}", Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:  Offered(agent == team.Lead),
 	})
+}
+
+// goal is the assignment's goal, or who gives it when the CEO deployed
+// without one (to give it in the lead's session).
+func goal(g string, lead bool) string {
+	switch {
+	case strings.TrimSpace(g) != "":
+		return strings.TrimSpace(g)
+	case lead:
+		return "none set yet: the CEO gives it in this session. Wait for it."
+	default:
+		return "none set yet: the CEO gives it to your lead, who tells you what to work on."
+	}
 }

@@ -118,7 +118,9 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                   >
                     {d.projectId}
                   </Link>
-                  <span className="text-tx2">{d.goal}</span>
+                  <span className={d.goal ? "text-tx2" : "text-tx4"}>
+                    {d.goal || "No goal set"}
+                  </span>
                   <span className="text-[13px] text-tx4">
                     {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
                   </span>

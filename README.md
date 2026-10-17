@@ -34,6 +34,8 @@ bin/foreman ~/agents-ws   # serve a workspace (or run it inside the folder)
 
 The first time, Foreman asks before creating `.foreman/` in the folder. It then prints a URL with an access token and opens it in your browser. Use that URL: without the token every request is refused. `bin/foreman -h` lists the flags.
 
+Ctrl-C stops Foreman and its agents: they go to sleep, and wake with their conversation when work arrives on the next run (a second Ctrl-C leaves them running instead).
+
 ## Develop
 
 ```sh

@@ -2,7 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"flag"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,5 +115,52 @@ func TestTheAgentPortIsTheNextOne(t *testing.T) {
 		if _, err := nextPort(bad); err == nil {
 			t.Errorf("%q accepted", bad)
 		}
+	}
+}
+
+// A signal stops serving, puts the signals back (so a second Ctrl-C ends
+// Foreman at once) and only then runs the shutdown.
+func TestServeUntilShutsDownOnASignal(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quit, signal := context.WithCancel(context.Background())
+	released, shutdown := false, false
+	var out bytes.Buffer
+	done := make(chan error, 1)
+	go func() {
+		done <- serveUntil(quit, func() { released = true }, &out, &http.Server{Handler: http.NotFoundHandler()}, l, func() {
+			if !released {
+				t.Error("the shutdown ran before the signals were released")
+			}
+			if _, err := http.Get("http://" + l.Addr().String()); err == nil {
+				t.Error("still serving during the shutdown")
+			}
+			shutdown = true
+		})
+	}()
+	if _, err := http.Get("http://" + l.Addr().String()); err != nil {
+		t.Fatalf("not serving: %v", err)
+	}
+	signal()
+	if err := <-done; err != nil || !shutdown {
+		t.Errorf("err %v, shutdown %v", err, shutdown)
+	}
+	if !bytes.Contains(out.Bytes(), []byte("Ctrl-C again")) {
+		t.Errorf("printed %q", out.String())
+	}
+}
+
+// Serving that fails returns its error, with no shutdown: nothing to stop.
+func TestServeUntilReturnsAServingError(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = l.Close()
+	err = serveUntil(context.Background(), func() {}, &bytes.Buffer{}, &http.Server{}, l, func() { t.Error("shut down") })
+	if err == nil || errors.Is(err, http.ErrServerClosed) {
+		t.Errorf("err %v", err)
 	}
 }

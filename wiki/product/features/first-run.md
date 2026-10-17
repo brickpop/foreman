@@ -34,7 +34,7 @@ Header: `Setup · N of M done`, then one panel, one row per step. Each row has a
 | **Agent image** | Podman engine | `Builds once Podman runs`; working: `Building the agent image (a few minutes, once)` with the build output | failed: a link to Settings → [Maintenance](./settings.md#maintenance) (Rebuild) |
 | **`<Harness>` connected** | each harness a team uses; every supported harness while there is no team | `Not logged in yet: its agents can't start` | **Connect**: the login terminal ([Settings → Harnesses](./settings.md#harnesses)) |
 | **A team** | always | `Create a team` | **Create a team**: the [Chief of Staff](./chief-of-staff.md)'s create-team flow |
-| **A project** | always | `Add a project` | **Add project**: the [Add a project](./add-project.md) dialog |
+| **A project** | always | `Add a project` | **New project**: the [Add a project](./add-project.md) dialog |
 | **A code repo in `<project>`** | each project with no code repo (and no problems) | `<project> has no code repo for agents to work in (New repo)` | **New repo**: the project's settings ([Project settings](./project-settings.md)) |
 
 ## The Podman machine (macOS)

@@ -1,6 +1,7 @@
 package workspace
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/exec"
@@ -108,7 +109,7 @@ func TestAddRepoOnTheProjectsMainBranch(t *testing.T) {
 	if b := gitOut(t, filepath.Join(w.Root(), "ledger", "ledger-api"), "branch", "--show-current"); b != "trunk" {
 		t.Errorf("on %q, not the project's main", b)
 	}
-	for name, want := range map[string]error{"ledger-api": ErrExists, "project": ErrInvalid, "-x": ErrInvalid, "a/b": ErrInvalid, "..": ErrInvalid, "": ErrInvalid} {
+	for name, want := range map[string]error{"ledger-api": ErrExists, "Ledger-API": ErrExists, "project": ErrInvalid, "PROJECT": ErrInvalid, "-x": ErrInvalid, "a/b": ErrInvalid, "..": ErrInvalid, "": ErrInvalid} {
 		if _, err := w.AddRepo(ctx, "ledger", name); !errors.Is(err, want) {
 			t.Errorf("%q: %v, want %v", name, err, want)
 		}
@@ -130,5 +131,120 @@ func TestAddRepoRefusesWhenTheReposAreListed(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(w.Root(), "ledger", "web")); err == nil {
 		t.Error("created anyway")
+	}
+}
+
+func TestNewProjectCreatesTheFolder(t *testing.T) {
+	w := loaded(t, nil)
+	p, err := w.NewProject(ctx, "cal", "cal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ID != "cal" || len(p.Problems) != 0 || !slices.Equal(p.Repos, []string{"cal"}) {
+		t.Errorf("project %+v", p)
+	}
+	dir := filepath.Join(w.Root(), "cal")
+	if log := gitOut(t, filepath.Join(dir, "project"), "log", "--format=%s"); log != "Project repo" {
+		t.Errorf("project repo log %q", log)
+	}
+	if log := gitOut(t, filepath.Join(dir, "cal"), "log", "--format=%s"); log != "First commit" {
+		t.Errorf("repo log %q", log)
+	}
+	// Without a repo: the project alone, which Project settings can give one later.
+	p, err = w.NewProject(ctx, "notes", "")
+	if err != nil || len(p.Repos) != 0 {
+		t.Errorf("no repo: %+v %v", p, err)
+	}
+	if len(w.Candidates()) != 0 {
+		t.Errorf("candidates %+v", w.Candidates())
+	}
+}
+
+func TestNewProjectRefusalsWriteNothing(t *testing.T) {
+	w := loaded(t, func(root string) {
+		if err := os.MkdirAll(filepath.Join(root, "billing"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, filepath.Join(root, "notes.txt"), "a file")
+	})
+	before := entries(t, w.Root())
+	for name, repo := range map[string]string{
+		"": "", ".hidden": "", "..": "", "a..b": "", "a/b": "", "-x": "",
+		"cal": "Project", "cal2": "Bad Name",
+	} {
+		if _, err := w.NewProject(ctx, name, repo); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%q %q: %v", name, repo, err)
+		}
+	}
+	for _, name := range []string{"billing", "Billing", "NOTES.TXT", ".foreman"} {
+		if _, err := w.NewProject(ctx, name, ""); err == nil {
+			t.Errorf("%q: created over what exists", name)
+		}
+	}
+	if _, err := w.NewProject(ctx, "billing", ""); !errors.Is(err, ErrExists) {
+		t.Errorf("an existing folder: %v", err)
+	}
+	if after := entries(t, w.Root()); !slices.Equal(before, after) {
+		t.Errorf("the workspace changed: %v → %v", before, after)
+	}
+}
+
+// failingGit fails the commit of a new code repo, after the project repo's.
+type failingGit struct{ Git }
+
+func (g failingGit) Commit(ctx context.Context, dir, message string, files ...string) error {
+	if message == "First commit" {
+		return errors.New("disk full")
+	}
+	return g.Git.Commit(ctx, dir, message, files...)
+}
+
+func TestAFailedStepLeavesNothingBehind(t *testing.T) {
+	w := loaded(t, func(root string) {
+		if err := os.MkdirAll(filepath.Join(root, "cal"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	})
+	w.git = failingGit{w.git}
+	before := entries(t, w.Root())
+	if _, err := w.NewProject(ctx, "ledger", "ledger-api"); err == nil {
+		t.Error("new project: no error")
+	}
+	if _, err := w.AddProject(ctx, "cal", "cal-go"); err == nil {
+		t.Error("add project: no error")
+	}
+	if after := entries(t, w.Root()); !slices.Equal(before, after) {
+		t.Errorf("left behind: %v → %v", before, after)
+	}
+	if got := entries(t, filepath.Join(w.Root(), "cal")); len(got) != 0 {
+		t.Errorf("cal/ holds %v", got)
+	}
+}
+
+func entries(t *testing.T, dir string) []string {
+	t.Helper()
+	es, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range es {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// Names keep their case: a workspace's folders already may (DevProject).
+func TestNewProjectKeepsUppercase(t *testing.T) {
+	w := loaded(t, nil)
+	p, err := w.NewProject(ctx, "DevProject", "Some-App")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.ID != "DevProject" || !slices.Equal(p.Repos, []string{"Some-App"}) {
+		t.Errorf("project %+v", p)
+	}
+	if _, err := w.NewProject(ctx, "devproject", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "DevProject") {
+		t.Errorf("the same name in another case: %v", err)
 	}
 }

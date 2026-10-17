@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Request } from "../../api/client";
 import { filesChanged, linkLine } from "../../app/model";
-import { repoDetail } from "../../components/AddProject";
+import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
 import { cell, columnLabel, layout } from "./Board";
 import { sourceLabel } from "./Changes";
 
@@ -90,6 +90,22 @@ describe("Add a project", () => {
     expect(repoDetail(["billing-api", "billing-web"])).toBe(
       "2 git repos: billing-api, billing-web",
     );
+  });
+  it("refuses a name a workspace folder has, in any case", () => {
+    const projects = ["Ledger"];
+    const candidates = ["billing", "DevProject"];
+    expect(nameClash("ledger", projects, candidates)).toBe("Ledger is already a project.");
+    expect(nameClash("  devproject ", projects, candidates)).toBe(
+      "DevProject/ already exists: pick it below to add it.",
+    );
+    expect(nameClash("billing-2", projects, candidates)).toBe("");
+    expect(nameClash("   ", projects, candidates)).toBe("");
+  });
+
+  it("names the repo it creates, with placeholders until typed", () => {
+    expect(repoHint("ledger", "api")).toMatch(/^Creates ledger\/api\/ and initializes/);
+    expect(repoHint("", "")).toMatch(/^Creates <project>\/<repo>\/ /);
+    expect(repoHint("ledger", "")).toMatch(/Leave it blank to add one later\.$/);
   });
 });
 

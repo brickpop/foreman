@@ -239,7 +239,7 @@ type Instances interface {
 }
 ```
 
-Built so far (`internal/instances`): `Deploy`, `Stop`, `List`, `Terminal` and `Restore` (re-attach after a Foreman restart, keeping a live agent's `idle` or `awaiting`); statuses live in the state store and go out on the event bus, so `Status` and `Watch` are the store and the bus; `Hook` turns harness hook events into statuses; `Type` writes into an instance's terminal. Delivery itself lives in Messaging, which reads the status and types: there is no `Instances.Deliver`.
+Built so far (`internal/instances`): `Deploy`, `Stop`, `List`, `Terminal`, `Restore` (re-attach after a Foreman crash, keeping a live agent's `idle` or `awaiting`) and `Shutdown` (a clean exit: every instance stopped and asleep); statuses live in the state store and go out on the event bus, so `Status` and `Watch` are the store and the bus; `Hook` turns harness hook events into statuses; `Type` writes into an instance's terminal. Delivery itself lives in Messaging, which reads the status and types: there is no `Instances.Deliver`.
 
 Details: [Agent runtime](./agent-runtime.md).
 

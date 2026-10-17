@@ -55,6 +55,12 @@ func (f fakeConfig) Candidates() []workspace.Candidate {
 func (f fakeConfig) AddProject(_ context.Context, folder, repo string) (workspace.Project, error) {
 	return f.added(folder, repo)
 }
+func (f fakeConfig) NewProject(_ context.Context, name, repo string) (workspace.Project, error) {
+	if name == "taken" {
+		return workspace.Project{}, fmt.Errorf("%w: taken", workspace.ErrExists)
+	}
+	return workspace.Project{ID: "new:" + name, Repos: []string{repo}}, nil
+}
 func (f fakeConfig) AddRepo(_ context.Context, project, name string) (workspace.Project, error) {
 	if project != "ledger" {
 		return workspace.Project{}, workspace.ErrNotFound
@@ -321,6 +327,10 @@ func TestAddingProjectsAndRepos(t *testing.T) {
 	if p.ID != "cal" || p.Repos[0] != "cal-go" {
 		t.Errorf("added %+v", p)
 	}
+	decodeBody(t, post("/api/projects", `{"folder":"cal","repo":"cal","new":true}`), &p)
+	if p.ID != "new:cal" || p.Repos[0] != "cal" {
+		t.Errorf("new %+v", p)
+	}
 	decodeBody(t, post("/api/projects/ledger/repos", `{"name":"web"}`), &p)
 	if p.ID != "ledger" || p.Repos[0] != "web" {
 		t.Errorf("repo %+v", p)
@@ -333,6 +343,7 @@ func TestAddingProjectsAndRepos(t *testing.T) {
 		{"/api/projects", `{"folder":"cal","repo":"bad"}`, http.StatusBadRequest, `{"code":"INVALID","error":"a repo name is lowercase"}`},
 		{"/api/projects/ledger/repos", `{"name":"taken"}`, http.StatusConflict, `{"code":"EXISTS","error":"ledger/taken already exists"}`},
 		{"/api/projects/nope/repos", `{"name":"x"}`, http.StatusNotFound, `"NOT_FOUND"`},
+		{"/api/projects", `{"folder":"taken","new":true}`, http.StatusConflict, `"EXISTS"`},
 		{"/api/projects", `not json`, http.StatusBadRequest, `"BAD_REQUEST"`},
 	} {
 		if w := post(tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {

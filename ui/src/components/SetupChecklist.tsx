@@ -129,7 +129,7 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
       return (
         <>
           <Button variant="small" onClick={() => setDialog(true)}>
-            Add project
+            New project
           </Button>
           {dialog && <AddProject open onClose={() => setDialog(false)} />}
         </>

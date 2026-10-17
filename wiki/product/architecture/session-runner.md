@@ -40,7 +40,7 @@ The [Terminal](./building-blocks.md#2-terminal-terminal) holding a process tees 
   - the live project repo `<project>/project/` → at `<sandbox>/project`, read-write for the lead, read-only for everyone else, with its `.git` read-only for everyone ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base))
   - no `~/.config`, no `~/.ssh`, no keychain, no `.foreman/` (secrets, state, team files), no other agents' worktrees, none of the CEO's working files.
 - **Harness credentials:** see [Credentials](#credentials). The host's harness config directories are never mounted.
-- **TTY:** the harness is the container's main process with a TTY, so the container keeps running when Foreman exits. After a Foreman restart, `List` finds it by label and Foreman re-attaches. Output printed while Foreman was down isn't in its log; that gap is accepted, and the pane shows `ⓘ Foreman restarted, output may be missing` at that point.
+- **TTY:** the harness is the container's main process with a TTY, so the container keeps running if Foreman dies (a clean exit stops it: [Agent runtime → Recovery](./agent-runtime.md#recovery)). After a Foreman restart, `List` finds it by label and Foreman re-attaches. Output printed while Foreman was down isn't in its log; that gap is accepted, and the pane shows `ⓘ Foreman restarted, output may be missing` at that point.
 - **User mapping:** `--userns keep-id:uid=1000,gid=1000` (the image's non-root user), so files written into the worktrees and the project repo are owned by the CEO's user, not a subordinate UID.
 - **SELinux:** on hosts where `/sys/fs/selinux/enforce` exists (Fedora, RHEL), bind mounts get the shared `:z` label; elsewhere no suffix. The private `:Z` is not used: several containers mount the same project repo and `.git`, and `:Z` would relabel it away from the others (learned in `pclaude`).
 - **Network:** containers need the network for model APIs. They reach Foreman's agent port at `host.containers.internal`, through `foreman-agent` ([Team tools → Transport](./team-tools.md#transport)).
@@ -95,7 +95,7 @@ Two Go sketches written before this design, kept verbatim as reference at the en
 | Running the harness **interactively, in a real TTY** | - |
 | Podman container spec: `Terminal: true` (a real TTY in the container), the harness as entrypoint, the workspace bind-mounted rw with the `z` option (SELinux relabelling, needed on Fedora and other SELinux hosts) | The sketch mounted the host's harness config dir read-only to reuse its login. That leaks every credential in it into every container and doesn't work on macOS (the Keychain); each instance instead gets a long-lived token as environment and a private config directory ([Credentials](#credentials)) |
 | A minimal image: base OS, `git`, `bash`, `openssh-client`, Node + the harness CLI, `TERM=xterm-256color`, `WORKDIR /workspace` | The image is Foreman's default image ([Agent images](./tech-stack.md#agent-images)); the official `containers/podman/v5/pkg/bindings` module the sketch used is avoided in favour of the libpod REST API ([Podman runner](#podman-engine-production)) |
-| Stop with a timeout, then remove | Containers outlive Foreman restarts and are re-attached, so removal happens only on instance stop |
+| Stop with a timeout, then remove | Containers outlive a Foreman crash and are re-attached, so removal happens only on instance stop, deployment stop or a clean exit |
 
 ### Reference: the PTY sketch
 

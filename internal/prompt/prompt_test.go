@@ -203,3 +203,18 @@ func TestTemplateShowsThePlaceholders(t *testing.T) {
 		}
 	}
 }
+
+// Deployed without a goal: the lead waits for the CEO's, a member for the
+// lead's word; neither is told an empty goal.
+func TestNoGoalSaysWhoGivesIt(t *testing.T) {
+	for agent, want := range map[string]string{
+		"mara": "Goal: none set yet: the CEO gives it in this session. Wait for it.\n",
+		"tove": "Goal: none set yet: the CEO gives it to your lead, who tells you what to work on.\n",
+	} {
+		in := input(agent, nil)
+		in.Goal = "  "
+		if got := Compose(in); !strings.Contains(got, want) {
+			t.Errorf("%s:\n%s", agent, got)
+		}
+	}
+}

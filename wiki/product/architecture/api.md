@@ -17,7 +17,7 @@ The PRD's surface (indicative; names may still change during implementation, thi
 ```
 GET    /api/workspace                         the workspace folder
 GET    /api/projects | /api/projects/:id      config (parsed), repos, version, problems (deployments join with the Instance manager)
-POST   /api/projects                          {folder, repo?} → create the project repo (adopt); with repo, also a first empty code repo
+POST   /api/projects                          {folder, repo?, new?} → create the project repo in an existing folder, or with new, in a new folder of that name; with repo, also a first empty code repo (400 INVALID, 409 EXISTS)
 POST   /api/projects/:id/repos                {name} → create an empty code repo in the project (400 INVALID, 409 EXISTS)
 GET    /api/candidates                        folders without project/project.toml (for Add)
 
@@ -26,7 +26,7 @@ PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in
 POST   /api/teams/:id/agents                  hire (from CoS)
 
 GET    /api/deployments                       the active deployments
-POST   /api/deployments                       {team, project, goal}
+POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session)
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status
 GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness

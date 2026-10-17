@@ -204,6 +204,7 @@ func linuxSocket(ctx context.Context) (string, func(), error) {
 		return socket, nil, nil
 	}
 	cmd := exec.Command("podman", "system", "service", "--time=0", "unix://"+socket)
+	ownGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		return "", nil, fmt.Errorf("starting podman system service: %w", err)
 	}

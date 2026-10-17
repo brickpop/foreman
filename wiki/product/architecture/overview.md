@@ -79,7 +79,7 @@ The same idea holds in the browser, scaled to it:
 - **Local first**: binds to localhost by default. No telemetry. Works offline, except harnesses and forges that need the network.
 - **Security**: no user accounts in v1, but every request needs the per-install access token ([Security](./security.md#access-token)); binding to the network shows a warning. Secrets are never written to project folders or logs. Agents never receive forge tokens. See [Security](./security.md) for what this does and doesn't protect against.
 - **Isolation**: a separate worktree and container per instance; Team tools return only designated outputs; knowledge-base write access limited to the lead.
-- **Reliability**: instances survive UI disconnects. On server restart, deployments are restored from `state.db`; running containers are re-attached, stopped ones restarted with the last task note ([Agent runtime](./agent-runtime.md#recovery)). PTY logs allow scrollback replay.
+- **Reliability**: instances survive UI disconnects. A clean exit puts every agent to sleep; on server restart, deployments are restored from `state.db`; containers still running (after a crash) are re-attached, stopped ones restarted with the last task note ([Agent runtime](./agent-runtime.md#recovery)). PTY logs allow scrollback replay.
 - **Performance**: 20+ concurrent sessions on a laptop. Terminal latency under 50 ms locally. File changes reflected in the UI within 1 s.
 - **Observability**: per-instance logs, a team-message log, a request history, and a server log with harness exit codes.
 - **Portability**: macOS and Linux first. Windows via WSL. On macOS Podman runs inside a VM (`podman machine`), see [Session runner](./session-runner.md).

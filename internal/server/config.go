@@ -31,6 +31,8 @@ type Config interface {
 	Candidates() []workspace.Candidate
 	// AddProject makes a folder a project, with an optional first (empty) repo.
 	AddProject(ctx context.Context, folder, repo string) (workspace.Project, error)
+	// NewProject creates the folder, then makes it a project as AddProject does.
+	NewProject(ctx context.Context, name, repo string) (workspace.Project, error)
 	// AddRepo creates an empty code repo in a project.
 	AddRepo(ctx context.Context, project, name string) (workspace.Project, error)
 }
@@ -55,12 +57,17 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		var req struct {
 			Folder string `json:"folder"`
 			Repo   string `json:"repo"`
+			New    bool   `json:"new"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {folder, repo?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {folder, repo?, new?}")
 			return
 		}
-		p, err := c.AddProject(r.Context(), req.Folder, req.Repo)
+		add := c.AddProject
+		if req.New {
+			add = c.NewProject
+		}
+		p, err := add(r.Context(), req.Folder, req.Repo)
 		writeCreated(w, p, err)
 	})
 	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {

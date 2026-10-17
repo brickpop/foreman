@@ -326,3 +326,16 @@ func TestWaitingMessagesWakeASleeperNotAStoppedAgent(t *testing.T) {
 	f.m.StatusChanged("tove@ledger", "asleep")
 	f.eventually("woken", func() bool { return len(f.s.wokenList()) == 1 })
 }
+
+// Messages waiting when Foreman exited (its agents asleep) wake their agent
+// on the next start, through the startup delivery.
+func TestTheSweepWakesASleeperWithMessagesWaiting(t *testing.T) {
+	f := newFixture(t)
+	f.call("mara@ledger", "ask", map[string]string{"teammate": "tove", "request": "build cal"}) // tove is running: queued
+	time.Sleep(50 * time.Millisecond)                                                           // its delivery found tove running
+	f.setStatus("tove@ledger", "asleep")                                                        // Foreman exited, no event
+	if err := f.m.Sweep(ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.eventually("woken", func() bool { return slices.Equal(f.s.wokenList(), []string{"tove@ledger"}) })
+}

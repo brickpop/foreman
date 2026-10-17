@@ -64,6 +64,9 @@ export function Terminal({
       lineHeight: 1.25,
       scrollback: 10000,
       cursorBlink: true,
+      // When the harness turns on mouse reporting, a drag goes to it, not to
+      // the selection: Option-drag (Shift-drag off the Mac) still selects.
+      macOptionClickForcesSelection: true,
       theme: {
         background: token("--term"),
         foreground: token("--tx2"),

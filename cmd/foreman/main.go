@@ -125,7 +125,23 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	defer state.Close()
 	bus := events.New()
-	if err := ws.Watch(ctx, func(c workspace.Change) { bus.Publish(configEvent(c)) }); err != nil {
+	wikis := wiki.New(ws.WikiDir)
+	followWikis, err := wikis.Watch(ctx, func() []string {
+		var ids []string
+		for _, p := range ws.Projects() {
+			ids = append(ids, p.ID)
+		}
+		return ids
+	}, func(c wiki.Changed) { bus.Publish(events.Event{Type: "wiki.changed", Data: c}) })
+	if err != nil {
+		return fmt.Errorf("watching the wikis: %w", err)
+	}
+	if err := ws.Watch(ctx, func(c workspace.Change) {
+		bus.Publish(configEvent(c))
+		if c.Kind == "projects" {
+			followWikis()
+		}
+	}); err != nil {
 		return fmt.Errorf("watching the workspace: %w", err)
 	}
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
@@ -239,7 +255,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages:    messenger,
 		Actions:     state.Actions(),
 		Harnesses:   login,
-		Wiki:        wiki.New(ws.WikiDir),
+		Wiki:        wikis,
 		Setup:       checklist,
 		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:   views,

@@ -1,0 +1,1 @@
+- The workspace indexer watches the workspace root (new or removed project folders and repos), every `project/project.toml`, and `.foreman/teams/` and `settings.toml`. The wiki block watches every project's wiki bundle with a watcher of its own ([Wiki engine](./wiki-engine.md

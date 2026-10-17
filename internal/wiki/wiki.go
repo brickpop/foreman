@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/agentic-wiki/wiki/bundle"
 	"github.com/agentic-wiki/wiki/index"
@@ -18,29 +19,47 @@ import (
 // ErrNotFound means no such project wiki, entry or image.
 var ErrNotFound = errors.New("wiki: not found")
 
-// Wikis reads the projects' wikis. Each read builds the wiki's index afresh;
-// the file watcher (projects-and-wiki card) will keep one per wiki instead.
+// Wikis reads the projects' wikis. While Watch follows them, each wiki's
+// index is kept and rebuilt on change; otherwise each read builds it afresh,
+// so nothing serves a stale index unnoticed.
 type Wikis struct {
 	dir func(project string) (string, error)
+
+	mu      sync.Mutex
+	watched map[string]*watched // by project, while Watch runs
 }
 
 // New reads the wiki that dir names for each project: its bundle folder, the
 // one holding wiki.toml.
 func New(dir func(project string) (string, error)) *Wikis {
-	return &Wikis{dir: dir}
+	return &Wikis{dir: dir, watched: map[string]*watched{}}
 }
 
+// open is the project wiki's index: the watcher's, else a fresh one.
 func (w *Wikis) open(project string) (*index.Index, error) {
+	w.mu.Lock()
+	cached := w.watched[project]
+	w.mu.Unlock()
+	if cached != nil && cached.idx != nil {
+		return cached.idx, nil
+	}
+	_, idx, err := w.build(project)
+	return idx, err
+}
+
+// build reads the project's wiki from disk: its folder and its index.
+func (w *Wikis) build(project string) (string, *index.Index, error) {
 	dir, err := w.dir(project)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrNotFound, project)
+		return "", nil, fmt.Errorf("%w: %s", ErrNotFound, project)
 	}
 	b, err := bundle.Discover(dir)
 	// Discover walks up: a wiki.toml above the project's isn't its wiki.
 	if err != nil || filepath.Clean(b.Dir) != filepath.Clean(dir) {
-		return nil, fmt.Errorf("%w: %s has no wiki", ErrNotFound, project)
+		return dir, nil, fmt.Errorf("%w: %s has no wiki", ErrNotFound, project)
 	}
-	return index.Build(b)
+	idx, err := index.Build(b)
+	return dir, idx, err
 }
 
 // Tree is the project wiki's tree, in the reader's order.

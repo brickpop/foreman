@@ -79,6 +79,19 @@ export interface Backlink {
   title: string; // the linking entry's title
 }
 /**
+ * Changed is the wiki.changed event: what a rebuild of a project's wiki
+ * found different (wiki/product/architecture/api.md#events).
+ */
+export interface Changed {
+  project: string;
+  /**
+   * Paths are the entries added, edited or removed, and wiki.toml when it
+   * changed. Empty when only a file the entries link to (an image) came or went.
+   */
+  paths: string[];
+  versions: { [key: string]: string}; // each path's new version, "" once it is gone
+}
+/**
  * Board is a kanban over entries, declared in wiki.toml
  * (wiki/product/features/board.md).
  */

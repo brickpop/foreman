@@ -172,11 +172,13 @@ export function usePipeline(project: string) {
   });
 }
 
+const wikiKey = (project: string) => ["wiki", project] as const;
+
 /** An entry's title (a review names its wiki card). */
 export function useEntryTitle(project: string, path: string) {
   const c = useClient();
   return useQuery({
-    queryKey: ["entry", project, path],
+    queryKey: [...wikiKey(project), "title", path],
     queryFn: () => c.wiki.entry(project, path),
     enabled: path !== "",
     select: (e) => e.title,
@@ -224,8 +226,6 @@ export function useMessages(deployment: string) {
     enabled: deployment !== "",
   });
 }
-
-const wikiKey = (project: string) => ["wiki", project] as const;
 
 export function useTree(project: string) {
   const c = useClient();

@@ -116,7 +116,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `team.message` | a message is routed | the message |
 | `team.action` | an agent called a git tool | the action |
 | `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
-| `wiki.changed` | files in a project wiki changed | project, paths, versions |
+| `wiki.changed` | a project wiki's content changed (an entry, `wiki.toml`, or an image its entries link to); only on a real change, by content | `project`, `paths` (entries added, edited or removed, and `wiki.toml`; empty when only a linked image came or went), `versions` (each path's new version, `""` once gone) |
 | `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |
 | `workspace.changed` | projects or repos appeared or disappeared | `{}`: refetch the project list |
 | `setup.changed` | Podman appeared, started, stopped or failed; the instances were restored; the background image build started or ended | `{}`: refetch the checklist |

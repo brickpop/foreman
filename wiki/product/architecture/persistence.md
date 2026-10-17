@@ -36,7 +36,7 @@ Minimum tables, one model entry each: [deployments](../models/deployment.md), [i
 
 ## File watching
 
-- The workspace indexer watches the workspace root (new or removed project folders and repos), every `project/project.toml`, every wiki bundle, and `.foreman/teams/` and `settings.toml`.
+- The workspace indexer watches the workspace root (new or removed project folders and repos), every `project/project.toml`, and `.foreman/teams/` and `settings.toml`. The wiki block watches every project's wiki bundle with a watcher of its own ([Wiki engine](./wiki-engine.md#what-foreman-adds-on-top)).
 - Changes are debounced, reloaded and pushed to clients as events ([API](./api.md#events)) within ~1 s.
 - A config file that fails to parse keeps its last good version in memory and surfaces the error (UI and server log) rather than breaking the project.
 - Foreman's own writes to team files and settings also produce watch events; they are recognised (by content version) so they don't bounce back as "external change".

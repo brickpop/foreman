@@ -4,6 +4,7 @@ import { filesChanged, forgeOf, linkLine } from "../../app/model";
 import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
 import { columnLabel, laneLabel, moveOf } from "./Board";
 import { sourceLabel } from "./Changes";
+import { repoTree } from "./ProjectSettings";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;
 const board = (cards: Card[], lanes: string[] = []) =>
@@ -133,5 +134,14 @@ describe("forgeOf", () => {
     expect(forgeOf("project", project("github", "https://x/ledger-project"))).toBe("github");
     expect(forgeOf("workspace", undefined, "gitea")).toBe("gitea");
     expect(forgeOf("api", undefined)).toBe("none");
+  });
+});
+
+describe("repoTree", () => {
+  it("draws the repos as the project folder's children", () => {
+    expect(repoTree("ledger", ["ledger-api", "ledger-web"])).toBe(
+      "ledger/\n├─ ledger-api/\n└─ ledger-web/",
+    );
+    expect(repoTree("cal", ["cal"])).toBe("cal/\n└─ cal/");
   });
 });

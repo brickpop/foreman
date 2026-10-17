@@ -128,9 +128,9 @@ function Configuration({ project }: { project: Project }) {
   ].join("\n");
   return (
     <section className="grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-9 border-t border-line px-12 pt-7 pb-16">
-      <div className="flex max-w-[520px] flex-col gap-6">
+      <div className="flex min-w-0 max-w-[520px] flex-col gap-6">
         <Block title="Workspace">
-          <pre className="m-0 font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
+          <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
             {tree}
           </pre>
         </Block>
@@ -142,7 +142,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Deployment",
-              "A team on this project with a goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix.",
+              "A team on this project, with an optional goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix.",
             ],
             [
               "Session prompt",
@@ -160,7 +160,7 @@ function Configuration({ project }: { project: Project }) {
           ))}
         </Block>
       </div>
-      <div className="flex flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
         <CodeRepos project={project} />
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
@@ -269,7 +269,9 @@ function CodeRepos({ project }: { project: Project }) {
           create an empty one here.
         </p>
       ) : (
-        <span className="font-mono text-[13.5px]">{project.repos.join(" · ")}</span>
+        <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
+          {repoTree(project.id, project.repos)}
+        </pre>
       )}
       {listed ? (
         <p className="m-0 text-[13px] text-tx3">
@@ -308,4 +310,12 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
       {children}
     </div>
   );
+}
+
+/** The project's code repos as a folder tree, like the Workspace tree. */
+export function repoTree(project: string, repos: string[]): string {
+  return [
+    `${project}/`,
+    ...repos.map((r, i) => `${i === repos.length - 1 ? "└─" : "├─"} ${r}/`),
+  ].join("\n");
 }

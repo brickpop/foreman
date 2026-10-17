@@ -8,7 +8,7 @@ import {
   type WorkItem,
 } from "../../api/client";
 import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
-import { agentOf, forgeOf, ordered } from "../../app/model";
+import { agentOf, forgeOf, ordered, when } from "../../app/model";
 import {
   useAnswer,
   useEntryTitle,
@@ -343,7 +343,7 @@ function MergedRow({
         <span className="text-ok">✓</span>
         <span className="font-medium">{title.data ?? mr.entry}</span>
         {mr.forgePrNumber > 0 && <span className="text-tx3">PR #{mr.forgePrNumber}</span>}
-        <span className="text-[13px] text-tx4">Merged to main at {mr.mergedAt.slice(11, 16)}</span>
+        <span className="text-[13px] text-tx4">Merged to main · {when(mr.mergedAt)}</span>
       </span>
       {items.map((w) => (
         <CarriedItem key={w.id} item={w} project={project} teams={teams} />

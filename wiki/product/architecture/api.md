@@ -26,7 +26,7 @@ GET    /api/teams | /api/teams/:id            definitions, with version and prob
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
 POST   /api/teams/:id/agents                  hire (from CoS)
 
-GET    /api/deployments                       the active deployments
+GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
 POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session)
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status
@@ -43,6 +43,7 @@ GET    /api/requests                          the open requests (today: reviews 
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
 GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge), oldest first
+GET    /api/activity?project=|deployment=     [&before=<cursor>] a page of team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; a project means its active deployments; 400 BAD_REQUEST for neither, both or a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/merge-requests/:id                one merge request, wherever it is (a Chief of Staff change to the workspace repo has no project)
 GET    /api/merge-requests/:id/diff           {diff}: its branch against main, as a unified diff
@@ -73,6 +74,8 @@ POST   /api/setup/podman/machine             {cpus, memory (GiB)}: 202, create a
 GET    /api/events                            SSE: requests, status, file changes
 ```
 
+
+A project's Activity tab pages its traffic with `/api/activity` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
 Resource ids: project = folder name; team = team id; instance = `agent@project` (agent ids are workspace-unique, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
 ## Error format

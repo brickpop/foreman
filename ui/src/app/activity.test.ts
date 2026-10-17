@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { TeamMessage } from "../api/client";
-import { entries, links, matches, shows, threads } from "./activity";
+import type { TeamAction, TeamMessage } from "../api/client";
+import { entries, links, matches, pageEntries, shows, threads } from "./activity";
 
 let next = 0;
 function msg(
@@ -102,5 +102,41 @@ describe("entries", () => {
     expect(shows(action, { agent: "tac@ledger" })).toBe(true);
     expect(shows(action, { agent: "tic@ledger" })).toBe(false);
     expect(shows(action, { a: "tac@ledger", b: "tic@ledger" })).toBe(false);
+  });
+});
+
+describe("activity across deployments (a project's Activity tab)", () => {
+  it("keeps each team's threads apart: a msg-N is unique only in its deployment", () => {
+    const atlasAsk = msg("mara", "tove", "ask", "msg-1");
+    const orionAsk = msg("nora", "ivo", "ask", "msg-1", { deploymentId: "orion@ledger" });
+    const orionReply = msg("ivo", "nora", "reply", "msg-2", {
+      deploymentId: "orion@ledger",
+      inReplyTo: "msg-1",
+    });
+    const got = threads([atlasAsk, orionAsk, orionReply]);
+    expect(got.find((t) => t.message === atlasAsk)?.replies).toEqual([]);
+    expect(got.find((t) => t.message === orionAsk)?.replies).toEqual([orionReply]);
+  });
+
+  it("threads pages again as they arrive: a reply finds its ask a page later", () => {
+    const ask = msg("mara", "tove", "ask", "msg-1", { createdAt: "2026-10-16T09:00:00Z" });
+    const reply = msg("tove", "mara", "reply", "msg-2", {
+      inReplyTo: "msg-1",
+      createdAt: "2026-10-16T11:00:00Z",
+    });
+    const commit = {
+      id: 1,
+      deploymentId: "atlas@ledger",
+      instance: "tove@ledger",
+      tool: "commit",
+      createdAt: "2026-10-16T10:00:00Z",
+    } as TeamAction;
+    const first = { items: [{ message: reply }, { action: commit }], next: "c" };
+    expect(pageEntries([first]).map((e) => ("thread" in e ? e.thread.message : e.action))).toEqual([
+      reply,
+      commit,
+    ]);
+    const both = pageEntries([first, { items: [{ message: ask }], next: "" }]);
+    expect(both).toEqual([{ thread: { message: ask, replies: [reply] } }, { action: commit }]);
   });
 });

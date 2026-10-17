@@ -144,3 +144,18 @@ export interface MergeRequest {
   mergedAt: string /* RFC 3339 */;
   rejectedAt: string /* RFC 3339 */;
 }
+/**
+ * ActivityItem is one item of a project's activity: a message or a git action.
+ */
+export interface ActivityItem {
+  message?: TeamMessage;
+  action?: TeamAction;
+}
+/**
+ * ActivityPage is one page of a project's activity, newest first; Next is the
+ * cursor of the following page, "" when there is none.
+ */
+export interface ActivityPage {
+  items: ActivityItem[];
+  next: string;
+}

@@ -61,7 +61,8 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "setup.changed", data: {} })).toEqual([keys.setup, keys.maintenance]);
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
     expect(staleKeys({ type: "request.created", data: {} })).toEqual([keys.requests]);
-    expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages]);
+    expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages, keys.activity]);
+    expect(staleKeys({ type: "team.action", data: {} })).toEqual([keys.actions, keys.activity]);
     expect(staleKeys({ type: "deployment.created", data: {} })).toEqual([
       keys.instances,
       keys.deployments,
@@ -195,5 +196,19 @@ describe("roster", () => {
       order: ["tove", "mara", "ivo", "gone"],
     } as unknown as Team["config"];
     expect(roster(c)).toEqual(["mara", "tove", "ivo", "ada", "zed"]);
+  });
+});
+
+import { when } from "./model";
+
+describe("when", () => {
+  // Local times, whatever the machine's zone: built from local parts.
+  const at = (y: number, mo: number, d: number, h: number, mi: number) =>
+    new Date(y, mo, d, h, mi).toISOString();
+  const now = new Date(2026, 9, 17, 16, 0);
+  it("shows the time today, the date before, the year before this one", () => {
+    expect(when(at(2026, 9, 17, 9, 5), now)).toBe("09:05");
+    expect(when(at(2026, 9, 15, 14, 30), now)).toBe("Oct 15 14:30");
+    expect(when(at(2025, 11, 31, 23, 59), now)).toBe("Dec 31 2025 23:59");
   });
 });

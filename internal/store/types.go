@@ -136,3 +136,16 @@ type MergeRequest struct {
 	MergedAt       time.Time `json:"mergedAt"`
 	RejectedAt     time.Time `json:"rejectedAt"`
 }
+
+// ActivityItem is one item of a project's activity: a message or a git action.
+type ActivityItem struct {
+	Message *TeamMessage `json:"message,omitempty"`
+	Action  *TeamAction  `json:"action,omitempty"`
+}
+
+// ActivityPage is one page of a project's activity, newest first; Next is the
+// cursor of the following page, "" when there is none.
+type ActivityPage struct {
+	Items []ActivityItem `json:"items"`
+	Next  string         `json:"next"`
+}

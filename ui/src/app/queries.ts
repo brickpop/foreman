@@ -1,6 +1,13 @@
-import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import {
+  type ActivityScope,
   type Board,
   type Draft,
   type ForemanClient,
@@ -32,6 +39,7 @@ export const keys = {
   setup: ["setup"],
   messages: ["messages"],
   actions: ["actions"],
+  activity: ["activity"],
   chiefOfStaff: ["chief-of-staff"],
 } as const;
 
@@ -91,9 +99,9 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "request.resolved":
       return [keys.requests];
     case "team.message":
-      return [keys.messages];
+      return [keys.messages, keys.activity];
     case "team.action":
-      return [keys.actions];
+      return [keys.actions, keys.activity];
     case "wiki.changed":
       return [["wiki", String((e.data as { project?: string }).project ?? "")]];
     case "pipeline.changed":
@@ -438,5 +446,27 @@ export function useSetup() {
       if (steps.some((s) => s.state === "working")) return 1000;
       return steps.some((s) => s.state !== "done") ? 3000 : false;
     },
+  });
+}
+
+/** The stopped deployments: a project's older sessions. Under the
+ * deployments' key, so a stop refreshes them. */
+export function useStoppedDeployments() {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.deployments, "stopped"],
+    queryFn: () => c.agents.stoppedDeployments(),
+  });
+}
+
+/** Team traffic a page at a time, newest first (a project's Activity tab). */
+export function useActivity(scope: ActivityScope, enabled = true) {
+  const c = useClient();
+  return useInfiniteQuery({
+    queryKey: [...keys.activity, scope],
+    queryFn: ({ pageParam }) => c.messages.activity(scope, pageParam),
+    initialPageParam: "",
+    getNextPageParam: (last) => last.next || undefined,
+    enabled,
   });
 }

@@ -215,3 +215,15 @@ export function forgeOf(repo: string, project?: Project, workspaceForge = "none"
     return project.config.forge.projectRepo ? project.config.forge.kind : "none";
   return project.config.forge.kind;
 }
+
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A stored time as the CEO reads it, in local time: `14:05` today, `Oct 15
+ * 14:05` earlier this year, `Oct 15 2025 14:05` before. */
+export function when(iso: string, now = new Date()): string {
+  const t = new Date(iso);
+  const hm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+  if (t.toDateString() === now.toDateString()) return hm;
+  const day = `${months[t.getMonth()]} ${t.getDate()}`;
+  return t.getFullYear() === now.getFullYear() ? `${day} ${hm}` : `${day} ${t.getFullYear()} ${hm}`;
+}

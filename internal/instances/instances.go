@@ -748,19 +748,19 @@ func (m *Manager) List(ctx context.Context) ([]store.Instance, error) {
 	return list, nil
 }
 
-// ActiveDeployments returns the active deployments.
-func (m *Manager) ActiveDeployments(ctx context.Context) ([]store.Deployment, error) {
+// DeploymentsIn returns the deployments with status (active or stopped).
+func (m *Manager) DeploymentsIn(ctx context.Context, status string) ([]store.Deployment, error) {
 	all, err := m.Deployments.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	active := []store.Deployment{}
+	list := []store.Deployment{}
 	for _, d := range all {
-		if d.Status == store.DeploymentActive {
-			active = append(active, d)
+		if d.Status == status {
+			list = append(list, d)
 		}
 	}
-	return active, nil
+	return list, nil
 }
 
 // compose is an instance's session prompt: launch writes it, Prompt shows it.

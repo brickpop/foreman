@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
 import { entries, type Filter, links, shows, type Thread } from "../app/activity";
-import { agentOf } from "../app/model";
+import { agentOf, when } from "../app/model";
 import { useActions, useMessages } from "../app/queries";
 import { CodeText } from "./CodeText";
 import { Dot } from "./ui";
@@ -18,7 +18,17 @@ const height = 150;
 const rx = 118;
 const ry = 50;
 
-type Names = (id: string) => string;
+export type Names = (id: string) => string;
+
+/** Who an id is, as the rows name them: an agent by its soul's name, the CEO
+ * as You, Foreman as itself. */
+export function namesOf(teams: Team[]): Names {
+  return (id) => {
+    if (id === "foreman") return "Foreman";
+    if (id === "ceo") return "You";
+    return agentOf(teams, id)?.soul.name ?? id.split("@")[0];
+  };
+}
 
 export function ActivityPanel({
   deployment,
@@ -37,11 +47,7 @@ export function ActivityPanel({
   const [filter, setFilter] = useState<Filter>(null);
   const [teamId, project] = deployment.split("@");
   const teamName = teams.find((t) => t.id === teamId)?.config.name ?? teamId;
-  const name: Names = (id) => {
-    if (id === "foreman") return "Foreman";
-    if (id === "ceo") return "You";
-    return agentOf(teams, id)?.soul.name ?? id.split("@")[0];
-  };
+  const name = namesOf(teams);
   const actions = useActions(deployment).data ?? [];
   const shown = entries(messages, actions).filter((e) => shows(e, filter));
   return (
@@ -170,8 +176,11 @@ function CallMap({
   name: Names;
 }) {
   const ids = roster.map((i) => i.id);
-  // Foreman and the CEO appear only when they sent something.
-  for (const m of messages)
+  // The map is the team at work: Foreman's notices (a merge, a conflict, main
+  // moving) stay in the list below, never as a teammate here. The CEO appears
+  // when they sent something.
+  const team = messages.filter((m) => m.fromInstance !== "foreman" && m.toInstance !== "foreman");
+  for (const m of team)
     for (const id of [m.fromInstance, m.toInstance]) if (!ids.includes(id)) ids.push(id);
   const at = new Map(
     ids.map((id, i) => {
@@ -179,7 +188,7 @@ function CallMap({
       return [id, { x: width / 2 + rx * Math.cos(angle), y: height / 2 + ry * Math.sin(angle) }];
     }),
   );
-  const pairs = links(messages);
+  const pairs = links(team);
   const selected = (a: string, b: string) =>
     filter !== null && "a" in filter && [filter.a, filter.b].sort().join() === [a, b].join();
   const status = (id: string) => roster.find((i) => i.id === id)?.status;
@@ -255,18 +264,19 @@ function CallMap({
   );
 }
 
-const time = (m: TeamMessage) => m.createdAt.slice(11, 16);
-
 /** A thread as one row: who asked whom, and how it stands. A click opens it
- * as a chat: the first message, then the replies. */
-function ThreadRow({
+ * as a chat: the first message, then the replies. With team, the row names
+ * its team (a project's Activity tab); without onOpen, it opens nowhere else. */
+export function ThreadRow({
   thread,
   name,
+  team,
   onOpen,
 }: {
   thread: Thread;
   name: Names;
-  onOpen: (instance: string) => void;
+  team?: string;
+  onOpen?: (instance: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const m = thread.message;
@@ -286,6 +296,7 @@ function ThreadRow({
         className="flex w-full flex-col gap-1 px-4 py-2.5 text-left hover:bg-hover"
       >
         <span className="flex items-center gap-1.5">
+          {team && <TeamTag team={team} />}
           <Exchange message={m} name={name} />
           <span className="flex-1" />
           {state && (
@@ -293,7 +304,7 @@ function ThreadRow({
               {state}
             </span>
           )}
-          <span className="text-[11.5px] text-tx4">{time(last)}</span>
+          <span className="text-[11.5px] text-tx4">{when(last.createdAt)}</span>
         </span>
         {!open && <span className="truncate text-[12.5px] text-tx3">{m.body}</span>}
       </button>
@@ -302,7 +313,7 @@ function ThreadRow({
           {[m, ...thread.replies].map((x) => (
             <Bubble key={x.id} message={x} name={name} first={x.fromInstance === m.fromInstance} />
           ))}
-          {m.fromInstance.includes("@") && (
+          {onOpen && m.fromInstance.includes("@") && (
             <button
               type="button"
               onClick={() => onOpen(m.fromInstance)}
@@ -342,7 +353,7 @@ function Bubble({
           {m.kind} · {m.ref}
         </span>
         <span className="flex-1" />
-        <span className="text-[11px] text-tx4">{time(m)}</span>
+        <span className="text-[11px] text-tx4">{when(m.createdAt)}</span>
       </span>
       <div className="text-[13px] leading-[1.5] whitespace-pre-wrap text-tx2 select-text">
         <CodeText text={m.body} />
@@ -417,19 +428,27 @@ function ActionText({ action: a }: { action: TeamAction }) {
 }
 
 /** One git tool call: who did what, then what happened in each repo (or why
- * it was refused). */
-function ActionRow({ action: a, name }: { action: TeamAction; name: Names }) {
-  const time = a.createdAt.slice(11, 16);
+ * it was refused). With team, the row names its team. */
+export function ActionRow({
+  action: a,
+  name,
+  team,
+}: {
+  action: TeamAction;
+  name: Names;
+  team?: string;
+}) {
   return (
     <div className="flex flex-col gap-1 border-b border-line bg-side/40 px-4 py-2">
       <span className="flex min-w-0 items-center gap-1.5">
+        {team && <TeamTag team={team} />}
         <NameTag id={a.instance} name={name} />
         <span className="min-w-0 truncate">
           <ActionText action={a} />
         </span>
         <span className="flex-1" />
         {a.error !== "" && <span className="text-[11.5px] text-err">refused</span>}
-        <span className="text-[11.5px] text-tx4">{time}</span>
+        <span className="text-[11.5px] text-tx4">{when(a.createdAt)}</span>
       </span>
       {a.error !== "" ? (
         <span className="line-clamp-2 text-[12px] text-tx3">{a.error}</span>
@@ -451,4 +470,10 @@ function ActionRow({ action: a, name }: { action: TeamAction; name: Names }) {
       )}
     </div>
   );
+}
+
+/** Which team a row is from, on a project's Activity tab: plain text, so the
+ * agents' labels stay the loudest. */
+function TeamTag({ team }: { team: string }) {
+  return <span className="shrink-0 text-[11.5px] font-medium text-tx4">{team} ·</span>;
 }

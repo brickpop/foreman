@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 priority: low
 tags: [feature]
 epic: terminal-multiplexer
@@ -15,4 +15,5 @@ epic: terminal-multiplexer
 - Only the project name links to the project (the keyboard path for each stays a real link or button).
 - The **Sessions** button goes, since the card does that now. **Stop** keeps its own action.
 
-- [ ] the Team page spec, then the card; a UI test that the card opens the deployment's sessions and the name opens the project
+- [x] the Team page spec, then the card (2026-10-17: the sessions link is stretched over the card; the name and Stop sit above it)
+- [x] a UI test: deferred by the CEO (2026-10-17) to [UI component tests](./ui-component-tests.md), since the UI has no component tests yet

@@ -8,6 +8,8 @@ import type { ImageStatus, Maintenance } from "./types/runner";
 import type { MachineSize, Step as SetupStep } from "./types/setup";
 import type {
   ActionRepo,
+  ActivityItem,
+  ActivityPage,
   Deployment,
   Instance,
   MergeRequest,
@@ -35,6 +37,8 @@ import type {
 
 export type {
   ActionRepo,
+  ActivityItem,
+  ActivityPage,
   Board,
   Candidate,
   Card,
@@ -96,6 +100,8 @@ export interface AgentsArea {
   instances(): Promise<Instance[]>;
   /** The active deployments. */
   deployments(): Promise<Deployment[]>;
+  /** The stopped deployments (a project's Activity tab lists their older sessions). */
+  stoppedDeployments(): Promise<Deployment[]>;
   /** An instance's session prompt, exactly as composed for its harness. */
   prompt(instance: string): Promise<string>;
   deploy(team: string, project: string, goal: string): Promise<Deployment>;
@@ -145,10 +151,17 @@ export interface RequestsArea {
   resolve(id: string, answer: string): Promise<void>;
 }
 
+/** Whose activity: a project's active deployments, or one deployment. */
+export type ActivityScope = { project: string } | { deployment: string };
+
 export interface MessagesArea {
   list(deployment: string): Promise<TeamMessage[]>;
   /** The git tools the deployment's agents called, oldest first. */
   actions(deployment: string): Promise<TeamAction[]>;
+  /** A page of team traffic, messages and git actions together, newest first:
+   * a project's active deployments, or one deployment; before is the previous
+   * page's next. */
+  activity(scope: ActivityScope, before?: string): Promise<ActivityPage>;
 }
 
 export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
@@ -308,6 +321,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     agents: {
       instances: () => getJSON("/api/instances"),
       deployments: () => getJSON("/api/deployments"),
+      stoppedDeployments: () => getJSON("/api/deployments?status=stopped"),
       prompt: async (instance) =>
         (await getJSON<{ prompt: string }>(`/api/instances/${id(instance)}/prompt`)).prompt,
       deploy: async (team, project, goal) =>
@@ -377,6 +391,13 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
       actions: (deployment) => getJSON(`/api/actions?deployment=${id(deployment)}`),
+      activity: (scope, before) => {
+        const q = new URLSearchParams(
+          "project" in scope ? { project: scope.project } : { deployment: scope.deployment },
+        );
+        if (before) q.set("before", before);
+        return getJSON(`/api/activity?${q}`);
+      },
     },
     chiefOfStaff: {
       conversation: notBuilt("the Chief of Staff"),

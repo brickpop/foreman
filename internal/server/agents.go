@@ -17,7 +17,8 @@ type Agents interface {
 	Deploy(ctx context.Context, team, project, goal string) (store.Deployment, error)
 	Stop(ctx context.Context, deployment string) error
 	List(ctx context.Context) ([]store.Instance, error)
-	ActiveDeployments(ctx context.Context) ([]store.Deployment, error)
+	// DeploymentsIn lists the deployments with status (active or stopped).
+	DeploymentsIn(ctx context.Context, status string) ([]store.Deployment, error)
 	// Prompt is an instance's session prompt, exactly as composed for its harness.
 	Prompt(ctx context.Context, instance string) (string, error)
 	// Wake starts an asleep instance; any other is left as it is.
@@ -65,7 +66,16 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 		}
 	})
 	mux.HandleFunc("GET /api/deployments", func(w http.ResponseWriter, r *http.Request) {
-		list, err := a.ActiveDeployments(r.Context())
+		status := r.URL.Query().Get("status")
+		switch status {
+		case "":
+			status = store.DeploymentActive
+		case store.DeploymentActive, store.DeploymentStopped:
+		default:
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?status=active or stopped")
+			return
+		}
+		list, err := a.DeploymentsIn(r.Context(), status)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 			return

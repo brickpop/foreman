@@ -1,4 +1,4 @@
-import type { TeamAction, TeamMessage } from "../api/client";
+import type { ActivityPage, TeamAction, TeamMessage } from "../api/client";
 
 // The Activity panel's model (wiki/product/features/sessions.md#activity):
 // who calls whom, and the exchanges as threads, newest first.
@@ -12,13 +12,17 @@ export type Thread = { message: TeamMessage; replies: TeamMessage[] };
 export function threads(messages: TeamMessage[]): Thread[] {
   const asks = new Map<string, Thread>();
   const all: Thread[] = [];
-  for (const m of messages) {
-    if (m.kind === "reply" && m.inReplyTo && asks.has(m.inReplyTo)) {
-      asks.get(m.inReplyTo)?.replies.push(m);
+  // Oldest first, in whatever order they came (pages come newest first): an
+  // ask is met before its replies.
+  for (const m of [...messages].sort((a, b) => a.id - b.id)) {
+    // A msg-N is unique only within its deployment.
+    const ask = `${m.deploymentId} ${m.inReplyTo}`;
+    if (m.kind === "reply" && m.inReplyTo && asks.has(ask)) {
+      asks.get(ask)?.replies.push(m);
       continue;
     }
     const t = { message: m, replies: [] };
-    if (m.kind === "ask") asks.set(m.ref, t);
+    if (m.kind === "ask") asks.set(`${m.deploymentId} ${m.ref}`, t);
     all.push(t);
   }
   const latest = (t: Thread) => Math.max(...[t.message, ...t.replies].map((m) => m.id));
@@ -84,4 +88,17 @@ export function entries(messages: TeamMessage[], actions: TeamAction[]): Entry[]
 export function shows(e: Entry, f: Filter): boolean {
   if ("thread" in e) return matches(e.thread, f);
   return !f || ("agent" in f && f.agent === e.action.instance);
+}
+
+/** Pages of activity as the panel's entries: every message and action loaded
+ * so far, threaded again as pages arrive (a reply's ask may come a page later). */
+export function pageEntries(pages: ActivityPage[]): Entry[] {
+  const messages: TeamMessage[] = [];
+  const actions: TeamAction[] = [];
+  for (const p of pages)
+    for (const it of p.items) {
+      if (it.message) messages.push(it.message);
+      if (it.action) actions.push(it.action);
+    }
+  return entries(messages, actions);
 }

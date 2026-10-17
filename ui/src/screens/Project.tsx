@@ -4,15 +4,17 @@ import { useInstances, useProjects, useRequests, useTeams, useWorkspace } from "
 import { deploymentTabs, mostRecentAgent } from "../app/sessions";
 import { DeployDialog } from "../components/DeployDialog";
 import { Button, CountBadge, outlineLink } from "../components/ui";
+import { Activity } from "./project/Activity";
 import { Board } from "./project/Board";
 import { Changes } from "./project/Changes";
 import { Overview } from "./project/Overview";
 import { ProjectSettings } from "./project/ProjectSettings";
 
-export type ProjectTab = "overview" | "changes" | "board" | "settings";
+export type ProjectTab = "overview" | "activity" | "changes" | "board" | "settings";
 
 const tabs: { tab: ProjectTab; label: string }[] = [
   { tab: "overview", label: "Overview" },
+  { tab: "activity", label: "Activity" },
   { tab: "changes", label: "Changes" },
   { tab: "board", label: "Board" },
   { tab: "settings", label: "Settings" },
@@ -64,6 +66,7 @@ export function Project() {
       </header>
       {/* Keyed by project: switching projects starts each tab fresh (tree, board, editors). */}
       {tab === "overview" && <Overview key={id} project={id} entry={entry} />}
+      {tab === "activity" && <Activity key={id} project={id} />}
       {tab === "changes" && <Changes key={id} project={project} />}
       {tab === "board" && <Board key={id} project={id} />}
       {tab === "settings" && (

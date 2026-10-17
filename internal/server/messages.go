@@ -42,6 +42,52 @@ func actionRoutes(mux *http.ServeMux, a Actions) {
 	})
 }
 
+// Activity pages team traffic, messages and git actions together (implemented
+// by the state store).
+type Activity interface {
+	Page(ctx context.Context, deployments []string, before string, limit int) (store.ActivityPage, error)
+}
+
+// activityPage is how many items a page of activity holds (the CEO, 2026-10-17).
+const activityPage = 50
+
+// activityRoutes serve a project's Activity tab: its active deployments'
+// traffic merged, or one deployment's (an older session).
+func activityRoutes(mux *http.ServeMux, act Activity, a Agents) {
+	mux.HandleFunc("GET /api/activity", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		project, deployment := q.Get("project"), q.Get("deployment")
+		var deployments []string
+		switch {
+		case (project == "") == (deployment == ""):
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?project=<id> or ?deployment=<team@project>")
+			return
+		case deployment != "":
+			deployments = []string{deployment}
+		default:
+			active, err := a.DeploymentsIn(r.Context(), store.DeploymentActive)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+				return
+			}
+			for _, d := range active {
+				if d.ProjectID == project {
+					deployments = append(deployments, d.ID)
+				}
+			}
+		}
+		page, err := act.Page(r.Context(), deployments, q.Get("before"), activityPage)
+		switch {
+		case errors.Is(err, store.ErrBadCursor):
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "a bad ?before= cursor")
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		default:
+			writeJSON(w, http.StatusOK, page)
+		}
+	})
+}
+
 func messageRoutes(mux *http.ServeMux, m Messages) {
 	mux.HandleFunc("GET /api/messages", func(w http.ResponseWriter, r *http.Request) {
 		deployment := r.URL.Query().Get("deployment")

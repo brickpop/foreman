@@ -104,6 +104,19 @@ describe("httpClient", () => {
     ]);
   });
 
+  it("pages activity by project or by deployment, and lists stopped deployments", async () => {
+    const calls = stubFetch(200, { items: [], next: "" });
+    const client = httpClient("http://x");
+    await client.messages.activity({ project: "ledger" });
+    await client.messages.activity({ deployment: "atlas@ledger" }, "c2");
+    await client.agents.stoppedDeployments();
+    expect(calls.map((c) => c.url)).toEqual([
+      "http://x/api/activity?project=ledger",
+      "http://x/api/activity?deployment=atlas%40ledger&before=c2",
+      "http://x/api/deployments?status=stopped",
+    ]);
+  });
+
   it("adds or creates a project with an optional first repo, and a repo to a project", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");

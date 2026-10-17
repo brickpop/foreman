@@ -58,4 +58,4 @@ Entries of a stopped [deployment](../models/deployment.md) stay listed with a `s
 
 ## 3. Merged
 
-Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `Merged to main at 14:05`; under each, its work items as compact lines (author avatar, board card title).
+Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `Merged to main · 14:05` (local time, with the date when not today); under each, its work items as compact lines (author avatar, board card title).

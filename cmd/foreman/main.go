@@ -273,6 +273,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Agents:      views,
 		Messages:    messenger,
 		Actions:     state.Actions(),
+		Activity:    state.Activity(),
 		Pipeline:    flow,
 		Requests:    flow,
 		Harnesses:   login,

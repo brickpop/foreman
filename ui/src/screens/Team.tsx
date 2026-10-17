@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
@@ -78,7 +78,6 @@ export function Team() {
 }
 
 function Deployments({ team, deployments }: { team: TeamData; deployments: Deployment[] }) {
-  const navigate = useNavigate();
   const instances = useInstances();
   const requests = useRequests();
   const [stopping, setStopping] = useState<Deployment>();
@@ -94,44 +93,36 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
             (r) => r.status === "open" && r.deploymentId === d.id,
           ).length;
           return (
-            <Panel key={d.id} className="hover:border-line3">
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: the whole card opens the project; the title link is the keyboard path */}
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents: the title link is the keyboard path */}
-              <div
-                className="flex cursor-pointer items-center gap-4 px-5 py-4"
-                onClick={(e) => {
-                  // The buttons and the link inside do their own thing.
-                  if ((e.target as HTMLElement).closest("a, button")) return;
-                  navigate({
-                    to: "/projects/$project",
-                    params: { project: d.projectId },
-                    search: { tab: "overview" },
-                  });
-                }}
-              >
-                <div className="flex flex-1 flex-col gap-0.5">
+            // The whole card opens the deployment's sessions: their link
+            // stretches over it, and the project name and Stop sit above it.
+            <Panel
+              key={d.id}
+              className="relative hover:border-line3 has-[[data-card]:focus-visible]:outline-2 has-[[data-card]:focus-visible]:outline-acc"
+            >
+              <div className="flex items-center gap-4 px-5 py-4">
+                <div className="flex flex-1 flex-col items-start gap-0.5">
                   <Link
                     to="/projects/$project"
                     params={{ project: d.projectId }}
                     search={{ tab: "overview" }}
-                    className="text-[15px] font-semibold text-tx"
+                    className="relative z-10 text-[15px] font-semibold text-tx hover:underline"
                   >
                     {d.projectId}
                   </Link>
                   <span className={d.goal ? "text-tx2" : "text-tx4"}>
                     {d.goal || "No goal set"}
                   </span>
-                  <span className="text-[13px] text-tx4">
+                  <Link
+                    to="/sessions"
+                    search={{ deployment: d.id }}
+                    data-card
+                    aria-label={`Open the sessions of ${team.config.name} on ${d.projectId}`}
+                    className="text-[13px] text-tx4 outline-none after:absolute after:inset-0"
+                  >
                     {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
-                  </span>
+                  </Link>
                 </div>
-                <Button
-                  variant="raised"
-                  onClick={() => navigate({ to: "/sessions", search: { deployment: d.id } })}
-                >
-                  Sessions
-                </Button>
-                <Button variant="danger" onClick={() => setStopping(d)}>
+                <Button variant="danger" className="relative z-10" onClick={() => setStopping(d)}>
                   Stop
                 </Button>
               </div>

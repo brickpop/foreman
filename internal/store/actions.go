@@ -39,27 +39,36 @@ func (s actions) Add(ctx context.Context, a TeamAction) (TeamAction, error) {
 }
 
 func (s actions) List(ctx context.Context, deploymentID string) ([]TeamAction, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT id, deployment_id, instance, tool, branch, message, repos, error, created_at FROM team_actions WHERE deployment_id = ? ORDER BY id", deploymentID)
+	rows, err := s.db.QueryContext(ctx, "SELECT "+actionColumns+" FROM team_actions WHERE deployment_id = ? ORDER BY id", deploymentID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	list := []TeamAction{}
 	for rows.Next() {
-		var a TeamAction
-		var branch, message, errText, created sql.NullString
-		var repos string
-		if err := rows.Scan(&a.ID, &a.DeploymentID, &a.Instance, &a.Tool, &branch, &message, &repos, &errText, &created); err != nil {
-			return nil, err
-		}
-		a.Branch, a.Message, a.Error = branch.String, message.String, errText.String
-		if err := json.Unmarshal([]byte(repos), &a.Repos); err != nil {
-			return nil, err
-		}
-		if a.CreatedAt, err = parseTime(created); err != nil {
+		a, err := scanAction(rows)
+		if err != nil {
 			return nil, err
 		}
 		list = append(list, a)
 	}
 	return list, rows.Err()
+}
+
+const actionColumns = "id, deployment_id, instance, tool, branch, message, repos, error, created_at"
+
+func scanAction(row interface{ Scan(...any) error }) (TeamAction, error) {
+	var a TeamAction
+	var branch, message, errText, created sql.NullString
+	var repos string
+	if err := row.Scan(&a.ID, &a.DeploymentID, &a.Instance, &a.Tool, &branch, &message, &repos, &errText, &created); err != nil {
+		return TeamAction{}, err
+	}
+	a.Branch, a.Message, a.Error = branch.String, message.String, errText.String
+	if err := json.Unmarshal([]byte(repos), &a.Repos); err != nil {
+		return TeamAction{}, err
+	}
+	var err error
+	a.CreatedAt, err = parseTime(created)
+	return a, err
 }

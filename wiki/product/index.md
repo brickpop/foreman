@@ -34,6 +34,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
 - [Sessions](./features/sessions.md): the terminal multiplexer
 - Project
   - [Wiki reader](./features/wiki-reader.md) (Overview tab)
+  - [Project activity](./features/project-activity.md)
   - [Changes](./features/changes.md)
   - [Board](./features/board.md)
   - [Project settings](./features/project-settings.md)

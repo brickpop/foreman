@@ -61,6 +61,7 @@ func fixture(t *testing.T) Browser {
 	gitIn(t, api, "worktree", "add", "--quiet", "-b", "wt/tove/x", tree)
 	write(t, filepath.Join(tree, "x.go"), "package x\n")
 	gitIn(t, tree, "add", "x.go")
+	t.Setenv("GIT_COMMITTER_DATE", "2030-01-01T10:00:00Z") // newer than trunk, whatever the clock
 	gitIn(t, tree, "commit", "--quiet", "-m", "x")
 	write(t, filepath.Join(tree, "x.go"), "package x // edited\n")
 	project := filepath.Join(root, "ledger", "project")
@@ -140,7 +141,8 @@ func TestAMainTheRepoHasNot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if api := list[0]; len(api.Branches) != 2 || api.Branches[0].Name != "trunk" || api.Branches[1].Ahead != 0 {
+	// Newest first, with no main to put first.
+	if api := list[0]; len(api.Branches) != 2 || api.Branches[0].Name != "wt/tove/x" || api.Branches[0].Ahead != 0 {
 		t.Errorf("api %+v", api)
 	}
 }

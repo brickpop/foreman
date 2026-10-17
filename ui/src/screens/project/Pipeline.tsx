@@ -84,9 +84,10 @@ export function InFlight({ project }: { project: Project }) {
     mrs.some((m) => m.id === w.mergeRequestId && (m.state === "open" || m.state === "merged"));
   const loose = items.filter((w) => !carried(w));
   if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
+  // Side by side when both fit (the CEO, 2026-10-17); one alone takes the width.
   return (
-    <>
-      <section className="flex flex-col gap-2.5">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] items-start gap-9">
+      <section className="flex min-w-0 flex-col gap-2.5">
         <div className="flex items-baseline gap-2">
           <SectionLabel>In flight</SectionLabel>
           <span className="text-xs text-tx4">worktree → lead → main</span>
@@ -119,7 +120,7 @@ export function InFlight({ project }: { project: Project }) {
         )}
       </section>
       {merged.length > 0 && (
-        <section className="flex flex-col gap-2.5">
+        <section className="flex min-w-0 flex-col gap-2.5">
           <SectionLabel>Merged</SectionLabel>
           {merged.map((m) => (
             <MergedRow
@@ -132,7 +133,7 @@ export function InFlight({ project }: { project: Project }) {
           ))}
         </section>
       )}
-    </>
+    </div>
   );
 }
 

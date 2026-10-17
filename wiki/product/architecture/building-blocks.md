@@ -440,7 +440,7 @@ CEO answers in the UI ──▶ Workflow.Resolve ──▶ the open tool call re
 **5. Hand-off, integration and a merge** (hand-off from epic 2; work items, integration and merges from the Git and Workflow epics)
 
 ```
-Member ── switch(branch), then commit(message) ──▶ Workflow: Git.Switch, Git.Commit in its worktrees
+Member ── switch(branch), then commit(commits) ──▶ Workflow: Git.Switch, Git.Commit in its worktrees
 Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pending work), policy check, work item (one repo: nothing to fetch)
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
 Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated

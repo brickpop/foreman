@@ -157,7 +157,7 @@ func branches(in Input, lead bool, has func(string) bool) string {
 func wikiAccess(lead bool, has func(string) bool) string {
 	switch {
 	case lead && has("commit"):
-		return "read and write: edit, then commit()"
+		return "read and write: edit, then commit its repo, project"
 	case lead:
 		return "read and write"
 	case has("contribute"):
@@ -185,10 +185,13 @@ var toolRows = map[string][]string{
 	"reply":        {"reply(request_id, output)           Answer a request. Only `output` is returned."},
 	"read_message": {"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."},
 	"switch":       {"switch(branch)                      Go to one of your branches (made from main if new)."},
-	"commit":       {"commit(message)                     Commit your changes, in every repo, on your branch."},
+	"commit": {
+		"commit(commits)                     Commit the repos you name, each with its own message:",
+		"                                    [{repo, message}], repo being its folder in your sandbox.",
+	},
 	"merge": {
 		"merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.",
-		"                                    On conflicts: resolve the markers, then commit().",
+		"                                    On conflicts: resolve the markers, then commit those repos.",
 	},
 	"abort_merge": {"abort_merge()                       Back out of an unfinished merge."},
 	"handoff":     {"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."},

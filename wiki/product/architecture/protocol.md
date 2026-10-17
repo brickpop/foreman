@@ -163,14 +163,15 @@ type SwitchResult struct { Created bool; Repos []string }               // creat
 ### `commit`
 
 ```go
-type CommitArgs   struct { Message string }
-type CommitResult struct { Commits []RepoCommit }        // one per repo that had changes
+type CommitArgs   struct { Commits []RepoMessage }       // at least one; each repo once
+type RepoMessage  struct { Repo string; Message string }
+type CommitResult struct { Commits []RepoCommit }        // one per repo named that had changes
 type RepoCommit   struct { Repo string; Branch string; Commit string }
 ```
 
-- Effect: Workflow asks Git to stage everything in each of the caller's worktrees that has changes and commit it on the branch checked out there, authored as the agent (from its token). For the lead it also commits its changes in the live project repo, on its `main` (other agents can't write that checkout). Agents can't commit themselves: every repo's `.git`, the project repo's included, is mounted read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). After an `merge` with conflicts, the commit concludes the merge.
+- Effect: for each repo named, Workflow asks Git to stage everything changed in it and commit it, with that repo's message, on the branch checked out there, authored as the agent (from its token). A repo is the caller's worktree of that code repo (its folder name in the sandbox) or, for the lead only, `project`: the live project repo, committed on its `main` (other agents can't write that checkout). Repos not named keep their changes (the CEO, 2026-10-17: the lead commits the wiki without its half-done code, and a commit's message fits its repo). Every entry is checked before anything is committed. A repo named with nothing changed is said in the result (`Nothing changed in web.`), not refused, unless no repo had changes. Agents can't commit themselves: every repo's `.git`, the project repo's included, is mounted read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). After a `merge` with conflicts, committing a repo concludes its merge.
 - Nothing is delivered; no marker.
-- Errors: `nothing_to_commit`, `conflicts_left` (conflict markers still in a file of an unfinished merge), `git_error` (with git's message).
+- Errors: `empty` (no repo named, or a repo without a message), `unknown_repo` (not one of the caller's: the refusal lists them), `repeated_repo`, `nothing_to_commit` (in none of the repos named), `conflicts_left` (conflict markers still in a file of an unfinished merge; the repos without them are committed meanwhile), `git_error` (with git's message).
 
 ### `merge`
 
@@ -180,7 +181,7 @@ type MergeResult struct { Repos []RepoMerge }
 type RepoMerge   struct { Repo string; Merged bool; Conflicts []string } // files left with conflict markers
 ```
 
-- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and calls `commit`, which finishes the merge (it refuses while markers are left), or backs out with `abort_merge`. Agents never rebase: branches are shared from their first commit (a teammate may already have merged one), and integration detection and the forge's PRs follow commits, which a rebase would replace (decided 2026-10-16).
+- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and commits those repos, which finishes the merge (it refuses while markers are left), or backs out with `abort_merge`. Agents never rebase: branches are shared from their first commit (a teammate may already have merged one), and integration detection and the forge's PRs follow commits, which a rebase would replace (decided 2026-10-16).
 - Nothing is delivered; a merge into a lead branch may let Workflow detect an integration ([Work items and merge requests](#work-items-and-merge-requests)).
 - Errors: `branch_not_found` (in none of the caller's repos), `uncommitted_changes` (commit first, so a merge never mixes with unsaved work), `git_error`.
 - `merge` was called `update` until 2026-10-16: the git word, which agents already know.
@@ -315,12 +316,11 @@ type TeamAction struct {
     Instance     string        // who called it
     Tool         string        // switch, commit, merge, abort_merge
     Branch       string        // switch: to; merge: from
-    Message      string        // commit
     Repos        []ActionRepo  // what happened in each repo
     Error        string        // the refusal the agent got; "" when it went through
     CreatedAt    time.Time
 }
-type ActionRepo struct { Repo, Branch, Commit string; Created bool; Conflicts []string }
+type ActionRepo struct { Repo, Branch, Message, Commit string; Created bool; Conflicts []string } // Message: commit's, for this repo
 ```
 
 Shown in the [Activity](../features/sessions.md#activity) panel, between the threads.

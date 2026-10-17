@@ -20,4 +20,8 @@ export interface Commit {
   date: string /* RFC 3339 */;
   subject: string;
   merge: boolean; // more than one parent
+  /**
+   * Branches are the branches pointing at it.
+   */
+  branches: string[];
 }

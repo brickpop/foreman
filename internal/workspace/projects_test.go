@@ -272,14 +272,14 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	})
 	repo := filepath.Join(w.Root(), "old", "project")
 	got, err := w.Missing("old")
-	if err != nil || len(got) != 6 {
+	if err != nil || len(got) != 7 {
 		t.Fatalf("missing %+v %v", got, err)
 	}
 	// The wiki can't be read without its files; it can without AGENTS.md.
 	for i, want := range []struct {
 		file     string
 		required bool
-	}{{"wiki/wiki.toml", true}, {"wiki/index.md", true}, {"AGENTS.md", false}, {"wiki/product/index.md", false}, {"wiki/backlog/index.md", false}, {"wiki/technical-debt.md", false}} {
+	}{{"wiki/wiki.toml", true}, {"wiki/index.md", true}, {"AGENTS.md", false}, {".gitignore", false}, {"wiki/product/index.md", false}, {"wiki/backlog/index.md", false}, {"wiki/technical-debt.md", false}} {
 		if got[i].File != want.file || got[i].Required != want.required || got[i].Why == "" {
 			t.Errorf("missing[%d] = %+v, want %+v", i, got[i], want)
 		}
@@ -298,7 +298,7 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(repo, "AGENTS.md")); !strings.Contains(string(data), "type: task") {
 		t.Errorf("AGENTS.md = %q", data)
 	}
-	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "Project repo: add wiki/wiki.toml, AGENTS.md, wiki/product/index.md, wiki/backlog/index.md, wiki/technical-debt.md\n\nAGENTS.md\nwiki/backlog/index.md\nwiki/product/index.md\nwiki/technical-debt.md\nwiki/wiki.toml" {
+	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "Project repo: add wiki/wiki.toml, AGENTS.md, .gitignore, wiki/product/index.md, wiki/backlog/index.md, wiki/technical-debt.md\n\n.gitignore\nAGENTS.md\nwiki/backlog/index.md\nwiki/product/index.md\nwiki/technical-debt.md\nwiki/wiki.toml" {
 		t.Errorf("commit %q", log)
 	}
 	// Nothing missing: nothing written, nothing committed.
@@ -352,6 +352,14 @@ func TestNewProjectWikiChecks(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(repo, "wiki", "index.md")); !strings.Contains(string(data), "# ledger\n") {
 		t.Errorf("index.md = %q", data)
+	}
+	// The wiki's index, secrets and clutter never show as changes to commit.
+	for _, f := range []string{"wiki/.wiki/index.db", ".env", "wiki/.DS_Store", "wiki/backlog/task.md.swp", ".obsidian/workspace.json"} {
+		writeFile(t, filepath.Join(repo, f), "x")
+	}
+	writeFile(t, filepath.Join(repo, "wiki", "product", "flow.png"), "x")
+	if status := gitOut(t, repo, "status", "--porcelain", "--untracked-files=all"); status != "?? wiki/product/flow.png" {
+		t.Errorf("status %q", status)
 	}
 	bin, err := exec.LookPath("wiki")
 	if err != nil {

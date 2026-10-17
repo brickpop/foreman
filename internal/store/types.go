@@ -84,8 +84,7 @@ type TeamAction struct {
 	DeploymentID string       `json:"deploymentId"`
 	Instance     string       `json:"instance"`
 	Tool         string       `json:"tool"`
-	Branch       string       `json:"branch"`  // switch: to; merge: from
-	Message      string       `json:"message"` // commit
+	Branch       string       `json:"branch"` // switch: to; merge: from
 	Repos        []ActionRepo `json:"repos"`
 	Error        string       `json:"error"` // the refusal the agent got; "" when it went through
 	CreatedAt    time.Time    `json:"createdAt"`
@@ -95,6 +94,7 @@ type TeamAction struct {
 type ActionRepo struct {
 	Repo      string   `json:"repo"`
 	Branch    string   `json:"branch"`    // checked out there after it
+	Message   string   `json:"message"`   // commit: the message given for this repo
 	Commit    string   `json:"commit"`    // a commit made
 	Created   bool     `json:"created"`   // switch: the branch was new
 	Conflicts []string `json:"conflicts"` // merge: files left with markers

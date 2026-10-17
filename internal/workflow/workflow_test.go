@@ -141,7 +141,7 @@ func (f *fixture) git(dir string, args ...string) string {
 	return strings.TrimSpace(string(out))
 }
 
-func (f *fixture) call(agent, tool string, args map[string]string) agentlink.Result {
+func (f *fixture) call(agent, tool string, args any) agentlink.Result {
 	f.t.Helper()
 	raw, _ := json.Marshal(args)
 	c := teamtools.Caller{
@@ -152,7 +152,16 @@ func (f *fixture) call(agent, tool string, args map[string]string) agentlink.Res
 	return f.w.Call(ctx, c, tool, raw)
 }
 
-func (f *fixture) ok(agent, tool string, args map[string]string) string {
+// commits are commit's arguments: repo, message, repo, message…
+func commits(pairs ...string) map[string]any {
+	var list []map[string]string
+	for i := 0; i+1 < len(pairs); i += 2 {
+		list = append(list, map[string]string{"repo": pairs[i], "message": pairs[i+1]})
+	}
+	return map[string]any{"commits": list}
+}
+
+func (f *fixture) ok(agent, tool string, args any) string {
 	f.t.Helper()
 	res := f.call(agent, tool, args)
 	if res.Error {
@@ -161,7 +170,7 @@ func (f *fixture) ok(agent, tool string, args map[string]string) string {
 	return res.Text
 }
 
-func (f *fixture) refused(agent, tool string, args map[string]string, code string) string {
+func (f *fixture) refused(agent, tool string, args any, code string) string {
 	f.t.Helper()
 	res := f.call(agent, tool, args)
 	if !res.Error || !strings.HasPrefix(res.Text, code+":") {
@@ -208,44 +217,91 @@ func TestSwitchRefusals(t *testing.T) {
 	}
 }
 
-func TestCommitInEveryRepoAsTheAgent(t *testing.T) {
+// Each repo named is committed with its own message, as the agent; the rest
+// are left alone, changes and all.
+func TestCommitTheReposNamedAsTheAgent(t *testing.T) {
 	f := newFixture(t)
-	f.refused("tove", "commit", map[string]string{"message": "x"}, "nothing_to_commit")
-	f.refused("tove", "commit", map[string]string{"message": " "}, "empty")
+	f.refused("tove", "commit", commits("api", "x"), "nothing_to_commit")
+	f.refused("tove", "commit", commits("api", " "), "empty")
+	f.refused("tove", "commit", commits(), "empty")
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
-	text := f.ok("tove", "commit", map[string]string{"message": "cal v0"})
+	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft.ts"), "x\n")
+	text := f.ok("tove", "commit", commits("api", "cal v0"))
 	if !strings.HasPrefix(text, "Committed api (wt/tove/main, ") || strings.Contains(text, "web") {
 		t.Errorf("%q", text)
 	}
 	if who := f.git(f.wt("tove", "api"), "log", "-1", "--format=%an <%ae>|%s"); who != "Tove <tove@foreman.invalid>|cal v0" {
 		t.Errorf("authored as %q", who)
 	}
+	if status := f.git(f.wt("tove", "web"), "status", "--porcelain"); status != "?? draft.ts" {
+		t.Errorf("web, not named, was touched: %q", status)
+	}
 	// Nothing reached main or the CEO's checkout.
 	if f.git(filepath.Join(f.root, "ledger", "api"), "rev-parse", "main") == f.git(f.wt("tove", "api"), "rev-parse", "HEAD") {
 		t.Error("main moved")
 	}
+	// Two repos, two messages; one with nothing new is said, not refused.
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v1\n")
+	text = f.ok("tove", "commit", commits("api", "cal v1", "web", "the draft"))
+	if !strings.Contains(text, "api (wt/tove/main, ") || !strings.Contains(text, "web (wt/tove/main, ") {
+		t.Errorf("%q", text)
+	}
+	if api, web := f.git(f.wt("tove", "api"), "log", "-1", "--format=%s"), f.git(f.wt("tove", "web"), "log", "-1", "--format=%s"); api != "cal v1" || web != "the draft" {
+		t.Errorf("messages %q, %q", api, web)
+	}
+	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft.ts"), "y\n")
+	if text := f.ok("tove", "commit", commits("api", "nothing", "web", "y")); !strings.HasSuffix(text, "Nothing changed in api.") {
+		t.Errorf("%q", text)
+	}
 }
 
-// The lead's commit also takes its edits in the live project repo, on main;
-// a member's never does.
-func TestTheLeadCommitsTheProjectRepoToo(t *testing.T) {
+// Every entry is checked before anything is committed.
+func TestACommitNamingABadRepoCommitsNothing(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
+	for _, c := range []struct {
+		args map[string]any
+		code string
+	}{
+		{commits("api", "cal", "nope", "x"), "unknown_repo"},
+		{commits("api", "cal", "project", "x"), "unknown_repo"}, // a member's project repo is read-only
+		{commits("api", "cal", "../api", "x"), "unknown_repo"},
+		{commits("api", "cal", "api", "again"), "repeated_repo"},
+		{commits("api", "cal", "web", ""), "empty"},
+	} {
+		f.refused("tove", "commit", c.args, c.code)
+	}
+	if text := f.refused("tove", "commit", commits("nope", "x"), "unknown_repo"); !strings.Contains(text, "yours are api, web") {
+		t.Errorf("%q", text)
+	}
+	if status := f.git(f.wt("tove", "api"), "status", "--porcelain"); status != "?? cal.go" {
+		t.Errorf("api committed anyway: %q", status)
+	}
+}
+
+// The lead commits the live project repo on main when it names it, and only
+// then: its code worktrees keep their changes.
+func TestTheLeadCommitsTheProjectRepoByName(t *testing.T) {
 	f := newFixture(t)
 	project := filepath.Join(f.root, "ledger", "project")
 	writeFile(t, filepath.Join(project, "wiki", "board.md"), "# Board\n")
-	f.refused("tove", "commit", map[string]string{"message": "x"}, "nothing_to_commit")
-	text := f.ok("mara", "commit", map[string]string{"message": "the board"})
-	if !strings.Contains(text, "project (main, ") {
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "half.go"), "package half\n")
+	text := f.ok("mara", "commit", commits("project", "the board"))
+	if text != "Committed project (main, "+f.git(project, "rev-parse", "HEAD")[:8]+")." {
 		t.Errorf("%q", text)
 	}
 	if who := f.git(project, "log", "-1", "--format=%an|%s"); who != "Mara|the board" {
 		t.Errorf("project repo HEAD: %q", who)
+	}
+	if status := f.git(f.wt("mara", "api"), "status", "--porcelain"); status != "?? half.go" {
+		t.Errorf("api, not named, was committed: %q", status)
 	}
 }
 
 func TestMergeATeammatesBranch(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
-	f.ok("tove", "commit", map[string]string{"message": "cal"})
+	f.ok("tove", "commit", commits("api", "cal"))
 	f.refused("mara", "merge", map[string]string{"branch": "wt/tove/nope"}, "branch_not_found")
 	f.refused("mara", "merge", map[string]string{"branch": "-x"}, "bad_branch")
 	if text := f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"}); text != "Merged wt/tove/main into api, web." {
@@ -261,18 +317,18 @@ func TestMergeATeammatesBranch(t *testing.T) {
 func TestMergeWithConflictsThenCommit(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "README"), "tove\n")
-	f.ok("tove", "commit", map[string]string{"message": "tove's readme"})
+	f.ok("tove", "commit", commits("api", "tove's readme"))
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
-	f.ok("mara", "commit", map[string]string{"message": "mara's readme"})
+	f.ok("mara", "commit", commits("api", "mara's readme"))
 	text := f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
-	if text != "Merged wt/tove/main into web. Conflicts in api (README): resolve the markers, then commit() to finish the merge, or abort_merge() to back out." {
+	if text != "Merged wt/tove/main into web. Conflicts in api (README): resolve the markers, then commit those repos to finish the merge, or abort_merge() to back out." {
 		t.Errorf("%q", text)
 	}
-	if text := f.refused("mara", "commit", map[string]string{"message": "merged"}, "conflicts_left"); !strings.Contains(text, "api/README") {
+	if text := f.refused("mara", "commit", commits("api", "merged"), "conflicts_left"); !strings.Contains(text, "api/README") {
 		t.Errorf("%q", text)
 	}
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "both\n")
-	if text := f.ok("mara", "commit", map[string]string{"message": "merged"}); !strings.Contains(text, "api (lead/atlas/integration") {
+	if text := f.ok("mara", "commit", commits("api", "merged")); !strings.Contains(text, "api (lead/atlas/integration") {
 		t.Errorf("%q", text)
 	}
 }
@@ -287,7 +343,7 @@ func TestHandoffNamesACommittedBranch(t *testing.T) {
 	if len(f.m.sent) != 0 {
 		t.Fatalf("a refusal sent %v", f.m.sent)
 	}
-	f.ok("tove", "commit", map[string]string{"message": "cal v0"})
+	f.ok("tove", "commit", commits("api", "cal v0"))
 	text := f.ok("tove", "handoff", map[string]string{"teammate": "Mara", "branch": "wt/tove/LED-44", "summary": "cal v0: all 6 samples match"})
 	if text != "msg-1: wt/tove/LED-44 handed to Mara. Your part ends here." {
 		t.Errorf("%q", text)
@@ -389,9 +445,9 @@ func TestAbortMerge(t *testing.T) {
 	f := newFixture(t)
 	f.refused("mara", "abort_merge", nil, "no_merge")
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "README"), "tove\n")
-	f.ok("tove", "commit", map[string]string{"message": "tove's readme"})
+	f.ok("tove", "commit", commits("api", "tove's readme"))
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
-	f.ok("mara", "commit", map[string]string{"message": "mara's readme"})
+	f.ok("mara", "commit", commits("api", "mara's readme"))
 	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
 	if text := f.ok("mara", "abort_merge", nil); text != "Merge aborted in api: your branch is as it was before it." {
 		t.Errorf("%q", text)
@@ -423,13 +479,13 @@ func TestGitToolsAreKeptAsActions(t *testing.T) {
 	f.w.Actions = kept
 	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
-	f.ok("tove", "commit", map[string]string{"message": "cal v0"})
+	f.ok("tove", "commit", commits("api", "cal v0"))
 	f.refused("tove", "switch", map[string]string{"branch": "main"}, "branch_not_allowed")
 	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "done"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
-	f.ok("mara", "commit", map[string]string{"message": "mara's readme"})
+	f.ok("mara", "commit", commits("api", "mara's readme"))
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "README"), "tove\n")
-	f.ok("tove", "commit", map[string]string{"message": "tove's readme"})
+	f.ok("tove", "commit", commits("api", "tove's readme"))
 	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
 	f.ok("mara", "abort_merge", nil)
 
@@ -444,7 +500,7 @@ func TestGitToolsAreKeptAsActions(t *testing.T) {
 	if sw.Instance != "tove@ledger" || sw.DeploymentID != "atlas@ledger" || sw.Branch != "wt/tove/LED-44" || len(sw.Repos) != 2 || !sw.Repos[0].Created {
 		t.Errorf("switch %+v", sw)
 	}
-	if commit.Message != "cal v0" || len(commit.Repos) != 1 || commit.Repos[0].Repo != "api" || commit.Repos[0].Branch != "wt/tove/LED-44" || len(commit.Repos[0].Commit) != 40 {
+	if len(commit.Repos) != 1 || commit.Repos[0].Message != "cal v0" || commit.Repos[0].Repo != "api" || commit.Repos[0].Branch != "wt/tove/LED-44" || len(commit.Repos[0].Commit) != 40 {
 		t.Errorf("commit %+v", commit)
 	}
 	if !strings.HasPrefix(refused.Error, "branch_not_allowed:") || len(refused.Repos) != 0 {
@@ -477,10 +533,12 @@ func (f *fixture) item(branch string) store.WorkItem {
 func (f *fixture) handOff(branch string, repos ...string) {
 	f.t.Helper()
 	f.ok("tove", "switch", map[string]string{"branch": branch})
+	var each []string
 	for _, r := range repos {
 		writeFile(f.t, filepath.Join(f.wt("tove", r), branch[len("wt/tove/"):]+".go"), fmt.Sprintf("package x // %d\n", len(f.m.sent)))
+		each = append(each, r, "work on "+branch)
 	}
-	f.ok("tove", "commit", map[string]string{"message": "work on " + branch})
+	f.ok("tove", "commit", commits(each...))
 	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": branch, "summary": "done"})
 }
 
@@ -633,7 +691,7 @@ func TestFromHandoffToMain(t *testing.T) {
 func TestMergeToMainConflicts(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "the lead's\n")
-	f.ok("mara", "commit", map[string]string{"message": "readme"})
+	f.ok("mara", "commit", commits("api", "readme"))
 	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
 	api := filepath.Join(f.root, "ledger", "api")
 	writeFile(t, filepath.Join(api, "README"), "main's\n")
@@ -654,7 +712,7 @@ func TestMergeToMainConflicts(t *testing.T) {
 	// The lead merges main in, resolves, asks again: the conflict is gone, and the merge goes through.
 	f.ok("mara", "merge", map[string]string{"branch": "main"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "both\n")
-	f.ok("mara", "commit", map[string]string{"message": "main merged in"})
+	f.ok("mara", "commit", commits("api", "main merged in"))
 	if text := f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}); !strings.Contains(text, "mr-1 (api), refreshed") {
 		t.Errorf("%q", text)
 	}
@@ -698,7 +756,7 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
 	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
-	f.ok("mara", "commit", map[string]string{"message": "second"})
+	f.ok("mara", "commit", commits("api", "second"))
 	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
 	// The CEO merges the first by hand, in their own checkout.
 	api := filepath.Join(f.root, "ledger", "api")
@@ -783,7 +841,7 @@ func TestReviewRequests(t *testing.T) {
 	// Rejected: resolved too.
 	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
-	f.ok("mara", "commit", map[string]string{"message": "second"})
+	f.ok("mara", "commit", commits("api", "second"))
 	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
 	if err := f.w.Reject(ctx, "mr-2", "no"); err != nil {
 		t.Fatal(err)

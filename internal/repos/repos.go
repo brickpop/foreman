@@ -34,7 +34,7 @@ type Config interface {
 
 // Git is what the browser needs of the Git block.
 type Git interface {
-	Branches(ctx context.Context, dir, prefix string) ([]string, error)
+	RecentBranches(ctx context.Context, dir string) ([]string, error)
 	Ahead(ctx context.Context, dir, branch, base string) (int, error)
 	Worktrees(ctx context.Context, dir string) (map[string]string, error)
 	Clean(ctx context.Context, dir string) (bool, error)
@@ -88,7 +88,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 }
 
 func (b Browser) branches(ctx context.Context, dir, main string) ([]Branch, error) {
-	names, err := b.Git.Branches(ctx, dir, "")
+	names, err := b.Git.RecentBranches(ctx, dir)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +113,7 @@ func (b Browser) branches(ctx context.Context, dir, main string) ([]Branch, erro
 		}
 		list = append(list, br)
 	}
-	// main first.
+	// main first, then the most recently committed.
 	slices.SortStableFunc(list, func(x, y Branch) int {
 		switch {
 		case x.Name == main && y.Name != main:

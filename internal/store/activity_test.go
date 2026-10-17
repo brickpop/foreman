@@ -25,8 +25,8 @@ func activityFixture(t *testing.T, rows ...[3]string) *DB {
 			_, err = db.sql.Exec(`INSERT INTO team_messages (deployment_id, ref, from_instance, to_instance, kind, body, created_at)
 				VALUES (?, ?, 'mara', 'tove', 'ask', ?, ?)`, r[0], fmt.Sprintf("msg-%d", i), fmt.Sprintf("#%d", i), r[2])
 		} else {
-			_, err = db.sql.Exec(`INSERT INTO team_actions (deployment_id, instance, tool, message, repos, created_at)
-				VALUES (?, 'mara', 'commit', ?, '[]', ?)`, r[0], fmt.Sprintf("#%d", i), r[2])
+			_, err = db.sql.Exec(`INSERT INTO team_actions (deployment_id, instance, tool, branch, repos, created_at)
+				VALUES (?, 'mara', 'switch', ?, '[]', ?)`, r[0], fmt.Sprintf("#%d", i), r[2])
 		}
 		if err != nil {
 			t.Fatal(err)
@@ -42,7 +42,7 @@ func labels(p ActivityPage) []string {
 		if it.Message != nil {
 			out = append(out, "m"+it.Message.Body)
 		} else {
-			out = append(out, "a"+it.Action.Message)
+			out = append(out, "a"+it.Action.Branch)
 		}
 	}
 	return out

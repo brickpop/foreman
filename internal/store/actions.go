@@ -29,8 +29,8 @@ func (s actions) Add(ctx context.Context, a TeamAction) (TeamAction, error) {
 		return a, err
 	}
 	a.CreatedAt = time.Now().UTC()
-	res, err := s.db.ExecContext(ctx, "INSERT INTO team_actions (deployment_id, instance, tool, branch, message, repos, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		a.DeploymentID, a.Instance, a.Tool, nullText(a.Branch), nullText(a.Message), string(repos), nullText(a.Error), timeText(a.CreatedAt))
+	res, err := s.db.ExecContext(ctx, "INSERT INTO team_actions (deployment_id, instance, tool, branch, repos, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		a.DeploymentID, a.Instance, a.Tool, nullText(a.Branch), string(repos), nullText(a.Error), timeText(a.CreatedAt))
 	if err != nil {
 		return a, err
 	}
@@ -55,16 +55,16 @@ func (s actions) List(ctx context.Context, deploymentID string) ([]TeamAction, e
 	return list, rows.Err()
 }
 
-const actionColumns = "id, deployment_id, instance, tool, branch, message, repos, error, created_at"
+const actionColumns = "id, deployment_id, instance, tool, branch, repos, error, created_at"
 
 func scanAction(row interface{ Scan(...any) error }) (TeamAction, error) {
 	var a TeamAction
-	var branch, message, errText, created sql.NullString
+	var branch, errText, created sql.NullString
 	var repos string
-	if err := row.Scan(&a.ID, &a.DeploymentID, &a.Instance, &a.Tool, &branch, &message, &repos, &errText, &created); err != nil {
+	if err := row.Scan(&a.ID, &a.DeploymentID, &a.Instance, &a.Tool, &branch, &repos, &errText, &created); err != nil {
 		return TeamAction{}, err
 	}
-	a.Branch, a.Message, a.Error = branch.String, message.String, errText.String
+	a.Branch, a.Error = branch.String, errText.String
 	if err := json.Unmarshal([]byte(repos), &a.Repos); err != nil {
 		return TeamAction{}, err
 	}

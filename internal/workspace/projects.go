@@ -150,7 +150,7 @@ func (w *Workspace) createProjectRepo(ctx context.Context, folder, dir string) e
 // (wiki/product/features/add-project.md#effect). The wiki follows the
 // conventions its AGENTS.md describes.
 //
-//go:embed starter
+//go:embed all:starter
 var starter embed.FS
 
 // scaffold is the starter's files in order, each with what goes wrong
@@ -159,6 +159,7 @@ var scaffold = []Missing{
 	{wikiDir + "/wiki.toml", "Foreman can't read the wiki or its boards without it", true},
 	{wikiDir + "/index.md", "the wiki has no home page", true},
 	{"AGENTS.md", "the agents don't know how this project's wiki and tasks work", false},
+	{".gitignore", "the wiki's index and editor files can be committed", false},
 	{wikiDir + "/product/index.md", "the specs have no map", false},
 	{wikiDir + "/backlog/index.md", "the backlog has no entry point", false},
 	{wikiDir + "/technical-debt.md", "technical debt has no page", false},

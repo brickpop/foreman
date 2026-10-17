@@ -11,7 +11,7 @@ export interface Repo {
   name: string;
   project: boolean; // the project repo (project/), listed last
   main: string;
-  branches: Branch[]; // main first, then by name
+  branches: Branch[]; // main first, then newest commit first
 }
 /**
  * Branch is one branch of a repo.

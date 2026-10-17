@@ -83,7 +83,6 @@ describe("entries", () => {
     instance: "tac@ledger",
     tool: "commit",
     branch: "",
-    message: "cal v0",
     repos: [],
     error: "",
     createdAt: "2026-10-16T18:02:00.5Z",

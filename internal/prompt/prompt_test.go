@@ -89,7 +89,7 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"# You are Mara, Team Lead on team Atlas\nCalm, decisive.\n",
 		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges to main", // the role's default job
 		"Branches: lead/atlas/<topic>, as many as you need (lead/atlas/integration exists).",
-		"(read and write: edit, then commit())",
+		"(read and write: edit, then commit its repo, project)",
 		"- Mara, Team Lead (lead: integrates, requests merges to main)\n",
 		"## Tools (from Foreman)\n",
 		"request_merge(branch, entry)        Ask the CEO to merge one of your lead/atlas/* branches into main;",
@@ -149,7 +149,7 @@ func TestTodaysTools(t *testing.T) {
 		for _, want := range []string{
 			"Work with them only through the tools below.",
 			"ask(teammate, request)", "reply(request_id, output)", "read_message(id)",
-			"switch(branch)", "commit(message)", "merge(branch)", "abort_merge()", "contribute(kind, title, body)",
+			"switch(branch)", "commit(commits)", "merge(branch)", "abort_merge()", "contribute(kind, title, body)",
 			"branch, commit\nand merge only through switch(), commit() and merge().",
 			"Messages arrive in this session as one line",
 			"resume the task\nthat asked for it.\n",

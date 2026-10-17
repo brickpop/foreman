@@ -378,10 +378,16 @@ function Ref({ children }: { children: React.ReactNode }) {
 function ActionText({ action: a }: { action: TeamAction }) {
   const refused = a.error !== "";
   switch (a.tool) {
+    // One repo: its message here. Several: each repo's line has its own.
     case "commit":
       return (
         <span className="text-[12.5px] text-tx2">
-          {refused ? "tried to commit" : "committed"} <span className="text-tx">“{a.message}”</span>
+          {refused ? "tried to commit" : "committed"}{" "}
+          {a.repos.length === 1 ? (
+            <span className="text-tx">“{a.repos[0].message}”</span>
+          ) : (
+            <span className="font-mono text-[11.5px]">{a.repos.map((r) => r.repo).join(", ")}</span>
+          )}
         </span>
       );
     case "switch":
@@ -459,6 +465,7 @@ export function ActionRow({
             {r.branch && <Ref>{r.branch}</Ref>}
             {r.commit && <Ref>{r.commit.slice(0, 7)}</Ref>}
             {r.mergeRequest && <Ref>{r.mergeRequest}</Ref>}
+            {a.repos.length > 1 && r.message && <span className="text-tx2">“{r.message}”</span>}
             {(r.conflicts ?? []).length > 0 && (
               <span className="text-accTx">
                 {r.conflicts.length === 1 ? "1 conflict" : `${r.conflicts.length} conflicts`}:{" "}

@@ -2,7 +2,7 @@
 
 This is the project repo: `project.toml` (the project's config, owned by the CEO) and `wiki/`, the team's knowledge base and task board. Every agent of the project reads the same live files.
 
-**Only the team lead writes the wiki**: edit the files, run `wiki --root project/wiki check`, then `commit()`. Everyone else adds through `contribute(kind, title, body)` (`finding`, `proposal` or `note`): Foreman files it in `wiki/inbox/` and tells the lead, who turns it into an entry or a task, or drops it. The CEO may tick a checkbox or move a card from Foreman at any time: re-read an entry before editing it.
+**Only the team lead writes the wiki**: edit the files, run `wiki --root project/wiki check`, then `commit()` naming the repo `project` (your code repos keep their changes until you name them). Everyone else adds through `contribute(kind, title, body)` (`finding`, `proposal` or `note`): Foreman files it in `wiki/inbox/` and tells the lead, who turns it into an entry or a task, or drops it. The CEO may tick a checkbox or move a card from Foreman at any time: re-read an entry before editing it.
 
 ## The wiki
 

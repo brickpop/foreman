@@ -107,12 +107,40 @@ func TestLogPagesAndMarksMerges(t *testing.T) {
 	if !all[0].Merge || all[1].Merge || all[0].Author == "" || all[0].Date.IsZero() || len(all[0].Hash) != 40 {
 		t.Errorf("first %+v, second %+v", all[0], all[1])
 	}
+	// The branches at each commit, never HEAD or a tag; two at one commit both show.
+	mustRun(t, dir, "tag", "v1", main)
+	mustRun(t, dir, "branch", "lead/atlas/integration", "wt/tove/x")
+	if all, _ = g.Log(ctx, dir, main, 0, 10); !slices.Equal(all[0].Branches, []string{"main"}) ||
+		!slices.Equal(all[1].Branches, []string{"lead/atlas/integration", "wt/tove/x"}) || all[2].Branches == nil || len(all[2].Branches) != 0 {
+		t.Errorf("branches %q, %q, %q", all[0].Branches, all[1].Branches, all[2].Branches)
+	}
 	page, _ := g.Log(ctx, dir, main, 2, 2)
 	if len(page) != 2 || page[0].Subject != "app" || page[1].Subject != "first" {
 		t.Errorf("skip 2: %+v", page)
 	}
 	if rest, err := g.Log(ctx, dir, main, 4, 2); err != nil || len(rest) != 0 {
 		t.Errorf("past the end: %+v %v", rest, err)
+	}
+}
+
+// By the last commit, not by name or creation: a branch made long ago and
+// committed to just now comes first; same-second ties by name.
+func TestRecentBranchesNewestFirst(t *testing.T) {
+	g := New()
+	dir := codeRepo(t, "main") // committed now
+	commitAt := func(branch, date string) {
+		t.Setenv("GIT_COMMITTER_DATE", date)
+		mustRun(t, dir, "checkout", "--quiet", "-B", branch, "main")
+		mustRun(t, dir, "commit", "--quiet", "--allow-empty", "-m", branch)
+	}
+	commitAt("a-old", "2020-01-01T10:00:00Z")
+	commitAt("z-new", "2026-10-17T10:00:00Z")
+	commitAt("m-mid", "2024-01-01T10:00:00Z")
+	commitAt("b-mid", "2024-01-01T10:00:00Z")
+	mustRun(t, dir, "tag", "v1")
+	got, err := g.RecentBranches(ctx, dir)
+	if want := []string{"main", "z-new", "b-mid", "m-mid", "a-old"}; err != nil || !slices.Equal(got, want) {
+		t.Errorf("%v %v, want %v", got, err, want)
 	}
 }
 

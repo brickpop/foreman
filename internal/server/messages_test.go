@@ -73,7 +73,7 @@ func TestTheCEOsLineAndTheCountdown(t *testing.T) {
 type fakeActions struct{}
 
 func (fakeActions) List(_ context.Context, deployment string) ([]store.TeamAction, error) {
-	return []store.TeamAction{{ID: 1, DeploymentID: deployment, Tool: "commit", Message: "cal v0"}}, nil
+	return []store.TeamAction{{ID: 1, DeploymentID: deployment, Tool: "commit", Repos: []store.ActionRepo{{Repo: "api", Message: "cal v0"}}}}, nil
 }
 
 func TestActionsOfADeployment(t *testing.T) {

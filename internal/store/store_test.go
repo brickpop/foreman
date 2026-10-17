@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -50,8 +51,9 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 8 {
-		t.Errorf("version %d after the first open", v)
+	// The schema version is the number of migrations: no constant to bump.
+	if files, _ := fs.Glob(migrationFiles, "migrations/*.sql"); version(t, db.sql) != len(files) || len(files) == 0 {
+		t.Errorf("version %d after the first open, %d migrations", version(t, db.sql), len(files))
 	}
 	var mode string
 	_ = db.sql.QueryRow("PRAGMA journal_mode").Scan(&mode)
@@ -546,8 +548,8 @@ func TestActions(t *testing.T) {
 	if list, err := a.List(ctx, "atlas@ledger"); err != nil || len(list) != 0 {
 		t.Fatalf("empty: %v %v", list, err)
 	}
-	commit, err := a.Add(ctx, TeamAction{DeploymentID: "atlas@ledger", Instance: "tove@ledger", Tool: "commit", Message: "cal v0",
-		Repos: []ActionRepo{{Repo: "api", Branch: "wt/tove/main", Commit: "1a2b3c4d"}}})
+	commit, err := a.Add(ctx, TeamAction{DeploymentID: "atlas@ledger", Instance: "tove@ledger", Tool: "commit",
+		Repos: []ActionRepo{{Repo: "api", Message: "cal v0", Branch: "wt/tove/main", Commit: "1a2b3c4d"}}})
 	if err != nil || commit.ID == 0 || commit.CreatedAt.IsZero() {
 		t.Fatalf("%+v %v", commit, err)
 	}
@@ -558,7 +560,7 @@ func TestActions(t *testing.T) {
 	if err != nil || len(list) != 2 {
 		t.Fatalf("%v %v", list, err)
 	}
-	if got := list[0]; got.Message != "cal v0" || len(got.Repos) != 1 || got.Repos[0].Commit != "1a2b3c4d" || got.Error != "" {
+	if got := list[0]; len(got.Repos) != 1 || got.Repos[0].Message != "cal v0" || got.Repos[0].Commit != "1a2b3c4d" || got.Error != "" {
 		t.Errorf("commit %+v", got)
 	}
 	if got := list[1]; got.Tool != "switch" || got.Branch != "main" || got.Error == "" || got.Repos == nil {
@@ -611,6 +613,54 @@ func TestTheOptionalGoalMigrationKeepsTheDeployments(t *testing.T) {
 	var violations int
 	if err := s.sql.QueryRow("SELECT count(*) FROM pragma_foreign_key_check").Scan(&violations); err != nil || violations != 0 {
 		t.Errorf("foreign keys: %d %v", violations, err)
+	}
+}
+
+// 009 moves a commit's one message into each repo it committed; other tools'
+// actions and a refusal that reached no repo are left as they were.
+func TestTheCommitMessagesMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "state.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var before []string
+	for i, name := range []string{"001_deployments_instances.sql", "002_instance_asleep.sql", "003_team_messages.sql", "004_team_actions.sql",
+		"005_optional_goal.sql", "006_work_items.sql", "007_merge_requests.sql", "008_requests.sql"} {
+		body, err := migrationFiles.ReadFile("migrations/" + name)
+		if err != nil {
+			t.Fatalf("%d %v", i, err)
+		}
+		before = append(before, name, string(body))
+	}
+	if err := migrate(ctx, db, migrations(before...)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES ('atlas@ledger', 'atlas', 'ledger', 'g', '2026-10-16T10:00:00Z');
+		INSERT INTO team_actions (deployment_id, instance, tool, branch, message, repos, error, created_at) VALUES
+		('atlas@ledger', 'mara@ledger', 'commit', NULL, 'the board', '[{"repo":"api","branch":"lead/atlas/x","commit":"1a2b","created":false,"conflicts":null},{"repo":"project","branch":"main","commit":"3c4d","created":false,"conflicts":null}]', NULL, '2026-10-16T10:01:00Z'),
+		('atlas@ledger', 'tove@ledger', 'commit', NULL, 'x', '[]', 'nothing_to_commit: …', '2026-10-16T10:02:00Z'),
+		('atlas@ledger', 'tove@ledger', 'switch', 'wt/tove/y', NULL, '[{"repo":"api","branch":"wt/tove/y","commit":"","created":true,"conflicts":null}]', NULL, '2026-10-16T10:03:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+	s, err := Open(ctx, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	list, err := s.Actions().List(ctx, "atlas@ledger")
+	if err != nil || len(list) != 3 {
+		t.Fatalf("%+v %v", list, err)
+	}
+	if r := list[0].Repos; len(r) != 2 || r[0].Message != "the board" || r[0].Commit != "1a2b" || r[1].Message != "the board" || r[1].Repo != "project" {
+		t.Errorf("commit %+v", r)
+	}
+	if got := list[1]; len(got.Repos) != 0 || got.Error == "" {
+		t.Errorf("refused commit %+v", got)
+	}
+	if r := list[2].Repos; len(r) != 1 || r[0].Message != "" || !r[0].Created {
+		t.Errorf("switch %+v", r)
 	}
 }
 

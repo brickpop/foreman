@@ -88,7 +88,6 @@ export interface TeamAction {
   instance: string;
   tool: string;
   branch: string; // switch: to; merge: from
-  message: string; // commit
   repos: ActionRepo[];
   error: string; // the refusal the agent got; "" when it went through
   createdAt: string /* RFC 3339 */;
@@ -99,6 +98,7 @@ export interface TeamAction {
 export interface ActionRepo {
   repo: string;
   branch: string; // checked out there after it
+  message: string; // commit: the message given for this repo
   commit: string; // a commit made
   created: boolean; // switch: the branch was new
   conflicts: string[]; // merge: files left with markers

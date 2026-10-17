@@ -7,7 +7,7 @@ type Repo struct {
 	Name     string   `json:"name"`
 	Project  bool     `json:"project"` // the project repo (project/), listed last
 	Main     string   `json:"main"`
-	Branches []Branch `json:"branches"` // main first, then by name
+	Branches []Branch `json:"branches"` // main first, then newest commit first
 }
 
 // Branch is one branch of a repo.

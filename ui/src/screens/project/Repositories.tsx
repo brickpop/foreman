@@ -39,49 +39,56 @@ export function Repositories({ project }: { project: Project }) {
   );
 }
 
-/** Each repo with its branches: main first, then whose each is, how far ahead
- * of main, and whether its worktree holds uncommitted changes. */
+/** Each repo, a heading, with its branches under it: main first (the default
+ * branch), then whose each is, how far ahead of main, and whether its
+ * worktree holds uncommitted changes. */
 function Branches({ repos, at, onChoose }: { repos: Repo[]; at: At; onChoose: (at: At) => void }) {
   const teams = useTeams().data ?? [];
   return (
-    <nav className="flex min-w-0 flex-col gap-4">
+    <nav className="flex min-w-0 flex-col gap-5">
       {repos.map((r) => (
-        <div key={r.name} className="flex flex-col gap-0.5">
-          <span className="font-mono text-[13px] font-semibold">
-            {r.name}/
-            {r.project && <span className="font-sans font-normal text-tx4"> project repo</span>}
+        <div key={r.name} className="flex flex-col gap-1.5">
+          <span className="flex items-baseline gap-2 border-b border-line pb-1.5">
+            <span className="truncate font-mono text-[13.5px] font-semibold text-tx">
+              {r.name}/
+            </span>
+            {r.project && <span className="shrink-0 text-[11.5px] text-tx4">project repo</span>}
           </span>
-          {r.branches.map((b) => {
-            const on = at.repo === r.name && at.branch === b.name;
-            const owner = branchOwner(b.name, teams);
-            return (
-              <button
-                key={b.name}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onChoose({ repo: r.name, branch: b.name })}
-                className={`flex min-w-0 flex-col rounded-md px-2 py-1 text-left ${on ? "bg-accSoft" : "hover:bg-hover"}`}
-              >
-                <span
-                  className={`truncate font-mono text-[12.5px] ${on ? "text-accTx" : "text-tx2"}`}
+          <div className="ml-1 flex flex-col gap-0.5 border-l border-line2 pl-2">
+            {r.branches.map((b) => {
+              const on = at.repo === r.name && at.branch === b.name;
+              const detail = [
+                b.name === r.main && "default branch",
+                branchOwner(b.name, teams),
+                b.ahead > 0 && `${b.ahead} ahead of ${r.main}`,
+              ].filter(Boolean);
+              return (
+                <button
+                  key={b.name}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onChoose({ repo: r.name, branch: b.name })}
+                  className={`flex min-w-0 flex-col rounded-md px-2 py-1 text-left ${on ? "bg-accSoft" : "hover:bg-hover"}`}
                 >
-                  {b.name}
-                </span>
-                {(owner || b.ahead > 0 || b.uncommitted) && (
-                  <span className="text-[11.5px] text-tx4">
-                    {[owner, b.ahead > 0 && `${b.ahead} ahead of ${r.main}`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                    {b.uncommitted && (
-                      <span className="text-accTx">
-                        {owner || b.ahead > 0 ? " · " : ""}uncommitted changes
-                      </span>
-                    )}
+                  <span
+                    className={`truncate font-mono text-[12.5px] ${on ? "text-accTx" : "text-tx2"}`}
+                  >
+                    {b.name}
                   </span>
-                )}
-              </button>
-            );
-          })}
+                  {(detail.length > 0 || b.uncommitted) && (
+                    <span className="text-[11.5px] text-tx4">
+                      {detail.join(" · ")}
+                      {b.uncommitted && (
+                        <span className="text-accTx">
+                          {detail.length > 0 ? " · " : ""}uncommitted changes
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       ))}
     </nav>
@@ -99,16 +106,8 @@ function Browser({ project, at }: { project: string; at: At }) {
   };
   return (
     <div className="flex min-w-0 flex-col gap-3">
+      {/* The path on the left, the view on the right (the CEO, 2026-10-17). */}
       <div className="flex flex-wrap items-center gap-3">
-        <Segmented
-          label="View"
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "files", label: "Files" },
-            { value: "history", label: "History" },
-          ]}
-        />
         {view === "files" && (
           <span className="flex min-w-0 flex-wrap items-center gap-1 font-mono text-[12.5px]">
             <button type="button" onClick={() => open("", false)} className="text-accTx">
@@ -128,6 +127,16 @@ function Browser({ project, at }: { project: string; at: At }) {
             ))}
           </span>
         )}
+        <span className="flex-1" />
+        <Segmented
+          label="View"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "files", label: "Files" },
+            { value: "history", label: "History" },
+          ]}
+        />
       </div>
       {view === "history" ? (
         <History project={project} at={at} />
@@ -282,9 +291,17 @@ function History({ project, at }: { project: string; at: At }) {
             className="flex items-baseline gap-3 border-b border-line px-4 py-2.5 last:border-b-0"
           >
             <span className="font-mono text-[12px] text-tx4">{c.hash.slice(0, 7)}</span>
-            <span className="min-w-0 flex-1 truncate text-[13.5px] text-tx">
-              {c.subject}
-              {c.merge && <span className="ml-2 text-[11.5px] text-tx4">merge</span>}
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="truncate text-[13.5px] text-tx">
+                {c.subject}
+                {c.merge && <span className="ml-2 text-[11.5px] text-tx4">merge</span>}
+              </span>
+              {/* The branches at this commit, as a second line. */}
+              {c.branches.length > 0 && (
+                <span className="truncate font-mono text-[11.5px] text-accTx">
+                  {c.branches.join(", ")}
+                </span>
+              )}
             </span>
             <span className="shrink-0 text-[12.5px] text-tx3">{c.author}</span>
             <span className="shrink-0 text-[12px] text-tx4">{when(c.date)}</span>

@@ -40,9 +40,10 @@ ask(teammate, request)              Get info or work. Keep going meanwhile.
 reply(request_id, output)           Answer a request. Only `output` is returned.
 read_message(id)                    Read a message to you in full (a delivery quotes only its start).
 switch(branch)                      Go to one of your branches (made from main if new).
-commit(message)                     Commit your changes, in every repo, on your branch.
+commit(commits)                     Commit the repos you name, each with its own message:
+                                    [{repo, message}], repo being its folder in your sandbox.
 merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.
-                                    On conflicts: resolve the markers, then commit().
+                                    On conflicts: resolve the markers, then commit those repos.
 abort_merge()                       Back out of an unfinished merge.
 handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends. (members only)
 contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note.
@@ -93,7 +94,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 | Placeholder | Lead | Member |
 |---|---|---|
 | `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch). Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with merge("main"), resolve any conflicts and commit(), then call request_merge again.` | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch). No push to main.` |
-| `{wiki access}` | `read and write: edit, then commit()` | `read only: use contribute` |
+| `{wiki access}` | `read and write: edit, then commit its repo, project` | `read only: use contribute` |
 | tools | all but `handoff`, including `request_merge` | all but `request_merge` |
 | `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask() or handoff()." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it, and tell {lead} if it's relevant to the team." |
 
@@ -110,5 +111,5 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 ## Updates
 
 - A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)): the changed sections of its prompt in full (not a diff), delivered as a message of kind `notice` (`From Foreman: your definition changed. Read it with read_message("msg-N").`), one message per turn however many saves happened. The full re-prompt happens at the next restart.
-- Knowledge-base access: read and write for the lead, who commits through `commit()` (no review); read only for everyone else, who use `contribute`. The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)). `{wiki access}` reads `read and write: edit, then commit()` or `read only: use contribute`.
+- Knowledge-base access: read and write for the lead, who commits it through `commit()`, naming the repo `project` (no review); read only for everyone else, who use `contribute`. The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)). `{wiki access}` reads `read and write: edit, then commit its repo, project` or `read only: use contribute`.
 - Roster changes (a hire) are a team edit: existing members learn about the new teammate through the same context update.

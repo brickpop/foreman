@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -103,9 +104,11 @@ func object(props string, required ...string) json.RawMessage {
 var definitions = []agentlink.Tool{
 	{Name: "switch", Description: "Switch your worktrees, in every repo, to one of your branches, making it from main if it is new. Commit first: a switch never carries changes along.",
 		InputSchema: object(`"branch":{"type":"string","description":"One of your branches: wt/<you>/<topic> for a member, lead/<team>/<topic> for the lead"}`, "branch")},
-	{Name: "commit", Description: "Commit everything you changed, in every repo, on the branch checked out there (git is read-only for you). After an update with conflicts, it concludes the merge once no conflict markers are left.",
-		InputSchema: object(`"message":{"type":"string","description":"The commit message"}`, "message")},
-	{Name: "merge", Description: "Merge a branch (main, the lead's, a teammate's) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit() to finish the merge, or abort_merge() to back out.",
+	{Name: "commit", Description: "Commit everything you changed in each repo you name, on the branch checked out there, with that repo's message (git is read-only for you); repos you don't name are left as they are. After a merge with conflicts, committing a repo concludes its merge once no conflict markers are left.",
+		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
+			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; the lead's project repo is project"},`+
+			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
+	{Name: "merge", Description: "Merge a branch (main, the lead's, a teammate's) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
 	{Name: "abort_merge", Description: "Back out of an unfinished merge, in every repo where one is under way: your branch and files are as they were before it.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
@@ -129,13 +132,16 @@ func (w *Workflow) Tools() []agentlink.Tool { return definitions }
 func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, args json.RawMessage) agentlink.Result {
 	var a struct {
 		Branch   string `json:"branch"`
-		Message  string `json:"message"`
 		Teammate string `json:"teammate"`
 		Entry    string `json:"entry"`
 		Summary  string `json:"summary"`
 		Kind     string `json:"kind"`
 		Title    string `json:"title"`
 		Body     string `json:"body"`
+		Commits  []struct {
+			Repo    string `json:"repo"`
+			Message string `json:"message"`
+		} `json:"commits"`
 	}
 	if res, ok := teamtools.Args(args, &a); !ok {
 		return res
@@ -152,8 +158,10 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.switchTo(ctx, act.Branch)
 	case "commit":
-		act.Message = strings.TrimSpace(a.Message)
-		res = t.commit(ctx, act.Message)
+		for _, c := range a.Commits {
+			act.Repos = append(act.Repos, store.ActionRepo{Repo: strings.TrimSpace(c.Repo), Message: strings.TrimSpace(c.Message)})
+		}
+		res = t.commit(ctx)
 	case "merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.merge(ctx, act.Branch)
@@ -303,42 +311,66 @@ func (t tool) switchTo(ctx context.Context, branch string) agentlink.Result {
 	return agentlink.Result{Text: text}
 }
 
-// commitAll commits every repo of the caller with changes; for the lead, the
-// live project repo too.
-func (t tool) commitAll(ctx context.Context, message string) (done []string, conflicts []string, err error) {
+// committable are the repos the caller may commit, by name: its worktrees,
+// and for the lead the live project repo.
+func (t tool) committable() map[string]repo {
 	repos := t.worktrees()
 	if t.c.Lead {
 		repos = append(repos, t.projectRepo())
 	}
+	byName := map[string]repo{}
 	for _, r := range repos {
-		sha, err := t.w.Git.CommitAll(ctx, r.dir, message, t.author())
+		byName[r.name] = r
+	}
+	return byName
+}
+
+// commit commits each repo the caller names (t.act.Repos), with its own
+// message, and fills in what happened there. Every entry is checked before
+// anything is committed.
+func (t tool) commit(ctx context.Context) agentlink.Result {
+	asked := t.act.Repos
+	if len(asked) == 0 {
+		return teamtools.Refusal("empty", "name at least one repo to commit, with its message")
+	}
+	repos := t.committable()
+	seen := map[string]bool{}
+	for _, a := range asked {
+		if _, ok := repos[a.Repo]; !ok {
+			names := slices.Sorted(maps.Keys(repos))
+			return teamtools.Refusal("unknown_repo", "%q isn't one of your repos: yours are %s", a.Repo, strings.Join(names, ", "))
+		}
+		if seen[a.Repo] {
+			return teamtools.Refusal("repeated_repo", "%s is named twice: one commit per repo", a.Repo)
+		}
+		seen[a.Repo] = true
+		if a.Message == "" {
+			return teamtools.Refusal("empty", "give %s a commit message", a.Repo)
+		}
+	}
+	var done, unchanged, conflicts []string
+	for i := range asked {
+		a := &asked[i]
+		r := repos[a.Repo]
+		sha, err := t.w.Git.CommitAll(ctx, r.dir, a.Message, t.author())
 		var left *git.ConflictsError
 		switch {
 		case errors.Is(err, git.ErrNothingToCommit):
+			unchanged = append(unchanged, r.name)
 		case errors.As(err, &left):
-			t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Conflicts: left.Files})
+			a.Conflicts = left.Files
 			for _, f := range left.Files {
 				conflicts = append(conflicts, r.name+"/"+f)
 			}
 		case err != nil:
-			return done, conflicts, fmt.Errorf("%s: %w", r.name, err)
+			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		default:
-			branch, _ := t.w.Git.Branch(ctx, r.dir)
-			t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, Commit: sha})
-			done = append(done, fmt.Sprintf("%s (%s, %.8s)", r.name, branch, sha))
+			a.Branch, _ = t.w.Git.Branch(ctx, r.dir)
+			a.Commit = sha
+			done = append(done, fmt.Sprintf("%s (%s, %.8s)", r.name, a.Branch, sha))
 		}
 	}
-	return done, conflicts, nil
-}
-
-func (t tool) commit(ctx context.Context, message string) agentlink.Result {
-	if message == "" {
-		return teamtools.Refusal("empty", "give a commit message")
-	}
-	done, conflicts, err := t.commitAll(ctx, message)
 	switch {
-	case err != nil:
-		return gitError(err)
 	case len(conflicts) > 0:
 		text := "conflict markers are still in " + strings.Join(conflicts, ", ") + ": resolve them, then commit again"
 		if len(done) > 0 {
@@ -346,9 +378,13 @@ func (t tool) commit(ctx context.Context, message string) agentlink.Result {
 		}
 		return teamtools.Refusal("conflicts_left", "%s", text)
 	case len(done) == 0:
-		return teamtools.Refusal("nothing_to_commit", "nothing changed since your last commit")
+		return teamtools.Refusal("nothing_to_commit", "nothing changed in %s since your last commit", strings.Join(unchanged, ", "))
 	}
-	return agentlink.Result{Text: "Committed " + strings.Join(done, ", ") + "."}
+	text := "Committed " + strings.Join(done, ", ") + "."
+	if len(unchanged) > 0 {
+		text += " Nothing changed in " + strings.Join(unchanged, ", ") + "."
+	}
+	return agentlink.Result{Text: text}
 }
 
 func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
@@ -388,7 +424,7 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 		text = append(text, fmt.Sprintf("Merged %s into %s.", branch, strings.Join(merged, ", ")))
 	}
 	if len(conflicted) > 0 {
-		text = append(text, fmt.Sprintf("Conflicts in %s: resolve the markers, then commit() to finish the merge, or abort_merge() to back out.", strings.Join(conflicted, "; ")))
+		text = append(text, fmt.Sprintf("Conflicts in %s: resolve the markers, then commit those repos to finish the merge, or abort_merge() to back out.", strings.Join(conflicted, "; ")))
 	}
 	return agentlink.Result{Text: strings.Join(text, " ")}
 }

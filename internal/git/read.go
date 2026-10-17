@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -129,8 +130,9 @@ func (g *CLI) kind(ctx context.Context, dir, commit, p string) (string, error) {
 // Log returns up to n commits of commit's history, newest first, after
 // skipping skip.
 func (g *CLI) Log(ctx context.Context, dir, commit string, skip, n int) ([]Commit, error) {
-	// Children before their parents, also within one second.
-	out, err := run(ctx, dir, "log", "--topo-order", "--format=%H%x1f%an%x1f%aI%x1f%P%x1f%s%x1e",
+	// Children before their parents, also within one second; decorated with
+	// the branches only (no HEAD, no tags).
+	out, err := run(ctx, dir, "log", "--topo-order", "--decorate-refs=refs/heads/", "--format=%H%x1f%an%x1f%aI%x1f%P%x1f%D%x1f%s%x1e",
 		"--skip="+strconv.Itoa(skip), "-n", strconv.Itoa(n), commit, "--")
 	if err != nil {
 		return nil, err
@@ -141,15 +143,20 @@ func (g *CLI) Log(ctx context.Context, dir, commit string, skip, n int) ([]Commi
 		if rec == "" {
 			continue
 		}
-		f := strings.Split(rec, "\x1f")
-		if len(f) != 5 {
+		f := strings.SplitN(rec, "\x1f", 6)
+		if len(f) != 6 {
 			return nil, fmt.Errorf("git log: unexpected %q", rec)
 		}
 		date, err := time.Parse(time.RFC3339, f[2])
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, Commit{Hash: f[0], Author: f[1], Date: date, Subject: f[4], Merge: len(strings.Fields(f[3])) > 1})
+		branches := []string{}
+		if f[4] != "" {
+			branches = strings.Split(f[4], ", ") // branch names have no spaces
+			slices.Sort(branches)
+		}
+		list = append(list, Commit{Hash: f[0], Author: f[1], Date: date, Subject: f[5], Merge: len(strings.Fields(f[3])) > 1, Branches: branches})
 	}
 	return list, nil
 }
@@ -172,4 +179,14 @@ func (g *CLI) Worktrees(ctx context.Context, dir string) (map[string]string, err
 		}
 	}
 	return trees, nil
+}
+
+// RecentBranches lists the repo's branches by their last commit, newest
+// first (by name when two were committed at the same second).
+func (g *CLI) RecentBranches(ctx context.Context, dir string) ([]string, error) {
+	out, err := run(ctx, dir, "for-each-ref", "--sort=-committerdate", "--format=%(refname:short)", "refs/heads/")
+	if err != nil {
+		return nil, err
+	}
+	return strings.Fields(out), nil
 }

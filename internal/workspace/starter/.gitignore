@@ -1,0 +1,16 @@
+# The wiki command's index: derived from the files, rebuilt when needed
+.wiki/
+
+# Secrets never belong here
+.env
+.env.local
+
+# Operating system and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.idea/
+.vscode/
+.obsidian/

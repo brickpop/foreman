@@ -204,3 +204,14 @@ export function linkLine(mr: MergeRequest, forge: string, files?: number, main =
         : "";
   return `${pr}${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
 }
+
+/** The forge of the repo a merge request targets ("none": no Create PR): a
+ * code repo's is the project's; the project repo's only when it has one on the
+ * forge; the workspace repo's from the workspace settings. */
+export function forgeOf(repo: string, project?: Project, workspaceForge = "none"): string {
+  if (repo === "workspace") return workspaceForge;
+  if (!project) return "none";
+  if (repo === "project")
+    return project.config.forge.projectRepo ? project.config.forge.kind : "none";
+  return project.config.forge.kind;
+}

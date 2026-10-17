@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Board, Card, MergeRequest, Request } from "../../api/client";
-import { filesChanged, linkLine } from "../../app/model";
+import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
+import { filesChanged, forgeOf, linkLine } from "../../app/model";
 import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
 import { columnLabel, laneLabel, moveOf } from "./Board";
 import { sourceLabel } from "./Changes";
@@ -121,5 +121,17 @@ describe("filesChanged", () => {
   it("counts the files of a unified diff", () => {
     expect(filesChanged("--- a/x\n+++ b/x\n+one\n--- a/y\n+++ b/y\n-two")).toBe(2);
     expect(filesChanged("")).toBe(0);
+  });
+});
+
+describe("forgeOf", () => {
+  const project = (kind: string, projectRepo = "") =>
+    ({ config: { forge: { kind, url: "", projectRepo } } }) as unknown as Project;
+  it("finds the forge of the repo a merge request targets", () => {
+    expect(forgeOf("api", project("github"))).toBe("github");
+    expect(forgeOf("project", project("github"))).toBe("none"); // the project repo isn't on it
+    expect(forgeOf("project", project("github", "https://x/ledger-project"))).toBe("github");
+    expect(forgeOf("workspace", undefined, "gitea")).toBe("gitea");
+    expect(forgeOf("api", undefined)).toBe("none");
   });
 });

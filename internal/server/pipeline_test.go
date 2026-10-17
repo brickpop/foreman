@@ -78,3 +78,18 @@ func TestPipeline(t *testing.T) {
 		t.Errorf("unknown: %d", w.Code)
 	}
 }
+
+type fakeRequests struct{}
+
+func (fakeRequests) OpenRequests(context.Context) ([]store.Request, error) {
+	return []store.Request{{ID: "req-1", Kind: "review", MergeRequestID: "mr-1"}}, nil
+}
+
+func TestRequests(t *testing.T) {
+	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Requests: fakeRequests{}, UI: builtUI})
+	var list []store.Request
+	decodeBody(t, get(t, h, "/api/requests"), &list)
+	if len(list) != 1 || list[0].MergeRequestID != "mr-1" {
+		t.Errorf("requests %+v", list)
+	}
+}

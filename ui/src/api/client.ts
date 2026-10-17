@@ -363,14 +363,16 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       reject: (mergeRequest, reason) =>
         send("POST", `/api/merge-requests/${id(mergeRequest)}/reject`, { reason }),
     },
+    requests: {
+      list: () => getJSON("/api/requests"),
+      // Answering comes with escalate (the Workflow epic): today's requests are
+      // reviews, decided on their merge request.
+      resolve: notBuilt("answering requests"),
+    },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {
       accounts: notBuilt("forge accounts"),
       connect: notBuilt("forge accounts"),
-    },
-    requests: {
-      list: notBuilt("requests"),
-      resolve: notBuilt("requests"),
     },
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),

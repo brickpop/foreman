@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -59,10 +60,11 @@ func mergeCheckedOut(ctx context.Context, dir, branch, message string, who []str
 
 func mergeWithoutWorktree(ctx context.Context, dir, target, branch, message string, who []string) error {
 	out, err := run(ctx, dir, "merge-tree", "--write-tree", "refs/heads/"+target, "refs/heads/"+branch)
-	if err != nil {
-		if strings.Contains(err.Error(), "exit status 1") {
-			return ErrConflict
-		}
+	var exit *exec.ExitError
+	switch {
+	case errors.As(err, &exit) && exit.ExitCode() == 1: // merge-tree's "conflicts"
+		return ErrConflict
+	case err != nil:
 		return err
 	}
 	tree := strings.Fields(out)[0]

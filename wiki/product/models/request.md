@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [model, requests, runtime]
 ---
 
@@ -37,3 +37,7 @@ Table `requests`.
 - Only `open` requests count toward "needs you".
 - An instance can have **many open requests**, each its own request panel on Home and in Changes. Because `escalate(approval)` blocks the caller, one agent naturally waits on one approval at a time (a harness issuing parallel tool calls can still open several, which is allowed); questions and findings don't block and can pile up. The [instance](./instance.md) is `awaiting` while any blocking approval of it is open.
 - The panel's **source label** is derived, not stored: `escalate(<kind>)` for `source: agent` on approval, question and finding; `request_merge()` for review; `waiting in its session` for `source: harness`; `raised by Foreman` for `source: foreman`; `Chief of Staff` for `source: cos`.
+
+## Phasing
+
+Built (2026-10-17, ahead of the Workflow epic, at the CEO's request: a merge request waiting for the CEO must show on Home): the table and `GET /api/requests` (the open ones), with `request.created` and `request.resolved`; **review** requests only. `request_merge` raises one per merge request (a refresh raises no second), and the merge request leaving `open` resolves it (`answer`: `merged` or `rejected`); one made before reviews existed gets its review at the next reconcile. Home and Changes decide it with the review panel. Not yet: `escalate` and the other kinds, answering (`POST /api/requests/:id/resolve`), `harness` and `foreman` sources, duplicate merging.

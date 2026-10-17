@@ -102,6 +102,10 @@ export interface ActionRepo {
   commit: string; // a commit made
   created: boolean; // switch: the branch was new
   conflicts: string[]; // merge: files left with markers
+  /**
+   * request_merge: the merge request made (or refreshed) for this repo.
+   */
+  mergeRequest?: string;
 }
 /**
  * WorkItem is a member's piece of work on its way to main

@@ -4,6 +4,7 @@ import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import {
   agentOf,
   checksSentence,
+  forgeOf,
   homeSubtitle,
   homeTitle,
   ordered,
@@ -99,31 +100,32 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
   const settings = useSettings();
   const projects = useProjects();
   const agent = agentOf(teams, r.instanceId);
-  const reviewText = useReviewText(r, agent?.soul.name);
-  // A Chief of Staff change is reviewed right here (home.md#request-list): its
-  // merge request carries the change to look at.
-  const fromChiefOfStaff = r.source === "cos" && r.kind === "review";
-  const mr = useMergeRequest(fromChiefOfStaff ? r.mergeRequestId : "");
+  const main = projects.data?.find((p) => p.id === r.projectId)?.config.main ?? "main";
+  const reviewText = useReviewText(r, main, agent?.soul.name);
+  // A review is decided right here (home.md#request-list): its merge request
+  // carries the change to look at.
+  const fromChiefOfStaff = r.source === "cos";
+  const mr = useMergeRequest(r.kind === "review" ? r.mergeRequestId : "");
   // A Chief of Staff change to a team file belongs to no project.
   const where = r.projectId ? `on ${r.projectId}` : "";
   const context = r.source === "cos" || !agent ? where : `${agent.team.config.name} ${where}`;
   const openSession = () =>
     navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
-  if (fromChiefOfStaff && mr.data) {
-    // The forge of the repo it changes: the workspace repo's, or the project repo's.
+  if (r.kind === "review" && mr.data) {
     const project = projects.data?.find((p) => p.id === r.projectId);
-    const forge = r.projectId
-      ? project?.config.forge.projectRepo
-        ? project.config.forge.kind
-        : "none"
-      : (settings.data?.settings.workspaceForge.kind ?? "none");
     return (
       <ReviewPanel
         request={r}
         mr={mr.data}
-        forge={forge}
+        main={main}
+        forge={forgeOf(mr.data.repo, project, settings.data?.settings.workspaceForge.kind)}
+        who={
+          fromChiefOfStaff ? undefined : agent && { name: agent.soul.name, look: agent.soul.look }
+        }
         context={context}
-        author="the Chief of Staff"
+        // A Chief of Staff change says what it proposes in its own words.
+        reviewText={fromChiefOfStaff ? undefined : reviewText}
+        author={fromChiefOfStaff ? "the Chief of Staff" : (agent?.soul.name ?? "the lead")}
         variant="home"
         onOpenSession={openSession}
         onOpenChiefOfStaff={() => openChiefOfStaff()}
@@ -151,12 +153,12 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
   );
 }
 
-/** A review's sentence: `<Lead> wants <entry title> merged into main in <repo>. Checks pass.` */
-function useReviewText(r: Request, lead?: string): string | undefined {
+/** A review's sentence: `<Lead> wants <entry title> merged into <main> in <repo>. Checks pass.` */
+function useReviewText(r: Request, main: string, lead?: string): string | undefined {
   const pipeline = usePipeline(r.kind === "review" ? r.projectId : "");
   const mr = pipeline.data?.mergeRequests.find((m) => m.id === r.mergeRequestId);
   const title = useEntryTitle(r.projectId, mr?.entry ?? "");
   if (r.kind !== "review" || !mr) return undefined;
   const what = title.data ?? mr.entry;
-  return `${lead ?? "The lead"} wants ${what} merged into main in ${mr.repo}.${checksSentence(mr.checksStatus)}`;
+  return `${lead ?? "The lead"} wants ${what} merged into ${main} in ${mr.repo}.${checksSentence(mr.checksStatus)}`;
 }

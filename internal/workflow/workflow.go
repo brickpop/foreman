@@ -77,7 +77,9 @@ type Deps struct {
 	// (the title of the entry that explains the work).
 	MergeRequests store.MergeRequests
 	Wiki          Wiki
-	Now           func() time.Time // the contributions' dates; time.Now when nil
+	// Requests are what waits for the CEO: a merge request's review (request.created, request.resolved).
+	Requests store.Requests
+	Now      func() time.Time // the contributions' dates; time.Now when nil
 }
 
 // Workflow serves its team tools.
@@ -160,11 +162,12 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "handoff":
 		return t.handoff(ctx, a.Teammate, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Summary))
 	case "request_merge":
-		return t.requestMerge(ctx, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Entry))
+		act.Branch = strings.TrimSpace(a.Branch)
+		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Entry))
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
-	// The git tools are kept as actions, refusals included (a hand-off and a
+	// The git tools and request_merge are kept as actions, refusals included (a hand-off and a
 	// contribution are messages already).
 	if res.Error {
 		act.Error = res.Text

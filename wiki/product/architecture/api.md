@@ -39,7 +39,7 @@ POST   /api/instances/:id/wake            starts an asleep instance, or a stoppe
 POST   /api/instances/:id/line            {text}: types the CEO's line into the session and sends it (204; 409 NOT_RUNNING)
 PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countdown of messages waiting on the CEO's draft (204)
 
-GET    /api/requests?project=&status=open
+GET    /api/requests                          the open requests (today: reviews of merge requests; Request → Phasing)
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
 GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge), oldest first

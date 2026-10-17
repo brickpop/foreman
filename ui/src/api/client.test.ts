@@ -135,6 +135,12 @@ describe("httpClient", () => {
     );
   });
 
+  it("lists the open requests", async () => {
+    const calls = stubFetch(200, []);
+    await httpClient("http://x").requests.list();
+    expect(calls[0].url).toBe("http://x/api/requests");
+  });
+
   it("decides on merge requests", async () => {
     const calls = stubFetch(204, undefined);
     const c = httpClient("http://x");
@@ -175,7 +181,7 @@ describe("httpClient", () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");
     for (const call of [
-      () => c.requests.list(),
+      () => c.requests.resolve("req-1", "yes"),
       () => c.pipeline.createPr("mr-1"),
       () => c.chiefOfStaff.send("hi"),
     ]) {

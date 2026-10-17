@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
 import { entries, type Filter, links, shows, type Thread } from "../app/activity";
@@ -391,6 +392,25 @@ function ActionText({ action: a }: { action: TeamAction }) {
           {refused ? "tried to abort a merge" : "aborted a merge"}
         </span>
       );
+    case "request_merge":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? "tried to request a merge of" : "requested a merge of"} <Ref>{a.branch}</Ref>
+          {!refused && (
+            <>
+              {" "}
+              <Link
+                to="/projects/$project"
+                params={{ project: a.instance.split("@")[1] ?? "" }}
+                search={{ tab: "changes" }}
+                className="font-medium text-accTx hover:underline"
+              >
+                Review in Changes
+              </Link>
+            </>
+          )}
+        </span>
+      );
     default:
       return <span className="text-[12.5px] text-tx2">{a.tool}</span>;
   }
@@ -419,6 +439,7 @@ function ActionRow({ action: a, name }: { action: TeamAction; name: Names }) {
             <span className="font-mono">{r.repo}</span>
             {r.branch && <Ref>{r.branch}</Ref>}
             {r.commit && <Ref>{r.commit.slice(0, 7)}</Ref>}
+            {r.mergeRequest && <Ref>{r.mergeRequest}</Ref>}
             {(r.conflicts ?? []).length > 0 && (
               <span className="text-accTx">
                 {r.conflicts.length === 1 ? "1 conflict" : `${r.conflicts.length} conflicts`}:{" "}

@@ -302,3 +302,14 @@ func TestChanged(t *testing.T) {
 		}
 	}
 }
+
+// Foreman reads some of git's messages: they must not depend on the CEO's
+// language (a Catalan git hid "local changes" from MergeInto).
+func TestGitSpeaksEnglish(t *testing.T) {
+	t.Setenv("LC_ALL", "ca_ES.UTF-8")
+	t.Setenv("LANG", "ca_ES.UTF-8")
+	env := command(ctx, ".", "status").Env
+	if env[len(env)-1] != "LC_ALL=C" {
+		t.Errorf("the last setting is %q, want LC_ALL=C (the last one wins)", env[len(env)-1])
+	}
+}

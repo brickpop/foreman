@@ -113,7 +113,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	f := &fixture{t: t, root: root, m: m, db: db}
 	f.w = New(Deps{Root: root, Git: g, Config: config{}, Messages: m, Now: now, WorkItems: db.WorkItems(),
-		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"},
+		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
 	return f
 }
@@ -718,5 +718,88 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 	f.w.Reconcile(ctx)
 	if len(f.m.sent) != sent+2 {
 		t.Error("noticed twice")
+	}
+}
+
+// A merge request shows in the team's activity: the lead's request_merge is
+// kept as an action, naming the merge request of each repo.
+func TestRequestMergeIsKeptAsAnAction(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	f.refused("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/nope.md"}, "entry_not_found")
+	list, err := f.db.Actions().List(ctx, "atlas@ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mine []store.TeamAction
+	for _, a := range list {
+		if a.Tool == "request_merge" {
+			mine = append(mine, a)
+		}
+	}
+	if len(mine) != 2 {
+		t.Fatalf("actions %+v", mine)
+	}
+	if a := mine[0]; a.Instance != "mara@ledger" || a.Branch != "lead/atlas/integration" || len(a.Repos) != 1 || a.Repos[0].Repo != "api" || a.Repos[0].MergeRequest != "mr-1" {
+		t.Errorf("action %+v", a)
+	}
+	if a := mine[1]; !strings.Contains(a.Error, "entry_not_found") && !strings.Contains(a.Error, "no wiki entry") {
+		t.Errorf("refusal %+v", a)
+	}
+}
+
+// A merge request waits for the CEO as a review request, until it's merged or rejected.
+func TestReviewRequests(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	req := map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
+	f.ok("mara", "request_merge", req)
+	f.ok("mara", "request_merge", req) // a refresh raises no second one
+	open, _ := f.w.OpenRequests(ctx)
+	if len(open) != 1 {
+		t.Fatalf("open %+v", open)
+	}
+	if r := open[0]; r.Kind != "review" || r.MergeRequestID != "mr-1" || r.InstanceID != "mara@ledger" || r.ProjectID != "ledger" ||
+		r.Source != "agent" || r.Summary != "Merge lead/atlas/integration into main in api: Export invoices." {
+		t.Errorf("review %+v", r)
+	}
+	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+		t.Fatal(err)
+	}
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
+		t.Errorf("still open after the merge: %+v", open)
+	}
+	var kinds []string
+	for _, e := range f.events {
+		if strings.HasPrefix(e.Type, "request.") {
+			kinds = append(kinds, e.Type)
+		}
+	}
+	if strings.Join(kinds, ",") != "request.created,request.resolved" {
+		t.Errorf("events %v", kinds)
+	}
+
+	// Rejected: resolved too.
+	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
+	f.ok("mara", "commit", map[string]string{"message": "second"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
+	if err := f.w.Reject(ctx, "mr-2", "no"); err != nil {
+		t.Fatal(err)
+	}
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
+		t.Errorf("still open after the rejection: %+v", open)
+	}
+
+	// One made before reviews existed gets its review at the next reconcile.
+	if _, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger", AuthorInstance: "mara@ledger",
+		Repo: "api", Branch: "lead/atlas/second", Entry: "backlog/led-44.md"}); err != nil {
+		t.Fatal(err)
+	}
+	f.w.Reconcile(ctx)
+	f.w.Reconcile(ctx)
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 1 || open[0].MergeRequestID != "mr-3" {
+		t.Errorf("backfilled %+v", open)
 	}
 }

@@ -212,7 +212,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	})
 	flow = workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger,
 		Actions: state.Actions(), Publish: bus.Publish, WorkItems: state.WorkItems(),
-		MergeRequests: state.MergeRequests(), Wiki: wikis})
+		MergeRequests: state.MergeRequests(), Wiki: wikis, Requests: state.Requests()})
 	// A merge request merged outside Foreman (the CEO's own git, a forge) is
 	// noticed within half a minute.
 	go func() {
@@ -274,6 +274,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages:    messenger,
 		Actions:     state.Actions(),
 		Pipeline:    flow,
+		Requests:    flow,
 		Harnesses:   login,
 		Wiki:        wikis,
 		Setup:       checklist,

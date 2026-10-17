@@ -50,7 +50,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("state.db not where asked: %v", err)
 	}
-	if v := version(t, db.sql); v != 7 {
+	if v := version(t, db.sql); v != 8 {
 		t.Errorf("version %d after the first open", v)
 	}
 	var mode string
@@ -716,5 +716,35 @@ func TestMergeRequests(t *testing.T) {
 		if _, err := mrs.Get(ctx, id); !errors.Is(err, ErrNotFound) {
 			t.Errorf("get %q: %v", id, err)
 		}
+	}
+}
+
+func TestRequests(t *testing.T) {
+	db := open(t)
+	reqs := db.Requests()
+	r, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", DeploymentID: "atlas@ledger", InstanceID: "mara@ledger",
+		Summary: "Mara wants it merged", Source: "agent", MergeRequestID: "mr-1", Links: []Link{{Label: "branch", Href: "x"}}})
+	if err != nil || r.ID != "req-1" || r.Status != RequestOpen || r.CreatedAt.IsZero() {
+		t.Fatalf("saved %+v %v", r, err)
+	}
+	if _, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", Summary: "other", Source: "agent", MergeRequestID: "mr-2"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := reqs.ForMergeRequest(ctx, "mr-1")
+	if err != nil || got.ID != "req-1" || got.Options == nil || len(got.Links) != 1 || got.Links[0].Label != "branch" {
+		t.Errorf("for mr-1: %+v %v", got, err)
+	}
+	r.Status, r.Answer, r.ResolvedAt = RequestResolved, "merged", time.Now().UTC()
+	if _, err := reqs.Save(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := reqs.ForMergeRequest(ctx, "mr-1"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("a resolved review is not open: %v", err)
+	}
+	if open, _ := reqs.Open(ctx); len(open) != 1 || open[0].ID != "req-2" {
+		t.Errorf("open %+v", open)
+	}
+	if _, err := reqs.Save(ctx, Request{ID: "req-9", Kind: "review", Summary: "x", Source: "agent"}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("an unknown id: %v", err)
 	}
 }

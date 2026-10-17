@@ -98,6 +98,8 @@ type ActionRepo struct {
 	Commit    string   `json:"commit"`    // a commit made
 	Created   bool     `json:"created"`   // switch: the branch was new
 	Conflicts []string `json:"conflicts"` // merge: files left with markers
+	// request_merge: the merge request made (or refreshed) for this repo.
+	MergeRequest string `json:"mergeRequest,omitempty"`
 }
 
 // WorkItem is a member's piece of work on its way to main

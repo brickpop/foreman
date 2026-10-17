@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -50,8 +51,7 @@ func (g *CLI) lock(ctx context.Context, dir string) func() {
 // Foreman's commits are unsigned: they are automatic, and a signing agent would
 // prompt (or fail) on every save.
 func run(ctx context.Context, dir string, args ...string) (string, error) {
-	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "commit.gpgsign=false", "-C", dir}
-	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
+	cmd := command(ctx, dir, args...)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	if err := cmd.Run(); err != nil {
@@ -162,4 +162,15 @@ func (g *CLI) Exclude(ctx context.Context, path string) error {
 		return err
 	}
 	return appendLine(strings.TrimSpace(file), "/"+filepath.ToSlash(rel)+"/")
+}
+
+// command is git with Foreman's settings, in dir. Its messages are always in
+// English (LC_ALL=C): Foreman reads some of them, and a CEO's git in another
+// language would otherwise hide what happened (found 2026-10-17, a Catalan
+// git). Only git's own messages change: file names and commits don't.
+func command(ctx context.Context, dir string, args ...string) *exec.Cmd {
+	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "commit.gpgsign=false", "-C", dir}
+	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	return cmd
 }

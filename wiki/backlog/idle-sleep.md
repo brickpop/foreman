@@ -12,7 +12,9 @@ epic: messaging-handoffs
 
 **Decided (the CEO, 2026-10-16):**
 - **A workspace setting, off by default.** When on, it applies after **20 minutes** of idle (the length is part of the setting).
-- **Foreman asks the agent first.** It types a line into the idle agent, something like `Are you currently doing anything or running any background process? If not, call idle()`. The agent answers by calling a new team tool **`idle()`**, and only then is it put to sleep. An agent that doesn't call it stays awake.
+- **Foreman asks the agent first** (proposed by the CEO, then judged noise the same day: see below). It types a line into the idle agent, something like `Are you currently doing anything or running any background process? If not, call idle()`. The agent answers by calling a new team tool **`idle()`**, and only then is it put to sleep. An agent that doesn't call it stays awake.
+
+**Second thought (the CEO, 2026-10-16):** the ping is noise. It lands in the conversation, costs a turn, and stays there. The silent process check alone may be enough. Assess both when the card starts.
 
 **Design** (from the 2026-10-16 discussion, to confirm when the card starts):
 - **Foreman stops the container, never types `/exit`.** `/exit` is specific to Claude Code and could land on the CEO's unsent draft or a dialog. Stopping the container works for every harness, and the container is gone once a stop returns. A new instance-manager `Sleep(id)` marks the agent asleep itself, so the SIGTERM exit code isn't counted as a crash. Nothing is lost: the transcript is written as the agent goes, and `idle()` is called with no turn in progress.
@@ -29,6 +31,6 @@ epic: messaging-handoffs
 
 - [ ] the setting (off, or minutes), in Settings and `settings.toml`
 - [ ] the process check in `foreman-agent`, with each adapter's helper list
-- [ ] the ping, through Messaging's delivery (draft countdown included), and the `idle()` team tool
+- [ ] decide: the silent process check alone, or the ping and `idle()` (through Messaging's delivery, draft countdown included)
 - [ ] `Sleep(id)` in the instance manager; activity cancels a pending sleep
 - [ ] tests: no ping with a stray process, with the setting off, or with messages waiting; `idle()` sleeps and a message wakes; activity after the ping keeps it awake

@@ -347,6 +347,7 @@ function SideSheet({
       <div className="px-[22px] pt-5 pb-8">
         {entry.data && (
           <WikiArticle
+            project={project}
             entry={entry.data}
             size="sheet"
             onOpen={open}

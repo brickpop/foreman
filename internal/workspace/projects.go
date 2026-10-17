@@ -150,9 +150,9 @@ func (w *Workspace) makeProject(ctx context.Context, folder, repo string) error 
 
 func (w *Workspace) createProjectRepo(ctx context.Context, folder, dir string) error {
 	files := map[string]string{
-		"project.toml":   fmt.Sprintf(starterProject, folder),
-		"wiki/wiki.toml": starterWiki,
-		"wiki/index.md":  fmt.Sprintf(starterIndex, folder),
+		"project.toml":         fmt.Sprintf(starterProject, folder),
+		wikiDir + "/wiki.toml": starterWiki,
+		wikiDir + "/index.md":  fmt.Sprintf(starterIndex, folder),
 	}
 	for rel, content := range files {
 		path := filepath.Join(dir, rel)
@@ -166,7 +166,7 @@ func (w *Workspace) createProjectRepo(ctx context.Context, folder, dir string) e
 	if err := w.git.Init(ctx, dir, "main"); err != nil {
 		return err
 	}
-	return w.git.Commit(ctx, dir, "Project repo", "project.toml", "wiki")
+	return w.git.Commit(ctx, dir, "Project repo", "project.toml", wikiDir)
 }
 
 // AddRepo creates an empty code repo in a project, on the project's main

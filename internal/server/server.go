@@ -30,6 +30,7 @@ type Options struct {
 	Messages    Messages
 	Actions     Actions
 	Harnesses   Harnesses
+	Wiki        Wiki
 	Setup       Setup
 	Maintenance Maintenance
 	Terminals   Terminals
@@ -49,6 +50,7 @@ func New(o Options) http.Handler {
 	maintenanceRoutes(mux, o.Maintenance)
 	setupRoutes(mux, o.Setup)
 	configRoutes(mux, o.Config)
+	wikiRoutes(mux, o.Wiki)
 	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))
 	// An endpoint the server doesn't have is an API error, never the web app.

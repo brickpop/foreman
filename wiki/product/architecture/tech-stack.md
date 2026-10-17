@@ -39,7 +39,6 @@ Guiding constraints, from the [vision](../vision.md): one local binary, local-fi
 | TOML (`project.toml`, team files, `settings.toml`) | `github.com/BurntSushi/toml` | Every Foreman config file is TOML, like `wiki.toml`. A save re-encodes the whole file (comments aren't kept); the [workspace repo](../models/workspace.md#the-workspace-repo) keeps the history. |
 | TOML (`wiki.toml`) | Through the wiki engine (`bundle.DecodeTool`) | Never parsed twice. |
 | Wiki | `github.com/agentic-wiki/wiki` (`bundle`, `index`, `parse`) | See [Wiki engine](./wiki-engine.md). |
-| Markdown → HTML | `github.com/yuin/goldmark` on the server, raw HTML disabled | Links are resolved by the engine's resolver and checkboxes carry their source line, so the browser never re-implements a wiki rule. Wiki content is written by agents, so it is untrusted: no raw HTML, and URLs are sanitised ([Security](./security.md)). |
 | Server-side terminal state | `github.com/charmbracelet/x/vt`, pinned at v0.1.0, behind the `Screen` interface | A maintained, pure-Go VT emulator (screen, scrollback, alternate screen, modes, styled render) from the Charm team. Its first tagged release is v0.1.0 (2026-10-12); the post-1.0 alternatives are a parser only (`go-vte`) or unmaintained since 2020 without scrollback (`vt10x`). Round-trip tests guard upgrades ([Terminal state](./terminal-state.md)) |
 | File watching | `github.com/fsnotify/fsnotify` | Config, team and wiki changes reach the UI within ~1s ([Persistence](./persistence.md)). |
 | Git | The `git` CLI (on the host for Foreman's own operations, in the container for agents) | Same behaviour as the CEO's git; `go-git` lacks parts of worktrees and hooks. |
@@ -61,6 +60,7 @@ Not used, on purpose: web frameworks, ORMs, dependency-injection containers, a m
 | Styling | Tailwind CSS 4 with the [design tokens](../design/design-system.md) declared as CSS variables | The prototype is a token system with inline styles, which maps 1:1 onto Tailwind utilities over the same variables. Both themes switch by `data-theme` on `<html>`. |
 | Accessible primitives | Radix UI primitives (dialog, popover, tabs, toggle), styled with our tokens | They bring what the prototype lacks: focus traps, Escape to close, real disabled states, keyboard navigation. Their default look is not used. |
 | Terminal | `@xterm/xterm` with the fit, web-links and serialize addons | Real ANSI terminal, resize, clickable links; "serialize" backs the Copy button. |
+| Wiki rendering | `react-markdown` with `remark-gfm` and a callout plugin, raw HTML off, as [wikiview](https://github.com/agentic-wiki/wikiview) does (the CEO, 2026-10-17: reuse its proven building blocks) | The server sends an entry's Markdown as on disk plus the engine's answers as lookup tables (each link resolved, heading ids, checkbox lines), so the browser renders without re-implementing a wiki rule ([Wiki engine](./wiki-engine.md#rendering)). Wiki content is written by agents, so it is untrusted: no raw HTML, script URLs dropped, and only the wiki's own images load ([Security](./security.md)). |
 | Board drag and drop | Native HTML5 drag and drop, plus a status menu on each board card as the keyboard and touch alternative | No dependency for a one-axis drop. |
 | Fonts | Geist and Geist Mono, **self-hosted** from the `geist` npm package | The prototype loads Google Fonts, which breaks "offline" and "no telemetry". |
 | Avatars | A React SVG component ported from the [Avatar](../design/avatar.md) spec | No image assets. |
@@ -138,7 +138,7 @@ foreman/
 │   ├── forge/            # Forge adapters: github, gitea (also Forgejo), none
 │   ├── store/            # State store: SQLite, migrations
 │   ├── workspace/        # Workspace & config: projects, teams, settings, file watcher
-│   ├── wiki/             # thin layer over agentic-wiki + markdown rendering
+│   ├── wiki/             # thin layer over agentic-wiki: tree, entries with their lookup tables, images
 │   ├── events/           # in-process event bus
 │   ├── cos/              # Chief of Staff
 │   ├── server/           # Web server: HTTP, SSE, WebSocket handlers (depends only on interfaces)

@@ -39,6 +39,7 @@ import (
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/terminal"
+	"github.com/brickpop/foreman/internal/wiki"
 	"github.com/brickpop/foreman/internal/workflow"
 	"github.com/brickpop/foreman/internal/workspace"
 	"github.com/brickpop/foreman/ui"
@@ -238,6 +239,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Messages:    messenger,
 		Actions:     state.Actions(),
 		Harnesses:   login,
+		Wiki:        wiki.New(ws.WikiDir),
 		Setup:       checklist,
 		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:   views,

@@ -155,6 +155,8 @@ export interface PipelineArea {
 export interface WikiArea {
   tree(project: string): Promise<Node[]>;
   entry(project: string, path: string): Promise<Entry>;
+  /** Where the browser loads an image of the wiki from (only one an entry links to is served). */
+  imageUrl(project: string, path: string): string;
   /** Every board declared in the project's wiki.toml, with its cards. */
   boards(project: string): Promise<Board[]>;
   setCheckbox(
@@ -253,6 +255,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
   };
   const wsOrigin = origin.replace(/^http/, "ws");
   const id = encodeURIComponent;
+  // A wiki path keeps its slashes: each segment is escaped on its own.
+  const wikiPath = (path: string) => path.split("/").map(id).join("/");
   return {
     workspace: {
       workspace: () => getJSON("/api/workspace"),
@@ -317,6 +321,15 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       startPodman: () => send("POST", "/api/setup/podman/start"),
       createMachine: (size) => send("POST", "/api/setup/podman/machine", size),
     },
+    wiki: {
+      tree: (project) => getJSON(`/api/wiki/${id(project)}/tree`),
+      entry: (project, path) => getJSON(`/api/wiki/${id(project)}/entry/${wikiPath(path)}`),
+      imageUrl: (project, path) => `${origin}/api/wiki/${id(project)}/image/${wikiPath(path)}`,
+      // Boards and the writes come with the rest of the Wiki block (projects-and-wiki card).
+      boards: notBuilt("the wiki"),
+      setCheckbox: notBuilt("the wiki"),
+      moveCard: notBuilt("the wiki"),
+    },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {
       accounts: notBuilt("forge accounts"),
@@ -337,13 +350,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       merge: notBuilt("the pipeline"),
       createPr: notBuilt("the pipeline"),
       reject: notBuilt("the pipeline"),
-    },
-    wiki: {
-      tree: notBuilt("the wiki"),
-      entry: notBuilt("the wiki"),
-      boards: notBuilt("the wiki"),
-      setCheckbox: notBuilt("the wiki"),
-      moveCard: notBuilt("the wiki"),
     },
     chiefOfStaff: {
       conversation: notBuilt("the Chief of Staff"),

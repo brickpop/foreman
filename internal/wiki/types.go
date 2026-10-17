@@ -1,10 +1,11 @@
 // Package wiki reads project wikis through the agentic-wiki engine and makes
-// Foreman's few writes (wiki/product/architecture/wiki-engine.md). These are
-// its wire types; the engine itself joins with the projects-and-wiki card.
+// Foreman's few writes (wiki/product/architecture/wiki-engine.md). Paths on
+// the wire are relative to the wiki, e.g. backlog/LED-44.md.
 package wiki
 
 // Node is one folder or entry of a wiki's tree, in the reader's order:
-// index.md first, then subfolders, then entries.
+// index.md first, then subfolders, then entries. A folder's own index.md
+// isn't among its children: opening the folder opens it.
 type Node struct {
 	Path     string `json:"path"` // relative to the wiki, e.g. backlog/LED-44.md
 	Title    string `json:"title"`
@@ -14,30 +15,56 @@ type Node struct {
 	Children []Node `json:"children"`
 }
 
-// Entry is one rendered entry, for the reader.
+// Entry is one entry, for the reader: its Markdown exactly as on disk, and
+// lookup tables for what the browser must not work out itself (the engine's
+// rules), as wikiview serves it.
 type Entry struct {
 	Path        string            `json:"path"`
 	Title       string            `json:"title"`
-	Version     string            `json:"version"` // guards the writes
-	Frontmatter map[string]string `json:"frontmatter"`
-	HTML        string            `json:"html"` // rendered server-side, raw HTML off
+	Version     string            `json:"version"`     // guards the writes
+	Frontmatter map[string]string `json:"frontmatter"` // lists joined with ", "
+	Body        string            `json:"body"`        // frontmatter stripped
+	Links       []Link            `json:"links"`
 	Headings    []Heading         `json:"headings"`
 	Checkboxes  []Checkbox        `json:"checkboxes"`
-	Backlinks   []string          `json:"backlinks"`
+	Backlinks   []Backlink        `json:"backlinks"`
 }
 
-// Heading is an H2 or H3, for "On this page".
+// Link is one link of the body, resolved by the engine. Raw is the lookup
+// key: the href exactly as the Markdown renderer meets it.
+type Link struct {
+	Raw     string `json:"raw"`
+	To      string `json:"to"`      // the wiki path; empty when Outside
+	Anchor  string `json:"anchor"`  // the fragment without '#'
+	Exists  bool   `json:"exists"`  // an entry; false for one not written yet
+	File    bool   `json:"file"`    // a file the wiki carries, not an entry
+	Image   bool   `json:"image"`   // a file the reader shows (served by /image)
+	Outside bool   `json:"outside"` // resolves above the wiki: not navigable
+}
+
+// Heading is one heading, with the id its anchor links resolve against.
+// BodyLine counts the body as served: what the renderer matches by.
 type Heading struct {
-	Level  int    `json:"level"`
-	Text   string `json:"text"`
-	Anchor string `json:"anchor"`
+	Level    int    `json:"level"`
+	Text     string `json:"text"`
+	ID       string `json:"id"`
+	BodyLine int    `json:"bodyLine"`
 }
 
-// Checkbox is one `- [ ]` line the CEO can tick.
+// Checkbox is one `- [ ]` line the CEO can tick. Line counts the whole file,
+// frontmatter included (what a write is addressed by); BodyLine counts the
+// body (what the renderer matches by).
 type Checkbox struct {
-	Line int    `json:"line"`
-	Done bool   `json:"done"`
-	Text string `json:"text"`
+	Line     int    `json:"line"`
+	BodyLine int    `json:"bodyLine"`
+	Done     bool   `json:"done"`
+	Text     string `json:"text"`
+}
+
+// Backlink is an entry linking to this one.
+type Backlink struct {
+	From  string `json:"from"`
+	Title string `json:"title"` // the linking entry's title
 }
 
 // Board is a kanban over entries, declared in wiki.toml

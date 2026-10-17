@@ -7,6 +7,13 @@ tags: [architecture]
 
 Workarounds and accepted limitations to revisit. Each item says why it exists and how it would be fixed. When one is scheduled, it becomes a card in the [backlog](./backlog/index.md) that links back here. When it's fixed, remove it from this page.
 
+## Copies of wikiview's building blocks
+
+- **State:** Foreman renders wikis as [wikiview](https://github.com/agentic-wiki/wikiview) does ([Wiki engine → Rendering](./product/architecture/wiki-engine.md#rendering)) and holds copies from wikiview v0.13.0: the heading-id rule and the readable-name rule (`internal/wiki/copied.go`) and the callout plugin (`ui/src/app/callout.ts`); `ui/src/components/Markdown.tsx` is adapted from its renderer. The heading-id rule is the engine's, which keeps it unexported, so the copy breaks the wiki engine's "never reimplement an engine rule"; a test cross-checks it against `wiki check`.
+- **Why:** wikiview's Go code is under `internal/` and its UI isn't a package, so Foreman can't import either (the CEO, 2026-10-17: copy now, upstream later). wikiview ships no LICENSE file either.
+- **Impact:** a fix in wikiview or a change to the engine's slug rule doesn't reach Foreman until copied again (the cross-check catches the slug rule).
+- **Fix:** the engine exports its heading-id rule; wikiview exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import wikiview's building blocks](./backlog/wikiview-upstream.md).
+
 ## Snapshots: a pending line wrap, and mirrored emulator state
 
 - **State:** terminal snapshots ([Terminal state](./product/architecture/terminal-state.md)) can't restore a pending line wrap: the `charmbracelet/x/vt` emulator keeps it private. `internal/screen/shadow.go` mirrors the pen, scroll region and saved cursor for the same reason. The every-offset round-trip test skips exactly the pending-wrap offsets.

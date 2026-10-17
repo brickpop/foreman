@@ -1,14 +1,14 @@
 ---
 type: task
 status: todo
-priority: high
+priority: low
 tags: [bug]
 epic: terminal-multiplexer
 ---
 
 # A woken agent's pane stays black until a key, and that key goes to Claude Code
 
-**Seen by the CEO (2026-10-16):** when an agent is woken, its pane sometimes stays black. It shows up only after a keypress, which Claude Code takes as input: the CEO lands in its agents list (an arrow key) and has to press left arrow, or similar, to get back.
+**Seen by the CEO (2026-10-16), very rarely (priority lowered 2026-10-17):** when an agent is woken, its pane sometimes stays black. It shows up only after a keypress, which Claude Code takes as input: the CEO lands in its agents list (an arrow key) and has to press left arrow, or similar, to get back.
 
 **Hypotheses** (to check first):
 - **The pane hides the replay** until output arrives (`Terminal.tsx`: drawn hidden, shown at once, with a 600 ms fallback). On a fresh start the first connect may arrive before the session has a terminal, or the view may stay hidden.

@@ -72,6 +72,7 @@ export function Overview({ project, entry }: { project: string; entry?: string }
         <div className="min-w-0">
           {current.data && (
             <WikiArticle
+              project={project}
               entry={current.data}
               onOpen={open}
               onTick={(line, done) =>

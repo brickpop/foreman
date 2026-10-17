@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, ui, wiki]
 ---
 
@@ -37,7 +37,7 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 Full width of its column, gap 14. Opens `index.md` by default.
 
 1. **"On this page"** (12px `--tx4` label): the entry's H2 and H3 headings (13px `--tx3`, H3 indented 12px), each smooth-scrolling to its heading (24px offset). Shown only when there are any; bottom border.
-2. **Frontmatter chips**: one `key: value` chip per field; empty values hidden.
+2. **Frontmatter chips**: one `key: value` chip per field; empty values hidden, and so is the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17).
 3. **Body** rendered from Markdown:
 
 | Element | Rendering |
@@ -47,11 +47,17 @@ Full width of its column, gap 14. Opens `index.md` by default.
 | H3 | 15.5px / 600, anchor target (new: the prototype rendered no H3) |
 | Paragraph | 15.5px / 1.65 / `--tx2`, with inline emphasis, code and links |
 | List item | `–` bullet in `--tx4` in an 18px gutter |
-| Link to another entry | Opens it in the reader (`--accTx`). External links open in a new tab |
-| Callout `> [!warning]`, `[!success]`, `[!info]`, any word | `--panel`, radius 10, padding `12px 16px`, a colored border and uppercase label: warning `--acc`/`--accTx`, success `--ok`, info `--info`, any other `--line3`/`--tx3`. The label defaults to the type word |
+| Link to another entry | Opens it in the reader (`--accTx`), resolved by the engine ([Wiki engine → Rendering](../architecture/wiki-engine.md#rendering)). External links open in a new tab |
+| Link to an entry not written yet | `--tx3`, dotted underline, titled "Not written yet"; still opens (and falls back to `index.md`) |
+| Link above the wiki (e.g. into a code repo) | Text, `--tx3` with a dotted underline, titled `<href> is outside the wiki`: never followed |
+| Link to a file the wiki carries | An image opens in a new tab; any other file (a PDF, a spreadsheet) is text like a link above the wiki, titled `Foreman doesn't show <path>`: Foreman serves the wiki's images only |
+| Callout `> [!warning] Title`, `[!success]`, `[!info]`, any word | `--panel`, radius 10, padding `12px 16px`, a colored border and an uppercase label (an element, so a screen reader hears it): warning `--acc`/`--accTx`, success `--ok`, info `--info`, any other `--line3`/`--tx3`. The label is the title, else the type word |
 | Checkbox `- [ ]` | Tickable (see below) |
 | Code block | `<pre>` on `--term`, radius 8 |
-| Image | Inline, max width of the column, resolved relative to the entry |
+| Image | Inline, max width of the column, resolved by the engine. Only the wiki's own images load (the CEO, 2026-10-17); an image elsewhere shows as a link to it, and a missing one as its alt text, dotted |
+| Table | Bordered cells (`--line2`), scrolling on its own when wider than the column |
+| Quote | A `--line3` left rule, `--tx3` |
+| Raw HTML | Shown as text, never rendered: agents write these files |
 
 ## Behaviour
 

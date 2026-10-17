@@ -67,6 +67,15 @@ func TestAddProjectWithAFirstRepo(t *testing.T) {
 	if len(changes) == 0 || changes[0].Kind != "projects" { // the list changed: the UI refetches it
 		t.Errorf("changes %+v", changes)
 	}
+	// The wiki Foreman reads is the one it just created.
+	if wiki, err := w.WikiDir("cal"); err != nil || wiki != filepath.Join(dir, "project", "wiki") {
+		t.Errorf("wiki dir %q %v", wiki, err)
+	} else if _, err := os.Stat(filepath.Join(wiki, "wiki.toml")); err != nil {
+		t.Errorf("no wiki.toml in the wiki dir: %v", err)
+	}
+	if _, err := w.WikiDir("nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("an unknown project's wiki: %v", err)
+	}
 	if len(w.Candidates()) != 0 {
 		t.Error("still a candidate")
 	}

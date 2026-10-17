@@ -58,6 +58,7 @@ const (
 	teamsDir     = "teams"
 	settingsFile = "settings.toml"
 	projectRepo  = "project"
+	wikiDir      = "wiki" // the wiki bundle, inside the project repo
 	sandboxes    = ".sandboxes"
 )
 
@@ -239,6 +240,14 @@ func (w *Workspace) Project(id string) (Project, error) {
 		return Project{}, ErrNotFound
 	}
 	return p, nil
+}
+
+// WikiDir is where a project's wiki bundle lives: <project>/project/wiki.
+func (w *Workspace) WikiDir(id string) (string, error) {
+	if _, err := w.Project(id); err != nil {
+		return "", err
+	}
+	return filepath.Join(w.root, id, projectRepo, wikiDir), nil
 }
 
 // Teams returns every team, by id.

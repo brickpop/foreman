@@ -169,8 +169,8 @@ a {
   }
 }
 
-/* A rendered wiki entry (wiki/product/features/wiki-reader.md#article): the
-   server sends HTML (raw HTML off); these are its styles, reader size by
+/* A rendered wiki entry (wiki/product/features/wiki-reader.md#article), from
+   its Markdown (components/Markdown.tsx); these are its styles, reader size by
    default and smaller in the board's side sheet. */
 .wiki {
   display: flex;
@@ -268,9 +268,8 @@ a {
   border-radius: 10px;
   background: var(--panel);
 }
-.wiki blockquote.callout::before {
-  content: attr(data-callout);
-  display: block;
+.wiki .callout-label {
+  margin-bottom: 4px;
   color: var(--tx3);
   font-size: 11.5px;
   font-weight: 600;
@@ -280,20 +279,51 @@ a {
 .wiki blockquote.callout[data-callout="warning"] {
   border-color: var(--acc);
 }
-.wiki blockquote.callout[data-callout="warning"]::before {
+.wiki blockquote.callout[data-callout="warning"] .callout-label {
   color: var(--accTx);
 }
 .wiki blockquote.callout[data-callout="success"] {
   border-color: var(--ok);
 }
-.wiki blockquote.callout[data-callout="success"]::before {
+.wiki blockquote.callout[data-callout="success"] .callout-label {
   color: var(--ok);
 }
 .wiki blockquote.callout[data-callout="info"] {
   border-color: var(--info);
 }
-.wiki blockquote.callout[data-callout="info"]::before {
+.wiki blockquote.callout[data-callout="info"] .callout-label {
   color: var(--info);
+}
+.wiki blockquote:not(.callout) {
+  margin: 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--line3);
+  color: var(--tx3);
+}
+/* A link to an entry not written yet, or to a file outside the wiki. */
+.wiki .unwritten,
+.wiki .outside {
+  color: var(--tx3);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+/* A wide table scrolls on its own, not the page. */
+.wiki .table {
+  overflow-x: auto;
+}
+.wiki table {
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.wiki th,
+.wiki td {
+  padding: 6px 12px;
+  border: 1px solid var(--line2);
+  text-align: left;
+}
+.wiki th {
+  color: var(--tx);
+  font-weight: 600;
 }
 .wiki.sheet {
   gap: 12px;

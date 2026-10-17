@@ -119,13 +119,27 @@ describe("httpClient", () => {
     ]);
   });
 
+  it("reads the wiki, escaping each segment of a path but not its slashes", async () => {
+    const calls = stubFetch(200, []);
+    const c = httpClient("http://x");
+    await c.wiki.tree("my project");
+    await c.wiki.entry("ledger", "backlog/a b#1.md");
+    expect(calls.map((c) => c.url)).toEqual([
+      "http://x/api/wiki/my%20project/tree",
+      "http://x/api/wiki/ledger/entry/backlog/a%20b%231.md",
+    ]);
+    expect(c.wiki.imageUrl("ledger", "img/d?.png")).toBe(
+      "http://x/api/wiki/ledger/image/img/d%3F.png",
+    );
+  });
+
   it("refuses the areas the server doesn't serve yet, without asking it", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");
     for (const call of [
       () => c.requests.list(),
       () => c.pipeline.merge("mr-1"),
-      () => c.wiki.tree("ledger"),
+      () => c.wiki.boards("ledger"),
       () => c.chiefOfStaff.send("hi"),
     ]) {
       const e = await call().catch((e: unknown) => e);

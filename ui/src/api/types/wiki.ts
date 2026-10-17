@@ -4,13 +4,14 @@
 // source: types.go
 /*
 Package wiki reads project wikis through the agentic-wiki engine and makes
-Foreman's few writes (wiki/product/architecture/wiki-engine.md). These are
-its wire types; the engine itself joins with the projects-and-wiki card.
+Foreman's few writes (wiki/product/architecture/wiki-engine.md). Paths on
+the wire are relative to the wiki, e.g. backlog/LED-44.md.
 */
 
 /**
  * Node is one folder or entry of a wiki's tree, in the reader's order:
- * index.md first, then subfolders, then entries.
+ * index.md first, then subfolders, then entries. A folder's own index.md
+ * isn't among its children: opening the folder opens it.
  */
 export interface Node {
   path: string; // relative to the wiki, e.g. backlog/LED-44.md
@@ -21,33 +22,61 @@ export interface Node {
   children: Node[];
 }
 /**
- * Entry is one rendered entry, for the reader.
+ * Entry is one entry, for the reader: its Markdown exactly as on disk, and
+ * lookup tables for what the browser must not work out itself (the engine's
+ * rules), as wikiview serves it.
  */
 export interface Entry {
   path: string;
   title: string;
   version: string; // guards the writes
-  frontmatter: { [key: string]: string};
-  html: string; // rendered server-side, raw HTML off
+  frontmatter: { [key: string]: string}; // lists joined with ", "
+  body: string; // frontmatter stripped
+  links: Link[];
   headings: Heading[];
   checkboxes: Checkbox[];
-  backlinks: string[];
+  backlinks: Backlink[];
 }
 /**
- * Heading is an H2 or H3, for "On this page".
+ * Link is one link of the body, resolved by the engine. Raw is the lookup
+ * key: the href exactly as the Markdown renderer meets it.
+ */
+export interface Link {
+  raw: string;
+  to: string; // the wiki path; empty when Outside
+  anchor: string; // the fragment without '#'
+  exists: boolean; // an entry; false for one not written yet
+  file: boolean; // a file the wiki carries, not an entry
+  image: boolean; // a file the reader shows (served by /image)
+  outside: boolean; // resolves above the wiki: not navigable
+}
+/**
+ * Heading is one heading, with the id its anchor links resolve against.
+ * BodyLine counts the body as served: what the renderer matches by.
  */
 export interface Heading {
   level: number /* int */;
   text: string;
-  anchor: string;
+  id: string;
+  bodyLine: number /* int */;
 }
 /**
- * Checkbox is one `- [ ]` line the CEO can tick.
+ * Checkbox is one `- [ ]` line the CEO can tick. Line counts the whole file,
+ * frontmatter included (what a write is addressed by); BodyLine counts the
+ * body (what the renderer matches by).
  */
 export interface Checkbox {
   line: number /* int */;
+  bodyLine: number /* int */;
   done: boolean;
   text: string;
+}
+/**
+ * Backlink is an entry linking to this one.
+ */
+export interface Backlink {
+  from: string;
+  title: string; // the linking entry's title
 }
 /**
  * Board is a kanban over entries, declared in wiki.toml

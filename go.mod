@@ -20,6 +20,7 @@ require (
 )
 
 require (
+	github.com/agentic-wiki/wiki v0.10.0 // indirect
 	github.com/charmbracelet/colorprofile v0.4.2 // indirect
 	github.com/charmbracelet/x/exp/ordered v0.1.0 // indirect
 	github.com/charmbracelet/x/term v0.2.2 // indirect

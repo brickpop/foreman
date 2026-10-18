@@ -1,6 +1,7 @@
 package git
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,7 +10,9 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
+	"time"
 )
 
 var ctx = context.Background()
@@ -308,8 +311,63 @@ func TestChanged(t *testing.T) {
 func TestGitSpeaksEnglish(t *testing.T) {
 	t.Setenv("LC_ALL", "ca_ES.UTF-8")
 	t.Setenv("LANG", "ca_ES.UTF-8")
-	env := command(ctx, ".", "status").Env
-	if env[len(env)-1] != "LC_ALL=C" {
-		t.Errorf("the last setting is %q, want LC_ALL=C (the last one wins)", env[len(env)-1])
+	t.Setenv("GIT_OPTIONAL_LOCKS", "1") // nor on the CEO's environment
+	// The last setting of a variable wins.
+	last := map[string]string{}
+	for _, kv := range command(ctx, ".", "status").Env {
+		k, v, _ := strings.Cut(kv, "=")
+		last[k] = v
+	}
+	if last["LC_ALL"] != "C" || last["GIT_OPTIONAL_LOCKS"] != "0" {
+		t.Errorf("LC_ALL=%q GIT_OPTIONAL_LOCKS=%q", last["LC_ALL"], last["GIT_OPTIONAL_LOCKS"])
+	}
+}
+
+// Reading a worktree never writes its index: status takes no optional lock
+// (index.lock), so Foreman's reads can't collide with an agent's own git, nor
+// leave a lock behind.
+func TestReadsNeverWriteTheIndex(t *testing.T) {
+	dir := repo(t)
+	write(t, filepath.Join(dir, "a.txt"), "a\n")
+	if err := (New()).Commit(ctx, dir, "a", "a.txt"); err != nil {
+		t.Fatal(err)
+	}
+	// The file's stat changes, not its content: a status with optional locks
+	// would refresh the index, writing it.
+	later := time.Now().Add(time.Hour)
+	if err := os.Chtimes(filepath.Join(dir, "a.txt"), later, later); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(filepath.Join(dir, ".git", "index"))
+	clean, err := (New()).Clean(ctx, dir)
+	if err != nil || !clean {
+		t.Fatalf("clean %v %v", clean, err)
+	}
+	after, _ := os.ReadFile(filepath.Join(dir, ".git", "index"))
+	if !bytes.Equal(before, after) {
+		t.Error("status rewrote the index")
+	}
+}
+
+// A cancelled git gets SIGTERM, on which git removes its lock files; a kill
+// would leave them.
+func TestACancelledGitIsTerminated(t *testing.T) {
+	dir := repo(t)
+	cctx, cancel := context.WithCancel(ctx)
+	cmd := command(cctx, dir, "hash-object", "--stdin")
+	in, err := cmd.StdinPipe() // never closed: git waits
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer in.Close()
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	_ = cmd.Wait()
+	ws, ok := cmd.ProcessState.Sys().(syscall.WaitStatus)
+	if !ok || !ws.Signaled() || ws.Signal() != syscall.SIGTERM {
+		t.Errorf("ended %v", cmd.ProcessState)
 	}
 }

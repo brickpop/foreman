@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
+	"time"
 )
 
 // fallbackIdentity signs commits when the CEO's git has no user configured,
@@ -168,9 +170,17 @@ func (g *CLI) Exclude(ctx context.Context, path string) error {
 // English (LC_ALL=C): Foreman reads some of them, and a CEO's git in another
 // language would otherwise hide what happened (found 2026-10-17, a Catalan
 // git). Only git's own messages change: file names and commits don't.
+//
+// No optional locks (GIT_OPTIONAL_LOCKS=0): a read such as `status` then never
+// takes index.lock to refresh the index, so Foreman's reads of an agent's
+// worktree never get in the way of the agent's own git. And a cancelled
+// command gets SIGTERM, on which git removes its lock files, before a kill:
+// a SIGKILL left a stale index.lock behind (found 2026-10-18).
 func command(ctx context.Context, dir string, args ...string) *exec.Cmd {
 	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "commit.gpgsign=false", "-C", dir}
 	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
-	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")
+	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
+	cmd.WaitDelay = 5 * time.Second
 	return cmd
 }

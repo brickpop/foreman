@@ -7,8 +7,8 @@
  * Step is one row of the setup checklist (wiki/product/features/first-run.md).
  */
 export interface Step {
-  kind: string; // "podman", "machine", "running", "image", "harness", "team", "project" or "repo"
-  subject: string; // the harness (harness) or project (repo); "" otherwise
+  kind: string; // "podman", "machine", "running", "image", "profile", "team", "project" or "repo"
+  subject: string; // the profile (profile) or project (repo); "" otherwise
   state: string; // "done", "todo", "working" or "failed"
   detail: string; // what it waits for, or why it failed
   log: string; // a machine creation's or an image build's output (its end)

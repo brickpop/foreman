@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/events"
-	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/workspace"
@@ -36,10 +36,12 @@ type Config interface {
 
 // Deps is what the checklist reads and the watcher drives.
 type Deps struct {
-	Engine    Engine // nil for the Direct engine: no Podman or image steps
-	Images    runner.Images
-	Harnesses func() []harness.Status
-	Config    Config
+	Engine Engine // nil for the Direct engine: no Podman or image steps
+	Images runner.Images
+	// Profiles are the profiles the projects use (the default while there
+	// is no project), with their state; one that doesn't exist has no harness.
+	Profiles func() []profiles.Profile
+	Config   Config
 	// Ready runs once, the first time the engine answers: restoring the
 	// instances and delivering what waited. Retried while it fails.
 	Ready func(ctx context.Context) error
@@ -216,14 +218,15 @@ func (s *Setup) Steps(ctx context.Context) []Step {
 		steps = append(steps, imageStep(im))
 	}
 	teams, projects := s.Config.Teams(), s.Config.Projects()
-	for _, h := range s.Harnesses() {
-		if used(h.ID, teams) {
-			step := Step{Kind: "harness", Subject: h.ID, State: "done"}
-			if !h.Connected {
-				step.State, step.Detail = "todo", "Not logged in yet: its agents can't start"
-			}
-			steps = append(steps, step)
+	for _, p := range s.Profiles() {
+		step := Step{Kind: "profile", Subject: p.Name, State: "done"}
+		switch {
+		case p.Harness == "":
+			step.State, step.Detail = "failed", "No such profile: create it under Settings → Global → Profiles, or pick another in the project's settings"
+		case !p.Connected:
+			step.State, step.Detail = "todo", "Not connected yet: its agents can't start"
 		}
+		steps = append(steps, step)
 	}
 	steps = append(steps, presence("team", len(teams), "Create a team"))
 	steps = append(steps, presence("project", len(projects), "Add a project"))
@@ -235,22 +238,6 @@ func (s *Setup) Steps(ctx context.Context) []Step {
 		}
 	}
 	return steps
-}
-
-// used reports whether a team uses harness h; with no team yet, every
-// supported harness is listed, since the first team will need one.
-func used(h string, teams []workspace.Team) bool {
-	if len(teams) == 0 {
-		return true
-	}
-	for _, t := range teams {
-		for _, a := range t.Config.Agents {
-			if a.Harness == h {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func presence(kind string, n int, todo string) Step {

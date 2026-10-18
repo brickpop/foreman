@@ -13,7 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/brickpop/foreman/internal/runner"
 )
@@ -26,23 +26,23 @@ type Images struct {
 	r             *Runner // reached through the engine, so a reconnection is followed
 	name          string  // e.g. localhost/foreman/harness
 	containerfile []byte
-
-	build sync.Mutex // one build at a time; concurrent Ensures share it
-
-	mu     sync.Mutex // guards what Status reports
-	state  string     // "", "missing", "building", "ready" or "failed"
-	log    string
-	builds int // builds started, for tests
+	// shared is the build as every workspace's Foreman sees it: the image is
+	// the machine's, so one builds at a time and all show the same state.
+	shared sharedBuild
+	builds atomic.Int32 // builds this Foreman started, for tests
 }
 
 var _ runner.Images = (*Images)(nil)
 
-// Images returns the image builder for the image name, built from containerfile.
-func (r *Runner) Images(name string, containerfile []byte) *Images {
-	return &Images{r: r, name: name, containerfile: containerfile}
+// Images returns the image builder for the image name, built from
+// containerfile; dir is where its build state is shared with the other
+// workspaces' Foremans (the CEO's folder, internal/userdata).
+func (r *Runner) Images(name string, containerfile []byte, dir string) *Images {
+	key := strings.NewReplacer("/", "-", ":", "-").Replace(name)
+	return &Images{r: r, name: name, containerfile: containerfile, shared: sharedBuild{dir: dir, key: key}}
 }
 
-// maxLog bounds the build log kept for Settings → Maintenance (its end).
+// maxLog bounds the build log shown in Settings → Maintenance (its end).
 const maxLog = 256 << 10
 
 func (im *Images) ref() string {
@@ -50,18 +50,23 @@ func (im *Images) ref() string {
 	return im.name + ":" + hex.EncodeToString(sum[:6])
 }
 
-// Ensure returns the image, building it first if it doesn't exist.
+// Ensure returns the image, building it first if it doesn't exist. While
+// another Foreman builds it, Ensure waits, then finds it built.
 func (im *Images) Ensure(ctx context.Context, _ string) (string, error) {
-	im.build.Lock()
-	defer im.build.Unlock()
+	unlock, err := im.shared.lock(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer unlock()
 	ref := im.ref()
 	exists, err := im.exists(ctx, ref)
 	if err != nil {
 		return "", err
 	}
 	if exists {
-		im.set("ready", "")
-		return ref, nil
+		// Agents start on it: a failed Refresh before doesn't hold the
+		// checklist on failed.
+		return ref, im.shared.set("ready")
 	}
 	if err := im.run(ctx, ref, false); err != nil {
 		return "", err
@@ -71,18 +76,19 @@ func (im *Images) Ensure(ctx context.Context, _ string) (string, error) {
 
 // Refresh rebuilds without cache, pulling the latest base image.
 func (im *Images) Refresh(ctx context.Context) error {
-	im.build.Lock()
-	defer im.build.Unlock()
+	unlock, err := im.shared.lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	return im.run(ctx, im.ref(), true)
 }
 
-// Status reports the image's state; before anything was built or checked in
-// this run, it asks Podman.
+// Status reports the image as every Foreman sees it: building (here or in
+// another workspace), failed, or else ready or missing as Podman says.
 func (im *Images) Status(ctx context.Context) []runner.ImageStatus {
-	im.mu.Lock()
-	state, log := im.state, im.log
-	im.mu.Unlock()
-	if state == "" {
+	state, log := im.shared.state()
+	if state != "building" && state != "failed" {
 		state = "missing"
 		if ok, err := im.exists(ctx, im.ref()); err == nil && ok {
 			state = "ready"
@@ -93,24 +99,6 @@ func (im *Images) Status(ctx context.Context) []runner.ImageStatus {
 		ref = im.ref()
 	}
 	return []runner.ImageStatus{{Name: im.name, Ref: ref, State: state, Log: log}}
-}
-
-func (im *Images) set(state, log string) {
-	im.mu.Lock()
-	defer im.mu.Unlock()
-	im.state = state
-	if log != "" || state == "building" {
-		im.log = log
-	}
-}
-
-func (im *Images) appendLog(s string) {
-	im.mu.Lock()
-	defer im.mu.Unlock()
-	im.log += s
-	if len(im.log) > maxLog {
-		im.log = im.log[len(im.log)-maxLog:]
-	}
 }
 
 func (im *Images) exists(ctx context.Context, ref string) (bool, error) {
@@ -131,20 +119,18 @@ func (im *Images) exists(ctx context.Context, ref string) (bool, error) {
 }
 
 // run builds ref (and moves the name's latest tag to it), streaming the
-// build's output into the log.
+// build's output into the shared log. Called holding the lock.
 func (im *Images) run(ctx context.Context, ref string, fresh bool) error {
-	im.mu.Lock()
-	im.builds++
-	im.mu.Unlock()
-	im.set("building", "")
-	err := im.post(ctx, ref, fresh)
-	if err != nil {
-		im.appendLog("\n" + err.Error() + "\n")
-		im.set("failed", "")
+	im.builds.Add(1)
+	if err := im.shared.begin(); err != nil {
 		return fmt.Errorf("building %s: %w", im.name, err)
 	}
-	im.set("ready", "")
-	return nil
+	if err := im.post(ctx, ref, fresh); err != nil {
+		im.shared.appendLog("\n" + err.Error() + "\n")
+		_ = im.shared.set("failed")
+		return fmt.Errorf("building %s: %w", im.name, err)
+	}
+	return im.shared.set("ready")
 }
 
 func (im *Images) post(ctx context.Context, ref string, fresh bool) error {
@@ -196,7 +182,7 @@ func (im *Images) post(ctx context.Context, ref string, fresh bool) error {
 		} else if err != nil {
 			return err
 		}
-		im.appendLog(line.Stream)
+		im.shared.appendLog(line.Stream)
 		if line.Error != "" {
 			return errors.New(strings.TrimSpace(line.Error))
 		}

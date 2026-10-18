@@ -19,6 +19,7 @@ Where Foreman keeps what, and how changes on disk reach the UI. The principle (c
 | Secrets | OS keychain or `<workspace>/.foreman/secrets` (0600) | Foreman (UI) | Write-only from the UI ([Secrets](../models/secrets.md)) |
 | Runtime state | `<workspace>/.foreman/state.db` (SQLite) | Foreman | Deployments, instances, requests, team messages, work items, merge requests, read markers, UI prefs |
 | Session logs | `<workspace>/.foreman/logs/<agent>@<project>/<session-id>.log` | Foreman | Raw terminal byte stream: each session's history and audit trail (a reload shows a snapshot instead, [Terminal state](./terminal-state.md)) |
+| The CEO's, on this machine (every workspace) | `~/.local/share/foreman/` (`$XDG_DATA_HOME/foreman/` when set; `internal/userdata`), outside any workspace: `profiles/<name>/` (a harness and its login), `preferences.toml` (the theme), `images/` (the agent images' build lock, state and log) | Foreman (UI) | Shared by every workspace's Foreman, so each reads it as it is when asked ([Settings → Global](../features/settings.md)) |
 
 ### state.db
 
@@ -32,7 +33,7 @@ Minimum tables, one model entry each: [deployments](../models/deployment.md), [i
 - The Terminal block appends every byte read from a session to its current log file before fanning it out ([Building blocks](./building-blocks.md#2-terminal-terminal)). A new session id (and file) per harness start.
 - Scrollback for a newly attached terminal is replayed from the tail of the log, so the UI shows history after a reload or a server restart.
 - **Retention:** logs rotate per instance at a size cap (50 MB by default, a [workspace setting](../models/workspace-settings.md)); the oldest files beyond it are deleted. Logs hold whatever the harness printed, minus the secrets Foreman redacts ([Secrets](../models/secrets.md#invariants)).
-- The "last output line" shown in [Project settings](../features/project-settings.md) is derived from the stream (ANSI stripped), not stored separately.
+- The activity line shown in [Project settings](../features/project-settings.md) comes from the harness's hooks and lives in the Instance manager's memory, never stored: a Foreman restart starts every instance without one, until its next hook ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)).
 
 ## File watching
 

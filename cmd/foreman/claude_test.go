@@ -18,29 +18,36 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/agentbin"
+	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/setup"
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/userdata"
 )
 
 // The Claude Code integration test (wiki/backlog/claude-integration-tests.md):
 // a real Claude Code, in Podman, driven through Foreman's whole stack and its
 // API, as the CEO would. It tells us a Claude Code update didn't break the
 // session start, delivery, the hooks or the team tools. It needs the CEO's
-// login and Podman, takes minutes and spends tokens, so it runs only with
-// FOREMAN_CLAUDE_LOGIN set (just test-claude).
+// login (the user's, in the profile given) and Podman, takes minutes and
+// spends tokens, so it runs only with FOREMAN_CLAUDE_PROFILE set (just test-claude).
 
 func TestClaudeCode(t *testing.T) {
-	login := os.Getenv("FOREMAN_CLAUDE_LOGIN")
-	if login == "" {
-		t.Skip("set FOREMAN_CLAUDE_LOGIN to a Claude Code login folder (just test-claude)")
+	profile := os.Getenv("FOREMAN_CLAUDE_PROFILE")
+	if profile == "" {
+		t.Skip("set FOREMAN_CLAUDE_PROFILE to a Claude Code profile, usually default (just test-claude)")
 	}
+	dir, err := userdata.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	login := profiles.In(dir).Dir(profile)
 	if _, err := os.Stat(filepath.Join(login, ".credentials.json")); err != nil {
-		t.Fatalf("no login in %s: connect Claude Code under Settings → Harnesses first", login)
+		t.Fatalf("no login in %s: connect the profile under Settings → Global → Profiles first", login)
 	}
 	if agentbin.Binary(runtime.GOARCH) == nil {
 		t.Fatal("foreman-agent isn't built: run just agent")
 	}
-	c := startClaudeWorkspace(t, login)
+	c := startClaudeWorkspace(t, profile)
 
 	// 1. The lead starts on its goal: a session with no dialog in the way,
 	// whose hooks say running, then idle.
@@ -94,17 +101,18 @@ type claudeWorkspace struct {
 }
 
 // startClaudeWorkspace makes a workspace with a two-agent team on a project
-// with one code repo, linked to the CEO's login, and runs Foreman on it.
+// with one code repo, on the CEO's login profile (the login itself: a refresh
+// during the test lands there, never in a copy), and runs Foreman on it.
 // It lives under .dev/: Podman's machine on macOS shares /Users, not the
 // system's temp folder. It is removed when the test passes.
-func startClaudeWorkspace(t *testing.T, login string) *claudeWorkspace {
+func startClaudeWorkspace(t *testing.T, profile string) *claudeWorkspace {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".dev", "claude-test", time.Now().Format("20060102-150405")))
 	if err != nil {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		".foreman/settings.toml": "engine = \"podman\"\n",
+		".foreman/settings.toml": "engine = \"podman\"\n\n[project_profiles]\nproj = \"" + profile + "\"\n",
 		".foreman/teams/itest.toml": "team = \"itest\"\nname = \"Itest\"\nlead = \"lena\"\n\n" +
 			"[agents.lena]\nname = \"Lena\"\nrole = \"team_lead\"\nharness = \"claude-code\"\n\n" +
 			"[agents.milo]\nname = \"Milo\"\nrole = \"engineer\"\nharness = \"claude-code\"\n",
@@ -124,15 +132,6 @@ func startClaudeWorkspace(t *testing.T, login string) *claudeWorkspace {
 		gitIn(t, filepath.Join(root, dir), "init", "--quiet", "--initial-branch=main")
 		gitIn(t, filepath.Join(root, dir), "add", "-A")
 		gitIn(t, filepath.Join(root, dir), "-c", "user.name=test", "-c", "user.email=test@localhost", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "first")
-	}
-	// The login itself, linked: a refresh during the test lands in the CEO's
-	// login, never in a copy that would leave the original stale.
-	if err := os.MkdirAll(filepath.Join(root, ".foreman", "credentials"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	abs, _ := filepath.Abs(login)
-	if err := os.Symlink(abs, filepath.Join(root, ".foreman", "credentials", "claude-code")); err != nil {
-		t.Fatal(err)
 	}
 
 	port := freePorts(t)

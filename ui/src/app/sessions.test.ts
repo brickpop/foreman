@@ -19,6 +19,7 @@ import {
   rosterOrder,
   searchFor,
   toggleSplit,
+  withDoing,
 } from "./sessions";
 
 const inst = (id: string, deploymentId: string) =>
@@ -83,20 +84,28 @@ describe("Sessions", () => {
     expect(moved(["a", "b", "c"], "x", "a")).toEqual(["a", "b", "c"]);
   });
 
-  it("finds the agent whose output is the latest", () => {
-    const at = (id: string, deploymentId: string, lastOutputAt: string) =>
-      ({ ...inst(id, deploymentId), lastOutputAt }) as Instance;
+  it("finds the agent that did something last", () => {
+    const at = (id: string, deploymentId: string, doing?: string) =>
+      ({ ...inst(id, deploymentId), doing: doing && { line: "Started", at: doing } }) as Instance;
     const list = [
       at("tove@ledger", "atlas@ledger", "2026-10-17T10:00:00Z"),
       at("mara@ledger", "atlas@ledger", "2026-10-17T11:30:00Z"),
-      at("ilya@ledger", "atlas@ledger", "0001-01-01T00:00:00Z"),
+      at("ilya@ledger", "atlas@ledger"),
       at("lumen@relay", "orion@relay", "2026-10-17T12:00:00Z"),
     ];
     expect(mostRecentAgent(list, "atlas@ledger")).toBe("mara");
-    expect(
-      mostRecentAgent([at("ilya@ledger", "atlas@ledger", "")], "atlas@ledger"),
-    ).toBeUndefined();
+    expect(mostRecentAgent([at("ilya@ledger", "atlas@ledger")], "atlas@ledger")).toBeUndefined();
     expect(mostRecentAgent(list, "nope@x")).toBeUndefined();
+  });
+
+  it("replaces one agent's activity line, leaving the rest", () => {
+    const doing = { line: "Bash: go test ./...", at: "2026-10-18T10:00:00Z" };
+    const list = [inst("tove@ledger", "atlas@ledger"), inst("mara@ledger", "atlas@ledger")];
+    const got = withDoing(list, { id: "mara@ledger", doing });
+    expect(got?.map((i) => i.doing)).toEqual([undefined, doing]);
+    expect(list[1].doing).toBeUndefined(); // the cached list itself is never changed
+    expect(withDoing(undefined, { id: "mara@ledger", doing })).toBeUndefined(); // nothing fetched yet
+    expect(withDoing(list, { id: "nobody@x", doing })).toEqual(list);
   });
 
   it("puts the lead first, then the team file's order", () => {

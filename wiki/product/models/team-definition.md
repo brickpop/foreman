@@ -29,8 +29,6 @@ to = "lead"
 [agents.mara]
 name = "Mara"
 role = "team_lead"
-harness = "claude-code"   # claude-code | codex | pi | hermes | custom
-command = ""              # required when harness = custom
 personality = "Calm, decisive, terse. Prefers small PRs."
 skills = ["decomposition", "code review"]
 instruction = """
@@ -91,7 +89,7 @@ Each example carries a full roster with job descriptions, a playbook and an esca
 
 - `lead` names an existing agent of the team.
 - Agent display names are unique across the workspace, so @-mentions and avatars stay unambiguous.
-- `command` is non-empty when `harness = "custom"`.
+- A soul names no harness: the project's [profile](../architecture/session-runner.md#credentials) does. An old file's `harness` and `command` lines load, are ignored, and go with the next save ([Agent soul](./agent-soul.md#what-it-runs-on)).
 - A team file never carries secrets or deployment state.
 - Agent ids are unique across the workspace, not just within the team.
 - An agent can't be removed, and a team file can't be deleted, while it is deployed: stop the deployments first. Removing an undeployed agent removes its soul and keeps its worktrees and branches on disk.

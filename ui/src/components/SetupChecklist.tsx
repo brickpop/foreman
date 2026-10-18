@@ -106,17 +106,30 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
   switch (s.kind) {
     case "image":
       return s.state === "failed" ? (
-        <Link to="/settings" className="text-[13px] text-accTx hover:underline">
+        <Link
+          to="/settings"
+          search={{ tab: "global" }}
+          className="text-[13px] text-accTx hover:underline"
+        >
           Maintenance
         </Link>
       ) : null;
-    case "harness":
-      return (
+    case "profile":
+      // One that doesn't exist (failed) is created or swapped in Settings.
+      return s.state === "failed" ? (
+        <Link
+          to="/settings"
+          search={{ tab: "global" }}
+          className="text-[13px] text-accTx hover:underline"
+        >
+          Profiles
+        </Link>
+      ) : (
         <>
           <Button variant="small" onClick={() => setDialog(true)}>
             Connect
           </Button>
-          {dialog && <ConnectDialog harness={s.subject} onClose={() => setDialog(false)} />}
+          {dialog && <ConnectDialog profile={s.subject} onClose={() => setDialog(false)} />}
         </>
       );
     case "team":

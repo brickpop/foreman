@@ -55,12 +55,6 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Why:** a harness gives no acknowledgement that a line reached its prompt; each known dialog is switched off in the config Foreman writes.
 - **Fix:** the Claude Code integration tests (`just test-claude`) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
 
-## The theme is kept in the browser only
-
-- **State:** Settings → Appearance stores the theme in this browser's `localStorage` (`ui/src/app/theme.ts`), so another browser starts on System.
-- **Why:** the `ui_prefs` API ([UI state](./product/models/ui-state.md)) isn't built yet; the spec already keeps a `localStorage` copy to paint the theme before the API answers.
-- **Fix:** with the `ui_prefs` API, save the theme there and keep `localStorage` as the paint-early cache only. The same API also keeps the Sessions panes across browsers ([Home and Sessions](./backlog/ui-home-sessions.md)).
-
 ## The Chief of Staff is typed in the UI only
 
 - **State:** the drawer's conversation types (`CosItem`, `CosConversation`, `CosEntry`) and the `cos.changed` event are defined in `ui/src/api/client.ts`, not generated from Go, and the HTTP client's `chiefOfStaff` area rejects every call. The drawer says "Not built yet".

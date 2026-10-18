@@ -17,6 +17,7 @@ import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notificat
 import {
   useInstances,
   useLiveEvents,
+  usePreferences,
   useProjects,
   useRequests,
   useSettings,
@@ -142,6 +143,7 @@ function Sidebar({
   const instances = useInstances();
   const requests = useRequests();
   const settings = useSettings();
+  usePreferences(); // the theme, the same in every workspace
   const model = sidebarModel(
     projects.data ?? [],
     teams.data ?? [],
@@ -256,6 +258,7 @@ function LiveEvents() {
   const teams = useTeams();
   const instances = useInstances();
   const settings = useSettings();
+  usePreferences(); // the theme, the same in every workspace
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
     if (!n) return;

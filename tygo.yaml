@@ -43,3 +43,9 @@ packages:
       git.Commit: "git.Commit"
     frontmatter: |
       import type * as git from "./git";
+  - path: github.com/brickpop/foreman/internal/profiles
+    output_path: ui/src/api/types/profiles.ts
+    include_files: [types.go]
+  - path: github.com/brickpop/foreman/internal/userdata
+    output_path: ui/src/api/types/userdata.ts
+    include_files: [types.go]

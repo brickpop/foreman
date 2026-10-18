@@ -21,4 +21,4 @@ Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.m
 - [x] browser notifications and toasts: `noticeFor` (request.created → needs me / merge requested; instance done → finishes), a toast always, a browser notification when permission, toggle and a hidden tab allow; tagged per instance; a click opens the session
 - [x] tests: `PUT /api/settings`, the maintenance routes and engine line, the demo client's settings/forge/rebuild, the notices and their gating
 
-Deferred, tracked elsewhere: forge tokens on the server ([Git epic](./epics/git.md)); build time and harness versions ([Full image chain](./image-chain.md)); the theme across browsers ([technical debt](../technical-debt.md#the-theme-is-kept-in-the-browser-only)).
+Deferred, tracked elsewhere: forge tokens on the server ([Git epic](./epics/git.md)); build time and harness versions ([Full image chain](./image-chain.md)). The theme across browsers and workspaces is built (2026-10-18, [Settings → Appearance](../product/features/settings.md#appearance)).

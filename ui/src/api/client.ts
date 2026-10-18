@@ -5,6 +5,7 @@ import type { Account as ForgeAccount } from "./types/forge";
 import type { Commit, TreeEntry } from "./types/git";
 import type { Status as HarnessStatus } from "./types/harness";
 import type { Draft } from "./types/messaging";
+import type { Profile } from "./types/profiles";
 import type { LogPage, Repo, Branch as RepoBranch, File as RepoFile } from "./types/repos";
 import type { ImageStatus, Maintenance } from "./types/runner";
 import type { MachineSize, Step as SetupStep } from "./types/setup";
@@ -13,6 +14,7 @@ import type {
   ActivityItem,
   ActivityPage,
   Deployment,
+  Doing,
   Instance,
   MergeRequest,
   Request,
@@ -20,6 +22,7 @@ import type {
   TeamMessage,
   WorkItem,
 } from "./types/store";
+import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Node } from "./types/wiki";
 import type {
   Candidate,
@@ -46,6 +49,7 @@ export type {
   Card,
   Commit,
   Deployment,
+  Doing,
   Draft,
   Entry,
   ForgeAccount,
@@ -58,6 +62,8 @@ export type {
   MergeRequest,
   Missing,
   Node,
+  Preferences,
+  Profile,
   Project,
   Repo,
   RepoBranch,
@@ -125,11 +131,28 @@ export interface AgentsArea {
 }
 
 export interface HarnessesArea {
+  /** The supported harnesses' facts (the keystroke for a new line). */
   list(): Promise<HarnessStatus[]>;
-  /** Starts the harness's login; returns the terminal to open with agents.openTerminal. */
-  connect(harness: string): Promise<string>;
-  /** Ends the harness's login, if one runs. */
-  endLogin(harness: string): Promise<void>;
+}
+
+/** The CEO's profiles: each a harness and its credentials, the same in every
+ * workspace (wiki/product/features/settings.md#profiles). */
+export interface ProfilesArea {
+  /** With their state, the default first. */
+  list(): Promise<Profile[]>;
+  create(name: string, harness: string): Promise<Profile>;
+  /** Deletes it and its credentials; never the default. */
+  remove(name: string): Promise<void>;
+  /** Starts its harness's login; returns the terminal to open with agents.openTerminal. */
+  connect(name: string): Promise<string>;
+  /** Ends its login, if one runs. */
+  endLogin(name: string): Promise<void>;
+}
+
+/** The CEO's preferences (the theme), the same in every workspace. */
+export interface PreferencesArea {
+  get(): Promise<Preferences>;
+  save(p: Preferences): Promise<Preferences>;
 }
 
 export interface MaintenanceArea {
@@ -266,6 +289,8 @@ export interface ForemanClient {
   workspace: WorkspaceArea;
   agents: AgentsArea;
   harnesses: HarnessesArea;
+  profiles: ProfilesArea;
+  preferences: PreferencesArea;
   maintenance: MaintenanceArea;
   setup: SetupArea;
   forge: ForgeArea;
@@ -357,11 +382,21 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     harnesses: {
       list: () => getJSON("/api/harnesses"),
-      connect: async (harness) => {
-        const r = await request("POST", `/api/harnesses/${id(harness)}/connect`);
+    },
+    preferences: {
+      get: () => getJSON("/api/preferences"),
+      save: async (p) => (await request("PUT", "/api/preferences", p)).json(),
+    },
+    profiles: {
+      list: () => getJSON("/api/profiles"),
+      create: async (name, harness) =>
+        (await request("POST", "/api/profiles", { name, harness })).json(),
+      remove: (name) => send("DELETE", `/api/profiles/${id(name)}`),
+      connect: async (name) => {
+        const r = await request("POST", `/api/profiles/${id(name)}/connect`);
         return ((await r.json()) as { terminal: string }).terminal;
       },
-      endLogin: (harness) => send("DELETE", `/api/harnesses/${id(harness)}/connect`),
+      endLogin: (name) => send("DELETE", `/api/profiles/${id(name)}/connect`),
     },
     maintenance: {
       status: () => getJSON("/api/maintenance"),

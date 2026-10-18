@@ -2,12 +2,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { harnessLabel } from "../app/model";
+import { harnessLabel, profileOf } from "../app/model";
 import {
   keys,
   useDeployments,
-  useHarnesses,
+  useProfiles,
   useProjects,
+  useSettings,
   useSetup,
   useTeams,
 } from "../app/queries";
@@ -19,7 +20,7 @@ import { Button } from "./ui";
 // Assigns a team to a project, with an optional goal
 // (wiki/product/features/deploy-team.md).
 // Opened with a team preset (Team page), a project preset (Project settings),
-// or neither (empty Sessions). A harness without a login is connected from here.
+// or neither (empty Sessions). The project's profile, not connected, is connected from here.
 
 const option = (on: boolean, disabled = false) =>
   `rounded-[7px] border px-3 py-1.5 text-[13px] ${
@@ -52,14 +53,12 @@ export function DeployDialog({
   const [project, setProject] = useState(presetProject);
   const [goal, setGoal] = useState("");
   const [connecting, setConnecting] = useState<string>();
-  const harnesses = useHarnesses();
-  // The team's harnesses without a login: its agents couldn't start, so connect first.
-  const used = new Set(
-    Object.values(teams.data?.find((t) => t.id === team)?.config.agents ?? {}).map(
-      (a) => a.harness,
-    ),
-  );
-  const unconnected = (harnesses.data ?? []).filter((h) => used.has(h.id) && !h.connected);
+  // The project's profile: its agents run on it, so it must be connected first.
+  const settings = useSettings().data?.settings;
+  const profiles = useProfiles();
+  const profileName = project ? profileOf(settings, project) : undefined;
+  const profile = profiles.data?.find((p) => p.name === profileName);
+  const profileReady = profile?.connected ?? false;
   // Agents start only once Podman runs (and the instances are restored).
   const running = useSetup().data?.find((s) => s.kind === "running");
   const engineDown = running !== undefined && running.state !== "done";
@@ -85,7 +84,7 @@ export function DeployDialog({
       });
     },
   });
-  const ready = team && project && !already(project) && unconnected.length === 0 && !engineDown;
+  const ready = team && project && !already(project) && profileReady && !engineDown;
   return (
     <Modal
       open={open}
@@ -139,19 +138,29 @@ export function DeployDialog({
             className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
           />
         </label>
-        {unconnected.map((h) => (
-          <div
-            key={h.id}
-            className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2"
-          >
+        {profileName && profiles.data && (
+          <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
             <span className="flex-1">
-              {harnessLabel(h.id)} isn’t connected yet, so this team’s agents can’t start.
+              {!profile ? (
+                <>
+                  The <span className="font-mono">{profileName}</span> profile doesn’t exist: pick
+                  another in the project’s settings.
+                </>
+              ) : (
+                <>
+                  Its agents run on the <span className="font-mono">{profile.name}</span> profile (
+                  {harnessLabel(profile.harness)})
+                  {profile.connected ? "." : ", which isn’t connected yet, so they can’t start."}
+                </>
+              )}
             </span>
-            <Button variant="small" onClick={() => setConnecting(h.id)}>
-              Connect
-            </Button>
+            {profile && !profile.connected && (
+              <Button variant="small" onClick={() => setConnecting(profile.name)}>
+                Connect
+              </Button>
+            )}
           </div>
-        ))}
+        )}
         {engineDown && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
             <span className="flex-1">Podman isn’t running yet, so agents can’t start.</span>
@@ -173,7 +182,7 @@ export function DeployDialog({
         </div>
       </div>
       {connecting && (
-        <ConnectDialog harness={connecting} onClose={() => setConnecting(undefined)} />
+        <ConnectDialog profile={connecting} onClose={() => setConnecting(undefined)} />
       )}
     </Modal>
   );

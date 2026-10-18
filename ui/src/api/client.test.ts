@@ -42,11 +42,24 @@ describe("httpClient", () => {
     });
   });
 
-  it("connects and returns the login terminal", async () => {
-    stubFetch(200, { terminal: "connect:claude-code" });
-    expect(await httpClient("http://x").harnesses.connect("claude-code")).toBe(
-      "connect:claude-code",
-    );
+  it("connects a profile and returns the login terminal", async () => {
+    const calls = stubFetch(200, { terminal: "connect:work" });
+    expect(await httpClient("http://x").profiles.connect("work")).toBe("connect:work");
+    expect(calls[0]).toMatchObject({ url: "http://x/api/profiles/work/connect", method: "POST" });
+  });
+
+  it("creates a profile with its harness", async () => {
+    const calls = stubFetch(201, { name: "work", harness: "claude-code", connected: false });
+    const p = await httpClient("http://x").profiles.create("work", "claude-code");
+    expect(p.name).toBe("work");
+    expect(calls[0]).toMatchObject({ url: "http://x/api/profiles", method: "POST" });
+    expect(JSON.parse(calls[0].body ?? "")).toEqual({ name: "work", harness: "claude-code" });
+  });
+
+  it("deletes a profile, escaping its name", async () => {
+    const calls = stubFetch(204, undefined);
+    await httpClient("http://x").profiles.remove("a/b");
+    expect(calls[0]).toMatchObject({ url: "http://x/api/profiles/a%2Fb", method: "DELETE" });
   });
 
   it("surfaces the server's error message", async () => {
@@ -77,9 +90,9 @@ describe("httpClient", () => {
 
   it("ends a login with DELETE", async () => {
     const calls = stubFetch(204, undefined);
-    await httpClient("http://x").harnesses.endLogin("claude-code");
+    await httpClient("http://x").profiles.endLogin("work");
     expect(calls[0]).toMatchObject({
-      url: "http://x/api/harnesses/claude-code/connect",
+      url: "http://x/api/profiles/work/connect",
       method: "DELETE",
     });
   });

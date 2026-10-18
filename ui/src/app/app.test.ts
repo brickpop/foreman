@@ -52,6 +52,7 @@ describe("staleKeys", () => {
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "settings" } })).toEqual([
       keys.settings,
+      keys.setup,
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "project" } })).toEqual([
       keys.projects,
@@ -218,5 +219,45 @@ describe("when", () => {
     expect(when(at(2026, 9, 17, 9, 5), now)).toBe("09:05");
     expect(when(at(2026, 9, 15, 14, 30), now)).toBe("Oct 15 14:30");
     expect(when(at(2025, 11, 31, 23, 59), now)).toBe("Dec 31 2025 23:59");
+  });
+});
+
+import { profileName } from "./model";
+
+describe("profileName", () => {
+  it("makes a typed name into a profile's, as settings.toml accepts it", () => {
+    expect(profileName("work")).toBe("work");
+    expect(profileName("  My Work!! ")).toBe("my-work");
+    expect(profileName("Side__Projects 2026")).toBe("side-projects-2026");
+    expect(profileName("../../etc")).toBe("etc");
+    expect(profileName("¡¿")).toBe("");
+    // Cut at 40, never ending on a dash.
+    expect(profileName(`${"a".repeat(39)} b`)).toBe("a".repeat(39));
+    expect(profileName("x".repeat(50))).toHaveLength(40);
+  });
+});
+
+import type { Settings } from "../api/client";
+import { profileOf } from "./model";
+
+describe("profileOf", () => {
+  it("is the project's own profile, else the default", () => {
+    const s = { projectProfiles: { ledger: "work" } } as unknown as Settings;
+    expect(profileOf(s, "ledger")).toBe("work");
+    expect(profileOf(s, "relay")).toBe("default");
+    // A workspace whose settings name none: Go sends null.
+    expect(profileOf({ projectProfiles: null } as unknown as Settings, "ledger")).toBe("default");
+    expect(profileOf(undefined, "ledger")).toBe("default");
+  });
+});
+
+import { asTheme } from "./theme";
+
+describe("asTheme", () => {
+  it("reads a stored or served theme, System unless Dark or Light", () => {
+    expect(asTheme("dark")).toBe("dark");
+    expect(asTheme("light")).toBe("light");
+    for (const other of ["system", "neon", "", null, undefined])
+      expect(asTheme(other)).toBe("system");
   });
 });

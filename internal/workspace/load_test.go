@@ -254,6 +254,23 @@ func TestSaveSettings(t *testing.T) {
 	}
 }
 
+// Each project names its profile in settings.toml; one not named uses the
+// default, and a profile is a name, never a path.
+func TestProjectProfiles(t *testing.T) {
+	s, p := ParseSettings([]byte("[project_profiles]\nledger = \"work\"\n"))
+	if len(p) > 0 || s.ProfileOf("ledger") != "work" || s.ProfileOf("relay") != "default" {
+		t.Errorf("%v %+v", p, s.ProjectProfiles)
+	}
+	if DefaultSettings().ProfileOf("ledger") != "default" {
+		t.Error("no settings: not the default")
+	}
+	for _, bad := range []string{"../../etc", "Work", ""} {
+		if _, p := ParseSettings([]byte("[project_profiles]\nledger = \"" + bad + "\"\n")); !hasProblem(p, "project_profiles.ledger") {
+			t.Errorf("%q: %v", bad, p)
+		}
+	}
+}
+
 // The watcher reports what the CEO changes on disk, and ignores Foreman's own
 // churn in .foreman/.
 func TestWatchReportsChangesOnDisk(t *testing.T) {

@@ -18,8 +18,8 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **2. Prepare the agent images.** Settings → Maintenance shows Base and Harnesses `not built yet`. The CEO presses **Refresh** (or the first deploy does it).
 - *Under the hood:* Image builder (Podman): builds `localhost/foreman/base`, then `…/harness` (Claude Code, Pi…); workspace and project layers are transparent tags. Build logs stream to the page; the Event bus pushes the state changes.
 
-**3. Log in to Claude Code.** Settings → Harnesses → Claude Code → **Connect**. A dialog shows a terminal running `claude /login`; the CEO completes the browser sign-in.
-- *Under the hood:* a one-off **login container**: Execution engine starts it from the harness image with the shared login folder `.foreman/credentials/claude-code/` mounted read-write; a Terminal streams it into the dialog exactly like any session. When it exits, Settings shows `connected`.
+**3. Log in to Claude Code.** Settings → Global → Profiles → `default` (Claude Code) → **Connect**, or the same button on Home's setup checklist. A dialog shows a terminal running `claude /login`; the CEO completes the browser sign-in. Once: every workspace's projects on `default` use it.
+- *Under the hood:* a one-off **login container**: Execution engine starts it from the harness image with the profile's folder (`~/.local/share/foreman/profiles/default/`) mounted read-write; a Terminal streams it into the dialog exactly like any session. When it exits, Settings shows `connected`.
 
 **4. Connect the forge.** Settings → Forge accounts → GitHub → **Connect**: host and token, checked against GitHub, never shown again.
 - *Under the hood:* Forge adapter (validates the token); the secret store (`.foreman/secrets`, 0600, never mounted into containers).
@@ -91,7 +91,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **22. The harness itself waits.** Pi stops at its own question ("Overwrite migrations? 1/2"). Home shows "Rhea is waiting in her session" with the choices; the CEO picks one, and it is typed into the session.
 - *Under the hood:* the harness's hook → `foreman-agent hook` → Agent link → Instance manager; the Harness adapter's `Interpret` says *waiting for the user* (not just idle) → Workflow raises the request; the answer goes through `Deliver`.
 
-**23. A crash.** Ilya's harness hits its rate limit and exits. Home: a **blocked** request, "Retry now · Retry in 30 min · Switch harness".
+**23. A crash.** Ilya's harness hits its rate limit and exits. Home: a **blocked** request, "Retry now · Retry in 30 min · Switch profile" (another account or harness for Ilya: later, [Profiles per agent](../backlog/profiles-per-agent.md)).
 - *Under the hood:* Terminal `Done` → Instance manager → Harness adapter `Diagnose(exit code, last output)` → Workflow raises the blocked request; **Retry** makes the Instance manager start the instance again (same worktrees, same private config).
 
 **24. A second team.** The CEO deploys **Vesper** (a challenge team) on `ledger` too. Kestrel finds a race and calls `escalate(finding, …, ["Atlas fixes it now", "Add to backlog", "Not an issue"])`. The CEO picks "Atlas fixes it now".

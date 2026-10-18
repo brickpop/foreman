@@ -32,6 +32,7 @@ import (
 	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/messaging"
+	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/repos"
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/server"
@@ -40,6 +41,7 @@ import (
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/terminal"
+	"github.com/brickpop/foreman/internal/userdata"
 	"github.com/brickpop/foreman/internal/wiki"
 	"github.com/brickpop/foreman/internal/workflow"
 	"github.com/brickpop/foreman/internal/workspace"
@@ -61,6 +63,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	newToken := flags.Bool("new-token", false, "replace the access token (logs every browser out)")
 	uiDir := flags.String("ui-dir", "", "development: serve the web UI from this folder instead of the embedded build")
 	fakeHarness := flags.String("fake-harness", "", "development: run agents and logins on this program (cmd/fakeharness) instead of Claude Code")
+	userDirFlag := flags.String("user-data", "", "tests: keep what is the CEO's on this machine (profiles, preferences, image builds) in this folder instead of ~/.local/share/foreman")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "Usage: foreman [<workspace-dir>] [flags]")
 		flags.PrintDefaults()
@@ -89,7 +92,14 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if *fakeHarness != "" && running != "direct" {
 		return fmt.Errorf("this workspace runs on %s, where --fake-harness can't run (it is a host program): drop --fake-harness to run Claude Code, or set engine = \"direct\" in settings.toml", running)
 	}
-	engineRunner, engineImages, pod := engine(running, stdout)
+	// What is the CEO's on this machine, the same for every workspace.
+	userDir := *userDirFlag
+	if userDir == "" {
+		if userDir, err = userdata.Dir(); err != nil {
+			return fmt.Errorf("the user data folder: %w", err)
+		}
+	}
+	engineRunner, engineImages, pod := engine(running, filepath.Join(userDir, "images"), stdout)
 	if pod != nil {
 		defer pod.Close()
 	}
@@ -147,8 +157,15 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
 	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
-	adapters := map[string]harness.Adapter{
-		"claude-code": claudecode.Adapter{Credentials: ws.Path("credentials", "claude-code"), GitConfig: homeGitConfig()},
+	claude := claudecode.Adapter{GitConfig: homeGitConfig()}
+	adapters := map[string]harness.Adapter{"claude-code": claude}
+	profileStore := profiles.In(userDir)
+	// Always the real harnesses' logins, even on the fake harness, which has
+	// none; then the default profile, which every project uses unless it
+	// names another.
+	adoptLogins(profileStore, ws.Root(), map[string]func(string) bool{"claude-code": claude.Connected}, stdout)
+	if err := profileStore.Ensure("claude-code"); err != nil {
+		return fmt.Errorf("the default profile: %w", err)
 	}
 	if *fakeHarness != "" {
 		program, err := resolveProgram(*fakeHarness)
@@ -197,9 +214,11 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			}
 		}
 	}
+	login := profileLogins{store: profileStore, adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog),
+		settings: func() workspace.Settings { return ws.Settings().Settings }}
 	manager := instances.New(instances.Deps{
 		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
-		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters,
+		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters, Profile: login.Of,
 		OpenLog: openLog, Publish: publish, Agent: agent,
 		Blocked: func() error { return checklist.Blocked() },
 	})
@@ -237,7 +256,6 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			slog.Error("the agent port stopped", "err", err)
 		}
 	}()
-	login := logins{adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog)}
 	// Foreman serves whether or not Podman is there: the setup watcher reaches
 	// it, then restores the instances and delivers what waited.
 	var podEngine setup.Engine
@@ -250,7 +268,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		}
 	}
 	checklist = setup.New(setup.Deps{
-		Engine: podEngine, Images: engineImages, Harnesses: login.Harnesses, Config: ws, Publish: bus.Publish,
+		Engine: podEngine, Images: engineImages, Config: ws, Publish: bus.Publish,
+		Profiles: func() []profiles.Profile { return login.Used(ws.Projects()) },
 		Ready: func(ctx context.Context) error {
 			if err := manager.Restore(ctx); err != nil {
 				return fmt.Errorf("restoring the instances: %w", err)
@@ -279,6 +298,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		Pipeline:    flow,
 		Requests:    flow,
 		Harnesses:   login,
+		Profiles:    login,
+		Preferences: userdata.PreferencesIn(userDir),
 		Wiki:        wikis,
 		Setup:       checklist,
 		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),

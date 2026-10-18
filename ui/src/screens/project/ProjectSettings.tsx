@@ -1,12 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
 import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
-import { agentOf, forgeLabel } from "../../app/model";
-import { keys, useDeployments, useInstances, useTeams, useWorkspace } from "../../app/queries";
+import { agentOf, forgeLabel, harnessLabel, profileOf, when } from "../../app/model";
+import {
+  keys,
+  useDeployments,
+  useInstances,
+  useProfiles,
+  useSaveSettings,
+  useSettings,
+  useTeams,
+  useWorkspace,
+} from "../../app/queries";
 import { rosterOrder } from "../../app/sessions";
 import { Avatar } from "../../components/Avatar";
+import { useToast } from "../../components/Toasts";
 import { Button, Empty, Panel } from "../../components/ui";
 
 // The project's Settings tab (wiki/product/features/project-settings.md): the
@@ -93,7 +103,16 @@ function Teams({ project, onDeploy }: { project: Project; onDeploy: () => void }
                           {lead && " · talk here"}
                         </span>
                       </span>
-                      <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
+                      <span className="flex min-w-0 flex-col">
+                        {i.task && (
+                          <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
+                        )}
+                        {i.doing && (
+                          <span className="truncate font-mono text-[12px] text-tx4">
+                            {i.doing.line} · {when(i.doing.at)}
+                          </span>
+                        )}
+                      </span>
                       <span className="text-[12.5px] text-tx3">Open →</span>
                     </button>
                   );
@@ -161,6 +180,7 @@ function Configuration({ project }: { project: Project }) {
         </Block>
       </div>
       <div className="flex min-w-0 flex-col gap-6">
+        <ProfileChoice project={project.id} />
         <CodeRepos project={project} />
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
@@ -245,6 +265,60 @@ function Configuration({ project }: { project: Project }) {
         </Block>
       </div>
     </section>
+  );
+}
+
+/** The profile this project's agents run on, a harness and its login. Kept in
+ * the workspace's settings, never project.toml, which the lead can write. */
+function ProfileChoice({ project }: { project: string }) {
+  const settings = useSettings().data?.settings;
+  const profiles = useProfiles();
+  const save = useSaveSettings();
+  const toast = useToast();
+  const current = profileOf(settings, project);
+  const found = profiles.data?.find((p) => p.name === current);
+  const choose = (name: string) =>
+    save((s) => {
+      // The default is no entry at all: the file names only what differs.
+      const { [project]: _, ...others } = s.projectProfiles ?? {};
+      return {
+        ...s,
+        projectProfiles: name === "default" ? others : { ...others, [project]: name },
+      };
+    }).catch((e: Error) =>
+      toast({ title: "Profile not saved", body: e.message, color: "var(--err)" }),
+    );
+  return (
+    <Block title="Profile">
+      <span className="flex items-center gap-3">
+        <select
+          aria-label="Profile"
+          value={current}
+          onChange={(e) => choose(e.target.value)}
+          className="rounded-md border border-line2 bg-panel px-2 py-1 font-mono text-[13px]"
+        >
+          {(profiles.data ?? []).map((p) => (
+            <option key={p.name} value={p.name}>
+              {p.name} · {harnessLabel(p.harness)}
+            </option>
+          ))}
+          {profiles.data && !found && <option value={current}>{current}</option>}
+        </select>
+        {profiles.data && (
+          <span className={`text-[13px] ${found?.connected ? "text-ok" : "text-err"}`}>
+            {!found ? "doesn’t exist" : found.connected ? "connected" : "not connected"}
+          </span>
+        )}
+      </span>
+      <span className="text-[13.5px] text-tx2">
+        Its agents run on this harness and login, from their next start. Profiles are yours on this
+        machine, in{" "}
+        <Link to="/settings" search={{ tab: "global" }} className="text-accTx hover:underline">
+          Settings → Global
+        </Link>
+        .
+      </span>
+    </Block>
   );
 }
 

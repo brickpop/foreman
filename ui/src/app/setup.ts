@@ -1,7 +1,6 @@
 // The setup checklist on Home (wiki/product/features/first-run.md): which
 // steps show, and what each row says.
 import type { MachineSize, SetupStep } from "../api/client";
-import { harnessLabel } from "./model";
 
 /** Whether the checklist shows: some step isn't done. */
 export function setupPending(steps: readonly SetupStep[]): boolean {
@@ -19,8 +18,8 @@ export function stepTitle(s: SetupStep): string {
       return "Podman running";
     case "image":
       return "Agent image";
-    case "harness":
-      return `${harnessLabel(s.subject)} connected`;
+    case "profile":
+      return `The ${s.subject} profile connected`;
     case "team":
       return "A team";
     case "project":

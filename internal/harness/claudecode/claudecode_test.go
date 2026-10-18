@@ -18,7 +18,7 @@ func setup(t *testing.T) (Adapter, harness.Session) {
 	write(t, filepath.Join(creds, ".credentials.json"), `{"claudeAiOauth":{}}`)
 	write(t, filepath.Join(creds, ".claude.json"), `{"oauthAccount":{"emailAddress":"x"},"projects":{"/elsewhere":{"hasTrustDialogAccepted":false}}}`)
 	sandbox := filepath.Join(t.TempDir(), "ledger", ".sandboxes", "mara")
-	return Adapter{Credentials: creds}, harness.Session{Instance: "mara@ledger", Sandbox: sandbox, Prompt: "# You are Mara"}
+	return Adapter{}, harness.Session{Instance: "mara@ledger", Sandbox: sandbox, Prompt: "# You are Mara", Login: creds}
 }
 
 func write(t *testing.T, path, content string) {
@@ -65,7 +65,7 @@ func TestLaunch(t *testing.T) {
 	if !reflect.DeepEqual(l.Env, []string{"CLAUDE_CONFIG_DIR=" + dir}) {
 		t.Errorf("env %v", l.Env)
 	}
-	want := []runner.Mount{{Source: filepath.Join(a.Credentials, ".credentials.json"), Target: filepath.Join(dir, ".credentials.json")}}
+	want := []runner.Mount{{Source: filepath.Join(s.Login, ".credentials.json"), Target: filepath.Join(dir, ".credentials.json")}}
 	if !reflect.DeepEqual(l.Mounts, want) {
 		t.Errorf("mounts %+v", l.Mounts)
 	}
@@ -135,7 +135,7 @@ func TestLaunchOptions(t *testing.T) {
 
 func TestLaunchRefusals(t *testing.T) {
 	a, s := setup(t)
-	if _, err := (Adapter{Credentials: t.TempDir()}).Launch(s); !errors.Is(err, harness.ErrNotConnected) {
+	if _, err := a.Launch(harness.Session{Sandbox: s.Sandbox, Login: t.TempDir()}); !errors.Is(err, harness.ErrNotConnected) {
 		t.Errorf("without a login: %v", err)
 	}
 	write(t, filepath.Join(ConfigDir(s.Sandbox), ".claude.json"), "{broken")
@@ -146,11 +146,11 @@ func TestLaunchRefusals(t *testing.T) {
 
 func TestLoginAndConnected(t *testing.T) {
 	creds := filepath.Join(t.TempDir(), "credentials", "claude-code")
-	a := Adapter{Credentials: creds}
-	if a.Connected() {
+	var a Adapter
+	if a.Connected(creds) {
 		t.Error("connected without a login")
 	}
-	l, err := a.Login()
+	l, err := a.Login(creds)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestLoginAndConnected(t *testing.T) {
 		t.Errorf("login %+v", l)
 	}
 	write(t, filepath.Join(creds, ".credentials.json"), "{}")
-	if !a.Connected() {
+	if !a.Connected(creds) {
 		t.Error("not connected with a login")
 	}
 }
@@ -237,6 +237,37 @@ func TestInterpret(t *testing.T) {
 		{"PreToolUse", `not json`, harness.Busy},
 	} {
 		if got := a.Interpret(tc.event, []byte(tc.payload)); got != tc.want {
+			t.Errorf("%s %s: %q, want %q", tc.event, tc.payload, got, tc.want)
+		}
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	var a Adapter
+	for _, tc := range []struct{ event, payload, want string }{
+		{"SessionStart", `{"source":"startup"}`, "Started"},
+		{"UserPromptSubmit", `{"prompt":"Message msg-1 from Tic"}`, "Working on “Message msg-1 from Tic”"},
+		{"PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"go test ./...\necho done"}}`, "Bash: go test ./...\necho done"},
+		// Inside the working directory, relative; outside it, as given.
+		{"PreToolUse", `{"tool_name":"Edit","cwd":"/ws/p/.sandboxes/tic","tool_input":{"file_path":"/ws/p/.sandboxes/tic/api/x.go"}}`, "Editing api/x.go"},
+		{"PreToolUse", `{"tool_name":"Read","cwd":"/ws/p/.sandboxes/tic","tool_input":{"file_path":"/ws/p/.sandboxes/tico/x.go"}}`, "Reading /ws/p/.sandboxes/tico/x.go"},
+		{"PreToolUse", `{"tool_name":"Write","tool_input":{"file_path":"notes.md"}}`, "Writing notes.md"},
+		{"PreToolUse", `{"tool_name":"Grep","tool_input":{"pattern":"func main"}}`, "Searching for func main"},
+		{"PreToolUse", `{"tool_name":"Task","tool_input":{"description":"Find the tests"}}`, "Subagent: Find the tests"},
+		{"PreToolUse", `{"tool_name":"AskUserQuestion"}`, "Asked you a question"},
+		{"PreToolUse", `{"tool_name":"mcp__foreman__commit","tool_input":{}}`, "Team tool: commit"},
+		{"PreToolUse", `{"tool_name":"mcp__github__create_issue"}`, "github: create_issue"},
+		{"PreToolUse", `{"tool_name":"SomethingNew","tool_input":{"x":1}}`, "SomethingNew"},
+		// A field of another type is left out, never a crash.
+		{"PreToolUse", `{"tool_name":"Bash","tool_input":{"command":42}}`, "Bash: "},
+		{"PreToolUse", `not json`, ""},
+		{"PostToolUse", `{"tool_name":"Bash"}`, ""},
+		{"Notification", `{"notification_type":"permission_prompt"}`, "Waiting for a permission"},
+		{"Notification", `{"notification_type":"idle_prompt"}`, ""},
+		{"Stop", `{}`, "Finished its turn"},
+		{"PreCompact", `{}`, ""},
+	} {
+		if got := a.Describe(tc.event, []byte(tc.payload)); got != tc.want {
 			t.Errorf("%s %s: %q, want %q", tc.event, tc.payload, got, tc.want)
 		}
 	}

@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/brickpop/foreman/internal/profiles"
 )
 
 // The config files the CEO owns, all TOML: project.toml
@@ -66,10 +68,13 @@ type Escalation struct {
 
 // Soul is one agent of a team.
 type Soul struct {
-	Name        string   `toml:"name" json:"name"`
-	Role        string   `toml:"role" json:"role"`
-	Harness     string   `toml:"harness" json:"harness"`
-	Command     string   `toml:"command,omitempty" json:"command"`
+	Name string `toml:"name" json:"name"`
+	Role string `toml:"role" json:"role"`
+	// Harness and Command are from before profiles (the project's profile
+	// names the harness now): read so an old file loads, never used, and
+	// dropped by the next save (encodeTeam).
+	Harness     string   `toml:"harness,omitempty" json:"-"`
+	Command     string   `toml:"command,omitempty" json:"-"`
 	Personality string   `toml:"personality,omitempty" json:"personality"`
 	Skills      []string `toml:"skills,omitempty" json:"skills"`
 	Instruction string   `toml:"instruction,omitempty" json:"instruction"`
@@ -97,6 +102,11 @@ type Settings struct {
 	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
 	WorkspaceForge    WorkspaceForge          `toml:"workspace_forge" json:"workspaceForge"`
 	Notifications     Notifications           `toml:"notifications" json:"notifications"`
+	// ProjectProfiles names the profile each project's agents run on (a
+	// harness and its credentials, internal/profiles); a project not named
+	// uses the default. Kept here, not in project.toml: the lead can write
+	// the project repo, and profiles are this machine's.
+	ProjectProfiles map[string]string `toml:"project_profiles,omitempty" json:"projectProfiles"`
 }
 
 // ForgeAccount is a forge account's host or owner; its token is a secret.
@@ -131,7 +141,6 @@ var (
 	slug       = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	snakeCase  = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 	forgeKinds = []string{"github", "forgejo", "gitea", "none"}
-	harnesses  = []string{"claude-code", "codex", "pi", "hermes", "custom"}
 	hairs      = []string{"short", "long", "curly", "bun", "bald"}
 	eyes       = []string{"dots", "glasses", "shades", "sleepy"}
 	beards     = []string{"none", "stubble", "full", "mustache"}
@@ -157,7 +166,7 @@ func decode(data []byte, v any) (toml.MetaData, problems) {
 	}
 	var p problems
 	for _, key := range md.Undecoded() {
-		p.add("%s: unknown field", key)
+		p.add("%s: not a field Foreman knows (misspelled, or left from an older version); remove it", key)
 	}
 	return md, p
 }
@@ -275,12 +284,6 @@ func (s Soul) validate(at, id string) problems {
 	if !snakeCase.MatchString(s.Role) {
 		p.add("%s.role: %q must be a role in snake_case (team_lead, engineer, …)", at, s.Role)
 	}
-	if !slices.Contains(harnesses, s.Harness) {
-		p.add("%s.harness: %q is not one of %s", at, s.Harness, strings.Join(harnesses, ", "))
-	}
-	if s.Harness == "custom" && strings.TrimSpace(s.Command) == "" {
-		p.add("%s.command: required when harness = \"custom\"", at)
-	}
 	seen := map[string]bool{}
 	for _, skill := range s.Skills {
 		if seen[skill] {
@@ -328,6 +331,12 @@ func (s Settings) validate() problems {
 	}
 	if s.LogCapMB <= 0 {
 		p.add("log_cap_mb: must be more than 0")
+	}
+	// A profile is a folder name in the user's store: never a path.
+	for _, project := range sortedKeys(s.ProjectProfiles) {
+		if !profiles.Valid(s.ProjectProfiles[project]) {
+			p.add("project_profiles.%s: %q must be lowercase letters, digits and dashes, at most 40", project, s.ProjectProfiles[project])
+		}
 	}
 	for _, k := range sortedKeys(s.Forges) {
 		if k == "none" || !slices.Contains(forgeKinds, k) {
@@ -399,7 +408,9 @@ func encodeTeam(c TeamConfig) ([]byte, error) {
 		}
 	}
 	for _, id := range ids {
-		chunk, err := encode(map[string]map[string]Soul{"agents": {id: agents[id]}})
+		soul := agents[id]
+		soul.Harness, soul.Command = "", "" // from before profiles: dropped
+		chunk, err := encode(map[string]map[string]Soul{"agents": {id: soul}})
 		if err != nil {
 			return nil, err
 		}
@@ -427,4 +438,12 @@ func (c TeamConfig) Roster() []string {
 		add(id)
 	}
 	return ids
+}
+
+// ProfileOf is the profile a project's agents run on: its own, else the default.
+func (s Settings) ProfileOf(project string) string {
+	if p := s.ProjectProfiles[project]; p != "" {
+		return p
+	}
+	return profiles.Default
 }

@@ -6,7 +6,7 @@ tags: [model, agents, teams]
 
 # Agent soul
 
-One member of a [team definition](./team-definition.md): who the agent is (name, role, personality, skills, job description), which harness runs it, and how it looks. A soul is stored under `agents.<id>` of its team file and is shared by every [deployment](./deployment.md) of the team: editing it changes all of them. Working memory is not part of the soul; it is per [instance](./instance.md) and stays inside that sandbox ([Agent runtime](../architecture/agent-runtime.md)). Edited on the [Agent page](../features/agent-page.md) or via the [Chief of Staff](../features/chief-of-staff.md) (hire, refine).
+One member of a [team definition](./team-definition.md): who the agent is (name, role, personality, skills, job description), and how it looks (what it runs on is its project's profile: [below](#what-it-runs-on)). A soul is stored under `agents.<id>` of its team file and is shared by every [deployment](./deployment.md) of the team: editing it changes all of them. Working memory is not part of the soul; it is per [instance](./instance.md) and stays inside that sandbox ([Agent runtime](../architecture/agent-runtime.md)). Edited on the [Agent page](../features/agent-page.md) or via the [Chief of Staff](../features/chief-of-staff.md) (hire, refine).
 
 ## Schema
 
@@ -15,8 +15,6 @@ One member of a [team definition](./team-definition.md): who the agent is (name,
 | (key) | String | yes | | slug, unique across the workspace | Agent id: the slug of the display name ([Team definition](./team-definition.md#schema)) |
 | `name` | String | yes | | unique across the workspace | Display name, used in @-mentions, tabs, prompts |
 | `role` | String | yes | | `team_lead`, `architect`, `engineer`, `qa`, `reviewer`, or a custom role in snake_case (e.g. `security_auditor`) | Labels: Team Lead, Architect, Engineer, QA / Tester, Reviewer; a custom role is shown with underscores as spaces, capitalised ("Security auditor"). Snake_case so a playbook can name it as a `who` ([Team definition](./team-definition.md#playbook-and-escalation)). No role but the lead's grants write access to the knowledge base |
-| `harness` | String | yes | | enum: `claude-code`, `codex`, `pi`, `hermes`, `custom` | Labels: Claude Code, Codex CLI, Pi, Hermes Agent, Custom ([Harness adapters](../architecture/harness-adapters.md)) |
-| `command` | String | when `harness = "custom"` | `""` | | The custom command line (e.g. `./bin/loadbot`) |
 | `personality` | String | | | | One or a few lines |
 | `skills` | Array of String | | `[]` | no duplicates | Shown as chips |
 | `instruction` | String (multi-line) | | the role's default | | The job description |
@@ -47,6 +45,6 @@ Used when a role is hired without a custom `instruction` (the CoS appends `Focus
 - The soul is the same in every deployment; only the composed [session prompt](../architecture/session-prompt.md) differs per project.
 - A soul edit reaches each running instance as a context-update message on its next turn, and a full re-prompt at its next restart.
 
-## Harness override
+## What it runs on
 
-"Switch harness" on a blocked [request](../features/requests.md) changes **that instance only**: the new harness is recorded as an override on the [instance](./instance.md) and lasts until the instance is next restarted from the team file. The request panel offers to also save it to the soul (all deployments). A permanent change is made here, through the [Agent page](../features/agent-page.md).
+A soul names no harness (the CEO, 2026-10-18): every agent deployed on a project runs on that project's [profile](../architecture/session-runner.md#credentials), a harness and its login. A team file from before, with `harness` and `command` lines, still loads: they are ignored and dropped by the next save. Choosing another profile for one agent (the "Switch harness" of a blocked request, a lead on Claude Code and the rest on Pi) is [Profiles per agent](../../backlog/profiles-per-agent.md), later.

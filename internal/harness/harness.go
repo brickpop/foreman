@@ -20,6 +20,9 @@ type Session struct {
 	// harness's private config inside it.
 	Sandbox string
 	Prompt  string // the composed session prompt
+	// Login is the folder of the profile it runs on, on the host: the
+	// harness's login, shared by every instance on it (internal/profiles).
+	Login string
 	// Continue: a restart within the deployment, which picks up the
 	// instance's conversation of this deployment if the harness kept one.
 	// False: the deployment's first start, always fresh.
@@ -80,11 +83,14 @@ type Adapter interface {
 	Launch(Session) (Launch, error)
 	// Interpret reads one of its hook events (the name and the JSON payload).
 	Interpret(event string, payload []byte) Activity
+	// Describe says, for the CEO, what a hook event shows it doing ("Bash: go
+	// test ./...", "Finished its turn"); "" when the event says nothing new.
+	Describe(event string, payload []byte) string
 	// Login is how to run the harness's own login (Settings → Harnesses →
-	// Connect), in a terminal the CEO types into.
-	Login() (Launch, error)
-	// Connected reports whether the harness has a login.
-	Connected() bool
+	// Connect) into the login folder dir, in a terminal the CEO types into.
+	Login(dir string) (Launch, error)
+	// Connected reports whether the login folder dir holds a login.
+	Connected(dir string) bool
 }
 
 // WriteFiles writes a launch's files, creating their folders.

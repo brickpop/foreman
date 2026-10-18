@@ -34,6 +34,8 @@ type Options struct {
 	Pipeline    Pipeline
 	Requests    Requests
 	Harnesses   Harnesses
+	Profiles    Profiles
+	Preferences Preferences
 	Wiki        Wiki
 	Setup       Setup
 	Maintenance Maintenance
@@ -55,6 +57,8 @@ func New(o Options) http.Handler {
 	pipelineRoutes(mux, o.Pipeline)
 	requestRoutes(mux, o.Requests)
 	harnessRoutes(mux, o.Harnesses)
+	profileRoutes(mux, o.Profiles)
+	preferenceRoutes(mux, o.Preferences)
 	maintenanceRoutes(mux, o.Maintenance)
 	setupRoutes(mux, o.Setup)
 	configRoutes(mux, o.Config)

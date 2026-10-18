@@ -9,8 +9,11 @@ import { useEffect, useRef } from "react";
 import {
   type ActivityScope,
   type Board,
+  type Doing,
   type Draft,
   type ForemanClient,
+  type Instance,
+  type Preferences,
   type Request,
   type Settings,
   type Soul,
@@ -20,6 +23,8 @@ import {
 import type { Event } from "../api/types/events";
 import { useToast } from "../components/Toasts";
 import { type SerialSaver, serialSaver } from "./serialSave";
+import { withDoing } from "./sessions";
+import { applyTheme, asTheme, type Theme } from "./theme";
 
 // Server state, through TanStack Query: one hook per query, and server events
 // invalidating what they touch, so every screen has one data path
@@ -34,6 +39,8 @@ export const keys = {
   deployments: ["deployments"],
   requests: ["requests"],
   harnesses: ["harnesses"],
+  profiles: ["profiles"],
+  preferences: ["preferences"],
   forge: ["forge"],
   maintenance: ["maintenance"],
   setup: ["setup"],
@@ -69,6 +76,13 @@ export function useHarnesses() {
   return useQuery({ queryKey: keys.harnesses, queryFn: () => c.harnesses.list() });
 }
 
+/** The CEO's profiles, with their state. Kept outside any workspace, so no
+ * event says they changed: what changes them here refetches them. */
+export function useProfiles() {
+  const c = useClient();
+  return useQuery({ queryKey: keys.profiles, queryFn: () => c.profiles.list() });
+}
+
 export function useInstances() {
   const c = useClient();
   return useQuery({ queryKey: keys.instances, queryFn: () => c.agents.instances() });
@@ -86,7 +100,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       const object = (e.data as { object?: string }).object;
       // A team change also changes its members' prompts.
       if (object === "team") return [keys.teams, ["prompt"], keys.setup];
-      if (object === "settings") return [keys.settings];
+      // The settings name each project's profile, which the checklist asks for.
+      if (object === "settings") return [keys.settings, keys.setup];
       return [keys.projects, keys.setup];
     }
     case "workspace.changed":
@@ -134,6 +149,11 @@ export function useLiveEvents(listen: (e: Event) => void = () => {}) {
               const { [d.id]: _, ...rest } = all;
               return d.waiting > 0 ? { ...rest, [d.id]: d } : rest;
             });
+          }
+          // So is an agent's activity line, at every step of its work.
+          if (e.type === "instance.doing") {
+            const change = e.data as { id: string; doing: Doing };
+            queries.setQueryData<Instance[]>(keys.instances, (list) => withDoing(list, change));
           }
           invalidate(queries, staleKeys(e));
           listener.current(e);
@@ -503,5 +523,28 @@ export function useRepoLog(project: string, repo: string, ref: string) {
     queryFn: ({ pageParam }) => c.repos.log(project, repo, ref, pageParam),
     initialPageParam: 0,
     getNextPageParam: (last) => last.next || undefined,
+  });
+}
+
+/** The CEO's preferences, applied as they arrive: on load, and when this tab
+ * comes back into focus after another workspace changed them. */
+export function usePreferences() {
+  const c = useClient();
+  const prefs = useQuery({ queryKey: keys.preferences, queryFn: () => c.preferences.get() });
+  useEffect(() => {
+    if (prefs.data) applyTheme(asTheme(prefs.data.theme));
+  }, [prefs.data]);
+  return prefs;
+}
+
+/** Saves the theme for every workspace; shown at once, put back if refused. */
+export function useSaveTheme() {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (theme: Theme) => c.preferences.save({ theme }),
+    onMutate: (theme: Theme) => applyTheme(theme),
+    onError: () => applyTheme(asTheme(queries.getQueryData<Preferences>(keys.preferences)?.theme)),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.preferences }),
   });
 }

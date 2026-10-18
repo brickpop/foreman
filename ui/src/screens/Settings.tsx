@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import {
   type ForgeAccount,
@@ -7,46 +8,81 @@ import {
   type Settings as SettingsData,
   useClient,
 } from "../api/client";
-import { harnessLabel } from "../app/model";
+import { harnessLabel, profileName } from "../app/model";
 import { permission } from "../app/notifications";
 import {
   keys,
   useHarnesses,
   useMaintenance,
+  usePreferences,
+  useProfiles,
   useSaveSettings,
+  useSaveTheme,
   useSettings,
   useWorkspace,
 } from "../app/queries";
-import { applyTheme, savedTheme, type Theme } from "../app/theme";
+import { asTheme, savedTheme } from "../app/theme";
 import { ConnectDialog } from "../components/ConnectDialog";
 import { Modal } from "../components/Overlays";
 import { useToast } from "../components/Toasts";
 import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
-// Workspace-wide settings (wiki/product/features/settings.md). Every change
-// saves at once, guarded by the version read.
+// Settings (wiki/product/features/settings.md), in two tabs: this
+// workspace's (settings.toml), and Global, the CEO's on this machine, the same
+// in every workspace (the CEO, 2026-10-18). Every change saves at once.
+
+export type SettingsTab = "workspace" | "global";
+
+const tabs: { tab: SettingsTab; label: string }[] = [
+  { tab: "workspace", label: "Workspace" },
+  { tab: "global", label: "Global" },
+];
 
 export function Settings() {
+  const tab = useSearch({ from: "/settings" }).tab ?? "workspace";
   const file = useSettings();
   const s = file.data?.settings;
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-9 px-12 pt-12 pb-16">
-      <PageTitle title="Settings" />
-      {file.data && file.data.problems.length > 0 && (
-        <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
-          settings.toml: {file.data.problems.join(" · ")}
-        </p>
-      )}
-      {s && (
+      <div className="flex flex-col gap-4">
+        <PageTitle title="Settings" />
+        <nav className="flex border-b border-line">
+          {tabs.map((t) => (
+            <Link
+              key={t.tab}
+              to="/settings"
+              search={{ tab: t.tab === "workspace" ? undefined : t.tab }}
+              className={`-mb-px border-b-2 px-3.5 py-[9px] font-medium ${
+                t.tab === tab ? "border-acc text-tx" : "border-transparent text-tx3 hover:text-tx2"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      </div>
+      {tab === "global" ? (
         <>
-          <WorkspaceSection settings={s} />
-          <HarnessesSection />
-          <ForgeSection settings={s} />
-          <NotificationsSection settings={s} />
+          <ProfilesSection />
+          <MaintenanceSection />
+          <AppearanceSection />
+        </>
+      ) : (
+        <>
+          {file.data && file.data.problems.length > 0 && (
+            <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
+              settings.toml: {file.data.problems.join(" · ")}
+            </p>
+          )}
+          {s && (
+            <>
+              <WorkspaceSection settings={s} />
+              <ForgeSection settings={s} />
+              <NotificationsSection settings={s} />
+            </>
+          )}
         </>
       )}
-      <MaintenanceSection />
-      <AppearanceSection />
     </div>
   );
 }
@@ -99,7 +135,7 @@ function Row({
   );
 }
 
-/** Asks before a setting that weakens safety. */
+/** Asks before a setting that weakens safety, or before deleting. */
 function Confirm({
   open,
   title,
@@ -276,35 +312,152 @@ function Stepper({
   );
 }
 
-function HarnessesSection() {
+/** The CEO's profiles: each a harness and its login, the same in every
+ * workspace (the CEO, 2026-10-18). A project picks one in its settings. */
+function ProfilesSection() {
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  const profiles = useProfiles();
   const harnesses = useHarnesses();
   const [connecting, setConnecting] = useState<string>();
+  const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState<string>();
+  const refetch = () => {
+    queries.invalidateQueries({ queryKey: keys.profiles });
+    queries.invalidateQueries({ queryKey: keys.setup });
+  };
+  const remove = useMutation({
+    mutationFn: (name: string) => client.profiles.remove(name),
+    onSettled: refetch,
+    onError: (e: Error) =>
+      toast({ title: "Profile not deleted", body: e.message, color: "var(--err)" }),
+  });
   return (
     <Section
-      label="Harnesses"
-      intro="The coding programs agents run, built into the agent image. Each needs its own login, once per workspace."
+      label="Profiles"
+      intro="Each profile is a harness and its login, yours on this machine: every workspace's projects can use it. A project uses default unless its settings pick another."
     >
-      {(harnesses.data ?? []).map((h) => (
+      {profiles.isError && <p className="m-0 text-[13px] text-err">{profiles.error.message}</p>}
+      {(profiles.data ?? []).map((p) => (
         <div
-          key={h.id}
-          className="grid grid-cols-[130px_1fr_auto] items-center gap-4 border-b border-line py-3"
+          key={p.name}
+          className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-line py-3"
         >
-          <span className="font-medium">{harnessLabel(h.id)}</span>
-          <span className="font-mono text-[13px] text-tx3">{h.command}</span>
-          <span className="flex items-center gap-3">
-            <span className={`text-[13px] ${h.connected ? "text-ok" : "text-tx4"}`}>
-              {h.connected ? "connected" : "not connected"}
-            </span>
-            <Button variant="small" onClick={() => setConnecting(h.id)}>
-              {h.connected ? "Reconnect" : "Connect"}
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate font-mono font-semibold">{p.name}</span>
+            <span className="text-[13px] text-tx4">{harnessLabel(p.harness)}</span>
+          </span>
+          <span className={`text-[13px] ${p.connected ? "text-ok" : "text-tx4"}`}>
+            {p.connected ? "connected" : "not connected"}
+          </span>
+          <span className="flex items-center gap-2">
+            <Button variant="small" onClick={() => setConnecting(p.name)}>
+              {p.connected ? "Reconnect" : "Connect"}
             </Button>
+            {p.name !== "default" && (
+              <Button variant="small" onClick={() => setDeleting(p.name)}>
+                Delete
+              </Button>
+            )}
           </span>
         </div>
       ))}
-      {connecting && (
-        <ConnectDialog harness={connecting} onClose={() => setConnecting(undefined)} />
+      {adding ? (
+        <NewProfile
+          harnesses={(harnesses.data ?? []).map((h) => h.id)}
+          onCancel={() => setAdding(false)}
+          onCreated={(name) => {
+            setAdding(false);
+            refetch();
+            setConnecting(name); // its login next
+          }}
+        />
+      ) : (
+        <div className="pt-3">
+          <Button variant="small" onClick={() => setAdding(true)}>
+            New profile
+          </Button>
+        </div>
       )}
+      {connecting && (
+        <ConnectDialog profile={connecting} onClose={() => setConnecting(undefined)} />
+      )}
+      <Confirm
+        open={deleting !== undefined}
+        title={`Delete the ${deleting} profile?`}
+        body="Its login goes with it. Projects that use it, in any workspace, can't start agents until they pick another profile."
+        action="Delete"
+        onConfirm={() => deleting && remove.mutate(deleting)}
+        onClose={() => setDeleting(undefined)}
+      />
     </Section>
+  );
+}
+
+/** A new profile: its name and its harness; its login comes after. */
+function NewProfile({
+  harnesses,
+  onCancel,
+  onCreated,
+}: {
+  harnesses: string[];
+  onCancel: () => void;
+  onCreated: (name: string) => void;
+}) {
+  const client = useClient();
+  const [typed, setTyped] = useState("");
+  const [harness, setHarness] = useState(harnesses[0] ?? "claude-code");
+  const name = profileName(typed);
+  const create = useMutation({
+    mutationFn: () => client.profiles.create(name, harness),
+    onSuccess: (p) => onCreated(p.name),
+  });
+  return (
+    <form
+      className="flex flex-wrap items-center gap-2 border-b border-line py-3 text-[13px]"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name) create.mutate();
+      }}
+    >
+      <label htmlFor="new-profile" className="text-tx3">
+        Name
+      </label>
+      <input
+        id="new-profile"
+        // biome-ignore lint/a11y/noAutofocus: opened on purpose, to type its name
+        autoFocus
+        value={typed}
+        onChange={(e) => setTyped(e.target.value)}
+        placeholder="work"
+        className="w-36 rounded-md border border-line2 bg-panel px-2 py-1 font-mono text-[13px]"
+      />
+      {typed && name !== typed && <span className="font-mono text-tx4">{name || "—"}</span>}
+      <label htmlFor="new-profile-harness" className="ml-2 text-tx3">
+        Harness
+      </label>
+      <select
+        id="new-profile-harness"
+        value={harness}
+        onChange={(e) => setHarness(e.target.value)}
+        className="rounded-md border border-line2 bg-panel px-2 py-1 text-[13px]"
+      >
+        {harnesses.map((h) => (
+          <option key={h} value={h}>
+            {harnessLabel(h)}
+          </option>
+        ))}
+      </select>
+      <span className="flex-1" />
+      <Button variant="small" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button variant="small" type="submit" disabled={!name || create.isPending}>
+        Create
+      </Button>
+      {create.error && <p className="m-0 w-full text-err">{create.error.message}</p>}
+    </form>
   );
 }
 
@@ -620,18 +773,32 @@ function ImageRow({
   );
 }
 
+/** The theme, one of the CEO's preferences: the same in every workspace. */
 function AppearanceSection() {
-  const [theme, setTheme] = useState<Theme>(savedTheme);
+  const prefs = usePreferences();
+  const save = useSaveTheme();
+  const toast = useToast();
+  const theme =
+    save.isPending && save.variables
+      ? save.variables
+      : prefs.data
+        ? asTheme(prefs.data.theme)
+        : savedTheme();
   return (
     <Section label="Appearance">
-      <Row title="Theme" explanation="System follows your operating system.">
+      <Row
+        title="Theme"
+        explanation="System follows your operating system. The same in every workspace."
+      >
         <Segmented
           label="Theme"
           value={theme}
-          onChange={(t) => {
-            setTheme(t);
-            applyTheme(t);
-          }}
+          onChange={(t) =>
+            save.mutate(t, {
+              onError: (e) =>
+                toast({ title: "Theme not saved", body: e.message, color: "var(--err)" }),
+            })
+          }
           options={[
             { value: "system", label: "System" },
             { value: "dark", label: "Dark" },

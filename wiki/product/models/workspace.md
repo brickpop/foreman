@@ -53,7 +53,7 @@ foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
 │  │  └─ atlas.toml
 │  ├─ cos/                 Chief of Staff working directory and session
 │  ├─ secrets              forge tokens (0600), unless the OS keychain is used
-│  ├─ credentials/         the harnesses' shared logins, and agent-link (the secret that signs agents' tokens)
+│  ├─ credentials/         agent-link (the secret that signs agents' tokens); and, from before profiles, a harness login until Foreman makes it a profile
 │  ├─ access-token         the per-install access token (0600)
 │  ├─ state.db             runtime state
 │  └─ logs/                PTY logs per instance
@@ -77,5 +77,5 @@ foreman [<workspace-dir>] [--yes] [--no-open] [--port 8888] [--new-token]
 ## Invariants
 
 - `.sandboxes/` must be git-ignored in the project folder. Foreman adds it to `.git/info/exclude` of any enclosing repo.
-- Nothing under `.foreman/` of the workspace (secrets, state, logs, team files) is ever mounted into an agent container, except each harness's shared login folder `credentials/<harness>/` ([Session runner](../architecture/session-runner.md#credentials)). The Chief of Staff is the only session that works on Foreman's files, and only through its own tools.
+- Nothing under `.foreman/` of the workspace (secrets, state, logs, team files) is ever mounted into an agent container. The harnesses' logins aren't in the workspace at all: they are the CEO's profiles, shared by every workspace, and the login file of the project's profile is mounted ([Session runner → Credentials](../architecture/session-runner.md#credentials)). The Chief of Staff is the only session that works on Foreman's files, and only through its own tools.
 - Secrets are never written into project folders or logs.

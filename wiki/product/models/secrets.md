@@ -6,7 +6,7 @@ tags: [model, security, forge]
 
 # Secrets
 
-Credentials Foreman uses on the CEO's behalf: in v1, the forge tokens used, on the CEO's Create PR or Sync, to push branches, open, watch and close PRs, and post comments ([Forge adapters](../architecture/forge-adapters.md)). Set from the [Workspace settings screen](../features/settings.md) through write-only fields (`PUT /api/secrets/forge/:kind`, see [API](../architecture/api.md)): the UI can show whether a token is set, never its value. Harness logins are not secrets in this store: each lives in its own credentials folder, `.foreman/credentials/<harness>/` (0600), written only by the login container ([Session runner → Credentials](../architecture/session-runner.md#credentials)).
+Credentials Foreman uses on the CEO's behalf: in v1, the forge tokens used, on the CEO's Create PR or Sync, to push branches, open, watch and close PRs, and post comments ([Forge adapters](../architecture/forge-adapters.md)). Set from the [Workspace settings screen](../features/settings.md) through write-only fields (`PUT /api/secrets/forge/:kind`, see [API](../architecture/api.md)): the UI can show whether a token is set, never its value. Harness logins are not secrets in this store: each lives in its own login folder in the user's store, its profile's folder, `~/.local/share/foreman/profiles/<name>/` (0600), written only by the login container ([Session runner → Credentials](../architecture/session-runner.md#credentials)).
 
 ## Storage
 

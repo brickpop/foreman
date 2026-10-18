@@ -10,9 +10,9 @@ epic: terminal-multiplexer
 
 **Why:** the screens exist ([Home and Sessions screens](./ui-home-sessions.md)) and run on the real server since the UI went live; this card finishes what they need from it ([Sessions](../product/features/sessions.md), [Home](../product/features/home.md)).
 
-**Done when:** deployments, instances, statuses and terminals come from the real server (endpoints and events), with their last lines and exact snapshots; requests say "Not built yet" until epic 4.
+**Done when:** deployments, instances, statuses and terminals come from the real server (endpoints and events), with their activity lines and exact snapshots; requests say "Not built yet" until epic 4.
 
 - [x] endpoints and events for deployments, instances and statuses
-- [ ] the `instance.line` event (a throttled last output line, ANSI stripped), shown on Project settings rows
+- [x] each agent's activity line on Project settings rows, from its harness's hooks (`instance.doing`, built 2026-10-18; the CEO chose hooks over the terminal's last line, which for Claude Code is its footer)
 - [x] the areas on the real client, no badges (the UI went live, [Full UI demo](./epics/full-ui-demo.md#going-live))
-- [ ] exact snapshots on reload with real sessions
+- [ ] exact snapshots on reload with real sessions: the server-side screen wired into the Terminal ([Terminal fidelity](./terminal-fidelity.md))

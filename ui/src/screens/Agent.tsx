@@ -9,17 +9,9 @@ import { Avatar } from "../components/Avatar";
 import { useToast } from "../components/Toasts";
 import { Button, Dot } from "../components/ui";
 
-// One agent's soul (wiki/product/features/agent-page.md): who it is, what it
-// runs on, and the exact prompt each deployment gives it. No save button:
-// choices save at once, text on blur or Enter.
-
-const harnesses = [
-  ["claude-code", "Claude Code"],
-  ["codex", "Codex CLI"],
-  ["pi", "Pi"],
-  ["hermes", "Hermes Agent"],
-  ["custom", "Custom"],
-] as const;
+// One agent's soul (wiki/product/features/agent-page.md): who it is, and
+// the exact prompt each deployment gives it (what it runs on is its project's
+// profile). No save button: choices save at once, text on blur or Enter.
 
 const option = (on: boolean) =>
   `rounded-[6px] border px-2.5 py-1 text-[13px] ${on ? "border-acc bg-accSoft text-tx" : "border-line2 text-tx2 hover:border-line3"}`;
@@ -71,8 +63,6 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
   const savedTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const commit = (next: Soul) => {
     setDraft(next);
-    // A custom harness waits for its command: the file requires one.
-    if (next.harness === "custom" && next.command.trim() === "") return;
     soul.save(next).then(
       (s) => {
         base.current = s.value;
@@ -227,33 +217,6 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
             ))}
           </Row>
         ))}
-      </Section>
-
-      <Section label="Harness">
-        <div className="flex flex-wrap gap-1.5">
-          {harnesses.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={draft.harness === value}
-              onClick={() => set("harness", value)}
-              className={option(draft.harness === value)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {draft.harness === "custom" && (
-          <input
-            value={draft.command}
-            onChange={(e) => setDraft({ ...draft, command: e.target.value })}
-            onBlur={() => draft.command !== base.current.command && commit(draft)}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-            placeholder="./bin/my-agent"
-            aria-label="Custom command"
-            className={`${field} font-mono`}
-          />
-        )}
       </Section>
 
       <Section label="Personality">

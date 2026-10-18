@@ -6,7 +6,7 @@ tags: [architecture, agents, sessions, team-tools]
 
 # Harness adapters
 
-A **harness** is the CLI program that runs an agent: Claude Code, Codex CLI, Pi, Hermes Agent, or a custom command ([Agent soul](../models/agent-soul.md) `harness` / `command`). Foreman stays harness-agnostic: any CLI coding agent that runs in a terminal can be a team member, as long as an adapter describes how to drive it.
+A **harness** is the CLI program that runs an agent: Claude Code, Codex CLI, Pi, Hermes Agent, or a custom command. A [profile](./session-runner.md#credentials) names one, with its credentials, and a project's agents run on its profile's. Foreman stays harness-agnostic: any CLI coding agent that runs in a terminal can be a team member, as long as an adapter describes how to drive it.
 
 ## Session drivers
 
@@ -61,6 +61,12 @@ Status (`running` / `idle` / `awaiting` / `done`) must not depend on scraping a 
 - **Fallback:** output silence for a few seconds after a turn plus a per-harness prompt pattern means `idle`.
 
 Idle detection matters beyond the status dot: queued team messages and soul updates are delivered "at the next idle prompt" ([Team tools](./team-tools.md#delivery)).
+
+## Activity lines
+
+The same hooks also say **what** an agent is doing, as one line for the CEO on [Project settings](../features/project-settings.md) rows (decided by the CEO, 2026-10-18, rather than the terminal's last line, which for a full-screen harness is its own footer). The adapter's `Describe(event, payload)` returns the line, or `""` when the event says nothing new; the Instance manager keeps the latest per instance in memory, keeps only its first line without control characters, cut at 200 characters, sends it as `instance.doing` and lists it with the instances. A new run starts without one; a hook before the instance runs, or after it stops, is ignored, as for statuses.
+
+Claude Code's, as built: `SessionStart` → `Started`; `UserPromptSubmit` → `Working on “<the message>”`; `PreToolUse` → the tool and what it works on (`Bash: <command>`, `Reading` / `Editing` / `Writing <path>`, relative to the sandbox when inside it, `Searching for <pattern>`, `Fetching <url>`, `Subagent: <description>`, `Asked you a question`, `Team tool: <tool>` for Foreman's, `<server>: <tool>` for another MCP server's, else the tool's name); `Notification` of a `permission_prompt` → `Waiting for a permission`; `Stop` → `Finished its turn`. A tool's result (`PostToolUse`) leaves the line on the tool.
 
 ## Open questions
 

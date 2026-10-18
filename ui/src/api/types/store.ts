@@ -32,6 +32,19 @@ export interface Instance {
   startedAt: string /* RFC 3339 */;
   lastOutputAt: string /* RFC 3339 */;
   restarts: number /* int */;
+  /**
+   * Doing is what its harness last reported doing in this run, nil until
+   * it says: kept by the instance manager in memory, never stored.
+   */
+  doing?: Doing;
+}
+/**
+ * Doing is one line on what an instance is doing, from its harness's hooks
+ * (the instance.doing event).
+ */
+export interface Doing {
+  line: string;
+  at: string /* RFC 3339 */;
 }
 /**
  * Request is something waiting for the CEO (wiki/product/models/request.md).

@@ -6,7 +6,7 @@ tags: [feature, ui, config, teams]
 
 # Project settings
 
-The project's **Settings** tab: the teams working on it (runtime state) and its configuration (read-only). The project header and tabs are described in [Wiki reader](./wiki-reader.md#project-header-and-tabs). Two stacked blocks.
+The project's **Settings** tab: the teams working on it (runtime state) and its configuration (read-only, but for the profile its agents run on). The project header and tabs are described in [Wiki reader](./wiki-reader.md#project-header-and-tabs). Two stacked blocks.
 
 ## 1. Teams on this project
 
@@ -17,7 +17,7 @@ Padding `24px 40px 64px`.
 - A panel of member rows (grid `auto 150px 1fr auto`, padding `12px 16px`), lead first:
   - Avatar 32 with status dot (`dotBorder --panel`).
   - Name (600) and role (12.5px `--tx4`); the lead's role reads `<Role> · talk here`.
-  - The current task (13.5px `--tx2`, ellipsis) and the **last terminal line** (Mono 12px `--tx4`, ellipsis, ANSI stripped) ([Instance](../models/instance.md)). **Phasing:** the last line needs the `instance.line` event (tracked on the [Sessions screen](../../backlog/sessions-screen.md) card); until then a row shows the task only.
+  - The current task (13.5px `--tx2`, ellipsis) and the **activity line**, what its harness last reported doing, then ` · ` and the time (Mono 12px `--tx4`, ellipsis): `Bash: go test ./...`, `Editing api/invoice.go`, `Finished its turn · 10:42` ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). It follows the `instance.doing` event; a run starts without one. Not the terminal's last line (decided by the CEO, 2026-10-18): a harness's screen ends in its own footer (Claude Code: `⏵⏵ bypass permissions on`), and finding the line that matters would mean reading its layout. **Phasing:** the task note isn't set by anything yet, so a row shows the activity line only.
   - `Open →` (12.5px `--tx3`). A click anywhere on the row opens that session.
 - **Empty**: `No team is deployed here yet. Deploy one and each member gets its own worktree of this project's repos.`
 
@@ -52,7 +52,8 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 
 **Right column**:
 
-- **"Code repos"** (first in the right column): the repos as a folder tree under `<project>/`, one per line (`├─ <repo>/`, the last `└─ <repo>/`), Mono, like the Workspace tree (the CEO, 2026-10-17); with none, in `--err`: `None yet: agents need at least one repo to work on. Clone one into <project>/, or create an empty one here.` Then a Mono input (placeholder `new-repo`) and a small **`New repo`** button: `POST /api/projects/:id/repos {name}` creates it as [Add a project](./add-project.md) does (empty, a first commit, on the project's `main`); a refusal (a bad or taken name) shows under it. When `project.toml` lists its `repos`, a new folder wouldn't count, so the form is replaced by `project.toml lists its repos: add a new one there, after creating it in <project>/.`
+- **"Profile"** (first in the right column; the CEO, 2026-10-18): a select of the CEO's [profiles](../architecture/session-runner.md#credentials) (`<name> · <Harness>`, Mono), the project's own selected (`default` unless set; one that no longer exists stays listed and selected), then its state, `connected` (`--ok`), `not connected` or `doesn't exist` (`--err`). Under it: "Its agents run on this harness and login, from their next start. Profiles are yours on this machine, in Settings → Global" (a link to [Settings → Profiles](./settings.md#profiles)). Choosing saves `project_profiles` in the workspace's [settings](../models/workspace-settings.md#schema), never `project.toml`; choosing `default` removes the project's line. One profile for all its agents for now ([Profiles per agent](../../backlog/profiles-per-agent.md), later).
+- **"Code repos"**: the repos as a folder tree under `<project>/`, one per line (`├─ <repo>/`, the last `└─ <repo>/`), Mono, like the Workspace tree (the CEO, 2026-10-17); with none, in `--err`: `None yet: agents need at least one repo to work on. Clone one into <project>/, or create an empty one here.` Then a Mono input (placeholder `new-repo`) and a small **`New repo`** button: `POST /api/projects/:id/repos {name}` creates it as [Add a project](./add-project.md) does (empty, a first commit, on the project's `main`); a refusal (a bad or taken name) shows under it. When `project.toml` lists its `repos`, a new folder wouldn't count, so the form is replaced by `project.toml lists its repos: add a new one there, after creating it in <project>/.`
 - **"What comes to you"**: grid `84px 1fr`, the kind label (colored, Mono uppercase, no border) and a line:
   - Approval: "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer."
   - Question: "An agent needs information only you have. It keeps working on other things meanwhile."

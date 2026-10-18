@@ -22,11 +22,13 @@ Table `instances`.
 | `pid` | Number | | | | Harness process id (inside the container, or the container's) |
 | `pty_id` | String | | | | Handle of the attached terminal in the session runner (e.g. container id) |
 | `sandbox_path` | String | yes | | | `<project>/.sandboxes/<agent>/`: its worktrees, one per code repo |
-| `harness` | String | yes | the soul's harness | enum as in [Agent soul](./agent-soul.md) | Harness actually running: differs from the soul after a "Switch harness", an override that lasts until the instance is next restarted from the team file ([Agent soul](./agent-soul.md#harness-override)) |
+| `harness` | String | yes | its project's profile's harness | a supported harness | The harness it runs on: its project's [profile](../architecture/session-runner.md#credentials)'s, set at deploy and again at each start, so a change of the project's profile reaches it at its next start |
 | `harness_session_id` | String | | | | The harness's own session id, for native resume on restart ([Agent runtime](../architecture/agent-runtime.md#restarts)) |
 | `started_at` | Timestamp | | | | |
 | `last_output_at` | Timestamp | | | | Drives the "stuck" blocked request (no output for N min, default 20) |
 | `restarts` | Number | yes | `0` | ≥ 0 | |
+
+Not stored: its **activity line** (`doing`: a line and its time), what its harness last reported doing in the current run, kept in memory by the Instance manager and sent with the instances ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). **Phasing:** `task` and `last_output_at` are never set yet, so neither is shown; the agent Sessions opens a deployment on is the one with the latest activity line.
 
 ## Statuses
 

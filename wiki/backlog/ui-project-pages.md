@@ -19,5 +19,5 @@ Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.m
 - [x] Changes: needs you (the shared request panel in its Changes variant: kind chip first, source, link line, Merge to main / Create PR / Open PR, Reject with its reason), in flight (work items, merge requests with what they carry, stopped deployments), merged (last 7 days)
 - [x] Board: switcher, `wiki.toml`, columns and lanes with counts and Other, native drag and drop shown at once and put back on failure, a status menu per card, the side sheet with Open in wiki and ticks, toasts
 - [x] Settings: teams on the project (needs `GET /api/deployments`, now built) and the read-only configuration (with the file as on disk: `Project.source`); the Add a project dialog (candidates, `+ New project`)
-- Not yet: a member's last terminal line (needs the `instance.line` event); Sync (Git epic); the Deploy dialog (Team and Agent card)
+- Not yet: Sync (Git epic); the Deploy dialog (Team and Agent card)
 - [x] the CEO looks at it on the Mac (`just dev`): approved 2026-10-15

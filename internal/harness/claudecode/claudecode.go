@@ -20,9 +20,6 @@ import (
 
 // Adapter launches Claude Code.
 type Adapter struct {
-	// Credentials is the harness's shared login folder on the host
-	// (.foreman/credentials/claude-code), where Connect logs in.
-	Credentials string
 	// GitConfig is the CEO's ~/.gitconfig, mounted read-only; "" when there is none.
 	GitConfig string
 }
@@ -39,12 +36,12 @@ const containerHome = "/home/node"
 // Launch starts Claude Code with permission checks off (the container is the
 // boundary), its config in the instance's private dir, and the shared login.
 func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
-	login := filepath.Join(a.Credentials, ".credentials.json")
+	login := filepath.Join(s.Login, ".credentials.json")
 	if _, err := os.Stat(login); err != nil {
 		return harness.Launch{}, harness.ErrNotConnected
 	}
 	dir := ConfigDir(s.Sandbox)
-	account, err := a.account(dir, s.Sandbox)
+	account, err := account(dir, s.Login, s.Sandbox)
 	if err != nil {
 		return harness.Launch{}, err
 	}
@@ -113,11 +110,11 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 // account is the instance's .claude.json: its own (history and all) once it
 // has one, else the login's account record; either way with onboarding done
 // and the sandbox trusted, so no dialog stops the session.
-func (a Adapter) account(dir, sandbox string) ([]byte, error) {
+func account(dir, login, sandbox string) ([]byte, error) {
 	record := map[string]any{}
 	data, err := os.ReadFile(filepath.Join(dir, ".claude.json"))
 	if errors.Is(err, os.ErrNotExist) {
-		data, err = os.ReadFile(filepath.Join(a.Credentials, ".claude.json"))
+		data, err = os.ReadFile(filepath.Join(login, ".claude.json"))
 		if errors.Is(err, os.ErrNotExist) {
 			data, err = []byte("{}"), nil
 		}
@@ -189,6 +186,87 @@ func (Adapter) Interpret(event string, payload []byte) harness.Activity {
 	return harness.Unknown
 }
 
+// Describe reads the same hooks for the CEO: the message it took, the tool it
+// is about to run, its question, the end of its turn. A tool's result says
+// nothing new (the line stays on the tool until the next one).
+func (Adapter) Describe(event string, payload []byte) string {
+	var p struct {
+		Prompt           string         `json:"prompt"`
+		ToolName         string         `json:"tool_name"`
+		ToolInput        map[string]any `json:"tool_input"`
+		NotificationType string         `json:"notification_type"`
+		Cwd              string         `json:"cwd"`
+	}
+	_ = json.Unmarshal(payload, &p)
+	switch event {
+	case "SessionStart":
+		return "Started"
+	case "UserPromptSubmit":
+		return "Working on “" + p.Prompt + "”"
+	case "PreToolUse":
+		return describeTool(p.ToolName, p.ToolInput, p.Cwd)
+	case "Notification":
+		if p.NotificationType == "permission_prompt" {
+			return "Waiting for a permission"
+		}
+	case "Stop":
+		return "Finished its turn"
+	}
+	return ""
+}
+
+// describeTool names a tool call by what it works on; paths inside the
+// working directory are shown relative to it.
+func describeTool(name string, input map[string]any, cwd string) string {
+	arg := func(key string) string {
+		s, _ := input[key].(string)
+		return s
+	}
+	path := func(key string) string {
+		p := arg(key)
+		if rel, err := filepath.Rel(cwd, p); cwd != "" && err == nil && filepath.IsAbs(p) && !strings.HasPrefix(rel, "..") {
+			return rel
+		}
+		return p
+	}
+	switch name {
+	case "Bash":
+		return "Bash: " + arg("command")
+	case "Read":
+		return "Reading " + path("file_path")
+	case "Edit", "MultiEdit":
+		return "Editing " + path("file_path")
+	case "Write":
+		return "Writing " + path("file_path")
+	case "NotebookEdit":
+		return "Editing " + path("notebook_path")
+	case "Grep":
+		return "Searching for " + arg("pattern")
+	case "Glob":
+		return "Looking for " + arg("pattern")
+	case "WebFetch":
+		return "Fetching " + arg("url")
+	case "WebSearch":
+		return "Searching the web for " + arg("query")
+	case "Task", "Agent":
+		return "Subagent: " + arg("description")
+	case "TodoWrite":
+		return "Updating its to-do list"
+	case "AskUserQuestion":
+		return "Asked you a question"
+	case "":
+		return ""
+	}
+	// MCP tools are mcp__<server>__<tool>; Foreman's are the team tools.
+	if server, tool, ok := strings.Cut(strings.TrimPrefix(name, "mcp__"), "__"); ok && strings.HasPrefix(name, "mcp__") {
+		if server == "foreman" {
+			return "Team tool: " + tool
+		}
+		return server + ": " + tool
+	}
+	return name
+}
+
 // hasConversation reports whether the config dir holds a conversation to
 // continue: `--continue` fails without one (a session that crashed at once).
 // freshStart lists, in the config dir, the conversations there when the
@@ -224,22 +302,22 @@ func (Adapter) Command() string { return "claude" }
 // in any terminal; Shift+Enter needs a terminal set up for it.
 func (Adapter) Newline() string { return "\\\r" }
 
-// Connected reports whether the shared login exists.
-func (a Adapter) Connected() bool {
-	_, err := os.Stat(filepath.Join(a.Credentials, ".credentials.json"))
+// Connected reports whether the login folder holds a login.
+func (Adapter) Connected(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, ".credentials.json"))
 	return err == nil
 }
 
-// Login runs Claude Code on the shared login folder as its config dir, so the
+// Login runs Claude Code on the login folder as its config dir, so the
 // login lands there. It never asks to log in on its own: the CEO types /login
 // (experiment B).
-func (a Adapter) Login() (harness.Launch, error) {
-	if err := os.MkdirAll(a.Credentials, 0o700); err != nil {
+func (a Adapter) Login(dir string) (harness.Launch, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return harness.Launch{}, err
 	}
 	return harness.Launch{
 		Command: []string{a.Command()},
-		Env:     []string{"CLAUDE_CONFIG_DIR=" + a.Credentials},
-		Mounts:  []runner.Mount{{Source: a.Credentials, Target: a.Credentials}},
+		Env:     []string{"CLAUDE_CONFIG_DIR=" + dir},
+		Mounts:  []runner.Mount{{Source: dir, Target: dir}},
 	}, nil
 }

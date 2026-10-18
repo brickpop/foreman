@@ -57,7 +57,7 @@ func TestProjectProblems(t *testing.T) {
 		"the project repo":    {`project = "ledger"` + "\nrepos = [\"project\"]", "not a code repo"},
 		"a path as repo":      {`project = "ledger"` + "\nrepos = [\"../etc\"]", "not a code repo"},
 		"merge by agents":     {`project = "ledger"` + "\nmerge_to_main = \"lead\"", "merge_to_main"},
-		"unknown field":       {`project = "ledger"` + "\nwiki = \"docs\"", "wiki: unknown field"},
+		"unknown field":       {`project = "ledger"` + "\nwiki = \"docs\"", "wiki: not a field Foreman knows"},
 		"syntax error":        {`project = `, "line 1"},
 		"multi-line describe": {`project = "ledger"` + "\ndescription = \"\"\"a\nb\"\"\"", "one line"},
 	} {
@@ -84,7 +84,6 @@ to = "lead"
 [agents.mara]
 name = "Mara"
 role = "team_lead"
-harness = "claude-code"
 personality = "Calm."
 skills = ["decomposition", "code review"]
 instruction = """
@@ -102,8 +101,6 @@ beard = "none"
 [agents.tove]
 name = "Tove"
 role = "security_auditor"
-harness = "custom"
-command = "./bin/audit"
 `
 
 func TestTeamExampleParses(t *testing.T) {
@@ -132,21 +129,41 @@ func TestTeamSurvivesARewrite(t *testing.T) {
 	}
 }
 
+// A team file from before profiles still loads, with nothing to fix (its
+// harness lines would otherwise block every deploy), and the next save drops
+// those lines: the project's profile names the harness now.
+func TestATeamFileFromBeforeProfiles(t *testing.T) {
+	old := strings.Replace(teamExample, "role = \"team_lead\"\n", "role = \"team_lead\"\nharness = \"claude-code\"\n", 1)
+	old = strings.Replace(old, "role = \"security_auditor\"\n", "role = \"security_auditor\"\nharness = \"custom\"\ncommand = \"./bin/audit\"\n", 1)
+	c, p := ParseTeam("atlas", []byte(old))
+	if len(p) > 0 {
+		t.Fatalf("problems: %v", p)
+	}
+	data, err := encodeTeam(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "harness") || strings.Contains(string(data), "command") {
+		t.Errorf("kept after a save:\n%s", data)
+	}
+	if again, p := ParseTeam("atlas", data); len(p) > 0 || again.Agents["mara"].Personality != "Calm." {
+		t.Errorf("after the save: %v %+v", p, again.Agents["mara"])
+	}
+}
+
 func TestTeamProblems(t *testing.T) {
 	base := teamExample
 	for name, tc := range map[string]struct{ from, to, want string }{
-		"file name":              {`team = "atlas"`, `team = "orion"`, "must equal the file name"},
-		"lead not a member":      {`lead = "mara"`, `lead = "ghost"`, `lead: "ghost"`},
-		"custom without command": {`command = "./bin/audit"`, `command = ""`, "agents.tove.command: required"},
-		"harness":                {`harness = "claude-code"`, `harness = "gpt"`, "agents.mara.harness"},
-		"role":                   {`role = "team_lead"`, `role = "Team Lead"`, "agents.mara.role"},
-		"look":                   {`hair = "bun"`, `hair = "mohawk"`, "agents.mara.look.hair"},
-		"skills":                 {`skills = ["decomposition", "code review"]`, `skills = ["x", "x"]`, `"x" twice`},
-		"playbook step":          {`{ lead = "Turns the goal into cards" }`, `{ lead = "a", qa = "b" }`, "playbook"},
-		"agent id":               {`[agents.tove]`, `[agents.Tove_2]`, "agents.Tove_2: the agent id must be a slug"},
-		"unknown field":          {`purpose =`, `mission = "x"` + "\npurpose =", "mission: unknown field"},
-		"no name":                {`name = "Atlas"`, `name = " "`, "name: required"},
-		"escalation":             {`to = "lead"`, `to = ""`, "escalate[0]"},
+		"file name":         {`team = "atlas"`, `team = "orion"`, "must equal the file name"},
+		"lead not a member": {`lead = "mara"`, `lead = "ghost"`, `lead: "ghost"`},
+		"role":              {`role = "team_lead"`, `role = "Team Lead"`, "agents.mara.role"},
+		"look":              {`hair = "bun"`, `hair = "mohawk"`, "agents.mara.look.hair"},
+		"skills":            {`skills = ["decomposition", "code review"]`, `skills = ["x", "x"]`, `"x" twice`},
+		"playbook step":     {`{ lead = "Turns the goal into cards" }`, `{ lead = "a", qa = "b" }`, "playbook"},
+		"agent id":          {`[agents.tove]`, `[agents.Tove_2]`, "agents.Tove_2: the agent id must be a slug"},
+		"unknown field":     {`purpose =`, `mission = "x"` + "\npurpose =", "mission: not a field Foreman knows"},
+		"no name":           {`name = "Atlas"`, `name = " "`, "name: required"},
+		"escalation":        {`to = "lead"`, `to = ""`, "escalate[0]"},
 	} {
 		src := strings.Replace(base, tc.from, tc.to, 1)
 		if src == base {
@@ -173,12 +190,12 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 		"port":       {`port = 70000`, "port"},
 		"sessions":   {`max_sessions = 0`, "max_sessions"},
 		"engine":     {`engine = "docker"`, "engine"},
-		"harnesses":  {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: unknown field"},
+		"harnesses":  {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: not a field Foreman knows"},
 		"stuck":      {`stuck_after_minutes = 0`, "stuck_after_minutes"},
 		"log cap":    {`log_cap_mb = -1`, "log_cap_mb"},
 		"forge kind": {"[forges.bitbucket]\nurl = \"https://x\"", "forges.bitbucket"},
 		"repo forge": {"[workspace_forge]\nkind = \"github\"", "workspace_forge.url: required"},
-		"unknown":    {`theme = "dark"`, "theme: unknown field"},
+		"unknown":    {`theme = "dark"`, "theme: not a field Foreman knows"},
 		"wrong type": {`port = "8888"`, "port"},
 	} {
 		if _, p := ParseSettings([]byte(tc.toml)); !hasProblem(p, tc.want) {
@@ -197,17 +214,14 @@ lead = "zoe"
 [agents.zoe]
 name = "Zoe"
 role = "team_lead"
-harness = "claude-code"
 
 [agents.mara]
 name = "Mara"
 role = "engineer"
-harness = "claude-code"
 
 [agents.ivo]
 name = "Ivo"
 role = "qa"
-harness = "claude-code"
 `
 	c, p := ParseTeam("atlas", []byte(file))
 	if len(p) > 0 || !reflect.DeepEqual(c.Order, []string{"zoe", "mara", "ivo"}) {

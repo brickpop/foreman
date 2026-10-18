@@ -62,7 +62,7 @@ The same idea holds in the browser, scaled to it:
 ## Process model
 
 - **One container per running instance**, decided: every harness runs in a rootless Podman container with only its own worktrees (and their repos' `.git`, read-only: Foreman writes git for the agents) and the project repo mounted ([Session runner](./session-runner.md)). Inside it the harness is attached to a TTY.
-- Foreman **never parses harness internals**. It reads the output stream (for logs, the "last line" and silence detection) and talks to the agent through the team tools and stdin.
+- Foreman **never parses harness internals**. It reads the output stream (for logs and silence detection), learns what an agent is doing from its harness's hooks (status and [activity line](./harness-adapters.md#activity-lines)), and talks to the agent through the team tools and stdin.
 - Harness integration contract (per [Harness adapters](./harness-adapters.md)):
   1. Foreman can start it with a working directory, environment and an initial prompt or system prompt file.
   2. It can call the team tools (an MCP server, configured per harness).

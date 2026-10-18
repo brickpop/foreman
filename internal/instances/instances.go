@@ -21,11 +21,14 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/store"
@@ -67,9 +70,13 @@ type Deps struct {
 	Deployments store.Deployments
 	Instances   store.Instances
 	Adapters    map[string]harness.Adapter // by harness name (claude-code, …)
-	OpenLog     func(instance string) (terminal.Log, error)
-	Publish     func(events.Event)
-	Agent       AgentLink
+	// Profile is the profile a project's agents run on (a harness and its
+	// credentials) and its folder, as it is when asked: a change reaches
+	// each agent at its next start.
+	Profile func(project string) (profiles.Profile, string, error)
+	OpenLog func(instance string) (terminal.Log, error)
+	Publish func(events.Event)
+	Agent   AgentLink
 	// Blocked is nil when agents can start, or why not (Podman isn't running);
 	// deploying and waking refuse meanwhile. nil: always ready.
 	Blocked func() error
@@ -93,6 +100,8 @@ type Manager struct {
 	live    map[string]*live // instances with a process or a start under way
 	queue   []string         // queued instances, in creation order
 	closing bool             // Foreman is exiting: nothing starts any more
+	// doing is each instance's activity line in its current run (Hook).
+	doing map[string]store.Doing
 }
 
 type live struct {
@@ -102,7 +111,9 @@ type live struct {
 }
 
 // New returns a manager.
-func New(d Deps) *Manager { return &Manager{Deps: d, live: map[string]*live{}} }
+func New(d Deps) *Manager {
+	return &Manager{Deps: d, live: map[string]*live{}, doing: map[string]store.Doing{}}
+}
 
 var (
 	// ErrNotRunning means the instance has no terminal now.
@@ -122,7 +133,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	if err := m.blocked(); err != nil {
 		return store.Deployment{}, err
 	}
-	team, project, err := m.deployable(teamID, projectID)
+	team, project, on, err := m.deployable(teamID, projectID)
 	if err != nil {
 		return store.Deployment{}, err
 	}
@@ -132,10 +143,9 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	}
 	m.publish("deployment.created", dep)
 	for _, agent := range team.Config.Roster() {
-		soul := team.Config.Agents[agent]
 		inst := store.Instance{
 			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Asleep,
-			SandboxPath: filepath.Join(m.Root, project.ID, ".sandboxes", agent), Harness: soul.Harness,
+			SandboxPath: filepath.Join(m.Root, project.ID, ".sandboxes", agent), Harness: on.harness,
 		}
 		if err := m.Instances.Put(ctx, inst); err != nil {
 			return dep, err
@@ -194,38 +204,49 @@ func (m *Manager) blocked() error {
 	return nil
 }
 
-// deployable checks what deploying needs: a valid team and project, and an
-// adapter for every member's harness.
-func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspace.Project, error) {
+// runsOn is what a project's agents run on: its profile's harness, its
+// adapter, and the profile's folder (the harness's login).
+type runsOn struct {
+	profile string
+	harness string
+	adapter harness.Adapter
+	login   string
+}
+
+// deployable checks what deploying needs: a valid team and project, and the
+// project's profile, with an adapter for its harness and its credentials.
+func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspace.Project, runsOn, error) {
+	var on runsOn
 	team, err := m.Config.Team(teamID)
 	if err != nil {
-		return team, workspace.Project{}, fmt.Errorf("%w: team %s: %v", ErrInvalid, teamID, err)
+		return team, workspace.Project{}, on, fmt.Errorf("%w: team %s: %v", ErrInvalid, teamID, err)
 	}
 	project, err := m.Config.Project(projectID)
 	if err != nil {
-		return team, project, fmt.Errorf("%w: project %s: %v", ErrInvalid, projectID, err)
+		return team, project, on, fmt.Errorf("%w: project %s: %v", ErrInvalid, projectID, err)
 	}
 	if len(team.Problems) > 0 {
-		return team, project, fmt.Errorf("%w: team %s has problems: %v", ErrInvalid, teamID, team.Problems)
+		return team, project, on, fmt.Errorf("%w: team %s has problems: %v", ErrInvalid, teamID, team.Problems)
 	}
 	if len(project.Problems) > 0 {
-		return team, project, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
+		return team, project, on, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}
 	if len(project.Repos) == 0 {
-		return team, project, fmt.Errorf("%w: project %s has no code repo for agents to work in: create one in its Settings (New repo), or clone one into its folder", ErrInvalid, projectID)
+		return team, project, on, fmt.Errorf("%w: project %s has no code repo for agents to work in: create one in its Settings (New repo), or clone one into its folder", ErrInvalid, projectID)
 	}
-	for _, agent := range team.Config.Roster() {
-		h := team.Config.Agents[agent].Harness
-		adapter := m.Adapters[h]
-		if adapter == nil {
-			return team, project, fmt.Errorf("%w: %s's harness %q isn't supported yet", ErrInvalid, agent, h)
-		}
-		// Refused here, not when the agent starts, where it would only reach the log.
-		if !adapter.Connected() {
-			return team, project, fmt.Errorf("%w: %s isn't connected yet: log in under Settings → Harnesses → Connect", ErrInvalid, h)
-		}
+	p, login, err := m.Profile(projectID)
+	if err != nil {
+		return team, project, on, fmt.Errorf("%w: project %s's profile: %v (Settings → Global → Profiles, and its Project settings)", ErrInvalid, projectID, err)
 	}
-	return team, project, nil
+	on = runsOn{profile: p.Name, harness: p.Harness, adapter: m.Adapters[p.Harness], login: login}
+	if on.adapter == nil {
+		return team, project, on, fmt.Errorf("%w: profile %s's harness %q isn't supported yet", ErrInvalid, p.Name, p.Harness)
+	}
+	// Refused here, not when the agent starts, where it would only reach the log.
+	if !on.adapter.Connected(login) {
+		return team, project, on, fmt.Errorf("%w: profile %s isn't connected yet: Connect it under Settings → Global → Profiles", ErrInvalid, p.Name)
+	}
+	return team, project, on, nil
 }
 
 // Stop stops a deployment's instances and marks it stopped. Their worktrees
@@ -320,8 +341,9 @@ func (m *Manager) Live(id string) bool {
 }
 
 // Hook takes one of an instance's harness hook events: what it says the
-// harness is doing becomes the instance's status (running, idle, awaiting).
-// Before the instance runs, or once it stops, the event changes nothing.
+// harness is doing becomes the instance's status (running, idle, awaiting)
+// and its activity line. Before the instance runs, or once it stops, the
+// event changes nothing.
 func (m *Manager) Hook(id, event string, payload []byte) {
 	ctx := context.Background()
 	inst, err := m.Instances.Get(ctx, id)
@@ -329,14 +351,45 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 		return
 	}
 	adapter := m.Adapters[inst.Harness]
-	if adapter == nil {
+	if adapter == nil || (inst.Status != Running && inst.Status != Idle && inst.Status != Awaiting) {
 		return
 	}
-	status, ok := map[harness.Activity]string{harness.Busy: Running, harness.Idle: Idle, harness.Waiting: Awaiting}[adapter.Interpret(event, payload)]
-	if !ok || (inst.Status != Running && inst.Status != Idle && inst.Status != Awaiting) {
-		return
+	if status, ok := map[harness.Activity]string{harness.Busy: Running, harness.Idle: Idle, harness.Waiting: Awaiting}[adapter.Interpret(event, payload)]; ok {
+		m.setStatus(ctx, id, status)
 	}
-	m.setStatus(ctx, id, status)
+	if line := oneLine(adapter.Describe(event, payload)); line != "" {
+		a := store.Doing{Line: line, At: time.Now().UTC()}
+		m.mu.Lock()
+		m.doing[id] = a
+		m.mu.Unlock()
+		m.publish("instance.doing", DoingChange{ID: id, Doing: a})
+	}
+}
+
+// DoingChange is the instance.doing event's data.
+type DoingChange struct {
+	ID    string      `json:"id"`
+	Doing store.Doing `json:"doing"`
+}
+
+// doingMax is the most of a line kept, in characters: a row shows one line.
+const doingMax = 200
+
+// oneLine is a description as a row shows it: its first line, without
+// control characters (a payload's text is the harness's, so anything), cut
+// at doingMax.
+func oneLine(s string) string {
+	s, _, _ = strings.Cut(strings.TrimSpace(s), "\n")
+	s = strings.TrimSpace(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, s))
+	if r := []rune(s); len(r) > doingMax {
+		s = string(r[:doingMax-1]) + "…"
+	}
+	return s
 }
 
 // Type writes p into the instance's terminal, as if typed (a delivery).
@@ -495,6 +548,10 @@ func (m *Manager) startQueued() {
 // terminal. A failure stops the instance (with its reason in the log).
 func (m *Manager) start(id string, l *live) {
 	ctx := context.Background()
+	// A new run: what the last one did is no longer what it is doing.
+	m.mu.Lock()
+	delete(m.doing, id)
+	m.mu.Unlock()
 	m.setStatus(ctx, id, Starting)
 	proc, err := m.launch(ctx, id)
 	var log terminal.Log
@@ -547,11 +604,18 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err != nil {
 		return nil, err
 	}
-	team, project, err := m.deployable(dep.TeamID, dep.ProjectID)
+	team, project, on, err := m.deployable(dep.TeamID, dep.ProjectID)
 	if err != nil {
 		return nil, err
 	}
-	adapter := m.Adapters[team.Config.Agents[inst.AgentID].Harness]
+	adapter := on.adapter
+	// The project's profile as it is now: a change reaches the agent here.
+	if inst.Harness != on.harness {
+		inst.Harness = on.harness
+		if err := m.Instances.Put(ctx, inst); err != nil {
+			return nil, err
+		}
+	}
 	lead := inst.AgentID == team.Config.Lead
 
 	projectDir := filepath.Join(m.Root, project.ID)
@@ -588,7 +652,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	text := m.compose(inst, dep, team, project)
 	first := inst.StartedAt.IsZero()
 	session := harness.Session{
-		Instance: id, Sandbox: inst.SandboxPath, Prompt: text,
+		Instance: id, Sandbox: inst.SandboxPath, Prompt: text, Login: on.login,
 		// A restart (after a crash, or a Foreman restart) picks up its conversation;
 		// a new deployment starts fresh.
 		Continue: !first,
@@ -744,6 +808,13 @@ func (m *Manager) List(ctx context.Context) ([]store.Instance, error) {
 			return nil, err
 		}
 		list = append(list, insts...)
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i := range list {
+		if a, ok := m.doing[list[i].ID]; ok {
+			list[i].Doing = &a
+		}
 	}
 	return list, nil
 }

@@ -14,7 +14,7 @@ tags: [architecture, workspace]
 - **Wiki bundle**: `<project>/project/wiki/`, the project's knowledge base: a folder of Markdown files with YAML frontmatter, plus `wiki.toml`. Compatible with the agentic-wiki / wikiview format. See [Wiki engine](./architecture/wiki-engine.md).
 - **Board**: a kanban view over wiki entries, declared in `wiki.toml` under `[[tool.wikiview.board]]`. See [Board](./features/board.md).
 - **Team definition**: a reusable roster and playbook, stored in `.foreman/teams/<team>.toml`. See [Team definition](./models/team-definition.md).
-- **Agent (soul)**: one member of a team definition: name, role, personality, skills, job description, harness and look (avatar). One soul can run in many deployments. See [Agent soul](./models/agent-soul.md).
+- **Agent (soul)**: one member of a team definition: name, role, personality, skills, job description and look (avatar); what it runs on is its project's profile. One soul can run in many deployments. See [Agent soul](./models/agent-soul.md).
 - **Deployment**: a team assigned to a project with a goal. This is runtime state, not config. See [Deployment](./models/deployment.md).
 - **Instance / session**: one agent running in one deployment. It is a live harness process with a PTY. Identified as `agent@project` (e.g. `mara@ledger`). See [Instance](./models/instance.md).
 - **Sandbox**: an agent instance's working directory, `<project>/.sandboxes/<agent>/`: its worktrees of the code repos, plus the live project repo mounted as `project/`. See [Sandboxes and git policy](./architecture/sandboxes-and-git.md).
@@ -22,6 +22,7 @@ tags: [architecture, workspace]
 - **Worktree branches**: `wt/<agent>/main`, each agent's home branch in a repo (created from `main`), and `wt/<agent>/<topic>`, where members do one piece of work (the topic usually a card id).
 - **Lead branch**: `lead/<team>/<topic>` (the default `lead/<team>/integration` is created at deploy), where the lead integrates handoffs; a lead can have any number. Lead branches are the only source of merge requests to `main`, one open merge request per branch at a time.
 - **Harness**: the CLI program that runs an agent (Claude Code, Codex CLI, Pi, Hermes Agent, or a custom command). See [Harness adapters](./architecture/harness-adapters.md).
+- **Profile**: a harness and its credentials, under a name (`default`: Claude Code and its login), the CEO's on this machine and the same in every workspace, kept in `~/.local/share/foreman/profiles/`. A project picks the one its agents run on (`default` unless set). See [Session runner → Credentials](./architecture/session-runner.md#credentials).
 - **Session runner**: where a harness process runs and how Foreman attaches to its terminal (a Podman container in v1). See [Session runner](./architecture/session-runner.md).
 - **Team tools**: the MCP tools Foreman exposes to every harness: `ask`, `reply`, `handoff`, `contribute`, `escalate`, `switch`, `commit`, `merge`, `abort_merge` and `request_merge`; agent-to-agent traffic through them is **team messages**. Called "ACP" in the original PRD. See [Team tools](./architecture/team-tools.md).
 - **Session driver**: how Foreman drives a harness session: through its TUI in a PTY (v1), or later through the Agent Client Protocol. See [Harness adapters](./architecture/harness-adapters.md#session-drivers).

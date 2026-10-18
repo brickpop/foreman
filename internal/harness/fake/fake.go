@@ -38,10 +38,10 @@ func (a Adapter) Command() string { return a.Program }
 func (Adapter) Newline() string { return "\\\r" }
 
 // Connected is always true: the fake harness needs no login.
-func (Adapter) Connected() bool { return true }
+func (Adapter) Connected(string) bool { return true }
 
 // Login runs the program, as if it were a login.
-func (a Adapter) Login() (harness.Launch, error) {
+func (a Adapter) Login(string) (harness.Launch, error) {
 	return harness.Launch{Command: []string{a.Program}}, nil
 }
 
@@ -54,4 +54,13 @@ func (Adapter) Interpret(event string, _ []byte) harness.Activity {
 		return harness.Busy
 	}
 	return harness.Unknown
+}
+
+// Describe names the same hooks as Claude Code's adapter does.
+func (Adapter) Describe(event string, _ []byte) string {
+	return map[string]string{
+		"SessionStart":     "Started",
+		"UserPromptSubmit": "Working on a message",
+		"Stop":             "Finished its turn",
+	}[event]
 }

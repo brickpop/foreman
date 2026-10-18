@@ -4,11 +4,11 @@
 // source: types.go
 
 /**
- * Status is a harness's state, for Settings → Harnesses (tygo.yaml).
+ * Status is what the UI knows of a harness (tygo.yaml); its credentials are
+ * a profile's (internal/profiles).
  */
 export interface Status {
   id: string; // claude-code, …
-  command: string; // what it runs when the settings name none
+  command: string; // what it runs
   newline: string; // the keystroke for a new line without sending
-  connected: boolean; // it has a login
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/fake"
+	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/sessionlog"
@@ -34,12 +35,10 @@ lead = "mara"
 [agents.mara]
 name = "Mara"
 role = "team_lead"
-harness = "claude-code"
 
 [agents.tove]
 name = "Tove"
 role = "engineer"
-harness = "claude-code"
 `
 
 func write(t *testing.T, path, content string, mode os.FileMode) {
@@ -61,14 +60,15 @@ func gitRun(t *testing.T, args ...string) {
 }
 
 type fixture struct {
-	t      *testing.T
-	root   string
-	m      *Manager
-	db     *store.DB
-	ws     *workspace.Workspace
-	deps   Deps
-	mu     sync.Mutex
-	events []events.Event
+	t        *testing.T
+	root     string
+	m        *Manager
+	db       *store.DB
+	ws       *workspace.Workspace
+	deps     Deps
+	mu       sync.Mutex
+	events   []events.Event
+	profiles profiles.Store // the CEO's profiles: default is the fake harness
 }
 
 // newFixture makes a workspace with project ledger (one code repo) and team
@@ -102,10 +102,15 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	t.Cleanup(func() { _ = db.Close() })
 	f := &fixture{t: t, root: root, db: db, ws: ws}
 	logs := sessionlog.Dir{Root: filepath.Join(root, ".foreman", "logs")}
+	f.profiles = profiles.Store{Root: t.TempDir()}
+	if err := f.profiles.Ensure("claude-code"); err != nil {
+		t.Fatal(err)
+	}
 	f.deps = Deps{
 		Root: root, Runner: direct.Runner{}, Images: direct.Images{}, Git: git.New(), Config: ws,
 		Deployments: db.Deployments(), Instances: db.Instances(),
 		Adapters: map[string]harness.Adapter{"claude-code": fake.Adapter{Program: program}},
+		Profile:  f.profileOf,
 		OpenLog:  func(id string) (terminal.Log, error) { return logs.Open(id) },
 		Publish: func(e events.Event) {
 			f.mu.Lock()
@@ -276,28 +281,69 @@ func TestDeployRefusals(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); !errors.Is(err, store.ErrActive) {
 		t.Errorf("deployed twice: %v", err)
 	}
-	// A harness without an adapter.
+	// The project's profile decides what its agents run on: one that doesn't
+	// exist, one whose harness isn't supported, one not connected; each
+	// refused before anything is created.
 	write(t, filepath.Join(f.root, ".foreman", "teams", "orion.toml"),
-		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo", `harness = "claude-code"`, `harness = "codex"`).Replace(teamFile), 0o644)
+		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
 	if err := f.ws.Load(ctx, git.New()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err == nil || !strings.Contains(err.Error(), "isn't supported yet") {
+	f.useProfile("ledger", "nope")
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no such profile: nope") {
+		t.Errorf("an unknown profile: %v", err)
+	}
+	if _, err := f.profiles.Create("other", "codex"); err != nil {
+		t.Fatal(err)
+	}
+	f.useProfile("ledger", "other")
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err == nil || !strings.Contains(err.Error(), `harness "codex" isn't supported yet`) {
 		t.Errorf("an unsupported harness: %v", err)
 	}
-	// A harness without a login: refused before anything is created.
-	f.m.Adapters["codex"] = disconnected{}
-	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "codex isn't connected yet") {
-		t.Errorf("a harness without a login: %v", err)
+	f.m.Adapters["codex"] = needsLogin{f.deps.Adapters["claude-code"].(fake.Adapter)}
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "profile other isn't connected yet") {
+		t.Errorf("a profile without a login: %v", err)
 	}
 	if _, err := f.db.Deployments().Get(ctx, "orion@ledger"); err == nil {
 		t.Error("a refused deployment was stored")
 	}
+	// Logged in: the profile's folder is the one checked, and the one the
+	// session is given; its agents run on its harness.
+	write(t, filepath.Join(f.profiles.Dir("other"), "login"), "", 0o600)
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	if nora := f.waitStatus("nora@ledger", Running); nora.Harness != "codex" {
+		t.Errorf("nora runs on %q", nora.Harness)
+	}
+	// A change of profile reaches an agent deployed before it at its next
+	// start: tove, asleep since atlas's deploy on the default.
+	if tove := f.status("tove@ledger"); tove.Harness != "claude-code" {
+		t.Fatalf("tove deployed on %q", tove.Harness)
+	}
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if tove := f.waitStatus("tove@ledger", Running); tove.Harness != "codex" {
+		t.Errorf("tove started on %q", tove.Harness)
+	}
 }
 
-type disconnected struct{ fake.Adapter }
+// needsLogin is connected when its login folder holds a file named login,
+// and starts only with that folder.
+type needsLogin struct{ fake.Adapter }
 
-func (disconnected) Connected() bool { return false }
+func (needsLogin) Connected(dir string) bool {
+	_, err := os.Stat(filepath.Join(dir, "login"))
+	return err == nil
+}
+
+func (a needsLogin) Launch(s harness.Session) (harness.Launch, error) {
+	if !a.Connected(s.Login) {
+		return harness.Launch{}, harness.ErrNotConnected
+	}
+	return a.Adapter.Launch(s)
+}
 
 // A Stop that lands while an instance is starting, after its process exists
 // but before it is handed over, still stops it and frees its slot.
@@ -582,6 +628,75 @@ func TestHooksBecomeStatuses(t *testing.T) {
 	f.m.Hook("mara@ledger", "busy", nil)
 	if s := f.status("mara@ledger"); s.Status != Stopped || f.m.Live("mara@ledger") {
 		t.Errorf("a hook after the stop: %s", s.Status)
+	}
+}
+
+// eventIsLine describes a hook event by its name.
+type eventIsLine struct{ fake.Adapter }
+
+func (eventIsLine) Describe(event string, _ []byte) string { return event }
+
+// Hook events give a running instance its activity line: one line of text,
+// sent as an event and listed with the instance; a new run starts without one.
+func TestHooksBecomeActivityLines(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsLine{f.deps.Adapters["claude-code"].(fake.Adapter)}}
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	activity := func(id string) *store.Doing {
+		t.Helper()
+		list, err := f.m.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, i := range list {
+			if i.ID == id {
+				return i.Doing
+			}
+		}
+		t.Fatalf("no %s", id)
+		return nil
+	}
+	if a := activity("mara@ledger"); a != nil {
+		t.Errorf("an activity before any hook: %+v", a)
+	}
+	f.m.Hook("mara@ledger", "  Bash: go test\x1b[31m ./...\n  echo done", nil)
+	f.m.Hook("mara@ledger", "", nil)        // says nothing new: the line stays
+	f.m.Hook("tove@ledger", "Reading", nil) // asleep: no line
+	a := activity("mara@ledger")
+	if a == nil || a.Line != "Bash: go test[31m ./..." || time.Since(a.At) > time.Minute {
+		t.Errorf("mara %+v", a)
+	}
+	if a := activity("tove@ledger"); a != nil {
+		t.Errorf("tove %+v", a)
+	}
+	f.mu.Lock()
+	var sent []DoingChange
+	for _, e := range f.events {
+		if e.Type == "instance.doing" {
+			sent = append(sent, e.Data.(DoingChange))
+		}
+	}
+	f.mu.Unlock()
+	if len(sent) != 1 || sent[0].ID != "mara@ledger" || sent[0].Doing != *a {
+		t.Errorf("events %+v", sent)
+	}
+	f.m.Hook("mara@ledger", strings.Repeat("é", 300), nil)
+	if r := []rune(activity("mara@ledger").Line); len(r) != doingMax || r[len(r)-1] != '…' {
+		t.Errorf("a long line kept %d characters", len(r))
+	}
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if a := activity("mara@ledger"); a != nil {
+		t.Errorf("the last run's line in the new run: %+v", a)
 	}
 }
 
@@ -951,5 +1066,22 @@ func TestShutdownKeepsWhatItCouldntStop(t *testing.T) {
 	f.m.Shutdown(ctx)
 	if s := f.status("mara@ledger"); s.Status != Running {
 		t.Errorf("after a failed stop: %s", s.Status)
+	}
+}
+
+// profileOf is the project's profile, as the composition root finds it.
+func (f *fixture) profileOf(project string) (profiles.Profile, string, error) {
+	p, err := f.profiles.Get(f.ws.Settings().Settings.ProfileOf(project))
+	return p, f.profiles.Dir(p.Name), err
+}
+
+// useProfile sets the project's profile in settings.toml.
+func (f *fixture) useProfile(project, profile string) {
+	f.t.Helper()
+	file := f.ws.Settings()
+	s := file.Settings
+	s.ProjectProfiles = map[string]string{project: profile}
+	if _, err := f.ws.SaveSettings(ctx, s, file.Version); err != nil {
+		f.t.Fatal(err)
 	}
 }

@@ -2,7 +2,7 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { harnessLabel, resolveWho, roleLabel, roster } from "../app/model";
+import { resolveWho, roleLabel, roster } from "../app/model";
 import { useDeployments, useInstances, useRequests, useTeams, useWorkspace } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
@@ -160,10 +160,7 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
             <span className="flex min-w-0 flex-col">
               <span className="font-semibold">
                 {soul.name}
-                <span className="font-normal text-tx4">
-                  {" "}
-                  · {roleLabel(soul.role)} · {harnessLabel(soul.harness)}
-                </span>
+                <span className="font-normal text-tx4"> · {roleLabel(soul.role)}</span>
               </span>
               <span className="truncate text-[13.5px] text-tx3">{soul.personality}</span>
             </span>

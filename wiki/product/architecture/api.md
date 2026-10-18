@@ -33,7 +33,7 @@ POST   /api/teams/:id/agents                  hire (from CoS)
 GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
 POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session)
 DELETE /api/deployments/:id                   stop
-GET    /api/instances                         the instances of the active deployments, with their status
+GET    /api/instances                         the instances of the active deployments, with their status and activity line (doing)
 GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness
 GET    /api/teams/:id/agents/:agent/prompt    {prompt}: the template before any deployment, {placeholders} for its parts
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
@@ -64,9 +64,13 @@ PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to 
 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems
-GET    /api/harnesses                         the supported harnesses: their default command, newline keystroke and login (connected or not)
-POST   /api/harnesses/:id/connect             start the harness's login in a terminal → {terminal}: open it with WS /ws/pty/:terminal
-DELETE /api/harnesses/:id/connect             end the harness's login, if one runs (the Connect dialog closed) → 204
+GET    /api/harnesses                         the supported harnesses: their command and newline keystroke
+GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same in every workspace: {theme} (system, dark or light; 400 INVALID)
+GET    /api/profiles                          the CEO's profiles (each a harness and its login, every workspace's): name, harness, connected; default first
+POST   /api/profiles                          {name, harness} → 201 the profile, with no login yet (400 INVALID: a bad name or an unsupported harness; 409 EXISTS)
+DELETE /api/profiles/:name                    deletes it and its login, ending its login terminal (204; 400 INVALID for default; 404)
+POST   /api/profiles/:name/connect            start its harness login in a terminal → {terminal}: open it with WS /ws/pty/:terminal (404)
+DELETE /api/profiles/:name/connect            end its login, if one runs (the Connect dialog closed) → 204
 GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
 PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
 GET    /api/maintenance                       {running, engine, podman, images}: the engine running now (podman or direct) and its state; why Podman can't be chosen ("" when installed); each image's name, ref, state, last build log
@@ -119,7 +123,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `request.created` / `request.resolved` | Workflow creates or resolves a request | the request |
 | `instance.status` | an instance changes status or task | id, status, task |
 | `instance.draft` | messages wait on the CEO's draft in an agent's terminal, each countdown step, and when they stop waiting | id, waiting (0: the notice goes), leftMs, counting, paused |
-| `instance.line` | throttled "last output line" updates (for Settings rows) | id, line |
+| `instance.doing` | an agent's harness reports a step of its work (a hook): its new activity line ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | id, doing (line, at) |
 | `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |
 | `team.message` | a message is routed | the message |

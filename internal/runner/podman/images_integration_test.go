@@ -18,7 +18,7 @@ func testBuilder(t *testing.T, r *Runner, steps string) *Images {
 	t.Helper()
 	name := fmt.Sprintf("localhost/foreman-test/%s", strings.ToLower(strings.ReplaceAll(t.Name(), "/", "-")))
 	file := fmt.Sprintf("FROM %s\n# run %d\n%s\n", testImage, time.Now().UnixNano(), steps)
-	im := r.Images(name, []byte(file))
+	im := r.Images(name, []byte(file), t.TempDir())
 	t.Cleanup(func() {
 		_ = r.c.call(ctx, "DELETE", "/images/"+name, map[string][]string{"force": {"true"}}, nil, nil)
 	})
@@ -55,8 +55,8 @@ func TestEnsureBuildsOnceAndRuns(t *testing.T) {
 		}
 		ref = got
 	}
-	if im.builds != 1 {
-		t.Errorf("%d builds, want 1", im.builds)
+	if im.builds.Load() != 1 {
+		t.Errorf("%d builds, want 1", im.builds.Load())
 	}
 	s := im.Status(ctx)[0]
 	if s.State != "ready" || s.Ref != ref || !strings.Contains(s.Log, "echo built") {
@@ -68,12 +68,12 @@ func TestEnsureBuildsOnceAndRuns(t *testing.T) {
 	out.waitFor(t, "built")
 
 	// A new builder for the same Containerfile (a Foreman restart) finds it.
-	again := r.Images(im.name, im.containerfile)
+	again := r.Images(im.name, im.containerfile, im.shared.dir)
 	if s := again.Status(ctx)[0]; s.State != "ready" {
 		t.Errorf("after a restart: %+v", s)
 	}
-	if got, err := again.Ensure(ctx, "relay"); err != nil || got != ref || again.builds != 0 {
-		t.Errorf("Ensure after a restart: %q %v, %d builds", got, err, again.builds)
+	if got, err := again.Ensure(ctx, "relay"); err != nil || got != ref || again.builds.Load() != 0 {
+		t.Errorf("Ensure after a restart: %q %v, %d builds", got, err, again.builds.Load())
 	}
 }
 
@@ -84,13 +84,13 @@ func TestAChangedContainerfileIsANewImage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changed := r.Images(im.name, append(im.containerfile, []byte("RUN echo more\n")...))
+	changed := r.Images(im.name, append(im.containerfile, []byte("RUN echo more\n")...), im.shared.dir)
 	second, err := changed.Ensure(ctx, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if first == second || changed.builds != 1 {
-		t.Errorf("refs %q %q, %d builds", first, second, changed.builds)
+	if first == second || changed.builds.Load() != 1 {
+		t.Errorf("refs %q %q, %d builds", first, second, changed.builds.Load())
 	}
 }
 
@@ -125,7 +125,7 @@ func TestRefreshRebuilds(t *testing.T) {
 	if err := im.Refresh(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if after := stamp(); after == before || im.builds != 2 {
-		t.Errorf("Refresh reused the cache: %q then %q, %d builds", before, after, im.builds)
+	if after := stamp(); after == before || im.builds.Load() != 2 {
+		t.Errorf("Refresh reused the cache: %q then %q, %d builds", before, after, im.builds.Load())
 	}
 }

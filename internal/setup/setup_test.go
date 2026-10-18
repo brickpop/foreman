@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/events"
-	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/podman"
 	"github.com/brickpop/foreman/internal/workspace"
@@ -96,7 +97,9 @@ func newRig(t *testing.T, e *engine) *rig {
 	}
 	r.Setup = New(Deps{
 		Engine: eng, Images: r.images, Config: config{},
-		Harnesses: func() []harness.Status { return []harness.Status{{ID: "claude-code", Connected: true}} },
+		Profiles: func() []profiles.Profile {
+			return []profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}}
+		},
 		Ready: func(context.Context) error {
 			r.ready++
 			return r.readyErr
@@ -219,7 +222,7 @@ func TestDirectEngine(t *testing.T) {
 	if r.ready != 1 || r.Blocked() != nil {
 		t.Fatalf("ready %d, blocked %v", r.ready, r.Blocked())
 	}
-	if got := kinds(r.Steps(ctx)); !reflect.DeepEqual(got, []string{"harness:claude-code done", "team todo", "project todo"}) {
+	if got := kinds(r.Steps(ctx)); !reflect.DeepEqual(got, []string{"profile:default done", "team todo", "project todo"}) {
 		t.Errorf("steps %v", got)
 	}
 }
@@ -231,34 +234,34 @@ func (runnerless) Refresh(context.Context) error                  { return nil }
 func (runnerless) Status(context.Context) []runner.ImageStatus    { return nil }
 
 func TestSteps(t *testing.T) {
-	team := func(harnesses ...string) workspace.Team {
-		var tm workspace.Team
-		tm.Config.Agents = map[string]workspace.Soul{}
-		for i, h := range harnesses {
-			tm.Config.Agents[string(rune('a'+i))] = workspace.Soul{Harness: h}
-		}
-		return tm
-	}
-	harnesses := []harness.Status{{ID: "claude-code", Connected: true}, {ID: "codex"}}
+	var team workspace.Team
 	for _, c := range []struct {
-		name   string
-		config config
-		want   []string
+		name     string
+		config   config
+		profiles []profiles.Profile
+		want     []string
 	}{
-		{"nothing yet: every harness, a team, a project", config{},
-			[]string{"image todo", "harness:claude-code done", "harness:codex todo", "team todo", "project todo"}},
-		{"only the harnesses teams use", config{teams: []workspace.Team{team("claude-code")}},
-			[]string{"image todo", "harness:claude-code done", "team done", "project todo"}},
+		{"nothing yet: the default profile, a team, a project", config{},
+			[]profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}},
+			[]string{"image todo", "profile:default done", "team todo", "project todo"}},
+		// The profiles the projects use: one not connected, one that doesn't exist.
 		{"a project without a repo, one with problems, one with a repo",
-			config{teams: []workspace.Team{team("codex")}, projects: []workspace.Project{
+			config{teams: []workspace.Team{team}, projects: []workspace.Project{
 				{ID: "web", Repos: []string{"app"}}, {ID: "ledger"}, {ID: "broken", Problems: []string{"bad toml"}}}},
-			[]string{"image todo", "harness:codex todo", "team done", "project done", "repo:ledger todo"}},
+			[]profiles.Profile{{Name: "default", Harness: "claude-code"}, {Name: "gone"}},
+			[]string{"image todo", "profile:default todo", "profile:gone failed", "team done", "project done", "repo:ledger todo"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			s := New(Deps{Images: &images{state: "missing"}, Config: c.config,
-				Harnesses: func() []harness.Status { return harnesses }})
-			if got := kinds(s.Steps(ctx)); !reflect.DeepEqual(got, c.want) {
+				Profiles: func() []profiles.Profile { return c.profiles }})
+			steps := s.Steps(ctx)
+			if got := kinds(steps); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("steps %v\nwant  %v", got, c.want)
+			}
+			for _, st := range steps {
+				if st.Subject == "gone" && !strings.Contains(st.Detail, "No such profile") {
+					t.Errorf("gone: %q", st.Detail)
+				}
 			}
 		})
 	}

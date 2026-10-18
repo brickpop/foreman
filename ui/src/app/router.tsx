@@ -3,7 +3,7 @@ import { Agent } from "../screens/Agent";
 import { Home } from "../screens/Home";
 import { Project, type ProjectTab } from "../screens/Project";
 import { Sessions } from "../screens/Sessions";
-import { Settings } from "../screens/Settings";
+import { Settings, type SettingsTab } from "../screens/Settings";
 import { Team, type TeamTab } from "../screens/Team";
 import { Shell } from "./Shell";
 import type { SessionsSearch } from "./sessions";
@@ -54,7 +54,14 @@ export const agentRoute = createRoute({
   component: Agent,
 });
 
-const settings = createRoute({ getParentRoute: () => root, path: "settings", component: Settings });
+const settings = createRoute({
+  getParentRoute: () => root,
+  path: "settings",
+  validateSearch: (s: Record<string, unknown>): { tab?: SettingsTab } => ({
+    tab: s.tab === "global" ? "global" : undefined,
+  }),
+  component: Settings,
+});
 
 export const router = createRouter({
   routeTree: root.addChildren([home, sessions, projectRoute, teamRoute, agentRoute, settings]),

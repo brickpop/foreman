@@ -365,7 +365,7 @@ How the answer travels back:
 | `approval`, `question` with `wait` | The open tool call (`CallID`) returns the answer; if it already returned `Pending`, a delivery carries it |
 | `question`, `finding` | A delivery to the raiser (`From the CEO, on <request>: …`); a finding's action may also deliver to another team's lead |
 | `review` | No answer: Merge to main, Create PR and Reject are `MergeAction`s. The request resolves when its merge request leaves `open` |
-| `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch harness |
+| `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch profile (later) |
 | `source: harness` (approval or question) | Typed into the session with the harness adapter's `Deliver`; also resolved by the next `busy` hook if the CEO answered in the terminal |
 
 **Dedup:** a new request with the same instance, kind and normalised summary as an `open` one created within 10 minutes isn't created; the open one is returned (its `RequestID` is the tool result). Details: [Request](../models/request.md#invariants).
@@ -422,7 +422,7 @@ Every state change is published on the in-process event bus; the web server stre
 | Event | Payload | Emitted by | Used by |
 |---|---|---|---|
 | `instance.status` | instance id, status, task | Instance manager | Sessions tabs, Home, Project and Team rows, avatars |
-| `instance.line` | instance id, last output line (throttled) | Terminal | Project settings rows |
+| `instance.doing` | instance id, its activity line and when ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | Instance manager, from the harness's hooks | Project settings rows; the agent Sessions opens on |
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity panel |
 | `team.action` | an [action](#team-actions), once recorded | Workflow | Activity panel |

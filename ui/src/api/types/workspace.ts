@@ -57,8 +57,6 @@ export interface Escalation {
 export interface Soul {
   name: string;
   role: string;
-  harness: string;
-  command: string;
   personality: string;
   skills: string[];
   instruction: string;
@@ -88,6 +86,13 @@ export interface Settings {
   forges: { [key: string]: ForgeAccount};
   workspaceForge: WorkspaceForge;
   notifications: Notifications;
+  /**
+   * ProjectProfiles names the profile each project's agents run on (a
+   * harness and its credentials, internal/profiles); a project not named
+   * uses the default. Kept here, not in project.toml: the lead can write
+   * the project repo, and profiles are this machine's.
+   */
+  projectProfiles: { [key: string]: string};
 }
 /**
  * ForgeAccount is a forge account's host or owner; its token is a secret.

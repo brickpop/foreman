@@ -19,8 +19,8 @@ describe("setup", () => {
     }
   });
 
-  it("titles name the harness and the project", () => {
-    expect(stepTitle(step("harness", "todo", "claude-code"))).toBe("Claude Code connected");
+  it("titles name the profile and the project", () => {
+    expect(stepTitle(step("profile", "todo", "work"))).toBe("The work profile connected");
     expect(stepTitle(step("repo", "todo", "ledger"))).toBe("A code repo in ledger");
   });
 

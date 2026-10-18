@@ -1,4 +1,4 @@
-import type { Instance, Request, Team } from "../api/client";
+import type { Doing, Instance, Request, Team } from "../api/client";
 import { roster } from "./model";
 
 // The Sessions screen's logic (wiki/product/features/sessions.md), apart from
@@ -70,15 +70,24 @@ export function moved(ids: string[], dragged: string, target: string): string[] 
   return [...rest.slice(0, at), dragged, ...rest.slice(at)];
 }
 
-/** The agent of a deployment with the latest output: where its work is. */
+/** The agent of a deployment that did something last: where its work is. */
 export function mostRecentAgent(instances: Instance[], deployment: string): string | undefined {
-  const mine = instances.filter((i) => i.deploymentId === deployment && i.lastOutputAt);
-  const at = (i: Instance) => Date.parse(i.lastOutputAt) || 0;
+  const mine = instances.filter((i) => i.deploymentId === deployment && i.doing);
+  const at = (i: Instance) => Date.parse(i.doing?.at ?? "") || 0;
   const latest = mine.reduce<Instance | undefined>(
     (a, i) => (!a || at(i) > at(a) ? i : a),
     undefined,
   );
   return latest && at(latest) > 0 ? latest.agentId : undefined;
+}
+
+/** The instances with one's activity line replaced: an instance.doing event,
+ * pushed at every step of its work, so never refetched for. */
+export function withDoing(
+  instances: Instance[] | undefined,
+  change: { id: string; doing: Doing },
+): Instance[] | undefined {
+  return instances?.map((i) => (i.id === change.id ? { ...i, doing: change.doing } : i));
 }
 
 /** A deployment's instances in tab order: the lead first, then the roster's order. */

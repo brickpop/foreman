@@ -33,6 +33,16 @@ type Instance struct {
 	StartedAt        time.Time `json:"startedAt"`
 	LastOutputAt     time.Time `json:"lastOutputAt"`
 	Restarts         int       `json:"restarts"`
+	// Doing is what its harness last reported doing in this run, nil until
+	// it says: kept by the instance manager in memory, never stored.
+	Doing *Doing `json:"doing"`
+}
+
+// Doing is one line on what an instance is doing, from its harness's hooks
+// (the instance.doing event).
+type Doing struct {
+	Line string    `json:"line"`
+	At   time.Time `json:"at"`
 }
 
 // Request is something waiting for the CEO (wiki/product/models/request.md).

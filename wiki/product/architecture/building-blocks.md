@@ -110,12 +110,12 @@ Every arrow, in words:
 │   /…/ledger/.sandboxes/tove/project      the live project repo (project.toml, wiki):│
 │                                          rw for the lead, else ro                   │
 │                                          (its .git ro for every agent)              │
-│   $CLAUDE_CONFIG_DIR     the instance's private config: prompt, MCP + hooks config,  │
-│                          history, memory (rw)                                        │
-│   …/credentials/<h>/     the harness's shared login file (rw)                        │
-│   ~/.gitconfig           ro, if it exists                                            │
-│  Never mounted: the rest of ~, ~/.ssh, ~/.config, .foreman/ (secrets, state, teams), │
-│  the CEO's working files, other agents' worktrees                                   │
+│   $CLAUDE_CONFIG_DIR     the instance's private config: prompt, MCP + hooks config, │
+│                          history, memory (rw)                                       │
+│   …/profiles/<name>/     the project's profile's login file (the CEO's; rw)         │
+│   ~/.gitconfig           ro, if it exists                                           │
+│  Never mounted: the rest of ~ (~/.ssh, ~/.config, …), .foreman/                    │
+│  (secrets, state, teams), the CEO's working files, other agents' worktrees          │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -199,6 +199,8 @@ type Adapter interface {
     Deliver(t Terminal, message string) error
     // What a hook event means: idle, busy, waiting for the CEO (a dialog, a question), done.
     Interpret(HookEvent) Status
+    // The same hook event as one line for the CEO ("Bash: go test ./..."), or "".
+    Describe(HookEvent) string
     // Recognises a crash or rate limit from the exit, for a blocked request.
     Diagnose(exitCode int, tail []byte) Diagnosis
 }

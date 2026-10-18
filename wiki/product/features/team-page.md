@@ -31,7 +31,7 @@ Padding `24px 48px 64px`, max 920px. One panel per deployment (padding `16px 20p
 Padding `20px 48px 64px`. One row per agent (grid `auto 1fr auto`, padding `14px 6px`), lead first; a click opens the [Agent page](./agent-page.md).
 
 - Avatar 38.
-- `<Name> · <Role> · <Harness label>` (the suffix 400 `--tx4`), then the personality (13.5px `--tx3`, ellipsis).
+- `<Name> · <Role>` (the suffix 400 `--tx4`; no harness: the project's profile says what it runs on), then the personality (13.5px `--tx3`, ellipsis).
 - Right: for each deployment, a 7px status dot and the project id ([Instance](../models/instance.md)).
 
 ## Playbook

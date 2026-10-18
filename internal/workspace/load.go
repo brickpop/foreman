@@ -71,7 +71,7 @@ const (
 
 // gitignore keeps Foreman's runtime files out of the workspace repo; temp
 // files are those of atomic writes.
-const gitignore = "state.db*\nlogs/\nsecrets\ncredentials/\naccess-token\n*.tmp\n"
+const gitignore = "state.db*\nlogs/\nsecrets\ncredentials/\naccess-token\ncos/\n*.tmp\n"
 
 // Load makes .foreman/ the workspace repo if it isn't yet, then reads every
 // config file.
@@ -88,7 +88,7 @@ func (w *Workspace) Load(ctx context.Context, g Git) error {
 
 func (w *Workspace) ensureRepo(ctx context.Context) error {
 	if _, err := os.Stat(w.Path(".git")); err == nil {
-		return nil
+		return w.ensureIgnored(ctx)
 	}
 	if err := w.git.Init(ctx, w.Path(), "main"); err != nil {
 		return err
@@ -107,6 +107,33 @@ func (w *Workspace) ensureRepo(ctx context.Context) error {
 		files = append(files, teamsDir)
 	}
 	return w.git.Commit(ctx, w.Path(), "Workspace repo", files...)
+}
+
+// ensureIgnored adds to an existing workspace repo's .gitignore the lines a
+// newer Foreman ignores (cos/, say), and commits it; lines the CEO wrote stay.
+func (w *Workspace) ensureIgnored(ctx context.Context) error {
+	data, err := os.ReadFile(w.Path(".gitignore"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	have := strings.Split(string(data), "\n")
+	var missing []string
+	for _, line := range strings.Split(strings.TrimSpace(gitignore), "\n") {
+		if !slices.Contains(have, line) {
+			missing = append(missing, line)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
+		data = append(data, '\n')
+	}
+	data = append(data, strings.Join(missing, "\n")+"\n"...)
+	if err := os.WriteFile(w.Path(".gitignore"), data, 0o644); err != nil {
+		return err
+	}
+	return w.git.Commit(ctx, w.Path(), "Ignore Foreman's runtime files", ".gitignore")
 }
 
 // scan reads every config file. A file that no longer parses keeps the last

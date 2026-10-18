@@ -247,6 +247,8 @@ func (c TeamConfig) validate(id string) problems {
 		p.add("team: required")
 	case c.Team != id:
 		p.add("team: %q must equal the file name %q", c.Team, id)
+	case !slug.MatchString(c.Team):
+		p.add("team: %q must be a slug (lowercase, digits, hyphens)", c.Team)
 	}
 	if strings.TrimSpace(c.Name) == "" {
 		p.add("name: required")

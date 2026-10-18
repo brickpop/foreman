@@ -123,6 +123,12 @@ func TestLaunchOptions(t *testing.T) {
 	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue"}) {
 		t.Errorf("continuing, with an opener: %v", l.Command)
 	}
+	// The Chief of Staff's does: each visit says what it is for.
+	s.OpenerOnContinue = true
+	if l, _ := a.Launch(s); !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions", "--continue", s.Opener}) {
+		t.Errorf("continuing, with an opener it gets: %v", l.Command)
+	}
+	s.OpenerOnContinue = false
 	if last := l.Mounts[len(l.Mounts)-1]; last != (runner.Mount{Source: gitconfig, Target: "/home/node/.gitconfig", ReadOnly: true}) {
 		t.Errorf("gitconfig mount %+v", last)
 	}

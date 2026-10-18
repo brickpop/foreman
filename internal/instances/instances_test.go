@@ -482,7 +482,7 @@ func TestRestore(t *testing.T) {
 	start := func(id, workspace string) runner.Process {
 		labels := map[string]string{"foreman.instance": id}
 		if workspace != "" {
-			labels[workspaceLabel] = workspace
+			labels[WorkspaceLabel] = workspace
 		}
 		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: labels})
 		if err != nil {
@@ -858,7 +858,7 @@ func TestRestoreLeavesOtherWorkspacesAlone(t *testing.T) {
 	start := func(id, workspace string) runner.Process {
 		labels := map[string]string{"foreman.instance": id}
 		if workspace != "" {
-			labels[workspaceLabel] = workspace
+			labels[WorkspaceLabel] = workspace
 		}
 		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: labels})
 		if err != nil {

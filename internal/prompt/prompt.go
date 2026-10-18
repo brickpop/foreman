@@ -289,6 +289,15 @@ var defaultInstructions = map[string]string{
 	"reviewer":  "Review diffs and ADRs for correctness and clarity. Approve or request changes. Never push code.",
 }
 
+// Roles are the built-in roles, as they are offered.
+var Roles = []string{"team_lead", "engineer", "qa", "architect", "reviewer"}
+
+// DefaultJob is a built-in role's default job description, as a session gets
+// it; "" for any other role.
+func DefaultJob(role string) string {
+	return instruction(workspace.Soul{Role: role}, true)
+}
+
 // leadMerges ends the lead's default job once request_merge exists.
 const leadMerges = " You are the only member who requests merges to main (request_merge, with the card that explains the work)."
 

@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { type EventHandlers, subscribeEvents } from "./events";
 import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
+import type { Proposal } from "./types/cos";
 import type { Account as ForgeAccount } from "./types/forge";
 import type { Commit, TreeEntry } from "./types/git";
 import type { Status as HarnessStatus } from "./types/harness";
@@ -26,6 +27,7 @@ import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Node } from "./types/wiki";
 import type {
   Candidate,
+  Look,
   Missing,
   Project,
   Settings,
@@ -65,6 +67,7 @@ export type {
   Preferences,
   Profile,
   Project,
+  Proposal,
   Repo,
   RepoBranch,
   RepoFile,
@@ -232,6 +235,16 @@ export interface WikiArea {
   ): Promise<void>;
 }
 
+/** The Chief of Staff's session, with its page (wiki/product/features/chief-of-staff.md). */
+export interface ChiefOfStaffArea {
+  /** Starts it unless it runs, typing the opener into it ("" for none). */
+  start(opener: string): Promise<{ terminal: string; proposal: Proposal | null }>;
+  /** Ends it: the CEO left the page. Sent even as the page unloads. */
+  stop(): Promise<void>;
+  /** Writes the proposal on screen, with the faces shown for members proposed without one. */
+  create(id: number, looks: Record<string, Look>): Promise<Team>;
+}
+
 export interface EventsArea {
   /** Follows the events until the returned function is called. */
   subscribe(handlers: EventHandlers): () => void;
@@ -262,6 +275,7 @@ export interface ForemanClient {
   pipeline: PipelineArea;
   repos: ReposArea;
   wiki: WikiArea;
+  chiefOfStaff: ChiefOfStaffArea;
   events: EventsArea;
 }
 
@@ -430,6 +444,15 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         if (before) q.set("before", before);
         return getJSON(`/api/activity?${q}`);
       },
+    },
+    chiefOfStaff: {
+      start: async (opener) => (await request("POST", "/api/cos", { opener })).json(),
+      // keepalive: the request survives the page being closed.
+      stop: async () => {
+        await fetch(`${origin}/api/cos`, { method: "DELETE", keepalive: true });
+      },
+      create: async (id, looks) =>
+        (await request("POST", "/api/cos/proposal", { id, looks })).json(),
     },
     events: {
       subscribe: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),

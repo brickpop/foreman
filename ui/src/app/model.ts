@@ -1,5 +1,5 @@
 import type { Instance, MergeRequest, Project, Request, Settings, Team } from "../api/client";
-import type { Look, Soul } from "../api/types/workspace";
+import type { Look, Soul, TeamConfig } from "../api/types/workspace";
 
 // Pure derivations the screens share: who an instance is, how requests are
 // ordered, what a project's state is. Kept apart from components to be tested.
@@ -136,9 +136,9 @@ export function roleLabel(role: string): string {
 /** Who a playbook step or escalation names, as the Team page shows it
  * (wiki/product/models/team-definition.md#playbook-and-escalation). Unknown
  * is shown as written, flagged. */
-export function resolveWho(team: Team, who: string): { text: string; known: boolean } {
-  const agents = team.config.agents;
-  if (who === "lead") return { text: agents[team.config.lead]?.name ?? who, known: true };
+export function resolveWho(team: TeamConfig, who: string): { text: string; known: boolean } {
+  const agents = team.agents;
+  if (who === "lead") return { text: agents[team.lead]?.name ?? who, known: true };
   if (who === "members") return { text: "Members", known: true };
   if (who === "ceo") return { text: "You", known: true };
   if (agents[who]) return { text: agents[who].name, known: true };

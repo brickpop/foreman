@@ -330,3 +330,50 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 	writeFile(t, filepath.Join(root, ".foreman", "settings.toml"), "port = 9000")
 	expect(Change{Kind: "settings"})
 }
+
+// CheckTeam refuses what SaveTeam would, writing nothing: the file's rules,
+// a team id that isn't one folder name, and agents of other teams.
+func TestCheckTeam(t *testing.T) {
+	ws := loaded(t, func(root string) {
+		writeFile(t, filepath.Join(root, ".foreman", "teams", "atlas.toml"), teamExample)
+	})
+	c, _ := ParseTeam("atlas", []byte(teamExample))
+	if p := ws.CheckTeam(c); len(p) != 0 {
+		t.Errorf("the team as it is: %v", p)
+	}
+	for _, id := range []string{"../escape", "Orion", "a/b", ""} {
+		bad := c
+		bad.Team = id
+		if p := ws.CheckTeam(bad); len(p) == 0 || !strings.HasPrefix(p[0], "team:") {
+			t.Errorf("team %q: %v", id, p)
+		}
+	}
+	orion := c
+	orion.Team, orion.Name = "orion", "Orion"
+	if p := ws.CheckTeam(orion); !hasProblem(p, "also used in team atlas") {
+		t.Errorf("an agent of atlas in orion: %v", p)
+	}
+	if _, err := os.Stat(ws.Path("teams", "orion.toml")); err == nil {
+		t.Error("checking wrote the team")
+	}
+}
+
+// A workspace repo from an older Foreman gets the newer ignore lines, once,
+// keeping the CEO's own.
+func TestOlderWorkspacesIgnoreWhatNewerOnesDo(t *testing.T) {
+	ws := loaded(t, nil)
+	writeFile(t, ws.Path(".gitignore"), "state.db*\nlogs/\nmy-notes.txt")
+	for range 2 {
+		if err := ws.Load(ctx, git.New()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, _ := os.ReadFile(ws.Path(".gitignore"))
+	got := string(data)
+	if !strings.HasPrefix(got, "state.db*\nlogs/\nmy-notes.txt\n") || strings.Count(got, "cos/") != 1 || strings.Count(got, "logs/") != 1 {
+		t.Errorf(".gitignore:\n%s", got)
+	}
+	if n := strings.Count(gitLog(t, ws.Path()), "Ignore Foreman's runtime files"); n != 1 {
+		t.Errorf("%d commits of it, want 1", n)
+	}
+}

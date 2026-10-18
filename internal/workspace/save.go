@@ -25,13 +25,7 @@ func (e *InvalidError) Error() string {
 func (w *Workspace) SaveTeam(ctx context.Context, c TeamConfig, version string) (Team, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if p := c.validate(c.Team); len(p) > 0 {
-		return Team{}, &InvalidError{p}
-	}
-	// The cross-team rules, against every other team as it is now.
-	teams := union(w.snap.teams, map[string]Team{c.Team: {ID: c.Team, Config: c}})
-	crossTeamProblems(teams)
-	if p := teams[c.Team].Problems; len(p) > 0 {
+	if p := w.checkTeam(c); len(p) > 0 {
 		return Team{}, &InvalidError{p}
 	}
 	data, err := encodeTeam(c)
@@ -109,4 +103,21 @@ func (w *Workspace) publish(changes []Change) {
 	for _, c := range changes {
 		w.notify(c)
 	}
+}
+
+// CheckTeam is what a save of c would refuse, without saving: the team
+// file's rules, and those across teams against every other team as it is now.
+func (w *Workspace) CheckTeam(c TeamConfig) []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.checkTeam(c)
+}
+
+func (w *Workspace) checkTeam(c TeamConfig) []string {
+	if p := c.validate(c.Team); len(p) > 0 {
+		return p
+	}
+	teams := union(w.snap.teams, map[string]Team{c.Team: {ID: c.Team, Config: c}})
+	crossTeamProblems(teams)
+	return teams[c.Team].Problems
 }

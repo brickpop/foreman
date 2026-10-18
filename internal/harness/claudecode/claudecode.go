@@ -82,7 +82,8 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	}
 	if continuing {
 		args = append(args, "--continue")
-	} else if s.Opener != "" {
+	}
+	if s.Opener != "" && (!continuing || s.OpenerOnContinue) {
 		// A prompt argument opens an interactive session with it as the first message
 		// (only -p would make it one-shot).
 		args = append(args, s.Opener)

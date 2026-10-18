@@ -49,3 +49,10 @@ packages:
   - path: github.com/brickpop/foreman/internal/userdata
     output_path: ui/src/api/types/userdata.ts
     include_files: [types.go]
+  - path: github.com/brickpop/foreman/internal/cos
+    output_path: ui/src/api/types/cos.ts
+    include_files: [types.go]
+    type_mappings:
+      workspace.TeamConfig: "workspace.TeamConfig"
+    frontmatter: |
+      import type * as workspace from "./workspace";

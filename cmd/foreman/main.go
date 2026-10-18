@@ -17,6 +17,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -25,6 +26,7 @@ import (
 	"github.com/brickpop/foreman/agentbin"
 	"github.com/brickpop/foreman/internal/access"
 	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/cos"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
@@ -249,7 +251,24 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}()
 	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: ws,
 		Blocks: []teamtools.Block{messenger, flow}}
-	link = agentlink.New(secret, manager.Live, router, manager)
+	chief := &chiefOfStaff{
+		root: ws.Root(), dir: ws.Path("cos"), teamsDir: ws.Path("teams"), teams: ws.Teams,
+		profiles: profileStore, adapters: adapters, images: engineImages, terms: login.terms, agent: agent,
+		blocked: func() error { return checklist.Blocked() }, pause: 150 * time.Millisecond,
+	}
+	chief.CoS = cos.New(cos.Deps{Teams: ws, Publish: bus.Publish, Tell: chief.tell,
+		Deployed: func(ctx context.Context, team string) bool {
+			active, _ := manager.DeploymentsIn(ctx, store.DeploymentActive)
+			return slices.ContainsFunc(active, func(d store.Deployment) bool { return d.TeamID == team })
+		},
+	})
+	live := func(id string) bool {
+		if id == cos.Instance {
+			return chief.Live()
+		}
+		return manager.Live(id)
+	}
+	link = agentlink.New(secret, live, agentCalls{team: router, cos: chief}, manager)
 	agentServer := &http.Server{Handler: link.Handler()}
 	go func() {
 		if err := agentServer.Serve(agentListener); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -286,25 +305,26 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	go checklist.Run(quit)
 	views := agents{Manager: manager, logins: login.terms, typed: messenger.Typed}
 	handler := server.New(server.Options{
-		Guard:       access.NewTokenGuard(token, access.LocalHosts(*port), *port),
-		Workspace:   ws,
-		Config:      ws,
-		Events:      bus,
-		Agents:      views,
-		Messages:    messenger,
-		Actions:     state.Actions(),
-		Activity:    state.Activity(),
-		Repos:       repos.Browser{Config: ws, Git: gitCLI},
-		Pipeline:    flow,
-		Requests:    flow,
-		Harnesses:   login,
-		Profiles:    login,
-		Preferences: userdata.PreferencesIn(userDir),
-		Wiki:        wikis,
-		Setup:       checklist,
-		Maintenance: maintenanceOf(running, engineRunner, engineImages, podman.Installed),
-		Terminals:   views,
-		UI:          files,
+		Guard:        access.NewTokenGuard(token, access.LocalHosts(*port), *port),
+		Workspace:    ws,
+		Config:       ws,
+		Events:       bus,
+		Agents:       views,
+		Messages:     messenger,
+		Actions:      state.Actions(),
+		Activity:     state.Activity(),
+		Repos:        repos.Browser{Config: ws, Git: gitCLI},
+		Pipeline:     flow,
+		Requests:     flow,
+		Harnesses:    login,
+		Profiles:     login,
+		Preferences:  userdata.PreferencesIn(userDir),
+		Wiki:         wikis,
+		Setup:        checklist,
+		Maintenance:  maintenanceOf(running, engineRunner, engineImages, podman.Installed),
+		Terminals:    views,
+		ChiefOfStaff: chief,
+		UI:           files,
 	})
 	return serveUntil(quit, stopSignals, stdout, &http.Server{Handler: handler}, listener, func() {
 		manager.Shutdown(context.Background())

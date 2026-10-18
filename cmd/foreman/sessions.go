@@ -12,8 +12,8 @@ import (
 )
 
 // sessions starts terminals by id and serves them to the server: the
-// harnesses' login terminals (logins.go). Instances' terminals are the
-// Instance manager's.
+// harnesses' login terminals (profiles.go) and the Chief of Staff's (cos.go).
+// Instances' terminals are the Instance manager's.
 type sessions struct {
 	runner  runner.Runner
 	openLog func(instance string) (terminal.Log, error)
@@ -51,6 +51,29 @@ func (s *sessions) start(ctx context.Context, instance string, spec runner.Spec)
 	s.terms[instance] = terminal.New(instance, process, log)
 	s.procs[instance] = process
 	return nil
+}
+
+// running reports whether the terminal's process runs.
+func (s *sessions) running(id string) bool {
+	s.mu.Lock()
+	t, ok := s.terms[id]
+	s.mu.Unlock()
+	if !ok {
+		return false
+	}
+	_, exited := t.ExitCode()
+	return !exited
+}
+
+// input types p into the terminal, as if typed.
+func (s *sessions) input(id string, p []byte) error {
+	s.mu.Lock()
+	t, ok := s.terms[id]
+	s.mu.Unlock()
+	if !ok {
+		return server.ErrNoTerminal
+	}
+	return t.Input(p)
 }
 
 // stop ends the terminal's process, if it runs; its terminal stays, exited.

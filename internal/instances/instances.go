@@ -434,7 +434,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 	unlabelled := map[string]runner.Process{}
 	for _, p := range procs {
 		id := p.Labels()["foreman.instance"]
-		switch p.Labels()[workspaceLabel] {
+		switch p.Labels()[WorkspaceLabel] {
 		case m.Root:
 			byID[id] = p
 		case "":
@@ -684,19 +684,22 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	return m.Runner.Start(ctx, runner.Spec{
 		Name: m.processName(id), Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: l.Env,
 		Mounts: append(mounts, l.Mounts...),
-		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, workspaceLabel: m.Root},
+		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, WorkspaceLabel: m.Root},
 	})
 }
 
-// workspaceLabel names the workspace a process belongs to. Every workspace on
+// WorkspaceLabel names the workspace a process belongs to. Every workspace on
 // a machine shares one Podman, so each touches only its own: two workspaces
 // may well have an agent mara on a project ledger.
-const workspaceLabel = "foreman.workspace"
+const WorkspaceLabel = "foreman.workspace"
 
-// processName is the instance's process name, unique on the machine: the
-// workspace's short hash, then the instance id.
-func (m *Manager) processName(id string) string {
-	sum := sha256.Sum256([]byte(m.Root))
+// processName is the instance's process name, unique on the machine.
+func (m *Manager) processName(id string) string { return ProcessName(m.Root, id) }
+
+// ProcessName is a workspace's process name for id, unique on the machine:
+// the workspace's short hash, then the id.
+func ProcessName(root, id string) string {
+	sum := sha256.Sum256([]byte(root))
 	return hex.EncodeToString(sum[:3]) + "-" + id
 }
 

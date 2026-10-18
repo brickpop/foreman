@@ -166,12 +166,12 @@ describe("teams", () => {
   } as unknown as Team;
 
   it("resolves who a step names", () => {
-    expect(resolveWho(atlas, "lead")).toEqual({ text: "Mara", known: true });
-    expect(resolveWho(atlas, "members")).toEqual({ text: "Members", known: true });
-    expect(resolveWho(atlas, "ceo")).toEqual({ text: "You", known: true });
-    expect(resolveWho(atlas, "tove")).toEqual({ text: "Tove", known: true });
-    expect(resolveWho(atlas, "engineer")).toEqual({ text: "Tove, Ilya", known: true });
-    expect(resolveWho(atlas, "designer")).toEqual({ text: "designer", known: false });
+    expect(resolveWho(atlas.config, "lead")).toEqual({ text: "Mara", known: true });
+    expect(resolveWho(atlas.config, "members")).toEqual({ text: "Members", known: true });
+    expect(resolveWho(atlas.config, "ceo")).toEqual({ text: "You", known: true });
+    expect(resolveWho(atlas.config, "tove")).toEqual({ text: "Tove", known: true });
+    expect(resolveWho(atlas.config, "engineer")).toEqual({ text: "Tove, Ilya", known: true });
+    expect(resolveWho(atlas.config, "designer")).toEqual({ text: "designer", known: false });
   });
 
   it("labels roles", () => {

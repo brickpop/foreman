@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, ui, agents, teams]
 ---
 
@@ -14,14 +14,15 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 
 - **An ad-hoc session, not an agent of a deployment**, like the login container of [Connect](./settings.md#profiles): one container with a terminal, started when the CEO opens the [page](#the-page) and stopped when they leave it. It isn't listed in [Sessions](./sessions.md), has no project, team or worktree, and doesn't count towards the instance limit. One at a time: a second tab shows the same session.
 - **What it runs:** the `default` profile's harness and login, whatever that is ([Session runner → Credentials](../architecture/session-runner.md#credentials)), started interactively like any agent's, from the agent image.
-- **Its conversation carries over:** its private harness config directory is in `<workspace>/.foreman/cos/`, so the next visit continues where the last one ended (Claude Code: `--continue`).
+- **Its conversation carries over:** its private harness config directory is in `<workspace>/.foreman/cos/`, so the next visit continues where the last one ended (Claude Code: `--continue`). The opening line is given on every visit, a continued one too (Claude Code: `--continue "<line>"`; to check on a real login).
+- **Its id is `cos`**, on the agent port and for its terminal (`/ws/pty/cos`); an agent's is `agent@project`, so they never clash. Its process is named, and labelled, by workspace, like the agents'.
 - **Mounts, and nothing else:**
   - `<workspace>/.foreman/cos/` → read-write: its working folder and its harness config (git-ignored in the workspace repo);
   - `<workspace>/.foreman/teams/` → **read-only**: it reads the current team files like any files;
-  - the profile's login file, as for any agent.
+  - the profile's login file, and `foreman-agent` (its tool and hooks), as for any agent.
 
   Never the rest of `.foreman/` (secrets, `state.db`, logs, settings), never a project folder, never the CEO's own harness config.
-- **Its prompt:** who it is, the team file format and its invariants, the roles' [default job descriptions](../models/agent-soul.md#default-job-descriptions), the names already used in the workspace, and its one tool.
+- **Its prompt:** who it is, the team file format and its invariants, the roles' [default job descriptions](../models/agent-soul.md#default-job-descriptions), the names already used in the workspace, and its one tool. It is composed at each start (`internal/cos`), so the names it lists are those of that moment; the files it reads stay current.
 
 ## Its tool
 
@@ -29,8 +30,9 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 
 - Foreman checks it as it would a save (the [invariants](../models/team-definition.md#invariants): ids and display names unique across the workspace, the lead in the roster, valid roles and looks). An invalid proposal is not shown: the call returns the reasons, and the CoS fixes it and calls again.
 - A valid one opens the [preview](#the-page) and returns. A newer proposal replaces the one on screen.
+- A member proposed without a face (no background color) gets one on the page, drawn once per proposal; **Create** sends those faces, so the one shown is the one saved.
 - It never writes. The CEO's **Create** / **Save** does, carrying the version of the team file the proposal was based on: if the file changed meanwhile (an edit on the Agent page, in an editor), nothing is written, the preview says so, and the CoS is told to propose again from the current file.
-- Once written, Foreman tells the CoS in its session ("The CEO created Atlas."), and the file watcher does the rest (a hired member starts on every deployment of the team, [Deploy a team](./deploy-team.md)).
+- Once written, Foreman tells the CoS in its session ("From Foreman: the CEO created Atlas; it is saved.", typed then sent with Enter after a pause, as a delivery is), and the file watcher does the rest (a hired member starts on every deployment of the team, [Deploy a team](./deploy-team.md)).
 
 ## The page
 
@@ -43,9 +45,9 @@ A 1-2-3 flow:
    - the team: its name, purpose, playbook and escalation rules;
    - **one tab per member** (avatar and name; the lead first), each showing the role, personality, skills and the full job description. On a hire or refine, the new or changed member is marked and selected, and a changed field shows what it was.
    - **`Adjust team`** closes the preview and puts the focus back in the terminal, where the CEO says what to change; the CoS proposes again. `Show preview` in the header reopens the last one.
-3. **Create.** **`Create <Name>`** (a new team) or **`Save <Name>`** (an existing one) writes the file, one commit. A new team opens its [Team page](./team-page.md); a changed one stays here, the preview showing `✓ Saved`.
+3. **Create.** **`Create <Name>`** (a new team) or **`Save <Name>`** (an existing one) writes the file, one commit. A new team opens its [Team page](./team-page.md) (Members); for a changed one the preview closes and the header shows `✓ Saved <Name>`. A refusal (the team changed meanwhile, a newer proposal) shows under the buttons.
 
-Leaving the page stops the session; a proposal not yet created is dropped (the CoS still has it in its conversation and can propose it again).
+Leaving the page stops the session, a second later (coming straight back, or opening it from another entry point, keeps it; closing the browser tab stops it at once); a proposal not yet created is dropped (the CoS still has it in its conversation and can propose it again). The session can't start while Podman isn't ready, nor before the `default` profile is connected: the page says so, with a link to Settings → Global → Profiles. Under 900px wide, the preview takes the whole width while open.
 
 ## Flows
 

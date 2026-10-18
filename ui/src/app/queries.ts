@@ -14,6 +14,7 @@ import {
   type ForemanClient,
   type Instance,
   type Preferences,
+  type Proposal,
   type Request,
   type Settings,
   type Soul,
@@ -147,6 +148,10 @@ export function useLiveEvents(listen: (e: Event) => void = () => {}) {
               return d.waiting > 0 ? { ...rest, [d.id]: d } : rest;
             });
           }
+          // So is the Chief of Staff's proposal: null once it is gone.
+          if (e.type === "cos.proposal") {
+            queries.setQueryData(cosProposalKey, (e.data as Proposal | null) ?? null);
+          }
           // So is an agent's activity line, at every step of its work.
           if (e.type === "instance.doing") {
             const change = e.data as { id: string; doing: Doing };
@@ -177,6 +182,20 @@ export function useDrafts(): Drafts {
     queryFn: () => ({}),
     enabled: false,
     initialData: {},
+  }).data;
+}
+
+/** The team the Chief of Staff proposes, on screen until it is created or
+ * replaced, or the session ends. Fed by cos.proposal events, and by the
+ * session's start (one already on screen). */
+export const cosProposalKey = ["cos-proposal"] as const;
+
+export function useCosProposal(): Proposal | null {
+  return useQuery<Proposal | null>({
+    queryKey: cosProposalKey,
+    queryFn: () => null,
+    enabled: false,
+    initialData: null,
   }).data;
 }
 

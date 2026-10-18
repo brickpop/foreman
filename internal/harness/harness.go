@@ -31,6 +31,10 @@ type Session struct {
 	// that continues a conversation), typed in as if by the CEO; the session
 	// stays interactive. "" for none.
 	Opener string
+	// OpenerOnContinue gives the opener to a session that continues its
+	// conversation too: the Chief of Staff's, whose every visit says what it
+	// is for.
+	OpenerOnContinue bool
 	// Link is how the harness reaches Foreman: the team tools and the hooks
 	// both go through foreman-agent. Zero when foreman-agent isn't built.
 	Link Link

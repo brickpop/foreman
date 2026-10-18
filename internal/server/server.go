@@ -22,25 +22,26 @@ type Workspace interface {
 
 // Options are the parts the server is assembled from.
 type Options struct {
-	Guard       Guard
-	Workspace   Workspace
-	Config      Config
-	Events      Events
-	Agents      Agents
-	Messages    Messages
-	Actions     Actions
-	Activity    Activity
-	Repos       Repos
-	Pipeline    Pipeline
-	Requests    Requests
-	Harnesses   Harnesses
-	Profiles    Profiles
-	Preferences Preferences
-	Wiki        Wiki
-	Setup       Setup
-	Maintenance Maintenance
-	Terminals   Terminals
-	UI          fs.FS // the built web app, index.html at its root
+	Guard        Guard
+	Workspace    Workspace
+	Config       Config
+	Events       Events
+	Agents       Agents
+	Messages     Messages
+	Actions      Actions
+	Activity     Activity
+	Repos        Repos
+	Pipeline     Pipeline
+	Requests     Requests
+	Harnesses    Harnesses
+	Profiles     Profiles
+	Preferences  Preferences
+	Wiki         Wiki
+	Setup        Setup
+	Maintenance  Maintenance
+	Terminals    Terminals
+	ChiefOfStaff ChiefOfStaff
+	UI           fs.FS // the built web app, index.html at its root
 }
 
 // New returns the HTTP handler, every route behind the guard.
@@ -63,6 +64,7 @@ func New(o Options) http.Handler {
 	setupRoutes(mux, o.Setup)
 	configRoutes(mux, o.Config)
 	wikiRoutes(mux, o.Wiki)
+	cosRoutes(mux, o.ChiefOfStaff)
 	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))
 	// An endpoint the server doesn't have is an API error, never the web app.

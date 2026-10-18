@@ -2,11 +2,12 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { resolveWho, roleLabel, roster } from "../app/model";
+import { roleLabel, roster } from "../app/model";
 import { useDeployments, useInstances, useRequests, useTeams, useWorkspace } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
 import { StopDialog } from "../components/StopDialog";
+import { TeamPlaybook } from "../components/TeamPlaybook";
 import { Button, Dot, Empty, Panel } from "../components/ui";
 
 export type TeamTab = "deployments" | "members" | "playbook" | "file";
@@ -183,48 +184,13 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
 }
 
 function Playbook({ team }: { team: TeamData }) {
-  const who = (w: string) => {
-    const r = resolveWho(team, w);
-    return r.known ? (
-      r.text
-    ) : (
-      <span className="flex items-center gap-1" title="No member matches this; check the team file">
-        {r.text} <span className="text-acc">⚠</span>
-      </span>
-    );
-  };
   return (
     <section className="flex w-full max-w-[760px] flex-col gap-6 px-12 pt-7 pb-16">
       <p className="m-0 text-tx2">
         The playbook is part of the team definition, so every deployment uses the same one. It's
         added to each member's session prompt. Each project's own gates and checks apply on top.
       </p>
-      <div className="grid grid-cols-[28px_110px_1fr] gap-x-3 gap-y-2.5">
-        {team.config.playbook.flatMap((step, i) =>
-          Object.entries(step).map(([w, text]) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a step has no id; its place in the playbook is its identity
-            <div key={`${i}-${w}`} className="contents">
-              <span className="font-mono text-tx4">{i + 1}</span>
-              <span className="font-semibold">{who(w)}</span>
-              <span className="text-tx2">{text}</span>
-            </div>
-          )),
-        )}
-      </div>
-      {team.config.escalate.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-medium text-tx4">Escalate</span>
-          {team.config.escalate.map((e) => (
-            <span key={e.when} className="flex gap-2">
-              <span className="text-tx2">{e.when}</span>
-              <span>→</span>
-              <span className={`font-medium ${e.to === "ceo" ? "text-accTx" : ""}`}>
-                {who(e.to)}
-              </span>
-            </span>
-          ))}
-        </div>
-      )}
+      <TeamPlaybook team={team.config} />
     </section>
   );
 }

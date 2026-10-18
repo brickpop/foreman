@@ -362,7 +362,6 @@ function SideSheet({
       open={path !== undefined}
       onClose={onClose}
       width={460}
-      layer={44}
       title={
         <span className="flex items-center gap-3">
           <span className="font-mono text-[12.5px] font-normal text-tx3">

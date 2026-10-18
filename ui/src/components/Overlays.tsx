@@ -46,21 +46,18 @@ export function Modal({
   );
 }
 
-/** A drawer from the right (Chief of Staff, board side sheet). It overlays, doesn't push. */
+/** A drawer from the right (the board's side sheet, layer 44). It overlays, doesn't push. */
 export function Drawer({
   open,
   onClose,
   title,
   width,
-  layer,
   children,
 }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
   width: number;
-  /** 44 for the side sheet, 45 for the Chief of Staff drawer. */
-  layer: number;
   children: ReactNode;
 }) {
   return (
@@ -69,7 +66,7 @@ export function Drawer({
         <Dialog.Content
           aria-describedby={undefined}
           className="fixed top-0 right-0 flex h-full flex-col border-l border-line2 bg-panel shadow-overlay focus:outline-none"
-          style={{ width: `min(${width}px, 100vw)`, zIndex: layer }}
+          style={{ width: `min(${width}px, 100vw)`, zIndex: 44 }}
         >
           <header className="flex items-center justify-between border-b border-line px-5 py-4">
             <Dialog.Title className="text-[15px] font-semibold">{title}</Dialog.Title>

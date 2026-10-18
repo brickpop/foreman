@@ -7,7 +7,6 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
 import { agentOf, forgeOf, ordered, when } from "../../app/model";
 import {
   useAnswer,
@@ -28,7 +27,6 @@ import { Button, Empty, NotBuilt, Panel, SectionLabel } from "../../components/u
 
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
-  if (r.source === "cos") return "Chief of Staff";
   if (r.kind === "blocked") return "raised by Foreman";
   if (r.kind === "review") return "request_merge()";
   return `escalate(${r.kind})`;
@@ -150,14 +148,11 @@ function ProjectRequest({
 }) {
   const navigate = useNavigate();
   const answer = useAnswer();
-  const openChiefOfStaff = useOpenChiefOfStaff();
   const agent = agentOf(teams, r.instanceId);
   const title = useEntryTitle(project.id, mr?.entry ?? "");
   const openSession = () =>
     navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
-  const fromChiefOfStaff = r.source === "cos";
-  const context =
-    fromChiefOfStaff || !agent ? `on ${project.id}` : `${agent.team.config.name} on ${project.id}`;
+  const context = agent ? `${agent.team.config.name} on ${project.id}` : `on ${project.id}`;
   const who = agent && { name: agent.soul.name, look: agent.soul.look };
   if (r.kind === "review" && mr) {
     return (
@@ -165,21 +160,14 @@ function ProjectRequest({
         request={r}
         mr={mr}
         main={project.config.main}
-        // The project repo's own forge for a config change, the code repo's otherwise.
-        forge={forgeOf(mr.repo, project)}
+        forge={forgeOf(project)}
         who={who}
         context={context}
-        // A Chief of Staff change says what it proposes in its own words.
-        reviewText={
-          fromChiefOfStaff
-            ? undefined
-            : `${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into main in ${mr.repo}.`
-        }
-        author={fromChiefOfStaff ? "the Chief of Staff" : (agent?.soul.name ?? "the lead")}
+        reviewText={`${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into ${project.config.main} in ${mr.repo}.`}
+        author={agent?.soul.name ?? "the lead"}
         variant="project"
         source={sourceLabel(r)}
         onOpenSession={openSession}
-        onOpenChiefOfStaff={() => openChiefOfStaff()}
       />
     );
   }
@@ -193,7 +181,6 @@ function ProjectRequest({
       onAnswer={(text) => answer.mutate({ request: r, answer: text })}
       answering={answer.isPending}
       onOpenSession={openSession}
-      onOpenChiefOfStaff={() => openChiefOfStaff()}
     />
   );
 }

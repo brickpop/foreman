@@ -1,6 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { isNotBuilt, type Request, type Team } from "../api/client";
-import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import {
   agentOf,
   checksSentence,
@@ -18,7 +17,6 @@ import {
   usePipeline,
   useProjects,
   useRequests,
-  useSettings,
   useSetup,
   useTeams,
 } from "../app/queries";
@@ -96,19 +94,15 @@ export function Home() {
 function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] }) {
   const navigate = useNavigate();
   const answer = useAnswer();
-  const openChiefOfStaff = useOpenChiefOfStaff();
-  const settings = useSettings();
   const projects = useProjects();
   const agent = agentOf(teams, r.instanceId);
   const main = projects.data?.find((p) => p.id === r.projectId)?.config.main ?? "main";
   const reviewText = useReviewText(r, main, agent?.soul.name);
   // A review is decided right here (home.md#request-list): its merge request
   // carries the change to look at.
-  const fromChiefOfStaff = r.source === "cos";
   const mr = useMergeRequest(r.kind === "review" ? r.mergeRequestId : "");
-  // A Chief of Staff change to a team file belongs to no project.
-  const where = r.projectId ? `on ${r.projectId}` : "";
-  const context = r.source === "cos" || !agent ? where : `${agent.team.config.name} ${where}`;
+  const where = `on ${r.projectId}`;
+  const context = agent ? `${agent.team.config.name} ${where}` : where;
   const openSession = () =>
     navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
   if (r.kind === "review" && mr.data) {
@@ -118,17 +112,13 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
         request={r}
         mr={mr.data}
         main={main}
-        forge={forgeOf(mr.data.repo, project, settings.data?.settings.workspaceForge.kind)}
-        who={
-          fromChiefOfStaff ? undefined : agent && { name: agent.soul.name, look: agent.soul.look }
-        }
+        forge={forgeOf(project)}
+        who={agent && { name: agent.soul.name, look: agent.soul.look }}
         context={context}
-        // A Chief of Staff change says what it proposes in its own words.
-        reviewText={fromChiefOfStaff ? undefined : reviewText}
-        author={fromChiefOfStaff ? "the Chief of Staff" : (agent?.soul.name ?? "the lead")}
+        reviewText={reviewText}
+        author={agent?.soul.name ?? "the lead"}
         variant="home"
         onOpenSession={openSession}
-        onOpenChiefOfStaff={() => openChiefOfStaff()}
       />
     );
   }
@@ -148,7 +138,6 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
           search: { tab: "overview" },
         })
       }
-      onOpenChiefOfStaff={() => openChiefOfStaff()}
     />
   );
 }

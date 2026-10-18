@@ -25,8 +25,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
   const project = (instance: string) => instance.split("@")[1] ?? "";
   if (e.type === "request.created") {
     const r = e.data as Request;
-    const who = r.source === "cos" ? "Chief of Staff" : name(r.instanceId);
-    // A Chief of Staff change to a team file belongs to no project.
+    const who = name(r.instanceId);
     const where = r.projectId ? ` on ${r.projectId}` : "";
     const base = { body: r.summary, instance: r.instanceId, deployment: r.deploymentId };
     if (r.kind === "review") {

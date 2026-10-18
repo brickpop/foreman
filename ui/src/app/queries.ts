@@ -48,7 +48,6 @@ export const keys = {
   actions: ["actions"],
   activity: ["activity"],
   repos: ["repos"],
-  chiefOfStaff: ["chief-of-staff"],
 } as const;
 
 export function useWorkspace() {
@@ -122,8 +121,6 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [["wiki", String((e.data as { project?: string }).project ?? "")]];
     case "pipeline.changed":
       return [["pipeline"], keys.repos];
-    case "cos.changed":
-      return [keys.chiefOfStaff];
     case "setup.changed":
       return [keys.setup, keys.maintenance];
     default:
@@ -214,8 +211,7 @@ export function useEntryTitle(project: string, path: string) {
   });
 }
 
-/** Answers a request; the list refetches. A failure, and a resolved Chief of
- * Staff review, show as toasts (app-shell.md, Toasts). */
+/** Answers a request; the list refetches. A failure shows as a toast (app-shell.md, Toasts). */
 export function useAnswer() {
   const c = useClient();
   const queries = useQueryClient();
@@ -223,15 +219,6 @@ export function useAnswer() {
   return useMutation({
     mutationFn: ({ request, answer }: { request: Request; answer: string }) =>
       c.requests.resolve(request.id, answer),
-    onSuccess: (_r, { request, answer }) => {
-      if (request.source !== "cos" || request.kind !== "review") return;
-      const merged = answer === "Merge to main";
-      toast({
-        title: request.projectId ? "project.toml" : "Team file",
-        body: merged ? "Config change merged to main." : "Config change rejected.",
-        color: merged ? "var(--ok)" : "var(--tx4)",
-      });
-    },
     onError: (e: Error) =>
       toast({ title: "Answer not sent", body: e.message, color: "var(--err)" }),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),

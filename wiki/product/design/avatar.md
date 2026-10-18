@@ -81,4 +81,4 @@ Elsewhere, status is a separate 7–8px dot next to text, not on the avatar.
 
 ## Chief of Staff
 
-The [Chief of Staff](../features/chief-of-staff.md) is shown as a 22–28px amber tile with a "C" (`--acc` background, `--accInk` letter), not a face. When a CoS request appears in a request list, it uses a fixed face: background `#E8A33D`, skin `#E2AE85`, bald, glasses, no beard.
+The [Chief of Staff](../features/chief-of-staff.md) is shown as a 28px amber tile with a "C" (`--acc` background, `--accInk` letter), not a face, in its page's header.

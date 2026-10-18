@@ -32,7 +32,7 @@ Dark is `:root`; light overrides it under `html[data-theme="light"]`.
 | `--acc` | `#E8A33D` | `#E8A33D` | Amber accent: fills, active underline, dots |
 | `--accTx` | `#E8A33D` | `#8A5200` | Accent used as text: links, the `❯` prompt, the "lead" tag |
 | `--accInk` | `#17130B` | `#17130B` | Text on an amber fill |
-| `--accSoft` | `#1A1610` | `#FBF1DF` | Selected option background, "me" chat bubble, CoS sidebar tile |
+| `--accSoft` | `#1A1610` | `#FBF1DF` | Selected option background, "me" chat bubble |
 | `--accLine` | `#3A3020` | `#EBCF9E` | Border of `--accSoft` surfaces, "lead" tag border |
 | `--ok` | `#6FCF8E` | `#23824A` | Running, success, "token set" |
 | `--info` | `#7AA7E8` | `#2B66B5` | Done, question kind, info callout |

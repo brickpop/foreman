@@ -50,11 +50,11 @@ type Request struct {
 	ID             string    `json:"id"`
 	Kind           string    `json:"kind"` // approval, question, review, finding or blocked
 	ProjectID      string    `json:"projectId"`
-	DeploymentID   string    `json:"deploymentId"` // "" for the Chief of Staff
-	InstanceID     string    `json:"instanceId"`   // who raised it, or who it is about; "" for the Chief of Staff
+	DeploymentID   string    `json:"deploymentId"` // "" with no instance
+	InstanceID     string    `json:"instanceId"`   // who raised it, or who it is about; "" when Foreman raised it about no instance
 	Summary        string    `json:"summary"`
 	Options        []string  `json:"options"` // the first is the primary action
-	Source         string    `json:"source"`  // agent, harness, foreman or cos
+	Source         string    `json:"source"`  // agent, harness or foreman
 	Status         string    `json:"status"`  // open, resolved or expired
 	Answer         string    `json:"answer"`
 	CreatedAt      time.Time `json:"createdAt"`
@@ -130,10 +130,10 @@ type WorkItem struct {
 // (wiki/product/models/merge-request.md).
 type MergeRequest struct {
 	ID             string    `json:"id"`
-	ProjectID      string    `json:"projectId"`    // "" for a Chief of Staff change to the workspace repo
-	DeploymentID   string    `json:"deploymentId"` // "" for a Chief of Staff change
+	ProjectID      string    `json:"projectId"`
+	DeploymentID   string    `json:"deploymentId"`
 	AuthorInstance string    `json:"authorInstance"`
-	Repo           string    `json:"repo"` // a code repo, "project" or "workspace"
+	Repo           string    `json:"repo"` // one of the project's code repos
 	Branch         string    `json:"branch"`
 	Entry          string    `json:"entry"` // the wiki card explaining the work
 	State          string    `json:"state"` // open, merged or rejected

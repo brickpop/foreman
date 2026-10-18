@@ -224,7 +224,6 @@ describe("httpClient", () => {
     for (const call of [
       () => c.requests.resolve("req-1", "yes"),
       () => c.pipeline.createPr("mr-1"),
-      () => c.chiefOfStaff.send("hi"),
     ]) {
       const e = await call().catch((e: unknown) => e);
       expect(isNotBuilt(e)).toBe(true);

@@ -22,7 +22,7 @@ While any setup step is left, Home starts with the setup checklist, above the re
 One **request panel** per open [request](../models/request.md), across all projects (gap 10). The kinds, their actions and their effect are defined in [Requests](./requests.md). Home and the project's Overview ([Needs you](./project-pipeline.md#1-needs-you)) use the same request panel component, so they can't drift: approvals and questions carry the free-text answer field here too. The differences below are only the extra context Needs you adds (source line, PR link).
 
 - **Request panel**: `--panel`, radius 12, padding `18px 20px`, gap 14. The whole panel opens its agent's session ([Sessions](./sessions.md)); its buttons, links and answer field keep their own action, and selecting text opens nothing. A Foreman-raised request (no agent) opens nothing.
-- **Header row**: Avatar 32 with an amber ring ([Avatar](../design/avatar.md)), the agent name (600; avatar and name are a button doing the same, the keyboard path), the context (13px `--tx4`): `<Team> on <project>`, or `on <project>` for a Chief of Staff item; a spacer; the kind chip.
+- **Header row**: Avatar 32 with an amber ring ([Avatar](../design/avatar.md)), the agent name (600; avatar and name are a button doing the same, the keyboard path), the context (13px `--tx4`): `<Team> on <project>`; a spacer; the kind chip.
 - **Text**: the request summary, 16px, line-height 1.5.
 - **Buttons** (wrap, gap 8), styled by position ([Design system](../design/design-system.md#buttons)):
   - Approval: its options (e.g. `Approve` / `Deny`). No `Open session` button: the card itself opens the session.

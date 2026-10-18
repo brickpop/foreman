@@ -1,16 +1,15 @@
 import { useState } from "react";
 import type { MergeRequest, Request } from "../api/client";
 import type { Look } from "../api/types/workspace";
-import { filesChanged, linkLine } from "../app/model";
-import { useDiff } from "../app/queries";
+import { linkLine } from "../app/model";
 import { DiffView } from "./DiffView";
 import { DecisionButtons, RejectForm, useMergeDecision } from "./MergeDecision";
 import { RequestPanel } from "./RequestPanel";
 
 // A review request with its merge request: what to look at (the link line
 // opens the change) and what to decide: Merge to main, Create PR on the forge,
-// or Reject with a message that goes back to its author. Home (Chief of Staff
-// changes) and a project's Overview use this same panel (wiki/product/features/changes.md).
+// or Reject with a message that goes back to the lead. Home and a project's
+// Overview use this same panel (wiki/product/features/changes.md).
 
 export function ReviewPanel({
   request: r,
@@ -24,7 +23,6 @@ export function ReviewPanel({
   variant,
   source,
   onOpenSession,
-  onOpenChiefOfStaff,
 }: {
   request: Request;
   mr: MergeRequest;
@@ -35,18 +33,15 @@ export function ReviewPanel({
   who?: { name: string; look: Look };
   context: string;
   reviewText?: string;
-  /** Who a rejection is sent to: the lead, or the Chief of Staff. */
+  /** Who a rejection is sent to: the lead. */
   author: string;
   variant: "home" | "project";
   source?: string;
   onOpenSession: () => void;
-  onOpenChiefOfStaff: () => void;
 }) {
   const decision = useMergeDecision(mr);
   const [viewing, setViewing] = useState(false);
-  // A Chief of Staff change has no checks: its line says how many files it changes.
-  const diff = useDiff(mr.authorInstance === "cos" ? mr.id : "");
-  const line = linkLine(mr, forge, diff.data ? filesChanged(diff.data) : undefined, main);
+  const line = linkLine(mr, forge, main);
   return (
     <div className="flex flex-col gap-2">
       <RequestPanel
@@ -58,7 +53,6 @@ export function ReviewPanel({
         reviewText={reviewText}
         onAnswer={() => {}}
         onOpenSession={onOpenSession}
-        onOpenChiefOfStaff={onOpenChiefOfStaff}
         actions={<DecisionButtons decision={decision} mr={mr} main={main} forge={forge} />}
       >
         {/* The change itself: the PR on the forge once there is one, its diff before. */}

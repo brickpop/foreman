@@ -14,7 +14,7 @@ A two-column grid: sidebar **220px**, main area `minmax(0, 1fr)`, full viewport 
 
 **One breakpoint** (basic responsiveness): under ~760px the sidebar collapses behind a menu button at the top left and opens as an overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)).
 
-Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./wiki-reader.md) with the [project pipeline](./project-pipeline.md)'s Needs you, [Board](./board.md), [Repositories](./repositories.md), [Activity](./project-activity.md), [Project settings](./project-settings.md)), [Team](./team-page.md), [Agent](./agent-page.md), [Settings](./settings.md). The app opens on Home (or the last screen, see [UI state](../models/ui-state.md)).
+Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./wiki-reader.md) with the [project pipeline](./project-pipeline.md)'s Needs you, [Board](./board.md), [Repositories](./repositories.md), [Activity](./project-activity.md), [Project settings](./project-settings.md)), [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on Home (or the last screen, see [UI state](../models/ui-state.md)).
 
 ## Sidebar
 
@@ -27,7 +27,6 @@ Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./
    - **Teams** label, then one row per team with, right-aligned (12px `--tx4`), where it is deployed: the project id if one deployment, `N projects` if more, `—` if none. A team row is active on its Team page and on the Agent page of any of its members. Then **`+ New team`**, which opens the [Chief of Staff](./chief-of-staff.md) "Create a team" flow.
    - Section labels are plain labels: not links, not collapsible. There is no Teams index screen (the prototype has one that nothing links to): the sidebar already lists every team.
 3. **Footer** (padding `12px 10px`, top border):
-   - **Chief of Staff tile**: padding `9px 10px`, radius 8, `--accLine` border, `--accSoft` background. A 24×24 amber "C" tile (radius 6), "Chief of Staff" (600 13px) and "Create and refine teams" (11.5px `--tx3`). Click opens the [Chief of Staff page](./chief-of-staff.md#the-page) with no opening line.
    - **Settings row**: "Settings" with the listen address on the right (e.g. `localhost:8888`, Mono 11.5px `--tx4`). Opens [Settings](./settings.md).
 
 Data: projects, teams and deployments from the workspace ([Workspace](../models/workspace.md), [Deployment](../models/deployment.md)); the badge and dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).

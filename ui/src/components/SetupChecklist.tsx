@@ -134,7 +134,7 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
       );
     case "team":
       return (
-        <Button variant="small" onClick={() => openChiefOfStaff({ flow: "create-team" })}>
+        <Button variant="small" onClick={() => openChiefOfStaff({ start: "create-team" })}>
           Create a team
         </Button>
       );

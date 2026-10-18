@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
-import { filesChanged, forgeOf, linkLine } from "../../app/model";
+import { forgeOf, linkLine } from "../../app/model";
 import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
 import { columnLabel, laneLabel, moveOf } from "./Board";
 import { sourceLabel } from "./Pipeline";
@@ -47,21 +47,15 @@ describe("Changes", () => {
   it("names each request's source", () => {
     const r = (kind: string, source = "agent") => ({ kind, source }) as Request;
     expect(
-      [
-        r("approval"),
-        r("question"),
-        r("finding"),
-        r("review"),
-        r("blocked", "foreman"),
-        r("review", "cos"),
-      ].map(sourceLabel),
+      [r("approval"), r("question"), r("finding"), r("review"), r("blocked", "foreman")].map(
+        sourceLabel,
+      ),
     ).toEqual([
       "escalate(approval)",
       "escalate(question)",
       "escalate(finding)",
       "request_merge()",
       "raised by Foreman",
-      "Chief of Staff",
     ]);
   });
 
@@ -75,20 +69,12 @@ describe("Changes", () => {
       "lead/atlas/integration → main · conflicts with main",
     );
     expect(linkLine({ ...mr, checksStatus: "" }, "none")).toBe("lead/atlas/integration → main");
-    expect(linkLine({ ...mr, checksStatus: "running" }, "none", undefined, "develop")).toBe(
+    expect(linkLine({ ...mr, checksStatus: "running" }, "none", "develop")).toBe(
       "lead/atlas/integration → develop · checks running",
     );
-    expect(linkLine({ ...mr, conflicting: true }, "none", undefined, "develop")).toBe(
+    expect(linkLine({ ...mr, conflicting: true }, "none", "develop")).toBe(
       "lead/atlas/integration → develop · conflicts with develop",
     );
-    // A Chief of Staff change has no checks: it says how many files it changes.
-    const cos = {
-      branch: "foreman/config-1",
-      authorInstance: "cos",
-      checksStatus: "",
-    } as MergeRequest;
-    expect(linkLine(cos, "none", 1)).toBe("foreman/config-1 → main · 1 file changed");
-    expect(linkLine(cos, "none", 2)).toBe("foreman/config-1 → main · 2 files changed");
   });
 });
 
@@ -118,22 +104,13 @@ describe("Add a project", () => {
   });
 });
 
-describe("filesChanged", () => {
-  it("counts the files of a unified diff", () => {
-    expect(filesChanged("--- a/x\n+++ b/x\n+one\n--- a/y\n+++ b/y\n-two")).toBe(2);
-    expect(filesChanged("")).toBe(0);
-  });
-});
-
 describe("forgeOf", () => {
-  const project = (kind: string, projectRepo = "") =>
-    ({ config: { forge: { kind, url: "", projectRepo } } }) as unknown as Project;
-  it("finds the forge of the repo a merge request targets", () => {
-    expect(forgeOf("api", project("github"))).toBe("github");
-    expect(forgeOf("project", project("github"))).toBe("none"); // the project repo isn't on it
-    expect(forgeOf("project", project("github", "https://x/ledger-project"))).toBe("github");
-    expect(forgeOf("workspace", undefined, "gitea")).toBe("gitea");
-    expect(forgeOf("api", undefined)).toBe("none");
+  const project = (kind: string) =>
+    ({ config: { forge: { kind, url: "", projectRepo: "" } } }) as unknown as Project;
+  it("is the project's forge, or none without a project", () => {
+    expect(forgeOf(project("github"))).toBe("github");
+    expect(forgeOf(project("none"))).toBe("none");
+    expect(forgeOf(undefined)).toBe("none");
   });
 });
 

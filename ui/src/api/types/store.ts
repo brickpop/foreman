@@ -53,11 +53,11 @@ export interface Request {
   id: string;
   kind: string; // approval, question, review, finding or blocked
   projectId: string;
-  deploymentId: string; // "" for the Chief of Staff
-  instanceId: string; // who raised it, or who it is about; "" for the Chief of Staff
+  deploymentId: string; // "" with no instance
+  instanceId: string; // who raised it, or who it is about; "" when Foreman raised it about no instance
   summary: string;
   options: string[]; // the first is the primary action
-  source: string; // agent, harness, foreman or cos
+  source: string; // agent, harness or foreman
   status: string; // open, resolved or expired
   answer: string;
   createdAt: string /* RFC 3339 */;
@@ -141,10 +141,10 @@ export interface WorkItem {
  */
 export interface MergeRequest {
   id: string;
-  projectId: string; // "" for a Chief of Staff change to the workspace repo
-  deploymentId: string; // "" for a Chief of Staff change
+  projectId: string;
+  deploymentId: string;
   authorInstance: string;
-  repo: string; // a code repo, "project" or "workspace"
+  repo: string; // one of the project's code repos
   branch: string;
   entry: string; // the wiki card explaining the work
   state: string; // open, merged or rejected

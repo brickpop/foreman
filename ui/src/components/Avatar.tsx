@@ -12,16 +12,6 @@ const defaults: Look = {
   beard: "none",
 };
 
-/** The Chief of Staff's fixed face, when one of its requests sits in a list. */
-export const chiefOfStaffLook: Look = {
-  color: "#E8A33D",
-  skin: "#E2AE85",
-  hair: "bald",
-  hairColor: "#2B2420",
-  eyes: "glasses",
-  beard: "none",
-};
-
 const ink = "#1A1A1A";
 const beardPath =
   "M8.7 17.5 C9.2 24.5 12.8 26.6 16 26.6 C19.2 26.6 22.8 24.5 23.3 17.5 C22.2 21.6 19.6 23.2 16 23.2 C12.4 23.2 9.8 21.6 8.7 17.5 Z";

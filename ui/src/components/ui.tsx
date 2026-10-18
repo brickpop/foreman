@@ -123,23 +123,6 @@ export function Segmented<T extends string>({
   );
 }
 
-/** An on/off button with the segmented look (Split, Messages). */
-export function Toggle({
-  on,
-  onChange,
-  children,
-}: {
-  on: boolean;
-  onChange: (on: boolean) => void;
-  children: ReactNode;
-}) {
-  return (
-    <button type="button" aria-pressed={on} onClick={() => onChange(!on)} className={segment(on)}>
-      {children}
-    </button>
-  );
-}
-
 function segment(on: boolean) {
   return `rounded-[6px] border px-3 py-1 text-[13px] focus-visible:outline-2 focus-visible:outline-acc disabled:opacity-45 ${
     on

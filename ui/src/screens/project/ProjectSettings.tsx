@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import { useOpenChiefOfStaff } from "../../app/chiefOfStaff";
 import { agentOf, forgeLabel, harnessLabel, profileOf, when } from "../../app/model";
 import {
   keys,
@@ -128,7 +127,6 @@ function Teams({ project, onDeploy }: { project: Project; onDeploy: () => void }
 
 function Configuration({ project }: { project: Project }) {
   const workspace = useWorkspace();
-  const openChiefOfStaff = useOpenChiefOfStaff();
   const root = workspace.data?.path ?? "~/agents-ws";
   const forge = project.config.forge;
   const repos = project.repos;
@@ -136,7 +134,7 @@ function Configuration({ project }: { project: Project }) {
     `${root}/`,
     "├─ .foreman/          workspace repo (git)",
     "│  ├─ teams/          team definitions (souls, playbooks)",
-    "│  ├─ cos/            Chief of Staff session",
+    "│  ├─ cos/            Chief of Staff (its own folder)",
     "│  └─ state.db        deployments, sessions, requests (runtime)",
     `└─ ${project.id}/`,
     "   ├─ project/        project repo (git)",
@@ -239,20 +237,11 @@ function Configuration({ project }: { project: Project }) {
           )}
         </Block>
         <Block title="project.toml">
-          <span className="flex items-center gap-3">
-            <span className="font-mono text-[12.5px] text-tx3">
-              {project.id}/project/project.toml · read-only
-            </span>
-            <Button
-              variant="small"
-              onClick={() => openChiefOfStaff({ flow: "project-config", project: project.id })}
-            >
-              Change with Chief of Staff
-            </Button>
+          <span className="font-mono text-[12.5px] text-tx3">
+            {project.id}/project/project.toml · read-only
           </span>
           <p className="m-0 text-[13.5px] text-tx2">
-            This file is config, committed in the project repo. Edit it in your editor, or have the
-            Chief of Staff edit it. Its change then comes back to you on the Overview, as a review.
+            This file is config, committed in the project repo. Edit it in your editor.
           </p>
           {project.problems.length > 0 && (
             <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">

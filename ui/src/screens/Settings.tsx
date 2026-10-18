@@ -582,7 +582,7 @@ function ForgeRow({
   );
 }
 
-/** Where the workspace repo is hosted, so the Chief of Staff's changes can become PRs there. */
+/** Where the workspace repo is hosted, so Sync can push its main there. */
 function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connected: string[] }) {
   const save = useSave();
   const current = settings.workspaceForge;
@@ -605,8 +605,8 @@ function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connec
       <div className="flex flex-col gap-0.5">
         <span className="font-medium">Workspace repo</span>
         <span className="text-[13.5px] leading-[1.5] text-tx3">
-          Where your team definitions are hosted, so the Chief of Staff’s changes can become PRs
-          there. Without a forge you merge them locally. Nothing is pushed automatically.
+          Where your team definitions are hosted, so Sync can push them there. Without a forge they
+          stay on this machine. Nothing is pushed automatically.
         </span>
       </div>
       <Segmented

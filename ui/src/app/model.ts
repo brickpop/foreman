@@ -203,35 +203,22 @@ export function forgeLabel(kind: string): string {
   return forgeLabels[kind] ?? kind;
 }
 
-/** How many files a unified diff touches. */
-export function filesChanged(diff: string): number {
-  return diff.split("\n").filter((l) => l.startsWith("+++ ")).length;
-}
-
-/** A merge request's link line: its PR, its branch, and its checks, or for a
- * Chief of Staff change (no checks) how many files it changes. */
-export function linkLine(mr: MergeRequest, forge: string, files?: number, main = "main"): string {
+/** A merge request's link line: its PR, its branch, and its checks. */
+export function linkLine(mr: MergeRequest, forge: string, main = "main"): string {
   const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
   // No checks status: the project has no checks (or they haven't run): nothing to say.
   const tail = mr.conflicting
     ? `conflicts with ${main}`
-    : mr.authorInstance === "cos"
-      ? `${plural(files ?? 0, "file")} changed`
-      : mr.checksStatus
-        ? `checks ${mr.checksStatus}`
-        : "";
+    : mr.checksStatus
+      ? `checks ${mr.checksStatus}`
+      : "";
   return `${pr}${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
 }
 
-/** The forge of the repo a merge request targets ("none": no Create PR): a
- * code repo's is the project's; the project repo's only when it has one on the
- * forge; the workspace repo's from the workspace settings. */
-export function forgeOf(repo: string, project?: Project, workspaceForge = "none"): string {
-  if (repo === "workspace") return workspaceForge;
-  if (!project) return "none";
-  if (repo === "project")
-    return project.config.forge.projectRepo ? project.config.forge.kind : "none";
-  return project.config.forge.kind;
+/** The forge a merge request can become a PR on ("none": no Create PR): its
+ * project's, since merge requests are on the project's code repos. */
+export function forgeOf(project?: Project): string {
+  return project?.config.forge.kind ?? "none";
 }
 
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

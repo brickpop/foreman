@@ -1,7 +1,7 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
 import type { Look } from "../api/types/workspace";
-import { Avatar, chiefOfStaffLook } from "./Avatar";
+import { Avatar } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
 // One request to the CEO. Home and a project's Overview (Needs you) use this same panel,
@@ -10,9 +10,9 @@ import { Button, KindChip } from "./ui";
 
 type Props = {
   request: Request;
-  /** Who raised it; undefined for the Chief of Staff. */
+  /** Who raised it; undefined when Foreman did. */
   who?: { name: string; look: Look };
-  /** `<Team> on <project>`, or `on <project>` for the Chief of Staff. */
+  /** `<Team> on <project>`. */
   context: string;
   /** For a review: the sentence that replaces the summary. */
   reviewText?: string;
@@ -22,7 +22,6 @@ type Props = {
   onOpenSession: () => void;
   /** Home: a review's Review button (opens the project's Overview). */
   onReview?: () => void;
-  onOpenChiefOfStaff: () => void;
   /** Home: avatar 32 with the amber ring. A project: kind chip first, avatar 24, the source. */
   variant?: "home" | "project";
   /** A project: where it came from (`escalate(approval)`, `request_merge()`…). */
@@ -42,24 +41,21 @@ export function RequestPanel({
   answering = false,
   onOpenSession,
   onReview,
-  onOpenChiefOfStaff,
   variant = "home",
   source,
   children,
   actions,
 }: Props) {
-  const fromChiefOfStaff = r.source === "cos";
   const onProject = variant === "project";
   const [answer, setAnswer] = useState("");
   const freeText = r.kind === "approval" || r.kind === "question";
-  const look = fromChiefOfStaff ? chiefOfStaffLook : who?.look;
-  // On Home the whole card opens who raised it (its session, or the Chief of
-  // Staff); its controls keep their own action, and selecting text opens nothing.
-  const opens = !onProject && (fromChiefOfStaff || r.instanceId !== "");
+  // On Home the whole card opens the session of who raised it; its controls keep
+  // their own action, and selecting text opens nothing.
+  const opens = !onProject && r.instanceId !== "";
   const openCard = (e: MouseEvent<HTMLElement>) => {
     if (!opens || (e.target as HTMLElement).closest("a, button, input, textarea, label")) return;
     if (window.getSelection()?.toString()) return;
-    (fromChiefOfStaff ? onOpenChiefOfStaff : onOpenSession)();
+    onOpenSession();
   };
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the name button is the keyboard path
@@ -69,28 +65,25 @@ export function RequestPanel({
     >
       <header className="flex items-center gap-2.5">
         {onProject && <KindChip kind={r.kind} />}
-        {/* Who raised it opens their session (the Chief of Staff: its drawer). With no
-            agent behind it, Foreman raised it (a crash, a failed build): nothing to open. */}
-        {fromChiefOfStaff || r.instanceId ? (
+        {/* Who raised it opens their session. With no agent behind it, Foreman raised it (a crash, a failed build): nothing to open. */}
+        {r.instanceId ? (
           <button
             type="button"
-            onClick={fromChiefOfStaff ? onOpenChiefOfStaff : onOpenSession}
-            title={fromChiefOfStaff ? "Open Chief of Staff" : "Open the session"}
+            onClick={onOpenSession}
+            title="Open the session"
             className="flex items-center gap-2.5 text-left"
           >
             <Avatar
-              look={look}
+              look={who?.look}
               size={onProject ? 24 : 32}
               ring={onProject ? undefined : "var(--acc)"}
             />
-            <span className="font-semibold">
-              {fromChiefOfStaff ? "Chief of Staff" : (who?.name ?? r.instanceId)}
-            </span>
+            <span className="font-semibold">{who?.name ?? r.instanceId}</span>
           </button>
         ) : (
           <>
             <Avatar
-              look={look}
+              look={who?.look}
               size={onProject ? 24 : 32}
               ring={onProject ? undefined : "var(--acc)"}
             />
@@ -130,12 +123,7 @@ export function RequestPanel({
           ))}
         {/* On Home the card itself opens it; on a project this button does. Nothing to
             open for a Foreman-raised request. */}
-        {onProject && fromChiefOfStaff && (
-          <Button variant="ghost" onClick={onOpenChiefOfStaff}>
-            Open Chief of Staff
-          </Button>
-        )}
-        {onProject && !fromChiefOfStaff && r.instanceId !== "" && (
+        {onProject && r.instanceId !== "" && (
           <Button variant="ghost" onClick={onOpenSession}>
             Open session
           </Button>
@@ -155,7 +143,7 @@ export function RequestPanel({
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             placeholder="Or type an answer…"
-            aria-label={`Answer ${who?.name ?? "the Chief of Staff"}`}
+            aria-label={`Answer ${who?.name ?? r.instanceId}`}
             className="min-w-[180px] flex-1 rounded-[7px] border border-line2 bg-term px-3 py-[7px] text-tx placeholder:text-tx4 focus-visible:outline-2 focus-visible:outline-acc"
           />
         </form>

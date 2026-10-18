@@ -1,10 +1,12 @@
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { Agent } from "../screens/Agent";
+import { ChiefOfStaff } from "../screens/ChiefOfStaff";
 import { Home } from "../screens/Home";
 import { Project, type ProjectTab } from "../screens/Project";
 import { Sessions } from "../screens/Sessions";
 import { Settings, type SettingsTab } from "../screens/Settings";
 import { Team, type TeamTab } from "../screens/Team";
+import { cosSearch } from "./chiefOfStaff";
 import { Shell } from "./Shell";
 import type { SessionsSearch } from "./sessions";
 
@@ -54,6 +56,13 @@ export const agentRoute = createRoute({
   component: Agent,
 });
 
+const chiefOfStaff = createRoute({
+  getParentRoute: () => root,
+  path: "chief-of-staff",
+  validateSearch: cosSearch,
+  component: ChiefOfStaff,
+});
+
 const settings = createRoute({
   getParentRoute: () => root,
   path: "settings",
@@ -64,7 +73,15 @@ const settings = createRoute({
 });
 
 export const router = createRouter({
-  routeTree: root.addChildren([home, sessions, projectRoute, teamRoute, agentRoute, settings]),
+  routeTree: root.addChildren([
+    home,
+    sessions,
+    projectRoute,
+    teamRoute,
+    agentRoute,
+    chiefOfStaff,
+    settings,
+  ]),
 });
 
 declare module "@tanstack/react-router" {

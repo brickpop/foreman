@@ -55,8 +55,3 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Why:** a harness gives no acknowledgement that a line reached its prompt; each known dialog is switched off in the config Foreman writes.
 - **Fix:** the Claude Code integration tests (`just test-claude`) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
 
-## The Chief of Staff drawer is the earlier design
-
-- **State:** the UI still has the Chief of Staff drawer (chat bubbles, chips, panels; its types and `cos.changed` defined in `ui/src/api/client.ts`, not generated from Go), review requests from it (`source: cos`) on Home and Changes, and Project settings' `Change with Chief of Staff`. The drawer says "Not built yet".
-- **Why:** the design changed (the CEO, 2026-10-18): a terminal on its own page, teams only, proposals instead of reviews ([Chief of Staff](./product/features/chief-of-staff.md)).
-- **Fix:** removed first thing in [Create a team, hire, refine](./backlog/cos-create-team.md).

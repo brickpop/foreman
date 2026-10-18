@@ -1,18 +1,10 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  type CosEntry,
-  type Instance,
-  type Project,
-  type Request,
-  type Team,
-  useClient,
-} from "../api/client";
+import type { Instance, Project, Request, Team } from "../api/client";
 import { AddProject } from "../components/AddProject";
-import { ChiefOfStaffDrawer } from "../components/ChiefOfStaffDrawer";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
-import { ChiefOfStaffContext } from "./chiefOfStaff";
+import { useOpenChiefOfStaff } from "./chiefOfStaff";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
 import {
   useInstances,
@@ -28,13 +20,6 @@ import {
 // sidebar, the main area, and the overlays.
 
 export function Shell() {
-  const client = useClient();
-  const [chiefOfStaff, setChiefOfStaff] = useState(false);
-  const openChiefOfStaff = (entry: CosEntry = { flow: "open" }) => {
-    setChiefOfStaff(true);
-    // A failure shows in the drawer, where the conversation fails to load too.
-    client.chiefOfStaff.start(entry).catch(() => {});
-  };
   // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
   useEffect(() => {
@@ -45,44 +30,40 @@ export function Shell() {
   }, [menu]);
   const [addProject, setAddProject] = useState(false);
   return (
-    <ChiefOfStaffContext.Provider value={openChiefOfStaff}>
-      <Toasts>
-        <LiveEvents />
-        <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
+    <Toasts>
+      <LiveEvents />
+      <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
+        <button
+          type="button"
+          aria-label="Menu"
+          aria-expanded={menu}
+          onClick={() => setMenu(true)}
+          className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side px-2.5 py-1 text-tx2 max-[760px]:block"
+        >
+          ☰
+        </button>
+        {menu && (
           <button
             type="button"
-            aria-label="Menu"
-            aria-expanded={menu}
-            onClick={() => setMenu(true)}
-            className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side px-2.5 py-1 text-tx2 max-[760px]:block"
-          >
-            ☰
-          </button>
-          {menu && (
-            <button
-              type="button"
-              aria-label="Close the menu"
-              tabIndex={-1}
-              onClick={() => setMenu(false)}
-              className="fixed inset-0 z-[35] hidden bg-black/40 max-[760px]:block"
-            />
-          )}
-          <Sidebar
-            onChiefOfStaff={openChiefOfStaff}
-            onAddProject={() => setAddProject(true)}
-            open={menu}
-            onClose={() => setMenu(false)}
+            aria-label="Close the menu"
+            tabIndex={-1}
+            onClick={() => setMenu(false)}
+            className="fixed inset-0 z-[35] hidden bg-black/40 max-[760px]:block"
           />
-          {/* Under 760px the content starts below the menu button. */}
-          <main className="min-h-0 min-w-0 overflow-auto max-[760px]:pt-12">
-            <Outlet />
-          </main>
-        </div>
-        <ChiefOfStaffDrawer open={chiefOfStaff} onClose={() => setChiefOfStaff(false)} />
-        {/* Mounted only while open: each opening starts fresh. */}
-        {addProject && <AddProject open onClose={() => setAddProject(false)} />}
-      </Toasts>
-    </ChiefOfStaffContext.Provider>
+        )}
+        <Sidebar
+          onAddProject={() => setAddProject(true)}
+          open={menu}
+          onClose={() => setMenu(false)}
+        />
+        {/* Under 760px the content starts below the menu button. */}
+        <main className="min-h-0 min-w-0 overflow-auto max-[760px]:pt-12">
+          <Outlet />
+        </main>
+      </div>
+      {/* Mounted only while open: each opening starts fresh. */}
+      {addProject && <AddProject open onClose={() => setAddProject(false)} />}
+    </Toasts>
   );
 }
 
@@ -127,17 +108,16 @@ const rowItem =
   "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
 
 function Sidebar({
-  onChiefOfStaff,
   onAddProject,
   open,
   onClose,
 }: {
-  onChiefOfStaff: (entry?: CosEntry) => void;
   onAddProject: () => void;
   /** Open as an overlay, on narrow screens. */
   open: boolean;
   onClose: () => void;
 }) {
+  const openChiefOfStaff = useOpenChiefOfStaff();
   const projects = useProjects();
   const teams = useTeams();
   const instances = useInstances();
@@ -216,7 +196,7 @@ function Sidebar({
           ))}
           <button
             type="button"
-            onClick={() => onChiefOfStaff({ flow: "create-team" })}
+            onClick={() => openChiefOfStaff({ start: "create-team" })}
             className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
           >
             + New team
@@ -224,19 +204,6 @@ function Sidebar({
         </section>
       </div>
       <footer className="flex flex-col gap-1 border-t border-line px-2.5 py-3">
-        <button
-          type="button"
-          onClick={() => onChiefOfStaff()}
-          className="flex items-center gap-2.5 rounded-lg border border-accLine bg-accSoft px-2.5 py-[9px] text-left"
-        >
-          <span className="grid size-6 place-items-center rounded-md bg-acc font-mono text-xs font-bold text-accInk">
-            C
-          </span>
-          <span className="flex flex-col">
-            <span className="text-[13px] font-semibold">Chief of Staff</span>
-            <span className="text-[11.5px] text-tx3">Hire, set up, anything else</span>
-          </span>
-        </button>
         <Link to="/settings" className={rowItem} activeProps={navActive}>
           Settings
           <span className="font-mono text-[11.5px] text-tx4">localhost:{port}</span>
@@ -262,7 +229,7 @@ function LiveEvents() {
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
     if (!n) return;
-    // No instance (the Chief of Staff, Foreman itself): the request waits on Home.
+    // No instance (Foreman itself): the request waits on Home.
     const open = () =>
       n.instance
         ? navigate({ to: "/sessions", search: { deployment: n.deployment, agent: n.instance } })

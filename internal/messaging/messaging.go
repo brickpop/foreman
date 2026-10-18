@@ -344,7 +344,7 @@ func (m *Messenger) Sweep(ctx context.Context) error {
 	return nil
 }
 
-// Traffic is a deployment's messages, oldest first (the Messages drawer).
+// Traffic is a deployment's messages, oldest first (the Sessions activity panel).
 func (m *Messenger) Traffic(ctx context.Context, deployment string) ([]store.TeamMessage, error) {
 	return m.Messages.List(ctx, deployment)
 }

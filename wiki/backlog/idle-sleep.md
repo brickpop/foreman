@@ -1,12 +1,14 @@
 ---
 type: task
 status: todo
-priority: low
+priority: high
 tags: [feature]
 epic: workflow
 ---
 
 # Put idle agents to sleep (a setting, off by default)
+
+**Seen 2026-10-18:** with 7 agents and 6 slots, Lumen stayed `queued` behind five idle agents and its messages never arrived (the CEO read it as a delivery bug). The Activity panel now says why a message waits, but nothing frees the slot. Next after the Chief of Staff (the CEO, 2026-10-18).
 
 **Why:** an agent that is done and waits for nothing still holds a container, a session slot (12 by default) and memory. Asleep, it holds none, and a message or the CEO's Start wakes it with its conversation ([Agent runtime → Lazy starts](../product/architecture/agent-runtime.md#lazy-starts)). A clean exit (`/exit`) already does this (built 2026-10-16). What's left is Foreman doing it on its own.
 

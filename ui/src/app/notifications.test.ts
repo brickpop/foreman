@@ -71,6 +71,28 @@ describe("noticeFor", () => {
     }
   });
 
+  it("warns, as a toast only, when an agent waits for a session slot", () => {
+    const queued = noticeFor(
+      { type: "instance.status", data: { id: "tove@ledger", status: "queued" } },
+      [team],
+      instances,
+    );
+    expect(queued).toMatchObject({
+      title: "Tove is waiting for a session slot",
+      instance: "tove@ledger",
+    });
+    expect(queued?.toggle).toBeUndefined();
+    vi.stubGlobal("Notification", { permission: "granted" });
+    expect(
+      notifiesBrowser(
+        queued as Notice,
+        { needsMe: true, finishes: true, mergeRequested: true },
+        true,
+      ),
+    ).toBe(false);
+    vi.unstubAllGlobals();
+  });
+
   it("ignores everything else", () => {
     for (const type of ["request.resolved", "team.message", "wiki.changed", "config.changed"]) {
       expect(noticeFor({ type, data: {} }, [team], instances)).toBeUndefined();

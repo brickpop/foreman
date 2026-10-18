@@ -56,7 +56,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 
 ## Concurrency
 
-- Workspace setting `max running sessions` (default 12, 1–64; [Workspace settings](../models/workspace-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up.
+- Workspace setting `max running sessions` (default 12, 1–64; [Workspace settings](../models/workspace-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up. Only an instance that actually waits shows `queued` (one that gets a slot at once goes straight to `starting`; the CEO, 2026-10-18: a passing `queued` warned them about slots for nothing). Raising the limit starts those that now fit at once (any change to `settings.toml`, from the UI or an editor); lowering it stops nothing.
 - A slot is held by every instance whose container is running, including one waiting on an approval or a reply. An `asleep` instance holds none. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the [Prove epic](../../backlog/epics/prove.md) shows which harnesses support it.
 - The Chief of Staff's session does not count towards the limit: it isn't an agent of a deployment, and the CEO must always be able to reach it ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)).
 

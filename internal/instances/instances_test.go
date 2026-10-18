@@ -438,6 +438,46 @@ func TestTheConcurrencyLimitQueues(t *testing.T) {
 	}
 }
 
+// With a slot free, an agent goes straight from asleep to starting: never
+// queued, which would warn the CEO about slots for nothing.
+func TestAFreeSlotNeverShowsQueued(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Running)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, e := range f.events {
+		if c, ok := e.Data.(StatusChange); ok && c.Status == Queued {
+			t.Errorf("%s was queued with slots free", c.ID)
+		}
+	}
+}
+
+// Raising the limit starts who waited, without anything else happening.
+func TestARaisedLimitStartsTheQueued(t *testing.T) {
+	f := newFixture(t, keepsRunning, 1)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	_ = f.m.Wake(ctx, "tove@ledger")
+	f.waitStatus("tove@ledger", Queued)
+	settings := f.ws.Settings()
+	s := settings.Settings
+	s.MaxSessions = 2
+	if _, err := f.ws.SaveSettings(ctx, s, settings.Version); err != nil {
+		t.Fatal(err)
+	}
+	f.m.LimitChanged()
+	f.waitStatus("tove@ledger", Running)
+}
+
 // A crash restarts once; a second one stops the instance. The fake harness
 // keeps no conversation, so its restart starts fresh and gets the goal again
 // (Claude Code's continues instead: its adapter's tests).

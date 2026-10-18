@@ -4,6 +4,7 @@ import { when } from "../../app/model";
 import { useRepoFile, useRepoLog, useRepos, useRepoTree, useTeams } from "../../app/queries";
 import { branchOwner, bytes, crumbs, folderOf, isMarkdown } from "../../app/repos";
 import { FileMarkdown } from "../../components/Markdown";
+import { Select } from "../../components/Select";
 import { Button, Empty, Panel, SectionLabel, Segmented } from "../../components/ui";
 import { InFlight } from "./Pipeline";
 
@@ -28,7 +29,7 @@ export function Repositories({ project }: { project: Project }) {
         <SectionLabel>Repositories</SectionLabel>
         {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
         {at && (
-          <div className="grid grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
+          <div className="grid h-[70vh] min-h-[360px] grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
             <Branches repos={list} at={at} onChoose={setChosen} />
             {/* Keyed by branch: another branch starts at its root. */}
             <Browser key={`${at.repo} ${at.branch}`} project={project.id} at={at} />
@@ -39,58 +40,64 @@ export function Repositories({ project }: { project: Project }) {
   );
 }
 
-/** Each repo, a heading, with its branches under it: main first (the default
- * branch), then whose each is, how far ahead of main, and whether its
- * worktree holds uncommitted changes. */
+/** The repo picker, then the chosen repo's branches, scrolling within the
+ * column: main first (the default branch), then whose each is, how far ahead
+ * of main, and whether its worktree holds uncommitted changes. */
 function Branches({ repos, at, onChoose }: { repos: Repo[]; at: At; onChoose: (at: At) => void }) {
   const teams = useTeams().data ?? [];
+  const repo = repos.find((r) => r.name === at.repo) ?? repos[0];
+  const choose = (name: string) => {
+    const r = repos.find((x) => x.name === name);
+    if (r) onChoose({ repo: r.name, branch: r.branches[0]?.name ?? r.main });
+  };
   return (
-    <nav className="flex min-w-0 flex-col gap-5">
-      {repos.map((r) => (
-        <div key={r.name} className="flex flex-col gap-1.5">
-          <span className="flex items-baseline gap-2 border-b border-line pb-1.5">
-            <span className="truncate font-mono text-[13.5px] font-semibold text-tx">
-              {r.name}/
-            </span>
-            {r.project && <span className="shrink-0 text-[11.5px] text-tx4">project repo</span>}
-          </span>
-          <div className="ml-1 flex flex-col gap-0.5 border-l border-line2 pl-2">
-            {r.branches.map((b) => {
-              const on = at.repo === r.name && at.branch === b.name;
-              const detail = [
-                b.name === r.main && "default branch",
-                branchOwner(b.name, teams),
-                b.ahead > 0 && `${b.ahead} ahead of ${r.main}`,
-              ].filter(Boolean);
-              return (
-                <button
-                  key={b.name}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => onChoose({ repo: r.name, branch: b.name })}
-                  className={`flex min-w-0 flex-col rounded-md px-2 py-1 text-left ${on ? "bg-accSoft" : "hover:bg-hover"}`}
-                >
-                  <span
-                    className={`truncate font-mono text-[12.5px] ${on ? "text-accTx" : "text-tx2"}`}
-                  >
-                    {b.name}
-                  </span>
-                  {(detail.length > 0 || b.uncommitted) && (
-                    <span className="text-[11.5px] text-tx4">
-                      {detail.join(" · ")}
-                      {b.uncommitted && (
-                        <span className="text-accTx">
-                          {detail.length > 0 ? " · " : ""}uncommitted changes
-                        </span>
-                      )}
+    <nav className="flex min-h-0 min-w-0 flex-col gap-2">
+      <Select
+        label="Repository"
+        mono
+        value={repo.name}
+        onChange={choose}
+        options={repos.map((r) => ({
+          value: r.name,
+          label: `${r.name}/`,
+          detail: `${r.project ? "project repo · " : ""}${r.branches.length} ${r.branches.length === 1 ? "branch" : "branches"}`,
+        }))}
+      />
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
+        {repo.branches.map((b) => {
+          const on = at.branch === b.name;
+          const detail = [
+            b.name === repo.main && "default branch",
+            branchOwner(b.name, teams),
+            b.ahead > 0 && `${b.ahead} ahead of ${repo.main}`,
+          ].filter(Boolean);
+          return (
+            <button
+              key={b.name}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChoose({ repo: repo.name, branch: b.name })}
+              className={`flex min-w-0 flex-col rounded-md px-2 py-1 text-left ${on ? "bg-accSoft" : "hover:bg-hover"}`}
+            >
+              <span
+                className={`truncate font-mono text-[12.5px] ${on ? "text-accTx" : "text-tx2"}`}
+              >
+                {b.name}
+              </span>
+              {(detail.length > 0 || b.uncommitted) && (
+                <span className="text-[11.5px] text-tx4">
+                  {detail.join(" · ")}
+                  {b.uncommitted && (
+                    <span className="text-accTx">
+                      {detail.length > 0 ? " · " : ""}uncommitted changes
                     </span>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </nav>
   );
 }
@@ -105,7 +112,7 @@ function Browser({ project, at }: { project: string; at: At }) {
     setFile(isFile);
   };
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-h-0 min-w-0 flex-col gap-3">
       {/* The path on the left, the view on the right (the CEO, 2026-10-17). */}
       <div className="flex flex-wrap items-center gap-3">
         {view === "files" && (
@@ -138,13 +145,21 @@ function Browser({ project, at }: { project: string; at: At }) {
           ]}
         />
       </div>
-      {view === "history" ? (
-        <History project={project} at={at} />
-      ) : file ? (
-        <FileView project={project} at={at} path={path} onUp={() => open(folderOf(path), false)} />
-      ) : (
-        <Folder project={project} at={at} path={path} onOpen={open} />
-      )}
+      {/* The view scrolls within the section, as the branches do, beside them. */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {view === "history" ? (
+          <History project={project} at={at} />
+        ) : file ? (
+          <FileView
+            project={project}
+            at={at}
+            path={path}
+            onUp={() => open(folderOf(path), false)}
+          />
+        ) : (
+          <Folder project={project} at={at} path={path} onOpen={open} />
+        )}
+      </div>
     </div>
   );
 }
@@ -222,7 +237,8 @@ function FileView({
       : undefined;
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-center gap-3">
+      {/* Stays in view while the file scrolls. */}
+      <div className="sticky top-0 z-10 flex items-center gap-3 bg-bg pb-1">
         <Button variant="small" onClick={onUp}>
           ← Folder
         </Button>

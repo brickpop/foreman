@@ -21,6 +21,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -513,22 +514,25 @@ func (m *Manager) enqueue(id string) {
 	if m.live[id] == nil && !contains(m.queue, id) {
 		m.queue = append(m.queue, id)
 	}
-	ctx := context.Background()
-	if inst, err := m.Instances.Get(ctx, id); err == nil && inst.Status != Queued {
-		inst.Status = Queued
-		_ = m.Instances.Put(ctx, inst)
-		m.publish("instance.status", StatusChange{ID: id, Status: Queued})
-	}
 }
 
 // startQueued starts queued instances while there are free slots
 // (max_sessions; a slot is held by every instance with a process or a start).
+// Those left waiting are marked queued: only they, so an instance that starts
+// at once never shows queued (nor warns the CEO about slots).
 func (m *Manager) startQueued() {
 	max := m.Config.Settings().Settings.MaxSessions
 	for {
 		m.mu.Lock()
 		if len(m.queue) == 0 || len(m.live) >= max || m.closing {
+			waiting := slices.Clone(m.queue)
+			closing := m.closing
 			m.mu.Unlock()
+			if !closing {
+				for _, id := range waiting {
+					m.markQueued(id)
+				}
+			}
 			return
 		}
 		id := m.queue[0]
@@ -541,6 +545,29 @@ func (m *Manager) startQueued() {
 			defer m.starts.Done()
 			m.start(id, l)
 		}()
+	}
+}
+
+// LimitChanged starts the queued instances that fit under a new session limit
+// (settings.toml changed). A lower limit stops nothing: running ones finish.
+func (m *Manager) LimitChanged() { m.startQueued() }
+
+// markQueued marks an instance queued if it still waits: the check and the
+// write hold the lock a start takes to leave the queue, so one that started
+// meanwhile is never marked.
+func (m *Manager) markQueued(id string) {
+	ctx := context.Background()
+	m.mu.Lock()
+	marked := false
+	if contains(m.queue, id) {
+		if inst, err := m.Instances.Get(ctx, id); err == nil && inst.Status != Queued {
+			inst.Status = Queued
+			marked = m.Instances.Put(ctx, inst) == nil
+		}
+	}
+	m.mu.Unlock()
+	if marked {
+		m.publish("instance.status", StatusChange{ID: id, Status: Queued})
 	}
 }
 

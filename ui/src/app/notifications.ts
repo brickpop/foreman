@@ -8,8 +8,8 @@ import { agentOf } from "./model";
 // notification when its toggle is on and permission is granted.
 
 export type Notice = {
-  /** The Settings toggle that gates its browser notification. */
-  toggle: keyof Notifications;
+  /** The Settings toggle that gates its browser notification; none: a toast only. */
+  toggle?: keyof Notifications;
   title: string;
   body: string;
   /** agent@project: a newer notice replaces an older one from the same instance. */
@@ -45,13 +45,24 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
   }
   if (e.type === "instance.status") {
     const { id, status } = e.data as { id: string; status: string };
+    const deployment = instances.find((i) => i.id === id)?.deploymentId ?? "";
+    if (status === "queued") {
+      // The CEO can act on it (the limit is theirs), but it isn't worth a browser notification.
+      return {
+        title: `${name(id)} is waiting for a session slot`,
+        body: "Every slot is taken, idle agents included. They start when one frees; the limit is in Settings → Workspace.",
+        instance: id,
+        deployment,
+        color: "var(--tx4)",
+      };
+    }
     if (status !== "done") return undefined;
     return {
       toggle: "finishes",
       title: `${name(id)} is done on ${project(id)}`,
       body: "Open the session to see the hand-off.",
       instance: id,
-      deployment: instances.find((i) => i.id === id)?.deploymentId ?? "",
+      deployment,
       color: "var(--info)",
     };
   }
@@ -71,7 +82,7 @@ export function permission(): Permission {
 /** Whether a notice also goes to the browser: its toggle is on, permission is
  * granted, and the CEO isn't looking at Foreman already (the toast covers that). */
 export function notifiesBrowser(n: Notice, toggles: Notifications, hidden: boolean): boolean {
-  return toggles[n.toggle] && permission() === "on" && hidden;
+  return n.toggle !== undefined && toggles[n.toggle] && permission() === "on" && hidden;
 }
 
 /** Shows a browser notification; its click focuses the tab and opens the session. */

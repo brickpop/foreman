@@ -232,3 +232,38 @@ export function when(iso: string, now = new Date()): string {
   const day = `${months[t.getMonth()]} ${t.getDate()}`;
   return t.getFullYear() === now.getFullYear() ? `${day} ${hm}` : `${day} ${t.getFullYear()} ${hm}`;
 }
+
+/** How many session slots are taken: every instance starting, running, idle
+ * or awaiting holds one (wiki/product/architecture/agent-runtime.md). */
+export function slotsTaken(instances: Instance[]): number {
+  return instances.filter((i) => ["starting", "running", "idle", "awaiting"].includes(i.status))
+    .length;
+}
+
+/** Why a message to an agent still waits, as the Activity panel says it
+ * (messages are delivered when their recipient is idle). */
+export function waitingReason(
+  to: Instance | undefined,
+  name: string,
+  instances: Instance[],
+  maxSessions: number,
+  draft: boolean,
+): string {
+  switch (to?.status) {
+    case "queued": {
+      return `${name} hasn't started: ${slotsTaken(instances)} of ${maxSessions} session slots are taken, idle agents included`;
+    }
+    case "asleep":
+      return `${name} is asleep, and is being woken for it`;
+    case "starting":
+      return `${name} is starting`;
+    case "running":
+      return `${name} is busy: it gets it when its turn ends`;
+    case "awaiting":
+      return `${name} is waiting for you first`;
+    case "idle":
+      return draft ? `${name}'s terminal has your unsent line: it waits for it` : "Being delivered";
+    default:
+      return `${name} isn't running`;
+  }
+}

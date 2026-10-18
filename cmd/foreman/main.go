@@ -149,14 +149,6 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("watching the wikis: %w", err)
 	}
-	if err := ws.Watch(ctx, func(c workspace.Change) {
-		bus.Publish(configEvent(c))
-		if c.Kind == "projects" {
-			followWikis()
-		}
-	}); err != nil {
-		return fmt.Errorf("watching the workspace: %w", err)
-	}
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
 	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
 	claude := claudecode.Adapter{GitConfig: homeGitConfig()}
@@ -224,6 +216,18 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		OpenLog: openLog, Publish: publish, Agent: agent,
 		Blocked: func() error { return checklist.Blocked() },
 	})
+	// Watched from here on: a settings change may let queued agents start.
+	if err := ws.Watch(ctx, func(c workspace.Change) {
+		bus.Publish(configEvent(c))
+		switch c.Kind {
+		case "projects":
+			followWikis()
+		case "settings":
+			manager.LimitChanged()
+		}
+	}); err != nil {
+		return fmt.Errorf("watching the workspace: %w", err)
+	}
 	// Messaging and Workflow need each other: a hand-off is a message, and its
 	// delivery moves the hand-off's work item.
 	var flow *workflow.Workflow

@@ -261,3 +261,30 @@ describe("asTheme", () => {
       expect(asTheme(other)).toBe("system");
   });
 });
+
+import { waitingReason } from "./model";
+
+describe("why a message waits", () => {
+  const inst = (id: string, status: string) => ({ id, status }) as Instance;
+  const all = [
+    inst("a@p", "idle"),
+    inst("b@p", "running"),
+    inst("c@p", "queued"),
+    inst("d@p", "asleep"),
+  ];
+  it("names what the recipient is doing", () => {
+    expect(waitingReason(inst("c@p", "queued"), "Lumen", all, 2, false)).toBe(
+      "Lumen hasn't started: 2 of 2 session slots are taken, idle agents included",
+    );
+    expect(waitingReason(inst("b@p", "running"), "Forge", all, 2, false)).toBe(
+      "Forge is busy: it gets it when its turn ends",
+    );
+    expect(waitingReason(inst("a@p", "awaiting"), "Vale", all, 2, false)).toMatch(
+      /waiting for you/,
+    );
+    expect(waitingReason(inst("d@p", "asleep"), "Nyx", all, 2, false)).toMatch(/asleep/);
+    expect(waitingReason(inst("a@p", "idle"), "Vale", all, 2, true)).toMatch(/unsent line/);
+    expect(waitingReason(inst("a@p", "idle"), "Vale", all, 2, false)).toBe("Being delivered");
+    expect(waitingReason(undefined, "Ghost", all, 2, false)).toBe("Ghost isn't running");
+  });
+});

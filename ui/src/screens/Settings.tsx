@@ -24,6 +24,7 @@ import {
 import { asTheme, savedTheme } from "../app/theme";
 import { ConnectDialog } from "../components/ConnectDialog";
 import { Modal } from "../components/Overlays";
+import { Select } from "../components/Select";
 import { useToast } from "../components/Toasts";
 import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
@@ -434,21 +435,13 @@ function NewProfile({
         className="w-36 rounded-md border border-line2 bg-panel px-2 py-1 font-mono text-[13px]"
       />
       {typed && name !== typed && <span className="font-mono text-tx4">{name || "—"}</span>}
-      <label htmlFor="new-profile-harness" className="ml-2 text-tx3">
-        Harness
-      </label>
-      <select
-        id="new-profile-harness"
+      <span className="ml-2 text-tx3">Harness</span>
+      <Select
+        label="Harness"
         value={harness}
-        onChange={(e) => setHarness(e.target.value)}
-        className="rounded-md border border-line2 bg-panel px-2 py-1 text-[13px]"
-      >
-        {harnesses.map((h) => (
-          <option key={h} value={h}>
-            {harnessLabel(h)}
-          </option>
-        ))}
-      </select>
+        onChange={setHarness}
+        options={harnesses.map((h) => ({ value: h, label: harnessLabel(h) }))}
+      />
       <span className="flex-1" />
       <Button variant="small" onClick={onCancel}>
         Cancel

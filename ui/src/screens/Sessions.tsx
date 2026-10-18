@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { type Instance, type Team, useClient } from "../api/client";
-import { agentOf, harnessLabel } from "../app/model";
+import { agentOf, harnessLabel, slotsTaken } from "../app/model";
 import {
   keys,
   useDeployments,
@@ -10,6 +10,7 @@ import {
   useHarnesses,
   useInstances,
   useRequests,
+  useSettings,
   useTeams,
 } from "../app/queries";
 import {
@@ -58,6 +59,10 @@ export function Sessions() {
   const teams = useTeams();
   const requests = useRequests();
   const [order, setOrder] = useState(tabOrder);
+  // The agent whose tab was clicked last, and how many times: its pane takes
+  // the keyboard once it shows it (the URL changes after the click, so only
+  // the pane showing that agent may take it, never the one it replaces).
+  const [focusAsk, setFocusAsk] = useState({ id: "", n: 0 });
   const tabs = inOrder(
     deploymentTabs(instances.data ?? [], teams.data ?? [], requests.data ?? []),
     order,
@@ -162,7 +167,10 @@ export function Sessions() {
         roster={roster}
         team={team}
         panes={panes}
-        onClick={(id) => setPanes(clickTab(panes, id))}
+        onClick={(id) => {
+          setPanes(clickTab(panes, id));
+          setFocusAsk((f) => ({ id, n: f.n + 1 }));
+        }}
       />
       <div className="flex min-h-0 flex-1">
         <div
@@ -175,6 +183,7 @@ export function Sessions() {
               teams={teams.data ?? []}
               lead={team?.config.lead}
               active={index === panes.active}
+              focusAsk={focusAsk}
               split={shown.length === 2}
               onActivate={() => setPanes({ ...panes, active: index })}
               onClose={() => setPanes(closePane(panes, index))}
@@ -248,6 +257,7 @@ function Pane({
   teams,
   lead,
   active,
+  focusAsk,
   split,
   onActivate,
   onClose,
@@ -256,6 +266,8 @@ function Pane({
   teams: Team[];
   lead?: string;
   active: boolean;
+  /** The last agent-tab click: the pane showing that agent takes the keyboard. */
+  focusAsk: { id: string; n: number };
   split: boolean;
   onActivate: () => void;
   onClose: () => void;
@@ -273,14 +285,22 @@ function Pane({
     terminal.current?.focus();
   };
   // The shortcut: open Line; from the terminal, back into Line; from Line, close it.
-  // Asleep or stopped: no session runs, and the pane offers to start one.
-  const asleep = instance.status === "asleep" || instance.status === "stopped";
+  // Asleep, stopped or queued: no session runs; the pane says why, and what to do.
+  const asleep = ["asleep", "stopped", "queued"].includes(instance.status);
   const toggleLine = () => {
     if (asleep) return;
     if (!lineMode) setLineMode(true);
     else if (document.activeElement !== lineInput.current) lineInput.current?.focus();
     else closeLine();
   };
+  // A tab click (or a pane it opened) takes the keyboard: Line when open, else
+  // the terminal; an agent with no session has nothing to type into.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a click only (and on mounting, for a pane the click opened); opening or closing Line moves the keyboard itself
+  useEffect(() => {
+    if (focusAsk.id !== instance.id) return;
+    if (lineMode) lineInput.current?.focus();
+    else terminal.current?.focus();
+  }, [focusAsk]);
   // The shortcut works anywhere on the screen, for the active pane. Listening on
   // the window's capture phase runs before the terminal, so the agent never gets it.
   const toggle = useRef(toggleLine);
@@ -388,7 +408,9 @@ function Pane({
           Direct line to {name}. They'll tell {leadName}, the lead, if it matters.
         </div>
       )}
-      {asleep ? (
+      {instance.status === "queued" ? (
+        <Queued name={name} />
+      ) : asleep ? (
         <Asleep instance={instance.id} name={name} stopped={instance.status === "stopped"} />
       ) : (
         <div className="flex min-h-0 flex-1">
@@ -524,6 +546,24 @@ function Asleep({ instance, name, stopped }: { instance: string; name: string; s
       <Button disabled={wake.isPending} onClick={() => wake.mutate()}>
         {stopped ? `Start ${name} again` : `Start ${name}`}
       </Button>
+    </div>
+  );
+}
+
+/** A queued agent's pane: every session slot is taken, idle agents included,
+ * so it starts when one frees; the limit is a workspace setting. */
+function Queued({ name }: { name: string }) {
+  const instances = useInstances().data ?? [];
+  const max = useSettings().data?.settings.maxSessions ?? 0;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      <p className="m-0 max-w-[420px] text-[13.5px] text-tx3">
+        {name} is waiting for a session slot: {slotsTaken(instances)} of {max} are taken, idle
+        agents included. They start as soon as one frees, and get their messages then.
+      </p>
+      <Link to="/settings" className="text-[13.5px] text-accTx">
+        Raise the limit in Settings
+      </Link>
     </div>
   );
 }

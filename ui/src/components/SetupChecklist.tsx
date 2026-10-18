@@ -8,6 +8,7 @@ import { cpuChoices, logTail, memoryChoices, stepTitle } from "../app/setup";
 import { AddProject } from "./AddProject";
 import { ConnectDialog } from "./ConnectDialog";
 import { CheckIcon } from "./icons";
+import { Select } from "./Select";
 import { Button, Panel, SectionLabel } from "./ui";
 
 // The setup checklist (wiki/product/features/first-run.md): Home shows it
@@ -163,8 +164,6 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
   }
 }
 
-const select = "rounded-[7px] border border-line2 bg-transparent px-2 py-1 text-[13px] text-tx";
-
 /** The machine's size, prefilled with half the Mac within the CEO's bounds. */
 function MachineForm({ size }: { size: MachineSize }) {
   const client = useClient();
@@ -186,30 +185,24 @@ function MachineForm({ size }: { size: MachineSize }) {
   }
   return (
     <div className="ml-[30px] flex flex-wrap items-center gap-3 text-[13px] text-tx2">
-      <label className="flex items-center gap-1.5">
+      <span className="flex items-center gap-1.5">
         Memory
-        <select
-          className={select}
+        <Select
+          label="Memory"
           value={memory}
-          onChange={(e) => setMemory(Number(e.target.value))}
-        >
-          {memories.map((m) => (
-            <option key={m} value={m}>
-              {m} GB
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="flex items-center gap-1.5">
+          onChange={setMemory}
+          options={memories.map((m) => ({ value: m, label: `${m} GB` }))}
+        />
+      </span>
+      <span className="flex items-center gap-1.5">
         CPUs
-        <select className={select} value={cpus} onChange={(e) => setCpus(Number(e.target.value))}>
-          {cpuChoices(size).map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </label>
+        <Select
+          label="CPUs"
+          value={cpus}
+          onChange={setCpus}
+          options={cpuChoices(size).map((c) => ({ value: c, label: String(c) }))}
+        />
+      </span>
       <Button variant="small" disabled={create.isPending} onClick={() => create.mutate()}>
         Create machine
       </Button>

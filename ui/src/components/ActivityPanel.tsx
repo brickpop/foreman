@@ -2,8 +2,8 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
 import { entries, type Filter, links, shows, type Thread } from "../app/activity";
-import { agentOf, when } from "../app/model";
-import { useActions, useMessages } from "../app/queries";
+import { agentOf, waitingReason, when } from "../app/model";
+import { useActions, useDraft, useInstances, useMessages, useSettings } from "../app/queries";
 import { CodeText } from "./CodeText";
 import { Dot } from "./ui";
 
@@ -253,9 +253,12 @@ function CallMap({
                   : "border-accLine bg-accSoft text-accTx hover:border-acc"
               }`}
               style={{ left: p.x, top: p.y }}
+              title={s ? `${name(id)} · ${s}` : undefined}
             >
               {s && <Dot status={s} />}
               {name(id)}
+              {/* A queued dot is hard to tell from idle at this size: said in words. */}
+              {s === "queued" && <span className="font-normal opacity-70">queued</span>}
             </button>
           );
         })}
@@ -282,6 +285,7 @@ export function ThreadRow({
   const m = thread.message;
   const last = thread.replies.at(-1) ?? m;
   const replies = thread.replies.length;
+  const waiting = useWaiting(m.state === "queued" ? m.toInstance : "", name);
   let state: string | undefined;
   if (m.state === "queued") state = "waiting";
   else if (m.state !== "delivered") state = m.state;
@@ -300,7 +304,10 @@ export function ThreadRow({
           <Exchange message={m} name={name} />
           <span className="flex-1" />
           {state && (
-            <span className={`text-[11.5px] ${m.state === "queued" ? "text-accTx" : "text-tx4"}`}>
+            <span
+              title={waiting}
+              className={`text-[11.5px] ${m.state === "queued" ? "text-accTx" : "text-tx4"}`}
+            >
               {state}
             </span>
           )}
@@ -328,6 +335,17 @@ export function ThreadRow({
   );
 }
 
+/** Why a message to instance still waits ("" for none): messages are
+ * delivered when their recipient is idle. */
+function useWaiting(instance: string, name: Names): string {
+  const instances = useInstances().data ?? [];
+  const max = useSettings().data?.settings.maxSessions ?? 0;
+  const draft = useDraft(instance) !== undefined;
+  if (!instance) return "";
+  const to = instances.find((i) => i.id === instance);
+  return waitingReason(to, name(instance), instances, max, draft);
+}
+
 /** One message of an open thread, as a chat bubble: the asker on the left,
  * the other side on the right. */
 function Bubble({
@@ -339,6 +357,7 @@ function Bubble({
   name: Names;
   first: boolean;
 }) {
+  const waiting = useWaiting(m.state === "queued" ? m.toInstance : "", name);
   return (
     <div
       className={`flex max-w-[88%] flex-col gap-1 rounded-xl border px-3 py-2 ${
@@ -361,9 +380,7 @@ function Bubble({
       {m.artifactRef && (
         <span className="font-mono text-[11.5px] text-tx3">Artifact: {m.artifactRef}</span>
       )}
-      {m.state === "queued" && (
-        <span className="text-[11.5px] text-accTx">Waiting to be delivered</span>
-      )}
+      {m.state === "queued" && <span className="text-[11.5px] text-accTx">Waiting: {waiting}</span>}
       {m.reason && <span className="text-[11.5px] text-err">{m.reason}</span>}
     </div>
   );

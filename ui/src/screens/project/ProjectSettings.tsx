@@ -15,6 +15,7 @@ import {
 } from "../../app/queries";
 import { rosterOrder } from "../../app/sessions";
 import { Avatar } from "../../components/Avatar";
+import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { Button, Empty, Panel } from "../../components/ui";
 
@@ -280,19 +281,21 @@ function ProfileChoice({ project }: { project: string }) {
   return (
     <Block title="Profile">
       <span className="flex items-center gap-3">
-        <select
-          aria-label="Profile"
+        <Select
+          label="Profile"
+          mono
           value={current}
-          onChange={(e) => choose(e.target.value)}
-          className="rounded-md border border-line2 bg-panel px-2 py-1 font-mono text-[13px]"
-        >
-          {(profiles.data ?? []).map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name} · {harnessLabel(p.harness)}
-            </option>
-          ))}
-          {profiles.data && !found && <option value={current}>{current}</option>}
-        </select>
+          onChange={choose}
+          options={[
+            ...(profiles.data ?? []).map((p) => ({
+              value: p.name,
+              label: p.name,
+              detail: harnessLabel(p.harness),
+            })),
+            // The one it names, even when that profile is gone.
+            ...(profiles.data && !found ? [{ value: current, label: current }] : []),
+          ]}
+        />
         {profiles.data && (
           <span className={`text-[13px] ${found?.connected ? "text-ok" : "text-err"}`}>
             {!found ? "doesn’t exist" : found.connected ? "connected" : "not connected"}

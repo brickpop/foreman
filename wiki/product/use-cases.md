@@ -15,7 +15,7 @@ Run `foreman` in `~/agents-ws`, open the UI, then use **+ New project** and add 
 Acceptance:
 - [ ] `foreman` started in a folder serves the UI on `localhost:8888`, and `.foreman/` exists in the workspace as a git repo (the workspace repo).
 - [ ] The [Add a project](./features/add-project.md) dialog lists `ledger/` with its detected repos; adding it creates the project repo `ledger/project/` (`git init`, `project.toml`, a starter wiki). Nothing is cloned.
-- [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a roster from the purpose (using the shipped example teams as references) and, once the CEO confirms, writes `.foreman/teams/atlas.toml` on a branch of the workspace repo and raises a review request; Atlas appears once the CEO merges it.
+- [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a team from the purpose and shows it in the preview beside its terminal, one tab per member; the CEO's **Create Atlas** writes `.foreman/teams/atlas.toml`, one commit in the workspace repo, and Atlas appears in the sidebar within 1 s. A draft that breaks the team file's invariants (a name already used) is never shown.
 - [ ] [Deploying](./features/deploy-team.md) Atlas to ledger with a goal creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
 
 ## 2. Delegate through the lead
@@ -96,10 +96,12 @@ Acceptance:
 From Atlas, choose **Hire** and complete the CoS interview. The new engineer joins and starts on every Atlas deployment.
 
 Acceptance:
-- [ ] The interview ends with a job description panel; confirming adds the agent to `atlas.toml`, with a random face, on a branch of the workspace repo, and raises a review request.
-- [ ] Once the CEO merges it, a new instance starts on every active Atlas deployment.
+- [ ] The interview ends with the preview, the new member's tab marked; the CEO's **Save** adds the agent to `atlas.toml`, with a random face, one commit in the workspace repo.
+- [ ] A new instance then starts on every active Atlas deployment.
 
 ## 10. Change config safely
+
+*Later* ([Project config with the Chief of Staff](../backlog/cos-project-config.md)): how the change is approved is decided there; the scenario below is the earlier proposal.
 
 In Project Settings, choose "Change with Chief of Staff" and ask it to "Use GitHub as the forge". A branch is created with the edit, and a review request appears.
 

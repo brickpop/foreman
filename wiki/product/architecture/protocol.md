@@ -247,11 +247,11 @@ type EscalateResult struct {
 ### `request_merge`
 
 ```go
-type RequestMergeArgs   struct { Branch string; Entry string } // branch: lead/<own team>/<topic>; entry: a wiki path, e.g. "backlog/LED-44.md"; required for a lead, optional for the Chief of Staff (which describes its change in the request)
+type RequestMergeArgs   struct { Branch string; Entry string } // branch: lead/<own team>/<topic>; entry: a wiki path, e.g. "backlog/LED-44.md"
 type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks string } // one per repo with new commits; refreshed: open ones on this branch were updated
 ```
 
-- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`; the Chief of Staff: its own `foreman/config-N`) and that `Entry` exists in the project's wiki (a lead must name one; the Chief of Staff may leave it empty and describe the change in the request instead), runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
+- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`) and that `Entry` exists in the project's wiki, runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
 - Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `uncommitted_changes` (commit first).
@@ -333,10 +333,10 @@ Workflow's unit to the CEO. Stored as a [request](../models/request.md); kinds, 
 type Request struct {
     ID          string
     Kind        string   // "approval" | "question" | "review" | "finding" | "blocked"
-    Source      string   // "agent" | "harness" (its waiting hook) | "foreman" | "cos"
+    Source      string   // "agent" | "harness" (its waiting hook) | "foreman"
     Project     string
-    Deployment  string   // absent for cos
-    Instance    string   // who raised it, or who it is about (blocked); absent for cos
+    Deployment  string
+    Instance    string   // who raised it, or who it is about (blocked)
     Summary     string
     Options     []string // first = primary
     MergeRequest string  // review only
@@ -436,7 +436,7 @@ Every state change is published on the in-process event bus; the web server stre
 - **Identity comes from the token.** `Instance` and `Deployment` in every `ToolCall` and `HookEvent` are set by the agent link from the caller's token; nothing in a payload can claim another identity.
 - **Messages never cross deployments.** Team-tool names resolve within the caller's deployment only.
 - **Only `Output` and `Artifact` cross sandboxes** in a reply; a handoff names a branch, never a path.
-- **Only the lead requests merges**, only from its own `lead/<team>/*` branches (the Chief of Staff from its own config branches), and **only the CEO's action merges or reaches a forge**.
+- **Only the lead requests merges**, only from its own `lead/<team>/*` branches, and **only the CEO's action merges or reaches a forge**.
 - **Only Foreman writes git.** Agents read it; every commit, merge and branch, in the code repos and the project repo alike, is a team tool run on the host ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)).
 - **Nothing is typed into a session except deliveries**, and only when the recipient is idle (the CEO's own keystrokes excepted).
 - **Every request has exactly one way back**: a tool result, a delivery, a forge event or an instance action (see [Requests](#requests)).

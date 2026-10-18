@@ -19,7 +19,7 @@ Dark is `:root`; light overrides it under `html[data-theme="light"]`.
 | `--bg` | `#0E0F11` | `#F5F3EE` | Page background, default avatar dot border, swatch inner ring |
 | `--side` | `#0B0C0E` | `#EDEAE3` | Sidebar, agent-tab strip, board cells, direct-line banner |
 | `--panel` | `#131518` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
-| `--raised` | `#1B1E22` | `#EEEBE4` | Selected nav/segment, raised buttons, chips, stage chips, Chief of Staff bubble |
+| `--raised` | `#1B1E22` | `#EEEBE4` | Selected nav/segment, raised buttons, chips, stage chips |
 | `--hover` | `#17191C` | `#E6E2DA` | Row and item hover |
 | `--term` | `#08090A` | `#FBFAF7` | Terminal panes, `<pre>`, inputs, textareas, CoS result panel |
 | `--line` | `#1F2227` | `#E0DCD3` | Default borders and dividers |
@@ -106,7 +106,7 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 - **Panel**: `--panel` background, `--line` border, radius 12. A list inside a panel separates rows with a `--line` bottom border and clips with `overflow: hidden`.
 - **Empty state**: `1px dashed var(--line2)`, radius 12, `--tx3` text, centered copy.
 - **Not built yet**: an empty state where the server doesn't serve an area yet: "**Not built yet.** The server doesn't serve <the wiki>." ("Not built yet." in `--tx2`, 500), in place of what the area would show.
-- **Overlays** (drawers, side sheet, modals, toasts) use `--panel` and `--shadow`. Layering: side sheet 44, Chief of Staff drawer 45, modals 50, toasts 60. See [App shell](../features/app-shell.md).
+- **Overlays** (drawers, side sheet, modals, toasts) use `--panel` and `--shadow`. Layering: side sheet 44, modals 50, toasts 60. See [App shell](../features/app-shell.md).
 
 ## Status colors
 
@@ -154,7 +154,7 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Listen on, Theme; and the on/off toggles Split and Messages, which look the same |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |
-| **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Change with Chief of Staff, Connect, Edit, Rebuild |
+| **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Connect, Edit, Rebuild |
 | **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | Terminal pane header only: Line, Copy, × |
 
 **Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on Home and 13px on the project's Overview (Needs you).

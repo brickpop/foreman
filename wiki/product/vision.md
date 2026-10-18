@@ -43,7 +43,7 @@ Terms are defined in the [Glossary](./glossary.md). The end-to-end scenarios v1 
 | Role | Who | What they can do |
 |---|---|---|
 | **CEO** | The human operator, sole user | Everything. Answers requests, decides merge requests (merge to main, create a PR, or reject), deploys teams, talks to any agent. |
-| **Chief of Staff** | A built-in agent (a harness session owned by Foreman, see [Chief of Staff](./features/chief-of-staff.md)) | Interviews the CEO to define roles and teams, edits config files on a branch, and handles any request the UI doesn't cover. |
+| **Chief of Staff** | A built-in agent (a harness session owned by Foreman, see [Chief of Staff](./features/chief-of-staff.md)) | Interviews the CEO to define roles and teams, and proposes the team files, which Foreman writes once the CEO confirms them. |
 | **Team lead** | One agent per team | Breaks down goals, delegates, reviews handoffs, integrates on `lead/<team>/*` branches, requests merges to `main`. The CEO's default point of contact for the team. |
 | **Members** | Engineer, Architect, QA, Reviewer, custom | Work in their own worktree branches (`wt/<agent>/<card>`) and hand off to the lead. Cannot publish to `main` or `lead/<team>/*`. |
 

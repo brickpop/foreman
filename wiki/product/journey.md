@@ -30,8 +30,8 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **6. Read the project.** Project → **Overview** shows the wiki's `index.md`; **Board** shows the Backlog board (empty); **Settings** shows `project.toml` read-only.
 - *Under the hood:* Wiki block (the agentic-wiki engine reads the bundle `ledger/project/wiki/`; markdown rendered on the server; links resolved by the engine).
 
-**7. Create a team.** Sidebar → **+ New team** opens the Chief of Staff drawer: "What is the new team for?" → "Build features for ledger" → a proposed roster (lead, two engineers) → **Create Atlas** → a review request; the CEO merges it.
-- *Under the hood:* the Chief of Staff is an instance like any other (Instance manager, Harness adapter, Terminal, Execution engine) with **extra team tools** (`present_choices`, `show_panel`, `create_team`, `hire`…). The drawer renders its tool calls as chat; `create_team` is handled by Workflow, which writes `.foreman/teams/atlas.toml` on a branch of the workspace repo through Workspace & config and sends it back through `request_merge` as a review request. Once the CEO merges it (Merge to main), the file watcher picks it up and the sidebar shows Atlas. (Gap G2: how the Chief of Staff runs.)
+**7. Create a team.** Sidebar → **+ New team** opens the Chief of Staff page, its terminal full width. The CEO types "A team to build features for ledger", answers its questions, and the preview opens beside the terminal: Atlas, its playbook, a tab per member (lead, two engineers). **Adjust team** → "make Ilya a reviewer" → a new preview → **Create Atlas**.
+- *Under the hood:* the Chief of Staff is an ad-hoc session like the login container (Harness adapter, Terminal, Execution engine), not an agent of a deployment, on the `default` profile, with `.foreman/teams/` mounted read-only. Its one tool, `propose_team`, is checked by Workspace & config and pushed to the page (`cos.proposal`). **Create Atlas** makes Workspace & config write `.foreman/teams/atlas.toml`, one commit in the workspace repo; the file watcher picks it up and the sidebar shows Atlas.
 
 **8. Tune an agent.** Team → Members → Tove → the Agent page: the CEO changes her look and personality. "Saved. Applies on every project."
 - *Under the hood:* Workspace & config writes the team file (version-guarded against concurrent edits) and commits it: one commit per save in the workspace repo.
@@ -97,13 +97,13 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 **24. A second team.** The CEO deploys **Vesper** (a challenge team) on `ledger` too. Kestrel finds a race and calls `escalate(finding, …, ["Atlas fixes it now", "Add to backlog", "Not an issue"])`. The CEO picks "Atlas fixes it now".
 - *Under the hood:* two deployments on one project: separate instances, worktrees, lead branches (`lead/vesper/*`) and message channels (Messaging never crosses deployments). Workflow turns the answer into a delivery to Atlas's lead, Mara.
 
-**25. Hire.** Team Atlas → **Hire** → the Chief of Staff interview → "Hire Arden". The CEO merges the review; Arden appears in the team and starts on every Atlas deployment.
-- *Under the hood:* the Chief of Staff's `hire` tool → Workflow → the team file on a branch of the workspace repo → `request_merge` → a review request; once merged, the file watcher → Instance manager `Ensure` starts the new instance (as in step 9).
+**25. Hire.** Team Atlas → **Hire** → the Chief of Staff page, already asked to hire for Atlas → its questions → the preview, Arden's tab marked new → **Save Atlas**. Arden appears in the team and starts on every Atlas deployment.
+- *Under the hood:* `propose_team` (Atlas with Arden) → the CEO's click → Workspace & config writes the team file, one commit → the file watcher → Instance manager `Ensure` starts the new instance (as in step 9).
 
 **26. Edit a soul while running.** The CEO edits Tove's job description. Running instances get a short context-update delivery at their next idle; the full prompt applies at their next start.
 - *Under the hood:* Workspace & config (team file) → Instance manager → Messaging delivery; the Harness adapter regenerates `CLAUDE.md` for the next start.
 
-**27. Change project config safely.** Project → Settings → **Change with Chief of Staff** → "Use GitHub as the forge". A review appears on the project's Overview, under Needs you.
+**27. Change project config safely.** *Later: how a Chief of Staff change to `project.toml` is approved is open ([Project config with the Chief of Staff](../backlog/cos-project-config.md)); below is the earlier proposal.* Project → Settings → **Change with Chief of Staff** → "Use GitHub as the forge". A review appears on the project's Overview, under Needs you.
 - *Under the hood:* the Chief of Staff edits `project.toml` on a branch `foreman/config-1` of the project repo `ledger/project/` (never in the live checkout) → `request_merge` → a review request (Merge to main, Create PR on the project repo's forge, or Reject).
 
 **28. Wiki and board.** In Overview, the CEO ticks a checkbox in a standup note; on the Board, drags LED-51 to "In progress".
@@ -122,7 +122,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 | # | Gap | Proposal (to decide) |
 |---|---|---|
 | G1 | ~~**Kickoff**~~ | **Resolved** (2026-10-15): only the lead starts on deploy, its harness launched with the goal as its opening message (still an interactive session); the other members sleep until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)) |
-| G2 | **How the Chief of Staff runs:** which engine, which mounts, and where it makes its branches of the workspace repo and of the project repos | An instance in a container that works on its own branches of the workspace repo (team files) and of the project repos (`project.toml`); it changes things only through its team tools, never `.foreman/` secrets or state |
+| G2 | ~~**How the Chief of Staff runs**~~ | **Resolved** (2026-10-18): an ad-hoc session like the login container, on the `default` profile, with its own folder and `.foreman/teams/` read-only; it proposes with `propose_team` and Foreman writes on the CEO's click, one commit, no branch or review ([Chief of Staff → How it runs](./features/chief-of-staff.md#how-it-runs)) |
 | G3 | ~~**Who writes cards**~~ | **Resolved** by the CEO's repo model: the lead writes the knowledge base (the live project repo), and commit through `commit()` (no review); everyone else contributes through `contribute` ([Sandboxes and git policy](./architecture/sandboxes-and-git.md#project-knowledge-base)) |
 | G4 | ~~**Screen after a Foreman restart**~~ | **Resolved** (2026-10-14): a container still running is resumed (Foreman re-attaches and rebuilds the screen by replaying the session log into a fresh emulator); a container that is gone gets a new terminal session ([Agent runtime → Restarts](./architecture/agent-runtime.md#restarts)) |
 | G5 | ~~**Git as a core block**~~ | **Resolved** by the CEO's decision to give git its own epic: Git is core block 8 in [Building blocks](./architecture/building-blocks.md#8-git-git), its `Prepare` (a worktree per agent) arriving in epic 1 and its merge plumbing with the [Git epic](../backlog/epics/git.md) |

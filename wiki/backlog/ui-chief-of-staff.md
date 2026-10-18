@@ -22,4 +22,4 @@ Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.m
 
 Demo choices, not spec changes: at the job panel a single word is taken as the name, anything else as a change to the job; `Open the review` is answered with where the review is.
 
-The server side waits on the [Chief of Staff epic](./epics/chief-of-staff.md) ([technical debt](../technical-debt.md#the-chief-of-staff-is-typed-in-the-ui-only)).
+Superseded (the CEO, 2026-10-18): the drawer is replaced by a terminal on its own page ([Create a team, hire, refine](./cos-create-team.md); [technical debt](../technical-debt.md#the-chief-of-staff-drawer-is-the-earlier-design)).

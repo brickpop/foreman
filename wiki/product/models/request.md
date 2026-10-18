@@ -17,11 +17,11 @@ Table `requests`.
 | `id` | String | yes | | unique | |
 | `kind` | String | yes | | enum: `approval`, `question`, `review`, `finding`, `blocked` | |
 | `project_id` | String | yes | | | |
-| `deployment_id` | String → Deployment | | | | Absent for Chief of Staff requests |
-| `instance_id` | String → Instance | | | | Who raised it (or who it is about, for `blocked`). Absent for Chief of Staff requests |
+| `deployment_id` | String → Deployment | | | | |
+| `instance_id` | String → Instance | | | | Who raised it (or who it is about, for `blocked`) |
 | `summary` | String | yes | | | The text shown on the request panel |
 | `options_json` | JSON array of String | | `[]` | | Choices; the first is the primary action |
-| `source` | String | yes | | enum: `agent`, `harness`, `foreman`, `cos` | `agent` via `escalate` or `request_merge`; `harness` when the harness reports it is waiting for the user (approval or question, [Protocol](../architecture/protocol.md#waiting-for-the-ceo)); `foreman` for blocked; `cos` for Chief of Staff requests (rendered "Chief of Staff", no instance needed) |
+| `source` | String | yes | | enum: `agent`, `harness`, `foreman` | `agent` via `escalate` or `request_merge`; `harness` when the harness reports it is waiting for the user (approval or question, [Protocol](../architecture/protocol.md#waiting-for-the-ceo)); `foreman` for blocked |
 | `status` | String | yes | `open` | enum: `open`, `resolved`, `expired` | |
 | `answer` | String | | | | The chosen option or typed text |
 | `created_at` | Timestamp | yes | now | | |
@@ -36,7 +36,7 @@ Table `requests`.
 - Duplicates are merged: same instance, kind and summary within 10 minutes, comparing summaries normalized (case-folded, whitespace collapsed). Known limit: an agent rephrasing the same ask still creates a second request, and two different asks worded identically merge.
 - Only `open` requests count toward "needs you".
 - An instance can have **many open requests**, each its own request panel on Home and on the project's Overview. Because `escalate(approval)` blocks the caller, one agent naturally waits on one approval at a time (a harness issuing parallel tool calls can still open several, which is allowed); questions and findings don't block and can pile up. The [instance](./instance.md) is `awaiting` while any blocking approval of it is open.
-- The panel's **source label** is derived, not stored: `escalate(<kind>)` for `source: agent` on approval, question and finding; `request_merge()` for review; `waiting in its session` for `source: harness`; `raised by Foreman` for `source: foreman`; `Chief of Staff` for `source: cos`.
+- The panel's **source label** is derived, not stored: `escalate(<kind>)` for `source: agent` on approval, question and finding; `request_merge()` for review; `waiting in its session` for `source: harness`; `raised by Foreman` for `source: foreman`.
 
 ## Phasing
 

@@ -46,7 +46,7 @@ In every repo, with or without a forge, Foreman also reads `main` on the same in
 
 ### Sync (the reserved repos)
 
-The workspace repo and the project repo never push on their own: Foreman commits to them locally (a UI save, a contribution, a card move, the lead's `commit()`), and nothing reaches their forge until the CEO clicks **Sync**. Sync fetches the forge's `main`, merges it into the local `main` (it may hold merges made on the forge, such as a Chief of Staff PR), then pushes `main`. On a conflict it stops, changes nothing, and tells the CEO. Sync is offered only when the repo has a forge: in [Settings → Forge accounts](../features/settings.md#forge-accounts) for the workspace repo, and in [Project settings](../features/project-settings.md) for the project repo.
+The workspace repo and the project repo never push on their own: Foreman commits to them locally (a UI save, a contribution, a card move, the lead's `commit()`), and nothing reaches their forge until the CEO clicks **Sync**. Sync fetches the forge's `main`, merges it into the local `main` (it may hold commits made on the forge), then pushes `main`. On a conflict it stops, changes nothing, and tells the CEO. Sync is offered only when the repo has a forge: in [Settings → Forge accounts](../features/settings.md#forge-accounts) for the workspace repo, and in [Project settings](../features/project-settings.md) for the project repo.
 
 ## Rules
 

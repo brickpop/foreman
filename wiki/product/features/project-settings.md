@@ -33,7 +33,7 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   ~/agents-ws/
   ├─ .foreman/          workspace repo (git)
   │  ├─ teams/          team definitions (souls, playbooks)
-  │  ├─ cos/            Chief of Staff session
+  │  ├─ cos/            Chief of Staff (its own folder)
   │  └─ state.db        deployments, sessions, requests (runtime)
   └─ <project>/
      ├─ project/        project repo (git)
@@ -64,6 +64,6 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - forge `none`: "No forge. You merge requested branches into main from Home or the project's Overview; Foreman does the merge."
   - otherwise: "Merge to main from Home or the project's Overview, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file."
   - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
-- **`project.toml`**: a row with `<project>/project/project.toml · read-only` (Mono 12.5px `--tx3`) and a small outline **`Change with Chief of Staff`** button ([Chief of Staff](./chief-of-staff.md), config flow). Below: "This file is config, committed in the project repo. Edit it in your editor, or have the Chief of Staff edit it. Its change then comes back to you on the Overview as a review." Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
+- **`project.toml`**: a row with `<project>/project/project.toml · read-only` (Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 
 Everything in this block is read-only. Changes to `project.toml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

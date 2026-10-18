@@ -1,12 +1,14 @@
 ---
 type: epic
-status: todo
+status: in-progress
 order: 4
 ---
 
 # Workflow with the CEO
 
 **Goal:** everything that needs the CEO reaches them, and their answers flow back. Requests (approval, question, waiting in its session, blocked, finding) on Home and Changes with notifications; `request_merge` runs the checks and raises the review; the CEO merges to main, creates a PR on the forge, or rejects; merges are noticed and other leads are told to merge `main` in.
+
+**Progress:** `request_merge`, Merge to main and Reject landed with the [Git epic](./git.md); requests from `escalate`, notifications and the rest are still to do.
 
 **Usable when done:** the full loop from a goal to a merge into `main`, with approvals, crashes and findings handled from the UI.
 

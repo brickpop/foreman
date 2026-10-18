@@ -391,7 +391,7 @@ interface ForemanClient {
 
 ### Chief of Staff
 
-Not a separate block: an instance like any other (Instance manager, Harness, Terminal, Execution engine) whose team tools include extra ones (`present_choices`, `show_panel`, `create_team`, `hire`, …), handled by Workflow. The drawer in the UI renders its tool calls as a chat. Details: [Chief of Staff](../features/chief-of-staff.md).
+Not a separate block: an ad-hoc session (Harness, Terminal, Execution engine), like the login container, on the `default` profile, with no deployment. Its one tool, `propose_team`, is checked against the team file's invariants and shown to the CEO; Workspace & config writes it once the CEO confirms it. Details: [Chief of Staff](../features/chief-of-staff.md).
 
 ## How the blocks work together
 

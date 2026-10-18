@@ -27,7 +27,7 @@ Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./
    - **Teams** label, then one row per team with, right-aligned (12px `--tx4`), where it is deployed: the project id if one deployment, `N projects` if more, `—` if none. A team row is active on its Team page and on the Agent page of any of its members. Then **`+ New team`**, which opens the [Chief of Staff](./chief-of-staff.md) "Create a team" flow.
    - Section labels are plain labels: not links, not collapsible. There is no Teams index screen (the prototype has one that nothing links to): the sidebar already lists every team.
 3. **Footer** (padding `12px 10px`, top border):
-   - **Chief of Staff tile**: padding `9px 10px`, radius 8, `--accLine` border, `--accSoft` background. A 24×24 amber "C" tile (radius 6), "Chief of Staff" (600 13px) and "Hire, set up, anything else" (11.5px `--tx3`). Click opens the CoS drawer with no flow.
+   - **Chief of Staff tile**: padding `9px 10px`, radius 8, `--accLine` border, `--accSoft` background. A 24×24 amber "C" tile (radius 6), "Chief of Staff" (600 13px) and "Create and refine teams" (11.5px `--tx3`). Click opens the [Chief of Staff page](./chief-of-staff.md#the-page) with no opening line.
    - **Settings row**: "Settings" with the listen address on the right (e.g. `localhost:8888`, Mono 11.5px `--tx4`). Opens [Settings](./settings.md).
 
 Data: projects, teams and deployments from the workspace ([Workspace](../models/workspace.md), [Deployment](../models/deployment.md)); the badge and dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
@@ -37,7 +37,6 @@ Data: projects, teams and deployments from the workspace ([Workspace](../models/
 | Overlay | Geometry | Layer |
 |---|---|---|
 | Side sheet (board card) | Fixed right, `min(460px, 100vw)` wide, full height, `--panel`, `--line2` left border | 44 |
-| Chief of Staff drawer | Fixed right, `min(420px, 100vw)` wide | 45 |
 | Modals ([Deploy](./deploy-team.md), [Add project](./add-project.md)) | Centered panel `min(520px, 100%)`, padding 24, radius 14, on a `rgba(5,6,7,0.55)` backdrop with 20px padding | 50 |
 | Toasts | Fixed top 20px, right 20px, 320px wide, gap 8 | 60 |
 

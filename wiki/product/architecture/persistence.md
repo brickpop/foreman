@@ -14,7 +14,7 @@ Where Foreman keeps what, and how changes on disk reach the UI. The principle (c
 |---|---|---|---|
 | Project config | `<project>/project/project.toml` (project repo) | CEO / Chief of Staff | Read-only for Foreman except "Add a project" (creates it). Parsed and validated on load and on change ([Project config](../models/project-config.md)) |
 | Wiki content | `<project>/project/wiki/` (project repo) | lead (commit through `commit()` (no review)), CEO | Read via the [wiki engine](./wiki-engine.md); Foreman writes only checkboxes, card moves and `contribute` notes, one commit per write |
-| Team definitions | `<workspace>/.foreman/teams/<team>.toml` (workspace repo) | Foreman (UI), Chief of Staff (on a branch), editor | Read and written by Foreman, one commit per save ([Team definition](../models/team-definition.md)) |
+| Team definitions | `<workspace>/.foreman/teams/<team>.toml` (workspace repo) | Foreman (UI, Chief of Staff proposals the CEO confirms), editor | Read and written by Foreman, one commit per save ([Team definition](../models/team-definition.md)) |
 | Workspace settings | `<workspace>/.foreman/settings.toml` (workspace repo) | Foreman (UI) | [Workspace settings](../models/workspace-settings.md) |
 | Secrets | OS keychain or `<workspace>/.foreman/secrets` (0600) | Foreman (UI) | Write-only from the UI ([Secrets](../models/secrets.md)) |
 | Runtime state | `<workspace>/.foreman/state.db` (SQLite) | Foreman | Deployments, instances, requests, team messages, work items, merge requests, read markers, UI prefs |

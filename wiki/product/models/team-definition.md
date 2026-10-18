@@ -6,7 +6,7 @@ tags: [model, teams, agents, config]
 
 # Team definition
 
-`~/agents-ws/.foreman/teams/<team>.toml`, in the [workspace repo](./workspace.md#the-workspace-repo): a reusable roster of [agent souls](./agent-soul.md) plus the team's playbook and escalation rules. One definition can be [deployed](./deployment.md) to any number of projects; every deployment uses the same souls and the same playbook. Foreman owns these files: the UI ([Team page](../features/team-page.md), [Agent page](../features/agent-page.md)), the [Chief of Staff](../features/chief-of-staff.md) (on a reviewed branch) and the CEO's editor all write them. A change applies to every running instance on its next turn ([Agent runtime](../architecture/agent-runtime.md)).
+`~/agents-ws/.foreman/teams/<team>.toml`, in the [workspace repo](./workspace.md#the-workspace-repo): a reusable roster of [agent souls](./agent-soul.md) plus the team's playbook and escalation rules. One definition can be [deployed](./deployment.md) to any number of projects; every deployment uses the same souls and the same playbook. Foreman owns these files: the UI ([Team page](../features/team-page.md), [Agent page](../features/agent-page.md)), the [Chief of Staff](../features/chief-of-staff.md) (its proposals, written by Foreman on the CEO's click) and the CEO's editor all write them. A change applies to every running instance on its next turn ([Agent runtime](../architecture/agent-runtime.md)).
 
 ## Example
 
@@ -75,7 +75,7 @@ Anything else (a typo, `team lead` with a space, a role nobody on the team has) 
 
 ## Example teams
 
-There are no templates and no team kinds. The [Chief of Staff](../features/chief-of-staff.md) drafts every team definition from the purpose the CEO describes, using a few **example team files shipped with Foreman** as references (read-only, never deployed):
+**Open** ([Starter teams](../../backlog/starter-teams.md)): whether Foreman ships example or starter teams at all. There are no templates and no team kinds: the [Chief of Staff](../features/chief-of-staff.md) drafts every team definition from the purpose the CEO describes. The earlier proposal was a few **example team files shipped with Foreman** as its references (read-only, never deployed):
 
 | Example | Purpose | Roster |
 |---|---|---|
@@ -96,4 +96,4 @@ Each example carries a full roster with job descriptions, a playbook and an esca
 
 ## Writes
 
-The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the workspace repo, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff never writes to the checked-out file: its edits land on a branch and come back to the CEO as a review.
+The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the workspace repo, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff never writes the file: it proposes, and the CEO's click on the proposal is a UI write like any other, version-guarded against the file it was drafted from ([Chief of Staff → Tools](../features/chief-of-staff.md#its-tool)).

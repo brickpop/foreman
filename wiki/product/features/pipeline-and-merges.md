@@ -36,7 +36,7 @@ The review request shows the entry's title, the branch and repo, the checks, and
 |---|---|
 | **`Merge to main`** (primary) | Merges the branch into `main` on the host, in the repo the merge request targets, as [below](#merge-to-main). The merge request and its work items move to "Merged", the request resolves, the lead is told, and merged branches are deleted under the existing rule ([Branches](../architecture/sandboxes-and-git.md#branches)). If the branch doesn't merge cleanly, nothing changes: the merge request is marked "conflicts with main" and the lead is asked to merge `main` in (*When main moves*) |
 | **`Create PR on <forge>`** (only when the repo has a forge) | Pushes the branch and opens a pull request on the forge, recording its URL and number; the request then shows **`Open PR ↗`** instead, and the CEO merges there. Foreman polls the PR ([Forge adapters](../architecture/forge-adapters.md#pr-state)), see below |
-| **`Reject`** | Asks for an optional message, delivers it to the author (the lead, typed into its session when idle; or the Chief of Staff, which answers in its conversation and offers to propose the change again), closes the forge PR if there is one (posting the reason as a comment), and returns the work items to stage 0. The branch stays: the lead can `switch` back to it, rework and request again |
+| **`Reject`** | Asks for an optional message, delivers it to the author (the lead, typed into its session when idle), closes the forge PR if there is one (posting the reason as a comment), and returns the work items to stage 0. The branch stays: the lead can `switch` back to it, rework and request again |
 
 After Create PR, the forge is watched:
 
@@ -46,7 +46,7 @@ After Create PR, the forge is watched:
 | Closed without merge | Marks the merge request rejected, resolves the review request, returns its work items to stage 0, tells the lead |
 | Review comments or "changes requested" | Delivers them to the lead (typed into its session when it is idle; [Protocol](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)); the merge request stays open |
 
-**Every repo works this way**: the project's code repos, the [project repo](../models/project-config.md#the-project-repo) (its forge is `forge.project_repo`) and the [workspace repo](../models/workspace.md#the-workspace-repo) (its forge is `workspace_forge` in [Workspace settings](../models/workspace-settings.md#schema)). The Chief of Staff's changes (branch `foreman/config-N`, to team files or `project.toml`; [Chief of Staff](./chief-of-staff.md)) go through the same `request_merge`, with no work items.
+**Only the code repos have merge requests.** The [project repo](../models/project-config.md#the-project-repo) gets the lead's `commit()` straight on `main`, and the [workspace repo](../models/workspace.md#the-workspace-repo) gets the UI's saves, the Chief of Staff's confirmed proposals included ([Chief of Staff](./chief-of-staff.md)); both reach their forge only through Sync.
 
 The forge is chosen per project ([Project config](../models/project-config.md)); its token lives in workspace [secrets](../models/secrets.md). Supported: GitHub, Forgejo, Gitea, `none`. Without a forge, Create PR is not offered.
 

@@ -54,7 +54,7 @@ Harness credentials are designed in [Session runner → Credentials](./session-r
 
 ### Chief of Staff
 
-The Chief of Staff can edit project config, create teams and hire agents. Its edits to project config (in the project repo) and to team files (in the workspace repo) always land on a branch and come back through `request_merge` as a review request; it never merges. Its powers and sandboxing are owned by [Chief of Staff](../features/chief-of-staff.md).
+The Chief of Staff can create teams, hire and refine agents, and changes nothing itself: it proposes with its one tool, `propose_team`; Foreman checks each proposal and shows it whole, and only the CEO's click writes it (one commit in the workspace repo). It sees `.foreman/teams/` read-only and nothing else of `.foreman/`. Its powers and sandboxing are owned by [Chief of Staff](../features/chief-of-staff.md).
 
 ## Accepted limitations (v1)
 
@@ -63,4 +63,4 @@ The Chief of Staff can edit project config, create teams and hire agents. Its ed
 - **Prompt injection between agents.** A reply's `output`, a handoff summary or a finding is text written into another agent's session. A confused or compromised agent (or a challenge team probing the build team) can inject instructions. Mitigations: injected text is framed as quoted data with its sender, length-capped, never crosses deployments ([Team tools](./team-tools.md#delivery)). The real backstop is that nothing reaches `main` without the CEO.
 - **Wiki as a shared channel.** Agents read the wiki that the lead writes; it is a prompt-injection path inside a deployment, and across deployments on the same project. Accepted: the wiki is the project's shared memory by design.
 - **Model provider sees the code.** Inherent to cloud harnesses.
-- **The lead can change `project.toml` without review.** Its rw mount of the live project repo covers `project.toml`, gates (`always_ask_ceo`) and checks included, and its `commit()` lands on the project repo's `main` without review, while the Chief of Staff's changes to the same file need the CEO's review. Accepted for v1 ("v1 today is better than v1 in 10 years"); tracked in the [backlog](../../backlog/index.md#not-yet-scheduled).
+- **The lead can change `project.toml` without review.** Its rw mount of the live project repo covers `project.toml`, gates (`always_ask_ceo`) and checks included, and its `commit()` lands on the project repo's `main` without review. Accepted for v1 ("v1 today is better than v1 in 10 years"); tracked in the [backlog](../../backlog/index.md#not-yet-scheduled).

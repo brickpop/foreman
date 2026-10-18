@@ -25,9 +25,9 @@ Padding `40px 48px 64px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, g
 - **"Personality"**: textarea (3 rows, 15px).
 - **"Skills"**: chips with `×`, and a `+ add` input (Enter adds; blank and duplicate skills are ignored).
 - **"Job description"**: a Mono textarea (6 rows, `--term`). Its label shows `✓ Saved. Applies on every project.` (12.5px `--ok`) for 3 s after a save.
-- **`Refine with Chief of Staff`** (outline): the [Chief of Staff](./chief-of-staff.md) refine flow.
+- **`Refine with Chief of Staff`** (outline): the [Chief of Staff](./chief-of-staff.md#the-page), to refine this agent.
 
-**Saving**: no save button. Text fields (personality, skills input, job description) save on blur or Enter; choices (look swatches and traits, Shuffle, removing a skill) save immediately. Each save writes the team file ([API](../architecture/api.md), `PUT /api/teams/:id/agents/:agent`) and shows `✓ Saved. Applies on every project.` for 3 s. Running instances get one context-update message per turn, however many saves happened in it; the full prompt changes at the next restart ([Agent runtime](../architecture/agent-runtime.md)). A save that conflicts with a change made elsewhere meanwhile (the CEO's editor, another tab, a merged Chief of Staff change) never drops the edit: it stays in the field and a prompt offers **Keep mine** (saves it over the new version) or **Take theirs** (drops it). Low priority.
+**Saving**: no save button. Text fields (personality, skills input, job description) save on blur or Enter; choices (look swatches and traits, Shuffle, removing a skill) save immediately. Each save writes the team file ([API](../architecture/api.md), `PUT /api/teams/:id/agents/:agent`) and shows `✓ Saved. Applies on every project.` for 3 s. Running instances get one context-update message per turn, however many saves happened in it; the full prompt changes at the next restart ([Agent runtime](../architecture/agent-runtime.md)). A save that conflicts with a change made elsewhere meanwhile (the CEO's editor, another tab, a Chief of Staff proposal saved) never drops the edit: it stays in the field and a prompt offers **Keep mine** (saves it over the new version) or **Take theirs** (drops it). Low priority.
 
 ## Right column
 

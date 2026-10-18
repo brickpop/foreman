@@ -28,7 +28,10 @@ GET    /api/candidates                        folders without project/project.to
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
-POST   /api/teams/:id/agents                  hire (from CoS)
+
+POST   /api/cos                              {opener?}: starts the Chief of Staff's session (or returns the running one) → {terminal, proposal?} (planned)
+DELETE /api/cos                              stops it (the CEO left the page)
+POST   /api/cos/proposal                     {version}: writes the proposal on screen, one commit → the team; 409 CONFLICT when the team file changed since, or a newer proposal replaced it
 
 GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
 POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session)
@@ -49,7 +52,7 @@ GET    /api/messages?deployment=              message log
 GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge), oldest first
 GET    /api/activity?project=|deployment=     [&before=<cursor>] a page of team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; a project means its active deployments; 400 BAD_REQUEST for neither, both or a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
-GET    /api/merge-requests/:id                one merge request, wherever it is (a Chief of Staff change to the workspace repo has no project)
+GET    /api/merge-requests/:id                one merge request
 GET    /api/merge-requests/:id/diff           {diff}: its branch against main, as a unified diff
 POST   /api/merge-requests/:id/merge          Merge to main: Foreman merges the branch locally (Pipeline and merges → Merge to main); 204; 409 CONFLICT (the lead is told to merge main in), LOCAL_CHANGES (the CEO's checkout is in the way), NOT_OPEN
 POST   /api/merge-requests/:id/create-pr      Create PR on the repo's forge: push the branch, open the PR
@@ -133,6 +136,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |
 | `workspace.changed` | projects or repos appeared or disappeared | `{}`: refetch the project list |
 | `setup.changed` | Podman appeared, started, stopped or failed; the instances were restored; the background image build started or ended | `{}`: refetch the checklist |
+| `cos.proposal` | the Chief of Staff called `propose_team` (checked) | the proposal: the team, and the version of the team file it was based on |
 
 The notifier also derives browser notifications and toasts from these events on the client ([Notifications](../features/notifications.md)). On reconnect, the client refetches what it shows (SSE `Last-Event-ID` replay is not required).
 

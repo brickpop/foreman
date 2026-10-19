@@ -554,3 +554,21 @@ export function useSaveTheme() {
     onSettled: () => queries.invalidateQueries({ queryKey: keys.preferences }),
   });
 }
+
+/** Saves the terminal's font or size for every workspace; open terminals
+ * follow at once, and go back if it is refused. */
+export function useSaveTerminalFont() {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (p: Pick<Partial<Preferences>, "terminalFont" | "terminalFontSize">) =>
+      c.preferences.save(p),
+    onMutate: (p) => {
+      const before = queries.getQueryData<Preferences>(keys.preferences);
+      if (before) queries.setQueryData(keys.preferences, { ...before, ...p });
+      return before;
+    },
+    onError: (_e, _p, before) => queries.setQueryData(keys.preferences, before),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.preferences }),
+  });
+}

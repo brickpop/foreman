@@ -8,4 +8,9 @@
  */
 export interface Preferences {
   theme: string; // system, dark or light
+  /**
+   * TerminalFont is one of TerminalFonts; the UI ships each but system.
+   */
+  terminalFont: string;
+  terminalFontSize: number /* int */; // px, MinFontSize to MaxFontSize
 }

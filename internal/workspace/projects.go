@@ -72,7 +72,7 @@ kind = "none"
 // creates that empty code repo. Nothing is left behind if a step fails.
 func (w *Workspace) AddProject(ctx context.Context, folder, repo string) (Project, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	defer w.unlock()
 	if !slices.ContainsFunc(w.candidates(), func(c Candidate) bool { return c.Folder == folder }) {
 		return Project{}, fmt.Errorf("%w: %q isn't a folder of the workspace that could become a project", ErrInvalid, folder)
 	}
@@ -87,7 +87,7 @@ func (w *Workspace) AddProject(ctx context.Context, folder, repo string) (Projec
 // any case.
 func (w *Workspace) NewProject(ctx context.Context, name, repo string) (Project, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	defer w.unlock()
 	if !validName(name) {
 		return Project{}, fmt.Errorf("%w: a project name is %s", ErrInvalid, nameRules)
 	}
@@ -237,7 +237,7 @@ func (w *Workspace) Scaffold(ctx context.Context, id string) error {
 // it.
 func (w *Workspace) AddRepo(ctx context.Context, project, name string) (Project, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	defer w.unlock()
 	p, ok := w.snap.projects[project]
 	if !ok {
 		return Project{}, ErrNotFound
@@ -307,7 +307,7 @@ func (w *Workspace) createRepo(ctx context.Context, dir, branch string) error {
 	return w.git.Commit(ctx, dir, "First commit", "README.md")
 }
 
-// rescan reloads the snapshot after a change on disk, tells the subscriber,
+// rescan reloads the snapshot after a change on disk, queues the changes,
 // and returns the project. Called with w.mu held.
 func (w *Workspace) rescan(project string) (Project, error) {
 	old := w.snap

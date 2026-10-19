@@ -8,7 +8,39 @@
  * a profile's (internal/profiles).
  */
 export interface Status {
-  id: string; // claude-code, …
+  id: string; // claude-code, pi, …
   command: string; // what it runs
   newline: string; // the keystroke for a new line without sending
+  /**
+   * Connect is how a profile gets its credentials: "login", the harness's
+   * own login in a terminal (Claude Code); "endpoint", a model server in a
+   * form (Pi).
+   */
+  connect: string;
+}
+/**
+ * Endpoint is a profile's model server and the model its agents run: the
+ * credentials of a harness that runs on one (Pi). The key is never sent back.
+ */
+export interface Endpoint {
+  /**
+   * URL is the server's OpenAI-compatible API as this machine reaches it
+   * (http://localhost:11434/v1); agents in containers reach localhost
+   * through the host alias.
+   */
+  url: string;
+  model: string;
+  contextWindow: number /* int */; // tokens
+  maxTokens: number /* int */; // the most a reply may take
+  apiKeySet: boolean;
+}
+/**
+ * EndpointChange sets a profile's endpoint; an empty APIKey keeps the one set.
+ */
+export interface EndpointChange {
+  url: string;
+  apiKey: string;
+  model: string;
+  contextWindow: number /* int */;
+  maxTokens: number /* int */;
 }

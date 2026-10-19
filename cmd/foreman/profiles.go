@@ -32,7 +32,11 @@ type profileLogins struct {
 func (p profileLogins) Harnesses() []harness.Status {
 	list := []harness.Status{}
 	for id, a := range p.adapters {
-		list = append(list, harness.Status{ID: id, Command: a.Command(), Newline: a.Newline()})
+		connect := "login"
+		if _, ok := a.(harness.EndpointAdapter); ok {
+			connect = "endpoint"
+		}
+		list = append(list, harness.Status{ID: id, Command: a.Command(), Newline: a.Newline(), Connect: connect})
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
 	return list
@@ -91,6 +95,9 @@ func (p profileLogins) Connect(ctx context.Context, name string) (string, error)
 	a := p.adapters[pr.Harness]
 	if a == nil {
 		return "", fmt.Errorf("%w: %q", server.ErrUnknownHarness, pr.Harness)
+	}
+	if _, ok := a.(harness.EndpointAdapter); ok {
+		return "", fmt.Errorf("%w: %s is set in a form, not a login", server.ErrConnectKind, pr.Harness)
 	}
 	login, err := a.Login(p.store.Dir(name))
 	if err != nil {
@@ -161,4 +168,45 @@ func adoptLogins(store profiles.Store, root string, connected map[string]func(st
 	for _, pr := range adopted {
 		fmt.Fprintf(stdout, "This workspace's %s login is now the profile %s, shared by your workspaces (%s)\n", pr.Harness, pr.Name, store.Dir(pr.Name))
 	}
+}
+
+// endpointOf is the profile's adapter when its harness runs on a model
+// server (Pi), and the profile's folder.
+func (p profileLogins) endpointOf(name string) (harness.EndpointAdapter, string, error) {
+	pr, err := p.store.Get(name)
+	if err != nil {
+		return nil, "", err
+	}
+	a, ok := p.adapters[pr.Harness].(harness.EndpointAdapter)
+	if !ok {
+		return nil, "", fmt.Errorf("%w: %s runs on a login, not a model server", server.ErrConnectKind, pr.Harness)
+	}
+	return a, p.store.Dir(name), nil
+}
+
+// Endpoint is the profile's model server and model.
+func (p profileLogins) Endpoint(name string) (harness.Endpoint, error) {
+	a, dir, err := p.endpointOf(name)
+	if err != nil {
+		return harness.Endpoint{}, err
+	}
+	return a.Endpoint(dir)
+}
+
+// SetEndpoint saves the profile's model server and model.
+func (p profileLogins) SetEndpoint(name string, c harness.EndpointChange) error {
+	a, dir, err := p.endpointOf(name)
+	if err != nil {
+		return err
+	}
+	return a.SetEndpoint(dir, c)
+}
+
+// Models lists the models a server offers, for the profile's form.
+func (p profileLogins) Models(ctx context.Context, name, url, key string) ([]string, error) {
+	a, dir, err := p.endpointOf(name)
+	if err != nil {
+		return nil, err
+	}
+	return a.Detect(ctx, dir, url, key)
 }

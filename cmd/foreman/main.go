@@ -32,6 +32,7 @@ import (
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/claudecode"
 	"github.com/brickpop/foreman/internal/harness/fake"
+	"github.com/brickpop/foreman/internal/harness/pi"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/messaging"
 	"github.com/brickpop/foreman/internal/profiles"
@@ -151,8 +152,17 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	logs := sessionlog.Dir{Root: ws.Path("logs")}
 	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
+	// How a container reaches this machine: the agent port, a model served
+	// here. Agents on the Direct engine are on it.
+	hostAlias := "host.containers.internal"
+	if running == "direct" {
+		hostAlias = ""
+	}
 	claude := claudecode.Adapter{GitConfig: homeGitConfig()}
-	adapters := map[string]harness.Adapter{"claude-code": claude}
+	adapters := map[string]harness.Adapter{
+		"claude-code": claude,
+		"pi":          pi.Adapter{GitConfig: homeGitConfig(), HostAlias: hostAlias},
+	}
 	profileStore := profiles.In(userDir)
 	// Always the real harnesses' logins, even on the fake harness, which has
 	// none; then the default profile, which every project uses unless it
@@ -186,7 +196,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	}
 	var link *agentlink.Link
 	agent := instances.AgentLink{
-		Host: agentHost, Path: "/opt/foreman/foreman-agent", URL: "http://host.containers.internal:" + agentPort,
+		Host: agentHost, Path: "/opt/foreman/foreman-agent", URL: "http://" + hostAlias + ":" + agentPort,
 		Token: func(id string) string { return link.Token(id) },
 	}
 	if running == "direct" {
@@ -285,11 +295,6 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if pod != nil {
 		podEngine = pod
 	}
-	sweep := func(ctx context.Context) {
-		if err := messenger.Sweep(ctx); err != nil {
-			slog.Error("delivering what waited", "err", err)
-		}
-	}
 	checklist = setup.New(setup.Deps{
 		Engine: podEngine, Images: engineImages, Config: ws, Publish: bus.Publish,
 		Profiles: func() []profiles.Profile { return login.Used(ws.Projects()) },
@@ -297,10 +302,13 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			if err := manager.Restore(ctx); err != nil {
 				return fmt.Errorf("restoring the instances: %w", err)
 			}
-			sweep(ctx)
 			return nil
 		},
-		Reconnected: sweep,
+		Connected: func(ctx context.Context) {
+			if err := messenger.Sweep(ctx); err != nil {
+				slog.Error("delivering what waited", "err", err)
+			}
+		},
 	})
 	// A clean exit (Ctrl-C, SIGTERM) stops the agents; a crash leaves them to
 	// the next start's restore.

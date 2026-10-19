@@ -315,6 +315,8 @@ type Workspace interface {
 }
 ```
 
+**`notify` is called outside the workspace's lock**, after a save or a reload has released it, so a subscriber may read the workspace back (the instance manager reads `max_sessions` on a settings change). Called under it, that read waited on itself and hung every request after it (found 2026-10-18, when a project's profile was chosen). Changes are queued while the lock is held and told on its release.
+
 Details: [Workspace](../models/workspace.md), [Persistence → File watching](./persistence.md#file-watching).
 
 ### Wiki (`wiki`)

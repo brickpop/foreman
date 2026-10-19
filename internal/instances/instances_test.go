@@ -1125,3 +1125,82 @@ func (f *fixture) useProfile(project, profile string) {
 		f.t.Fatal(err)
 	}
 }
+
+// recording is the fake harness, keeping what each launch was asked.
+type recording struct {
+	fake.Adapter
+	mu       *sync.Mutex
+	sessions *[]harness.Session
+}
+
+func (r recording) Launch(s harness.Session) (harness.Launch, error) {
+	r.mu.Lock()
+	*r.sessions = append(*r.sessions, s)
+	r.mu.Unlock()
+	return r.Adapter.Launch(s)
+}
+
+// A restart runs the agent on the project's profile as it is now: on the
+// same harness it continues its conversation; on another it starts fresh,
+// and the lead gets its goal again. One that isn't up is left alone.
+func TestRestartTakesTheProfileAsItIsNow(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	var mu sync.Mutex
+	var sessions []harness.Session
+	last := func() harness.Session {
+		mu.Lock()
+		defer mu.Unlock()
+		return sessions[len(sessions)-1]
+	}
+	base := f.deps.Adapters["claude-code"].(fake.Adapter)
+	f.m.Adapters["claude-code"] = recording{base, &mu, &sessions}
+	f.m.Adapters["codex"] = recording{base, &mu, &sessions}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "ship it"); err != nil {
+		t.Fatal(err)
+	}
+	if mara := f.waitStatus("mara@ledger", Running); mara.Profile != "default" || mara.Harness != "claude-code" {
+		t.Fatalf("deployed on %q %q", mara.Profile, mara.Harness)
+	}
+	starts := func() int { mu.Lock(); defer mu.Unlock(); return len(sessions) }
+	restart := func(want int) store.Instance {
+		t.Helper()
+		if err := f.m.Restart(ctx, "mara@ledger"); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for starts() < want && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		return f.waitStatus("mara@ledger", Running)
+	}
+
+	// Another account, the same harness: the conversation goes on.
+	if _, err := f.profiles.Create("work", "claude-code"); err != nil {
+		t.Fatal(err)
+	}
+	f.useProfile("ledger", "work")
+	if mara := restart(2); mara.Profile != "work" || mara.Harness != "claude-code" || mara.Restarts != 0 {
+		t.Errorf("on work: %+v", mara)
+	}
+	if s := last(); !s.Continue || s.Login != f.profiles.Dir("work") {
+		t.Errorf("same harness: %+v", s)
+	}
+	// Another harness: fresh, with the goal.
+	if _, err := f.profiles.Create("other", "codex"); err != nil {
+		t.Fatal(err)
+	}
+	f.useProfile("ledger", "other")
+	if mara := restart(3); mara.Profile != "other" || mara.Harness != "codex" {
+		t.Errorf("on other: %+v", mara)
+	}
+	if s := last(); s.Continue || !strings.Contains(s.Opener, "ship it") {
+		t.Errorf("another harness: %+v", s)
+	}
+	// Asleep: nothing to restart; it starts on the profile anyway.
+	if err := f.m.Restart(ctx, "tove@ledger"); err != nil || f.status("tove@ledger").Status != Asleep || starts() != 3 {
+		t.Errorf("an asleep agent restarted: %v", err)
+	}
+	if err := f.m.Restart(ctx, "nope@ledger"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("unknown: %v", err)
+	}
+}

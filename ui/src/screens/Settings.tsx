@@ -5,6 +5,7 @@ import {
   type ForgeAccount,
   type ImageStatus,
   isNotBuilt,
+  type Preferences,
   type Settings as SettingsData,
   useClient,
 } from "../api/client";
@@ -17,6 +18,7 @@ import {
   usePreferences,
   useProfiles,
   useSaveSettings,
+  useSaveTerminalFont,
   useSaveTheme,
   useSettings,
   useWorkspace,
@@ -26,6 +28,7 @@ import { ConnectDialog } from "../components/ConnectDialog";
 import { Modal } from "../components/Overlays";
 import { Select } from "../components/Select";
 import { useToast } from "../components/Toasts";
+import { terminalFont, terminalFontSizes, terminalFonts } from "../components/terminalFonts";
 import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
 // Settings (wiki/product/features/settings.md), in two tabs: this
@@ -337,7 +340,7 @@ function ProfilesSection() {
   return (
     <Section
       label="Profiles"
-      intro="Each profile is a harness and its login, yours on this machine: every workspace's projects can use it. A project uses default unless its settings pick another."
+      intro="Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every workspace's projects can use it; a project uses default unless its settings pick another."
     >
       {profiles.isError && <p className="m-0 text-[13px] text-err">{profiles.error.message}</p>}
       {(profiles.data ?? []).map((p) => (
@@ -387,7 +390,7 @@ function ProfilesSection() {
       <Confirm
         open={deleting !== undefined}
         title={`Delete the ${deleting} profile?`}
-        body="Its login goes with it. Projects that use it, in any workspace, can't start agents until they pick another profile."
+        body="Its credentials go with it. Projects that use it, in any workspace, can't start agents until they pick another profile."
         action="Delete"
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(undefined)}
@@ -396,7 +399,7 @@ function ProfilesSection() {
   );
 }
 
-/** A new profile: its name and its harness; its login comes after. */
+/** A new profile: its name and its harness; its credentials come after (Connect). */
 function NewProfile({
   harnesses,
   onCancel,
@@ -799,6 +802,37 @@ function AppearanceSection() {
           ]}
         />
       </Row>
+      {prefs.data && <TerminalFontRow prefs={prefs.data} />}
     </Section>
+  );
+}
+
+function TerminalFontRow({ prefs }: { prefs: Preferences }) {
+  const save = useSaveTerminalFont();
+  const toast = useToast();
+  const change = (p: Partial<Preferences>) =>
+    save.mutate(p, {
+      onError: (e) => toast({ title: "Font not saved", body: e.message, color: "var(--err)" }),
+    });
+  return (
+    <Row
+      title="Terminal font"
+      explanation="The agents’ terminals, in every workspace. System uses your operating system’s monospace font."
+    >
+      <span className="flex gap-2">
+        <Select
+          label="Terminal font"
+          value={terminalFont(prefs.terminalFont).id}
+          options={terminalFonts.map((f) => ({ value: f.id, label: f.label }))}
+          onChange={(terminalFont) => change({ terminalFont })}
+        />
+        <Select
+          label="Terminal font size"
+          value={prefs.terminalFontSize}
+          options={terminalFontSizes.map((s) => ({ value: s, label: `${s} px` }))}
+          onChange={(terminalFontSize) => change({ terminalFontSize })}
+        />
+      </span>
+    </Row>
   );
 }

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/prompt"
@@ -50,9 +51,17 @@ type Router struct {
 
 var _ agentlink.Tools = (*Router)(nil)
 
-// MaxBody caps any text an agent sends (a request, an output, a summary, a
-// contribution): longer work belongs in a branch or a wiki entry, named.
+// MaxBody caps the text an agent sends to a teammate (a request, an output, a
+// summary): it lands in their conversation, so longer work belongs in a branch
+// or a wiki entry, named.
 const MaxBody = 8000
+
+// MaxContribution caps a contribution's body: it becomes a wiki file, not a
+// terminal line, so a whole design record fits.
+const MaxContribution = 32000
+
+// TooLong says whether s is over max characters (not bytes: "→" is one).
+func TooLong(s string, limit int) bool { return utf8.RuneCountInString(s) > limit }
 
 // Refusal is a tool error the agent reads: a code, then what to do.
 func Refusal(code, format string, a ...any) agentlink.Result {

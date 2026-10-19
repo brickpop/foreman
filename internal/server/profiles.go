@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/profiles"
 )
 
@@ -23,12 +24,25 @@ type Profiles interface {
 	Connect(ctx context.Context, name string) (string, error)
 	// EndLogin ends the profile's login, if one runs.
 	EndLogin(name string) error
+	// Endpoint is the model server and model of a profile whose harness runs
+	// on one (Pi), set in a form instead of a login (ErrConnectKind otherwise).
+	Endpoint(name string) (harness.Endpoint, error)
+	// SetEndpoint checks and saves it (harness.ErrInvalid).
+	SetEndpoint(name string, c harness.EndpointChange) error
+	// Models lists the models the server at url offers, with key, or the
+	// profile's key when key is "".
+	Models(ctx context.Context, name, url, key string) ([]string, error)
 }
 
 // ErrUnknownHarness means a profile was asked for a harness Foreman doesn't support.
 var ErrUnknownHarness = errors.New("no such harness")
 
+// ErrConnectKind means a profile was asked to connect the other way: a
+// login for a harness set in a form, or the reverse.
+var ErrConnectKind = errors.New("the profile connects another way")
+
 func profileRoutes(mux *http.ServeMux, p Profiles) {
+	endpointRoutes(mux, p)
 	mux.HandleFunc("GET /api/profiles", func(w http.ResponseWriter, r *http.Request) {
 		list, err := p.List()
 		if err != nil {
@@ -76,6 +90,8 @@ func profileRoutes(mux *http.ServeMux, p Profiles) {
 		switch {
 		case errors.Is(err, profiles.ErrNotFound):
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such profile")
+		case errors.Is(err, ErrConnectKind):
+			writeError(w, http.StatusBadRequest, "INVALID", err.Error())
 		case err != nil:
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 		default:
@@ -91,6 +107,63 @@ func profileRoutes(mux *http.ServeMux, p Profiles) {
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 		default:
 			w.WriteHeader(http.StatusNoContent)
+		}
+	})
+}
+
+// endpointRoutes are a Pi profile's form: its model server and model.
+func endpointRoutes(mux *http.ServeMux, p Profiles) {
+	refused := func(w http.ResponseWriter, err error) bool {
+		switch {
+		case err == nil:
+			return false
+		case errors.Is(err, profiles.ErrNotFound):
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such profile")
+		case errors.Is(err, ErrConnectKind), errors.Is(err, harness.ErrInvalid):
+			writeError(w, http.StatusBadRequest, "INVALID", err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		}
+		return true
+	}
+	mux.HandleFunc("GET /api/profiles/{name}/endpoint", func(w http.ResponseWriter, r *http.Request) {
+		e, err := p.Endpoint(r.PathValue("name"))
+		if !refused(w, err) {
+			writeJSON(w, http.StatusOK, e)
+		}
+	})
+	mux.HandleFunc("PUT /api/profiles/{name}/endpoint", func(w http.ResponseWriter, r *http.Request) {
+		var c harness.EndpointChange
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&c); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {url, apiKey, model, contextWindow, maxTokens}")
+			return
+		}
+		if !refused(w, p.SetEndpoint(r.PathValue("name"), c)) {
+			w.WriteHeader(http.StatusNoContent)
+		}
+	})
+	// A POST, not a GET: the key travels in the body, never in a URL.
+	mux.HandleFunc("POST /api/profiles/{name}/endpoint/models", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			URL    string `json:"url"`
+			APIKey string `json:"apiKey"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {url, apiKey}")
+			return
+		}
+		if refused(w, harness.CheckURL(req.URL)) {
+			return
+		}
+		ids, err := p.Models(r.Context(), r.PathValue("name"), req.URL, req.APIKey)
+		switch {
+		case errors.Is(err, profiles.ErrNotFound), errors.Is(err, ErrConnectKind), errors.Is(err, harness.ErrInvalid):
+			refused(w, err)
+		case err != nil:
+			// The server's own failure, said as it is: the CEO fixes the URL or starts it.
+			writeError(w, http.StatusBadGateway, "UNREACHABLE", err.Error())
+		default:
+			writeJSON(w, http.StatusOK, ids)
 		}
 	})
 }

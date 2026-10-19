@@ -29,6 +29,11 @@ export interface Instance {
   task: string; // the current task note, for a restart
   sandboxPath: string;
   harness: string;
+  /**
+   * Profile is the one its current run started on (Harness is its harness);
+   * "" for a run from before it was kept.
+   */
+  profile: string;
   startedAt: string /* RFC 3339 */;
   lastOutputAt: string /* RFC 3339 */;
   restarts: number /* int */;

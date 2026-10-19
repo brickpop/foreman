@@ -249,6 +249,8 @@ func TestRefusals(t *testing.T) {
 		{"mara@ledger", "handoff", map[string]string{"teammate": "tove"}, "unknown_tool:"},
 		{"tove@ledger", "reply", map[string]string{"request_id": "msg-9", "output": "x"}, "unknown_request:"},
 		{"ivo@ledger", "reply", map[string]string{"request_id": "msg-1", "output": "x"}, "not_addressee:"},
+		// The asker answering its own ask is told a reply ends it.
+		{"mara@ledger", "reply", map[string]string{"request_id": "msg-1", "output": "thanks"}, "not_addressee: msg-1 is your own ask to Tove; a reply comes from them and ends it."},
 		{"tove@ledger", "reply", map[string]string{"request_id": "msg-1", "output": "x", "artifact": "../../etc"}, "bad_artifact:"},
 		{"tove@ledger", "reply", map[string]string{"request_id": "msg-1", "output": ""}, "empty:"},
 		{"ivo@ledger", "read_message", map[string]string{"id": "msg-1"}, "unknown_message:"},

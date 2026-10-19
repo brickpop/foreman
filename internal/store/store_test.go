@@ -271,7 +271,7 @@ func TestInstanceRoundTripsEveryField(t *testing.T) {
 	full := Instance{
 		ID: "mara@ledger", DeploymentID: "atlas@ledger", AgentID: "mara", Status: "running",
 		Task: "LED-44", PID: 4242, PtyID: "c0ffee", SandboxPath: "/ws/ledger/.sandboxes/mara",
-		Harness: "claude-code", HarnessSessionID: "s-1", StartedAt: at, LastOutputAt: at.Add(time.Minute), Restarts: 2,
+		Harness: "claude-code", Profile: "work", HarnessSessionID: "s-1", StartedAt: at, LastOutputAt: at.Add(time.Minute), Restarts: 2,
 	}
 	bare := Instance{ID: "tove@ledger", DeploymentID: "atlas@ledger", AgentID: "tove", Status: "starting",
 		SandboxPath: "/ws/ledger/.sandboxes/tove", Harness: "claude-code"}

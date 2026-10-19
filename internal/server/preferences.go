@@ -20,7 +20,8 @@ func preferenceRoutes(mux *http.ServeMux, p Preferences) {
 		writeJSON(w, http.StatusOK, p.Get())
 	})
 	mux.HandleFunc("PUT /api/preferences", func(w http.ResponseWriter, r *http.Request) {
-		var req userdata.Preferences
+		// The fields named change; the rest stay as they are.
+		req := p.Get()
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected the preferences")
 			return

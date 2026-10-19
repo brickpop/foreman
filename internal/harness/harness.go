@@ -109,3 +109,18 @@ func WriteFiles(files []File) error {
 	}
 	return nil
 }
+
+// containerHome is the agent image's user's home (images/Containerfile: node).
+const containerHome = "/home/node"
+
+// GitConfig mounts the CEO's ~/.gitconfig read-only in the container, so
+// agents commit as the CEO set git up; none when path is "" or missing.
+func GitConfig(path string) []runner.Mount {
+	if path == "" {
+		return nil
+	}
+	if _, err := os.Stat(path); err != nil {
+		return nil
+	}
+	return []runner.Mount{{Source: path, Target: containerHome + "/.gitconfig", ReadOnly: true}}
+}

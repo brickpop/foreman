@@ -20,15 +20,18 @@ type Deployment struct {
 // (wiki/product/models/instance.md). Empty strings and zero values are
 // stored as NULL.
 type Instance struct {
-	ID               string    `json:"id"` // agent@project
-	DeploymentID     string    `json:"deploymentId"`
-	AgentID          string    `json:"agentId"`
-	Status           string    `json:"status"` // asleep, queued, starting, running, idle, awaiting, done or stopped
-	Task             string    `json:"task"`   // the current task note, for a restart
-	PID              int       `json:"-"`
-	PtyID            string    `json:"-"` // the engine's handle (e.g. the container id)
-	SandboxPath      string    `json:"sandboxPath"`
-	Harness          string    `json:"harness"`
+	ID           string `json:"id"` // agent@project
+	DeploymentID string `json:"deploymentId"`
+	AgentID      string `json:"agentId"`
+	Status       string `json:"status"` // asleep, queued, starting, running, idle, awaiting, done or stopped
+	Task         string `json:"task"`   // the current task note, for a restart
+	PID          int    `json:"-"`
+	PtyID        string `json:"-"` // the engine's handle (e.g. the container id)
+	SandboxPath  string `json:"sandboxPath"`
+	Harness      string `json:"harness"`
+	// Profile is the one its current run started on (Harness is its harness);
+	// "" for a run from before it was kept.
+	Profile          string    `json:"profile"`
 	HarnessSessionID string    `json:"-"` // for the harness's own resume
 	StartedAt        time.Time `json:"startedAt"`
 	LastOutputAt     time.Time `json:"lastOutputAt"`

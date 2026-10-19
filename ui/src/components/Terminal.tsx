@@ -5,6 +5,8 @@ import "@xterm/xterm/css/xterm.css";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { useClient } from "../api/client";
 import type { PtyConnection } from "../api/pty";
+import { usePreferences } from "../app/queries";
+import { loadTerminalFont } from "./terminalFonts";
 
 // Our terminal component. Screens use this, never xterm.js directly, so the
 // emulator can be replaced in one file (wiki/product/architecture/overview.md#in-the-ui).
@@ -37,6 +39,10 @@ export function Terminal({
   const host = useRef<HTMLDivElement>(null);
   const xterm = useRef<XTerm | null>(null);
   const connection = useRef<PtyConnection | null>(null);
+  const fit = useRef<FitAddon | null>(null);
+  const prefs = usePreferences().data;
+  const font = prefs?.terminalFont;
+  const fontSize = prefs?.terminalFontSize ?? 13;
 
   useImperativeHandle(ref, () => ({
     text() {
@@ -75,11 +81,12 @@ export function Terminal({
       },
     });
     xterm.current = term;
-    const fit = new FitAddon();
-    term.loadAddon(fit);
+    const fitting = new FitAddon();
+    fit.current = fitting;
+    term.loadAddon(fitting);
     term.loadAddon(new WebLinksAddon());
     term.open(host.current);
-    fit.fit();
+    fitting.fit();
 
     // The replay (the screen and its scrollback, sent first on every connect)
     // is drawn hidden, then shown at once: no flash of it scrolling by.
@@ -119,7 +126,7 @@ export function Terminal({
       return false;
     });
     const resizing = term.onResize(({ cols, rows }) => conn.resize(cols, rows));
-    const observer = new ResizeObserver(() => fit.fit());
+    const observer = new ResizeObserver(() => fitting.fit());
     observer.observe(host.current);
 
     return () => {
@@ -131,8 +138,26 @@ export function Terminal({
       connection.current = null;
       term.dispose();
       xterm.current = null;
+      fit.current = null;
     };
   }, [client, instance]);
+
+  // The CEO's font, applied once it has loaded (the cells are measured on it),
+  // and again whenever it changes, to every open terminal.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new terminal (another instance) needs it too
+  useEffect(() => {
+    let current = true;
+    loadTerminalFont(font, fontSize).then((family) => {
+      const term = xterm.current;
+      if (!current || !term) return;
+      term.options.fontFamily = family;
+      term.options.fontSize = fontSize;
+      fit.current?.fit();
+    });
+    return () => {
+      current = false;
+    };
+  }, [font, fontSize, instance]);
 
   return <div ref={host} className="h-full w-full opacity-0 transition-opacity duration-150" />;
 }

@@ -146,7 +146,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	for _, agent := range team.Config.Roster() {
 		inst := store.Instance{
 			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Asleep,
-			SandboxPath: filepath.Join(m.Root, project.ID, ".sandboxes", agent), Harness: on.harness,
+			SandboxPath: filepath.Join(m.Root, project.ID, ".sandboxes", agent), Harness: on.harness, Profile: on.profile,
 		}
 		if err := m.Instances.Put(ctx, inst); err != nil {
 			return dep, err
@@ -179,6 +179,54 @@ func (m *Manager) Wake(ctx context.Context, id string) error {
 	}
 	if inst.Restarts != 0 {
 		inst.Restarts = 0 // the CEO's start: a later crash gets its one restart again
+		if err := m.Instances.Put(ctx, inst); err != nil {
+			return err
+		}
+	}
+	m.enqueue(id)
+	m.startQueued()
+	return nil
+}
+
+// Restart stops a running instance and starts it again at once, on its
+// project's profile as it is now (Project settings → Profile), continuing
+// its conversation unless the harness changed. One that isn't up is left as
+// it is: it starts on that profile anyway.
+func (m *Manager) Restart(ctx context.Context, id string) error {
+	inst, err := m.Instances.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	switch inst.Status {
+	case Starting, Running, Idle, Awaiting:
+	default:
+		return nil
+	}
+	if err := m.blocked(); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	l := m.live[id]
+	if l != nil {
+		l.stopping = true // its end is not a crash
+	}
+	m.mu.Unlock()
+	if l != nil && l.proc != nil {
+		if err := l.proc.Stop(stopGrace); err != nil {
+			return err
+		}
+	}
+	// As a stop: the slot is free at once, and a run still starting ends
+	// itself without touching the new one.
+	if l != nil {
+		m.release(id, l)
+	}
+	// Read again: hooks may have changed it while it stopped.
+	if inst, err = m.Instances.Get(ctx, id); err != nil {
+		return err
+	}
+	if inst.Restarts != 0 {
+		inst.Restarts = 0 // the CEO's restart: a later crash gets its one restart again
 		if err := m.Instances.Put(ctx, inst); err != nil {
 			return err
 		}
@@ -637,8 +685,11 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	}
 	adapter := on.adapter
 	// The project's profile as it is now: a change reaches the agent here.
-	if inst.Harness != on.harness {
-		inst.Harness = on.harness
+	// Another harness can't continue this one's conversation: the run starts
+	// fresh, and a lead gets its goal again.
+	switched := inst.Harness != on.harness
+	if switched || inst.Profile != on.profile {
+		inst.Harness, inst.Profile = on.harness, on.profile
 		if err := m.Instances.Put(ctx, inst); err != nil {
 			return nil, err
 		}
@@ -681,8 +732,8 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	session := harness.Session{
 		Instance: id, Sandbox: inst.SandboxPath, Prompt: text, Login: on.login,
 		// A restart (after a crash, or a Foreman restart) picks up its conversation;
-		// a new deployment starts fresh.
-		Continue: !first,
+		// a new deployment, or another harness, starts fresh.
+		Continue: !first && !switched,
 	}
 	if m.Agent.Host != "" {
 		mounts = append(mounts, runner.Mount{Source: m.Agent.Host, Target: m.Agent.Path, ReadOnly: true})

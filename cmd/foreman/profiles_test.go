@@ -11,6 +11,7 @@ import (
 
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/fake"
+	"github.com/brickpop/foreman/internal/harness/pi"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner/direct"
@@ -220,5 +221,53 @@ func TestAdoptLoginsAtStart(t *testing.T) {
 	adoptLogins(store, root, connected, &out)
 	if out.Len() != 0 {
 		t.Errorf("again: %q", out.String())
+	}
+}
+
+// A Pi profile is a model server set in a form: no login terminal, connected
+// once its server and model are saved; a login harness has no form.
+func TestAPiProfile(t *testing.T) {
+	s := workspace.DefaultSettings()
+	p := testProfiles(t, &s)
+	p.adapters["pi"] = pi.Adapter{}
+	if _, err := p.Create("local", "pi"); err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]string{}
+	for _, h := range p.Harnesses() {
+		kinds[h.ID] = h.Connect
+	}
+	if kinds["fake"] != "login" || kinds["pi"] != "endpoint" {
+		t.Errorf("connect kinds %v", kinds)
+	}
+	if _, err := p.Connect(context.Background(), "local"); !errors.Is(err, server.ErrConnectKind) {
+		t.Errorf("a Pi login terminal: %v", err)
+	}
+	for _, err := range []error{
+		p.SetEndpoint("default", harness.EndpointChange{URL: "http://h/v1", Model: "m", ContextWindow: 2, MaxTokens: 1}),
+		func() error { _, err := p.Endpoint("default"); return err }(),
+		func() error { _, err := p.Models(context.Background(), "default", "http://h/v1", ""); return err }(),
+	} {
+		if !errors.Is(err, server.ErrConnectKind) {
+			t.Errorf("a form for a login harness: %v", err)
+		}
+	}
+	if _, err := p.Endpoint("nope"); !errors.Is(err, profiles.ErrNotFound) {
+		t.Errorf("unknown profile: %v", err)
+	}
+	if pr, _ := p.get("local"); pr.Connected {
+		t.Error("connected before its form is saved")
+	}
+	if err := p.SetEndpoint("local", harness.EndpointChange{URL: "http://localhost:11434/v1", Model: "qwen3", ContextWindow: 262144, MaxTokens: 131072}); err != nil {
+		t.Fatal(err)
+	}
+	if e, err := p.Endpoint("local"); err != nil || e.Model != "qwen3" {
+		t.Errorf("endpoint %+v %v", e, err)
+	}
+	if pr, _ := p.get("local"); !pr.Connected {
+		t.Error("not connected once its form is saved")
+	}
+	if _, err := os.Stat(filepath.Join(p.store.Dir("local"), "models.json")); err != nil {
+		t.Errorf("the profile folder holds no models.json: %v", err)
 	}
 }

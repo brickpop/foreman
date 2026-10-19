@@ -2,7 +2,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import { agentOf, forgeLabel, harnessLabel, profileOf, when } from "../../app/model";
+import {
+  agentOf,
+  forgeLabel,
+  harnessLabel,
+  onOtherProfile,
+  profileOf,
+  when,
+} from "../../app/model";
 import {
   keys,
   useDeployments,
@@ -302,6 +309,7 @@ function ProfileChoice({ project }: { project: string }) {
           </span>
         )}
       </span>
+      {found && <StillOnAnother project={project} profile={found} />}
       <span className="text-[13.5px] text-tx2">
         Its agents run on this harness and login, from their next start. Profiles are yours on this
         machine, in{" "}
@@ -384,4 +392,39 @@ export function repoTree(project: string, repos: string[]): string {
     `${project}/`,
     ...repos.map((r, i) => `${i === repos.length - 1 ? "└─" : "├─"} ${r}/`),
   ].join("\n");
+}
+
+/** The project's running agents still on another profile than its own: they
+ * switch at their next start, or now with Restart them. */
+function StillOnAnother({
+  project,
+  profile,
+}: {
+  project: string;
+  profile: { name: string; harness: string };
+}) {
+  const client = useClient();
+  const toast = useToast();
+  const stale = onOtherProfile(useInstances().data ?? [], project, profile);
+  const restart = useMutation({
+    mutationFn: () => Promise.all(stale.map((i) => client.agents.restart(i.id))),
+    onError: (e: Error) =>
+      toast({ title: "Agents not restarted", body: e.message, color: "var(--err)" }),
+  });
+  if (stale.length === 0) return null;
+  const on = [...new Set(stale.map((i) => i.profile || harnessLabel(i.harness)))].join(", ");
+  const switching = stale.some((i) => i.harness !== profile.harness);
+  return (
+    <span className="flex items-center gap-3 rounded-[8px] border border-line2 px-3 py-2 text-[13px] text-tx2">
+      <span className="flex-1">
+        {stale.length === 1 ? "1 agent still runs" : `${stale.length} agents still run`} on {on}:{" "}
+        {stale.length === 1 ? "it switches" : "they switch"} at the next start.
+        {switching &&
+          ` On ${harnessLabel(profile.harness)}, ${stale.length === 1 ? "it starts" : "each starts"} a new conversation; a lead gets its goal again.`}
+      </span>
+      <Button variant="small" disabled={restart.isPending} onClick={() => restart.mutate()}>
+        {stale.length === 1 ? "Restart it" : "Restart them"}
+      </Button>
+    </span>
+  );
 }

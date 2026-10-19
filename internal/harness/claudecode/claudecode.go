@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/brickpop/foreman/internal/harness"
@@ -29,9 +28,6 @@ var _ harness.Adapter = Adapter{}
 // ConfigDir is the instance's private Claude Code config dir, inside its
 // sandbox: its settings, history and memory, and its session prompt.
 func ConfigDir(sandbox string) string { return filepath.Join(sandbox, ".harness", "claude-code") }
-
-// The image's user (images/Containerfile: node).
-const containerHome = "/home/node"
 
 // Launch starts Claude Code with permission checks off (the container is the
 // boundary), its config in the instance's private dir, and the shared login.
@@ -76,9 +72,10 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	// has one; else the session starts fresh (with the opener, if any). The
 	// config dir outlives deployments, so a fresh start writes down the
 	// conversations already there: those are never continued.
-	continuing := s.Continue && hasConversation(dir)
+	saved := conversations(dir)
+	continuing := s.Continue && saved.Continues()
 	if !s.Continue {
-		files = append(files, harness.File{Path: filepath.Join(dir, freshStart), Data: []byte(strings.Join(conversations(dir), "\n")), Mode: 0o600})
+		files = append(files, saved.FreshStart())
 	}
 	if continuing {
 		args = append(args, "--continue")
@@ -93,17 +90,12 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		Env:     append([]string{"CLAUDE_CONFIG_DIR=" + dir}, s.Link.Env...),
 		// The login file alone, so a refresh by any instance reaches all of
 		// them (a symlink breaks that; experiment B).
-		Mounts: []runner.Mount{{Source: login, Target: filepath.Join(dir, ".credentials.json")}},
+		Mounts: append([]runner.Mount{{Source: login, Target: filepath.Join(dir, ".credentials.json")}}, harness.GitConfig(a.GitConfig)...),
 		Files: append([]harness.File{
 			{Path: filepath.Join(dir, "CLAUDE.md"), Data: []byte(s.Prompt), Mode: 0o600},
 			{Path: filepath.Join(dir, "settings.json"), Data: settings, Mode: 0o600},
 			{Path: filepath.Join(dir, ".claude.json"), Data: account, Mode: 0o600},
 		}, files...),
-	}
-	if a.GitConfig != "" {
-		if _, err := os.Stat(a.GitConfig); err == nil {
-			l.Mounts = append(l.Mounts, runner.Mount{Source: a.GitConfig, Target: containerHome + "/.gitconfig", ReadOnly: true})
-		}
 	}
 	return l, nil
 }
@@ -268,32 +260,9 @@ func describeTool(name string, input map[string]any, cwd string) string {
 	return name
 }
 
-// hasConversation reports whether the config dir holds a conversation to
-// continue: `--continue` fails without one (a session that crashed at once).
-// freshStart lists, in the config dir, the conversations there when the
-// deployment's first session started.
-const freshStart = "foreman-fresh-start"
-
 // conversations are Claude Code's saved conversations in the config dir.
-func conversations(dir string) []string {
-	found, _ := filepath.Glob(filepath.Join(dir, "projects", "*", "*.jsonl"))
-	for i, f := range found {
-		found[i], _ = filepath.Rel(dir, f)
-	}
-	return found
-}
-
-// hasConversation reports whether the config dir has a conversation from
-// this deployment: one that wasn't there at its fresh start.
-func hasConversation(dir string) bool {
-	before, _ := os.ReadFile(filepath.Join(dir, freshStart))
-	old := strings.Split(string(before), "\n")
-	for _, c := range conversations(dir) {
-		if !slices.Contains(old, c) {
-			return true
-		}
-	}
-	return false
+func conversations(dir string) harness.Conversations {
+	return harness.Conversations{Dir: dir, Glob: filepath.Join("projects", "*", "*.jsonl")}
 }
 
 // Command is Claude Code's CLI.

@@ -23,6 +23,9 @@ type Agents interface {
 	Prompt(ctx context.Context, instance string) (string, error)
 	// Wake starts an asleep instance; any other is left as it is.
 	Wake(ctx context.Context, instance string) error
+	// Restart stops a running instance and starts it again, on its project's
+	// profile as it is now; one that isn't up is left as it is.
+	Restart(ctx context.Context, instance string) error
 }
 
 // deployRequest is the body of POST /api/deployments.
@@ -52,19 +55,28 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 			writeJSON(w, http.StatusOK, map[string]string{"prompt": text})
 		}
 	})
-	mux.HandleFunc("POST /api/instances/{id}/wake", func(w http.ResponseWriter, r *http.Request) {
-		err := a.Wake(r.Context(), r.PathValue("id"))
-		switch {
-		case errors.Is(err, store.ErrNotFound):
-			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such instance")
-		case errors.Is(err, instances.ErrNotReady):
-			writeError(w, http.StatusConflict, "NOT_READY", err.Error())
-		case err != nil:
-			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
-		default:
-			w.WriteHeader(http.StatusNoContent)
-		}
-	})
+	for _, action := range []struct {
+		path string
+		do   func(context.Context, string) error
+	}{
+		// Closures, not method values: a method value of a nil Agents panics here.
+		{"wake", func(ctx context.Context, id string) error { return a.Wake(ctx, id) }},
+		{"restart", func(ctx context.Context, id string) error { return a.Restart(ctx, id) }},
+	} {
+		mux.HandleFunc("POST /api/instances/{id}/"+action.path, func(w http.ResponseWriter, r *http.Request) {
+			err := action.do(r.Context(), r.PathValue("id"))
+			switch {
+			case errors.Is(err, store.ErrNotFound):
+				writeError(w, http.StatusNotFound, "NOT_FOUND", "No such instance")
+			case errors.Is(err, instances.ErrNotReady):
+				writeError(w, http.StatusConflict, "NOT_READY", err.Error())
+			case err != nil:
+				writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+			default:
+				w.WriteHeader(http.StatusNoContent)
+			}
+		})
+	}
 	mux.HandleFunc("GET /api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		status := r.URL.Query().Get("status")
 		switch status {

@@ -288,3 +288,28 @@ describe("why a message waits", () => {
     expect(waitingReason(undefined, "Ghost", all, 2, false)).toBe("Ghost isn't running");
   });
 });
+
+import { onOtherProfile } from "./model";
+
+describe("onOtherProfile", () => {
+  const inst = (id: string, status: string, profile: string, harness = "claude-code") =>
+    ({ id, status, profile, harness }) as Instance;
+  it("lists the project's running agents on another profile", () => {
+    const list = [
+      inst("mara@ledger", "running", "default"),
+      inst("tove@ledger", "idle", "local-pi", "pi"),
+      inst("ivo@ledger", "asleep", "default"), // starts on the new one anyway
+      inst("nora@relay", "running", "default"), // another project
+      inst("lia@ledger", "awaiting", ""), // from before profiles were kept: by harness
+      inst("zed@ledger", "starting", "", "pi"),
+    ];
+    const ids = (p: { name: string; harness: string }) =>
+      onOtherProfile(list, "ledger", p).map((i) => i.id);
+    expect(ids({ name: "local-pi", harness: "pi" })).toEqual(["mara@ledger", "lia@ledger"]);
+    expect(ids({ name: "default", harness: "claude-code" })).toEqual(["tove@ledger", "zed@ledger"]);
+  });
+  it("doesn't take a project for another that ends the same", () => {
+    const list = [inst("mara@my-ledger", "running", "default")];
+    expect(onOtherProfile(list, "ledger", { name: "pi", harness: "pi" })).toEqual([]);
+  });
+});

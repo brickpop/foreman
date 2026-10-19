@@ -12,19 +12,27 @@ func TestPreferences(t *testing.T) {
 	file := userdata.PreferencesIn(t.TempDir())
 	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Preferences: file, UI: builtUI})
 	var got userdata.Preferences
-	if decodeBody(t, get(t, h, "/api/preferences"), &got); got.Theme != "system" {
+	if decodeBody(t, get(t, h, "/api/preferences"), &got); got != userdata.DefaultPreferences() {
 		t.Errorf("before any: %+v", got)
 	}
 	if w := send(h, "PUT", "/api/preferences", `{"theme":"dark"}`); w.Code != http.StatusOK {
 		t.Fatalf("put: %d %s", w.Code, w.Body)
 	}
+	// Each setting is saved on its own: the font leaves the theme alone.
+	if w := send(h, "PUT", "/api/preferences", `{"terminalFont":"jetbrains-mono","terminalFontSize":15}`); w.Code != http.StatusOK {
+		t.Fatalf("put the font: %d %s", w.Code, w.Body)
+	}
 	// What another workspace's Foreman would read.
-	if p := userdata.PreferencesIn(filepath.Dir(file.Path)).Get(); p.Theme != "dark" {
+	want := userdata.Preferences{Theme: "dark", TerminalFont: "jetbrains-mono", TerminalFontSize: 15}
+	if p := userdata.PreferencesIn(filepath.Dir(file.Path)).Get(); p != want {
 		t.Errorf("kept %+v", p)
 	}
-	for body, want := range map[string]int{`{"theme":"neon"}`: http.StatusBadRequest, `nope`: http.StatusBadRequest} {
-		if w := send(h, "PUT", "/api/preferences", body); w.Code != want {
+	for _, body := range []string{`{"theme":"neon"}`, `{"terminalFont":"comic-sans"}`, `{"terminalFontSize":9}`, `{"terminalFontSize":25}`, `nope`} {
+		if w := send(h, "PUT", "/api/preferences", body); w.Code != http.StatusBadRequest {
 			t.Errorf("%s: %d", body, w.Code)
 		}
+	}
+	if p := file.Get(); p != want {
+		t.Errorf("a refused put changed %+v", p)
 	}
 }

@@ -1,3 +1,20 @@
+/** The project's agents whose run started on another profile than its own
+ * now: they switch at their next start. A run from before the profile was
+ * kept is judged by its harness (wiki/product/features/project-settings.md). */
+export function onOtherProfile(
+  instances: Instance[],
+  project: string,
+  profile: { name: string; harness: string },
+): Instance[] {
+  const up = ["starting", "running", "idle", "awaiting"];
+  return instances.filter(
+    (i) =>
+      i.id.endsWith(`@${project}`) &&
+      up.includes(i.status) &&
+      (i.profile ? i.profile !== profile.name : i.harness !== profile.harness),
+  );
+}
+
 import type { Instance, MergeRequest, Project, Request, Settings, Team } from "../api/client";
 import type { Look, Soul, TeamConfig } from "../api/types/workspace";
 

@@ -4,7 +4,7 @@ import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
 import type { Proposal } from "./types/cos";
 import type { Account as ForgeAccount } from "./types/forge";
 import type { Commit, TreeEntry } from "./types/git";
-import type { Status as HarnessStatus } from "./types/harness";
+import type { Endpoint, EndpointChange, Status as HarnessStatus } from "./types/harness";
 import type { Draft } from "./types/messaging";
 import type { Profile } from "./types/profiles";
 import type { LogPage, Repo, Branch as RepoBranch, File as RepoFile } from "./types/repos";
@@ -125,6 +125,9 @@ export interface AgentsArea {
   stop(deployment: string): Promise<void>;
   /** Starts an asleep instance; any other is left as it is. */
   wake(instance: string): Promise<void>;
+  /** Stops a running instance and starts it again, on its project's profile
+   * as it is now; any other is left as it is. */
+  restart(instance: string): Promise<void>;
   /** Types the CEO's line into the agent's session and sends it (the same
    * typing as a delivery, so the harness takes the Enter as sending). */
   line(instance: string, text: string): Promise<void>;
@@ -150,12 +153,19 @@ export interface ProfilesArea {
   connect(name: string): Promise<string>;
   /** Ends its login, if one runs. */
   endLogin(name: string): Promise<void>;
+  /** A Pi profile's model server and model (the key is never sent back). */
+  endpoint(name: string): Promise<Endpoint>;
+  /** Saves them; an empty apiKey keeps the one set. */
+  setEndpoint(name: string, change: EndpointChange): Promise<void>;
+  /** The models a server offers; with no apiKey, the profile's. */
+  models(name: string, url: string, apiKey: string): Promise<string[]>;
 }
 
-/** The CEO's preferences (the theme), the same in every workspace. */
+/** The CEO's preferences (the theme, the terminal font), the same in every workspace. */
 export interface PreferencesArea {
   get(): Promise<Preferences>;
-  save(p: Preferences): Promise<Preferences>;
+  /** Changes the fields given; the others stay. */
+  save(p: Partial<Preferences>): Promise<Preferences>;
 }
 
 export interface MaintenanceArea {
@@ -351,6 +361,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         ).json() as Promise<Deployment>,
       stop: (deployment) => send("DELETE", `/api/deployments/${id(deployment)}`),
       wake: (instance) => send("POST", `/api/instances/${id(instance)}/wake`),
+      restart: (instance) => send("POST", `/api/instances/${id(instance)}/restart`),
       line: (instance, text) => send("POST", `/api/instances/${id(instance)}/line`, { text }),
       pauseCountdown: (instance, paused) =>
         send("PUT", `/api/instances/${id(instance)}/countdown`, { paused }),
@@ -373,6 +384,12 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         return ((await r.json()) as { terminal: string }).terminal;
       },
       endLogin: (name) => send("DELETE", `/api/profiles/${id(name)}/connect`),
+      endpoint: (name) => getJSON(`/api/profiles/${id(name)}/endpoint`),
+      setEndpoint: (name, change) => send("PUT", `/api/profiles/${id(name)}/endpoint`, change),
+      models: async (name, url, apiKey) =>
+        (
+          await request("POST", `/api/profiles/${id(name)}/endpoint/models`, { url, apiKey })
+        ).json(),
     },
     maintenance: {
       status: () => getJSON("/api/maintenance"),

@@ -43,6 +43,7 @@ WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
 (line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
 POST   /api/instances/:id/restart
 POST   /api/instances/:id/wake            starts an asleep instance, or a stopped one of an active deployment (Start again); both pick up their conversation (204; any other status is left as it is)
+POST   /api/instances/:id/restart         stops a running instance (starting, running, idle, awaiting) and starts it again on its project's profile as it is now, continuing its conversation unless the harness changed (204; any other status is left as it is; 404; 409 NOT_READY)
 POST   /api/instances/:id/line            {text}: types the CEO's line into the session and sends it (204; 409 NOT_RUNNING)
 PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countdown of messages waiting on the CEO's draft (204)
 
@@ -67,13 +68,16 @@ PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to 
 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems
-GET    /api/harnesses                         the supported harnesses: their command and newline keystroke
-GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same in every workspace: {theme} (system, dark or light; 400 INVALID)
-GET    /api/profiles                          the CEO's profiles (each a harness and its login, every workspace's): name, harness, connected; default first
+GET    /api/harnesses                         the supported harnesses: their command, newline keystroke, and how a profile connects (login: a terminal; endpoint: a form)
+GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same in every workspace: {theme, terminalFont, terminalFontSize} (theme: system, dark or light; terminalFont: geist-mono, jetbrains-mono, ibm-plex-mono, fira-code, source-code-pro or system; terminalFontSize: 10 to 24; 400 INVALID). A PUT changes the fields it names; the rest stay
+GET    /api/profiles                          the CEO's profiles (each a harness and its credentials, every workspace's): name, harness, connected; default first
 POST   /api/profiles                          {name, harness} → 201 the profile, with no login yet (400 INVALID: a bad name or an unsupported harness; 409 EXISTS)
 DELETE /api/profiles/:name                    deletes it and its login, ending its login terminal (204; 400 INVALID for default; 404)
-POST   /api/profiles/:name/connect            start its harness login in a terminal → {terminal}: open it with WS /ws/pty/:terminal (404)
+POST   /api/profiles/:name/connect            start its harness login in a terminal → {terminal}: open it with WS /ws/pty/:terminal (404; 400 INVALID for a harness set in a form, Pi)
 DELETE /api/profiles/:name/connect            end its login, if one runs (the Connect dialog closed) → 204
+GET    /api/profiles/:name/endpoint           a Pi profile's model server: {url, model, contextWindow, maxTokens, apiKeySet}, zero when unset; the key is never sent (400 INVALID for a login harness; 404)
+PUT    /api/profiles/:name/endpoint           {url, apiKey, model, contextWindow, maxTokens} → 204; an empty apiKey keeps the one set (400 INVALID with the reason; 404)
+POST   /api/profiles/:name/endpoint/models    {url, apiKey} → the ids the server lists (GET <url>/models, asked from Foreman; an empty apiKey uses the one set); 502 UNREACHABLE with the server's error (400 INVALID; 404)
 GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
 PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
 GET    /api/maintenance                       {running, engine, podman, images}: the engine running now (podman or direct) and its state; why Podman can't be chosen ("" when installed); each image's name, ref, state, last build log

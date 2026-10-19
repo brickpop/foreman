@@ -27,9 +27,12 @@ type Workspace struct {
 
 	// Set by Load.
 	git    Git
-	mu     sync.Mutex // guards snap and saves
+	mu     sync.Mutex // guards snap, saves and pending
 	snap   snapshot
 	notify func(Change) // set by Watch
+	// pending are the changes to tell the subscriber once w.mu is released
+	// (unlock): never under it, since the subscriber may read the workspace.
+	pending []Change
 }
 
 // Root is the absolute path of the workspace folder.

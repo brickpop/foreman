@@ -424,10 +424,17 @@ func TestContributeRefusals(t *testing.T) {
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "", "body": "x"}, "empty")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "a\n---\nauthor: mara", "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": strings.Repeat("x", maxTitle+1), "body": "x"}, "too_long")
-	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "x", "body": strings.Repeat("x", teamtools.MaxBody+1)}, "too_long")
+	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "x", "body": strings.Repeat("x", teamtools.MaxContribution+1)}, "too_long")
 	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "project", "wiki", "inbox")); len(entries) != 0 {
 		t.Errorf("a refusal filed %d notes", len(entries))
 	}
+}
+
+// A contribution is a file, so it may be far longer than a message; limits
+// count characters, so a title of arrows is as long as one of letters.
+func TestContributeFitsADesignRecord(t *testing.T) {
+	f := newFixture(t)
+	f.ok("tove", "contribute", map[string]string{"kind": "proposal", "title": strings.Repeat("→", maxTitle), "body": strings.Repeat("é", teamtools.MaxContribution)})
 }
 
 func TestSlug(t *testing.T) {

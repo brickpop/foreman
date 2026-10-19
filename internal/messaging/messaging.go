@@ -138,7 +138,7 @@ func (m *Messenger) ask(ctx context.Context, c teamtools.Caller, teammate, reque
 	if strings.TrimSpace(request) == "" {
 		return teamtools.Refusal("empty", "say what you need in request")
 	}
-	if len(request) > teamtools.MaxBody {
+	if teamtools.TooLong(request, teamtools.MaxBody) {
 		return teamtools.Refusal("too_long", "a request is at most %d characters; put the rest in a wiki entry or a branch and name it", teamtools.MaxBody)
 	}
 	msg, err := m.Send(ctx, store.TeamMessage{DeploymentID: c.Deployment.ID, FromInstance: c.Instance.ID, ToInstance: to, Kind: "ask", Body: request})
@@ -154,6 +154,12 @@ func (m *Messenger) reply(ctx context.Context, c teamtools.Caller, ref, output, 
 		return teamtools.Refusal("unknown_request", "no ask %q in this deployment", ref)
 	}
 	if ask.ToInstance != c.Instance.ID {
+		// Seen 2026-10-19: a lead "replying" to its own ask to answer the
+		// teammate's reply, over and over. Say what to do instead.
+		if ask.FromInstance == c.Instance.ID {
+			return teamtools.Refusal("not_addressee", "%s is your own ask to %s; a reply comes from them and ends it. "+
+				"Nothing to acknowledge: to follow up, ask() again, only when you need something back", ref, nameOf(c.Team, ask.ToInstance))
+		}
 		return teamtools.Refusal("not_addressee", "%s wasn't sent to you", ref)
 	}
 	if _, err := m.Messages.ReplyTo(ctx, c.Deployment.ID, ref); err == nil {
@@ -162,7 +168,7 @@ func (m *Messenger) reply(ctx context.Context, c teamtools.Caller, ref, output, 
 	if strings.TrimSpace(output) == "" {
 		return teamtools.Refusal("empty", "give the outcome in output")
 	}
-	if len(output) > teamtools.MaxBody {
+	if teamtools.TooLong(output, teamtools.MaxBody) {
 		return teamtools.Refusal("too_long", "an output is at most %d characters: give the outcome, and put the rest in a branch or a wiki entry named as the artifact", teamtools.MaxBody)
 	}
 	if artifact != "" && (len(artifact) > 200 || strings.ContainsAny(artifact, " \t\n") || strings.Contains(artifact, "..")) {

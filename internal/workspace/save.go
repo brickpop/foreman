@@ -24,7 +24,7 @@ func (e *InvalidError) Error() string {
 // is the one read ("" for a new team). It returns the saved team.
 func (w *Workspace) SaveTeam(ctx context.Context, c TeamConfig, version string) (Team, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	defer w.unlock()
 	if p := w.checkTeam(c); len(p) > 0 {
 		return Team{}, &InvalidError{p}
 	}
@@ -44,7 +44,7 @@ func (w *Workspace) SaveTeam(ctx context.Context, c TeamConfig, version string) 
 // ("" while the file doesn't exist). It returns the new version.
 func (w *Workspace) SaveSettings(ctx context.Context, s Settings, version string) (string, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	defer w.unlock()
 	if p := s.validate(); len(p) > 0 {
 		return "", &InvalidError{p}
 	}
@@ -59,7 +59,8 @@ func (w *Workspace) SaveSettings(ctx context.Context, s Settings, version string
 }
 
 // write replaces a file under .foreman/ if it is still at version, commits
-// it, then reloads and tells the watcher's subscriber. Called with w.mu held.
+// it, then reloads and queues the changes for the subscriber. Called with
+// w.mu held, released with unlock.
 func (w *Workspace) write(ctx context.Context, rel, version string, data []byte, message string) error {
 	path := w.Path(rel)
 	current, err := os.ReadFile(path)
@@ -96,12 +97,24 @@ func (w *Workspace) write(ctx context.Context, rel, version string, data []byte,
 	return nil
 }
 
+// publish queues changes for the subscriber. Called with w.mu held, which
+// is released with unlock.
 func (w *Workspace) publish(changes []Change) {
-	if w.notify == nil {
-		return
+	if w.notify != nil {
+		w.pending = append(w.pending, changes...)
 	}
+}
+
+// unlock releases w.mu, then tells the subscriber what changed meanwhile.
+// Under the lock, a subscriber reading the workspace (the instance manager
+// reading max_sessions on a settings change) would wait on itself forever,
+// and every request after it.
+func (w *Workspace) unlock() {
+	changes, notify := w.pending, w.notify
+	w.pending = nil
+	w.mu.Unlock()
 	for _, c := range changes {
-		w.notify(c)
+		notify(c)
 	}
 }
 

@@ -388,11 +388,6 @@ function Pane({
             {copied ? <CheckIcon /> : <CopyIcon />}
           </IconButton>
         )}
-        {split && (
-          <IconButton onClick={onClose} label={`Close ${name}'s pane`}>
-            <span className="text-[16px] leading-4">×</span>
-          </IconButton>
-        )}
         {!asleep && (
           <IconButton
             onClick={() => (lineMode ? closeLine() : setLineMode(true))}
@@ -400,6 +395,12 @@ function Pane({
             label={`Line input (${lineShortcut()})`}
           >
             <PromptIcon />
+          </IconButton>
+        )}
+        {/* Always last, where a close is expected. */}
+        {split && (
+          <IconButton onClick={onClose} label={`Close ${name}'s pane`}>
+            <span className="text-[16px] leading-4">×</span>
           </IconButton>
         )}
       </header>

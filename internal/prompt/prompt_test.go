@@ -45,9 +45,9 @@ Own the UI.
 ## This assignment
 Project: ledger  (/ws/ledger)
 Goal: Ship invoices.
-Your sandbox: ledger/.sandboxes/tove (a git worktree per repo)
+Your sandbox: ledger/.sandboxes/tove (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
 Branches: you work on wt/tove/main, made for you from main.
-Knowledge base: ledger/.sandboxes/tove/project/wiki (read only)
+Knowledge base: ledger/.sandboxes/tove/project/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
 Read ledger/.sandboxes/tove/project/AGENTS.md first: how this project's wiki and tasks work.
 
@@ -95,6 +95,8 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"request_merge(branch, entry)        Ask the CEO to merge one of your lead/atlas/* branches into main;",
 		"The CEO talks to you. Break requests down and delegate with ask().",
 		"Before you request a merge, run: npm test",
+		// so the lead never asks a member for what its mount refuses
+		"Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -113,7 +115,7 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 	if !strings.Contains(member, "handoff(teammate, branch, summary)") || strings.Contains(member, "request_merge(") {
 		t.Errorf("member tools:\n%s", member)
 	}
-	if !strings.Contains(member, "Branches: wt/ilya/<card> only;") || !strings.Contains(member, "(read only: use contribute)") {
+	if !strings.Contains(member, "Branches: wt/ilya/<card> only;") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") {
 		t.Errorf("member branches or wiki access:\n%s", member)
 	}
 	lead := Compose(input("mara", nil))
@@ -122,7 +124,8 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 			t.Errorf("an epic 1 prompt mentions %q:\n%s", absent, lead)
 		}
 	}
-	if !strings.Contains(lead, "Branches: you work on lead/atlas/integration, made for you from main.") || !strings.Contains(lead, "(read and write)") {
+	if !strings.Contains(lead, "Branches: you work on lead/atlas/integration, made for you from main.") || !strings.Contains(lead, "(read and write)") ||
+		!strings.Contains(lead, "Your teammates can't write it: ask them for content, never to write wiki files.") {
 		t.Errorf("epic 1 lead:\n%s", lead)
 	}
 }
@@ -140,6 +143,11 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	if !strings.Contains(got, "made for you from trunk.") {
 		t.Error("the project's main branch name isn't used")
 	}
+	solo := input("mara", every)
+	solo.Team.Agents = map[string]workspace.Soul{"mara": atlas.Agents["mara"]}
+	if got := Compose(solo); strings.Contains(got, "Your teammates") {
+		t.Errorf("a lead alone is told about teammates:\n%s", got)
+	}
 }
 
 // Today's step: messaging, the git tools and request_merge (the lead's); no escalate yet.
@@ -154,6 +162,7 @@ func TestTodaysTools(t *testing.T) {
 			"Messages arrive in this session as one line",
 			"resume the task\nthat asked for it.\n",
 			"A reply (or a handoff) is its outcome: the result, the decisions you took",
+			"A reply ends its ask: don't answer a reply,",
 		} {
 			if !strings.Contains(got, want) {
 				t.Errorf("%s: missing %q in:\n%s", agent, want, got)
@@ -171,7 +180,7 @@ func TestTodaysTools(t *testing.T) {
 		t.Errorf("lead:\n%s", lead)
 	}
 	member := Compose(input("ilya", Offered(false)))
-	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only: use contribute)") || strings.Contains(member, "request_merge") {
+	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") {
 		t.Errorf("member:\n%s", member)
 	}
 }

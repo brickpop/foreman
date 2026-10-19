@@ -15,7 +15,7 @@ A new workspace works out of the box. Foreman starts whatever is missing, says w
 - **The watcher** (the setup block, `internal/setup`) reaches Podman at launch, then checks every 3 seconds, and at once after the CEO's Start or a machine creation ([The Podman service](../architecture/session-runner.md#the-podman-service)).
   - At launch it starts a stopped macOS machine, as Foreman always has. Later checks never do, so a machine the CEO stopped stays stopped until they press **Start**.
   - On Linux it starts the rootless service whenever nothing answers.
-- **The first time Podman answers**, Foreman restores the instances of active deployments (re-attaching their containers, [Agent runtime](../architecture/agent-runtime.md#restarts)) and delivers the messages that waited. It then builds the agent image in the background, so the first deploy doesn't wait minutes for it.
+- **The first time Podman answers**, Foreman restores the instances of active deployments (re-attaching their containers, [Agent runtime](../architecture/agent-runtime.md#restarts)); once that is done and agents may start, it delivers the messages that waited, waking asleep recipients. It then builds the agent image in the background, so the first deploy doesn't wait minutes for it.
 - **Each later return** of Podman delivers what waited meanwhile and checks the image again.
 - **Until then, deploying and waking an agent refuse** with `409 NOT_READY` ("agents can't start yet: podman isn't running: see the setup checklist on Home"). Messages for a sleeping agent wait.
 - **The Direct engine** needs none of this: it is ready at once, with no Podman or image steps.

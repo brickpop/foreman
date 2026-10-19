@@ -43,13 +43,15 @@ type Deps struct {
 	Profiles func() []profiles.Profile
 	Config   Config
 	// Ready runs once, the first time the engine answers: restoring the
-	// instances and delivering what waited. Retried while it fails.
+	// instances. Retried while it fails.
 	Ready func(ctx context.Context) error
-	// Reconnected runs each time the engine answers again after being away:
-	// delivering what waited meanwhile.
-	Reconnected func(ctx context.Context)
-	Publish     func(events.Event)
-	Every       time.Duration // how often the watcher checks Podman (default 3 s)
+	// Connected runs each time agents may start again: right after Ready
+	// succeeds, then whenever the engine answers after being away. It
+	// delivers what waited, so it runs after Ready, never inside it: a
+	// delivery wakes asleep agents, which is refused until Ready is done.
+	Connected func(ctx context.Context)
+	Publish   func(events.Event)
+	Every     time.Duration // how often the watcher checks Podman (default 3 s)
 }
 
 // ErrNotReady means agents can't start yet: Podman isn't there or isn't
@@ -117,15 +119,15 @@ func (s *Setup) check(ctx context.Context, start bool) {
 	s.becomeReady(ctx, connected)
 }
 
-// becomeReady runs Ready until it succeeds once; after that, Reconnected runs
-// whenever the engine answers again (again).
+// becomeReady runs Ready until it succeeds once, then Connected; after that,
+// Connected runs whenever the engine answers again (again).
 func (s *Setup) becomeReady(ctx context.Context, again bool) {
 	s.mu.Lock()
 	ready := s.ready
 	s.mu.Unlock()
 	if ready {
-		if again && s.Reconnected != nil {
-			s.Reconnected(ctx)
+		if again {
+			s.connected(ctx)
 		}
 		return
 	}
@@ -137,6 +139,13 @@ func (s *Setup) becomeReady(ctx context.Context, again bool) {
 	s.ready = true
 	s.mu.Unlock()
 	s.changed()
+	s.connected(ctx)
+}
+
+func (s *Setup) connected(ctx context.Context) {
+	if s.Connected != nil {
+		s.Connected(ctx)
+	}
 }
 
 // build makes sure the agent image exists, so the first deploy doesn't wait.

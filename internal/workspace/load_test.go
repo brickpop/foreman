@@ -377,3 +377,59 @@ func TestOlderWorkspacesIgnoreWhatNewerOnesDo(t *testing.T) {
 		t.Errorf("%d commits of it, want 1", n)
 	}
 }
+
+// The subscriber is told after the workspace's lock is released, so it can
+// read the workspace back (the instance manager reads max_sessions on a
+// settings change): under the lock it waited on itself, and every request
+// after it (found 2026-10-18: choosing a project's profile hung Foreman).
+func TestTheSubscriberCanReadTheWorkspace(t *testing.T) {
+	var root string
+	ws := loaded(t, func(r string) { root = r })
+	read := make(chan int, 16)
+	wctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if err := ws.Watch(wctx, func(c Change) {
+		if c.Kind == "settings" {
+			read <- ws.Settings().Settings.MaxSessions
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	expect := func(want int, how string) {
+		t.Helper()
+		select {
+		case got := <-read:
+			if got != want {
+				t.Errorf("%s: read %d, want %d", how, got, want)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: the subscriber never read the workspace", how)
+		}
+	}
+	s := DefaultSettings()
+	s.MaxSessions = 3
+	saved := make(chan error, 1)
+	go func() {
+		_, err := ws.SaveSettings(ctx, s, "")
+		saved <- err
+	}()
+	select {
+	case err := <-saved:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the save never returned")
+	}
+	expect(3, "a save in the UI")
+	// A change by hand, through the watcher.
+	writeFile(t, filepath.Join(root, ".foreman", "settings.toml"), "max_sessions = 5\n")
+	expect(5, "an edit on disk")
+	done := make(chan struct{})
+	go func() { ws.Teams(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the workspace stayed locked")
+	}
+}

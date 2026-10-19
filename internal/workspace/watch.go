@@ -54,7 +54,7 @@ func (w *Workspace) Watch(ctx context.Context, notify func(Change)) error {
 
 func (w *Workspace) reload() {
 	w.mu.Lock()
-	defer w.mu.Unlock()
+	defer w.unlock()
 	old := w.snap
 	w.snap = w.scan(old)
 	w.publish(diff(old, w.snap))

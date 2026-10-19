@@ -16,10 +16,11 @@ import (
 )
 
 type fakeAgents struct {
-	list     []store.Instance
-	deployed []deployRequest
-	stopped  []string
-	woken    []string
+	list      []store.Instance
+	deployed  []deployRequest
+	stopped   []string
+	woken     []string
+	restarted []string
 }
 
 func (f *fakeAgents) Deploy(_ context.Context, team, project, goal string) (store.Deployment, error) {
@@ -205,6 +206,14 @@ func (f *fakeAgents) Wake(_ context.Context, id string) error {
 	return nil
 }
 
+func (f *fakeAgents) Restart(_ context.Context, id string) error {
+	if id != "mara@ledger" {
+		return store.ErrNotFound
+	}
+	f.restarted = append(f.restarted, id)
+	return nil
+}
+
 func TestWake(t *testing.T) {
 	a := &fakeAgents{}
 	h := withAgents(a)
@@ -212,6 +221,17 @@ func TestWake(t *testing.T) {
 		t.Errorf("wake: %d %+v", w.Code, a.woken)
 	}
 	if w := send(h, "POST", "/api/instances/nobody@ledger/wake", ""); w.Code != http.StatusNotFound {
+		t.Errorf("unknown instance: %d", w.Code)
+	}
+}
+
+func TestRestart(t *testing.T) {
+	a := &fakeAgents{}
+	h := withAgents(a)
+	if w := send(h, "POST", "/api/instances/mara@ledger/restart", ""); w.Code != http.StatusNoContent || len(a.restarted) != 1 || len(a.woken) != 0 {
+		t.Errorf("restart: %d %+v %+v", w.Code, a.restarted, a.woken)
+	}
+	if w := send(h, "POST", "/api/instances/nobody@ledger/restart", ""); w.Code != http.StatusNotFound {
 		t.Errorf("unknown instance: %d", w.Code)
 	}
 }

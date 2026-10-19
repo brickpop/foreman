@@ -124,7 +124,7 @@ type AskResult struct { RequestID string }                // "msg-41"
 - Effect: a [message](#messages) of kind `ask` from the caller to the teammate, `msg-N` assigned, queued for delivery.
 - Delivered to the teammate: `Message msg-41 from Mara (ask): <the request's start>… Read it with read_message("msg-41"); answer with reply("msg-41", output).`
 - Markers: `Mara → Rhea · ask · msg-41`.
-- Errors: `unknown_teammate`, `self` (asking oneself), `too_long` (over the delivery cap), `deployment_stopped`.
+- Errors: `unknown_teammate`, `self` (asking oneself), `too_long` (over 8,000 characters, the cap on any text sent to a teammate: a request, an output, a hand-off summary), `deployment_stopped`.
 
 ### `reply`
 
@@ -218,7 +218,7 @@ type ContributeArgs   struct { Kind string; Title string; Body string } // kind:
 type ContributeResult struct { Path string }                            // "project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md"
 ```
 
-- Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter; a taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
+- Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter. A body is at most 32,000 characters: it becomes a file, not a line in the lead's conversation, so a whole design record fits (the CEO, 2026-10-19; messages keep 8,000). Limits count characters, not bytes. A taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in project/wiki/inbox/<file>.` The lead decides what becomes of it.
 - Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the Activity panel shows the title.
 - Errors: `bad_kind`, `too_long`.

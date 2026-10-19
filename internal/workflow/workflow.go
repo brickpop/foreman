@@ -440,7 +440,7 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 	if summary == "" {
 		return teamtools.Refusal("empty", "give the outcome in summary")
 	}
-	if len(summary) > teamtools.MaxBody {
+	if teamtools.TooLong(summary, teamtools.MaxBody) {
 		return teamtools.Refusal("too_long", "a summary is at most %d characters; put the rest in the branch or a wiki entry", teamtools.MaxBody)
 	}
 	// Nothing pending: what is handed off is exactly what is committed.
@@ -488,10 +488,10 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 		return teamtools.Refusal("bad_kind", "kind is finding, proposal or note")
 	case title == "" || body == "":
 		return teamtools.Refusal("empty", "give a title and a body")
-	case len(title) > maxTitle || strings.ContainsAny(title, "\r\n"):
+	case teamtools.TooLong(title, maxTitle) || strings.ContainsAny(title, "\r\n"):
 		return teamtools.Refusal("too_long", "a title is one line of at most %d characters", maxTitle)
-	case len(body) > teamtools.MaxBody:
-		return teamtools.Refusal("too_long", "a body is at most %d characters", teamtools.MaxBody)
+	case teamtools.TooLong(body, teamtools.MaxContribution):
+		return teamtools.Refusal("too_long", "a body is at most %d characters: split it into separate contributions, one subject each", teamtools.MaxContribution)
 	}
 	project := t.projectRepo()
 	inbox := filepath.Join(project.dir, "wiki", "inbox")

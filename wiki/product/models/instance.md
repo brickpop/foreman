@@ -23,6 +23,7 @@ Table `instances`.
 | `pty_id` | String | | | | Handle of the attached terminal in the session runner (e.g. container id) |
 | `sandbox_path` | String | yes | | | `<project>/.sandboxes/<agent>/`: its worktrees, one per code repo |
 | `harness` | String | yes | its project's profile's harness | a supported harness | The harness it runs on: its project's [profile](../architecture/session-runner.md#credentials)'s, set at deploy and again at each start, so a change of the project's profile reaches it at its next start |
+| `profile` | String | yes | its project's profile | a profile name, or empty | The [profile](../architecture/session-runner.md#credentials) its current run started on, set at deploy and at each start; empty for a run from before it was kept (2026-10-18). Project settings lists running agents whose profile isn't the project's ([Project settings](../features/project-settings.md)) |
 | `harness_session_id` | String | | | | The harness's own session id, for native resume on restart ([Agent runtime](../architecture/agent-runtime.md#restarts)) |
 | `started_at` | Timestamp | | | | |
 | `last_output_at` | Timestamp | | | | Drives the "stuck" blocked request (no output for N min, default 20) |

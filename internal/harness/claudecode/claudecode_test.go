@@ -317,7 +317,7 @@ func TestARestartContinuesOnlyThisDeploymentsConversation(t *testing.T) {
 	}
 	// A restart doesn't rewrite the list of what was there before.
 	for _, f := range restart.Files {
-		if filepath.Base(f.Path) == freshStart {
+		if filepath.Base(f.Path) == "foreman-fresh-start" {
 			t.Error("a restart rewrote the fresh-start list")
 		}
 	}

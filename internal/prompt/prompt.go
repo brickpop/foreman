@@ -68,10 +68,19 @@ func Compose(in Input) string {
 	line("## This assignment")
 	line("Project: %s  (%s)", in.Project, in.Path)
 	line("Goal: %s", goal(in.Goal, lead))
-	line("Your sandbox: %s/.sandboxes/%s (a git worktree per repo)", in.Project, in.Agent)
+	line("Your sandbox: %s/.sandboxes/%s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Project, in.Agent)
 	line("Branches: %s", branches(in, lead, has))
 	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
+	if lead && len(in.Team.Roster()) > 1 {
+		// Without this, a lead writes cards that tell members to write wiki
+		// files, and a member takes its read-only mount for a fault.
+		if has("contribute") {
+			line("Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.")
+		} else {
+			line("Your teammates can't write it: ask them for content, never to write wiki files.")
+		}
+	}
 	line("Read %s/.sandboxes/%s/project/AGENTS.md first: how this project's wiki and tasks work.", in.Project, in.Agent)
 	line("")
 	line("## Your team on %s", in.Project)
@@ -161,9 +170,9 @@ func wikiAccess(lead bool, has func(string) bool) string {
 	case lead:
 		return "read and write"
 	case has("contribute"):
-		return "read only: use contribute"
+		return "read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file"
 	default:
-		return "read only"
+		return "read only, by design, not a fault"
 	}
 }
 
@@ -233,7 +242,9 @@ func tools(in Input, lead bool, has func(string) bool) string {
 	}
 	if has("reply") {
 		notes += "A reply (or a handoff) is its outcome: the result, the decisions you took, what is\n" +
-			"left open, and how you checked it. A few lines, never a transcript.\n"
+			"left open, and how you checked it. A few lines, never a transcript.\n" +
+			"A reply ends its ask: don't answer a reply, and don't ask() just to thank, confirm or\n" +
+			"close a loop, since every ask() waits for a reply. Ask only when you need something back.\n"
 	}
 	return "## Tools (from Foreman)\n" + strings.Join(rows, "\n") + "\n" + notes
 }

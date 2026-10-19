@@ -42,6 +42,16 @@ describe("httpClient", () => {
     });
   });
 
+  it("saves only the preferences it is given", async () => {
+    const saved = { theme: "dark", terminalFont: "fira-code", terminalFontSize: 14 };
+    const calls = stubFetch(200, saved);
+    expect(await httpClient("http://x").preferences.save({ terminalFont: "fira-code" })).toEqual(
+      saved,
+    );
+    expect(calls[0]).toMatchObject({ url: "http://x/api/preferences", method: "PUT" });
+    expect(JSON.parse(calls[0].body ?? "")).toEqual({ terminalFont: "fira-code" });
+  });
+
   it("connects a profile and returns the login terminal", async () => {
     const calls = stubFetch(200, { terminal: "connect:work" });
     expect(await httpClient("http://x").profiles.connect("work")).toBe("connect:work");
@@ -88,12 +98,47 @@ describe("httpClient", () => {
     });
   });
 
+  it("saves a Pi profile's endpoint with PUT", async () => {
+    const calls = stubFetch(204, undefined);
+    const change = {
+      url: "http://localhost:11434/v1",
+      apiKey: "",
+      model: "qwen3:30b",
+      contextWindow: 262144,
+      maxTokens: 131072,
+    };
+    await httpClient("http://x").profiles.setEndpoint("local", change);
+    expect(calls[0]).toMatchObject({ url: "http://x/api/profiles/local/endpoint", method: "PUT" });
+    expect(JSON.parse(calls[0].body ?? "")).toEqual(change);
+  });
+
+  it("asks a server's models with the key in the body, never the URL", async () => {
+    const calls = stubFetch(200, ["qwen3:30b"]);
+    expect(await httpClient("http://x").profiles.models("local", "http://gpu/v1", "sk-1")).toEqual([
+      "qwen3:30b",
+    ]);
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/profiles/local/endpoint/models",
+      method: "POST",
+    });
+    expect(JSON.parse(calls[0].body ?? "")).toEqual({ url: "http://gpu/v1", apiKey: "sk-1" });
+  });
+
   it("ends a login with DELETE", async () => {
     const calls = stubFetch(204, undefined);
     await httpClient("http://x").profiles.endLogin("work");
     expect(calls[0]).toMatchObject({
       url: "http://x/api/profiles/work/connect",
       method: "DELETE",
+    });
+  });
+
+  it("restarts an instance with POST", async () => {
+    const calls = stubFetch(204, undefined);
+    await httpClient("http://x").agents.restart("mara@ledger");
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/instances/mara%40ledger/restart",
+      method: "POST",
     });
   });
 

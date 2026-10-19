@@ -81,11 +81,12 @@ func (c config) Projects() []workspace.Project { return c.projects }
 
 type rig struct {
 	*Setup
-	engine           *engine
-	images           *images
-	ready, reconnect int
-	readyErr         error
-	published        int
+	engine          *engine
+	images          *images
+	ready, connects int
+	deliveryBlocked error // what Blocked said when Connected last ran
+	readyErr        error
+	published       int
 }
 
 func newRig(t *testing.T, e *engine) *rig {
@@ -104,7 +105,10 @@ func newRig(t *testing.T, e *engine) *rig {
 			r.ready++
 			return r.readyErr
 		},
-		Reconnected: func(context.Context) { r.reconnect++ },
+		Connected: func(context.Context) {
+			r.connects++
+			r.deliveryBlocked = r.Blocked()
+		},
 		Publish: func(e events.Event) {
 			if e.Type == "setup.changed" {
 				r.published++
@@ -147,9 +151,14 @@ func TestPodmanAppearsAfterStartup(t *testing.T) {
 	if got := stateOf(r.Steps(ctx), "running"); got != "done" {
 		t.Errorf("restored: %s", got)
 	}
+	// What waited is delivered once agents may start: a delivery wakes asleep
+	// agents, which a not-yet-ready Foreman refuses.
+	if r.connects != 1 || r.deliveryBlocked != nil {
+		t.Errorf("first delivery: connected %d, blocked %v", r.connects, r.deliveryBlocked)
+	}
 	r.check(ctx, false)
-	if r.ready != 1 || r.reconnect != 0 {
-		t.Errorf("a steady engine: ready %d, reconnected %d", r.ready, r.reconnect)
+	if r.ready != 1 || r.connects != 1 {
+		t.Errorf("a steady engine: ready %d, connected %d", r.ready, r.connects)
 	}
 	select {
 	case <-r.images.builds:
@@ -159,7 +168,7 @@ func TestPodmanAppearsAfterStartup(t *testing.T) {
 }
 
 // Podman going away blocks agents again; its return delivers what waited
-// (Reconnected), never restores twice, and checks the image again.
+// (Connected), never restores twice, and checks the image again.
 func TestPodmanStopsAndComesBack(t *testing.T) {
 	r := newRig(t, &engine{installed: true, running: true})
 	r.check(ctx, true)
@@ -172,8 +181,8 @@ func TestPodmanStopsAndComesBack(t *testing.T) {
 	r.engine.set(func(e *engine) { e.running = true })
 	r.check(ctx, false)
 	r.built(t)
-	if r.ready != 1 || r.reconnect != 1 || r.Blocked() != nil {
-		t.Errorf("back: ready %d, reconnected %d, blocked %v", r.ready, r.reconnect, r.Blocked())
+	if r.ready != 1 || r.connects != 2 || r.Blocked() != nil || r.deliveryBlocked != nil {
+		t.Errorf("back: ready %d, connected %d, blocked %v, delivery blocked %v", r.ready, r.connects, r.Blocked(), r.deliveryBlocked)
 	}
 }
 
@@ -204,8 +213,8 @@ func TestAFailedRestoreIsRetried(t *testing.T) {
 	}
 	r.readyErr = nil
 	r.check(ctx, false)
-	if r.ready != 2 || r.Blocked() != nil || r.reconnect != 0 {
-		t.Errorf("retry: ready %d, blocked %v, reconnected %d", r.ready, r.Blocked(), r.reconnect)
+	if r.ready != 2 || r.Blocked() != nil || r.connects != 1 {
+		t.Errorf("retry: ready %d, blocked %v, connected %d", r.ready, r.Blocked(), r.connects)
 	}
 }
 

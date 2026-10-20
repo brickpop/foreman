@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { MergeRequest, Request } from "../api/client";
-import type { Look } from "../api/types/workspace";
+import type { Look } from "../api/types/home";
 import { linkLine } from "../app/model";
 import { DiffView } from "./DiffView";
 import { DecisionButtons, RejectForm, useMergeDecision } from "./MergeDecision";

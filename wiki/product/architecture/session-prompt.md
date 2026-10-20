@@ -6,9 +6,9 @@ tags: [architecture, agents, teams, sessions]
 
 # Session prompt
 
-The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from four sources: the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [deployment](../models/deployment.md) (goal) and the [project config](../models/project-config.md) (path, gates, checks). It is passed to the harness as described by its [adapter](./harness-adapters.md).
+The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from four sources: the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [deployment](../models/deployment.md) (goal) the [project config](../models/project-config.md) (gates, checks) and the instance's sandbox. It is passed to the harness as described by its [adapter](./harness-adapters.md).
 
-The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)). For an agent whose team isn't deployed anywhere, it shows the full template with the deployment-dependent variables (`{project}`, `{path}`, `{goal}`, `{repos}`, `{checks}`, `{gates}`…) left as highlighted placeholders, so the whole shape is visible before deploying.
+The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)). For an agent whose team isn't deployed anywhere, it shows the full template with the deployment-dependent variables (`{project}`, `{sandbox}`, `{goal}`, `{repos}`, `{checks}`, `{gates}`…) left as highlighted placeholders, so the whole shape is visible before deploying.
 
 ## Template
 
@@ -20,14 +20,14 @@ The [Agent page](../features/agent-page.md) shows this exact composed text, one 
 {instruction}
 
 ## This assignment
-Project: {project}  ({path})
+Project: {project}
 Goal: {deployment.goal}
-Your sandbox: {project}/.sandboxes/{agent} (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
+Your sandbox: {sandbox} (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
 Branches: {branches}
-Knowledge base: {project}/.sandboxes/{agent}/project/wiki ({wiki access})
+Knowledge base: {sandbox}/project/wiki ({wiki access})
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
 {teammates and the wiki}
-Read {project}/.sandboxes/{agent}/project/AGENTS.md first: how this project's wiki and tasks work.
+Read {sandbox}/project/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on {project}
 - {name}, {role} (lead: integrates, requests merges to main)
@@ -104,7 +104,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 | tools | all but `handoff`, including `request_merge` | all but `request_merge` |
 | `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask() or handoff()." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it, and tell {lead} if it's relevant to the team." |
 
-- `Project: {project}  ({path})` has two spaces before the parenthesis.
+- `{sandbox}` is the agent's sandbox, absolute (`~/.foreman/sandboxes/<project>/<agent>`), at the same path on the host and in its container. The prompt names no project folder: a project has none, its code repos live anywhere ([Project config](../models/project-config.md#the-project-record)).
 - Playbook steps resolve their `who` ([Team definition](../models/team-definition.md#playbook-and-escalation)): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → `CEO`, a role name (`qa`) → the name(s) of the member(s) with that role, an agent id → that agent's name. Anything else is shown as written (and flagged on the [Team page](../features/team-page.md)).
 - Gates come from `always_ask_ceo`, checks from `checks` in `project.toml`.
 - The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (`lead/<team>/*` for the lead; `wt/<agent>/main` and `wt/<agent>/<topic>` for members).

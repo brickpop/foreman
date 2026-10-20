@@ -4,7 +4,7 @@
 package forge
 
 // Account is a forge's connection, for Settings → Forge accounts (tygo.yaml).
-// Its host is in the workspace settings (forges); its token is a secret, never
+// Its host is in the global settings (forges); its token is a secret, never
 // sent back.
 type Account struct {
 	Kind     string `json:"kind"` // github, forgejo or gitea

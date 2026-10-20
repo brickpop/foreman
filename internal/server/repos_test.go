@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/repos"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // fakeRepos: project ledger, repo api, ref trunk, path README.md; it records
@@ -19,7 +19,7 @@ type fakeRepos struct{ asked []string }
 func (f *fakeRepos) check(project, repo, ref string) error {
 	switch {
 	case project != "ledger":
-		return workspace.ErrNotFound
+		return home.ErrNotFound
 	case repo != "api":
 		return repos.ErrNoRepo
 	case ref != "trunk":
@@ -64,7 +64,7 @@ func (f *fakeRepos) Log(_ context.Context, project, repo, ref string, skip int) 
 
 func TestRepoReads(t *testing.T) {
 	f := &fakeRepos{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Repos: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Repos: f, UI: builtUI})
 	var list []map[string]any
 	decodeBody(t, get(t, h, "/api/projects/ledger/repos"), &list)
 	if len(list) != 2 || list[1]["project"] != true {

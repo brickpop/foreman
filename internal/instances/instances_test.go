@@ -18,13 +18,13 @@ import (
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/fake"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/sessionlog"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/terminal"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 var ctx = context.Background()
@@ -65,50 +65,56 @@ type fixture struct {
 	root     string
 	m        *Manager
 	db       *store.DB
-	ws       *workspace.Workspace
+	ws       *home.Home
 	deps     Deps
 	mu       sync.Mutex
 	events   []events.Event
 	profiles profiles.Store // the CEO's profiles: default is the fake harness
 }
 
-// newFixture makes a workspace with project ledger (one code repo) and team
-// atlas, whose harness is a shell script: script is its body.
+// newFixture makes a home (.foreman in the CEO's home folder, root) with
+// project ledger (one code repo, root/dev/ledger-api) and team atlas, whose
+// harness is a shell script: script is its body.
 func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	root := t.TempDir()
-	ws, err := workspace.Init(root)
+	t.Setenv("HOME", root)
+	ws, err := home.Open(filepath.Join(root, ".foreman"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, filepath.Join(root, "ledger", "project", "project.toml"), `project = "ledger"`, 0o644)
-	gitRun(t, "init", "--quiet", "--initial-branch=main", filepath.Join(root, "ledger", "project"))
-	api := filepath.Join(root, "ledger", "ledger-api")
+	api := filepath.Join(root, "dev", "ledger-api")
 	gitRun(t, "init", "--quiet", "--initial-branch=main", api)
 	write(t, filepath.Join(api, "README"), "hello\n", 0o644)
 	gitRun(t, "-C", api, "add", "README")
 	gitRun(t, "-C", api, "commit", "--quiet", "-m", "first")
-	write(t, filepath.Join(root, ".foreman", "teams", "atlas.toml"), teamFile, 0o644)
-	write(t, filepath.Join(root, ".foreman", "settings.toml"), fmt.Sprintf("max_sessions = %d\n", maxSessions), 0o644)
-	if err := ws.Load(ctx, git.New()); err != nil {
-		t.Fatal(err)
-	}
-	program := filepath.Join(t.TempDir(), "harness.sh")
-	write(t, program, "#!/bin/sh\n"+script+"\n", 0o755)
-	db, err := store.Open(ctx, filepath.Join(root, ".foreman", "state.db"))
+	write(t, ws.Path("config", "teams", "atlas.toml"), teamFile, 0o644)
+	write(t, ws.Path("config", "settings.toml"), fmt.Sprintf("max_sessions = %d\n", maxSessions), 0o644)
+	db, err := store.Open(ctx, ws.Path("state.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
+	if err := ws.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ws.NewProject(ctx, "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ws.AddRepo(ctx, "ledger", "ledger-api", api); err != nil {
+		t.Fatal(err)
+	}
+	program := filepath.Join(t.TempDir(), "harness.sh")
+	write(t, program, "#!/bin/sh\n"+script+"\n", 0o755)
 	f := &fixture{t: t, root: root, db: db, ws: ws}
-	logs := sessionlog.Dir{Root: filepath.Join(root, ".foreman", "logs")}
+	logs := sessionlog.Dir{Root: ws.Path("logs")}
 	f.profiles = profiles.Store{Root: t.TempDir()}
 	if err := f.profiles.Ensure("claude-code"); err != nil {
 		t.Fatal(err)
 	}
 	f.deps = Deps{
-		Root: root, Runner: direct.Runner{}, Images: direct.Images{}, Git: git.New(), Config: ws,
+		Home: ws.Root(), Runner: direct.Runner{}, Images: direct.Images{}, Git: git.New(), Config: ws,
 		Deployments: db.Deployments(), Instances: db.Instances(),
 		Adapters: map[string]harness.Adapter{"claude-code": fake.Adapter{Program: program}},
 		Profile:  f.profileOf,
@@ -207,7 +213,7 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 	if s := f.status("tove@ledger"); s.Status != Asleep || !s.StartedAt.IsZero() {
 		t.Errorf("tove before any work: %+v", s)
 	}
-	if _, err := os.Stat(filepath.Join(f.root, "ledger", ".sandboxes", "tove")); !os.IsNotExist(err) {
+	if _, err := os.Stat(f.ws.Sandbox("ledger", "tove")); !os.IsNotExist(err) {
 		t.Errorf("an asleep member has a sandbox: %v", err)
 	}
 	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
@@ -218,17 +224,17 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 		t.Errorf("a member got an opener: %q", got)
 	}
 	for _, id := range []string{"mara@ledger", "tove@ledger"} {
-		if inst := f.status(id); inst.StartedAt.IsZero() || inst.SandboxPath != filepath.Join(f.root, "ledger", ".sandboxes", strings.Split(id, "@")[0]) {
+		if inst := f.status(id); inst.StartedAt.IsZero() || inst.SandboxPath != f.ws.Sandbox("ledger", strings.Split(id, "@")[0]) {
 			t.Errorf("%s: %+v", id, inst)
 		}
 	}
-	if b := f.branch(filepath.Join(f.root, "ledger", ".sandboxes", "mara", "ledger-api")); b != "lead/atlas/integration" {
+	if b := f.branch(filepath.Join(f.ws.Sandbox("ledger", "mara"), "ledger-api")); b != "lead/atlas/integration" {
 		t.Errorf("the lead's branch %q", b)
 	}
-	if b := f.branch(filepath.Join(f.root, "ledger", ".sandboxes", "tove", "ledger-api")); b != "wt/tove/main" {
+	if b := f.branch(filepath.Join(f.ws.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/tove/main" {
 		t.Errorf("a member's branch %q", b)
 	}
-	prompt, _ := os.ReadFile(filepath.Join(f.root, "ledger", ".sandboxes", "tove", ".harness", "fake", "PROMPT.md"))
+	prompt, _ := os.ReadFile(filepath.Join(f.ws.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
 	if !strings.Contains(string(prompt), "Goal: Ship invoices") || strings.Contains(string(prompt), "## Tools") {
 		t.Errorf("tove's prompt:\n%s", prompt)
 	}
@@ -285,9 +291,9 @@ func TestDeployRefusals(t *testing.T) {
 	// The project's profile decides what its agents run on: one that doesn't
 	// exist, one whose harness isn't supported, one not connected; each
 	// refused before anything is created.
-	write(t, filepath.Join(f.root, ".foreman", "teams", "orion.toml"),
+	write(t, f.ws.Path("config", "teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
-	if err := f.ws.Load(ctx, git.New()); err != nil {
+	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	f.useProfile("ledger", "nope")
@@ -376,9 +382,9 @@ func TestStopWhileStarting(t *testing.T) {
 		t.Errorf("a stopped instance kept its terminal: %v", err)
 	}
 	// Its one slot is free: another deployment's lead starts.
-	write(t, filepath.Join(f.root, ".foreman", "teams", "orion.toml"),
+	write(t, f.ws.Path("config", "teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
-	if err := f.ws.Load(ctx, git.New()); err != nil {
+	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err != nil {
@@ -408,7 +414,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 	if d, _ := f.db.Deployments().Get(ctx, "atlas@ledger"); d.Status != store.DeploymentStopped {
 		t.Errorf("deployment %+v", d)
 	}
-	if _, err := os.Stat(filepath.Join(f.root, "ledger", ".sandboxes", "tove", "ledger-api", "README")); err != nil {
+	if _, err := os.Stat(filepath.Join(f.ws.Sandbox("ledger", "tove"), "ledger-api", "README")); err != nil {
 		t.Error("stopping removed the worktree")
 	}
 	// Redeploying starts again, fresh.
@@ -491,7 +497,7 @@ func TestACrashRestartsOnceThenStops(t *testing.T) {
 	if inst.Restarts != 1 {
 		t.Errorf("restarts %d, want 1", inst.Restarts)
 	}
-	openers, _ := os.ReadFile(filepath.Join(f.root, "ledger", ".sandboxes", "mara", ".harness", "fake", "PROMPT.md.openers"))
+	openers, _ := os.ReadFile(filepath.Join(f.ws.Sandbox("ledger", "mara"), ".harness", "fake", "PROMPT.md.openers"))
 	if string(openers) != "[Your goal on ledger: g]\n[Your goal on ledger: g]\n" {
 		t.Errorf("openers per start: %q", openers)
 	}
@@ -517,34 +523,33 @@ func TestRestore(t *testing.T) {
 	for agent, status := range map[string]string{"mara": Running, "tove": Running, "ivo": Asleep} {
 		_ = f.db.Instances().Put(ctx, store.Instance{
 			ID: agent + "@ledger", DeploymentID: dep.ID, AgentID: agent, Status: status, Harness: "claude-code",
-			SandboxPath: filepath.Join(f.root, "ledger", ".sandboxes", agent), StartedAt: time.Now().Add(-time.Hour),
+			SandboxPath: f.ws.Sandbox("ledger", agent), StartedAt: time.Now().Add(-time.Hour),
 		})
 	}
-	start := func(id, workspace string) runner.Process {
+	start := func(id, home string) runner.Process {
 		labels := map[string]string{"foreman.instance": id}
-		if workspace != "" {
-			labels[WorkspaceLabel] = workspace
+		if home != "" {
+			labels[HomeLabel] = home
 		}
 		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: labels})
 		if err != nil {
 			t.Fatal(err)
 		}
-		// The other workspace's are never stopped by the manager: never left running either.
+		// Another home's are never stopped by the manager: never left running either.
 		t.Cleanup(func() { _ = p.Stop(time.Second) })
 		return p
 	}
-	survivor, orphan := start("mara@ledger", f.root), start("ghost@ledger", f.root)
-	// Another workspace on the machine, with the same names: never touched.
+	survivor, orphan := start("mara@ledger", f.ws.Root()), start("ghost@ledger", f.ws.Root())
+	// Another home on the machine, with the same names, and unlabelled ones:
+	// never touched.
 	theirs, theirOrphan := start("tove@ledger", "/elsewhere"), start("ghost2@ledger", "/elsewhere")
-	// From before processes named their workspace: adopted when it matches one
-	// of ours, never stopped.
-	older, olderUnknown := start("tove@ledger", ""), start("ghost3@ledger", "")
+	unlabelled := start("ghost3@ledger", "")
 	t.Cleanup(func() {
-		for _, p := range []runner.Process{theirs, theirOrphan, olderUnknown} {
+		for _, p := range []runner.Process{theirs, theirOrphan, unlabelled} {
 			_ = p.Stop(time.Second)
 		}
 	})
-	f.deps.Runner = listing{listed: []runner.Process{survivor, orphan, theirs, theirOrphan, older, olderUnknown}}
+	f.deps.Runner = listing{listed: []runner.Process{survivor, orphan, theirs, theirOrphan, unlabelled}}
 	m := New(f.deps)
 	f.m = m
 	if err := m.Restore(ctx); err != nil {
@@ -555,9 +560,7 @@ func TestRestore(t *testing.T) {
 	} else {
 		_ = term.Input([]byte("still here\n"))
 	}
-	if term, err := m.Terminal("tove@ledger"); err != nil || term == nil {
-		t.Errorf("the unlabelled process wasn't adopted: %v", err)
-	}
+	// tove was running, with no process of this home's: it restarts.
 	f.waitStatus("tove@ledger", Running)
 	if s := f.status("ivo@ledger"); s.Status != Asleep {
 		t.Errorf("an asleep instance after a restore: %+v", s)
@@ -623,7 +626,7 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	given, _ := os.ReadFile(filepath.Join(f.root, "ledger", ".sandboxes", "tove", ".harness", "fake", "PROMPT.md"))
+	given, _ := os.ReadFile(filepath.Join(f.ws.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
 	if shown != string(given) || !strings.Contains(shown, "Goal: Ship invoices") {
 		t.Errorf("shown:\n%s\ngiven:\n%s", shown, given)
 	}
@@ -806,8 +809,8 @@ func (g *failingSync) SyncSubmodules(_ context.Context, dir string, recursive bo
 // fetched doesn't keep the agent from starting.
 func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	write(t, filepath.Join(f.root, "ledger", "project", "project.toml"), "project = \"ledger\"\nrecursive_submodules = true\n", 0o644)
-	if err := f.ws.Load(ctx, git.New()); err != nil {
+	write(t, f.ws.Path("projects", "ledger", "project.toml"), "recursive_submodules = true\n", 0o644)
+	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	g := &failingSync{Git: f.deps.Git}
@@ -819,7 +822,7 @@ func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	f.waitStatus("mara@ledger", Running)
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	want := []string{filepath.Join(f.root, "ledger", ".sandboxes", "mara", "ledger-api") + " recursive=true"}
+	want := []string{filepath.Join(f.ws.Sandbox("ledger", "mara"), "ledger-api") + " recursive=true"}
 	if !slices.Equal(g.synced, want) {
 		t.Errorf("synced %q, want %q", g.synced, want)
 	}
@@ -866,10 +869,7 @@ func closeOnce(c chan struct{}) {
 // what to do.
 func TestDeployRefusesAProjectWithoutRepos(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if err := os.RemoveAll(filepath.Join(f.root, "ledger", "ledger-api")); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.ws.Load(ctx, git.New()); err != nil {
+	if _, err := f.ws.RemoveRepo(ctx, "ledger", "ledger-api"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no code repo") {
@@ -931,14 +931,14 @@ func TestStartAgainAfterTwoCrashes(t *testing.T) {
 	}
 }
 
-// Processes of another workspace, and old unlabelled ones that match nothing,
-// are left running by a restore.
-func TestRestoreLeavesOtherWorkspacesAlone(t *testing.T) {
+// Processes of another home, and unlabelled ones, are left running by a
+// restore.
+func TestRestoreLeavesOtherHomesAlone(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	start := func(id, workspace string) runner.Process {
+	start := func(id, home string) runner.Process {
 		labels := map[string]string{"foreman.instance": id}
-		if workspace != "" {
-			labels[WorkspaceLabel] = workspace
+		if home != "" {
+			labels[HomeLabel] = home
 		}
 		p, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"}, Labels: labels})
 		if err != nil {
@@ -953,7 +953,7 @@ func TestRestoreLeavesOtherWorkspacesAlone(t *testing.T) {
 	if err := f.m.Restore(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for name, p := range map[string]runner.Process{"another workspace's": theirs, "an unlabelled": older} {
+	for name, p := range map[string]runner.Process{"another home's": theirs, "an unlabelled": older} {
 		done := make(chan struct{})
 		go func() { _, _ = p.Wait(); close(done) }()
 		select {
@@ -964,10 +964,10 @@ func TestRestoreLeavesOtherWorkspacesAlone(t *testing.T) {
 	}
 }
 
-// Every process names its workspace, and its name is unique on the machine.
-func TestProcessesNameTheirWorkspace(t *testing.T) {
-	a := New(Deps{Root: "/ws/a"})
-	b := New(Deps{Root: "/ws/b"})
+// Every process names its home, and its name is unique on the machine.
+func TestProcessesNameTheirHome(t *testing.T) {
+	a := New(Deps{Home: "/a/.foreman"})
+	b := New(Deps{Home: "/b/.foreman"})
 	if a.processName("mara@ledger") == b.processName("mara@ledger") || !strings.HasSuffix(a.processName("mara@ledger"), "-mara@ledger") {
 		t.Errorf("names %q %q", a.processName("mara@ledger"), b.processName("mara@ledger"))
 	}
@@ -1151,17 +1151,18 @@ func TestShutdownKeepsWhatItCouldntStop(t *testing.T) {
 
 // profileOf is the project's profile, as the composition root finds it.
 func (f *fixture) profileOf(project string) (profiles.Profile, string, error) {
-	p, err := f.profiles.Get(f.ws.Settings().Settings.ProfileOf(project))
+	pr, err := f.ws.Project(project)
+	if err != nil {
+		return profiles.Profile{}, "", err
+	}
+	p, err := f.profiles.Get(pr.Profile)
 	return p, f.profiles.Dir(p.Name), err
 }
 
-// useProfile sets the project's profile in settings.toml.
+// useProfile sets the project's profile.
 func (f *fixture) useProfile(project, profile string) {
 	f.t.Helper()
-	file := f.ws.Settings()
-	s := file.Settings
-	s.ProjectProfiles = map[string]string{project: profile}
-	if _, err := f.ws.SaveSettings(ctx, s, file.Version); err != nil {
+	if _, err := f.ws.SetProfile(ctx, project, profile); err != nil {
 		f.t.Fatal(err)
 	}
 }
@@ -1243,4 +1244,134 @@ func TestRestartTakesTheProfileAsItIsNow(t *testing.T) {
 	if err := f.m.Restart(ctx, "nope@ledger"); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("unknown: %v", err)
 	}
+}
+
+// specs is the Direct engine, keeping what each start was asked.
+type specs struct {
+	direct.Runner
+	mu  sync.Mutex
+	got []runner.Spec
+}
+
+func (s *specs) Start(ctx context.Context, spec runner.Spec) (runner.Process, error) {
+	s.mu.Lock()
+	s.got = append(s.got, spec)
+	s.mu.Unlock()
+	return s.Runner.Start(ctx, spec)
+}
+
+func (s *specs) last() runner.Spec {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.got[len(s.got)-1]
+}
+
+// An agent gets its sandbox, each repo's .git read-only at its real path
+// (which its worktree's link names, a symlinked repo folder included), and
+// the project repo in its sandbox: writable for the lead only, its .git
+// read-only for all. Nothing else of the machine, the home least of all.
+func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	link := filepath.Join(f.root, "linked-api")
+	if err := os.Symlink(filepath.Join(f.root, "dev", "ledger-api"), link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.ws.LocateRepo(ctx, "ledger", "ledger-api", link); err != nil {
+		t.Fatal(err)
+	}
+	rec := &specs{}
+	f.deps.Runner = rec
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	realAPI, _ := filepath.EvalSymlinks(filepath.Join(f.root, "dev", "ledger-api"))
+	project := f.ws.Path("projects", "ledger")
+	mara := f.ws.Sandbox("ledger", "mara")
+	want := []runner.Mount{
+		{Source: mara, Target: mara},
+		{Source: filepath.Join(realAPI, ".git"), Target: filepath.Join(realAPI, ".git"), ReadOnly: true},
+		{Source: project, Target: filepath.Join(mara, "project")},
+		{Source: filepath.Join(project, ".git"), Target: filepath.Join(mara, "project", ".git"), ReadOnly: true},
+	}
+	if got := rec.last(); !slices.Equal(got.Mounts, want) || got.Labels[HomeLabel] != f.ws.Root() {
+		t.Errorf("the lead's mounts:\n%+v\nwant\n%+v\nlabels %v", got.Mounts, want, got.Labels)
+	}
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Running)
+	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: project, Target: filepath.Join(f.ws.Sandbox("ledger", "tove"), "project"), ReadOnly: true}) {
+		t.Errorf("a member's project repo: %+v", got.Mounts[2])
+	}
+}
+
+// A repo that moved keeps its agents from starting until it is located:
+// then their worktrees, made at the old place, are relinked and reused, with
+// the agents' work in them.
+func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	worktree := filepath.Join(f.ws.Sandbox("ledger", "mara"), "ledger-api")
+	write(t, filepath.Join(worktree, "work.txt"), "mara's\n", 0o644)
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	moved := filepath.Join(f.root, "src", "ledger-api")
+	if err := os.MkdirAll(filepath.Dir(moved), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(filepath.Join(f.root, "dev", "ledger-api"), moved); err != nil {
+		t.Fatal(err)
+	}
+	// Nothing reloaded the home: the start checks the repos itself.
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "is missing") {
+		t.Fatalf("deploying with a missing repo: %v", err)
+	}
+	if _, err := f.ws.LocateRepo(ctx, "ledger", "ledger-api", moved); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if b := f.branch(worktree); b != "lead/atlas/integration" {
+		t.Errorf("the relinked worktree's branch %q", b)
+	}
+	if data, _ := os.ReadFile(filepath.Join(worktree, "work.txt")); string(data) != "mara's\n" {
+		t.Errorf("the agent's work: %q", data)
+	}
+}
+
+// One team can't work on two projects that share a repo, stopped or not:
+// its branches and worktrees would collide there. Another team can.
+func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if _, err := f.ws.NewProject(ctx, "suite"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.ws.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, f.ws.Path("config", "teams", "orion.toml"),
+		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
+	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.m.Stop(ctx, "atlas@ledger")
+	_, err := f.m.Deploy(ctx, "atlas", "suite", "g")
+	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "team atlas also works on ledger, which shares the repo api") {
+		t.Errorf("atlas on a second project of the repo: %v", err)
+	}
+	if _, err := f.m.Deploy(ctx, "orion", "suite", "g"); err != nil {
+		t.Errorf("another team: %v", err)
+	}
+	f.waitStatus("nora@suite", Running)
 }

@@ -35,7 +35,7 @@ func TestWiki(t *testing.T) {
 		}
 		return dir, nil
 	}, nil)
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Wiki: wk, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Wiki: wk, UI: builtUI})
 
 	var tree []wiki.Node
 	decodeBody(t, get(t, h, "/api/wiki/ledger/tree"), &tree)
@@ -91,7 +91,7 @@ func TestWikiWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	wk := wiki.New(func(string) (string, error) { return dir, nil }, g)
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Wiki: wk, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Wiki: wk, UI: builtUI})
 
 	var boards []wiki.Board
 	decodeBody(t, get(t, h, "/api/wiki/ledger/boards"), &boards)

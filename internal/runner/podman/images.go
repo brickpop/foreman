@@ -26,7 +26,7 @@ type Images struct {
 	r             *Runner // reached through the engine, so a reconnection is followed
 	name          string  // e.g. localhost/foreman/harness
 	containerfile []byte
-	// shared is the build as every workspace's Foreman sees it: the image is
+	// shared is the build as every Foreman on this machine sees it: the image is
 	// the machine's, so one builds at a time and all show the same state.
 	shared sharedBuild
 	builds atomic.Int32 // builds this Foreman started, for tests
@@ -36,7 +36,7 @@ var _ runner.Images = (*Images)(nil)
 
 // Images returns the image builder for the image name, built from
 // containerfile; dir is where its build state is shared with the other
-// workspaces' Foremans (the CEO's folder, internal/userdata).
+// Foremans on this machine (Foreman's home, internal/userdata).
 func (r *Runner) Images(name string, containerfile []byte, dir string) *Images {
 	key := strings.NewReplacer("/", "-", ":", "-").Replace(name)
 	return &Images{r: r, name: name, containerfile: containerfile, shared: sharedBuild{dir: dir, key: key}}
@@ -85,7 +85,7 @@ func (im *Images) Refresh(ctx context.Context) error {
 }
 
 // Status reports the image as every Foreman sees it: building (here or in
-// another workspace), failed, or else ready or missing as Podman says.
+// another Foreman), failed, or else ready or missing as Podman says.
 func (im *Images) Status(ctx context.Context) []runner.ImageStatus {
 	state, log := im.shared.state()
 	if state != "building" && state != "failed" {

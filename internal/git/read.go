@@ -190,3 +190,15 @@ func (g *CLI) RecentBranches(ctx context.Context, dir string) ([]string, error) 
 	}
 	return strings.Fields(out), nil
 }
+
+// RootCommit is a first commit of dir's history (of several, joined by a
+// merge, the lowest hash: commit dates tie): it names the repo wherever its
+// folder goes, so a moved repo is recognised. ErrNoRef with no commit yet.
+func (g *CLI) RootCommit(ctx context.Context, dir string) (string, error) {
+	out, err := run(ctx, dir, "rev-list", "--max-parents=0", "HEAD")
+	roots := strings.Fields(out)
+	if err != nil || len(roots) == 0 {
+		return "", ErrNoRef
+	}
+	return slices.Min(roots), nil
+}

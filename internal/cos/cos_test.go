@@ -8,44 +8,44 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/events"
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 var ctx = context.Background()
 
-// teams is a workspace's team files in memory: a save is refused on a stale
-// version, as the workspace's is.
+// teams is a home's team files in memory: a save is refused on a stale
+// version, as the home's is.
 type teams struct {
-	files   map[string]workspace.Team
+	files   map[string]home.Team
 	refuse  []string // what CheckTeam says
-	saved   []workspace.TeamConfig
+	saved   []home.TeamConfig
 	version int
 }
 
-func (t *teams) Teams() []workspace.Team {
-	var all []workspace.Team
+func (t *teams) Teams() []home.Team {
+	var all []home.Team
 	for _, team := range t.files {
 		all = append(all, team)
 	}
 	return all
 }
 
-func (t *teams) Team(id string) (workspace.Team, error) {
+func (t *teams) Team(id string) (home.Team, error) {
 	team, ok := t.files[id]
 	if !ok {
-		return workspace.Team{}, workspace.ErrNotFound
+		return home.Team{}, home.ErrNotFound
 	}
 	return team, nil
 }
 
-func (t *teams) CheckTeam(workspace.TeamConfig) []string { return t.refuse }
+func (t *teams) CheckTeam(home.TeamConfig) []string { return t.refuse }
 
-func (t *teams) SaveTeam(_ context.Context, c workspace.TeamConfig, version string) (workspace.Team, error) {
+func (t *teams) SaveTeam(_ context.Context, c home.TeamConfig, version string) (home.Team, error) {
 	if t.files[c.Team].Version != version {
-		return workspace.Team{}, workspace.ErrConflict
+		return home.Team{}, home.ErrConflict
 	}
 	t.version++
-	saved := workspace.Team{ID: c.Team, Config: c, Version: string(rune('a' + t.version))}
+	saved := home.Team{ID: c.Team, Config: c, Version: string(rune('a' + t.version))}
 	t.files[c.Team] = saved
 	t.saved = append(t.saved, c)
 	return saved, nil
@@ -60,12 +60,12 @@ type fixture struct {
 }
 
 func newFixture() *fixture {
-	f := &fixture{teams: &teams{files: map[string]workspace.Team{
-		"atlas": {ID: "atlas", Version: "v1", Config: workspace.TeamConfig{
+	f := &fixture{teams: &teams{files: map[string]home.Team{
+		"atlas": {ID: "atlas", Version: "v1", Config: home.TeamConfig{
 			Team: "atlas", Name: "Atlas", Lead: "mara", Order: []string{"mara", "tove"},
-			Agents: map[string]workspace.Soul{
-				"mara": {Name: "Mara", Role: "team_lead", Look: workspace.Look{Color: "#D9825B"}},
-				"tove": {Name: "Tove", Role: "engineer", Look: workspace.Look{Color: "#8DB86B"}},
+			Agents: map[string]home.Soul{
+				"mara": {Name: "Mara", Role: "team_lead", Look: home.Look{Color: "#D9825B"}},
+				"tove": {Name: "Tove", Role: "engineer", Look: home.Look{Color: "#8DB86B"}},
 			},
 		}},
 	}}}
@@ -104,12 +104,12 @@ func TestANewTeamIsShownThenCreated(t *testing.T) {
 	if len(f.teams.saved) != 0 {
 		t.Fatal("a proposal wrote the team")
 	}
-	look := workspace.Look{Color: "#6FA8DC", Skin: "#E2AE85", Hair: "bun", HairColor: "#2B2420", Eyes: "dots", Beard: "none"}
-	saved, err := f.Create(ctx, p.ID, map[string]workspace.Look{"nyx": look, "ghost": look})
+	look := home.Look{Color: "#6FA8DC", Skin: "#E2AE85", Hair: "bun", HairColor: "#2B2420", Eyes: "dots", Beard: "none"}
+	saved, err := f.Create(ctx, p.ID, map[string]home.Look{"nyx": look, "ghost": look})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved.ID != "vesper" || f.teams.saved[0].Agents["nyx"].Look != look || f.teams.saved[0].Agents["kestrel"].Look != (workspace.Look{}) {
+	if saved.ID != "vesper" || f.teams.saved[0].Agents["nyx"].Look != look || f.teams.saved[0].Agents["kestrel"].Look != (home.Look{}) {
 		t.Errorf("saved %+v", f.teams.saved)
 	}
 	if _, ok := f.Proposal(); ok || f.proposals[len(f.proposals)-1] != nil {
@@ -203,6 +203,6 @@ func TestThePromptNamesWhatIsTaken(t *testing.T) {
 		}
 	}
 	if empty := Prompt(nil, "/t"); !strings.Contains(empty, "Team ids: none yet.") {
-		t.Error("an empty workspace")
+		t.Error("no teams")
 	}
 }

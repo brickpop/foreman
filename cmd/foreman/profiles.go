@@ -4,15 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
 	"sort"
 
 	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/server"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // profileLogins is the CEO's profiles as Foreman uses them
@@ -25,7 +23,7 @@ type profileLogins struct {
 	adapters map[string]harness.Adapter
 	images   runner.Images
 	terms    *sessions // the login terminals, by id
-	settings func() workspace.Settings
+	project  func(id string) (home.Project, error)
 }
 
 // Harnesses lists the harnesses Foreman supports.
@@ -127,20 +125,23 @@ func (p profileLogins) EndLogin(name string) error {
 	return p.terms.stop("connect:" + name)
 }
 
-// Of is the profile a project's agents run on, as the settings say now, and
+// Of is the profile a project's agents run on, as its record says now, and
 // its folder.
 func (p profileLogins) Of(project string) (profiles.Profile, string, error) {
-	name := p.settings().ProfileOf(project)
-	pr, err := p.store.Get(name)
-	return pr, p.store.Dir(name), err
+	proj, err := p.project(project)
+	if err != nil {
+		return profiles.Profile{}, "", err
+	}
+	pr, err := p.store.Get(proj.Profile)
+	return pr, p.store.Dir(proj.Profile), err
 }
 
 // Used are the profiles the projects use, by name (the default while there
 // is no project), with their state; one that doesn't exist has no harness.
-func (p profileLogins) Used(projects []workspace.Project) []profiles.Profile {
+func (p profileLogins) Used(projects []home.Project) []profiles.Profile {
 	names := map[string]bool{}
 	for _, pr := range projects {
-		names[p.settings().ProfileOf(pr.ID)] = true
+		names[pr.Profile] = true
 	}
 	if len(projects) == 0 {
 		names[profiles.Default] = true
@@ -155,19 +156,6 @@ func (p profileLogins) Used(projects []workspace.Project) []profiles.Profile {
 	}
 	sort.Slice(used, func(i, j int) bool { return used[i].Name < used[j].Name })
 	return used
-}
-
-// adoptLogins turns the workspace's own logins, from before profiles, into
-// profiles, once: then nothing is left to move. Foreman starts whatever
-// happens; a login that couldn't move is connected again.
-func adoptLogins(store profiles.Store, root string, connected map[string]func(string) bool, stdout io.Writer) {
-	adopted, err := store.Adopt(root, connected)
-	if err != nil {
-		slog.Warn("moving the workspace's logins into profiles", "err", err)
-	}
-	for _, pr := range adopted {
-		fmt.Fprintf(stdout, "This workspace's %s login is now the profile %s, shared by your workspaces (%s)\n", pr.Harness, pr.Name, store.Dir(pr.Name))
-	}
 }
 
 // endpointOf is the profile's adapter when its harness runs on a model

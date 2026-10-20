@@ -6,7 +6,7 @@ tags: [architecture, forge, git, pipeline]
 
 # Forge adapters
 
-A **forge** is where pull requests live. Foreman connects to an existing one; it never hosts it, and **only goes there when the CEO asks**: Create PR on a [merge request](../models/merge-request.md), or Sync on a reserved repo. The forge is chosen per project in [`project.toml`](../models/project-config.md) (`forge.kind`, `forge.url`, `forge.project_repo`), and for the workspace repo in [Workspace settings](../models/workspace-settings.md#schema) (`workspace_forge`); tokens live in workspace [secrets](../models/secrets.md), set from [Settings](../features/settings.md). The pipeline uses an adapter for every forge operation ([Pipeline and merges](../features/pipeline-and-merges.md)).
+A **forge** is where pull requests live. Foreman connects to an existing one; it never hosts it, and **only goes there when the CEO asks**: Create PR on a [merge request](../models/merge-request.md), or Sync on a reserved repo. The forge is chosen per project in [`project.toml`](../models/project-config.md) (`forge.kind`, `forge.url`, `forge.project_repo`), and for the global repo in [Global settings](../models/global-settings.md#schema) (`global_forge`); tokens live in Foreman's [secrets](../models/secrets.md), set from [Settings](../features/settings.md). The pipeline uses an adapter for every forge operation ([Pipeline and merges](../features/pipeline-and-merges.md)).
 
 ## Kinds
 
@@ -17,7 +17,7 @@ A **forge** is where pull requests live. Foreman connects to an existing one; it
 | `gitea` | Gitea REST | Same API family as Forgejo, so one implementation can serve both |
 | `none` | local | No forge: merge requests offer Merge to main and Reject only, and there is nothing to Sync. A `project.toml` without a `forge` table means `none` |
 
-The repo name on the forge equals the repo's folder name, under the `forge.url` owner/org. The [project repo](../models/project-config.md#the-project-repo) is named in full by `forge.project_repo`, and the [workspace repo](../models/workspace.md#the-workspace-repo) by `workspace_forge.url`. A per-repo name override is not in v1; it would be an optional field in `project.toml`, added only when a real project needs it.
+The repo name on the forge equals the repo's name in the project, under the `forge.url` owner/org. The [project repo](../models/project-config.md#the-project-repo) is named in full by `forge.project_repo`, and the [global repo](../models/home.md#the-global-repo) by `global_forge.url`. A per-repo name override is not in v1; it would be an optional field in `project.toml`, added only when a real project needs it.
 
 ## Operations
 
@@ -25,7 +25,7 @@ Every adapter implements the same small set, so kinds are interchangeable. Forem
 
 | Operation | Used when |
 |---|---|
-| push branch | **Create PR**: Foreman pushes the merge request's branch to the forge (again, as a plain fast-forward, when the lead calls `request_merge` again after merging `main` in) with the workspace token. **Sync** on a reserved repo pushes its `main` the same way. Agents never push to the forge and never see the token ([Sandboxes and git policy](./sandboxes-and-git.md)) |
+| push branch | **Create PR**: Foreman pushes the merge request's branch to the forge (again, as a plain fast-forward, when the lead calls `request_merge` again after merging `main` in) with the forge account's token. **Sync** on a reserved repo pushes its `main` the same way. Agents never push to the forge and never see the token ([Sandboxes and git policy](./sandboxes-and-git.md)) |
 | open PR (title, body, head, base = `main`) → URL, number | **Create PR**: the title and body come from the merge request's wiki entry |
 | read PR state | polling, below |
 | read check status | after opening and while polling; shown as "checks pass" on review request panels ([Needs you](../features/project-pipeline.md#1-needs-you)), next to Foreman's own run of the project `checks` |
@@ -46,7 +46,7 @@ In every repo, with or without a forge, Foreman also reads `main` on the same in
 
 ### Sync (the reserved repos)
 
-The workspace repo and the project repo never push on their own: Foreman commits to them locally (a UI save, a contribution, a card move, the lead's `commit()`), and nothing reaches their forge until the CEO clicks **Sync**. Sync fetches the forge's `main`, merges it into the local `main` (it may hold commits made on the forge), then pushes `main`. On a conflict it stops, changes nothing, and tells the CEO. Sync is offered only when the repo has a forge: in [Settings → Forge accounts](../features/settings.md#forge-accounts) for the workspace repo, and in [Project settings](../features/project-settings.md) for the project repo.
+The global repo and the project repo never push on their own: Foreman commits to them locally (a UI save, a contribution, a card move, the lead's `commit()`), and nothing reaches their forge until the CEO clicks **Sync**. Sync fetches the forge's `main`, merges it into the local `main` (it may hold commits made on the forge), then pushes `main`. On a conflict it stops, changes nothing, and tells the CEO. Sync is offered only when the repo has a forge: in [Settings → Forge accounts](../features/settings.md#forge-accounts) for the global repo, and in [Project settings](../features/project-settings.md) for the project repo.
 
 ## Rules
 

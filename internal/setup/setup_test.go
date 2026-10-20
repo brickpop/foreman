@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/podman"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 var ctx = context.Background()
@@ -72,12 +72,12 @@ func (im *images) Status(context.Context) []runner.ImageStatus {
 }
 
 type config struct {
-	teams    []workspace.Team
-	projects []workspace.Project
+	teams    []home.Team
+	projects []home.Project
 }
 
-func (c config) Teams() []workspace.Team       { return c.teams }
-func (c config) Projects() []workspace.Project { return c.projects }
+func (c config) Teams() []home.Team       { return c.teams }
+func (c config) Projects() []home.Project { return c.projects }
 
 type rig struct {
 	*Setup
@@ -243,7 +243,7 @@ func (runnerless) Refresh(context.Context) error                  { return nil }
 func (runnerless) Status(context.Context) []runner.ImageStatus    { return nil }
 
 func TestSteps(t *testing.T) {
-	var team workspace.Team
+	var team home.Team
 	for _, c := range []struct {
 		name     string
 		config   config
@@ -255,8 +255,8 @@ func TestSteps(t *testing.T) {
 			[]string{"image todo", "profile:default done", "team todo", "project todo"}},
 		// The profiles the projects use: one not connected, one that doesn't exist.
 		{"a project without a repo, one with problems, one with a repo",
-			config{teams: []workspace.Team{team}, projects: []workspace.Project{
-				{ID: "web", Repos: []string{"app"}}, {ID: "ledger"}, {ID: "broken", Problems: []string{"bad toml"}}}},
+			config{teams: []home.Team{team}, projects: []home.Project{
+				{ID: "web", Repos: []home.Repo{{Name: "app", Path: "/home/ceo/app"}}}, {ID: "ledger"}, {ID: "broken", Problems: []string{"bad toml"}}}},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code"}, {Name: "gone"}},
 			[]string{"image todo", "profile:default todo", "profile:gone failed", "team done", "project done", "repo:ledger todo"}},
 	} {

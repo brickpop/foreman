@@ -12,10 +12,11 @@ Each [instance](../models/instance.md) works in its **own git worktree** of each
 
 ## Layout
 
-- **Worktree:** `<project>/.sandboxes/<agent>/<repo>/` for each code repo of the [project](../models/workspace.md#discovery), created on the host with `git -C <project>/<repo> worktree add`. A worktree shares its repo's object store and refs: nothing is copied, and every branch any agent creates is at once visible to the others and to the CEO. Agent ids are workspace-unique, so worktree paths never collide ([Team definition](../models/team-definition.md#schema)).
-- `<project>/.sandboxes/<agent>/` is the instance's **sandbox**: its working directory, holding its worktrees and its view of the project repo (`project/`, mounted there).
-- `.sandboxes/` must be git-ignored: Foreman adds it to `.git/info/exclude` of any enclosing repo.
-- The project repo `<project>/project/` never gets agent worktrees: it is the live, shared knowledge base.
+- **Worktree:** `~/.foreman/sandboxes/<project>/<agent>/<repo>/` for each code repo of the [project](../models/project-config.md#the-project-record), created on the host with `git -C <repo path> worktree add`. The code repo itself is wherever the CEO keeps it; Foreman writes only in its `.git`. A worktree shares its repo's object store and refs: nothing is copied, and every branch any agent creates is at once visible to the others and to the CEO. Agent ids are unique across teams, so worktree paths never collide ([Team definition](../models/team-definition.md#schema)).
+- `~/.foreman/sandboxes/<project>/<agent>/` is the instance's **sandbox**: its working directory, holding its worktrees and its view of the project repo (`project/`, mounted there). It lives under Foreman's home, outside every repo, so nothing has to be git-ignored, and git run in it never finds the [global repo](../models/home.md#the-global-repo) as an enclosing repo.
+- The project repo `~/.foreman/projects/<name>/` never gets agent worktrees: it is the live, shared knowledge base.
+- **A located repo:** when the CEO points a moved code repo at its new path (Locate, [Project config](../models/project-config.md#the-project-record)), each existing worktree follows it on its next start (`git worktree repair`). A repo missing or changed blocks starting the project's agents until then.
+- **Two projects, one repo:** a code repo may be in several projects. Different teams never collide in it (their branches are named after agents and teams, all unique), but the same team can't be deployed on two projects that share a repo: its branches would be the same in that repo's `.git`, so the deploy is refused.
 
 ## Branches
 
@@ -32,12 +33,12 @@ Everything at the **same path as on the host** ([Session runner](./session-runne
 
 | Host path | In the container | Mode |
 |---|---|---|
-| `<project>/.sandboxes/<agent>/` (the sandbox: its worktrees) | same path; the working directory | rw |
-| `<project>/<repo>/.git` (each code repo) | same path | **ro** |
-| `<project>/project/` (the live project repo) | `<project>/.sandboxes/<agent>/project` | rw for the lead, ro for the others |
-| `<project>/project/.git` | `<project>/.sandboxes/<agent>/project/.git`, over the mount above | **ro** for every agent |
+| `~/.foreman/sandboxes/<project>/<agent>/` (the sandbox: its worktrees) | same path; the working directory | rw |
+| `<repo path>/.git` (each code repo, at its real path) | same path | **ro** |
+| `~/.foreman/projects/<name>/` (the live project repo) | `<sandbox>/project` | rw for the lead, ro for the others |
+| `~/.foreman/projects/<name>/.git` | `<sandbox>/project/.git`, over the mount above | **ro** for every agent |
 
-A worktree's `.git` is a file pointing at `<project>/<repo>/.git/worktrees/<name>` by host path, so git works inside the container only because the repo's `.git` is mounted at that same path. A submodule's `.git` file points into that same mount (`.git/worktrees/<name>/modules/<path>`), so it resolves there too ([Submodules](#submodules)). The CEO's working files (`<project>/<repo>/` outside `.git`) are never mounted, and no agent ever touches the CEO's checkout or checks out a branch there. Foreman's own Merge to main runs in it only when it has `main` checked out, so its files move with `main` ([Pipeline and merges → Merge to main](../features/pipeline-and-merges.md#merge-to-main)).
+A worktree's `.git` is a file pointing at `<repo path>/.git/worktrees/<name>` by host path, so git works inside the container only because the repo's `.git` is mounted at that same path. A submodule's `.git` file points into that same mount (`.git/worktrees/<name>/modules/<path>`), so it resolves there too ([Submodules](#submodules)). The CEO's working files (the code repo outside `.git`) are never mounted, and no agent ever touches the CEO's checkout or checks out a branch there. Foreman's own Merge to main runs in it only when it has `main` checked out, so its files move with `main` ([Pipeline and merges → Merge to main](../features/pipeline-and-merges.md#merge-to-main)).
 
 ## Agents and git
 
@@ -85,16 +86,16 @@ A hand-off is a message naming a branch: `handoff(mara, "wt/tove/LED-44", summar
 By Foreman, never by hooks in the repo: agents can't write `.git` at all, and Foreman is the only one that writes it, through the tools:
 
 - **`switch`**, **`commit`**, **`merge`**, **`abort_merge`** and **`set_submodule`** act only on the caller's own worktrees and the branches checked out there; **`handoff`** accepts only `wt/<self>/*`; **`request_merge`** only the caller's own `lead/<team>/*` ([Protocol → Team tools](./protocol.md#team-tools)).
-- **Agents never push, and nothing is pushed on its own.** Only the CEO's **Create PR** on a merge request makes Foreman push the lead branch to the **forge** from the host, with the workspace token ([Forge adapters](./forge-adapters.md)); agents never receive forge tokens. Calling `request_merge` again on a lead branch whose merge request is still open refreshes it (after merging `main` in, or new integrations): Foreman reruns the checks, and pushes again if it has a PR. Lead branches only ever move forward: nothing is rebased.
+- **Agents never push, and nothing is pushed on its own.** Only the CEO's **Create PR** on a merge request makes Foreman push the lead branch to the **forge** from the host, with the forge account's token ([Forge adapters](./forge-adapters.md)); agents never receive forge tokens. Calling `request_merge` again on a lead branch whose merge request is still open refreshes it (after merging `main` in, or new integrations): Foreman reruns the checks, and pushes again if it has a PR. Lead branches only ever move forward: nothing is rebased.
 - **Merge to main** is Foreman merging the branch into `main` on the host, on the CEO's click; with or without a forge ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 
 ## Project knowledge base
 
-The [project repo](../models/project-config.md) `<project>/project/` (`project.toml` and the wiki) is **one live checkout**, mounted into every container of the project: read-write for the **lead** (the lead of each team deployed on the project), read-only for everyone else, enforced by the mount mode. Its `.git` is read-only for every agent, the lead included: the lead edits the files and calls `commit()`, which commits on the project repo's `main` directly: no branches, no merge requests. Everyone else contributes through the [`contribute`](./team-tools.md#tools) team tool: Foreman writes the contribution into `project/wiki/inbox/` and tells the lead. There is no writable folder for read-only agents.
+The [project repo](../models/project-config.md#the-project-repo) `~/.foreman/projects/<name>/` (`project.toml` and the wiki) is **one live checkout**, mounted into every container of the project: read-write for the **lead** (the lead of each team deployed on the project), read-only for everyone else, enforced by the mount mode. Its `.git` is read-only for every agent, the lead included: the lead edits the files and calls `commit()`, which commits on the project repo's `main` directly: no branches, no merge requests. Everyone else contributes through the [`contribute`](./team-tools.md#tools) team tool: Foreman writes the contribution into `project/wiki/inbox/` and tells the lead. There is no writable folder for read-only agents.
 
 **Several leads, one checkout.** Each team deployed on the project has its own lead, and they all share this one checkout. A lead's `commit()` naming `project` takes everything changed in it, so it can sweep another lead's unfinished edit into its own commit: nothing is lost, only the attribution suffers. Accepted for v1; a worktree per lead, with Foreman merging each commit into `main`, is an option for later ([backlog](../../backlog/index.md#not-yet-scheduled)).
 
-**Foreman commits its own writes** to the project repo, one commit per write, like the [workspace repo](../models/workspace.md#the-workspace-repo)'s one commit per save: a `contribute` note authored as the contributing agent, a checkbox tick or card move from the UI authored as the CEO. Each commit holds only the file Foreman wrote, so the lead's uncommitted edits in other files are left alone. When the file itself already has changes nobody committed (the lead mid-edit, or an entry an agent created and hasn't committed yet), Foreman writes it but doesn't commit it: the change goes into the lead's next commit, rather than the lead's edits being committed as the CEO's (the CEO, 2026-10-17).
+**Foreman commits its own writes** to the project repo, one commit per write, like the [global repo](../models/home.md#the-global-repo)'s one commit per save: a `contribute` note authored as the contributing agent, a checkbox tick or card move from the UI authored as the CEO. Each commit holds only the file Foreman wrote, so the lead's uncommitted edits in other files are left alone. When the file itself already has changes nobody committed (the lead mid-edit, or an entry an agent created and hasn't committed yet), Foreman writes it but doesn't commit it: the change goes into the lead's next commit, rather than the lead's edits being committed as the CEO's (the CEO, 2026-10-17).
 
 **Changes to `project.toml` by the Chief of Staff** come later, and how they are approved is decided then ([Project config with the Chief of Staff](../../backlog/cos-project-config.md)). Nothing in the project repo is pushed on its own: the CEO pushes its `main` with **Sync** in Project settings ([Forge adapters → Sync](./forge-adapters.md#sync-the-reserved-repos)) ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 

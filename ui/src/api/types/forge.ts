@@ -10,7 +10,7 @@ For now it holds only the wire types; the adapters come with the Git epic.
 
 /**
  * Account is a forge's connection, for Settings → Forge accounts (tygo.yaml).
- * Its host is in the workspace settings (forges); its token is a secret, never
+ * Its host is in the global settings (forges); its token is a secret, never
  * sent back.
  */
 export interface Account {

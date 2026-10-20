@@ -44,4 +44,4 @@ Padding `28px 48px 64px`, max 760px.
 
 ## File
 
-Padding `28px 48px 64px`, max 860px. The path `~/agents-ws/.foreman/teams/<id>.toml` and the file's actual content in a read-only `<pre>`, exactly as on disk ([Team definition](../models/team-definition.md)).
+Padding `28px 48px 64px`, max 860px. The path `<home>/config/teams/<id>.toml` (the home's real path, e.g. `~/.foreman/config/teams/atlas.toml`, in the [global repo](../models/home.md#the-global-repo)) and the file's actual content in a read-only `<pre>`, exactly as on disk ([Team definition](../models/team-definition.md)).

@@ -37,7 +37,7 @@ func (f *fakeMessages) Traffic(_ context.Context, deployment string) ([]store.Te
 
 func TestMessagesOfADeployment(t *testing.T) {
 	f := &fakeMessages{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Messages: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Messages: f, UI: builtUI})
 	var list []map[string]any
 	decodeBody(t, get(t, h, "/api/messages?deployment=atlas%40ledger"), &list)
 	if f.asked != "atlas@ledger" || len(list) != 1 || list[0]["ref"] != "msg-1" || list[0]["body"] != "build cal" {
@@ -50,7 +50,7 @@ func TestMessagesOfADeployment(t *testing.T) {
 
 func TestTheCEOsLineAndTheCountdown(t *testing.T) {
 	f := &fakeMessages{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Messages: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Messages: f, UI: builtUI})
 	do := func(method, path, body string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(method, path, strings.NewReader(body)))
@@ -77,7 +77,7 @@ func (fakeActions) List(_ context.Context, deployment string) ([]store.TeamActio
 }
 
 func TestActionsOfADeployment(t *testing.T) {
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Actions: fakeActions{}, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Actions: fakeActions{}, UI: builtUI})
 	var list []map[string]any
 	decodeBody(t, get(t, h, "/api/actions?deployment=atlas%40ledger"), &list)
 	if len(list) != 1 || list[0]["tool"] != "commit" || list[0]["deploymentId"] != "atlas@ledger" {

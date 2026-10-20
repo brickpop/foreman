@@ -1,4 +1,4 @@
-import type { Look } from "../api/types/workspace";
+import type { Look } from "../api/types/home";
 
 // An agent's generated face (wiki/product/design/avatar.md): a 32×32 SVG drawn
 // from its soul's look, with an optional status dot and "needs you" ring.

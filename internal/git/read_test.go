@@ -158,3 +158,33 @@ func TestWorktreesByBranch(t *testing.T) {
 		t.Error("tove's uncommitted edit wasn't seen")
 	}
 }
+
+// The root commit names a repo wherever it goes: the same from a clone, the
+// same after another history is merged in (the lowest hash of the two), none
+// before the first commit.
+func TestRootCommit(t *testing.T) {
+	g := New()
+	if _, err := g.RootCommit(ctx, repo(t)); !errors.Is(err, ErrNoRef) {
+		t.Errorf("no commit yet: %v", err)
+	}
+	dir := codeRepo(t, "main")
+	first, err := g.RootCommit(ctx, dir)
+	if err != nil || len(first) != 40 {
+		t.Fatalf("%q %v", first, err)
+	}
+	clone := filepath.Join(t.TempDir(), "clone")
+	mustRun(t, dir, "clone", "--quiet", dir, clone)
+	if got, _ := g.RootCommit(ctx, clone); got != first {
+		t.Errorf("a clone: %s, want %s", got, first)
+	}
+	mustRun(t, dir, "checkout", "--quiet", "--orphan", "other")
+	write(t, filepath.Join(dir, "other"), "x\n")
+	mustRun(t, dir, "add", "other")
+	mustRun(t, dir, "commit", "--quiet", "-m", "another history")
+	second, _ := g.RootCommit(ctx, dir)
+	mustRun(t, dir, "checkout", "--quiet", "main")
+	mustRun(t, dir, "merge", "--quiet", "--allow-unrelated-histories", "-m", "join", "other")
+	if got, _ := g.RootCommit(ctx, dir); got != min(first, second) || first == second {
+		t.Errorf("after joining another history: %s, of %s and %s", got, first, second)
+	}
+}

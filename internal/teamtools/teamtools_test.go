@@ -9,25 +9,25 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/messaging"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/workflow"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 var ctx = context.Background()
 
-var atlas = workspace.Team{ID: "atlas", Config: workspace.TeamConfig{
-	Team: "atlas", Lead: "mara", Agents: map[string]workspace.Soul{"mara": {Name: "Mara"}, "tove": {Name: "Tove"}},
+var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
+	Team: "atlas", Lead: "mara", Agents: map[string]home.Soul{"mara": {Name: "Mara"}, "tove": {Name: "Tove"}},
 }}
 
 type config struct{}
 
-func (config) Team(string) (workspace.Team, error) { return atlas, nil }
-func (config) Project(id string) (workspace.Project, error) {
-	return workspace.Project{ID: id, Config: workspace.ProjectConfig{Main: "main"}}, nil
+func (config) Team(string) (home.Team, error) { return atlas, nil }
+func (config) Project(id string) (home.Project, error) {
+	return home.Project{ID: id, Config: home.ProjectConfig{Main: "main"}}, nil
 }
 
 // spy is a block that records the calls that reach it.

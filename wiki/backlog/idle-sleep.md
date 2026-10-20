@@ -13,7 +13,7 @@ epic: workflow
 **Why:** an agent that is done and waits for nothing still holds a container, a session slot (12 by default) and memory. Asleep, it holds none, and a message or the CEO's Start wakes it with its conversation ([Agent runtime → Lazy starts](../product/architecture/agent-runtime.md#lazy-starts)). A clean exit (`/exit`) already does this (built 2026-10-16). What's left is Foreman doing it on its own.
 
 **Decided (the CEO, 2026-10-16):**
-- **A workspace setting, off by default.** When on, it applies after **20 minutes** of idle (the length is part of the setting).
+- **A global setting, off by default.** When on, it applies after **20 minutes** of idle (the length is part of the setting).
 - **Foreman asks the agent first** (proposed by the CEO, then judged noise the same day: see below). It types a line into the idle agent, something like `Are you currently doing anything or running any background process? If not, call idle()`. The agent answers by calling a new team tool **`idle()`**, and only then is it put to sleep. An agent that doesn't call it stays awake.
 
 **Second thought (the CEO, 2026-10-16):** the ping is noise. It lands in the conversation, costs a turn, and stays there. The silent process check alone may be enough. Assess both when the card starts.

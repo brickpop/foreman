@@ -11,13 +11,13 @@ epic: install-first-run
 **Why:** today a new workspace works only if the CEO already knows what agents need, and each missing piece shows up as a refusal: Foreman doesn't start without Podman, the agent image builds for minutes on the first deploy, a harness login is found through the Deploy dialog's Connect row, and the engine, `--fake-harness` and `just dev`'s workspaces can contradict each other (the CEO hit that on 2026-10-16). Replaces the "First-run onboarding" idea of 2026-10-15.
 
 **Defaults** (confirmed by the CEO, 2026-10-16):
-- **Foreman always starts**, whatever is missing, and says what is missing in the UI rather than at the terminal. Only a busy port or an unreadable workspace stops it.
+- **Foreman always starts**, whatever is missing, and says what is missing in the UI rather than at the terminal. Only a busy port or an unreadable home stops it.
 - **The engine is Podman**, never switched on its own. `direct` stays an explicit setting for development, with its warning. Foreman notices Podman once it is installed or its machine is running, with no restart.
 - **On macOS, Foreman offers to create and start the Podman machine** (one button, with Podman's own output shown), since that is the step people miss.
 - **The agent image builds in the background as soon as Podman is ready**, not on the first deploy; its progress shows in the checklist and in Settings → Maintenance.
-- **A setup checklist on Home** while anything is missing, in order: Podman (installed, and running), the agent image, each harness the workspace's teams use (Connect), a project, a team. A project without a code repo is a step too (its button: New repo, built 2026-10-16). Each row says what to do and has its button; it goes away when everything is done, and comes back if something breaks (Podman stopped, logged out).
+- **A setup checklist on Home** while anything is missing, in order: Podman (installed, and running), the agent image, each harness the teams use (Connect), a project, a team. A project without a code repo is a step too (its button, New repo, built 2026-10-16, is gone until [Add a project, anywhere](./add-project-anywhere.md)). Each row says what to do and has its button; it goes away when everything is done, and comes back if something breaks (Podman stopped, logged out).
 - **Deploy refuses with the first missing step**, linking to it (it already does so for a harness login).
-- **Development stays out of the way:** `--fake-harness` and `--ui-dir` are development flags only, and `just dev` (Claude Code) and `just dev fake` each have their own workspace (done 2026-10-16).
+- **Development stays out of the way:** `--fake-harness` and `--ui-dir` are development flags only, and `just dev` (Claude Code) and `just dev fake` each have their own home (done 2026-10-16).
 
 **The machine's size** (the CEO, 2026-10-16): the Create button opens a small form. Memory starts at 4 GB and goes up in 1 GB steps to 60% of the Mac's, prefilled with half the Mac (kept within those limits). CPUs go from 1 to all of the Mac's cores, prefilled with half. A Mac with too little memory for 4 GB within 60% gets the reason rather than the form. Podman's own defaults (often about 2 GB) fit only 2–3 agents.
 
@@ -29,7 +29,7 @@ epic: install-first-run
 - **Machine creation:** `POST /api/setup/podman-machine {cpus, memory}` runs `podman machine init --now` with that size; its output is kept like a build log and shown in the row.
 - **Deploy refuses** with the first missing step that blocks it. While the image is building, deploying is allowed and the lead waits in `starting`, as today.
 
-**Done when:** a new workspace on a machine with nothing set up reaches a first deploy by following the checklist alone; each missing piece shows as a checklist row, never as a startup error.
+**Done when:** a new install on a machine with nothing set up reaches a first deploy by following the checklist alone; each missing piece shows as a checklist row, never as a startup error.
 
 - [x] the CEO confirms the defaults above (2026-10-16: all four as proposed)
 - [x] Foreman starts without Podman; the engine connects when Podman becomes available (no restart); deploying and waking refuse with `NOT_READY` meanwhile, and Maintenance says Podman isn't reachable

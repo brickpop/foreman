@@ -55,3 +55,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Why:** a harness gives no acknowledgement that a line reached its prompt; each known dialog is switched off in the config Foreman writes.
 - **Fix:** the Claude Code integration tests (`just test-claude`) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
 
+
+## Projects as records: known edges
+
+- **State** (from [Projects as records](./backlog/projects-as-records.md), 2026-10-20):
+  - **A stopped deployment holds its repos:** the refusal of the same team on two projects sharing a repo counts stopped deployments too, since their worktrees stay. Nothing in the UI removes a stopped deployment's sandboxes yet, so that team can never be deployed on the other project.
+  - **Locate to a clone:** Locate accepts any folder holding the repo's root commit, so a fresh clone passes; the agents' worktrees still point at the old `.git`, `git worktree repair` can't relink them to another repo, and the next start fails with git's "already exists".
+  - **Every start rescans:** each start calls `Checked`, which rescans every project's repos (a few `git` calls each), not only the one starting.
+  - **No project UI:** New project, adding, locating and removing repos exist as routes only; the dialog, the sidebar entry and the checklist's actions come back with [Add a project, anywhere](./backlog/add-project-anywhere.md).
+- **Why:** each is rare, cheap or temporary next to what the card had to land.
+- **Fix:** a stopped deployment's sandboxes removed with it (or on demand), and the refusal then counting active ones only; Locate refusing a folder whose `.git` isn't the one the worktrees name when worktrees exist (or recreating them); `Checked` rescanning only the project starting; the next card's dialog.

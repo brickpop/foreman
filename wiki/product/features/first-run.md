@@ -6,12 +6,12 @@ tags: [feature, ui, setup]
 
 # First run
 
-A new workspace works out of the box. Foreman starts whatever is missing, says what's left on [Home](./home.md), and reaches Podman as soon as it's there. There's no flag, setting or command to know beforehand, and nothing to discover by hitting a refusal. The defaults were confirmed by the CEO on 2026-10-16 ([First run card](../../backlog/first-run.md)).
+A new home works out of the box: `foreman`, with no folder and no question, makes `~/.foreman` ([Home](../models/home.md#starting-foreman)). Foreman starts whatever is missing, says what's left on [Home](./home.md), and reaches Podman as soon as it's there. There's no flag, setting or command to know beforehand, and nothing to discover by hitting a refusal. The defaults were confirmed by the CEO on 2026-10-16 ([First run card](../../backlog/first-run.md)).
 
 ## Foreman always starts
 
-- Only a busy port or an unreadable workspace stops `foreman`. Podman missing, stopped or failing is a checklist row, not a startup error.
-- **The engine is Podman**, and is never switched on its own. `direct` stays an explicit development setting ([Workspace settings](../models/workspace-settings.md)).
+- Only a busy port, an unreadable home or a folder argument stops `foreman`; a second `foreman` prints the first one's URL instead. Podman missing, stopped or failing is a checklist row, not a startup error.
+- **The engine is Podman**, and is never switched on its own. `direct` stays an explicit development setting ([Global settings](../models/global-settings.md)).
 - **The watcher** (the setup block, `internal/setup`) reaches Podman at launch, then checks every 3 seconds, and at once after the CEO's Start or a machine creation ([The Podman service](../architecture/session-runner.md#the-podman-service)).
   - At launch it starts a stopped macOS machine, as Foreman always has. Later checks never do, so a machine the CEO stopped stays stopped until they press **Start**.
   - On Linux it starts the rootless service whenever nothing answers.
@@ -22,7 +22,7 @@ A new workspace works out of the box. Foreman starts whatever is missing, says w
 
 ## The checklist
 
-Home shows it above the requests while any step isn't done, and hides it once all are. It comes back if something breaks (Podman stopped, a login gone). `GET /api/setup` returns the steps in order ([API](../architecture/api.md#endpoints)). The UI refetches on `setup.changed`, `config.changed` and `workspace.changed`, and polls every 3 s while a step is left (every second while one is working), since installing Podman or logging in happens outside Foreman.
+Home shows it above the requests while any step isn't done, and hides it once all are. It comes back if something breaks (Podman stopped, a login gone). `GET /api/setup` returns the steps in order ([API](../architecture/api.md#endpoints)). The UI refetches on `setup.changed`, `config.changed` and `projects.changed`, and polls every 3 s while a step is left (every second while one is working), since installing Podman or logging in happens outside Foreman.
 
 Header: `Setup · N of M done`, then one panel, one row per step. Each row has a state mark (done: a green check; to do: an empty ring; working: a spinning ring; failed: red), the title, and the detail when not done. A row that is working or failed shows the last lines of its output in a small terminal box.
 
@@ -34,8 +34,8 @@ Header: `Setup · N of M done`, then one panel, one row per step. Each row has a
 | **Agent image** | Podman engine | `Builds once Podman runs`; working: `Building the agent image (a few minutes, once)` with the build output | failed: a link to Settings → [Maintenance](./settings.md#maintenance) (Rebuild) |
 | **The `<profile>` profile connected** | each profile the projects use (`default` while there is no project) | `Not connected yet: its agents can't start`; for one that doesn't exist, the step fails: `No such profile: create it under Settings → Global → Profiles, or pick another in the project's settings` | **Connect**: the login terminal ([Settings → Profiles](./settings.md#profiles)); for one that doesn't exist, a link to Profiles |
 | **A team** | always | `Create a team` | **Create a team**: the [Chief of Staff](./chief-of-staff.md)'s create-team flow |
-| **A project** | always | `Add a project` | **New project**: the [Add a project](./add-project.md) dialog |
-| **A code repo in `<project>`** | each project with no code repo (and no problems) | `<project> has no code repo for agents to work in (New repo)` | **New repo**: the project's settings ([Project settings](./project-settings.md)) |
+| **A project** | always | `Add a project` | none for now: the [Add a project](./add-project.md) dialog comes back with [Add a project, anywhere](../../backlog/add-project-anywhere.md) |
+| **A code repo in `<project>`** | each project with no code repo (and no problems) | `<project> has no code repo for agents to work in: add one` | none for now: adding a repo from [Project settings](./project-settings.md) comes with the same card (the route exists: [Add a project → Code repos](./add-project.md#code-repos)) |
 
 ## The Podman machine (macOS)
 

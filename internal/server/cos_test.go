@@ -9,8 +9,8 @@ import (
 
 	"github.com/brickpop/foreman/internal/cos"
 	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/instances"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 type fakeCoS struct {
@@ -19,7 +19,7 @@ type fakeCoS struct {
 	stopped   int
 	proposal  *cos.Proposal
 	createErr error
-	looks     map[string]workspace.Look
+	looks     map[string]home.Look
 }
 
 func (f *fakeCoS) Start(_ context.Context, opener string) (string, error) {
@@ -36,20 +36,20 @@ func (f *fakeCoS) Proposal() (cos.Proposal, bool) {
 	return *f.proposal, true
 }
 
-func (f *fakeCoS) Create(_ context.Context, id int, looks map[string]workspace.Look) (workspace.Team, error) {
+func (f *fakeCoS) Create(_ context.Context, id int, looks map[string]home.Look) (home.Team, error) {
 	if f.createErr != nil {
-		return workspace.Team{}, f.createErr
+		return home.Team{}, f.createErr
 	}
 	if f.proposal == nil || f.proposal.ID != id {
-		return workspace.Team{}, cos.ErrStale
+		return home.Team{}, cos.ErrStale
 	}
 	f.looks = looks
-	return workspace.Team{ID: f.proposal.Team.Team, Config: f.proposal.Team}, nil
+	return home.Team{ID: f.proposal.Team.Team, Config: f.proposal.Team}, nil
 }
 
 func TestChiefOfStaff(t *testing.T) {
 	f := &fakeCoS{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), ChiefOfStaff: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), ChiefOfStaff: f, UI: builtUI})
 
 	var session cosSession
 	decodeBody(t, send(h, "POST", "/api/cos", `{"opener":"Hire someone for Atlas."}`), &session)
@@ -57,13 +57,13 @@ func TestChiefOfStaff(t *testing.T) {
 		t.Errorf("start: %+v %q", session, f.openers)
 	}
 	// Coming back to the page finds the proposal still on screen.
-	f.proposal = &cos.Proposal{ID: 3, Team: workspace.TeamConfig{Team: "vesper", Name: "Vesper"}}
+	f.proposal = &cos.Proposal{ID: 3, Team: home.TeamConfig{Team: "vesper", Name: "Vesper"}}
 	decodeBody(t, send(h, "POST", "/api/cos", `{}`), &session)
 	if session.Proposal == nil || session.Proposal.ID != 3 || f.openers[1] != "" {
 		t.Errorf("again: %+v", session)
 	}
 
-	var team workspace.Team
+	var team home.Team
 	decodeBody(t, send(h, "POST", "/api/cos/proposal", `{"id":3,"looks":{"nyx":{"color":"#8E9AAF"}}}`), &team)
 	if team.ID != "vesper" || f.looks["nyx"].Color != "#8E9AAF" {
 		t.Errorf("create: %+v %v", team, f.looks)
@@ -76,7 +76,7 @@ func TestChiefOfStaff(t *testing.T) {
 	}{
 		{`{"id":2}`, nil, http.StatusConflict, "STALE"},
 		{`{"id":3}`, cos.ErrChanged, http.StatusConflict, "CONFLICT"},
-		{`{"id":3}`, &workspace.InvalidError{Problems: []string{"lead: required"}}, http.StatusBadRequest, "INVALID"},
+		{`{"id":3}`, &home.InvalidError{Problems: []string{"lead: required"}}, http.StatusBadRequest, "INVALID"},
 		{`nope`, nil, http.StatusBadRequest, "BAD_REQUEST"},
 	} {
 		f.createErr = c.err

@@ -17,14 +17,14 @@ import (
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Config is the team files, as loaded.
 type Config interface {
-	Team(id string) (workspace.Team, error)
+	Team(id string) (home.Team, error)
 }
 
 // Sessions is what Messaging needs of the instance manager.
@@ -364,7 +364,7 @@ func (m *Messenger) publish(msg store.TeamMessage) {
 // Notice is the one line that delivers messages: one message's notice, or a
 // line naming each of a burst (wiki/product/architecture/protocol.md#messages).
 // Plain words only: no symbols, no line breaks.
-func Notice(team workspace.Team, msgs []store.TeamMessage) string {
+func Notice(team home.Team, msgs []store.TeamMessage) string {
 	if len(msgs) == 1 {
 		msg := msgs[0]
 		head := fmt.Sprintf("Message %s from %s (%s): %s", msg.Ref, nameOf(team, msg.FromInstance), kindText(msg), preview(msg.Body))
@@ -406,7 +406,7 @@ func preview(body string) string {
 }
 
 // nameOf is how an instance or a sender is named to agents.
-func nameOf(team workspace.Team, instance string) string {
+func nameOf(team home.Team, instance string) string {
 	switch instance {
 	case "foreman":
 		return "Foreman"

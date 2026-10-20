@@ -8,7 +8,7 @@ tags: [design, ui]
 
 The visual language of the Foreman UI: tokens, type, spacing, surfaces and the small set of components every screen is built from. The visual reference is the clickable [prototype](./prototype/foreman-prototype.dc.html) (open it in a browser). It is reference only: its inline styles, simulated data and dead state are not production code. This entry is the source of truth when the two disagree. The [Avatar](./avatar.md) has its own entry.
 
-Two themes, **dark** and **light** (the CEO picks one, or `System` to follow the operating system; see [Settings](../features/settings.md#appearance)), built on the same tokens, with one accent: **amber**. Every color in the UI comes from a token, so a theme is a token set. The theme choice is a [workspace setting](../features/settings.md).
+Two themes, **dark** and **light** (the CEO picks one, or `System` to follow the operating system; see [Settings](../features/settings.md#appearance)), built on the same tokens, with one accent: **amber**. Every color in the UI comes from a token, so a theme is a token set. The theme choice is one of the CEO's preferences (`~/.foreman/preferences.toml`, [Settings → Appearance](../features/settings.md#appearance)).
 
 ## Tokens
 

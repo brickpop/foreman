@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { isConflict, type Soul, type Team } from "../api/client";
-import type { Look } from "../api/types/workspace";
+import type { Look } from "../api/types/home";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import { palettes, randomLook, roleLabel } from "../app/model";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";

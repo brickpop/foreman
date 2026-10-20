@@ -1,4 +1,4 @@
-import type { TeamConfig } from "../api/types/workspace";
+import type { TeamConfig } from "../api/types/home";
 import { resolveWho } from "../app/model";
 
 // A team's playbook and escalation rules, as the Team page and the Chief of

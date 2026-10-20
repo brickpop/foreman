@@ -15,15 +15,15 @@ type Guard interface {
 	Wrap(next http.Handler) http.Handler
 }
 
-// Workspace is what the server needs to know about the workspace it serves.
-type Workspace interface {
+// Home is what the server needs to know about Foreman's home.
+type Home interface {
 	Root() string
 }
 
 // Options are the parts the server is assembled from.
 type Options struct {
 	Guard        Guard
-	Workspace    Workspace
+	Home         Home
 	Config       Config
 	Events       Events
 	Agents       Agents
@@ -47,8 +47,8 @@ type Options struct {
 // New returns the HTTP handler, every route behind the guard.
 func New(o Options) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/workspace", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, workspaceSummary{Path: o.Workspace.Root()})
+	mux.HandleFunc("GET /api/home", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root()})
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
@@ -77,8 +77,8 @@ func New(o Options) http.Handler {
 	return o.Guard.Wrap(mux)
 }
 
-// workspaceSummary is the body of GET /api/workspace.
-type workspaceSummary struct {
+// homeSummary is the body of GET /api/home.
+type homeSummary struct {
 	Path string `json:"path"`
 }
 

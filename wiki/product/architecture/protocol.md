@@ -442,7 +442,7 @@ Every state change is published on the in-process event bus; the web server stre
 | `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, project Overview, sidebar badges, notifications |
 | `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Repositories |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
-| `wiki.changed`, `config.changed`, `workspace.changed` | as in [API](./api.md#events) | Workspace & config, Wiki | Overview, Board, Settings |
+| `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Overview, Board, Settings |
 
 ## Invariants
 

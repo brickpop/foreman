@@ -65,11 +65,11 @@ The tools are an **MCP server** inside Foreman, reached through the [agent link]
 
 Nothing about the team tools is configured by the CEO. At every spawn, Foreman:
 
-1. Gives the instance its token: its identity, signed with the workspace's agent-link secret (`.foreman/credentials/agent-link`, never in git) and passed only in the instance's environment. It is accepted only while the instance runs, so a stopped instance's token is dead; and since the same instance always gets the same token, a container that kept running across a Foreman restart is still recognised (built 2026-10-15, rather than tokens kept only in memory, which a restart would have lost).
+1. Gives the instance its token: its identity, signed with Foreman's agent-link secret (`~/.foreman/credentials/agent-link`, never in git) and passed only in the instance's environment. It is accepted only while the instance runs, so a stopped instance's token is dead; and since the same instance always gets the same token, a container that kept running across a Foreman restart is still recognised (built 2026-10-15, rather than tokens kept only in memory, which a restart would have lost).
 2. Writes the harness's MCP configuration into the instance's private config directory ([Session runner → Credentials](./session-runner.md#credentials)): one stdio server, `foreman`, running `foreman-agent mcp` (Claude Code: an `--mcp-config` file). The hooks configuration runs `foreman-agent hook <event>`.
 3. Offers only the tools the role allows: `foreman-agent` asks Foreman for its tool list, and Foreman answers by the token's role; `request_merge` is listed for the lead only, `handoff` for members only ([Tools](#tools)).
 
-Agents get no other MCP servers in v1: only the team tools, plus whatever CLIs their [image](./tech-stack.md#agent-images) contains. CEO-configured MCP servers (per team or workspace) are a possible later addition.
+Agents get no other MCP servers in v1: only the team tools, plus whatever CLIs their [image](./tech-stack.md#agent-images) contains. CEO-configured MCP servers (per team or per machine) are a possible later addition.
 
 ## Waiting on approval
 

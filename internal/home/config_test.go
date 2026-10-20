@@ -1,4 +1,4 @@
-package workspace
+package home
 
 import (
 	"reflect"
@@ -21,9 +21,7 @@ func hasProblem(problems []string, fragments ...string) bool {
 }
 
 const projectExample = `
-project = "ledger"
 description = "Settlement and reconciliation service."
-repos = ["ledger-api", "ledger-web"]
 checks = "npm test"
 always_ask_ceo = ["new dependency"]
 
@@ -34,14 +32,14 @@ project_repo = "https://localhost:3000/ledger/ledger-project"
 `
 
 func TestProjectExampleParsesWithDefaults(t *testing.T) {
-	c, p := ParseProject("ledger", []byte(projectExample))
+	c, p := ParseProject([]byte(projectExample))
 	if len(p) > 0 {
 		t.Fatalf("problems: %v", p)
 	}
-	if c.Main != "main" || c.MergeToMain != "ceo" || c.Forge.Kind != "forgejo" || len(c.Repos) != 2 {
+	if c.Main != "main" || c.MergeToMain != "ceo" || c.Forge.Kind != "forgejo" || len(c.AlwaysAskCEO) != 1 {
 		t.Errorf("parsed %+v", c)
 	}
-	minimal, p := ParseProject("ledger", []byte(`project = "ledger"`))
+	minimal, p := ParseProject(nil)
 	if len(p) > 0 || minimal.Forge.Kind != "none" || minimal.Main != "main" {
 		t.Errorf("minimal: %+v %v", minimal, p)
 	}
@@ -49,19 +47,17 @@ func TestProjectExampleParsesWithDefaults(t *testing.T) {
 
 func TestProjectProblems(t *testing.T) {
 	for name, tc := range map[string]struct{ toml, want string }{
-		"folder mismatch":     {`project = "relay"`, "must equal the folder name"},
-		"missing id":          {`description = "x"`, "project: required"},
-		"forge without urls":  {"project = \"ledger\"\n[forge]\nkind = \"github\"", "forge.url: required"},
-		"forge kind":          {"project = \"ledger\"\n[forge]\nkind = \"bitbucket\"", "forge.kind"},
-		"forge url scheme":    {"project = \"ledger\"\n[forge]\nkind = \"github\"\nurl = \"ftp://x\"\nproject_repo = \"https://x/y\"", "not an http(s) URL"},
-		"the project repo":    {`project = "ledger"` + "\nrepos = [\"project\"]", "not a code repo"},
-		"a path as repo":      {`project = "ledger"` + "\nrepos = [\"../etc\"]", "not a code repo"},
-		"merge by agents":     {`project = "ledger"` + "\nmerge_to_main = \"lead\"", "merge_to_main"},
-		"unknown field":       {`project = "ledger"` + "\nwiki = \"docs\"", "wiki: not a field Foreman knows"},
-		"syntax error":        {`project = `, "line 1"},
-		"multi-line describe": {`project = "ledger"` + "\ndescription = \"\"\"a\nb\"\"\"", "one line"},
+		"forge without urls":      {"[forge]\nkind = \"github\"", "forge.url: required"},
+		"forge kind":              {"[forge]\nkind = \"bitbucket\"", "forge.kind"},
+		"forge url scheme":        {"[forge]\nkind = \"github\"\nurl = \"ftp://x\"\nproject_repo = \"https://x/y\"", "not an http(s) URL"},
+		"its name, the record's":  {`project = "ledger"`, "project: not a field Foreman knows"},
+		"its repos, the record's": {`repos = ["api"]`, "repos: not a field Foreman knows"},
+		"merge by agents":         {"merge_to_main = \"lead\"", "merge_to_main"},
+		"unknown field":           {"wiki = \"docs\"", "wiki: not a field Foreman knows"},
+		"syntax error":            {`checks = `, "line 1"},
+		"multi-line describe":     {"description = \"\"\"a\nb\"\"\"", "one line"},
 	} {
-		if _, p := ParseProject("ledger", []byte(tc.toml)); !hasProblem(p, tc.want) {
+		if _, p := ParseProject([]byte(tc.toml)); !hasProblem(p, tc.want) {
 			t.Errorf("%s: problems %v, want one with %q", name, p, tc.want)
 		}
 	}
@@ -129,28 +125,6 @@ func TestTeamSurvivesARewrite(t *testing.T) {
 	}
 }
 
-// A team file from before profiles still loads, with nothing to fix (its
-// harness lines would otherwise block every deploy), and the next save drops
-// those lines: the project's profile names the harness now.
-func TestATeamFileFromBeforeProfiles(t *testing.T) {
-	old := strings.Replace(teamExample, "role = \"team_lead\"\n", "role = \"team_lead\"\nharness = \"claude-code\"\n", 1)
-	old = strings.Replace(old, "role = \"security_auditor\"\n", "role = \"security_auditor\"\nharness = \"custom\"\ncommand = \"./bin/audit\"\n", 1)
-	c, p := ParseTeam("atlas", []byte(old))
-	if len(p) > 0 {
-		t.Fatalf("problems: %v", p)
-	}
-	data, err := encodeTeam(c)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(data), "harness") || strings.Contains(string(data), "command") {
-		t.Errorf("kept after a save:\n%s", data)
-	}
-	if again, p := ParseTeam("atlas", data); len(p) > 0 || again.Agents["mara"].Personality != "Calm." {
-		t.Errorf("after the save: %v %+v", p, again.Agents["mara"])
-	}
-}
-
 func TestTeamProblems(t *testing.T) {
 	base := teamExample
 	for name, tc := range map[string]struct{ from, to, want string }{
@@ -194,7 +168,7 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 		"stuck":      {`stuck_after_minutes = 0`, "stuck_after_minutes"},
 		"log cap":    {`log_cap_mb = -1`, "log_cap_mb"},
 		"forge kind": {"[forges.bitbucket]\nurl = \"https://x\"", "forges.bitbucket"},
-		"repo forge": {"[workspace_forge]\nkind = \"github\"", "workspace_forge.url: required"},
+		"repo forge": {"[global_forge]\nkind = \"github\"", "global_forge.url: required"},
 		"unknown":    {`theme = "dark"`, "theme: not a field Foreman knows"},
 		"wrong type": {`port = "8888"`, "port"},
 	} {

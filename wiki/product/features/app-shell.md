@@ -23,13 +23,13 @@ Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./
 1. **Brand** (padding `20px 18px 16px`, gap 9): a 22×22 amber tile (radius 5) with "F" in `--accInk` (Mono 700 12px), and "Foreman" (600 15px).
 2. **Scrolling area** (padding `0 10px 12px`, gap 18 between groups):
    - **Nav**: `Home`, with a count badge of open requests when there are any ([Requests](./requests.md)), and `Sessions`. Items: padding `8px 10px`, radius 6, 500. Active: `--raised`, `--tx`. Inactive: transparent, `--tx2`.
-   - **Projects** label, then one row per project (padding `6px 10px`, 13.5px). A project that needs the CEO shows a 7px amber dot. Active while that project's screen is open. Then **`+ New project`** (13px `--tx4`), which opens [Add a project](./add-project.md).
+   - **Projects** label, then one row per project (padding `6px 10px`, 13.5px). A project that needs the CEO shows a 7px amber dot. Active while that project's screen is open. Then **`+ New project`** (13px `--tx4`), which opens [Add a project](./add-project.md). **Phasing:** the button is gone until that dialog comes back with [Add a project, anywhere](../../backlog/add-project-anywhere.md).
    - **Teams** label, then one row per team with, right-aligned (12px `--tx4`), where it is deployed: the project id if one deployment, `N projects` if more, `—` if none. A team row is active on its Team page and on the Agent page of any of its members. Then **`+ New team`**, which opens the [Chief of Staff](./chief-of-staff.md) "Create a team" flow.
    - Section labels are plain labels: not links, not collapsible. There is no Teams index screen (the prototype has one that nothing links to): the sidebar already lists every team.
 3. **Footer** (padding `12px 10px`, top border):
    - **Settings row**: "Settings" with the listen address on the right (e.g. `localhost:8888`, Mono 11.5px `--tx4`). Opens [Settings](./settings.md).
 
-Data: projects, teams and deployments from the workspace ([Workspace](../models/workspace.md), [Deployment](../models/deployment.md)); the badge and dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
+Data: projects and teams from the [home](../models/home.md) (the projects' records and project repos, the global repo's team files), deployments from the runtime state ([Deployment](../models/deployment.md)); the badge and dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
 
 ## Overlays
 

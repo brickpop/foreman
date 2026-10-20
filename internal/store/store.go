@@ -114,3 +114,22 @@ func parseTime(s sql.NullString) (time.Time, error) {
 	}
 	return time.Parse(time.RFC3339Nano, s.String)
 }
+
+// unique turns a uniqueness violation into ErrExists.
+func unique(err error) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed") {
+		return ErrExists
+	}
+	return err
+}
+
+// touched is ErrNotFound when a statement touched no row.
+func touched(res sql.Result, err error) error {
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}

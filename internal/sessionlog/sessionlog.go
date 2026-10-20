@@ -14,7 +14,7 @@ import (
 
 // Dir opens session logs under one folder.
 type Dir struct {
-	Root string           // e.g. <workspace>/.foreman/logs
+	Root string           // e.g. ~/.foreman/logs
 	Now  func() time.Time // session ids are timestamps; replaceable in tests
 }
 

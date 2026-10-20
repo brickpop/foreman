@@ -10,7 +10,7 @@ import (
 
 func TestPreferences(t *testing.T) {
 	file := userdata.PreferencesIn(t.TempDir())
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Preferences: file, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Preferences: file, UI: builtUI})
 	var got userdata.Preferences
 	if decodeBody(t, get(t, h, "/api/preferences"), &got); got != userdata.DefaultPreferences() {
 		t.Errorf("before any: %+v", got)
@@ -22,7 +22,7 @@ func TestPreferences(t *testing.T) {
 	if w := send(h, "PUT", "/api/preferences", `{"terminalFont":"jetbrains-mono","terminalFontSize":15}`); w.Code != http.StatusOK {
 		t.Fatalf("put the font: %d %s", w.Code, w.Body)
 	}
-	// What another workspace's Foreman would read.
+	// What another home's Foreman would read.
 	want := userdata.Preferences{Theme: "dark", TerminalFont: "jetbrains-mono", TerminalFontSize: 15}
 	if p := userdata.PreferencesIn(filepath.Dir(file.Path)).Get(); p != want {
 		t.Errorf("kept %+v", p)

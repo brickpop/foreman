@@ -1,5 +1,5 @@
 // Package profiles keeps the CEO's profiles: each a harness and its
-// credentials, under a name, shared by every workspace on this machine
+// credentials, under a name, shared by every project on this machine
 // (wiki/product/architecture/session-runner.md#credentials). A project uses
 // one; its agents run on that harness with those credentials.
 //
@@ -143,73 +143,4 @@ func (s Store) Delete(profile string) error {
 		return err
 	}
 	return os.RemoveAll(s.Dir(profile))
-}
-
-// Adopt turns a workspace's own logins, from before profiles
-// (<workspace>/.foreman/credentials/<harness>/), into profiles, and returns
-// them: the default when it doesn't exist yet, else one named after the
-// workspace (my-work, my-work-2…), so no login is lost or overwritten.
-// connected says, per harness, whether a folder holds a login; a folder
-// without one stays where it is.
-func (s Store) Adopt(workspace string, connected map[string]func(dir string) bool) ([]Profile, error) {
-	old := filepath.Join(workspace, ".foreman", "credentials")
-	harnesses := make([]string, 0, len(connected))
-	for h := range connected {
-		harnesses = append(harnesses, h)
-	}
-	slices.Sort(harnesses)
-	var adopted []Profile
-	for _, h := range harnesses {
-		src := filepath.Join(old, h)
-		if !connected[h](src) {
-			continue
-		}
-		// Free: no such profile, or one of this harness never connected.
-		free := func(name string) bool {
-			p, err := s.Get(name)
-			return errors.Is(err, ErrNotFound) || err == nil && p.Harness == h && !connected[h](s.Dir(name))
-		}
-		profile := Default
-		if !free(profile) {
-			base := profileName(filepath.Base(workspace))
-			profile = base
-			for n := 2; !free(profile); n++ {
-				profile = fmt.Sprintf("%s-%d", base, n)
-			}
-		}
-		if err := move(src, s.Dir(profile)); err != nil {
-			return adopted, fmt.Errorf("moving the %s login: %w", h, err)
-		}
-		if err := s.write(profile, h); err != nil {
-			return adopted, err
-		}
-		adopted = append(adopted, Profile{Name: profile, Harness: h, Connected: true})
-	}
-	return adopted, nil
-}
-
-// profileName makes a profile name of a folder's: lowercase letters, digits
-// and dashes ("My Work" → "my-work"), never the default's.
-func profileName(folder string) string {
-	var b strings.Builder
-	dash := false
-	for _, r := range strings.ToLower(folder) {
-		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
-			if dash && b.Len() > 0 {
-				b.WriteByte('-')
-			}
-			b.WriteRune(r)
-			dash = false
-		} else {
-			dash = true
-		}
-	}
-	s := b.String()
-	if len(s) > 32 {
-		s = strings.TrimRight(s[:32], "-")
-	}
-	if s == "" || s == Default {
-		return "workspace"
-	}
-	return s
 }

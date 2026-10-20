@@ -8,7 +8,7 @@ import (
 
 	"github.com/agentic-wiki/wiki/index"
 
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // ErrConflict means the entry changed since the version the write was based on.
@@ -119,7 +119,7 @@ func (w *Wikis) write(ctx context.Context, project, p, version string, change fu
 	if err != nil {
 		return err
 	}
-	if workspace.Version([]byte(raw)) != version {
+	if home.Version([]byte(raw)) != version {
 		return fmt.Errorf("%w: %s", ErrConflict, p)
 	}
 	file := rel(e.Path)

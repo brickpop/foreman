@@ -5,7 +5,6 @@ import { type MachineSize, type SetupStep, useClient } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import { keys } from "../app/queries";
 import { cpuChoices, logTail, memoryChoices, stepTitle } from "../app/setup";
-import { AddProject } from "./AddProject";
 import { ConnectDialog } from "./ConnectDialog";
 import { CheckIcon } from "./icons";
 import { Select } from "./Select";
@@ -138,26 +137,6 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
         <Button variant="small" onClick={() => openChiefOfStaff({ start: "create-team" })}>
           Create a team
         </Button>
-      );
-    case "project":
-      return (
-        <>
-          <Button variant="small" onClick={() => setDialog(true)}>
-            New project
-          </Button>
-          {dialog && <AddProject open onClose={() => setDialog(false)} />}
-        </>
-      );
-    case "repo":
-      return (
-        <Link
-          to="/projects/$project"
-          params={{ project: s.subject }}
-          search={{ tab: "settings" }}
-          className="text-[13px] text-accTx hover:underline"
-        >
-          New repo
-        </Link>
       );
     default:
       return null;

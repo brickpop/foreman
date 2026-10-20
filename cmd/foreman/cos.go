@@ -12,10 +12,10 @@ import (
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/cos"
 	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // chiefOfStaff is the Chief of Staff's session
@@ -25,10 +25,10 @@ import (
 // them only through propose_team (internal/cos).
 type chiefOfStaff struct {
 	*cos.CoS
-	root     string // the workspace folder
-	dir      string // .foreman/cos: its working folder and harness config
-	teamsDir string // .foreman/teams, read-only
-	teams    func() []workspace.Team
+	home     string // Foreman's home: its process is labelled with it
+	dir      string // <home>/cos: its working folder and harness config
+	teamsDir string // <home>/config/teams, read-only
+	teams    func() []home.Team
 	profiles profiles.Store
 	adapters map[string]harness.Adapter
 	images   runner.Images
@@ -95,9 +95,9 @@ func (c *chiefOfStaff) Start(ctx context.Context, opener string) (string, error)
 		return "", err
 	}
 	err = c.terms.start(ctx, cos.Instance, runner.Spec{
-		Name: instances.ProcessName(c.root, cos.Instance), Image: image, Command: l.Command, Dir: c.dir, Env: l.Env,
+		Name: instances.ProcessName(c.home, cos.Instance), Image: image, Command: l.Command, Dir: c.dir, Env: l.Env,
 		Mounts: append(mounts, l.Mounts...),
-		Labels: map[string]string{"foreman.cos": "true", instances.WorkspaceLabel: c.root},
+		Labels: map[string]string{"foreman.cos": "true", instances.HomeLabel: c.home},
 	})
 	if errors.Is(err, errRunning) {
 		return cos.Instance, nil // another tab started it meanwhile

@@ -15,7 +15,7 @@ import (
 	"github.com/agentic-wiki/wiki/index"
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // debounce gathers a burst of file events (a save, a `wiki tidy`, a git
@@ -34,7 +34,7 @@ type watched struct {
 // Watch follows every project's wiki until ctx ends: it keeps each one's
 // index and calls publish with what each change changed. The follow it
 // returns tells it the projects changed (it never blocks, so it can be called
-// from the workspace's own notify). publish must not block.
+// from the home's own notify). publish must not block.
 func (w *Wikis) Watch(ctx context.Context, projects func() []string, publish func(Changed)) (follow func(), err error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -160,11 +160,11 @@ func snapshot(dir string, idx *index.Index) *watched {
 	}
 	for _, e := range idx.Entries {
 		if raw, err := e.Raw(); err == nil {
-			s.versions[rel(e.Path)] = workspace.Version([]byte(raw))
+			s.versions[rel(e.Path)] = home.Version([]byte(raw))
 		}
 	}
 	if raw, err := os.ReadFile(filepath.Join(dir, "wiki.toml")); err == nil {
-		s.versions["wiki.toml"] = workspace.Version(raw)
+		s.versions["wiki.toml"] = home.Version(raw)
 	}
 	for _, e := range idx.Entries {
 		for _, l := range e.Links {

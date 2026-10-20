@@ -113,14 +113,22 @@ func hasIdentity(ctx context.Context, dir string) bool {
 // Prepare makes worktree a git worktree of repo on branch, creating the branch
 // from base when it doesn't exist. A worktree already there is reused as it
 // is, on whatever branch its agent switched to
-// (wiki/product/architecture/sandboxes-and-git.md).
+// (wiki/product/architecture/sandboxes-and-git.md), and relinked to repo if
+// repo moved since (Locate).
 func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) error {
 	defer g.lock(ctx, repo)()
 	common, err := run(ctx, repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return fmt.Errorf("%s is not a git repo: %w", repo, err)
 	}
-	if existing, err := run(ctx, worktree, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil {
+	existing, err := run(ctx, worktree, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if _, statErr := os.Stat(filepath.Join(worktree, ".git")); err != nil && statErr == nil {
+		// A worktree whose link to the repo's old folder is broken: repair names
+		// the new one.
+		_, _ = run(ctx, repo, "worktree", "repair", worktree)
+		existing, err = run(ctx, worktree, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	}
+	if err == nil {
 		if strings.TrimSpace(existing) != strings.TrimSpace(common) {
 			return fmt.Errorf("%s is a checkout of another repo", worktree)
 		}
@@ -139,34 +147,6 @@ func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) 
 	}
 	_, err = run(ctx, repo, args...)
 	return err
-}
-
-// Exclude keeps path (a folder) out of the repo that contains it, if any,
-// through that repo's .git/info/exclude: nothing committed by accident, and
-// no change to the CEO's own .gitignore.
-func (g *CLI) Exclude(ctx context.Context, path string) error {
-	dir := filepath.Dir(path)
-	top, err := run(ctx, dir, "rev-parse", "--show-toplevel")
-	if err != nil {
-		return nil // not inside a repo: nothing to exclude from
-	}
-	defer g.lock(ctx, dir)()
-	// git names the top by its real path: so must we, or a folder reached
-	// through a symlink (macOS's /var is /private/var) makes a line that
-	// matches nothing.
-	real, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		return err
-	}
-	rel, err := filepath.Rel(strings.TrimSpace(top), filepath.Join(real, filepath.Base(path)))
-	if err != nil {
-		return err
-	}
-	file, err := run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude")
-	if err != nil {
-		return err
-	}
-	return appendLine(strings.TrimSpace(file), "/"+filepath.ToSlash(rel)+"/")
 }
 
 // command is git with Foreman's settings, in dir. Its messages are always in

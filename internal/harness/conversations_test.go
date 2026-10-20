@@ -23,7 +23,7 @@ func TestOnlyThisDeploymentsConversationContinues(t *testing.T) {
 		t.Error("nothing saved, yet it continues")
 	}
 	save("last-deployment.jsonl")
-	// Before any fresh start, whatever is there counts (a workspace from before the list).
+	// Before any fresh start, whatever is there counts (a sandbox from before the list).
 	if !c.Continues() {
 		t.Error("a conversation without a fresh-start list doesn't continue")
 	}

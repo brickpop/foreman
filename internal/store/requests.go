@@ -72,13 +72,7 @@ func (s requests) Save(ctx context.Context, r Request) (Request, error) {
 		return r, errors.Join(ErrNotFound, fmt.Errorf("no request %q", r.ID))
 	}
 	res, err := s.db.ExecContext(ctx, "UPDATE requests SET kind = ?, project_id = ?, deployment_id = ?, instance_id = ?, summary = ?, options = ?, source = ?, status = ?, answer = ?, created_at = ?, resolved_at = ?, merge_request_id = ?, links = ? WHERE seq = ?", append(values, seq)...)
-	if err != nil {
-		return r, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return r, ErrNotFound
-	}
-	return r, nil
+	return r, touched(res, err)
 }
 
 func (s requests) Open(ctx context.Context) ([]Request, error) {

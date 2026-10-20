@@ -7,11 +7,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
 	"slices"
 
 	"github.com/brickpop/foreman/internal/git"
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // FileLimit is the largest file shown; a larger one says so.
@@ -26,10 +25,9 @@ const projectRepo = "project"
 // ErrNoRepo means the project has no such repo.
 var ErrNoRepo = errors.New("repos: no such repo")
 
-// Config is what the browser needs of the workspace.
+// Config is what the browser needs of the home.
 type Config interface {
-	Root() string
-	Project(id string) (workspace.Project, error)
+	Project(id string) (home.Project, error)
 }
 
 // Git is what the browser needs of the Git block.
@@ -56,16 +54,18 @@ func (b Browser) dir(project, repo string) (string, string, error) {
 	if err != nil {
 		return "", "", err
 	}
+	dir, ok := p.RepoDir(repo)
 	switch {
+	case !ok:
+		return "", "", ErrNoRepo
 	case repo == projectRepo:
-		return filepath.Join(b.Config.Root(), project, projectRepo), "main", nil
-	case slices.Contains(p.Repos, repo):
-		return filepath.Join(b.Config.Root(), project, repo), p.Config.Main, nil
+		return dir, "main", nil
 	}
-	return "", "", ErrNoRepo
+	return dir, p.Config.Main, nil
 }
 
-// Repos lists the project's code repos, then its project repo, each with its
+// Repos lists the project's code repos agents can use (a missing one is a
+// problem shown on the project), then its project repo, each with its
 // branches: main first, then the others by name.
 func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 	p, err := b.Config.Project(project)
@@ -73,7 +73,13 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 		return nil, err
 	}
 	list := []Repo{}
-	for _, name := range append(slices.Clone(p.Repos), projectRepo) {
+	var names []string
+	for _, r := range p.Repos {
+		if r.Ready() {
+			names = append(names, r.Name)
+		}
+	}
+	for _, name := range append(names, projectRepo) {
 		dir, main, err := b.dir(project, name)
 		if err != nil {
 			return nil, err

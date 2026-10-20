@@ -11,33 +11,37 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/prompt"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
-// Config is the workspace's config files, as loaded (implemented by
-// workspace.Workspace).
+// Config is the home's config files and projects, as loaded (implemented by
+// home.Home).
 type Config interface {
-	Projects() []workspace.Project
-	Project(id string) (workspace.Project, error) // workspace.ErrNotFound
-	Teams() []workspace.Team
-	Team(id string) (workspace.Team, error) // workspace.ErrNotFound
-	Settings() workspace.SettingsFile
+	Projects() []home.Project
+	Project(id string) (home.Project, error) // home.ErrNotFound
+	Teams() []home.Team
+	Team(id string) (home.Team, error) // home.ErrNotFound
+	Settings() home.SettingsFile
 	// SaveSettings writes settings.toml if still at version; returns the new version.
-	SaveSettings(ctx context.Context, s workspace.Settings, version string) (string, error)
+	SaveSettings(ctx context.Context, s home.Settings, version string) (string, error)
 	// SaveTeam writes a team file if still at version; returns the saved team.
-	SaveTeam(ctx context.Context, c workspace.TeamConfig, version string) (workspace.Team, error)
-	// Candidates are the folders Add a project can turn into projects.
-	Candidates() []workspace.Candidate
-	// AddProject makes a folder a project, with an optional first (empty) repo.
-	AddProject(ctx context.Context, folder, repo string) (workspace.Project, error)
-	// NewProject creates the folder, then makes it a project as AddProject does.
-	NewProject(ctx context.Context, name, repo string) (workspace.Project, error)
-	// AddRepo creates an empty code repo in a project.
-	AddRepo(ctx context.Context, project, name string) (workspace.Project, error)
+	SaveTeam(ctx context.Context, c home.TeamConfig, version string) (home.Team, error)
+	// NewProject creates a project with its project repo, and no code repo yet.
+	NewProject(ctx context.Context, name string) (home.Project, error)
+	// AddRepo adds an existing repo, by its folder; NewRepo creates an empty
+	// one at a new folder and adds it.
+	AddRepo(ctx context.Context, project, name, path string) (home.Project, error)
+	NewRepo(ctx context.Context, project, name, path string) (home.Project, error)
+	// LocateRepo points a missing repo at its new folder; RemoveRepo takes a
+	// repo out of the project (refused while a team is deployed on it).
+	LocateRepo(ctx context.Context, project, name, path string) (home.Project, error)
+	RemoveRepo(ctx context.Context, project, name string) (home.Project, error)
+	// SetProfile names the profile the project's agents run on.
+	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
 	// Scaffold creates them, never overwriting one.
-	Missing(project string) ([]workspace.Missing, error)
+	Missing(project string) ([]home.Missing, error)
 	Scaffold(ctx context.Context, project string) error
 }
 
@@ -54,27 +58,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		p, err := c.Project(r.PathValue("id"))
 		writeFound(w, p, err, "project")
 	})
-	mux.HandleFunc("GET /api/candidates", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, c.Candidates())
-	})
 	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Folder string `json:"folder"`
-			Repo   string `json:"repo"`
-			New    bool   `json:"new"`
-		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {folder, repo?, new?}")
-			return
-		}
-		add := c.AddProject
-		if req.New {
-			add = c.NewProject
-		}
-		p, err := add(r.Context(), req.Folder, req.Repo)
-		writeCreated(w, p, err)
-	})
-	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Name string `json:"name"`
 		}
@@ -82,8 +66,51 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name}")
 			return
 		}
-		p, err := c.AddRepo(r.Context(), r.PathValue("id"), req.Name)
-		writeCreated(w, p, err)
+		p, err := c.NewProject(r.Context(), req.Name)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+			New  bool   `json:"new"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, new?}")
+			return
+		}
+		add := c.AddRepo
+		if req.New {
+			add = c.NewRepo
+		}
+		p, err := add(r.Context(), r.PathValue("id"), req.Name, req.Path)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Path string `json:"path"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {path}")
+			return
+		}
+		p, err := c.LocateRepo(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Path)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("DELETE /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {
+		p, err := c.RemoveRepo(r.Context(), r.PathValue("id"), r.PathValue("repo"))
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("PUT /api/projects/{id}/profile", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Profile string `json:"profile"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {profile}")
+			return
+		}
+		p, err := c.SetProfile(r.Context(), r.PathValue("id"), req.Profile)
+		writeProject(w, p, err)
 	})
 	mux.HandleFunc("GET /api/projects/{id}/scaffold", func(w http.ResponseWriter, r *http.Request) {
 		m, err := c.Missing(r.PathValue("id"))
@@ -114,8 +141,8 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Settings workspace.Settings `json:"settings"`
-			Version  string             `json:"version"`
+			Settings home.Settings `json:"settings"`
+			Version  string        `json:"version"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {settings, version}")
@@ -129,8 +156,8 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("PUT /api/teams/{id}/agents/{agent}", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Soul    workspace.Soul `json:"soul"`
-			Version string         `json:"version"`
+			Soul    home.Soul `json:"soul"`
+			Version string    `json:"version"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {soul, version}")
@@ -142,7 +169,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "no such agent")
 			return
 		}
-		// The team is the workspace's own: change a copy, so a refused save changes nothing.
+		// The team is the home's own: change a copy, so a refused save changes nothing.
 		t.Config.Agents = maps.Clone(t.Config.Agents)
 		t.Config.Agents[agent] = req.Soul
 		saved, err := c.SaveTeam(r.Context(), t.Config, req.Version)
@@ -159,7 +186,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 
 func writeFound(w http.ResponseWriter, v any, err error, what string) {
 	switch {
-	case errors.Is(err, workspace.ErrNotFound):
+	case errors.Is(err, home.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "No such "+what)
 	case err != nil:
 		writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
@@ -168,13 +195,16 @@ func writeFound(w http.ResponseWriter, v any, err error, what string) {
 	}
 }
 
-// writeCreated answers a request that created a project or a repo.
-func writeCreated(w http.ResponseWriter, p workspace.Project, err error) {
+// writeProject answers a request that changed a project (made it, or one of
+// its repos), with the project as it is now; a refusal says why.
+func writeProject(w http.ResponseWriter, p home.Project, err error) {
 	switch {
-	case errors.Is(err, workspace.ErrInvalid):
-		writeError(w, http.StatusBadRequest, "INVALID", strings.TrimPrefix(err.Error(), workspace.ErrInvalid.Error()+": "))
-	case errors.Is(err, workspace.ErrExists):
-		writeError(w, http.StatusConflict, "EXISTS", strings.TrimPrefix(err.Error(), workspace.ErrExists.Error()+": ")+" already exists")
+	case errors.Is(err, home.ErrInvalid):
+		writeError(w, http.StatusBadRequest, "INVALID", strings.TrimPrefix(err.Error(), home.ErrInvalid.Error()+": "))
+	case errors.Is(err, home.ErrExists):
+		writeError(w, http.StatusConflict, "EXISTS", strings.TrimPrefix(err.Error(), home.ErrExists.Error()+": "))
+	case errors.Is(err, home.ErrDeployed):
+		writeError(w, http.StatusConflict, "DEPLOYED", strings.TrimPrefix(err.Error(), home.ErrDeployed.Error()+": "))
 	default:
 		writeFound(w, p, err, "project")
 	}
@@ -233,9 +263,9 @@ func handleEvents(bus Events) http.HandlerFunc {
 
 // writeSaveError answers a refused save of file: a stale version or invalid content.
 func writeSaveError(w http.ResponseWriter, err error, file string) {
-	var invalid *workspace.InvalidError
+	var invalid *home.InvalidError
 	switch {
-	case errors.Is(err, workspace.ErrConflict):
+	case errors.Is(err, home.ErrConflict):
 		writeError(w, http.StatusConflict, "CONFLICT", file+" changed since you read it")
 	case errors.As(err, &invalid):
 		writeError(w, http.StatusBadRequest, "INVALID", invalid.Error())

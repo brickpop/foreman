@@ -32,7 +32,7 @@ import { applyTheme, asTheme, type Theme } from "./theme";
 // (wiki/product/architecture/tech-stack.md).
 
 export const keys = {
-  workspace: ["workspace"],
+  home: ["home"],
   projects: ["projects"],
   teams: ["teams"],
   settings: ["settings"],
@@ -51,24 +51,29 @@ export const keys = {
   repos: ["repos"],
 } as const;
 
-export function useWorkspace() {
+export function useHomeFolder() {
   const c = useClient();
-  return useQuery({ queryKey: keys.workspace, queryFn: () => c.workspace.workspace() });
+  return useQuery({ queryKey: keys.home, queryFn: () => c.home.folder() });
 }
 
 export function useProjects() {
   const c = useClient();
-  return useQuery({ queryKey: keys.projects, queryFn: () => c.workspace.projects() });
+  return useQuery({ queryKey: keys.projects, queryFn: () => c.home.projects() });
+}
+
+/** Where a project's repo is on disk, for showing paths: <home>/projects/<id>. */
+export function useProjectRepo(project: string): string {
+  return `${useHomeFolder().data?.path ?? "~/.foreman"}/projects/${project}`;
 }
 
 export function useTeams() {
   const c = useClient();
-  return useQuery({ queryKey: keys.teams, queryFn: () => c.workspace.teams() });
+  return useQuery({ queryKey: keys.teams, queryFn: () => c.home.teams() });
 }
 
 export function useSettings() {
   const c = useClient();
-  return useQuery({ queryKey: keys.settings, queryFn: () => c.workspace.settings() });
+  return useQuery({ queryKey: keys.settings, queryFn: () => c.home.settings() });
 }
 
 export function useHarnesses() {
@@ -76,7 +81,7 @@ export function useHarnesses() {
   return useQuery({ queryKey: keys.harnesses, queryFn: () => c.harnesses.list() });
 }
 
-/** The CEO's profiles, with their state. Kept outside any workspace, so no
+/** The CEO's profiles, with their state. Kept outside the global repo, so no
  * event says they changed: what changes them here refetches them. */
 export function useProfiles() {
   const c = useClient();
@@ -100,11 +105,11 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       const object = (e.data as { object?: string }).object;
       // A team change also changes its members' prompts.
       if (object === "team") return [keys.teams, ["prompt"], keys.setup];
-      // The settings name each project's profile, which the checklist asks for.
+      // The settings choose the engine, which the checklist checks.
       if (object === "settings") return [keys.settings, keys.setup];
       return [keys.projects, keys.setup];
     }
-    case "workspace.changed":
+    case "projects.changed":
       return [keys.projects, keys.setup, keys.repos];
     case "instance.status":
       return [keys.instances];
@@ -267,7 +272,7 @@ export function useMissing(project: string) {
   const c = useClient();
   return useQuery({
     queryKey: [...wikiKey(project), "missing"],
-    queryFn: () => c.workspace.missing(project),
+    queryFn: () => c.home.missing(project),
   });
 }
 
@@ -276,7 +281,7 @@ export function useScaffold(project: string) {
   const c = useClient();
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: () => c.workspace.scaffold(project),
+    mutationFn: () => c.home.scaffold(project),
     onSettled: () => queries.invalidateQueries({ queryKey: wikiKey(project) }),
   });
 }
@@ -373,7 +378,7 @@ export function useSaveSoul(team: Team, agent: string) {
   const queries = useQueryClient();
   const saver = useRef(
     serialSaver<Soul>(async (soul, version) => {
-      const saved = await c.workspace.saveSoul(team.id, agent, soul, version);
+      const saved = await c.home.saveSoul(team.id, agent, soul, version);
       return { value: saved.config.agents[agent], version: saved.version };
     }),
   ).current;
@@ -398,7 +403,7 @@ export function usePrompt(team: string, agent: string, instance?: string) {
   const c = useClient();
   return useQuery({
     queryKey: ["prompt", team, agent, instance ?? ""],
-    queryFn: () => (instance ? c.agents.prompt(instance) : c.workspace.promptTemplate(team, agent)),
+    queryFn: () => (instance ? c.agents.prompt(instance) : c.home.promptTemplate(team, agent)),
   });
 }
 
@@ -414,7 +419,7 @@ export function useSaveSettings() {
   let saver = settingsSavers.get(c);
   if (!saver) {
     saver = serialSaver<Settings>(async (s, version) => {
-      const saved = await c.workspace.saveSettings(s, version);
+      const saved = await c.home.saveSettings(s, version);
       return { value: saved.settings, version: saved.version };
     });
     settingsSavers.set(c, saver);
@@ -533,7 +538,7 @@ export function useRepoLog(project: string, repo: string, ref: string) {
 }
 
 /** The CEO's preferences, applied as they arrive: on load, and when this tab
- * comes back into focus after another workspace changed them. */
+ * comes back into focus after another tab changed them. */
 export function usePreferences() {
   const c = useClient();
   const prefs = useQuery({ queryKey: keys.preferences, queryFn: () => c.preferences.get() });
@@ -543,7 +548,7 @@ export function usePreferences() {
   return prefs;
 }
 
-/** Saves the theme for every workspace; shown at once, put back if refused. */
+/** Saves the theme; shown at once, put back if refused. */
 export function useSaveTheme() {
   const c = useClient();
   const queries = useQueryClient();
@@ -555,7 +560,7 @@ export function useSaveTheme() {
   });
 }
 
-/** Saves the terminal's font or size for every workspace; open terminals
+/** Saves the terminal's font or size; open terminals
  * follow at once, and go back if it is refused. */
 export function useSaveTerminalFont() {
   const c = useClient();

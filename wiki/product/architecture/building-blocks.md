@@ -27,7 +27,7 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 │ CORE        Workflow · Messaging · Instance manager · Agent link            │
 │             Harness adapters · Terminal · Execution engine + Image builder  │
 │             Git (worktrees per agent)                                       │
-│ FOUNDATION  Workspace & config · Wiki · State store · Event bus · Secrets · │
+│ FOUNDATION  Home & config · Wiki · State store · Event bus · Secrets ·      │
 │             Forge adapter                                                   │
 └──────┬────────────────────────────────────────────────────▲────────────────┘
        │ start · attach · resize · build (Podman REST API)    │ agent port 127.0.0.1:<p>,
@@ -47,7 +47,7 @@ An arrow means "calls through an interface". Blocks below the dashed line are us
           │ attach, input │ CEO messages │ answers,      │ projects, teams,│
           ▼               ▼              ▼ merge actions ▼ settings, wiki  │
    ┌──────────────┐  ┌───────────┐  ┌──────────┐  ┌────────────────────┐  │
-   │   Instance   │◀─│ Messaging │◀─│ Workflow │─▶│ Workspace & config │  │
+   │   Instance   │◀─│ Messaging │◀─│ Workflow │─▶│ Home & config      │  │
    │   manager    │  └───────────┘  └──┬────┬──┘  │ Wiki               │  │
    └─┬───┬───┬──┬─┘        ▲           │    │     └────────────────────┘  │
      │   │   │  │          │           ▼    ▼                              │
@@ -75,12 +75,12 @@ Every arrow, in words:
 | Web server | Instance manager | Open a terminal view, type into it, deploy, stop |
 | Web server | Messaging | The CEO's Line; the Activity panel; the countdown on the CEO's draft |
 | Web server | Workflow | Answer a request; Merge to main, Create PR or Reject a merge request; Sync a reserved repo |
-| Web server | Workspace & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
+| Web server | Home & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
 | Workflow | Messaging | Deliver answers, notices ("PR #128 opened", "main moved") to agents |
 | Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge to main, push a branch for a PR, or Sync a reserved repo (Git epic) |
 | Workflow | Forge adapter | On the CEO's Create PR: open, then poll, comment on and close pull requests |
-| Workflow | Workspace & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
+| Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
 | Agent link | Workflow | `switch`, `commit`, `merge`, `abort_merge`, `set_submodule`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
@@ -105,16 +105,17 @@ Every arrow, in words:
 │  foreman-agent ──────────── tcp: host.containers.internal:<agent port>, token ──────┼──▶ Agent link
 │                                                                                     │
 │  Mounts                                                                             │
-│   /…/ledger/.sandboxes/tove/ledger-api   Tove's worktree (wt/tove/*), rw            │
-│   /…/ledger/ledger-api/.git              the repo every worktree shares, ro         │
-│   /…/ledger/.sandboxes/tove/project      the live project repo (project.toml, wiki):│
+│   ~/.foreman/sandboxes/ledger/tove/ledger-api  Tove's worktree (wt/tove/*), rw      │
+│   ~/dev/ledger-api/.git                  the repo every worktree shares, ro         │
+│   ~/.foreman/sandboxes/ledger/tove/project  the live project repo (project.toml,    │
+│                                          wiki), from ~/.foreman/projects/ledger:    │
 │                                          rw for the lead, else ro                   │
 │                                          (its .git ro for every agent)              │
 │   $CLAUDE_CONFIG_DIR     the instance's private config: prompt, MCP + hooks config, │
 │                          history, memory (rw)                                       │
 │   …/profiles/<name>/     the project's profile's login file (the CEO's; rw)         │
 │   ~/.gitconfig           ro, if it exists                                           │
-│  Never mounted: the rest of ~ (~/.ssh, ~/.config, …), .foreman/                    │
+│  Never mounted: the rest of ~ (~/.ssh, ~/.config, …), the rest of ~/.foreman/       │
 │  (secrets, state, teams), the CEO's working files, other agents' worktrees          │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -152,7 +153,7 @@ Each engine comes with the image builder that matches it. The Instance manager a
 
 ```go
 type Images interface {
-    Ensure(ctx, project) (ref string, err error) // builds or tags the chain as needed: base → harness → workspace → project
+    Ensure(ctx, project) (ref string, err error) // builds or tags the chain as needed: base → harness → global → project
     Refresh(ctx, layer) error                    // rebuild without cache (new harness versions), then everything below
     Prune(ctx) (reclaimed int64, err error)      // Foreman's outdated images only
     Status(ctx) []ImageStatus                    // Settings → Maintenance
@@ -299,25 +300,30 @@ type Git interface {
 
 No open risk here: standard techniques. Each is still behind its own interface.
 
-### Workspace & config (`workspace`)
+### Home & config (`home`)
 
-The files the CEO owns: the workspace folder and [workspace repo](../models/workspace.md#the-workspace-repo) (team files, settings), each project's [project repo](../models/project-config.md#the-project-repo) (`project.toml`); and the file watcher that notices their changes. All TOML.
+The [home](../models/home.md) and what the CEO owns in it: the [global repo](../models/home.md#the-global-repo) (team files, settings), the projects' [records](../models/project-config.md#the-project-record) (kept in the State store) and each project's [project repo](../models/project-config.md#the-project-repo) (`project.toml`); the checks of the code repos (on load, on every reload and before each start); and the file watcher that notices changes. All TOML.
 
 ```go
-type Workspace interface {
+type Home interface {
     Projects() []Project;  Project(id) (Project, error)
-    Candidates() []Candidate                         // folders that aren't projects yet (Add a project)
-    AddProject(folder) (Project, error)              // creates the project repo: project.toml and a starter wiki
+    Checked(id) (Project, error)                     // the project with its code repos checked now (before a start)
+    NewProject(name) (Project, error)                // the record and its project repo: project.toml and a starter wiki
+    AddRepo(project, name, path) (Project, error)    // an existing code repo; NewRepo makes an empty one at path
+    LocateRepo(project, name, path) (Project, error) // a moved repo: the new path must hold its root commit
+    RemoveRepo(project, name) (Project, error)       // refused while a team is deployed on the project
+    SetProfile(project, profile) (Project, error)
+    Sandbox(project, agent) string                   // <home>/sandboxes/<project>/<agent>
     Teams() []Team;        Team(id) (Team, error)
     SaveTeam(TeamConfig, version) (Team, error)      // version-guarded; one commit per save
     Settings() SettingsFile; SaveSettings(Settings, version) (newVersion, error)
-    Watch(ctx, notify func(Change)) error            // file watcher: project.toml, team files, settings (wiki and Containerfiles join with their cards)
+    Watch(ctx, notify func(Change)) error            // file watcher: the global repo, projects/, each project.toml (wiki and Containerfiles join with their cards)
 }
 ```
 
-**`notify` is called outside the workspace's lock**, after a save or a reload has released it, so a subscriber may read the workspace back (the instance manager reads `max_sessions` on a settings change). Called under it, that read waited on itself and hung every request after it (found 2026-10-18, when a project's profile was chosen). Changes are queued while the lock is held and told on its release.
+**`notify` is called outside the home's lock**, after a save or a reload has released it, so a subscriber may read the home back (the instance manager reads `max_sessions` on a settings change). Called under it, that read waited on itself and hung every request after it (found 2026-10-18, when a project's profile was chosen). Changes are queued while the lock is held and told on its release.
 
-Details: [Workspace](../models/workspace.md), [Persistence → File watching](./persistence.md#file-watching).
+Details: [Home](../models/home.md), [Project config](../models/project-config.md), [Persistence → File watching](./persistence.md#file-watching).
 
 ### Wiki (`wiki`)
 
@@ -384,8 +390,8 @@ Implementations: GitHub, Gitea (also Forgejo), none. Used only on the CEO's Crea
 
 ```ts
 interface ForemanClient {
-  workspace(): Promise<Workspace>
-  instances(): Promise<Instance[]>
+  home: HomeArea            // the home's path, projects, teams, settings
+  agents: AgentsArea        // instances, …
   openTerminal(instance: string, handlers: PtyHandlers): PtyConnection
   // … one method per API call; the types are generated from the Go structs
 }
@@ -393,7 +399,7 @@ interface ForemanClient {
 
 ### Chief of Staff
 
-Not a separate block: an ad-hoc session (Harness, Terminal, Execution engine), like the login container, on the `default` profile, with no deployment. Its one tool, `propose_team`, is checked against the team file's invariants and shown to the CEO; Workspace & config writes it once the CEO confirms it. Details: [Chief of Staff](../features/chief-of-staff.md).
+Not a separate block: an ad-hoc session (Harness, Terminal, Execution engine), like the login container, on the `default` profile, with no deployment. Its one tool, `propose_team`, is checked against the team file's invariants and shown to the CEO; Home & config writes it once the CEO confirms it. Details: [Chief of Staff](../features/chief-of-staff.md).
 
 ## How the blocks work together
 
@@ -478,12 +484,12 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 - `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
-- `internal/workspace`: Workspace & config: discovery, `project.toml`, team files and settings (TOML, validated), the workspace repo, version-guarded saves (one commit each), the file watcher, Add a project and new empty code repos.
-- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager), `Exclude`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
+- `internal/home`: Home & config (`home.Home`): the home's layout (its lock is `internal/userdata`'s), the projects' records (with `store.Projects`) and their code repos' checks, `project.toml`, team files and settings (TOML, validated), the global repo, version-guarded saves (one commit each), the file watcher, New project, and adding, creating, locating and removing code repos.
+- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager; it repairs a worktree whose repo was located elsewhere), `RootCommit`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
 - `internal/instances`: the Instance manager.
 - `internal/setup`: the setup checklist and the engine's watcher: reaches Podman whenever it is there, restores the instances the first time, builds the agent image in the background, and holds deploying and waking until then ([First run](../features/first-run.md)).
 - `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.
-- `internal/store`: the State store (`state.db`, embedded migrations); `Deployments` and `Instances` so far, opened at startup.
+- `internal/store`: the State store (`state.db`, embedded migrations); `Projects`, `Deployments` and `Instances` so far, opened at startup.
 - `internal/agentlink` (the agent port: tokens, the tool and hook relay, and the client), `cmd/foreman-agent` (the stdio MCP server and hook forwarder), `agentbin/` (its Linux builds, embedded in `foreman`; the one for Foreman's CPU type is written to the user's cache folder to be mounted, and copies no Foreman has started with for a week are removed): the Agent link. `internal/teamtools`: the team-tools router; `internal/messaging` and `internal/workflow`: the blocks behind it.
 - `cmd/foreman/sessions.go`: the harnesses' login terminals, by id (instances' terminals are the Instance manager's).
 - `internal/screen` (parked, see [Terminal fidelity](../../backlog/terminal-fidelity.md)), `internal/sessionlog`: the Terminal's `Screen` and `Log`.

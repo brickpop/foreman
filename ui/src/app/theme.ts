@@ -1,6 +1,6 @@
 // The theme (wiki/product/features/settings.md#appearance): System follows the
 // operating system live (styles.css, prefers-color-scheme); Dark and Light set
-// data-theme. It is one of the CEO's preferences, the same in every workspace
+// data-theme. It is one of the CEO's preferences
 // (GET/PUT /api/preferences); this browser keeps a copy only to paint the
 // first frame in it, before the server answers.
 

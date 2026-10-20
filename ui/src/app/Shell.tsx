@@ -1,7 +1,6 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { Instance, Project, Request, Team } from "../api/client";
-import { AddProject } from "../components/AddProject";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { useOpenChiefOfStaff } from "./chiefOfStaff";
@@ -28,7 +27,6 @@ export function Shell() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [menu]);
-  const [addProject, setAddProject] = useState(false);
   return (
     <Toasts>
       <LiveEvents />
@@ -51,18 +49,12 @@ export function Shell() {
             className="fixed inset-0 z-[35] hidden bg-black/40 max-[760px]:block"
           />
         )}
-        <Sidebar
-          onAddProject={() => setAddProject(true)}
-          open={menu}
-          onClose={() => setMenu(false)}
-        />
+        <Sidebar open={menu} onClose={() => setMenu(false)} />
         {/* Under 760px the content starts below the menu button. */}
         <main className="min-h-0 min-w-0 overflow-auto max-[760px]:pt-12">
           <Outlet />
         </main>
       </div>
-      {/* Mounted only while open: each opening starts fresh. */}
-      {addProject && <AddProject open onClose={() => setAddProject(false)} />}
     </Toasts>
   );
 }
@@ -73,7 +65,7 @@ export type SidebarModel = {
   teams: { id: string; name: string; deployedOn: string }[];
 };
 
-/** What the sidebar shows, from the workspace, the instances and the requests. */
+/** What the sidebar shows, from the projects, teams, instances and requests. */
 export function sidebarModel(
   projects: Project[],
   teams: Team[],
@@ -108,11 +100,9 @@ const rowItem =
   "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
 
 function Sidebar({
-  onAddProject,
   open,
   onClose,
 }: {
-  onAddProject: () => void;
   /** Open as an overlay, on narrow screens. */
   open: boolean;
   onClose: () => void;
@@ -123,7 +113,7 @@ function Sidebar({
   const instances = useInstances();
   const requests = useRequests();
   const settings = useSettings();
-  usePreferences(); // the theme, the same in every workspace
+  usePreferences(); // the theme
   const model = sidebarModel(
     projects.data ?? [],
     teams.data ?? [],
@@ -169,13 +159,6 @@ function Sidebar({
               {p.needsYou && <Dot title="Needs you" />}
             </Link>
           ))}
-          <button
-            type="button"
-            onClick={onAddProject}
-            className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
-          >
-            + New project
-          </button>
         </section>
         <section className="flex flex-col gap-0.5">
           <Label>Teams</Label>
@@ -225,7 +208,7 @@ function LiveEvents() {
   const teams = useTeams();
   const instances = useInstances();
   const settings = useSettings();
-  usePreferences(); // the theme, the same in every workspace
+  usePreferences(); // the theme
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
     if (!n) return;

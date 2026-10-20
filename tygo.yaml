@@ -2,8 +2,8 @@
 # truth for API and event shapes (wiki/product/architecture/tech-stack.md#wire-formats).
 # Run `just types`; the output is committed.
 packages:
-  - path: github.com/brickpop/foreman/internal/workspace
-    output_path: ui/src/api/types/workspace.ts
+  - path: github.com/brickpop/foreman/internal/home
+    output_path: ui/src/api/types/home.ts
     include_files: [config.go, load.go]
   - path: github.com/brickpop/foreman/internal/events
     output_path: ui/src/api/types/events.ts
@@ -53,6 +53,6 @@ packages:
     output_path: ui/src/api/types/cos.ts
     include_files: [types.go]
     type_mappings:
-      workspace.TeamConfig: "workspace.TeamConfig"
+      home.TeamConfig: "home.TeamConfig"
     frontmatter: |
-      import type * as workspace from "./workspace";
+      import type * as home from "./home";

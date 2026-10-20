@@ -6,7 +6,7 @@ tags: [feature, ui, agents, teams]
 
 # Chief of Staff
 
-Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Nothing else: it raises no requests, appears on no Home, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [workspace repo](../models/workspace.md#the-workspace-repo), only on the CEO's click.
+Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Nothing else: it raises no requests, appears on no Home, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [global repo](../models/home.md#the-global-repo), only on the CEO's click.
 
 ## How it runs
 
@@ -14,21 +14,21 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 
 - **An ad-hoc session, not an agent of a deployment**, like the login container of [Connect](./settings.md#profiles): one container with a terminal, started when the CEO opens the [page](#the-page) and stopped when they leave it. It isn't listed in [Sessions](./sessions.md), has no project, team or worktree, and doesn't count towards the instance limit. One at a time: a second tab shows the same session.
 - **What it runs:** the `default` profile's harness and login, whatever that is ([Session runner → Credentials](../architecture/session-runner.md#credentials)), started interactively like any agent's, from the agent image.
-- **Its conversation carries over:** its private harness config directory is in `<workspace>/.foreman/cos/`, so the next visit continues where the last one ended (Claude Code: `--continue`). The opening line is given on every visit, a continued one too (Claude Code: `--continue "<line>"`; to check on a real login).
-- **Its id is `cos`**, on the agent port and for its terminal (`/ws/pty/cos`); an agent's is `agent@project`, so they never clash. Its process is named, and labelled, by workspace, like the agents'.
+- **Its conversation carries over:** its private harness config directory is in `~/.foreman/cos/`, so the next visit continues where the last one ended (Claude Code: `--continue`). The opening line is given on every visit, a continued one too (Claude Code: `--continue "<line>"`; to check on a real login).
+- **Its id is `cos`**, on the agent port and for its terminal (`/ws/pty/cos`); an agent's is `agent@project`, so they never clash. Its process is named, and labelled with the home (`foreman.home`), like the agents'.
 - **Mounts, and nothing else:**
-  - `<workspace>/.foreman/cos/` → read-write: its working folder and its harness config (git-ignored in the workspace repo);
-  - `<workspace>/.foreman/teams/` → **read-only**: it reads the current team files like any files;
+  - `~/.foreman/cos/` → read-write: its working folder and its harness config (outside the global repo);
+  - `~/.foreman/config/teams/` → **read-only**: it reads the current team files like any files;
   - the profile's login file, and `foreman-agent` (its tool and hooks), as for any agent.
 
-  Never the rest of `.foreman/` (secrets, `state.db`, logs, settings), never a project folder, never the CEO's own harness config.
-- **Its prompt:** who it is, the team file format and its invariants, the roles' [default job descriptions](../models/agent-soul.md#default-job-descriptions), the names already used in the workspace, and its one tool. It is composed at each start (`internal/cos`), so the names it lists are those of that moment; the files it reads stay current.
+  Never the rest of the home (secrets, `state.db`, logs, settings, projects, sandboxes), never a code repo, never the CEO's own harness config.
+- **Its prompt:** who it is, the team file format and its invariants, the roles' [default job descriptions](../models/agent-soul.md#default-job-descriptions), the names already used in any team, and its one tool. It is composed at each start (`internal/cos`), so the names it lists are those of that moment; the files it reads stay current.
 
 ## Its tool
 
 `propose_team(team)`: the whole team definition as it should be ([Team definition](../models/team-definition.md)): a new team, or an existing one with a member added (hire) or changed (refine). One tool for the three cases, since each is the team file as it should become.
 
-- Foreman checks it as it would a save (the [invariants](../models/team-definition.md#invariants): ids and display names unique across the workspace, the lead in the roster, valid roles and looks). An invalid proposal is not shown: the call returns the reasons, and the CoS fixes it and calls again.
+- Foreman checks it as it would a save (the [invariants](../models/team-definition.md#invariants): ids and display names unique across all teams, the lead in the roster, valid roles and looks). An invalid proposal is not shown: the call returns the reasons, and the CoS fixes it and calls again.
 - A valid one opens the [preview](#the-page) and returns. A newer proposal replaces the one on screen.
 - A member proposed without a face (no background color) gets one on the page, drawn once per proposal; **Create** sends those faces, so the one shown is the one saved.
 - It never writes. The CEO's **Create** / **Save** does, carrying the version of the team file the proposal was based on: if the file changed meanwhile (an edit on the Agent page, in an editor), nothing is written, the preview says so, and the CoS is told to propose again from the current file.
@@ -53,7 +53,7 @@ Leaving the page stops the session, a second later (coming straight back, or ope
 
 What the CoS asks is in its prompt, not scripted by Foreman; these are the shapes it follows.
 
-- **Create a team:** what the team is for; a name not already used; then the proposal. No templates: it drafts from the purpose, the roles' default job descriptions and the workspace's existing teams. Whether Foreman ships starter or example teams for it is still open ([Starter teams](../../backlog/starter-teams.md)).
+- **Create a team:** what the team is for; a name not already used; then the proposal. No templates: it drafts from the purpose, the roles' default job descriptions and the existing teams. Whether Foreman ships starter or example teams for it is still open ([Starter teams](../../backlog/starter-teams.md)).
 - **Hire:** which team (given when started from one), the role (not Team Lead), what they'll focus on, how they work with the team; then the team with the new member: the role's default job description plus `Focus: <focus>.`, the working style as personality, a random face ([Avatar](../design/avatar.md)). No harness question: an agent runs on its project's profile ([Agent soul](../models/agent-soul.md#what-it-runs-on)).
 - **Refine:** what should change about how the member works; then the team with that member changed (usually `Adjustment: <text>.` appended to the job description).
 

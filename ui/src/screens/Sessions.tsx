@@ -552,7 +552,7 @@ function Asleep({ instance, name, stopped }: { instance: string; name: string; s
 }
 
 /** A queued agent's pane: every session slot is taken, idle agents included,
- * so it starts when one frees; the limit is a workspace setting. */
+ * so it starts when one frees; the limit is in settings.toml. */
 function Queued({ name }: { name: string }) {
   const instances = useInstances().data ?? [];
   const max = useSettings().data?.settings.maxSessions ?? 0;

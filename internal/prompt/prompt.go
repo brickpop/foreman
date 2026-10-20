@@ -9,16 +9,16 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // Input is everything a session prompt is made of.
 type Input struct {
-	Agent   string               // the agent's id in Team.Agents
-	Team    workspace.TeamConfig // souls, roster, playbook
-	Project string               // the project's id
-	Path    string               // the project folder on the host
-	Config  workspace.ProjectConfig
+	Agent   string          // the agent's id in Team.Agents
+	Team    home.TeamConfig // souls, roster, playbook
+	Project string          // the project's id
+	Sandbox string          // the agent's sandbox, at the same path on the host and in its container
+	Config  home.ProjectConfig
 	Goal    string // the deployment's goal
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
 	// describes those and no others. Without ask, it describes working alone,
@@ -66,11 +66,11 @@ func Compose(in Input) string {
 	line("%s", instruction(soul, has("request_merge")))
 	line("")
 	line("## This assignment")
-	line("Project: %s  (%s)", in.Project, in.Path)
+	line("Project: %s", in.Project)
 	line("Goal: %s", goal(in.Goal, lead))
-	line("Your sandbox: %s/.sandboxes/%s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Project, in.Agent)
+	line("Your sandbox: %s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Sandbox)
 	line("Branches: %s", branches(in, lead, has))
-	line("Knowledge base: %s/.sandboxes/%s/project/wiki (%s)", in.Project, in.Agent, wikiAccess(lead, has))
+	line("Knowledge base: %s/project/wiki (%s)", in.Sandbox, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	if lead && len(in.Team.Roster()) > 1 {
 		// Without this, a lead writes cards that tell members to write wiki
@@ -81,7 +81,7 @@ func Compose(in Input) string {
 			line("Your teammates can't write it: ask them for content, never to write wiki files.")
 		}
 	}
-	line("Read %s/.sandboxes/%s/project/AGENTS.md first: how this project's wiki and tasks work.", in.Project, in.Agent)
+	line("Read %s/project/AGENTS.md first: how this project's wiki and tasks work.", in.Sandbox)
 	line("")
 	line("## Your team on %s", in.Project)
 	for _, id := range in.Team.Roster() {
@@ -255,7 +255,7 @@ func tools(in Input, lead bool, has func(string) bool) string {
 
 // Who resolves a playbook or escalation `who`
 // (wiki/product/models/team-definition.md#playbook-and-escalation).
-func Who(t workspace.TeamConfig, who string) string {
+func Who(t home.TeamConfig, who string) string {
 	switch who {
 	case "lead":
 		return t.Agents[t.Lead].Name
@@ -310,7 +310,7 @@ var Roles = []string{"team_lead", "engineer", "qa", "architect", "reviewer"}
 // DefaultJob is a built-in role's default job description, as a session gets
 // it; "" for any other role.
 func DefaultJob(role string) string {
-	return instruction(workspace.Soul{Role: role}, true)
+	return instruction(home.Soul{Role: role}, true)
 }
 
 // leadMerges ends the lead's default job once request_merge exists.
@@ -318,7 +318,7 @@ const leadMerges = " You are the only member who requests merges to main (reques
 
 // instruction is the soul's job description, or its role's default
 // (wiki/product/models/agent-soul.md#default-job-descriptions).
-func instruction(s workspace.Soul, merges bool) string {
+func instruction(s home.Soul, merges bool) string {
 	if text := strings.TrimSpace(s.Instruction); text != "" {
 		return text
 	}
@@ -330,10 +330,10 @@ func instruction(s workspace.Soul, merges bool) string {
 
 // Template is an agent's prompt before any deployment: the deployment's and
 // the project's parts stay as {placeholders}, so the whole shape shows.
-func Template(team workspace.TeamConfig, agent string) string {
+func Template(team home.TeamConfig, agent string) string {
 	return Compose(Input{
-		Agent: agent, Team: team, Project: "{project}", Path: "{path}", Goal: "{goal}",
-		Config: workspace.ProjectConfig{Main: "{main}", Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
+		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", Goal: "{goal}",
+		Config: home.ProjectConfig{Main: "{main}", Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:  Offered(agent == team.Lead),
 	})
 }

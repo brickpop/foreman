@@ -14,6 +14,7 @@ import { permission } from "../app/notifications";
 import {
   keys,
   useHarnesses,
+  useHomeFolder,
   useMaintenance,
   usePreferences,
   useProfiles,
@@ -21,7 +22,6 @@ import {
   useSaveTerminalFont,
   useSaveTheme,
   useSettings,
-  useWorkspace,
 } from "../app/queries";
 import { asTheme, savedTheme } from "../app/theme";
 import { ConnectDialog } from "../components/ConnectDialog";
@@ -31,9 +31,9 @@ import { useToast } from "../components/Toasts";
 import { terminalFont, terminalFontSizes, terminalFonts } from "../components/terminalFonts";
 import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
-// Settings (wiki/product/features/settings.md), in two tabs: this
-// workspace's (settings.toml), and Global, the CEO's on this machine, the same
-// in every workspace (the CEO, 2026-10-18). Every change saves at once.
+// Settings (wiki/product/features/settings.md), in two tabs: the global
+// repo's settings.toml, and Global, the CEO's on this machine outside any
+// repo (profiles, maintenance, appearance). Every change saves at once.
 
 export type SettingsTab = "workspace" | "global";
 
@@ -80,7 +80,7 @@ export function Settings() {
           )}
           {s && (
             <>
-              <WorkspaceSection settings={s} />
+              <GeneralSection settings={s} />
               <ForgeSection settings={s} />
               <NotificationsSection settings={s} />
             </>
@@ -176,18 +176,18 @@ function Confirm({
   );
 }
 
-function WorkspaceSection({ settings }: { settings: SettingsData }) {
+function GeneralSection({ settings }: { settings: SettingsData }) {
   const save = useSave();
-  const workspace = useWorkspace();
+  const home = useHomeFolder();
   const engine = useMaintenance();
   const [confirm, setConfirm] = useState<"lan" | "direct">();
   return (
-    <Section label="Workspace">
+    <Section label="General">
       <Row
-        title="Folder"
-        explanation="Every subfolder with a project/project.toml is a project. Foreman doesn’t clone anything. It uses the git repos it finds in each project folder."
+        title="Home"
+        explanation="Foreman’s folder on this machine: the global repo (teams, settings), each project’s repo, the agents’ sandboxes and its state."
       >
-        <span className="font-mono text-[13px] text-tx2">{workspace.data?.path}</span>
+        <span className="font-mono text-[13px] text-tx2">{home.data?.path}</span>
       </Row>
       <Row
         title="Listen on"
@@ -316,8 +316,8 @@ function Stepper({
   );
 }
 
-/** The CEO's profiles: each a harness and its login, the same in every
- * workspace (the CEO, 2026-10-18). A project picks one in its settings. */
+/** The CEO's profiles: each a harness and its login, on this machine. A
+ * project picks one in its settings. */
 function ProfilesSection() {
   const client = useClient();
   const queries = useQueryClient();
@@ -340,7 +340,7 @@ function ProfilesSection() {
   return (
     <Section
       label="Profiles"
-      intro="Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every workspace's projects can use it; a project uses default unless its settings pick another."
+      intro="Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every project can use it; a project uses default unless its settings pick another."
     >
       {profiles.isError && <p className="m-0 text-[13px] text-err">{profiles.error.message}</p>}
       {(profiles.data ?? []).map((p) => (
@@ -390,7 +390,7 @@ function ProfilesSection() {
       <Confirm
         open={deleting !== undefined}
         title={`Delete the ${deleting} profile?`}
-        body="Its credentials go with it. Projects that use it, in any workspace, can't start agents until they pick another profile."
+        body="Its credentials go with it. Projects that use it can't start agents until they pick another profile."
         action="Delete"
         onConfirm={() => deleting && remove.mutate(deleting)}
         onClose={() => setDeleting(undefined)}
@@ -489,7 +489,7 @@ function ForgeSection({ settings }: { settings: SettingsData }) {
           />
         ))
       )}
-      <WorkspaceRepo settings={settings} connected={connected} />
+      <GlobalRepo settings={settings} connected={connected} />
     </Section>
   );
 }
@@ -578,10 +578,10 @@ function ForgeRow({
   );
 }
 
-/** Where the workspace repo is hosted, so Sync can push its main there. */
-function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connected: string[] }) {
+/** Where the global repo is hosted, so Sync can push its main there. */
+function GlobalRepo({ settings, connected }: { settings: SettingsData; connected: string[] }) {
   const save = useSave();
-  const current = settings.workspaceForge;
+  const current = settings.globalForge;
   // A forge needs its repo URL before it can be saved (settings validation).
   const [kind, setKind] = useState(current.kind);
   const [url, setUrl] = useState(current.url);
@@ -589,24 +589,24 @@ function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connec
   if (current.kind !== "none" && !kinds.includes(current.kind)) kinds.push(current.kind);
   const choose = (k: string) => {
     setKind(k);
-    if (k === "none") save((s) => ({ ...s, workspaceForge: { kind: "none", url: "" } }));
+    if (k === "none") save((s) => ({ ...s, globalForge: { kind: "none", url: "" } }));
   };
   const commitUrl = () => {
     const next = url.trim();
     if (kind === "none" || next === "" || (kind === current.kind && next === current.url)) return;
-    save((s) => ({ ...s, workspaceForge: { kind, url: next } }));
+    save((s) => ({ ...s, globalForge: { kind, url: next } }));
   };
   return (
     <div className="flex flex-col gap-2.5 py-3.5">
       <div className="flex flex-col gap-0.5">
-        <span className="font-medium">Workspace repo</span>
+        <span className="font-medium">Global repo</span>
         <span className="text-[13.5px] leading-[1.5] text-tx3">
-          Where your team definitions are hosted, so Sync can push them there. Without a forge they
-          stay on this machine. Nothing is pushed automatically.
+          Where your team definitions and settings are hosted, so Sync can push them there. Without
+          a forge they stay on this machine. Nothing is pushed automatically.
         </span>
       </div>
       <Segmented
-        label="Workspace repo forge"
+        label="Global repo forge"
         value={kind}
         onChange={choose}
         options={kinds.map((k) => ({ value: k, label: k === "none" ? "No forge" : forgeLabel(k) }))}
@@ -614,8 +614,8 @@ function WorkspaceRepo({ settings, connected }: { settings: SettingsData; connec
       {kind !== "none" && (
         <span className="flex items-center gap-2">
           <input
-            aria-label="Workspace repo URL"
-            placeholder="https://…/workspace"
+            aria-label="Global repo URL"
+            placeholder="https://…/foreman-config"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             onBlur={commitUrl}
@@ -769,7 +769,7 @@ function ImageRow({
   );
 }
 
-/** The theme, one of the CEO's preferences: the same in every workspace. */
+/** The theme, one of the CEO's preferences. */
 function AppearanceSection() {
   const prefs = usePreferences();
   const save = useSaveTheme();
@@ -782,10 +782,7 @@ function AppearanceSection() {
         : savedTheme();
   return (
     <Section label="Appearance">
-      <Row
-        title="Theme"
-        explanation="System follows your operating system. The same in every workspace."
-      >
+      <Row title="Theme" explanation="System follows your operating system.">
         <Segmented
           label="Theme"
           value={theme}
@@ -817,7 +814,7 @@ function TerminalFontRow({ prefs }: { prefs: Preferences }) {
   return (
     <Row
       title="Terminal font"
-      explanation="The agents’ terminals, in every workspace. System uses your operating system’s monospace font."
+      explanation="The agents’ terminals. System uses your operating system’s monospace font."
     >
       <span className="flex gap-2">
         <Select

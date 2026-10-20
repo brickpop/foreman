@@ -29,12 +29,12 @@ import (
 
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/terminal"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Statuses (wiki/product/models/instance.md#statuses).
@@ -53,19 +53,23 @@ const (
 type Git interface {
 	Prepare(ctx context.Context, repo, worktree, branch, base string) error
 	SyncSubmodules(ctx context.Context, dir string, recursive bool) error
-	Exclude(ctx context.Context, path string) error
 }
 
-// Config is the workspace's config, as loaded.
+// Config is the home's config, as loaded.
 type Config interface {
-	Project(id string) (workspace.Project, error)
-	Team(id string) (workspace.Team, error)
-	Settings() workspace.SettingsFile
+	Project(id string) (home.Project, error)
+	// Checked is the project with its repos checked now: one may have moved
+	// since the last reload, which the home doesn't watch.
+	Checked(id string) (home.Project, error)
+	// Sandbox is the folder of an agent's worktrees on a project.
+	Sandbox(project, agent string) string
+	Team(id string) (home.Team, error)
+	Settings() home.SettingsFile
 }
 
 // Deps are the blocks the manager is assembled from.
 type Deps struct {
-	Root        string // the workspace folder: projects are its subfolders
+	Home        string // Foreman's home: its processes are labelled with it
 	Runner      runner.Runner
 	Images      runner.Images
 	Git         Git
@@ -136,7 +140,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	if err := m.blocked(); err != nil {
 		return store.Deployment{}, err
 	}
-	team, project, on, err := m.deployable(teamID, projectID)
+	team, project, on, err := m.deployable(ctx, teamID, projectID)
 	if err != nil {
 		return store.Deployment{}, err
 	}
@@ -148,7 +152,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	for _, agent := range team.Config.Roster() {
 		inst := store.Instance{
 			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Asleep,
-			SandboxPath: filepath.Join(m.Root, project.ID, ".sandboxes", agent), Harness: on.harness, Profile: on.profile,
+			SandboxPath: m.Config.Sandbox(project.ID, agent), Harness: on.harness, Profile: on.profile,
 		}
 		if err := m.Instances.Put(ctx, inst); err != nil {
 			return dep, err
@@ -266,13 +270,13 @@ type runsOn struct {
 
 // deployable checks what deploying needs: a valid team and project, and the
 // project's profile, with an adapter for its harness and its credentials.
-func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspace.Project, runsOn, error) {
+func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (home.Team, home.Project, runsOn, error) {
 	var on runsOn
 	team, err := m.Config.Team(teamID)
 	if err != nil {
-		return team, workspace.Project{}, on, fmt.Errorf("%w: team %s: %v", ErrInvalid, teamID, err)
+		return team, home.Project{}, on, fmt.Errorf("%w: team %s: %v", ErrInvalid, teamID, err)
 	}
-	project, err := m.Config.Project(projectID)
+	project, err := m.Config.Checked(projectID)
 	if err != nil {
 		return team, project, on, fmt.Errorf("%w: project %s: %v", ErrInvalid, projectID, err)
 	}
@@ -283,7 +287,10 @@ func (m *Manager) deployable(teamID, projectID string) (workspace.Team, workspac
 		return team, project, on, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}
 	if len(project.Repos) == 0 {
-		return team, project, on, fmt.Errorf("%w: project %s has no code repo for agents to work in: create one in its Settings (New repo), or clone one into its folder", ErrInvalid, projectID)
+		return team, project, on, fmt.Errorf("%w: project %s has no code repo for agents to work in: add one to it first", ErrInvalid, projectID)
+	}
+	if err := m.sharing(ctx, teamID, project); err != nil {
+		return team, project, on, err
 	}
 	p, login, err := m.Profile(projectID)
 	if err != nil {
@@ -351,27 +358,32 @@ func (m *Manager) Shutdown(ctx context.Context) {
 	m.closing = true
 	ids := m.queue
 	m.queue = nil
-	procs := map[string]runner.Process{}
+	running := map[string]*live{}
 	for id, l := range m.live {
 		// A start under way sees it and stops what it launched.
 		l.stopping = true
 		ids = append(ids, id)
 		if l.proc != nil {
-			procs[id] = l.proc
+			running[id] = l
 		}
 	}
 	m.mu.Unlock()
 	var stops sync.WaitGroup
 	var failedMu sync.Mutex
 	failed := map[string]bool{}
-	for id, p := range procs {
+	for id, l := range running {
 		stops.Go(func() {
-			if err := p.Stop(stopGrace); err != nil {
+			if err := l.proc.Stop(stopGrace); err != nil {
 				slog.Warn("stopping an instance; the next start re-attaches it", "instance", id, "err", err)
 				failedMu.Lock()
 				failed[id] = true
 				failedMu.Unlock()
+				return
 			}
+			// Its terminal has read the end (and closed its log), and the slot
+			// is free, before Shutdown returns: its watcher would do both later.
+			<-l.term.Done()
+			m.release(id, l)
 		})
 	}
 	stops.Wait()
@@ -472,26 +484,19 @@ func (m *Manager) Terminal(id string) (*terminal.Terminal, error) {
 	return nil, ErrNotRunning
 }
 
-// Restore picks up after a Foreman restart: this workspace's running
-// containers are re-attached, live instances whose process is gone restart
-// (continuing their conversation), and this workspace's processes that belong
-// to nothing are stopped. Another workspace's processes are left alone.
+// Restore picks up after a Foreman restart: this home's running containers
+// are re-attached, live instances whose process is gone restart (continuing
+// their conversation), and this home's processes that belong to nothing are
+// stopped. Another home's (a test's, just dev's) are left alone.
 func (m *Manager) Restore(ctx context.Context) error {
 	procs, err := m.Runner.List(ctx)
 	if err != nil {
 		return err
 	}
-	byID := map[string]runner.Process{} // this workspace's
-	unlabelled := map[string]runner.Process{}
+	byID := map[string]runner.Process{} // this home's
 	for _, p := range procs {
-		id := p.Labels()["foreman.instance"]
-		switch p.Labels()[WorkspaceLabel] {
-		case m.Root:
-			byID[id] = p
-		case "":
-			// From before processes named their workspace: adopted when one of
-			// ours matches, never stopped (it may be another workspace's).
-			unlabelled[id] = p
+		if p.Labels()[HomeLabel] == m.Home {
+			byID[p.Labels()["foreman.instance"]] = p
 		}
 	}
 	deps, err := m.Deployments.List(ctx)
@@ -510,11 +515,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 			if inst.Status == Stopped || inst.Status == Asleep {
 				continue
 			}
-			p, ok := byID[inst.ID]
-			if !ok {
-				p, ok = unlabelled[inst.ID]
-			}
-			if ok {
+			if p, ok := byID[inst.ID]; ok {
 				delete(byID, inst.ID)
 				if err := m.adopt(ctx, inst.ID, p); err != nil {
 					slog.Warn("re-attaching", "instance", inst.ID, "err", err)
@@ -681,7 +682,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err != nil {
 		return nil, err
 	}
-	team, project, on, err := m.deployable(dep.TeamID, dep.ProjectID)
+	team, project, on, err := m.deployable(ctx, dep.TeamID, dep.ProjectID)
 	if err != nil {
 		return nil, err
 	}
@@ -698,11 +699,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	}
 	lead := inst.AgentID == team.Config.Lead
 
-	projectDir := filepath.Join(m.Root, project.ID)
 	if err := os.MkdirAll(inst.SandboxPath, 0o755); err != nil {
-		return nil, err
-	}
-	if err := m.Git.Exclude(ctx, filepath.Join(projectDir, ".sandboxes")); err != nil {
 		return nil, err
 	}
 	branch := "wt/" + inst.AgentID + "/main"
@@ -712,8 +709,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	var mounts []runner.Mount
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {
-		repoDir := filepath.Join(projectDir, repo)
-		worktree := filepath.Join(inst.SandboxPath, repo)
+		repoDir, worktree := repo.Path, filepath.Join(inst.SandboxPath, repo.Name)
 		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, project.Config.Main); err != nil {
 			return nil, err
 		}
@@ -721,13 +717,18 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		// a private repo) rather than not at all: its next switch or merge
 		// tries again, and says so.
 		if err := m.Git.SyncSubmodules(ctx, worktree, project.Config.RecursiveSubmodules); err != nil {
-			slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo, "err", err)
+			slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo.Name, "err", err)
 		}
-		// Agents read git; only Foreman writes it.
-		mounts = append(mounts, runner.Mount{Source: filepath.Join(repoDir, ".git"), Target: filepath.Join(repoDir, ".git"), ReadOnly: true})
+		// Agents read git; only Foreman writes it. At its real path, which the
+		// worktree's link names.
+		real, err := filepath.EvalSymlinks(repoDir)
+		if err != nil {
+			return nil, err
+		}
+		mounts = append(mounts, runner.Mount{Source: filepath.Join(real, ".git"), Target: filepath.Join(real, ".git"), ReadOnly: true})
 	}
 	// The live project repo, writable for the lead only; its .git read-only for all.
-	projectRepo, inSandbox := filepath.Join(projectDir, "project"), filepath.Join(inst.SandboxPath, "project")
+	projectRepo, inSandbox := project.Path, filepath.Join(inst.SandboxPath, "project")
 	if err := os.MkdirAll(inSandbox, 0o755); err != nil {
 		return nil, err
 	}
@@ -771,22 +772,23 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	return m.Runner.Start(ctx, runner.Spec{
 		Name: m.processName(id), Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: l.Env,
 		Mounts: append(mounts, l.Mounts...),
-		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, WorkspaceLabel: m.Root},
+		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, HomeLabel: m.Home},
 	})
 }
 
-// WorkspaceLabel names the workspace a process belongs to. Every workspace on
-// a machine shares one Podman, so each touches only its own: two workspaces
-// may well have an agent mara on a project ledger.
-const WorkspaceLabel = "foreman.workspace"
+// HomeLabel names the Foreman home a process belongs to. Every Foreman on a
+// machine (one per home: yours, just dev's, a test's) shares one Podman, so
+// each touches only its own: two may well have an agent mara on a project
+// ledger.
+const HomeLabel = "foreman.home"
 
 // processName is the instance's process name, unique on the machine.
-func (m *Manager) processName(id string) string { return ProcessName(m.Root, id) }
+func (m *Manager) processName(id string) string { return ProcessName(m.Home, id) }
 
-// ProcessName is a workspace's process name for id, unique on the machine:
-// the workspace's short hash, then the id.
-func ProcessName(root, id string) string {
-	sum := sha256.Sum256([]byte(root))
+// ProcessName is a home's process name for id, unique on the machine: the
+// home's short hash, then the id.
+func ProcessName(home, id string) string {
+	sum := sha256.Sum256([]byte(home))
 	return hex.EncodeToString(sum[:3]) + "-" + id
 }
 
@@ -925,10 +927,9 @@ func (m *Manager) DeploymentsIn(ctx context.Context, status string) ([]store.Dep
 }
 
 // compose is an instance's session prompt: launch writes it, Prompt shows it.
-func (m *Manager) compose(inst store.Instance, dep store.Deployment, team workspace.Team, project workspace.Project) string {
+func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
-		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Path: filepath.Join(m.Root, project.ID),
-		Config: project.Config, Goal: dep.Goal,
+		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Goal: dep.Goal,
 		Tools: m.tools(inst.AgentID == team.Config.Lead),
 	})
 }
@@ -966,3 +967,41 @@ func (m *Manager) Prompt(ctx context.Context, id string) (string, error) {
 // Wait waits for the starts under way to finish (at shutdown, and in tests:
 // a start may be writing worktrees).
 func (m *Manager) Wait() { m.starts.Wait() }
+
+// sharing refuses a team on a project that shares a repo with another
+// project the team works on, stopped or not: its agents' branches
+// (wt/<agent>/*, lead/<team>/*) and their worktrees, which a stopped
+// deployment keeps, would collide in that repo.
+func (m *Manager) sharing(ctx context.Context, teamID string, project home.Project) error {
+	deps, err := m.Deployments.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, d := range deps {
+		if d.TeamID != teamID || d.ProjectID == project.ID {
+			continue
+		}
+		other, err := m.Config.Project(d.ProjectID)
+		if err != nil {
+			continue // gone: its worktrees with it
+		}
+		for _, r := range project.Repos {
+			for _, o := range other.Repos {
+				if samePath(r.Path, o.Path) {
+					return fmt.Errorf("%w: team %s also works on %s, which shares the repo %s (%s): its branches can't be in two projects of one repo. Deploy another team here", ErrInvalid, teamID, other.ID, r.Name, r.Path)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// samePath says whether two paths are one folder, symlinks resolved.
+func samePath(a, b string) bool {
+	ra, errA := filepath.EvalSymlinks(a)
+	rb, errB := filepath.EvalSymlinks(b)
+	if errA != nil || errB != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return ra == rb
+}

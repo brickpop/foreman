@@ -72,7 +72,7 @@ func (f fakeTerminals) Attach(id string) (Terminal, error) {
 
 func ptyServer(t *testing.T, terms fakeTerminals) string {
 	t.Helper()
-	srv := httptest.NewServer(New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Terminals: terms, UI: builtUI}))
+	srv := httptest.NewServer(New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Terminals: terms, UI: builtUI}))
 	t.Cleanup(srv.Close)
 	return "ws" + strings.TrimPrefix(srv.URL, "http")
 }

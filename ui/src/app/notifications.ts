@@ -1,6 +1,6 @@
 import type { Instance, Request, Team } from "../api/client";
 import type { Event } from "../api/types/events";
-import type { Notifications } from "../api/types/workspace";
+import type { Notifications } from "../api/types/home";
 import { agentOf } from "./model";
 
 // What the CEO hears about (wiki/product/features/notifications.md): one

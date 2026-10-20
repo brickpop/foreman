@@ -8,8 +8,8 @@ import (
 
 	"github.com/brickpop/foreman/internal/cos"
 	"github.com/brickpop/foreman/internal/harness"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/instances"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // ChiefOfStaff is the Chief of Staff's page (wiki/product/features/chief-of-staff.md):
@@ -24,7 +24,7 @@ type ChiefOfStaff interface {
 	Proposal() (cos.Proposal, bool)
 	// Create writes the proposal on screen, with the faces the page gave the
 	// members proposed without one.
-	Create(ctx context.Context, id int, looks map[string]workspace.Look) (workspace.Team, error)
+	Create(ctx context.Context, id int, looks map[string]home.Look) (home.Team, error)
 }
 
 // cosSession is the body of POST /api/cos.
@@ -67,8 +67,8 @@ func cosRoutes(mux *http.ServeMux, c ChiefOfStaff) {
 	})
 	mux.HandleFunc("POST /api/cos/proposal", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ID    int                       `json:"id"`
-			Looks map[string]workspace.Look `json:"looks"`
+			ID    int                  `json:"id"`
+			Looks map[string]home.Look `json:"looks"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {id, looks}")

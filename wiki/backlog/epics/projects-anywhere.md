@@ -8,13 +8,13 @@ order: 3
 
 **Goal:** a project is a chosen set of repos, wherever they are on disk, not a folder of a workspace folder. One Foreman per machine; teams are the same everywhere, projects belong to the machine. Ahead of the CEO's first Foundry projects, so they are set up once (the CEO, 2026-10-20).
 
-**Why:** today a project must be a direct subfolder of the workspace and its repos direct subfolders of the project ([Workspace](../../product/models/workspace.md)). So a single repo can't be a project with its own wiki, a repo can't be in two projects (`aragon/app` alone, and the `aragon` set), the CEO's `~/dev/{aragon,brickpop,agentic}` forces one project per parent folder, and two Foremans on nested folders (`~/dev` and `~/dev/brickpop`) overlap with nothing to stop them.
+**Why:** today a project must be a direct subfolder of the workspace and its repos direct subfolders of the project ([Workspace](../../product/models/home.md)). So a single repo can't be a project with its own wiki, a repo can't be in two projects (`aragon/app` alone, and the `aragon` set), the CEO's `~/dev/{aragon,brickpop,agentic}` forces one project per parent folder, and two Foremans on nested folders (`~/dev` and `~/dev/brickpop`) overlap with nothing to stop them.
 
 ## Decided (the CEO, 2026-10-20)
 
 - **One Foreman per machine, at `~/.foreman/`**, held by an OS file lock (`~/.foreman/server.lock`, released by the system even after a crash, so never stale): a second `foreman` says where the first one runs and opens it. No workspace folder argument any more.
 - **What's committed and what isn't.** `~/.foreman/` is a git repo for what should be the same on every machine: **teams** and the machine's **settings**. What belongs to this machine stays out of git: **the projects and their repo paths** (in the state database: projects may be short-lived, and differ between machines), the runtime state, logs, secrets, logins (profiles), image builds, sandboxes, project repos.
-- **Per-machine data moves in:** profiles, preferences and image builds leave `~/.local/share/foreman` for `~/.foreman/`, so there is one place.
+- **Per-machine data lives in the home:** profiles, preferences and image builds are in `~/.foreman/` (they were in `~/.local/share/foreman`, never released, so nothing is moved), so there is one place.
 - **A project is a record:** a name, its repos (paths anywhere, each with a name unique in the project), and its project repo.
 - **Project repos live in `~/.foreman/projects/<name>/`**: one rule, nothing written into the CEO's code folders. A symlink from anywhere works for browsing. Their remote is managed as today (`forge.project_repo` and **Sync** in Project settings), and so is the global repo's (Settings).
 - **Sandboxes live in `~/.foreman/sandboxes/<project>/<agent>/<repo>`**, not in the CEO's folders: no more `.sandboxes/` to exclude. The CEO sees an agent's work in its sandbox folder at any time, and in their own checkout as soon as it commits (worktrees share the repo's `.git`).
@@ -48,9 +48,8 @@ order: 3
 
 ## Cards
 
-- [The home and the lock](../home-and-lock.md): `~/.foreman`, the lock, the CLI, per-machine data moved in, the global repo and its `.gitignore`.
-- [Projects as records](../projects-as-records.md): projects and repos in the database, project repos under `~/.foreman/projects/`, missing repos, the API.
-- [Sandboxes under the home](../sandboxes-under-home.md): worktree paths, mounts, the prompt's paths, the Podman shared-folder check.
+- [The home and the lock](../home-and-lock.md): `~/.foreman`, the lock, the CLI, per-machine data in it, the global repo and its `.gitignore`.
+- [Projects as records, sandboxes under the home](../projects-as-records.md): projects and repos in the database, project repos under `~/.foreman/projects/`, missing repos, the API, worktrees and mounts under the home, the prompt's paths.
 - [Add a project, anywhere](../add-project-anywhere.md): the dialog (New or Clone, then pick repos), Project settings' repos (add, rename, locate, remove), removing a project.
 
 **Specs it changes:** Workspace (rewritten as the home), Project config, Workspace settings, Persistence, Sandboxes and git policy (mounts), Session runner (mounts, credentials' folder), Session prompt (`{path}`), Add a project, Project settings, Settings, First run, App shell, API, Glossary, Security, Chief of Staff (its mounts).

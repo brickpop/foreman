@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Soul, Team } from "../api/client";
-import type { TeamConfig } from "../api/types/workspace";
+import type { TeamConfig } from "../api/types/home";
 import { cosSearch, memberChanges, openerOf } from "./chiefOfStaff";
 
 describe("the Chief of Staff's entry points", () => {

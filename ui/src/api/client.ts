@@ -5,6 +5,7 @@ import type { Proposal } from "./types/cos";
 import type { Account as ForgeAccount } from "./types/forge";
 import type { Commit, TreeEntry } from "./types/git";
 import type { Endpoint, EndpointChange, Status as HarnessStatus } from "./types/harness";
+import type { Look, Missing, Project, Settings, SettingsFile, Soul, Team } from "./types/home";
 import type { Draft } from "./types/messaging";
 import type { Profile } from "./types/profiles";
 import type { LogPage, Repo, Branch as RepoBranch, File as RepoFile } from "./types/repos";
@@ -25,16 +26,6 @@ import type {
 } from "./types/store";
 import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Node } from "./types/wiki";
-import type {
-  Candidate,
-  Look,
-  Missing,
-  Project,
-  Settings,
-  SettingsFile,
-  Soul,
-  Team,
-} from "./types/workspace";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -47,7 +38,6 @@ export type {
   ActivityItem,
   ActivityPage,
   Board,
-  Candidate,
   Card,
   Commit,
   Deployment,
@@ -83,10 +73,11 @@ export type {
   WorkItem,
 };
 
-export type Workspace = { path: string };
+/** Foreman's home folder on this machine (~/.foreman). */
+export type HomeFolder = { path: string };
 
-export interface WorkspaceArea {
-  workspace(): Promise<Workspace>;
+export interface HomeArea {
+  folder(): Promise<HomeFolder>;
   projects(): Promise<Project[]>;
   project(id: string): Promise<Project>;
   teams(): Promise<Team[]>;
@@ -94,16 +85,8 @@ export interface WorkspaceArea {
   settings(): Promise<SettingsFile>;
   /** Saves settings.toml, guarded by the version read. */
   saveSettings(settings: Settings, version: string): Promise<SettingsFile>;
-  /** Folders that aren't projects yet. */
-  candidates(): Promise<Candidate[]>;
-  /** Turns a candidate folder into a project: its project repo and starter
-   * wiki; with repo, also a first empty code repo of that name. */
-  addProject(folder: string, repo?: string): Promise<Project>;
-  /** Creates the folder name in the workspace, then makes it a project as
-   * addProject does. */
-  newProject(name: string, repo?: string): Promise<Project>;
-  /** Creates an empty code repo in a project (Foreman never clones). */
-  addRepo(project: string, name: string): Promise<Project>;
+  /** Sets the profile a project's agents run on, from their next start. */
+  setProfile(project: string, profile: string): Promise<Project>;
   /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
   missing(project: string): Promise<Missing[]>;
   scaffold(project: string): Promise<Missing[]>;
@@ -141,8 +124,8 @@ export interface HarnessesArea {
   list(): Promise<HarnessStatus[]>;
 }
 
-/** The CEO's profiles: each a harness and its credentials, the same in every
- * workspace (wiki/product/features/settings.md#profiles). */
+/** The CEO's profiles: each a harness and its credentials, on this machine
+ * (wiki/product/features/settings.md#profiles). */
 export interface ProfilesArea {
   /** With their state, the default first. */
   list(): Promise<Profile[]>;
@@ -161,7 +144,7 @@ export interface ProfilesArea {
   models(name: string, url: string, apiKey: string): Promise<string[]>;
 }
 
-/** The CEO's preferences (the theme, the terminal font), the same in every workspace. */
+/** The CEO's preferences (the theme, the terminal font), on this machine. */
 export interface PreferencesArea {
   get(): Promise<Preferences>;
   /** Changes the fields given; the others stay. */
@@ -272,7 +255,7 @@ export interface ReposArea {
 }
 
 export interface ForemanClient {
-  workspace: WorkspaceArea;
+  home: HomeArea;
   agents: AgentsArea;
   harnesses: HarnessesArea;
   profiles: ProfilesArea;
@@ -314,8 +297,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
   // A wiki path keeps its slashes: each segment is escaped on its own.
   const wikiPath = (path: string) => path.split("/").map(id).join("/");
   return {
-    workspace: {
-      workspace: () => getJSON("/api/workspace"),
+    home: {
+      folder: () => getJSON("/api/home"),
       projects: () => getJSON("/api/projects"),
       project: (project) => getJSON(`/api/projects/${id(project)}`),
       teams: () => getJSON("/api/teams"),
@@ -325,16 +308,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/settings", { settings, version })
         ).json() as Promise<SettingsFile>,
-      candidates: () => getJSON("/api/candidates"),
-      addProject: async (folder, repo) =>
-        (await request("POST", "/api/projects", { folder, repo })).json() as Promise<Project>,
-      newProject: async (name, repo) =>
+      setProfile: async (project, profile) =>
         (
-          await request("POST", "/api/projects", { folder: name, repo, new: true })
-        ).json() as Promise<Project>,
-      addRepo: async (project, name) =>
-        (
-          await request("POST", `/api/projects/${id(project)}/repos`, { name })
+          await request("PUT", `/api/projects/${id(project)}/profile`, { profile })
         ).json() as Promise<Project>,
       missing: (project) => getJSON(`/api/projects/${id(project)}/scaffold`),
       scaffold: async (project) =>

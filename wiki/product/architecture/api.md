@@ -15,16 +15,18 @@ All endpoints are local-only unless the listen setting changes. Every request pa
 The PRD's surface (indicative; names may still change during implementation, this entry is then updated):
 
 ```
-GET    /api/workspace                         the workspace folder
-GET    /api/projects | /api/projects/:id      config (parsed), repos, version, problems (deployments join with the Instance manager)
-POST   /api/projects                          {folder, repo?, new?} → create the project repo in an existing folder, or with new, in a new folder of that name; with repo, also a first empty code repo (400 INVALID, 409 EXISTS)
-POST   /api/projects/:id/repos                {name} → create an empty code repo in the project (400 INVALID, 409 EXISTS)
+GET    /api/home                              {path}: Foreman's home on this machine
+GET    /api/projects | /api/projects/:id      the record (name, profile, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
+POST   /api/projects                          {name} → New: the record and its project repo under the home, with a starter wiki (400 INVALID, 409 EXISTS)
+POST   /api/projects/:id/repos                {name, path, new?} → add an existing code repo at path, or with new, create an empty one at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
+PUT    /api/projects/:id/repos/:repo          {path} → Locate: the repo's new path, which must hold its root commit (400 INVALID)
+DELETE /api/projects/:id/repos/:repo          remove it from the project; its folder and branches stay (409 DEPLOYED while a team is deployed on the project)
+PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip= a page of history, newest first: {commits, next}, 50 commits; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
-GET    /api/candidates                        folders without project/project.toml (for Add)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
@@ -58,7 +60,7 @@ GET    /api/merge-requests/:id/diff           {diff}: its branch against main, a
 POST   /api/merge-requests/:id/merge          Merge to main: Foreman merges the branch locally (Pipeline and merges → Merge to main); 204; 409 CONFLICT (the lead is told to merge main in), LOCAL_CHANGES (the CEO's checkout is in the way), NOT_OPEN
 POST   /api/merge-requests/:id/create-pr      Create PR on the repo's forge: push the branch, open the PR
 POST   /api/merge-requests/:id/reject         {reason}: close its PR if any, deliver the reason, work items back to stage 0
-POST   /api/repos/workspace/sync              Sync: fetch, merge in and push the workspace repo's main (stops on a conflict)
+POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 
 GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry: its Markdown and lookup tables (Wiki engine → Rendering; reading it marks it seen); every board with its cards
@@ -69,8 +71,8 @@ PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems
 GET    /api/harnesses                         the supported harnesses: their command, newline keystroke, and how a profile connects (login: a terminal; endpoint: a form)
-GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same in every workspace: {theme, terminalFont, terminalFontSize} (theme: system, dark or light; terminalFont: geist-mono, jetbrains-mono, ibm-plex-mono, fira-code, source-code-pro or system; terminalFontSize: 10 to 24; 400 INVALID). A PUT changes the fields it names; the rest stay
-GET    /api/profiles                          the CEO's profiles (each a harness and its credentials, every workspace's): name, harness, connected; default first
+GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same for every project: {theme, terminalFont, terminalFontSize} (theme: system, dark or light; terminalFont: geist-mono, jetbrains-mono, ibm-plex-mono, fira-code, source-code-pro or system; terminalFontSize: 10 to 24; 400 INVALID). A PUT changes the fields it names; the rest stay
+GET    /api/profiles                          the CEO's profiles (each a harness and its credentials, shared by every project): name, harness, connected; default first
 POST   /api/profiles                          {name, harness} → 201 the profile, with no login yet (400 INVALID: a bad name or an unsupported harness; 409 EXISTS)
 DELETE /api/profiles/:name                    deletes it and its login, ending its login terminal (204; 400 INVALID for default; 404)
 POST   /api/profiles/:name/connect            start its harness login in a terminal → {terminal}: open it with WS /ws/pty/:terminal (404; 400 INVALID for a harness set in a form, Pi)
@@ -92,7 +94,8 @@ GET    /api/events                            SSE: requests, status, file change
 
 A project's Activity tab pages its traffic with `/api/activity` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
 Its Repositories tab reads its repos read-only with `/api/projects/:id/repos…` ([Repositories](../features/repositories.md)).
-Resource ids: project = folder name; team = team id; instance = `agent@project` (agent ids are workspace-unique, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
+The project routes answer with the project as it is now; a refusal is 400 INVALID, 409 EXISTS or 409 DEPLOYED with the reason. Removing a project comes with [Add a project, anywhere](../../backlog/add-project-anywhere.md).
+Resource ids: project = its name (unique in any case); team = team id; instance = `agent@project` (agent ids are unique across teams, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
 ## Error format
 
@@ -100,7 +103,7 @@ Resource ids: project = folder name; team = team id; instance = `agent@project` 
 { "error": "Human readable message", "code": "MACHINE_CODE", "details": {} }
 ```
 
-`details` is optional. Clients branch on `code`; messages never leak internals (paths outside the workspace, tokens, stack traces).
+`details` is optional. Clients branch on `code`; messages never leak internals (paths outside the home, tokens, stack traces).
 
 | Status | Meaning |
 |---|---|
@@ -110,6 +113,7 @@ Resource ids: project = folder name; team = team id; instance = `agent@project` 
 | 404 `NOT_FOUND` | Unknown project, team, instance, entry…, or an endpoint the server doesn't have (never the web app's page) |
 | 409 `VERSION_CONFLICT` | Guarded write against a stale version |
 | 409 `ALREADY_DEPLOYED` | Deploying a team to a project it's already on |
+| 400 `CANT_DEPLOY` | A deploy that can't go ahead: the team or the project has problems (a code repo missing or changed is one), or the same team is deployed on another project that shares a repo |
 | 409 `NOT_READY` | Deploying or waking an agent before Podman runs and the instances are restored ([First run](../features/first-run.md)) |
 | 500 `SERVER_ERROR` | Anything unexpected (logged with details server-side) |
 
@@ -119,7 +123,7 @@ Every file-backed object the UI can change (wiki entry, team definition, setting
 - matching version → write, respond with the new version;
 - different version → `409 VERSION_CONFLICT` with the current version; the UI shows an error and reloads the object. Never last-writer-wins.
 
-Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field frontmatter rewrite, single-character checkbox flip). A checkbox is identified by its source line, the way the engine keys checkboxes, and the version guard makes that safe: if the entry changed since the UI read it, the line may have moved, and the write is refused with `409`. (The PRD sent an `index`; candidates are listed at `/api/candidates`, not under a project id, since they aren't projects yet.)
+Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field frontmatter rewrite, single-character checkbox flip). A checkbox is identified by its source line, the way the engine keys checkboxes, and the version guard makes that safe: if the entry changed since the UI read it, the line may have moved, and the write is refused with `409`. (The PRD sent an `index`.)
 
 ## Events
 
@@ -138,7 +142,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
 | `wiki.changed` | a project wiki's content changed (an entry, `wiki.toml`, or an image its entries link to); only on a real change, by content | `project`, `paths` (entries added, edited or removed, and `wiki.toml`; empty when only a linked image came or went), `versions` (each path's new version, `""` once gone) |
 | `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |
-| `workspace.changed` | projects or repos appeared or disappeared | `{}`: refetch the project list |
+| `projects.changed` | projects or their repos appeared, went or changed (a repo added, located, removed, gone missing) | `{}`: refetch the project list |
 | `setup.changed` | Podman appeared, started, stopped or failed; the instances were restored; the background image build started or ended | `{}`: refetch the checklist |
 | `cos.proposal` | the Chief of Staff proposed a team (checked), or the one on screen is gone (created, stale, the session ended) | the proposal (`id`, `team`, `current`: the team as it is, null for a new one), or null |
 

@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 )
@@ -187,8 +187,8 @@ func (w *Workflow) Reject(ctx context.Context, id, reason string) error {
 }
 
 // Reconcile notices open merge requests whose branch is in main already,
-// whoever merged it (the CEO's own git, a forge), and gives one made
-// without a review its review.
+// whoever merged it (the CEO's own git, a forge), and gives one whose
+// review couldn't be saved (a database error) its review.
 func (w *Workflow) Reconcile(ctx context.Context) {
 	open, err := w.MergeRequests.Open(ctx)
 	if err != nil {
@@ -203,7 +203,7 @@ func (w *Workflow) Reconcile(ctx context.Context) {
 		if in, err := w.Git.Contains(ctx, dir, main, mr.Branch); err == nil && in {
 			w.merged(ctx, mr, main)
 		} else {
-			w.review(ctx, mr) // one made before reviews existed gets its review
+			w.review(ctx, mr) // one whose review couldn't be saved gets it now
 		}
 	}
 }
@@ -237,7 +237,11 @@ func (w *Workflow) target(ctx context.Context, id string) (store.MergeRequest, s
 	if err != nil {
 		return mr, "", "", err
 	}
-	return mr, project.Config.Main, filepath.Join(w.Root, project.ID, mr.Repo), nil
+	dir, ok := project.RepoDir(mr.Repo)
+	if !ok {
+		return mr, "", "", fmt.Errorf("%w: %s has no repo %s agents can use", home.ErrNotFound, project.ID, mr.Repo)
+	}
+	return mr, project.Config.Main, dir, nil
 }
 
 // tell delivers a notice to the merge request's lead, from Foreman or the CEO.

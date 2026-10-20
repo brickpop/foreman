@@ -52,8 +52,8 @@ function LoginConnect({ profile, onClose }: { profile: string; onClose: () => vo
       <div className="flex flex-col gap-3">
         <p className="m-0 text-[13.5px] text-tx3">
           {label}’s own login, in its container. For Claude Code, type{" "}
-          <span className="font-mono text-tx2">/login</span> and follow it. Every workspace’s
-          projects on the <span className="font-mono text-tx2">{profile}</span> profile use it.
+          <span className="font-mono text-tx2">/login</span> and follow it. Every project on the{" "}
+          <span className="font-mono text-tx2">{profile}</span> profile uses it.
         </p>
         <div className="h-[380px] overflow-hidden rounded-[10px] border border-line bg-term">
           {login.data && <Terminal instance={login.data} />}

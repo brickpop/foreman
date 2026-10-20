@@ -175,7 +175,7 @@ func TestCtrlPCtrlQReachTheProgram(t *testing.T) {
 
 func TestMountsAtTheSamePathReadWriteAndReadOnly(t *testing.T) {
 	r := engine(t)
-	// The workspace must be shared with the podman machine on macOS: use a
+	// The folder must be shared with the podman machine on macOS: use a
 	// folder under the user's home rather than the system temp folder.
 	home, _ := os.UserHomeDir()
 	base, err := os.MkdirTemp(home, ".foreman-podman-test-")

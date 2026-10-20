@@ -23,10 +23,10 @@ v1 has **no user authentication** (one CEO, local machine). That makes the HTTP 
 
 Listening on `127.0.0.1` alone is not enough: any website open in the CEO's browser can send requests and open WebSockets to it, and the agents' containers can reach the host. So every HTTP request and WebSocket upgrade needs a token, on localhost too (Jupyter-style):
 
-1. On first start Foreman generates an unguessable per-install token and stores it in `.foreman/` (0600, never mounted into containers).
+1. On first start Foreman generates an unguessable per-install token and stores it in the home, `~/.foreman/access-token` (0600, never mounted into containers).
 2. On every start it prints the URL with the token, `http://127.0.0.1:8888/?token=…`, and opens it in the default browser (`--no-open` skips that).
 3. The server swaps the URL token for an HttpOnly, `SameSite=Strict` cookie and redirects to the same URL without it, so the token doesn't stay in the address bar or the history.
-4. Missing or wrong token: `401` (and a page that says to use the URL printed in the terminal). Rotating the token (`foreman --new-token`, see [Starting Foreman](../models/workspace.md#starting-foreman)) logs every browser out.
+4. Missing or wrong token: `401` (and a page that says to use the URL printed in the terminal). Rotating the token (`foreman --new-token`, see [Starting Foreman](../models/home.md#starting-foreman)) logs every browser out.
 
 The same token protects "Listen on: Local network"; the Settings warning stays, since anyone holding the URL has full control.
 
@@ -44,7 +44,7 @@ The same token protects "Listen on: Local network"; the Settings warning stays, 
 
 Decided: every instance runs in a rootless Podman container ([Session runner](./session-runner.md)).
 - Mounted: the instance's own sandbox, i.e. its git worktrees (rw), each code repo's `.git` (**read-only**, shared by every agent of the project), its private harness config directory (rw), the live project repo with `project.toml` and the wiki (files rw for the lead, else ro; its `.git` ro for everyone), the login file of the project's profile, `~/.foreman/profiles/<name>/` (rw), and `~/.gitconfig` (ro, only if it exists) ([Credentials](./session-runner.md#credentials)).
-- Never mounted: the home directory, `~/.config`, `~/.ssh`, the keychain, the rest of `.foreman/` (secrets, state, team files), other agents' worktrees, the CEO's working files.
+- Never mounted: the home directory, `~/.config`, `~/.ssh`, the keychain, the rest of `~/.foreman/` (secrets, state, the global repo, other projects and sandboxes), other agents' worktrees, the CEO's working files.
 - **The secrets store is never mounted into containers** (forge tokens, the access token). The one credential agents hold is their harness's shared login. A misbehaving agent could log it out or corrupt it for every agent of that harness, which then raises "Reconnect" ([Credentials](./session-runner.md#credentials)). Accepted for v1; per-instance logins would contain it.
 - **Forge tokens are used only by Foreman's push path** ([Forge adapters](./forge-adapters.md)); no agent ever receives one.
 - **Git belongs to Foreman; agents only read it.** Every repo's `.git` is mounted read-only for every agent, the project repo's included (its only writer, the lead, edits its files and commits through `commit`), and every git write is a team tool (`switch`, `commit`, `merge`, `handoff`) that Foreman runs on the host, with the repo's hooks and fsmonitor turned off ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). So the **branch policy** holds by construction, never by hooks in the repo ([where it is enforced](./sandboxes-and-git.md#where-the-policy-is-enforced)), and no agent can damage refs or plant a hook or a `.git/config` setting (`core.hooksPath`, `core.fsmonitor`) that would run a program on the host the next time the CEO or Foreman runs git there. Accepted: every agent can read every branch of the repo. Hiding `.git` entirely is a later option.
@@ -54,7 +54,7 @@ Harness credentials are designed in [Session runner → Credentials](./session-r
 
 ### Chief of Staff
 
-The Chief of Staff can create teams, hire and refine agents, and changes nothing itself: it proposes with its one tool, `propose_team`; Foreman checks each proposal and shows it whole, and only the CEO's click writes it (one commit in the workspace repo). It sees `.foreman/teams/` read-only and nothing else of `.foreman/`. Its powers and sandboxing are owned by [Chief of Staff](../features/chief-of-staff.md).
+The Chief of Staff can create teams, hire and refine agents, and changes nothing itself: it proposes with its one tool, `propose_team`; Foreman checks each proposal and shows it whole, and only the CEO's click writes it (one commit in the global repo). It sees `~/.foreman/config/teams/` read-only and nothing else of the home but its own `cos/`. Its powers and sandboxing are owned by [Chief of Staff](../features/chief-of-staff.md).
 
 ## Accepted limitations (v1)
 

@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import { roleLabel, roster } from "../app/model";
-import { useDeployments, useInstances, useRequests, useTeams, useWorkspace } from "../app/queries";
+import { useDeployments, useHomeFolder, useInstances, useRequests, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
 import { StopDialog } from "../components/StopDialog";
@@ -30,7 +30,7 @@ export function Team() {
   const [deploy, setDeploy] = useState(false);
   const team = teams.data?.find((t) => t.id === id);
   if (teams.isPending) return null;
-  if (!team) return <p className="p-12 text-tx3">No team {id} in this workspace.</p>;
+  if (!team) return <p className="p-12 text-tx3">No team {id}.</p>;
   const mine = (deployments.data ?? []).filter((d) => d.teamId === id);
   return (
     <div className="flex flex-col">
@@ -196,11 +196,11 @@ function Playbook({ team }: { team: TeamData }) {
 }
 
 function File({ team }: { team: TeamData }) {
-  const workspace = useWorkspace();
+  const home = useHomeFolder();
   return (
     <section className="flex w-full max-w-[860px] flex-col gap-3 px-12 pt-7 pb-16">
       <span className="font-mono text-[12.5px] text-tx3">
-        {workspace.data?.path ?? "~"}/.foreman/teams/{team.id}.toml
+        {home.data?.path ?? "~/.foreman"}/config/teams/{team.id}.toml
       </span>
       <pre className="m-0 overflow-x-auto rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2">
         {team.source}

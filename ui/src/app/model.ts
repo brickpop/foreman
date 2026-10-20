@@ -15,8 +15,8 @@ export function onOtherProfile(
   );
 }
 
-import type { Instance, MergeRequest, Project, Request, Settings, Team } from "../api/client";
-import type { Look, Soul, TeamConfig } from "../api/types/workspace";
+import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
+import type { Look, Soul, TeamConfig } from "../api/types/home";
 
 // Pure derivations the screens share: who an instance is, how requests are
 // ordered, what a project's state is. Kept apart from components to be tested.
@@ -117,12 +117,6 @@ export function harnessLabel(harness: string): string {
   return harnessLabels[harness] ?? harness;
 }
 
-/** The profile a project's agents run on: its own (settings.toml's
- * project_profiles), else the default. */
-export function profileOf(settings: Settings | undefined, project: string): string {
-  return settings?.projectProfiles?.[project] || "default";
-}
-
 /** A new profile's name as typed, made into one (lowercase letters,
  * digits and dashes, at most 40: "My Work" → "my-work"), or "" when nothing
  * is left; the server checks the same in settings.toml. */
@@ -191,7 +185,7 @@ export function randomLook(
 }
 
 /** A team's agent ids as the team presents them: the lead first, then the
- * file's order, then any it doesn't name, sorted (as workspace.TeamConfig.Roster). */
+ * file's order, then any it doesn't name, sorted (as home.TeamConfig.Roster). */
 export function roster(c: Team["config"]): string[] {
   const ids: string[] = [];
   const add = (id: string) => {

@@ -14,14 +14,14 @@ Table `instances`.
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| `id` | String | yes | | `agent@project`, unique | Can't collide: agent ids are unique across the workspace ([Team definition](./team-definition.md#schema)) |
+| `id` | String | yes | | `agent@project`, unique | Can't collide: agent ids are unique across all teams ([Team definition](./team-definition.md#schema)) |
 | `deployment_id` | String → Deployment | yes | | | |
 | `agent_id` | String | yes | | an agent of the deployment's team | |
 | `status` | String | yes | `starting` | enum below | Set at creation: `asleep`, or `queued` for the lead on deploy |
 | `task` | String | | | | Current task note (e.g. "Waiting for a card"). Used to restart after a server restart |
 | `pid` | Number | | | | Harness process id (inside the container, or the container's) |
 | `pty_id` | String | | | | Handle of the attached terminal in the session runner (e.g. container id) |
-| `sandbox_path` | String | yes | | | `<project>/.sandboxes/<agent>/`: its worktrees, one per code repo |
+| `sandbox_path` | String | yes | | | `~/.foreman/sandboxes/<project>/<agent>/`: its worktrees, one per code repo |
 | `harness` | String | yes | its project's profile's harness | a supported harness | The harness it runs on: its project's [profile](../architecture/session-runner.md#credentials)'s, set at deploy and again at each start, so a change of the project's profile reaches it at its next start |
 | `profile` | String | yes | its project's profile | a profile name, or empty | The [profile](../architecture/session-runner.md#credentials) its current run started on, set at deploy and at each start; empty for a run from before it was kept (2026-10-18). Project settings lists running agents whose profile isn't the project's ([Project settings](../features/project-settings.md)) |
 | `harness_session_id` | String | | | | The harness's own session id, for native resume on restart ([Agent runtime](../architecture/agent-runtime.md#restarts)) |
@@ -46,7 +46,7 @@ Not stored: its **activity line** (`doing`: a line and its time), what its harne
 
 ## Logs
 
-The raw terminal byte stream is appended to `~/agents-ws/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It is the session's history and audit trail; the browser terminal is restored from a snapshot of the server-side screen, not from the log ([Terminal state](../architecture/terminal-state.md)). Logs rotate at a size cap ([Persistence](../architecture/persistence.md#session-logs)).
+The raw terminal byte stream is appended to `~/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It is the session's history and audit trail; the browser terminal is restored from a snapshot of the server-side screen, not from the log ([Terminal state](../architecture/terminal-state.md)). Logs rotate at a size cap ([Persistence](../architecture/persistence.md#session-logs)).
 
 ## Invariants
 

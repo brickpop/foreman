@@ -14,16 +14,16 @@ import (
 	"unicode/utf8"
 
 	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/store"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Caller is who calls a tool: its instance, deployment and team.
 type Caller struct {
 	Instance   store.Instance
 	Deployment store.Deployment
-	Team       workspace.Team
+	Team       home.Team
 	Lead       bool
 }
 
@@ -38,7 +38,7 @@ type Block interface {
 
 // Config is the team files, as loaded.
 type Config interface {
-	Team(id string) (workspace.Team, error)
+	Team(id string) (home.Team, error)
 }
 
 // Router serves the team tools of every block.

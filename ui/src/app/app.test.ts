@@ -58,7 +58,7 @@ describe("staleKeys", () => {
       keys.projects,
       keys.setup,
     ]);
-    expect(staleKeys({ type: "workspace.changed", data: {} })).toEqual([
+    expect(staleKeys({ type: "projects.changed", data: {} })).toEqual([
       keys.projects,
       keys.setup,
       keys.repos,
@@ -234,20 +234,6 @@ describe("profileName", () => {
     // Cut at 40, never ending on a dash.
     expect(profileName(`${"a".repeat(39)} b`)).toBe("a".repeat(39));
     expect(profileName("x".repeat(50))).toHaveLength(40);
-  });
-});
-
-import type { Settings } from "../api/client";
-import { profileOf } from "./model";
-
-describe("profileOf", () => {
-  it("is the project's own profile, else the default", () => {
-    const s = { projectProfiles: { ledger: "work" } } as unknown as Settings;
-    expect(profileOf(s, "ledger")).toBe("work");
-    expect(profileOf(s, "relay")).toBe("default");
-    // A workspace whose settings name none: Go sends null.
-    expect(profileOf({ projectProfiles: null } as unknown as Settings, "ledger")).toBe("default");
-    expect(profileOf(undefined, "ledger")).toBe("default");
   });
 });
 

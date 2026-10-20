@@ -47,7 +47,7 @@ func (f *fakeAgents) Stop(_ context.Context, id string) error {
 func (f *fakeAgents) List(context.Context) ([]store.Instance, error) { return f.list, nil }
 
 func withAgents(a Agents) http.Handler {
-	return New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Agents: a, UI: builtUI})
+	return New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Agents: a, UI: builtUI})
 }
 
 func send(h http.Handler, method, path, body string) *httptest.ResponseRecorder {
@@ -158,7 +158,7 @@ func (p *pages) Page(_ context.Context, deployments []string, before string, lim
 // deployment's (an older session) is asked by its id.
 func TestActivity(t *testing.T) {
 	p := &pages{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Agents: &fakeAgents{}, Activity: p, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Agents: &fakeAgents{}, Activity: p, UI: builtUI})
 	var page map[string]any
 	decodeBody(t, get(t, h, "/api/activity?project=ledger"), &page)
 	if page["next"] != "c2" {

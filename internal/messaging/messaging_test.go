@@ -12,17 +12,17 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/agentlink"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 var ctx = context.Background()
 
-var atlas = workspace.Team{ID: "atlas", Config: workspace.TeamConfig{
+var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 	Team: "atlas", Name: "Atlas", Lead: "mara", Order: []string{"mara", "tove", "ivo"},
-	Agents: map[string]workspace.Soul{
+	Agents: map[string]home.Soul{
 		"mara": {Name: "Mara", Role: "team_lead"},
 		"tove": {Name: "Tove", Role: "engineer"},
 		"ivo":  {Name: "Ivo", Role: "engineer"},
@@ -31,9 +31,9 @@ var atlas = workspace.Team{ID: "atlas", Config: workspace.TeamConfig{
 
 type config struct{}
 
-func (config) Team(id string) (workspace.Team, error) {
+func (config) Team(id string) (home.Team, error) {
 	if id != "atlas" {
-		return workspace.Team{}, workspace.ErrNotFound
+		return home.Team{}, home.ErrNotFound
 	}
 	return atlas, nil
 }

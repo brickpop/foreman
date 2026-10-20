@@ -7,22 +7,12 @@ import (
 	"testing"
 )
 
-// ~/.foreman on macOS and Linux alike, whatever XDG_DATA_HOME says; the old
-// place was ~/.local/share/foreman, or under XDG_DATA_HOME when absolute.
-func TestDirAndTheOldOne(t *testing.T) {
+// ~/.foreman on macOS and Linux alike, whatever XDG_DATA_HOME says.
+func TestDir(t *testing.T) {
 	t.Setenv("HOME", "/home/u")
-	for env, old := range map[string]string{
-		"":            "/home/u/.local/share/foreman",
-		"relative/x":  "/home/u/.local/share/foreman",
-		"/data/share": "/data/share/foreman",
-	} {
-		t.Setenv("XDG_DATA_HOME", env)
-		if got, err := Dir(); err != nil || got != "/home/u/.foreman" {
-			t.Errorf("XDG_DATA_HOME=%q: %s %v", env, got, err)
-		}
-		if got, err := legacyDir(); err != nil || got != old {
-			t.Errorf("XDG_DATA_HOME=%q: the old one %s %v, want %s", env, got, err, old)
-		}
+	t.Setenv("XDG_DATA_HOME", "/data/share")
+	if got, err := Dir(); err != nil || got != "/home/u/.foreman" {
+		t.Errorf("%s %v", got, err)
 	}
 }
 

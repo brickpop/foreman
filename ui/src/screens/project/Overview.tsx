@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { isNotBuilt, type Node } from "../../api/client";
-import { useEntry, useMissing, useTick, useTree } from "../../app/queries";
+import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
 import { Chevron, TreeIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
 import { Button, Dot, NotBuilt } from "../../components/ui";
@@ -11,6 +11,7 @@ import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 // The project's Overview: a reader for its wiki (wiki/product/features/wiki-reader.md).
 
 export function Overview({ project, entry }: { project: string; entry?: string }) {
+  const repo = useProjectRepo(project);
   const navigate = useNavigate();
   const toast = useToast();
   const [files, setFiles] = useState(false); // closed by default
@@ -69,7 +70,7 @@ export function Overview({ project, entry }: { project: string; entry?: string }
           </span>
         </Button>
         <span className="truncate font-mono text-xs text-tx4">
-          {project}/project/wiki/{path}
+          {repo}/wiki/{path}
         </span>
       </div>
       <div

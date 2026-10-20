@@ -14,10 +14,10 @@ import (
 const harnessImage = "localhost/foreman/harness"
 
 // engine picks the execution engine and its image builder from the `engine`
-// setting (wiki/product/models/workspace-settings.md). pod is the Podman
+// setting (wiki/product/models/global-settings.md). pod is the Podman
 // engine, not connected yet (the setup watcher reaches it), or nil for the
 // Direct engine. images is where the images' build state is shared with the
-// other workspaces' Foremans.
+// other Foremans on this machine (another home's, such as a test's).
 func engine(choice, images string, stdout io.Writer) (r runner.Runner, im runner.Images, pod *podman.Runner) {
 	if choice == "direct" {
 		fmt.Fprintln(stdout, "WARNING: engine = \"direct\": agents run as plain processes on this machine, with NO isolation (development only)")

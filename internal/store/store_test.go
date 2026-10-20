@@ -39,7 +39,7 @@ func version(t *testing.T, db *sql.DB) int {
 // --- opening and migrations --------------------------------------------------
 
 func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
-	// Workspace folders may have spaces and characters a SQLite URI treats specially.
+	// Home folders may have spaces and characters a SQLite URI treats specially.
 	path := filepath.Join(t.TempDir(), "my work#space?x=1 100%", "state.db")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -383,36 +383,6 @@ func TestReadsDoNotWaitForAWrite(t *testing.T) {
 	}
 }
 
-// 002 rebuilds the instances table for the asleep status: existing rows survive.
-func TestTheAsleepMigrationKeepsTheInstances(t *testing.T) {
-	db := rawDB(t)
-	first, err := migrationFiles.ReadFile("migrations/001_deployments_instances.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := migrate(ctx, db, migrations("001_deployments_instances.sql", string(first))); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES ('atlas@ledger', 'atlas', 'ledger', 'g', 'now');
-		INSERT INTO instances (id, deployment_id, agent_id, status, sandbox_path, harness, restarts) VALUES ('mara@ledger', 'atlas@ledger', 'mara', 'running', '/s', 'claude-code', 2)`); err != nil {
-		t.Fatal(err)
-	}
-	if err := migrate(ctx, db, migrationFiles); err != nil {
-		t.Fatal(err)
-	}
-	var status string
-	var restarts int
-	if err := db.QueryRow(`SELECT status, restarts FROM instances WHERE id = 'mara@ledger'`).Scan(&status, &restarts); err != nil || status != "running" || restarts != 2 {
-		t.Errorf("after the migration: %q %d %v", status, restarts, err)
-	}
-	if _, err := db.Exec(`UPDATE instances SET status = 'asleep'`); err != nil {
-		t.Errorf("asleep refused: %v", err)
-	}
-	if _, err := db.Exec(`UPDATE instances SET status = 'napping'`); err == nil {
-		t.Error("the CHECK was lost")
-	}
-}
-
 // --- team messages ------------------------------------------------------------
 
 func deployTwo(t *testing.T, db *DB) {
@@ -571,99 +541,6 @@ func TestActions(t *testing.T) {
 	}
 }
 
-// 005 makes the goal optional: existing deployments keep theirs, with the
-// rows that point at them, and a deployment without one can be made.
-func TestTheOptionalGoalMigrationKeepsTheDeployments(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "state.db")
-	db, err := sql.Open("sqlite", "file:"+path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var before []string
-	for _, name := range []string{"001_deployments_instances.sql", "002_instance_asleep.sql", "003_team_messages.sql", "004_team_actions.sql"} {
-		body, err := migrationFiles.ReadFile("migrations/" + name)
-		if err != nil {
-			t.Fatal(err)
-		}
-		before = append(before, name, string(body))
-	}
-	if err := migrate(ctx, db, migrations(before...)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES ('atlas@ledger', 'atlas', 'ledger', 'Ship it', '2026-10-16T10:00:00Z');
-		INSERT INTO instances (id, deployment_id, agent_id, status, sandbox_path, harness) VALUES ('mara@ledger', 'atlas@ledger', 'mara', 'asleep', '/s', 'claude-code')`); err != nil {
-		t.Fatal(err)
-	}
-	_ = db.Close()
-	s, err := Open(ctx, path) // 005 runs as it does for real, foreign keys on
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	dep, err := s.Deployments().Get(ctx, "atlas@ledger")
-	if err != nil || dep.Goal != "Ship it" {
-		t.Fatalf("kept %+v %v", dep, err)
-	}
-	if inst, err := s.Instances().Get(ctx, "mara@ledger"); err != nil || inst.DeploymentID != "atlas@ledger" {
-		t.Errorf("instance %+v %v", inst, err)
-	}
-	if dep, err := s.Deployments().Deploy(ctx, "orion", "ledger", ""); err != nil || dep.Goal != "" {
-		t.Errorf("no goal: %+v %v", dep, err)
-	}
-	var violations int
-	if err := s.sql.QueryRow("SELECT count(*) FROM pragma_foreign_key_check").Scan(&violations); err != nil || violations != 0 {
-		t.Errorf("foreign keys: %d %v", violations, err)
-	}
-}
-
-// 009 moves a commit's one message into each repo it committed; other tools'
-// actions and a refusal that reached no repo are left as they were.
-func TestTheCommitMessagesMigration(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "state.db")
-	db, err := sql.Open("sqlite", "file:"+path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var before []string
-	for i, name := range []string{"001_deployments_instances.sql", "002_instance_asleep.sql", "003_team_messages.sql", "004_team_actions.sql",
-		"005_optional_goal.sql", "006_work_items.sql", "007_merge_requests.sql", "008_requests.sql"} {
-		body, err := migrationFiles.ReadFile("migrations/" + name)
-		if err != nil {
-			t.Fatalf("%d %v", i, err)
-		}
-		before = append(before, name, string(body))
-	}
-	if err := migrate(ctx, db, migrations(before...)); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec(`INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES ('atlas@ledger', 'atlas', 'ledger', 'g', '2026-10-16T10:00:00Z');
-		INSERT INTO team_actions (deployment_id, instance, tool, branch, message, repos, error, created_at) VALUES
-		('atlas@ledger', 'mara@ledger', 'commit', NULL, 'the board', '[{"repo":"api","branch":"lead/atlas/x","commit":"1a2b","created":false,"conflicts":null},{"repo":"project","branch":"main","commit":"3c4d","created":false,"conflicts":null}]', NULL, '2026-10-16T10:01:00Z'),
-		('atlas@ledger', 'tove@ledger', 'commit', NULL, 'x', '[]', 'nothing_to_commit: …', '2026-10-16T10:02:00Z'),
-		('atlas@ledger', 'tove@ledger', 'switch', 'wt/tove/y', NULL, '[{"repo":"api","branch":"wt/tove/y","commit":"","created":true,"conflicts":null}]', NULL, '2026-10-16T10:03:00Z')`); err != nil {
-		t.Fatal(err)
-	}
-	_ = db.Close()
-	s, err := Open(ctx, path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	list, err := s.Actions().List(ctx, "atlas@ledger")
-	if err != nil || len(list) != 3 {
-		t.Fatalf("%+v %v", list, err)
-	}
-	if r := list[0].Repos; len(r) != 2 || r[0].Message != "the board" || r[0].Commit != "1a2b" || r[1].Message != "the board" || r[1].Repo != "project" {
-		t.Errorf("commit %+v", r)
-	}
-	if got := list[1]; len(got.Repos) != 0 || got.Error == "" {
-		t.Errorf("refused commit %+v", got)
-	}
-	if r := list[2].Repos; len(r) != 1 || r[0].Message != "" || !r[0].Created {
-		t.Errorf("switch %+v", r)
-	}
-}
-
 func TestWorkItems(t *testing.T) {
 	db := open(t)
 	deps := db.Deployments()
@@ -796,5 +673,83 @@ func TestRequests(t *testing.T) {
 	}
 	if _, err := reqs.Save(ctx, Request{ID: "req-9", Kind: "review", Summary: "x", Source: "agent"}); !errors.Is(err, ErrNotFound) {
 		t.Errorf("an unknown id: %v", err)
+	}
+}
+
+// --- projects -------------------------------------------------------------------
+
+func TestProjectsAndTheirRepos(t *testing.T) {
+	p := open(t).Projects()
+	if list, err := p.List(ctx); err != nil || len(list) != 0 {
+		t.Fatalf("empty: %v %v", list, err)
+	}
+	for _, id := range []string{"ledger", "aragon"} {
+		if err := p.Create(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A Mac takes Ledger and ledger for one folder.
+	if err := p.Create(ctx, "Ledger"); !errors.Is(err, ErrExists) {
+		t.Errorf("a name in another case: %v", err)
+	}
+	app := RepoRecord{Name: "app", Path: "/home/ceo/dev/aragon/app", RootCommit: "c0ffee"}
+	for _, r := range []RepoRecord{app, {Name: "sdk", Path: "/home/ceo/dev/aragon/sdk", RootCommit: "beef"}} {
+		if err := p.AddRepo(ctx, "aragon", r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// One repo in two projects.
+	if err := p.AddRepo(ctx, "ledger", app); err != nil {
+		t.Errorf("a repo in a second project: %v", err)
+	}
+	for name, r := range map[string]RepoRecord{
+		"a name in another case": {Name: "App", Path: "/elsewhere", RootCommit: "1"},
+		"the same path":          {Name: "app2", Path: app.Path, RootCommit: "c0ffee"},
+	} {
+		if err := p.AddRepo(ctx, "aragon", r); !errors.Is(err, ErrExists) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if err := p.AddRepo(ctx, "nope", app); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such project: %v", err)
+	}
+	if err := p.SetProfile(ctx, "aragon", "work"); err != nil {
+		t.Fatal(err)
+	}
+	list, err := p.List(ctx)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("%v %v", list, err)
+	}
+	aragon := list[0]
+	if aragon.ID != "aragon" || aragon.Profile != "work" || aragon.CreatedAt.IsZero() ||
+		!slices.Equal(aragon.Repos, []RepoRecord{app, {Name: "sdk", Path: "/home/ceo/dev/aragon/sdk", RootCommit: "beef"}}) {
+		t.Errorf("aragon: %+v", aragon)
+	}
+	if list[1].Profile != "" || len(list[1].Repos) != 1 {
+		t.Errorf("ledger: %+v", list[1])
+	}
+
+	// Locate and remove, each touching only that project's repo.
+	if err := p.MoveRepo(ctx, "aragon", "app", "/home/ceo/src/app"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.MoveRepo(ctx, "aragon", "app", "/home/ceo/dev/aragon/sdk"); !errors.Is(err, ErrExists) {
+		t.Errorf("onto another repo's path: %v", err)
+	}
+	if err := p.RemoveRepo(ctx, "aragon", "sdk"); err != nil {
+		t.Fatal(err)
+	}
+	for name, err := range map[string]error{
+		"locate a repo that isn't there": p.MoveRepo(ctx, "aragon", "sdk", "/x"),
+		"remove it again":                p.RemoveRepo(ctx, "aragon", "sdk"),
+		"a profile for no project":       p.SetProfile(ctx, "nope", "work"),
+	} {
+		if !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	list, _ = p.List(ctx)
+	if !slices.Equal(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee"}}) || list[1].Repos[0] != app {
+		t.Errorf("after locate and remove: %+v", list)
 	}
 }

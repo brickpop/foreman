@@ -8,7 +8,7 @@ tags: [model, pipeline, git, forge]
 
 A lead's request to merge one of its branches into `main` of one repo, stored in `state.db`. It is the pipeline's own entry, separate from the [work items](./work-item.md) it carries. The lead creates it with `request_merge(branch, entry)`, naming a wiki entry (a task card) that explains what was done. It groups the work items whose branch head is contained in its branch and that aren't in another merge request yet, and it raises the pipeline's only [request](./request.md): the **review**, with three actions for the CEO: **Merge to main** (Foreman merges locally), **Create PR on the forge** (only when the repo has one), **Reject** with a reason. Nothing reaches a forge unless the CEO chooses Create PR; a pull request on a forge is then just this merge request's forge side (its `forge_pr_*` fields). The flow is in [Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge).
 
-It applies to the project's code repos, where the lead branches are. The [project repo](./project-config.md#the-project-repo) and the [workspace repo](./workspace.md#the-workspace-repo) have none: the lead commits the knowledge base straight to `main`, and the [Chief of Staff](../features/chief-of-staff.md)'s team changes are proposals the CEO confirms on its page, not merge requests.
+It applies to the project's code repos, where the lead branches are. The [project repo](./project-config.md#the-project-repo) and the [global repo](./home.md#the-global-repo) have none: the lead commits the knowledge base straight to `main`, and the [Chief of Staff](../features/chief-of-staff.md)'s team changes are proposals the CEO confirms on its page, not merge requests.
 
 ## Schema
 

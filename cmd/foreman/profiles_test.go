@@ -6,19 +6,18 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/harness/pi"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/server"
 	"github.com/brickpop/foreman/internal/sessionlog"
 	"github.com/brickpop/foreman/internal/terminal"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // loginFile is the fake harness, connected when its folder holds a file
@@ -31,8 +30,8 @@ func (loginFile) Connected(dir string) bool {
 }
 
 // testProfiles has the default profile, on the fake harness ("fake"), whose
-// login is cat; settings is what the workspace says.
-func testProfiles(t *testing.T, settings *workspace.Settings) profileLogins {
+// login is cat, and the projects given.
+func testProfiles(t *testing.T, projects ...home.Project) profileLogins {
 	t.Helper()
 	program := filepath.Join(t.TempDir(), "login.sh")
 	if err := os.WriteFile(program, []byte("#!/bin/sh\ncat\n"), 0o755); err != nil {
@@ -44,7 +43,14 @@ func testProfiles(t *testing.T, settings *workspace.Settings) profileLogins {
 		adapters: map[string]harness.Adapter{"fake": loginFile{fake.Adapter{Program: program}}},
 		images:   direct.Images{},
 		terms:    newSessions(direct.Runner{}, func(id string) (terminal.Log, error) { return logs.Open(id) }),
-		settings: func() workspace.Settings { return *settings },
+		project: func(id string) (home.Project, error) {
+			for _, p := range projects {
+				if p.ID == id {
+					return p, nil
+				}
+			}
+			return home.Project{}, home.ErrNotFound
+		},
 	}
 	if err := p.store.Ensure("fake"); err != nil {
 		t.Fatal(err)
@@ -61,8 +67,7 @@ func login(t *testing.T, p profileLogins, name string) {
 
 // The list says which profiles have a login; only supported harnesses get one.
 func TestProfilesAndTheirState(t *testing.T) {
-	s := workspace.DefaultSettings()
-	p := testProfiles(t, &s)
+	p := testProfiles(t)
 	if _, err := p.Create("work", "fake"); err != nil {
 		t.Fatal(err)
 	}
@@ -82,15 +87,14 @@ func TestProfilesAndTheirState(t *testing.T) {
 	}
 }
 
-// A project runs on its own profile, else the default; the checklist asks for
-// the profiles the projects use, one that doesn't exist included.
+// A project runs on its profile (the default unless set); the checklist asks
+// for the profiles the projects use, one that doesn't exist included.
 func TestTheProfileAProjectRunsOn(t *testing.T) {
-	s := workspace.DefaultSettings()
-	p := testProfiles(t, &s)
+	projects := []home.Project{{ID: "ledger", Profile: "work"}, {ID: "relay", Profile: "gone"}, {ID: "web", Profile: "default"}}
+	p := testProfiles(t, projects...)
 	if _, err := p.Create("work", "fake"); err != nil {
 		t.Fatal(err)
 	}
-	s.ProjectProfiles = map[string]string{"ledger": "work", "relay": "gone"}
 	if pr, dir, err := p.Of("ledger"); err != nil || pr.Name != "work" || dir != p.store.Dir("work") {
 		t.Errorf("ledger: %+v %s %v", pr, dir, err)
 	}
@@ -100,7 +104,10 @@ func TestTheProfileAProjectRunsOn(t *testing.T) {
 	if _, _, err := p.Of("relay"); !errors.Is(err, profiles.ErrNotFound) {
 		t.Errorf("relay: %v", err)
 	}
-	used := p.Used([]workspace.Project{{ID: "ledger"}, {ID: "relay"}, {ID: "web"}})
+	if _, _, err := p.Of("nowhere"); !errors.Is(err, home.ErrNotFound) {
+		t.Errorf("no such project: %v", err)
+	}
+	used := p.Used(projects)
 	if want := []profiles.Profile{{Name: "default", Harness: "fake"}, {Name: "gone"}, {Name: "work", Harness: "fake"}}; !slices.Equal(used, want) {
 		t.Errorf("used %+v", used)
 	}
@@ -110,8 +117,7 @@ func TestTheProfileAProjectRunsOn(t *testing.T) {
 }
 
 func TestConnectStartsTheLoginTerminalOnce(t *testing.T) {
-	s := workspace.DefaultSettings()
-	p := testProfiles(t, &s)
+	p := testProfiles(t)
 	ctx := context.Background()
 	id, err := p.Connect(ctx, "default")
 	if err != nil || id != "connect:default" {
@@ -135,8 +141,7 @@ func TestConnectStartsTheLoginTerminalOnce(t *testing.T) {
 // Closing the dialog ends a running login; ending none is harmless, and the
 // next Connect starts a fresh one. Deleting a profile ends its login too.
 func TestEndLogin(t *testing.T) {
-	s := workspace.DefaultSettings()
-	p := testProfiles(t, &s)
+	p := testProfiles(t)
 	ctx := context.Background()
 	if err := p.EndLogin("default"); err != nil {
 		t.Errorf("no login running: %v", err)
@@ -170,8 +175,7 @@ func TestEndLogin(t *testing.T) {
 
 // A terminal id is looked for among the instances, then the logins.
 func TestTerminalsAreFoundWhereverTheyRun(t *testing.T) {
-	s := workspace.DefaultSettings()
-	p := testProfiles(t, &s)
+	p := testProfiles(t)
 	ctx := context.Background()
 	if _, err := p.Connect(ctx, "default"); err != nil {
 		t.Fatal(err)
@@ -198,37 +202,10 @@ func TestTerminalsAreFoundWhereverTheyRun(t *testing.T) {
 	}
 }
 
-// A workspace's own login becomes a profile when Foreman starts, and says so.
-func TestAdoptLoginsAtStart(t *testing.T) {
-	store := profiles.Store{Root: t.TempDir()}
-	root := filepath.Join(t.TempDir(), "Work")
-	if err := os.MkdirAll(filepath.Join(root, ".foreman", "credentials", "claude-code"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, ".foreman", "credentials", "claude-code", "login"), []byte("work"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	var out strings.Builder
-	connected := map[string]func(string) bool{"claude-code": loginFile{}.Connected}
-	adoptLogins(store, root, connected, &out)
-	if !strings.Contains(out.String(), "claude-code login is now the profile default") {
-		t.Errorf("said %q", out.String())
-	}
-	if got, _ := os.ReadFile(filepath.Join(store.Dir("default"), "login")); string(got) != "work" {
-		t.Errorf("default holds %q", got)
-	}
-	out.Reset()
-	adoptLogins(store, root, connected, &out)
-	if out.Len() != 0 {
-		t.Errorf("again: %q", out.String())
-	}
-}
-
 // A Pi profile is a model server set in a form: no login terminal, connected
 // once its server and model are saved; a login harness has no form.
 func TestAPiProfile(t *testing.T) {
-	s := workspace.DefaultSettings()
-	p := testProfiles(t, &s)
+	p := testProfiles(t)
 	p.adapters["pi"] = pi.Adapter{}
 	if _, err := p.Create("local", "pi"); err != nil {
 		t.Fatal(err)

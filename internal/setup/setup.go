@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/podman"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Engine is the Podman engine as setup needs it.
@@ -28,10 +28,10 @@ type Engine interface {
 	CreateMachine(ctx context.Context, cpus, memory int) error
 }
 
-// Config is the workspace's teams and projects.
+// Config is the home's teams and projects.
 type Config interface {
-	Teams() []workspace.Team
-	Projects() []workspace.Project
+	Teams() []home.Team
+	Projects() []home.Project
 }
 
 // Deps is what the checklist reads and the watcher drives.
@@ -243,7 +243,7 @@ func (s *Setup) Steps(ctx context.Context) []Step {
 	for _, p := range projects {
 		if len(p.Repos) == 0 && len(p.Problems) == 0 {
 			steps = append(steps, Step{Kind: "repo", Subject: p.ID, State: "todo",
-				Detail: p.ID + " has no code repo for agents to work in (New repo)"})
+				Detail: p.ID + " has no code repo for agents to work in: add one"})
 		}
 	}
 	return steps

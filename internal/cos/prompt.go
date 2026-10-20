@@ -6,14 +6,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/prompt"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Prompt is the Chief of Staff's session prompt: who it is, the team file
 // format and its rules, the roles, and the names already taken. teamsDir is
 // where it reads the team files (read-only).
-func Prompt(teams []workspace.Team, teamsDir string) string {
+func Prompt(teams []home.Team, teamsDir string) string {
 	var b strings.Builder
 	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
 	line("# You are the Chief of Staff")
@@ -48,8 +48,8 @@ func Prompt(teams []workspace.Team, teamsDir string) string {
 	line("- `team`: its id, lowercase letters, digits and hyphens (`atlas`); the file is `<id>.toml`. Never change an existing team's id.")
 	line("- `name`: how it reads (`Atlas`); `purpose`: one line, what it is for.")
 	line("- `lead`: the id of its team lead, one of `agents`.")
-	line("- `agents`: each member by id (lowercase letters, digits and hyphens, unique in the whole workspace): " +
-		"`name` (unique in the whole workspace), `role` (snake_case), `personality`, `skills` (a few words each), " +
+	line("- `agents`: each member by id (lowercase letters, digits and hyphens, unique across all teams): " +
+		"`name` (unique across all teams), `role` (snake_case), `personality`, `skills` (a few words each), " +
 		"`instruction` (the job description; empty means the role's default). Leave `look` out for a new member: " +
 		"Foreman gives them a face. Keep an existing member's `look` as it is.")
 	line("- `order`: the member ids in the order the team lists them, the lead first.")
@@ -75,7 +75,7 @@ func Prompt(teams []workspace.Team, teamsDir string) string {
 	return b.String()
 }
 
-func teamIDs(teams []workspace.Team) []string {
+func teamIDs(teams []home.Team) []string {
 	var ids []string
 	for _, t := range teams {
 		ids = append(ids, t.ID)
@@ -84,7 +84,7 @@ func teamIDs(teams []workspace.Team) []string {
 	return ids
 }
 
-func members(teams []workspace.Team) []string {
+func members(teams []home.Team) []string {
 	var out []string
 	for _, t := range teams {
 		for _, id := range t.Config.Roster() {

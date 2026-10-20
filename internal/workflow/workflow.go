@@ -23,10 +23,10 @@ import (
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/wiki"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Git is what Workflow needs of the Git block.
@@ -52,7 +52,7 @@ type Git interface {
 
 // Config is the projects, as loaded.
 type Config interface {
-	Project(id string) (workspace.Project, error)
+	Project(id string) (home.Project, error)
 }
 
 // Wiki reads a project's wiki entries (the Wiki block).
@@ -67,7 +67,6 @@ type Messages interface {
 
 // Deps are the blocks Workflow is assembled from.
 type Deps struct {
-	Root     string // the workspace folder: projects are its subfolders
 	Git      Git
 	Config   Config
 	Messages Messages
@@ -223,7 +222,7 @@ func (w *Workflow) record(ctx context.Context, a store.TeamAction) {
 type tool struct {
 	w       *Workflow
 	c       teamtools.Caller
-	project workspace.Project
+	project home.Project
 	act     *store.TeamAction
 }
 
@@ -234,17 +233,17 @@ type repo struct{ name, dir string }
 // that it has (a repo added since its deploy has none yet).
 func (t tool) worktrees() []repo {
 	var repos []repo
-	for _, name := range t.project.Repos {
-		dir := filepath.Join(t.c.Instance.SandboxPath, name)
+	for _, r := range t.project.Repos {
+		dir := filepath.Join(t.c.Instance.SandboxPath, r.Name)
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
-			repos = append(repos, repo{name, dir})
+			repos = append(repos, repo{r.Name, dir})
 		}
 	}
 	return repos
 }
 
 func (t tool) projectRepo() repo {
-	return repo{"project", filepath.Join(t.w.Root, t.project.ID, "project")}
+	return repo{"project", t.project.Path}
 }
 
 // author is the caller, as its commits name it.

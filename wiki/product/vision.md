@@ -1,15 +1,15 @@
 ---
 type: spec
 status: planned
-tags: [architecture, workspace]
+tags: [architecture, home]
 ---
 
 # Vision
 
 Foreman is a self-hosted server and web UI. It lets one person (the **CEO**) run several **teams of AI coding agents** across several **projects** on their own machine.
 
-- A **[workspace](./models/workspace.md)** is a local folder. Each subfolder that Foreman recognises (it holds a [project repo](./models/project-config.md#the-project-repo), `project/project.toml`) is a **project**.
-- A project holds one or more **git repositories** and a **wiki** (a folder of Markdown files that acts as the project's shared memory, see [Wiki engine](./architecture/wiki-engine.md)).
+- Foreman keeps everything of its own in one folder, its **[home](./models/home.md)** (`~/.foreman`). A **[project](./models/project-config.md)** is a record there plus a [project repo](./models/project-config.md#the-project-repo) (its rules and its wiki).
+- A project names one or more **git repositories**, wherever the CEO keeps them, and has a **wiki** (a folder of Markdown files that acts as the project's shared memory, see [Wiki engine](./architecture/wiki-engine.md)).
 - A **[team](./models/team-definition.md)** is a reusable definition: a roster of [agents](./models/agent-soul.md), each with a personality, skills and a job description, plus a playbook for how they work together.
 - A team is **[deployed](./models/deployment.md)** onto a project with a goal. One team can be deployed on many projects at the same time. Each deployment runs its own sessions.
 - Each agent in a deployment runs as a real **coding harness process** (Claude Code, Codex CLI, Pi, Hermes Agent or a custom command), an [instance](./models/instance.md). It works in its **own git worktree** of each of the project's repos, on its own branch ([Sandboxes and git policy](./architecture/sandboxes-and-git.md)).
@@ -32,7 +32,7 @@ Terms are defined in the [Glossary](./glossary.md). The end-to-end scenarios v1 
 ## Non-goals (v1)
 
 - Multi-user accounts, permissions or remote multi-tenant hosting.
-- Cloning or provisioning repositories. The CEO puts repos in project folders by hand.
+- Cloning code repositories. The CEO keeps them where they like and adds them to a project by path.
 - Editing project config or wiki prose from the UI. Files are edited in the CEO's editor or by agents.
 - Built-in code review UI (diffs). Review happens on the forge, or locally via `git`.
 - Hosting the forge. Foreman connects to an existing GitHub, Forgejo or Gitea.
@@ -59,7 +59,7 @@ Roles with default job descriptions (used by the Chief of Staff and the example 
 ## Non-functional requirements
 
 - **Local first**: binds to localhost by default. There is no telemetry. Works offline, except harnesses and forges that need the network.
-- **Security**: there are no user accounts in v1, but every request needs the per-install access token from the URL Foreman prints at start ([Security](./architecture/security.md#access-token)); binding to the network shows a warning. Secrets are never written to project folders or config; Foreman redacts the secrets it knows from session logs, and anything else a harness prints is a documented limit. Agents never receive forge tokens ([Secrets](./models/secrets.md#invariants), [Security](./architecture/security.md)).
+- **Security**: there are no user accounts in v1, but every request needs the per-install access token from the URL Foreman prints at start ([Security](./architecture/security.md#access-token)); binding to the network shows a warning. Secrets are never written to a repo or to config; Foreman redacts the secrets it knows from session logs, and anything else a harness prints is a documented limit. Agents never receive forge tokens ([Secrets](./models/secrets.md#invariants), [Security](./architecture/security.md)).
 - **Isolation**: a separate worktree and container per instance. Team tools return only designated outputs. Write access to the knowledge base is limited to the lead; the others use `contribute`.
 - **Reliability**:
   - Instances survive UI disconnects.

@@ -22,9 +22,9 @@ func (closedGuard) Wrap(http.Handler) http.Handler {
 	})
 }
 
-type fakeWorkspace string
+type fakeHome string
 
-func (f fakeWorkspace) Root() string { return string(f) }
+func (f fakeHome) Root() string { return string(f) }
 
 var builtUI = fstest.MapFS{
 	"index.html":    {Data: []byte("<!doctype html><title>Foreman</title>")},
@@ -39,21 +39,21 @@ func get(t *testing.T, h http.Handler, path string) *httptest.ResponseRecorder {
 }
 
 func open(ui fstest.MapFS) http.Handler {
-	return New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), UI: ui})
+	return New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), UI: ui})
 }
 
 func TestEveryRouteGoesThroughTheGuard(t *testing.T) {
-	h := New(Options{Guard: closedGuard{}, Workspace: fakeWorkspace("/ws"), UI: builtUI})
-	for _, path := range []string{"/", "/api/workspace", "/api/instances", "/api/deployments", "/api/projects", "/api/teams/x", "/api/settings", "/api/events", "/ws/pty/x", "/assets/app.js", "/no/such/route"} {
+	h := New(Options{Guard: closedGuard{}, Home: fakeHome("/home/ceo/.foreman"), UI: builtUI})
+	for _, path := range []string{"/", "/api/home", "/api/instances", "/api/deployments", "/api/projects", "/api/teams/x", "/api/settings", "/api/events", "/ws/pty/x", "/assets/app.js", "/no/such/route"} {
 		if w := get(t, h, path); w.Code != http.StatusTeapot {
 			t.Errorf("%s bypassed the guard: %d", path, w.Code)
 		}
 	}
 }
 
-func TestWorkspaceSummaryComesFromTheWorkspace(t *testing.T) {
-	w := get(t, open(builtUI), "/api/workspace")
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/ws"`) {
+func TestHomeSummaryIsTheHomesPath(t *testing.T) {
+	w := get(t, open(builtUI), "/api/home")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman"`) {
 		t.Errorf("got %d %q", w.Code, w.Body.String())
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
@@ -77,13 +77,13 @@ func TestUIServesFilesAndFallsBackToIndex(t *testing.T) {
 // An unknown API path answers with the API's error format, not index.html.
 func TestUnknownEndpointsAreAPIErrors(t *testing.T) {
 	h := open(builtUI)
-	for _, path := range []string{"/api/nothing", "/api/workspace/extra", "/ws/nothing"} {
+	for _, path := range []string{"/api/nothing", "/api/home/extra", "/ws/nothing"} {
 		w := get(t, h, path)
 		if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), `"code":"NOT_FOUND"`) {
 			t.Errorf("%s: got %d %q", path, w.Code, w.Body.String())
 		}
 	}
-	if w := get(t, h, "/api/workspace"); w.Code != http.StatusOK {
+	if w := get(t, h, "/api/home"); w.Code != http.StatusOK {
 		t.Errorf("a real endpoint: %d", w.Code)
 	}
 }

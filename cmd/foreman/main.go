@@ -1,9 +1,8 @@
-// Command foreman serves a workspace: `foreman [<workspace-dir>]`.
-// See wiki/product/models/workspace.md#starting-foreman.
+// Command foreman runs Foreman on this machine, from its home (~/.foreman):
+// `foreman [flags]`. See wiki/product/models/home.md#starting-foreman.
 package main
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"flag"
@@ -33,6 +32,7 @@ import (
 	"github.com/brickpop/foreman/internal/harness/claudecode"
 	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/harness/pi"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/messaging"
 	"github.com/brickpop/foreman/internal/profiles"
@@ -47,47 +47,51 @@ import (
 	"github.com/brickpop/foreman/internal/userdata"
 	"github.com/brickpop/foreman/internal/wiki"
 	"github.com/brickpop/foreman/internal/workflow"
-	"github.com/brickpop/foreman/internal/workspace"
 	"github.com/brickpop/foreman/ui"
 )
 
 func main() {
-	if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
+	if err := run(os.Args[1:], os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "foreman:", err)
 		os.Exit(1)
 	}
 }
 
-func run(args []string, stdin io.Reader, stdout io.Writer) error {
+func run(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("foreman", flag.ContinueOnError)
-	yes := flags.Bool("yes", false, "create .foreman/ without asking if the folder isn't a workspace yet")
 	noOpen := flags.Bool("no-open", false, "print the URL but don't open the browser")
 	port := flags.String("port", "8888", "port for the web UI")
 	newToken := flags.Bool("new-token", false, "replace the access token (logs every browser out)")
 	uiDir := flags.String("ui-dir", "", "development: serve the web UI from this folder instead of the embedded build")
 	fakeHarness := flags.String("fake-harness", "", "development: run agents and logins on this program (cmd/fakeharness) instead of Claude Code")
-	homeFlag := flags.String("home", "", "Foreman's home on this machine (profiles, preferences, image builds, the lock), instead of ~/.foreman: for tests and development")
+	homeFlag := flags.String("home", "", "Foreman's home on this machine (teams, settings, projects, logins, state), instead of ~/.foreman: for tests and development")
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: foreman [<workspace-dir>] [flags]")
+		fmt.Fprintln(flags.Output(), "Usage: foreman [flags]")
 		flags.PrintDefaults()
 	}
-	dir, err := parseArgs(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return err
 	}
+	if flags.NArg() > 0 {
+		return fmt.Errorf("foreman takes no folder (%s): it runs from its home, ~/.foreman, and projects are added in its UI", flags.Arg(0))
+	}
 
-	// What is the CEO's on this machine, the same for every workspace, and
-	// the lock that keeps Foreman to one server per machine.
+	// Foreman's home, and the lock that keeps Foreman to one server per machine.
+	var err error
 	userDir := *homeFlag
 	if userDir == "" {
 		if userDir, err = userdata.Dir(); err != nil {
 			return fmt.Errorf("finding Foreman's home: %w", err)
 		}
 	}
+	// Absolute: its paths are mounted into containers and compared with repos'.
+	if userDir, err = filepath.Abs(userDir); err != nil {
+		return err
+	}
 	lock, err := userdata.TakeLock(userDir)
 	var other *userdata.RunningError
 	if errors.As(err, &other) {
-		fmt.Fprintf(stdout, "Foreman is already running on this machine (one per machine), serving %s\nOpen: %s\n", other.Workspace, other.URL)
+		fmt.Fprintf(stdout, "Foreman is already running on this machine (one per machine)\nOpen: %s\n", other.URL)
 		if !*noOpen && other.URL != "" {
 			openBrowser(other.URL, stdout)
 		}
@@ -97,31 +101,35 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return err
 	}
 	defer lock.Release()
-	// Under the lock, so two starts never move at once.
-	if *homeFlag == "" {
-		if err := userdata.MoveIn(userDir); err != nil {
-			return err
-		}
-	}
 
-	ws, err := openOrCreate(dir, *yes, stdin, stdout)
+	h, err := home.Open(userDir)
 	if err != nil {
 		return err
 	}
-	token, err := ws.AccessToken(*newToken)
+	token, err := h.AccessToken(*newToken)
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
 	}
 	ctx := context.Background()
 	gitCLI := git.New()
-	if err := ws.Load(ctx, gitCLI); err != nil {
+	state, err := store.Open(ctx, h.Path("state.db"))
+	if err != nil {
+		return fmt.Errorf("state: %w", err)
+	}
+	defer state.Close()
+	var manager *instances.Manager
+	deployed := func(ctx context.Context, project string) bool {
+		active, _ := manager.DeploymentsIn(ctx, store.DeploymentActive)
+		return slices.ContainsFunc(active, func(d store.Deployment) bool { return d.ProjectID == project })
+	}
+	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed}); err != nil {
 		return err
 	}
 	// The engine is chosen once: a change of the setting takes effect on restart.
-	running := ws.Settings().Settings.Engine
+	running := h.Settings().Settings.Engine
 	// The fake harness is a host binary: a container can't run it.
 	if *fakeHarness != "" && running != "direct" {
-		return fmt.Errorf("this workspace runs on %s, where --fake-harness can't run (it is a host program): drop --fake-harness to run Claude Code, or set engine = \"direct\" in settings.toml", running)
+		return fmt.Errorf("this Foreman runs on %s, where --fake-harness can't run (it is a host program): drop --fake-harness to run Claude Code, or set engine = \"direct\" in settings.toml", running)
 	}
 	engineRunner, engineImages, pod := engine(running, filepath.Join(userDir, "images"), stdout)
 	if pod != nil {
@@ -144,10 +152,10 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return fmt.Errorf("the agent port: %w", err)
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%s/?token=%s", *port, token)
-	if err := lock.Announce(url, ws.Root()); err != nil {
+	if err := lock.Announce(url); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Foreman is serving %s\nOpen: %s\n", ws.Root(), url)
+	fmt.Fprintf(stdout, "Foreman is running from %s\nOpen: %s\n", h.Root(), url)
 	if !*noOpen {
 		openBrowser(url, stdout)
 	}
@@ -157,16 +165,11 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if *uiDir != "" {
 		files = os.DirFS(*uiDir)
 	}
-	state, err := store.Open(ctx, ws.Path("state.db"))
-	if err != nil {
-		return fmt.Errorf("state: %w", err)
-	}
-	defer state.Close()
 	bus := events.New()
-	wikis := wiki.New(ws.WikiDir, gitCLI)
+	wikis := wiki.New(h.WikiDir, gitCLI)
 	followWikis, err := wikis.Watch(ctx, func() []string {
 		var ids []string
-		for _, p := range ws.Projects() {
+		for _, p := range h.Projects() {
 			ids = append(ids, p.ID)
 		}
 		return ids
@@ -174,7 +177,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("watching the wikis: %w", err)
 	}
-	logs := sessionlog.Dir{Root: ws.Path("logs")}
+	logs := sessionlog.Dir{Root: h.Path("logs")}
 	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
 	// How a container reaches this machine: the agent port, a model served
 	// here. Agents on the Direct engine are on it.
@@ -191,7 +194,6 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	// Always the real harnesses' logins, even on the fake harness, which has
 	// none; then the default profile, which every project uses unless it
 	// names another.
-	adoptLogins(profileStore, ws.Root(), map[string]func(string) bool{"claude-code": claude.Connected}, stdout)
 	if err := profileStore.Ensure("claude-code"); err != nil {
 		return fmt.Errorf("the default profile: %w", err)
 	}
@@ -203,7 +205,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		adapters["claude-code"] = fake.Adapter{Program: program}
 		fmt.Fprintf(stdout, "Agents run on the fake harness (%s), not Claude Code\n", program)
 	}
-	secret, err := ws.AgentSecret()
+	secret, err := h.AgentSecret()
 	if err != nil {
 		return fmt.Errorf("agent link: %w", err)
 	}
@@ -243,15 +245,15 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		}
 	}
 	login := profileLogins{store: profileStore, adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog),
-		settings: func() workspace.Settings { return ws.Settings().Settings }}
-	manager := instances.New(instances.Deps{
-		Root: ws.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: ws,
+		project: h.Project}
+	manager = instances.New(instances.Deps{
+		Home: h.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: h,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters, Profile: login.Of,
 		OpenLog: openLog, Publish: publish, Agent: agent,
 		Blocked: func() error { return checklist.Blocked() },
 	})
 	// Watched from here on: a settings change may let queued agents start.
-	if err := ws.Watch(ctx, func(c workspace.Change) {
+	if err := h.Watch(ctx, func(c home.Change) {
 		bus.Publish(configEvent(c))
 		switch c.Kind {
 		case "projects":
@@ -260,17 +262,17 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			manager.LimitChanged()
 		}
 	}); err != nil {
-		return fmt.Errorf("watching the workspace: %w", err)
+		return fmt.Errorf("watching the home: %w", err)
 	}
 	// Messaging and Workflow need each other: a hand-off is a message, and its
 	// delivery moves the hand-off's work item.
 	var flow *workflow.Workflow
 	messenger = messaging.New(messaging.Deps{
 		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
-		Config: ws, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
+		Config: h, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
 		Delivered: func(ctx context.Context, msg store.TeamMessage) { flow.Delivered(ctx, msg) },
 	})
-	flow = workflow.New(workflow.Deps{Root: ws.Root(), Git: gitCLI, Config: ws, Messages: messenger,
+	flow = workflow.New(workflow.Deps{Git: gitCLI, Config: h, Messages: messenger,
 		Actions: state.Actions(), Publish: bus.Publish, WorkItems: state.WorkItems(),
 		MergeRequests: state.MergeRequests(), Wiki: wikis, Requests: state.Requests()})
 	// A merge request merged outside Foreman (the CEO's own git, a forge) is
@@ -287,14 +289,14 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			}
 		}
 	}()
-	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: ws,
+	router := &teamtools.Router{Instances: state.Instances(), Deployments: state.Deployments(), Config: h,
 		Blocks: []teamtools.Block{messenger, flow}}
 	chief := &chiefOfStaff{
-		root: ws.Root(), dir: ws.Path("cos"), teamsDir: ws.Path("teams"), teams: ws.Teams,
+		home: h.Root(), dir: h.Path("cos"), teamsDir: h.TeamsDir(), teams: h.Teams,
 		profiles: profileStore, adapters: adapters, images: engineImages, terms: login.terms, agent: agent,
 		blocked: func() error { return checklist.Blocked() }, pause: 150 * time.Millisecond,
 	}
-	chief.CoS = cos.New(cos.Deps{Teams: ws, Publish: bus.Publish, Tell: chief.tell,
+	chief.CoS = cos.New(cos.Deps{Teams: h, Publish: bus.Publish, Tell: chief.tell,
 		Deployed: func(ctx context.Context, team string) bool {
 			active, _ := manager.DeploymentsIn(ctx, store.DeploymentActive)
 			return slices.ContainsFunc(active, func(d store.Deployment) bool { return d.TeamID == team })
@@ -320,8 +322,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		podEngine = pod
 	}
 	checklist = setup.New(setup.Deps{
-		Engine: podEngine, Images: engineImages, Config: ws, Publish: bus.Publish,
-		Profiles: func() []profiles.Profile { return login.Used(ws.Projects()) },
+		Engine: podEngine, Images: engineImages, Config: h, Publish: bus.Publish,
+		Profiles: func() []profiles.Profile { return login.Used(h.Projects()) },
 		Ready: func(ctx context.Context) error {
 			if err := manager.Restore(ctx); err != nil {
 				return fmt.Errorf("restoring the instances: %w", err)
@@ -342,14 +344,14 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	views := agents{Manager: manager, logins: login.terms, typed: messenger.Typed}
 	handler := server.New(server.Options{
 		Guard:        access.NewTokenGuard(token, access.LocalHosts(*port), *port),
-		Workspace:    ws,
-		Config:       ws,
+		Home:         h,
+		Config:       h,
 		Events:       bus,
 		Agents:       views,
 		Messages:     messenger,
 		Actions:      state.Actions(),
 		Activity:     state.Activity(),
-		Repos:        repos.Browser{Config: ws, Git: gitCLI},
+		Repos:        repos.Browser{Config: h, Git: gitCLI},
 		Pipeline:     flow,
 		Requests:     flow,
 		Harnesses:    login,
@@ -387,45 +389,6 @@ func serveUntil(quit context.Context, release func(), stdout io.Writer, srv *htt
 	return nil
 }
 
-// parseArgs accepts flags before and after the workspace folder (the flag
-// package alone stops at the first positional argument).
-func parseArgs(flags *flag.FlagSet, args []string) (string, error) {
-	var positional []string
-	for {
-		if err := flags.Parse(args); err != nil {
-			return "", err
-		}
-		if flags.NArg() == 0 {
-			break
-		}
-		positional = append(positional, flags.Arg(0))
-		args = flags.Args()[1:]
-	}
-	switch len(positional) {
-	case 0:
-		return ".", nil
-	case 1:
-		return positional[0], nil
-	default:
-		return "", errors.New("expected at most one workspace folder")
-	}
-}
-
-func openOrCreate(dir string, yes bool, stdin io.Reader, stdout io.Writer) (*workspace.Workspace, error) {
-	ws, err := workspace.Open(dir)
-	if !errors.Is(err, workspace.ErrNotInitialized) {
-		return ws, err
-	}
-	if !yes {
-		fmt.Fprintf(stdout, "%s isn't a Foreman workspace yet. Create %s/ here? [y/N] ", dir, workspace.DirName)
-		answer, _ := bufio.NewReader(stdin).ReadString('\n')
-		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-			return nil, errors.New("not a workspace; nothing was created")
-		}
-	}
-	return workspace.Init(dir)
-}
-
 // openBrowser is best effort: the URL is printed either way.
 func openBrowser(url string, stdout io.Writer) {
 	name := "xdg-open"
@@ -459,9 +422,9 @@ func nextPort(port string) (string, error) {
 
 // configEvent turns a change on disk into the event the browser gets
 // (wiki/product/architecture/api.md#events).
-func configEvent(c workspace.Change) events.Event {
+func configEvent(c home.Change) events.Event {
 	if c.Kind == "projects" {
-		return events.Event{Type: "workspace.changed", Data: struct{}{}}
+		return events.Event{Type: "projects.changed", Data: struct{}{}}
 	}
 	return events.Event{Type: "config.changed", Data: c}
 }

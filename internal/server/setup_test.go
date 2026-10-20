@@ -31,7 +31,7 @@ func (f *fakeSetup) CreateMachine(_ context.Context, cpus, memory int) error {
 
 func TestSetup(t *testing.T) {
 	f := &fakeSetup{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Setup: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Setup: f, UI: builtUI})
 	var steps []map[string]any
 	decodeBody(t, get(t, h, "/api/setup"), &steps)
 	if len(steps) != 1 || steps[0]["kind"] != "machine" || steps[0]["machine"].(map[string]any)["maxCpus"] != 10.0 {

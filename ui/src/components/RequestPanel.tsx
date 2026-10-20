@@ -1,6 +1,6 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
-import type { Look } from "../api/types/workspace";
+import type { Look } from "../api/types/home";
 import { Avatar } from "./Avatar";
 import { Button, KindChip } from "./ui";
 

@@ -64,13 +64,7 @@ func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, 
 		return m, err
 	}
 	res, err := s.db.ExecContext(ctx, "UPDATE merge_requests SET project_id = ?, deployment_id = ?, author_instance = ?, repo = ?, branch = ?, entry = ?, state = ?, checks_status = ?, conflicting = ?, forge_pr_url = ?, forge_pr_number = ?, note = ?, created_at = ?, merged_at = ?, rejected_at = ? WHERE seq = ?", append(values, seq)...)
-	if err != nil {
-		return m, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return m, ErrNotFound
-	}
-	return m, nil
+	return m, touched(res, err)
 }
 
 func (s mergeRequests) Get(ctx context.Context, id string) (MergeRequest, error) {

@@ -19,7 +19,7 @@ func (fakeHarnesses) Harnesses() []harness.Status {
 }
 
 func TestHarnesses(t *testing.T) {
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Harnesses: fakeHarnesses{}, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Harnesses: fakeHarnesses{}, UI: builtUI})
 	var list []map[string]any
 	decodeBody(t, get(t, h, "/api/harnesses"), &list)
 	if len(list) != 1 || list[0]["id"] != "claude-code" || list[0]["newline"] != "\\\r" {
@@ -98,7 +98,7 @@ func (f *fakeProfiles) EndLogin(name string) error {
 
 func TestProfiles(t *testing.T) {
 	f := &fakeProfiles{list: []profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}}}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Profiles: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Profiles: f, UI: builtUI})
 	var list []profiles.Profile
 	if decodeBody(t, get(t, h, "/api/profiles"), &list); len(list) != 1 || !list[0].Connected {
 		t.Errorf("profiles %+v", list)
@@ -180,7 +180,7 @@ func (f *fakeProfiles) Models(_ context.Context, name, _, key string) ([]string,
 // key goes in, never out.
 func TestProfileEndpoint(t *testing.T) {
 	f := &fakeProfiles{list: []profiles.Profile{{Name: "default", Harness: "claude-code"}, {Name: "local", Harness: "pi"}}}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Profiles: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Profiles: f, UI: builtUI})
 	good := `{"url":"http://localhost:11434/v1","apiKey":"sk-1","model":"qwen3:30b","contextWindow":262144,"maxTokens":131072}`
 	if w := send(h, "PUT", "/api/profiles/local/endpoint", good); w.Code != http.StatusNoContent {
 		t.Fatalf("set: %d %s", w.Code, w.Body)

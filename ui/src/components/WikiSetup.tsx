@@ -1,5 +1,5 @@
 import type { Missing } from "../api/client";
-import { useScaffold } from "../app/queries";
+import { useProjectRepo, useScaffold } from "../app/queries";
 import { Button, Empty } from "./ui";
 
 // What Overview and Board show while the project repo lacks scaffold files
@@ -10,6 +10,7 @@ import { Button, Empty } from "./ui";
 /** Instead of the wiki: some missing file is one it can't be read without. */
 export function WikiSetup({ project, missing }: { project: string; missing: Missing[] }) {
   const scaffold = useScaffold(project);
+  const repo = useProjectRepo(project);
   return (
     <Empty>
       <div className="flex flex-col items-center gap-3">
@@ -18,7 +19,7 @@ export function WikiSetup({ project, missing }: { project: string; missing: Miss
         <ul className="m-0 flex list-none flex-col gap-0.5 p-0 font-mono text-[13px] text-tx2">
           {missing.map((m) => (
             <li key={m.file}>
-              {project}/project/{m.file}
+              {repo}/{m.file}
             </li>
           ))}
         </ul>

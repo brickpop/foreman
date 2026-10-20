@@ -8,8 +8,8 @@ import (
 	"github.com/brickpop/foreman/internal/userdata"
 )
 
-// Preferences are the CEO's, the same in every workspace (Settings → Global →
-// Appearance), kept outside any workspace.
+// Preferences are the CEO's (Settings → Global → Appearance), kept outside
+// the global repo.
 type Preferences interface {
 	Get() userdata.Preferences
 	Set(userdata.Preferences) error

@@ -2,16 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { harnessLabel, profileOf } from "../app/model";
-import {
-  keys,
-  useDeployments,
-  useProfiles,
-  useProjects,
-  useSettings,
-  useSetup,
-  useTeams,
-} from "../app/queries";
+import { harnessLabel } from "../app/model";
+import { keys, useDeployments, useProfiles, useProjects, useSetup, useTeams } from "../app/queries";
 import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
@@ -54,9 +46,8 @@ export function DeployDialog({
   const [goal, setGoal] = useState("");
   const [connecting, setConnecting] = useState<string>();
   // The project's profile: its agents run on it, so it must be connected first.
-  const settings = useSettings().data?.settings;
   const profiles = useProfiles();
-  const profileName = project ? profileOf(settings, project) : undefined;
+  const profileName = projects.data?.find((p) => p.id === project)?.profile;
   const profile = profiles.data?.find((p) => p.name === profileName);
   const profileReady = profile?.connected ?? false;
   // Agents start only once Podman runs (and the instances are restored).

@@ -38,7 +38,7 @@ func (f *fakePipeline) Reject(_ context.Context, id, reason string) error {
 
 func TestPipeline(t *testing.T) {
 	f := &fakePipeline{}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Pipeline: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Pipeline: f, UI: builtUI})
 	var p struct {
 		WorkItems     []store.WorkItem     `json:"workItems"`
 		MergeRequests []store.MergeRequest `json:"mergeRequests"`
@@ -86,7 +86,7 @@ func (fakeRequests) OpenRequests(context.Context) ([]store.Request, error) {
 }
 
 func TestRequests(t *testing.T) {
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Requests: fakeRequests{}, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Requests: fakeRequests{}, UI: builtUI})
 	var list []store.Request
 	decodeBody(t, get(t, h, "/api/requests"), &list)
 	if len(list) != 1 || list[0].MergeRequestID != "mr-1" {

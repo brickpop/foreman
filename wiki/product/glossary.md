@@ -1,28 +1,29 @@
 ---
 type: spec
 status: planned
-tags: [architecture, workspace]
+tags: [architecture, home]
 ---
 
 # Glossary
 
-- **Workspace**: the root folder the server runs on (e.g. `~/agents-ws`). It contains projects and Foreman's own data in `~/agents-ws/.foreman/`. See [Workspace](./models/workspace.md).
-- **Workspace repo**: `.foreman/` itself, a git repo holding the team files and `settings.toml`; every UI save is one commit, and runtime state, logs, secrets, credentials and the access token are git-ignored. See [Workspace → The workspace repo](./models/workspace.md#the-workspace-repo).
-- **Project**: a subfolder of the workspace containing `project/project.toml`. It holds the project repo, the code repos and the agents' sandboxes. See [Project config](./models/project-config.md).
-- **Project repo**: `<project>/project/`, the one git repo Foreman reserves in every project: `project.toml` and the project's knowledge base (`wiki/`). One live checkout shared by every agent of the project, writable by the lead only. See [Project config → The project repo](./models/project-config.md#the-project-repo).
-- **Repository** (code repo): a git repo inside a project folder, other than the project repo. Foreman detects repos; it never clones them, but creates an empty one on request.
-- **Wiki bundle**: `<project>/project/wiki/`, the project's knowledge base: a folder of Markdown files with YAML frontmatter, plus `wiki.toml`. Compatible with the agentic-wiki / wikiview format. See [Wiki engine](./architecture/wiki-engine.md).
+- **Home**: Foreman's folder on this machine, `~/.foreman` (or `--home`); one Foreman runs per machine. It holds the global repo, the project repos, the agents' sandboxes and Foreman's state. See [Home](./models/home.md).
+- **Global repo**: `~/.foreman/config/`, a git repo holding the team files and `settings.toml`; every UI save is one commit. Nothing else in the home is in a repo. See [Home → The global repo](./models/home.md#the-global-repo).
+- **Project**: a project record plus its project repo; its code repos live anywhere in the CEO's home folder. See [Project config](./models/project-config.md).
+- **Project record**: a project's row in `state.db`: its name, its code repos (name, path, root commit) and its profile. Edited from the UI, never in a file. See [Project config → The project record](./models/project-config.md#the-project-record).
+- **Project repo**: `~/.foreman/projects/<name>/`, the one git repo Foreman reserves in every project: `project.toml` and the project's knowledge base (`wiki/`). One live checkout shared by every agent of the project, writable by the lead only. See [Project config → The project repo](./models/project-config.md#the-project-repo).
+- **Repository** (code repo): a git repo the CEO adds to a project by its path, anywhere in their home folder. Foreman never clones or moves one, but creates an empty one on request. A repo gone from its path blocks starting the project's agents until it is located or removed.
+- **Wiki bundle**: `wiki/` in the project repo, the project's knowledge base: a folder of Markdown files with YAML frontmatter, plus `wiki.toml`. Compatible with the agentic-wiki / wikiview format. See [Wiki engine](./architecture/wiki-engine.md).
 - **Board**: a kanban view over wiki entries, declared in `wiki.toml` under `[[tool.wikiview.board]]`. See [Board](./features/board.md).
-- **Team definition**: a reusable roster and playbook, stored in `.foreman/teams/<team>.toml`. See [Team definition](./models/team-definition.md).
+- **Team definition**: a reusable roster and playbook, stored in `~/.foreman/config/teams/<team>.toml`, in the global repo. See [Team definition](./models/team-definition.md).
 - **Agent (soul)**: one member of a team definition: name, role, personality, skills, job description and look (avatar); what it runs on is its project's profile. One soul can run in many deployments. See [Agent soul](./models/agent-soul.md).
 - **Deployment**: a team assigned to a project with a goal. This is runtime state, not config. See [Deployment](./models/deployment.md).
 - **Instance / session**: one agent running in one deployment. It is a live harness process with a PTY. Identified as `agent@project` (e.g. `mara@ledger`). See [Instance](./models/instance.md).
-- **Sandbox**: an agent instance's working directory, `<project>/.sandboxes/<agent>/`: its worktrees of the code repos, plus the live project repo mounted as `project/`. See [Sandboxes and git policy](./architecture/sandboxes-and-git.md).
-- **Worktree** (of an instance): the instance's git worktree of one code repo, `<project>/.sandboxes/<agent>/<repo>/`, made with `git worktree add` on the host. It shares the repo's objects and branches, so a hand-off only names a branch. Agents read git there; every git write goes through Foreman's `switch`, `commit` and `merge` tools. See [Sandboxes and git policy](./architecture/sandboxes-and-git.md#layout).
+- **Sandbox**: an agent instance's working directory, `~/.foreman/sandboxes/<project>/<agent>/`: its worktrees of the code repos, plus the live project repo mounted as `project/`. See [Sandboxes and git policy](./architecture/sandboxes-and-git.md).
+- **Worktree** (of an instance): the instance's git worktree of one code repo, `~/.foreman/sandboxes/<project>/<agent>/<repo>/`, made with `git worktree add` on the host. It shares the repo's objects and branches, so a hand-off only names a branch. Agents read git there; every git write goes through Foreman's `switch`, `commit` and `merge` tools. See [Sandboxes and git policy](./architecture/sandboxes-and-git.md#layout).
 - **Worktree branches**: `wt/<agent>/main`, each agent's home branch in a repo (created from `main`), and `wt/<agent>/<topic>`, where members do one piece of work (the topic usually a card id).
 - **Lead branch**: `lead/<team>/<topic>` (the default `lead/<team>/integration` is created at deploy), where the lead integrates handoffs; a lead can have any number. Lead branches are the only source of merge requests to `main`, one open merge request per branch at a time.
 - **Harness**: the CLI program that runs an agent (Claude Code, Codex CLI, Pi, Hermes Agent, or a custom command). See [Harness adapters](./architecture/harness-adapters.md).
-- **Profile**: a harness and its credentials, under a name (`default`: Claude Code and its login), the CEO's on this machine and the same in every workspace, kept in `~/.foreman/profiles/`. A project picks the one its agents run on (`default` unless set). See [Session runner → Credentials](./architecture/session-runner.md#credentials).
+- **Profile**: a harness and its credentials, under a name (`default`: Claude Code and its login), the CEO's on this machine, kept in `~/.foreman/profiles/`. A project picks the one its agents run on (`default` unless set). See [Session runner → Credentials](./architecture/session-runner.md#credentials).
 - **Session runner**: where a harness process runs and how Foreman attaches to its terminal (a Podman container in v1). See [Session runner](./architecture/session-runner.md).
 - **Team tools**: the MCP tools Foreman exposes to every harness: `ask`, `reply`, `handoff`, `contribute`, `escalate`, `switch`, `commit`, `merge`, `abort_merge`, `set_submodule` and `request_merge`; agent-to-agent traffic through them is **team messages**. Called "ACP" in the original PRD. See [Team tools](./architecture/team-tools.md).
 - **Session driver**: how Foreman drives a harness session: through its TUI in a PTY (v1), or later through the Agent Client Protocol. See [Harness adapters](./architecture/harness-adapters.md#session-drivers).
@@ -33,7 +34,7 @@ tags: [architecture, workspace]
 - **Playbook**: the team's written workflow (who does what, when, and when to escalate). It is part of the team definition.
 - **Gates**: project rules that always escalate to the CEO (e.g. "new dependency"). They are part of project config (`always_ask_ceo`).
 - **Forge**: where PRs live: GitHub, Forgejo or Gitea. Foreman goes there only when the CEO asks: Create PR on a merge request (the CEO then merges there), or Sync on a reserved repo. A repo with no forge offers only Merge to main and Reject. See [Forge adapters](./architecture/forge-adapters.md).
-- **Sync**: the CEO's action that fetches a reserved repo's `main` from its forge, merges it in (stopping and telling the CEO on a conflict) and pushes `main` (the workspace repo, from Settings; the project repo, from Project settings) to its forge. Those repos never push on their own. See [Forge adapters → Sync](./architecture/forge-adapters.md#sync-the-reserved-repos).
+- **Sync**: the CEO's action that fetches a reserved repo's `main` from its forge, merges it in (stopping and telling the CEO on a conflict) and pushes `main` (the global repo, from Settings; the project repo, from Project settings) to its forge. Those repos never push on their own. See [Forge adapters → Sync](./architecture/forge-adapters.md#sync-the-reserved-repos).
 - **Card** (board card): a wiki task entry shown on a [board](./features/board.md). "Card" means only this; members usually work on one card per topic branch (`wt/<agent>/<card>`).
 - **Work item**: one agent's branch on its way into the lead branch (in worktree → handed to lead → lead reviewing → integrated). Informational: it never needs the CEO. See [Work item](./models/work-item.md).
 - **Merge request**: the lead's request, through `request_merge(branch, entry)`, to merge a lead branch into `main` of one repo, explained by a wiki entry and carrying the integrated work items; the only pipeline entry that raises a request (the review), whose actions are Merge to main, Create PR on the forge and Reject. A **pull request (PR)** is a merge request's forge side, made only by Create PR. See [Merge request](./models/merge-request.md) and [Pipeline and merges](./features/pipeline-and-merges.md).

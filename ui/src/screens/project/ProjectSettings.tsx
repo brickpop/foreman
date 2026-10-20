@@ -1,24 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import {
-  agentOf,
-  forgeLabel,
-  harnessLabel,
-  onOtherProfile,
-  profileOf,
-  when,
-} from "../../app/model";
+import { agentOf, forgeLabel, harnessLabel, onOtherProfile, when } from "../../app/model";
 import {
   keys,
   useDeployments,
+  useHomeFolder,
   useInstances,
   useProfiles,
-  useSaveSettings,
-  useSettings,
   useTeams,
-  useWorkspace,
 } from "../../app/queries";
 import { rosterOrder } from "../../app/sessions";
 import { Avatar } from "../../components/Avatar";
@@ -134,27 +124,23 @@ function Teams({ project, onDeploy }: { project: Project; onDeploy: () => void }
 }
 
 function Configuration({ project }: { project: Project }) {
-  const workspace = useWorkspace();
-  const root = workspace.data?.path ?? "~/agents-ws";
+  const home = useHomeFolder().data?.path ?? "~/.foreman";
   const forge = project.config.forge;
-  const repos = project.repos;
   const tree = [
-    `${root}/`,
-    "├─ .foreman/          workspace repo (git)",
-    "│  ├─ teams/          team definitions (souls, playbooks)",
-    "│  ├─ cos/            Chief of Staff (its own folder)",
-    "│  └─ state.db        deployments, sessions, requests (runtime)",
-    `└─ ${project.id}/`,
-    "   ├─ project/        project repo (git)",
-    "   │  ├─ project.toml repos, checks, gates, forge",
-    "   │  └─ wiki/        knowledge base + wiki.toml (boards)",
-    ...repos.map((r) => `   ├─ ${r}/`),
-    "   └─ .sandboxes/     one git worktree per agent, per repo",
+    `${home}/`,
+    "├─ config/              global repo (git): teams, settings",
+    "├─ projects/",
+    `│  └─ ${project.id}/`,
+    "│     ├─ project.toml    checks, gates, forge",
+    "│     └─ wiki/           knowledge base + wiki.toml (boards)",
+    "├─ sandboxes/",
+    `│  └─ ${project.id}/      one git worktree per agent, per repo`,
+    "└─ state.db             deployments, sessions, requests (runtime)",
   ].join("\n");
   return (
     <section className="grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-9 border-t border-line px-12 pt-7 pb-16">
       <div className="flex min-w-0 max-w-[520px] flex-col gap-6">
-        <Block title="Workspace">
+        <Block title="Where things live">
           <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
             {tree}
           </pre>
@@ -163,7 +149,7 @@ function Configuration({ project }: { project: Project }) {
           {[
             [
               "Team definition",
-              "Lives once in the workspace: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.",
+              "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.",
             ],
             [
               "Deployment",
@@ -186,7 +172,7 @@ function Configuration({ project }: { project: Project }) {
         </Block>
       </div>
       <div className="flex min-w-0 flex-col gap-6">
-        <ProfileChoice project={project.id} />
+        <ProfileChoice project={project} />
         <CodeRepos project={project} />
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
@@ -233,7 +219,7 @@ function Configuration({ project }: { project: Project }) {
           <span className="text-[13.5px] text-tx2">
             {forge.kind === "none"
               ? "No forge. You merge requested branches into main from the Overview, under Needs you; Foreman does the merge."
-              : `Merge to main from the Overview, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file.`}
+              : `Merge to main from the Overview, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
           </span>
           {forge.projectRepo && (
             <span className="flex items-center gap-3 text-[13px] text-tx3">
@@ -246,7 +232,7 @@ function Configuration({ project }: { project: Project }) {
         </Block>
         <Block title="project.toml">
           <span className="font-mono text-[12.5px] text-tx3">
-            {project.id}/project/project.toml · read-only
+            {project.path}/project.toml · read-only
           </span>
           <p className="m-0 text-[13.5px] text-tx2">
             This file is config, committed in the project repo. Edit it in your editor.
@@ -266,25 +252,21 @@ function Configuration({ project }: { project: Project }) {
 }
 
 /** The profile this project's agents run on, a harness and its login. Kept in
- * the workspace's settings, never project.toml, which the lead can write. */
-function ProfileChoice({ project }: { project: string }) {
-  const settings = useSettings().data?.settings;
+ * Foreman's records, never project.toml, which the lead can write. */
+function ProfileChoice({ project }: { project: Project }) {
+  const client = useClient();
+  const queries = useQueryClient();
   const profiles = useProfiles();
-  const save = useSaveSettings();
   const toast = useToast();
-  const current = profileOf(settings, project);
+  const current = project.profile;
   const found = profiles.data?.find((p) => p.name === current);
   const choose = (name: string) =>
-    save((s) => {
-      // The default is no entry at all: the file names only what differs.
-      const { [project]: _, ...others } = s.projectProfiles ?? {};
-      return {
-        ...s,
-        projectProfiles: name === "default" ? others : { ...others, [project]: name },
-      };
-    }).catch((e: Error) =>
-      toast({ title: "Profile not saved", body: e.message, color: "var(--err)" }),
-    );
+    client.home
+      .setProfile(project.id, name)
+      .then(() => queries.invalidateQueries({ queryKey: keys.projects }))
+      .catch((e: Error) =>
+        toast({ title: "Profile not saved", body: e.message, color: "var(--err)" }),
+      );
   return (
     <Block title="Profile">
       <span className="flex items-center gap-3">
@@ -309,7 +291,7 @@ function ProfileChoice({ project }: { project: string }) {
           </span>
         )}
       </span>
-      {found && <StillOnAnother project={project} profile={found} />}
+      {found && <StillOnAnother project={project.id} profile={found} />}
       <span className="text-[13.5px] text-tx2">
         Its agents run on this harness and login, from their next start. Profiles are yours on this
         machine, in{" "}
@@ -322,57 +304,27 @@ function ProfileChoice({ project }: { project: string }) {
   );
 }
 
-/** The project's code repos, and a new empty one (Foreman never clones). */
+/** The project's code repos, wherever they are on disk, each with what keeps
+ * agents from using it. */
 function CodeRepos({ project }: { project: Project }) {
-  const client = useClient();
-  const queries = useQueryClient();
-  const [name, setName] = useState("");
-  const add = useMutation({
-    mutationFn: () => client.workspace.addRepo(project.id, name.trim()),
-    onSuccess: () => {
-      setName("");
-      queries.invalidateQueries({ queryKey: keys.projects });
-    },
-  });
-  const listed = project.config.repos.length > 0;
   return (
     <Block title="Code repos">
       {project.repos.length === 0 ? (
         <p className="m-0 text-[13.5px] text-err">
-          None yet: agents need at least one repo to work on. Clone one into {project.id}/, or
-          create an empty one here.
+          None yet: agents need at least one repo to work on.
         </p>
       ) : (
-        <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
-          {repoTree(project.id, project.repos)}
-        </pre>
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+          {project.repos.map((r) => (
+            <li key={r.name} className="flex flex-col gap-0.5">
+              <span className="font-mono text-[13px]">
+                <span className="text-tx">{r.name}</span> <span className="text-tx3">{r.path}</span>
+              </span>
+              {r.problem && <span className="text-[13px] text-err">{r.problem}</span>}
+            </li>
+          ))}
+        </ul>
       )}
-      {listed ? (
-        <p className="m-0 text-[13px] text-tx3">
-          project.toml lists its repos: add a new one there, after creating it in {project.id}/.
-        </p>
-      ) : (
-        <form
-          className="flex items-center gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            add.mutate();
-          }}
-        >
-          <input
-            aria-label="New repo name"
-            placeholder="new-repo"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            spellCheck={false}
-            className="w-48 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx placeholder:text-tx4"
-          />
-          <Button type="submit" variant="small" disabled={!name.trim() || add.isPending}>
-            New repo
-          </Button>
-        </form>
-      )}
-      {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}
     </Block>
   );
 }
@@ -384,14 +336,6 @@ function Block({ title, children }: { title: string; children: React.ReactNode }
       {children}
     </div>
   );
-}
-
-/** The project's code repos as a folder tree, like the Workspace tree. */
-export function repoTree(project: string, repos: string[]): string {
-  return [
-    `${project}/`,
-    ...repos.map((r, i) => `${i === repos.length - 1 ? "└─" : "├─"} ${r}/`),
-  ].join("\n");
 }
 
 /** The project's running agents still on another profile than its own: they

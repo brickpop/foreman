@@ -6,7 +6,7 @@ tags: [model, teams, agents, config]
 
 # Team definition
 
-`~/agents-ws/.foreman/teams/<team>.toml`, in the [workspace repo](./workspace.md#the-workspace-repo): a reusable roster of [agent souls](./agent-soul.md) plus the team's playbook and escalation rules. One definition can be [deployed](./deployment.md) to any number of projects; every deployment uses the same souls and the same playbook. Foreman owns these files: the UI ([Team page](../features/team-page.md), [Agent page](../features/agent-page.md)), the [Chief of Staff](../features/chief-of-staff.md) (its proposals, written by Foreman on the CEO's click) and the CEO's editor all write them. A change applies to every running instance on its next turn ([Agent runtime](../architecture/agent-runtime.md)).
+`~/.foreman/config/teams/<team>.toml`, in the [global repo](./home.md#the-global-repo): a reusable roster of [agent souls](./agent-soul.md) plus the team's playbook and escalation rules. One definition can be [deployed](./deployment.md) to any number of projects; every deployment uses the same souls and the same playbook. Foreman owns these files: the UI ([Team page](../features/team-page.md), [Agent page](../features/agent-page.md)), the [Chief of Staff](../features/chief-of-staff.md) (its proposals, written by Foreman on the CEO's click) and the CEO's editor all write them. A change applies to every running instance on its next turn ([Agent runtime](../architecture/agent-runtime.md)).
 
 ## Example
 
@@ -55,7 +55,7 @@ beard = "none"            # none | stubble | full | mustache
 | `name` | String | yes | | | Display name |
 | `purpose` | String | | | one line | What the team is for, shown under its name on the [Team page](../features/team-page.md). Free text; there are no team kinds |
 | `lead` | String | yes | | an id in `agents` | The team lead: the CEO's default contact, the only member who can call `request_merge` |
-| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across the workspace** (the slug of the display name, which is workspace-unique too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when two teams share a project. Their order in the file is the roster's order everywhere, lead first: Sessions tabs, Members, the session prompt |
+| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across all teams** (the slug of the display name, which is unique across all teams too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when two teams share a project. Their order in the file is the roster's order everywhere, lead first: Sessions tabs, Members, the session prompt |
 | `playbook` | Array of single-key inline tables `{ who = "text" }` | | `[]` | | Ordered steps. `who` as in [Playbook and escalation](#playbook-and-escalation) |
 | `escalate` | Array of tables `[[escalate]]` with `when`, `to` | | `[]` | `to`: a `who` ([Playbook and escalation](#playbook-and-escalation)) | Escalation table. Project gates ([Project config](./project-config.md)) apply on top |
 
@@ -88,12 +88,12 @@ Each example carries a full roster with job descriptions, a playbook and an esca
 ## Invariants
 
 - `lead` names an existing agent of the team.
-- Agent display names are unique across the workspace, so @-mentions and avatars stay unambiguous.
+- Agent display names are unique across all teams, so @-mentions and avatars stay unambiguous.
 - A soul names no harness: the project's [profile](../architecture/session-runner.md#credentials) does. An old file's `harness` and `command` lines load, are ignored, and go with the next save ([Agent soul](./agent-soul.md#what-it-runs-on)).
 - A team file never carries secrets or deployment state.
-- Agent ids are unique across the workspace, not just within the team.
+- Agent ids are unique across all teams, not just within the team.
 - An agent can't be removed, and a team file can't be deleted, while it is deployed: stop the deployments first. Removing an undeployed agent removes its soul and keeps its worktrees and branches on disk.
 
 ## Writes
 
-The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the workspace repo, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff never writes the file: it proposes, and the CEO's click on the proposal is a UI write like any other, version-guarded against the file it was drafted from ([Chief of Staff → Tools](../features/chief-of-staff.md#its-tool)).
+The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the global repo, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff never writes the file: it proposes, and the CEO's click on the proposal is a UI write like any other, version-guarded against the file it was drafted from ([Chief of Staff → Tools](../features/chief-of-staff.md#its-tool)).

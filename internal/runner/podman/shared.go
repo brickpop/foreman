@@ -11,7 +11,7 @@ import (
 )
 
 // sharedBuild is an image's build as every Foreman on this machine sees it:
-// the image is one for every workspace, so one Foreman builds it at a time
+// the image is one for every home, so one Foreman builds it at a time
 // (a lock file), and each shows the same state and log, wherever the build
 // runs. Files under dir: <key>.lock, <key>.state (building, ready or
 // failed) and <key>.log, the last build's output.

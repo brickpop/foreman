@@ -10,7 +10,7 @@ import (
 
 	"github.com/agentic-wiki/wiki/index"
 
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // declaration is one [[tool.wikiview.board]] of wiki.toml, the keys Foreman
@@ -142,7 +142,7 @@ func build(idx *index.Index, d declaration) Board {
 			Column:   e.Field(d.Status),
 			Priority: e.Field("priority"),
 			Assignee: e.Field("assignee"),
-			Version:  workspace.Version([]byte(raw)),
+			Version:  home.Version([]byte(raw)),
 		}
 		if d.Lane != "" {
 			c.Lane = e.Field(d.Lane)

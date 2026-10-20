@@ -47,7 +47,7 @@ func TestClaudeCode(t *testing.T) {
 	if agentbin.Binary(runtime.GOARCH) == nil {
 		t.Fatal("foreman-agent isn't built: run just agent")
 	}
-	c := startClaudeWorkspace(t, profile)
+	c := startClaudeHome(t, profile)
 
 	// 1. The lead starts on its goal: a session with no dialog in the way,
 	// whose hooks say running, then idle.
@@ -92,56 +92,52 @@ func TestClaudeCode(t *testing.T) {
 	c.said("lena", "4")
 }
 
-type claudeWorkspace struct {
+type claudeHome struct {
 	t        *testing.T
-	root     string
+	home     string // Foreman's home for the test
 	base     string // http://127.0.0.1:<port>
 	token    string
 	statuses map[string][]string // each instance's statuses, as seen
 }
 
-// startClaudeWorkspace makes a workspace with a two-agent team on a project
-// with one code repo, on the CEO's login profile (the login itself: a refresh
-// during the test lands there, never in a copy), and runs Foreman on it.
-// It lives under .dev/: Podman's machine on macOS shares /Users, not the
-// system's temp folder. It is removed when the test passes.
-func startClaudeWorkspace(t *testing.T, profile string) *claudeWorkspace {
+// startClaudeHome runs Foreman, in a home of its own, with a two-agent
+// team and a project with one code repo on the CEO's login profile (the login
+// itself: a refresh during the test lands there, never in a copy). It lives
+// under .dev/: Podman's machine on macOS shares /Users, not the system's temp
+// folder, and a code repo must be inside the CEO's home folder. It is removed
+// when the test passes.
+func startClaudeHome(t *testing.T, profile string) *claudeHome {
 	t.Helper()
 	root, err := filepath.Abs(filepath.Join("..", "..", ".dev", "claude-test", time.Now().Format("20060102-150405")))
 	if err != nil {
 		t.Fatal(err)
 	}
+	home := filepath.Join(root, "home")
+	app := filepath.Join(root, "app")
 	files := map[string]string{
-		".foreman/settings.toml": "engine = \"podman\"\n\n[project_profiles]\nproj = \"" + profile + "\"\n",
-		".foreman/teams/itest.toml": "team = \"itest\"\nname = \"Itest\"\nlead = \"lena\"\n\n" +
+		"home/config/settings.toml": "engine = \"podman\"\n",
+		"home/config/teams/itest.toml": "team = \"itest\"\nname = \"Itest\"\nlead = \"lena\"\n\n" +
 			"[agents.lena]\nname = \"Lena\"\nrole = \"team_lead\"\nharness = \"claude-code\"\n\n" +
 			"[agents.milo]\nname = \"Milo\"\nrole = \"engineer\"\nharness = \"claude-code\"\n",
-		"proj/project/project.toml": "project = \"proj\"\n",
-		"proj/app/README.md":        "# app\n",
+		"app/README.md": "# app\n",
 	}
 	for rel, content := range files {
 		path := filepath.Join(root, rel)
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, dir := range []string{"proj/project", "proj/app"} {
-		gitIn(t, filepath.Join(root, dir), "init", "--quiet", "--initial-branch=main")
-		gitIn(t, filepath.Join(root, dir), "add", "-A")
-		gitIn(t, filepath.Join(root, dir), "-c", "user.name=test", "-c", "user.email=test@localhost", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "first")
-	}
+	gitIn(t, app, "init", "--quiet", "--initial-branch=main")
+	gitIn(t, app, "add", "-A")
+	gitIn(t, app, "-c", "user.name=test", "-c", "user.email=test@localhost", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "first")
 
 	// Its own home, so it runs beside the CEO's Foreman (one per home), with
 	// the CEO's profiles and image builds linked in.
-	home := filepath.Join(root, ".home")
 	mine, err := userdata.Dir()
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(home, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"profiles", "images"} {
@@ -152,15 +148,15 @@ func startClaudeWorkspace(t *testing.T, profile string) *claudeWorkspace {
 	port := freePorts(t)
 	var out bytes.Buffer
 	go func() {
-		err := run([]string{root, "--yes", "--no-open", "--port", port, "--home", home}, strings.NewReader(""), &out)
+		err := run([]string{"--no-open", "--port", port, "--home", home}, &out)
 		t.Logf("foreman stopped: %v\n%s", err, out.String())
 	}()
-	c := &claudeWorkspace{t: t, root: root, base: "http://127.0.0.1:" + port, statuses: map[string][]string{}}
+	c := &claudeHome{t: t, home: home, base: "http://127.0.0.1:" + port, statuses: map[string][]string{}}
 	deadline := time.Now().Add(2 * time.Minute)
 	for {
-		if data, err := os.ReadFile(filepath.Join(root, ".foreman", "access-token")); err == nil {
+		if data, err := os.ReadFile(filepath.Join(home, "access-token")); err == nil {
 			c.token = strings.TrimSpace(string(data))
-			if res, err := c.do(http.MethodGet, "/api/workspace", nil); err == nil && res.StatusCode == http.StatusOK {
+			if res, err := c.do(http.MethodGet, "/api/home", nil); err == nil && res.StatusCode == http.StatusOK {
 				res.Body.Close()
 				break
 			}
@@ -170,6 +166,9 @@ func startClaudeWorkspace(t *testing.T, profile string) *claudeWorkspace {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	c.post("/api/projects", map[string]string{"name": "proj"})
+	c.post("/api/projects/proj/repos", map[string]string{"name": "app", "path": app})
+	c.put("/api/projects/proj/profile", map[string]string{"profile": profile})
 	// Foreman serves before Podman answers: agents start once the checklist
 	// says Podman runs and the instances are restored.
 	for !c.podmanRuns() {
@@ -181,7 +180,7 @@ func startClaudeWorkspace(t *testing.T, profile string) *claudeWorkspace {
 	t.Cleanup(func() {
 		_, _ = c.do(http.MethodDelete, "/api/deployments/itest@proj", nil)
 		if t.Failed() {
-			t.Logf("kept for a look: %s (session logs in .foreman/logs)", root)
+			t.Logf("kept for a look: %s (session logs in home/logs)", root)
 			return
 		}
 		_ = os.RemoveAll(root)
@@ -216,7 +215,7 @@ func freePorts(t *testing.T) string {
 	return ""
 }
 
-func (c *claudeWorkspace) do(method, path string, body any) (*http.Response, error) {
+func (c *claudeHome) do(method, path string, body any) (*http.Response, error) {
 	var r io.Reader
 	if body != nil {
 		data, _ := json.Marshal(body)
@@ -233,21 +232,31 @@ func (c *claudeWorkspace) do(method, path string, body any) (*http.Response, err
 	return http.DefaultClient.Do(req)
 }
 
-func (c *claudeWorkspace) post(path string, body any) string {
+func (c *claudeHome) post(path string, body any) string {
 	c.t.Helper()
-	res, err := c.do(http.MethodPost, path, body)
+	return c.send(http.MethodPost, path, body)
+}
+
+func (c *claudeHome) put(path string, body any) string {
+	c.t.Helper()
+	return c.send(http.MethodPut, path, body)
+}
+
+func (c *claudeHome) send(method, path string, body any) string {
+	c.t.Helper()
+	res, err := c.do(method, path, body)
 	if err != nil {
 		c.t.Fatal(err)
 	}
 	defer res.Body.Close()
 	data, _ := io.ReadAll(res.Body)
 	if res.StatusCode >= 300 {
-		c.t.Fatalf("POST %s: %d %s", path, res.StatusCode, data)
+		c.t.Fatalf("%s %s: %d %s", method, path, res.StatusCode, data)
 	}
 	return string(data)
 }
 
-func (c *claudeWorkspace) get(path string, into any) {
+func (c *claudeHome) get(path string, into any) {
 	c.t.Helper()
 	res, err := c.do(http.MethodGet, path, nil)
 	if err != nil {
@@ -260,7 +269,7 @@ func (c *claudeWorkspace) get(path string, into any) {
 }
 
 // poll records every instance's status as it changes.
-func (c *claudeWorkspace) poll() map[string]string {
+func (c *claudeHome) poll() map[string]string {
 	var list []store.Instance
 	c.get("/api/instances", &list)
 	now := map[string]string{}
@@ -274,18 +283,18 @@ func (c *claudeWorkspace) poll() map[string]string {
 	return now
 }
 
-func (c *claudeWorkspace) waitStatus(id, status string, timeout time.Duration) {
+func (c *claudeHome) waitStatus(id, status string, timeout time.Duration) {
 	c.t.Helper()
 	for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(250 * time.Millisecond) {
 		if c.poll()[id] == status {
 			return
 		}
 	}
-	c.t.Fatalf("%s never %s; seen %v (session log in %s)", id, status, c.statuses[id], filepath.Join(c.root, ".foreman", "logs"))
+	c.t.Fatalf("%s never %s; seen %v (session log in %s)", id, status, c.statuses[id], filepath.Join(c.home, "logs"))
 }
 
 // waitTurn waits for a turn: running, then idle again.
-func (c *claudeWorkspace) waitTurn(id string, timeout time.Duration) {
+func (c *claudeHome) waitTurn(id string, timeout time.Duration) {
 	c.t.Helper()
 	before := len(c.statuses[id])
 	c.waitStatus(id, "running", timeout)
@@ -295,14 +304,14 @@ func (c *claudeWorkspace) waitTurn(id string, timeout time.Duration) {
 	}
 }
 
-func (c *claudeWorkspace) saw(id, status string) {
+func (c *claudeHome) saw(id, status string) {
 	c.t.Helper()
 	if !slices.Contains(c.statuses[id], status) {
 		c.t.Errorf("%s was never %s; seen %v", id, status, c.statuses[id])
 	}
 }
 
-func (c *claudeWorkspace) waitMessage(match func(store.TeamMessage) bool, timeout time.Duration) store.TeamMessage {
+func (c *claudeHome) waitMessage(match func(store.TeamMessage) bool, timeout time.Duration) store.TeamMessage {
 	c.t.Helper()
 	for deadline := time.Now().Add(timeout); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
 		c.poll()
@@ -321,9 +330,9 @@ func (c *claudeWorkspace) waitMessage(match func(store.TeamMessage) bool, timeou
 }
 
 // transcript is an agent's conversation, as Claude Code saved it.
-func (c *claudeWorkspace) transcript(agent string) []map[string]any {
+func (c *claudeHome) transcript(agent string) []map[string]any {
 	c.t.Helper()
-	files, _ := filepath.Glob(filepath.Join(c.root, "proj", ".sandboxes", agent, ".harness", "claude-code", "projects", "*", "*.jsonl"))
+	files, _ := filepath.Glob(filepath.Join(c.home, "sandboxes", "proj", agent, ".harness", "claude-code", "projects", "*", "*.jsonl"))
 	var lines []map[string]any
 	for _, f := range files {
 		file, err := os.Open(f)
@@ -345,7 +354,7 @@ func (c *claudeWorkspace) transcript(agent string) []map[string]any {
 
 // prompts counts the prompts the agent received with exactly this text: what
 // was typed or delivered, as Claude Code took it.
-func (c *claudeWorkspace) prompts(agent, text string) int {
+func (c *claudeHome) prompts(agent, text string) int {
 	n := 0
 	for _, l := range c.transcript(agent) {
 		if msg, ok := l["message"].(map[string]any); ok && l["type"] == "user" {
@@ -360,7 +369,7 @@ func (c *claudeWorkspace) prompts(agent, text string) int {
 // said fails unless the agent's answers come to include the text. Claude
 // Code writes its transcript a little after the Stop hook says idle, so it
 // waits for it.
-func (c *claudeWorkspace) said(agent, text string) {
+func (c *claudeHome) said(agent, text string) {
 	c.t.Helper()
 	for deadline := time.Now().Add(time.Minute); time.Now().Before(deadline); time.Sleep(time.Second) {
 		if c.answered(agent, text) {
@@ -370,7 +379,7 @@ func (c *claudeWorkspace) said(agent, text string) {
 	c.t.Errorf("%s never said %q", agent, text)
 }
 
-func (c *claudeWorkspace) answered(agent, text string) bool {
+func (c *claudeHome) answered(agent, text string) bool {
 	for _, l := range c.transcript(agent) {
 		if l["type"] != "assistant" {
 			continue
@@ -387,7 +396,7 @@ func (c *claudeWorkspace) answered(agent, text string) bool {
 }
 
 // toolCalls counts the agent's calls of a Foreman team tool.
-func (c *claudeWorkspace) toolCalls(agent, tool string) int {
+func (c *claudeHome) toolCalls(agent, tool string) int {
 	n := 0
 	for _, l := range c.transcript(agent) {
 		if l["type"] != "assistant" {
@@ -405,7 +414,7 @@ func (c *claudeWorkspace) toolCalls(agent, tool string) int {
 }
 
 // podmanRuns reports whether the setup checklist says Podman runs.
-func (c *claudeWorkspace) podmanRuns() bool {
+func (c *claudeHome) podmanRuns() bool {
 	res, err := c.do(http.MethodGet, "/api/setup", nil)
 	if err != nil {
 		return false

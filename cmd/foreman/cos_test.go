@@ -16,13 +16,14 @@ import (
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/fake"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/runner"
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/sessionlog"
+	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/terminal"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // specs records what each start asked of the engine.
@@ -36,40 +37,46 @@ func (s *specs) Start(ctx context.Context, spec runner.Spec) (runner.Process, er
 	return s.Runner.Start(ctx, spec)
 }
 
-// testChief is a workspace's Chief of Staff on a stand-in harness: a script
+// testChief is a home's Chief of Staff on a stand-in harness: a script
 // that prints its arguments, then echoes what is typed into it.
-func testChief(t *testing.T) (*chiefOfStaff, *workspace.Workspace, *specs) {
+func testChief(t *testing.T) (*chiefOfStaff, *home.Home, *specs) {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
-	ws, err := workspace.Init(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	h, err := home.Open(filepath.Join(os.Getenv("HOME"), ".foreman"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ws.Load(context.Background(), git.New()); err != nil {
+	db, err := store.Open(context.Background(), h.Path("state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := h.Load(context.Background(), home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	program := filepath.Join(t.TempDir(), "harness.sh")
 	if err := os.WriteFile(program, []byte("#!/bin/sh\necho \"opened: $*\"\ncat\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	store := profiles.Store{Root: t.TempDir()}
-	if err := store.Ensure("fake"); err != nil {
+	logins := profiles.Store{Root: t.TempDir()}
+	if err := logins.Ensure("fake"); err != nil {
 		t.Fatal(err)
 	}
 	logs := sessionlog.Dir{Root: t.TempDir()}
 	engine := &specs{Runner: direct.Runner{}}
 	c := &chiefOfStaff{
-		root: ws.Root(), dir: ws.Path("cos"), teamsDir: ws.Path("teams"), teams: ws.Teams,
-		profiles: store, adapters: map[string]harness.Adapter{"fake": fake.Adapter{Program: program}},
+		home: h.Root(), dir: h.Path("cos"), teamsDir: h.TeamsDir(), teams: h.Teams,
+		profiles: logins, adapters: map[string]harness.Adapter{"fake": fake.Adapter{Program: program}},
 		images: direct.Images{}, terms: newSessions(engine, func(id string) (terminal.Log, error) { return logs.Open(id) }),
 		agent:   instances.AgentLink{Host: "/host/foreman-agent", Path: "/opt/foreman-agent", URL: "http://agent", Token: func(id string) string { return "token-" + id }},
 		blocked: func() error { return nil },
 	}
-	c.CoS = cos.New(cos.Deps{Teams: ws, Publish: func(events.Event) {}, Tell: c.tell,
+	c.CoS = cos.New(cos.Deps{Teams: h, Publish: func(events.Event) {}, Tell: c.tell,
 		Deployed: func(context.Context, string) bool { return false }})
 	t.Cleanup(func() { c.terms.stopAll() })
-	return c, ws, engine
+	return c, h, engine
 }
 
 // screen waits for the session's screen to show want.
@@ -91,9 +98,9 @@ func screen(t *testing.T, c *chiefOfStaff, want string) {
 }
 
 // The session sees its own folder and the team files, read-only, and nothing
-// else of the workspace; it starts with the opener and the default profile.
+// else of the home; it starts with the opener and the default profile.
 func TestTheChiefOfStaffSession(t *testing.T) {
-	c, ws, engine := testChief(t)
+	c, h, engine := testChief(t)
 	term, err := c.Start(context.Background(), "Create a new team.")
 	if err != nil || term != cos.Instance {
 		t.Fatalf("start: %q %v", term, err)
@@ -101,8 +108,8 @@ func TestTheChiefOfStaffSession(t *testing.T) {
 	screen(t, c, "opened: Create a new team.")
 	spec := engine.got[0]
 	want := []runner.Mount{
-		{Source: ws.Path("cos"), Target: ws.Path("cos")},
-		{Source: ws.Path("teams"), Target: ws.Path("teams"), ReadOnly: true},
+		{Source: h.Path("cos"), Target: h.Path("cos")},
+		{Source: h.TeamsDir(), Target: h.TeamsDir(), ReadOnly: true},
 		{Source: "/host/foreman-agent", Target: "/opt/foreman-agent", ReadOnly: true},
 	}
 	if len(spec.Mounts) != len(want) {
@@ -114,18 +121,18 @@ func TestTheChiefOfStaffSession(t *testing.T) {
 		}
 	}
 	for _, m := range spec.Mounts {
-		if m.Source == ws.Path() || strings.HasPrefix(ws.Path("secrets"), m.Source) {
+		if m.Source == h.Path() || strings.HasPrefix(h.Path("secrets"), m.Source) {
 			t.Errorf("mounted %s", m.Source)
 		}
 	}
-	if spec.Dir != ws.Path("cos") || spec.Labels[instances.WorkspaceLabel] != ws.Root() || !strings.HasSuffix(spec.Name, "-cos") {
+	if spec.Dir != h.Path("cos") || spec.Labels[instances.HomeLabel] != h.Root() || !strings.HasSuffix(spec.Name, "-cos") {
 		t.Errorf("spec %+v", spec)
 	}
 	if env := strings.Join(spec.Env, " "); !strings.Contains(env, "FOREMAN_AGENT_TOKEN=token-cos") {
 		t.Errorf("env %s", env)
 	}
-	prompt, _ := os.ReadFile(filepath.Join(ws.Path("cos"), ".harness", "fake", "PROMPT.md"))
-	if !strings.Contains(string(prompt), ws.Path("teams")) {
+	prompt, _ := os.ReadFile(filepath.Join(h.Path("cos"), ".harness", "fake", "PROMPT.md"))
+	if !strings.Contains(string(prompt), h.TeamsDir()) {
 		t.Errorf("prompt:\n%s", prompt)
 	}
 	if !c.Live() {
@@ -162,9 +169,9 @@ func TestTheChiefOfStaffWaitsForPodman(t *testing.T) {
 	}
 }
 
-// From propose_team to the team file, through the workspace's own rules.
+// From propose_team to the team file, through the home's own rules.
 func TestAProposalBecomesATeamFile(t *testing.T) {
-	c, ws, _ := testChief(t)
+	c, h, _ := testChief(t)
 	if _, err := c.Start(context.Background(), ""); err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +184,7 @@ func TestAProposalBecomesATeamFile(t *testing.T) {
 	}
 	team := `{"team": "vesper", "name": "Vesper", "lead": "kestrel", "order": ["kestrel", "nyx"],
 	  "agents": {"kestrel": {"name": "Kestrel", "role": "team_lead"}, "nyx": {"name": "Nyx", "role": "qa"}}}`
-	// The workspace's rules: an id that isn't a slug is refused, never shown.
+	// The home's rules: an id that isn't a slug is refused, never shown.
 	if r := calls.Call(context.Background(), cos.Instance, cos.ProposeTeam, json.RawMessage(strings.Replace(team, `"vesper"`, `"Vesper Team"`, 1))); !r.Error {
 		t.Errorf("a bad id: %+v", r)
 	}
@@ -188,11 +195,11 @@ func TestAProposalBecomesATeamFile(t *testing.T) {
 	if !ok {
 		t.Fatal("nothing on screen")
 	}
-	look := workspace.Look{Color: "#8E9AAF", Skin: "#C38A62", Hair: "curly", HairColor: "#6B4A2F", Eyes: "sleepy", Beard: "full"}
-	if _, err := c.Create(context.Background(), p.ID, map[string]workspace.Look{"kestrel": look, "nyx": look}); err != nil {
+	look := home.Look{Color: "#8E9AAF", Skin: "#C38A62", Hair: "curly", HairColor: "#6B4A2F", Eyes: "sleepy", Beard: "full"}
+	if _, err := c.Create(context.Background(), p.ID, map[string]home.Look{"kestrel": look, "nyx": look}); err != nil {
 		t.Fatal(err)
 	}
-	saved, err := ws.Team("vesper")
+	saved, err := h.Team("vesper")
 	if err != nil || saved.Config.Agents["nyx"].Look != look || len(saved.Problems) != 0 {
 		t.Errorf("saved %+v %v", saved, err)
 	}

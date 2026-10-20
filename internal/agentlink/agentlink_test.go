@@ -79,12 +79,12 @@ func TestOnlyGenuineTokensOfRunningInstancesGetThrough(t *testing.T) {
 	name, sig, _ := strings.Cut(mara, ".")
 	toveName, _, _ := strings.Cut(link.Token("tove@ledger"), ".")
 	for what, token := range map[string]string{
-		"no token":                   "",
-		"another workspace's secret": other.Token("mara@ledger"),
-		"mara's signature on tove":   toveName + "." + sig,
-		"a stopped instance":         link.Token("ivo@ledger"),
-		"no signature":               name,
-		"garbage":                    "!!!.abc",
+		"no token":                 "",
+		"another home's secret":    other.Token("mara@ledger"),
+		"mara's signature on tove": toveName + "." + sig,
+		"a stopped instance":       link.Token("ivo@ledger"),
+		"no signature":             name,
+		"garbage":                  "!!!.abc",
 	} {
 		req, _ := http.NewRequest("GET", srv.URL+"/tools", nil)
 		if token != "" {

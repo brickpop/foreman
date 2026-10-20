@@ -123,11 +123,11 @@ func TestBoardsNoneDeclared(t *testing.T) {
 	}
 }
 
-// The starter's two task boards (internal/workspace/starter): a task moved to
+// The starter's two task boards (internal/home/starter): a task moved to
 // todo on Backlog stays there and shows on Board too; one at work only on
 // Board; an unscheduled one only on Backlog (the CEO, 2026-10-17).
 func TestTheStartersTaskBoards(t *testing.T) {
-	toml, err := os.ReadFile("../workspace/starter/wiki/wiki.toml")
+	toml, err := os.ReadFile("../home/starter/wiki/wiki.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

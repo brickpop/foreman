@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Two Foremans (two workspaces) share one image: one builds at a time, the
+// Two Foremans (two homes) share one image: one builds at a time, the
 // other waits; both see the same state and log.
 func TestOneBuildAtATimeAcrossForemans(t *testing.T) {
 	dir := t.TempDir()

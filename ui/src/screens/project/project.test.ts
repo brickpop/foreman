@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
 import { forgeOf, linkLine } from "../../app/model";
-import { nameClash, repoDetail, repoHint } from "../../components/AddProject";
 import { columnLabel, laneLabel, moveOf } from "./Board";
 import { sourceLabel } from "./Pipeline";
-import { repoTree } from "./ProjectSettings";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;
 const board = (cards: Card[], lanes: string[] = []) =>
@@ -78,32 +76,6 @@ describe("Changes", () => {
   });
 });
 
-describe("Add a project", () => {
-  it("describes a folder's repos", () => {
-    expect(repoDetail([])).toBe("No git repos yet");
-    expect(repoDetail(["mobile-app"])).toBe("1 git repo: mobile-app");
-    expect(repoDetail(["billing-api", "billing-web"])).toBe(
-      "2 git repos: billing-api, billing-web",
-    );
-  });
-  it("refuses a name a workspace folder has, in any case", () => {
-    const projects = ["Ledger"];
-    const candidates = ["billing", "DevProject"];
-    expect(nameClash("ledger", projects, candidates)).toBe("Ledger is already a project.");
-    expect(nameClash("  devproject ", projects, candidates)).toBe(
-      "DevProject/ already exists: pick it below to add it.",
-    );
-    expect(nameClash("billing-2", projects, candidates)).toBe("");
-    expect(nameClash("   ", projects, candidates)).toBe("");
-  });
-
-  it("names the repo it creates, with placeholders until typed", () => {
-    expect(repoHint("ledger", "api")).toMatch(/^Creates ledger\/api\/ and initializes/);
-    expect(repoHint("", "")).toMatch(/^Creates <project>\/<repo>\/ /);
-    expect(repoHint("ledger", "")).toMatch(/Leave it blank to add one later\.$/);
-  });
-});
-
 describe("forgeOf", () => {
   const project = (kind: string) =>
     ({ config: { forge: { kind, url: "", projectRepo: "" } } }) as unknown as Project;
@@ -111,14 +83,5 @@ describe("forgeOf", () => {
     expect(forgeOf(project("github"))).toBe("github");
     expect(forgeOf(project("none"))).toBe("none");
     expect(forgeOf(undefined)).toBe("none");
-  });
-});
-
-describe("repoTree", () => {
-  it("draws the repos as the project folder's children", () => {
-    expect(repoTree("ledger", ["ledger-api", "ledger-web"])).toBe(
-      "ledger/\n├─ ledger-api/\n└─ ledger-web/",
-    );
-    expect(repoTree("cal", ["cal"])).toBe("cal/\n└─ cal/");
   });
 });

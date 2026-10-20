@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, ui, config, teams]
 ---
 
@@ -27,33 +27,32 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 
 **Left column** (max 520px):
 
-- **"Workspace"**: the folder tree, explained (Mono 13px / 1.7 `<pre>`), with this project's real repo names:
+- **"Where things live"**: the home's tree, explained (Mono 13px / 1.7 `<pre>`), with the home's real path and this project's name:
 
   ```
-  ~/agents-ws/
-  ├─ .foreman/          workspace repo (git)
-  │  ├─ teams/          team definitions (souls, playbooks)
-  │  ├─ cos/            Chief of Staff (its own folder)
-  │  └─ state.db        deployments, sessions, requests (runtime)
-  └─ <project>/
-     ├─ project/        project repo (git)
-     │  ├─ project.toml repos, checks, gates, forge
-     │  └─ wiki/        knowledge base + wiki.toml (boards)
-     ├─ <repo1>/
-     ├─ <repo2>/
-     └─ .sandboxes/     one git worktree per agent, per repo
+  ~/.foreman/
+  ├─ config/              global repo (git): teams, settings
+  ├─ projects/
+  │  └─ <project>/
+  │     ├─ project.toml    checks, gates, forge
+  │     └─ wiki/           knowledge base + wiki.toml (boards)
+  ├─ sandboxes/
+  │  └─ <project>/      one git worktree per agent, per repo
+  └─ state.db             deployments, sessions, requests (runtime)
   ```
+
+  The code repos are not in it: they are wherever the CEO keeps them, listed under **Code repos** ([Home → Layout](../models/home.md#layout)).
 
 - **"How work flows"**: four items, title (600) and body (`--tx2`, line-height 1.55):
-  - **Team definition**: "Lives once in the workspace: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
+  - **Team definition**: "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
   - **Deployment**: "A team on this project with a goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix."
   - **Session prompt**: "Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt."
   - **Enforced by Foreman**: "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (that’s In flight, in Repositories), wakes requesters when replies land, sends escalations to Home, and only lets the lead request merges to main."
 
 **Right column**:
 
-- **"Profile"** (first in the right column; the CEO, 2026-10-18): a select of the CEO's [profiles](../architecture/session-runner.md#credentials) (`<name> · <Harness>`, Mono), the project's own selected (`default` unless set; one that no longer exists stays listed and selected), then its state, `connected` (`--ok`), `not connected` or `doesn't exist` (`--err`). Under it: "Its agents run on this harness and login, from their next start. Profiles are yours on this machine, in Settings → Global" (a link to [Settings → Profiles](./settings.md#profiles)). Choosing saves `project_profiles` in the workspace's [settings](../models/workspace-settings.md#schema), never `project.toml`; choosing `default` removes the project's line. While any of the project's running agents (starting, running, idle, awaiting) still runs on another profile, a bordered line under the select says so (the CEO, 2026-10-18): "<n> agents still run on <their profiles>: they switch at the next start.", plus, when that means another harness, "On <Harness>, each starts a new conversation; a lead gets its goal again." Beside it, **`Restart them`** (`Restart it` for one) restarts them now (`POST /api/instances/:id/restart` each). A run from before the instance kept its profile is judged by its harness. Agents asleep or stopped aren't listed: they start on the new profile anyway. One profile for all its agents for now ([Profiles per agent](../../backlog/profiles-per-agent.md), later).
-- **"Code repos"**: the repos as a folder tree under `<project>/`, one per line (`├─ <repo>/`, the last `└─ <repo>/`), Mono, like the Workspace tree (the CEO, 2026-10-17); with none, in `--err`: `None yet: agents need at least one repo to work on. Clone one into <project>/, or create an empty one here.` Then a Mono input (placeholder `new-repo`) and a small **`New repo`** button: `POST /api/projects/:id/repos {name}` creates it as [Add a project](./add-project.md) does (empty, a first commit, on the project's `main`); a refusal (a bad or taken name) shows under it. When `project.toml` lists its `repos`, a new folder wouldn't count, so the form is replaced by `project.toml lists its repos: add a new one there, after creating it in <project>/.`
+- **"Profile"** (first in the right column; the CEO, 2026-10-18): a select of the CEO's [profiles](../architecture/session-runner.md#credentials) (`<name> · <Harness>`, Mono), the project's own selected (`default` unless set; one that no longer exists stays listed and selected), then its state, `connected` (`--ok`), `not connected` or `doesn't exist` (`--err`). Under it: "Its agents run on this harness and login, from their next start. Profiles are yours on this machine, in Settings → Global" (a link to [Settings → Profiles](./settings.md#profiles)). Choosing saves it on the project's [record](../models/project-config.md#the-project-record) (`PUT /api/projects/:id/profile {profile}`), never in `project.toml`, which the lead can write; choosing `default` empties it. While any of the project's running agents (starting, running, idle, awaiting) still runs on another profile, a bordered line under the select says so (the CEO, 2026-10-18): "<n> agents still run on <their profiles>: they switch at the next start.", plus, when that means another harness, "On <Harness>, each starts a new conversation; a lead gets its goal again." Beside it, **`Restart them`** (`Restart it` for one) restarts them now (`POST /api/instances/:id/restart` each). A run from before the instance kept its profile is judged by its harness. Agents asleep or stopped aren't listed: they start on the new profile anyway. One profile for all its agents for now ([Profiles per agent](../../backlog/profiles-per-agent.md), later).
+- **"Code repos"**: one line per repo of the [record](../models/project-config.md#the-project-record), Mono 13px: its name (`--tx`) and its path (`--tx3`), and under it, when it has one, its problem in `--err` (a missing folder, or one that is another repo: `Locate it where it went, or remove it from the project`). With none, in `--err`: `None yet: agents need at least one repo to work on.` **Phasing:** adding (an existing repo or a new empty one), locating and removing a repo come back here with [Add a project, anywhere](../../backlog/add-project-anywhere.md); their routes exist ([Add a project → Code repos](./add-project.md#code-repos)).
 - **"What comes to you"**: grid `84px 1fr`, the kind label (colored, Mono uppercase, no border) and a line:
   - Approval: "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer."
   - Question: "An agent needs information only you have. It keeps working on other things meanwhile."
@@ -62,8 +61,8 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
 - **"Merges"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:
   - forge `none`: "No forge. You merge requested branches into main from Home or the project's Overview; Foreman does the merge."
-  - otherwise: "Merge to main from Home or the project's Overview, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in your workspace Settings, never in this file."
+  - otherwise: "Merge to main from Home or the project's Overview, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file."
   - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
-- **`project.toml`**: a row with `<project>/project/project.toml · read-only` (Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
+- **`project.toml`**: a row with `~/.foreman/projects/<project>/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 
 Everything in this block is read-only. Changes to `project.toml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

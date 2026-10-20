@@ -11,7 +11,7 @@ import (
 )
 
 // Profiles is Settings → Global → Profiles: each a harness and its
-// credentials, shared by every workspace (wiki/product/architecture/session-runner.md#credentials).
+// credentials, shared by every project (wiki/product/architecture/session-runner.md#credentials).
 type Profiles interface {
 	// List returns the profiles with their state, the default first.
 	List() ([]profiles.Profile, error)

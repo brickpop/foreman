@@ -13,7 +13,7 @@ import (
 	"github.com/agentic-wiki/wiki/bundle"
 	"github.com/agentic-wiki/wiki/index"
 
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // ErrNotFound means no such project wiki, entry or image.
@@ -171,7 +171,7 @@ func (w *Wikis) Entry(project, p string) (Entry, error) {
 	return Entry{
 		Path:        rel(e.Path),
 		Title:       title(e),
-		Version:     workspace.Version([]byte(raw)),
+		Version:     home.Version([]byte(raw)),
 		Frontmatter: frontmatter(e),
 		Body:        body,
 		Links:       links(idx, e),

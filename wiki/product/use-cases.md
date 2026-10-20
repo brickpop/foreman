@@ -1,7 +1,7 @@
 ---
 type: spec
 status: planned
-tags: [feature, workspace]
+tags: [feature, home]
 ---
 
 # Use cases
@@ -10,12 +10,12 @@ The end-to-end scenarios v1 must pass. Each one becomes an end-to-end test; the 
 
 ## 1. Start from scratch
 
-Run `foreman` in `~/agents-ws`, open the UI, then use **+ New project** and add the `ledger` folder (repos already cloned). Next, use **+ New team** to have the Chief of Staff draft "Atlas", a team to build features. Finally, deploy Atlas to ledger with a goal, and the sessions start.
+Run `foreman`, open the UI, then use **+ New project** to make `ledger` and add its repo `~/dev/ledger-api` (already cloned). Next, use **+ New team** to have the Chief of Staff draft "Atlas", a team to build features. Finally, deploy Atlas to ledger with a goal, and the sessions start.
 
 Acceptance:
-- [ ] `foreman` started in a folder serves the UI on `localhost:8888`, and `.foreman/` exists in the workspace as a git repo (the workspace repo).
-- [ ] The [Add a project](./features/add-project.md) dialog lists `ledger/` with its detected repos; adding it creates the project repo `ledger/project/` (`git init`, `project.toml`, a starter wiki). Nothing is cloned.
-- [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a team from the purpose and shows it in the preview beside its terminal, one tab per member; the CEO's **Create Atlas** writes `.foreman/teams/atlas.toml`, one commit in the workspace repo, and Atlas appears in the sidebar within 1 s. A draft that breaks the team file's invariants (a name already used) is never shown.
+- [ ] `foreman` serves the UI on `localhost:8888`, and `~/.foreman/config/` exists as a git repo (the global repo). A second `foreman` only prints the first one's URL.
+- [ ] The [Add a project](./features/add-project.md) dialog creates the project repo `~/.foreman/projects/ledger/` (`git init`, `project.toml`, a starter wiki) and adds `~/dev/ledger-api` to the project's record by its path. Nothing is cloned, and nothing is written in `~/dev/ledger-api` but its `.git`.
+- [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a team from the purpose and shows it in the preview beside its terminal, one tab per member; the CEO's **Create Atlas** writes `~/.foreman/config/teams/atlas.toml`, one commit in the global repo, and Atlas appears in the sidebar within 1 s. A draft that breaks the team file's invariants (a name already used) is never shown.
 - [ ] [Deploying](./features/deploy-team.md) Atlas to ledger with a goal creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
 
 ## 2. Delegate through the lead
@@ -28,7 +28,7 @@ Acceptance:
 - [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
 - [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Repositories](./features/repositories.md) tab, under In flight.
-- [ ] Tove's `contribute(finding, …)` writes a note in `ledger/project/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
+- [ ] Tove's `contribute(finding, …)` writes a note in `~/.foreman/projects/ledger/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
 - [ ] When the lead updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
 
 ## 3. Direct instruction
@@ -96,7 +96,7 @@ Acceptance:
 From Atlas, choose **Hire** and complete the CoS interview. The new engineer joins and starts on every Atlas deployment.
 
 Acceptance:
-- [ ] The interview ends with the preview, the new member's tab marked; the CEO's **Save** adds the agent to `atlas.toml`, with a random face, one commit in the workspace repo.
+- [ ] The interview ends with the preview, the new member's tab marked; the CEO's **Save** adds the agent to `atlas.toml`, with a random face, one commit in the global repo.
 - [ ] A new instance then starts on every active Atlas deployment.
 
 ## 10. Change config safely

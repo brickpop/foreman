@@ -7,9 +7,7 @@
  * ProjectConfig is project.toml.
  */
 export interface ProjectConfig {
-  project: string;
   description: string;
-  repos: string[];
   main: string;
   checks: string;
   mergeToMain: string;
@@ -89,15 +87,8 @@ export interface Settings {
   stuckAfterMinutes: number /* int */;
   logCapMb: number /* int */;
   forges: { [key: string]: ForgeAccount};
-  workspaceForge: WorkspaceForge;
+  globalForge: GlobalForge;
   notifications: Notifications;
-  /**
-   * ProjectProfiles names the profile each project's agents run on (a
-   * harness and its credentials, internal/profiles); a project not named
-   * uses the default. Kept here, not in project.toml: the lead can write
-   * the project repo, and profiles are this machine's.
-   */
-  projectProfiles: { [key: string]: string};
 }
 /**
  * ForgeAccount is a forge account's host or owner; its token is a secret.
@@ -106,9 +97,9 @@ export interface ForgeAccount {
   url: string;
 }
 /**
- * WorkspaceForge is the forge hosting the workspace repo.
+ * GlobalForge is the forge hosting the global repo (teams and settings).
  */
-export interface WorkspaceForge {
+export interface GlobalForge {
   kind: string;
   url: string;
 }
@@ -125,15 +116,26 @@ export interface Notifications {
 // source: load.go
 
 /**
- * Project is a workspace subfolder with project/project.toml.
+ * Project is a project of this machine: its record (its name, its repos, its
+ * profile) and its project repo's project.toml.
  */
 export interface Project {
-  id: string; // the folder name
+  id: string;
+  path: string; // its project repo, <home>/projects/<id>
+  profile: string; // the profile its agents run on: its own, else the default
   config: ProjectConfig;
-  repos: string[]; // the code repos agents get worktrees of
+  repos: Repo[]; // the code repos agents get worktrees of, by name
   version: string; // of project.toml
-  problems: string[]; // what is wrong with project.toml; Config is then the last good one
+  problems: string[]; // what is wrong with project.toml or a repo; Config is then the last good one
   source: string; // project.toml as it is on disk, shown read-only
+}
+/**
+ * Repo is one of a project's code repos, anywhere on disk.
+ */
+export interface Repo {
+  name: string; // unique in the project
+  path: string; // absolute
+  problem: string; // why agents can't use it (missing, …); "" when they can
 }
 /**
  * Team is a team file.
@@ -163,19 +165,11 @@ export interface Missing {
   required: boolean; // the wiki can't be read without it
 }
 /**
- * Change says what changed on disk, for the UI to refetch.
+ * Change says what changed, for the UI to refetch.
  */
 export interface Change {
-  object: string; // "projects" (a project or repo appeared or went), "project", "team" or "settings"
+  object: string; // "projects" (a project or repo appeared, went or changed), "project", "team" or "settings"
   id?: string; // the project or team, for "project" and "team"
   version?: string; // the file's new version ("" once it is gone)
   problems?: string[]; // what is wrong with it now
-}
-/**
- * Candidate is a workspace folder that isn't a project yet: Add a project
- * turns it into one (wiki/product/features/add-project.md).
- */
-export interface Candidate {
-  folder: string;
-  repos: string[]; // the git repos found in it
 }

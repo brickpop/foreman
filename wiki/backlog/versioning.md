@@ -17,4 +17,4 @@ Three things carry a version and can drift apart, and the CEO decides what happe
 - [ ] decide 1–3 with the CEO; record in the specs
 - [ ] handshake in `foreman-agent` and the agent link (when the agent link is built, epic 2)
 - [ ] migration policy in the state store
-- [ ] file format versions in workspace & config loading
+- [ ] file format versions in home & config loading

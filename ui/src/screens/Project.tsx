@@ -1,6 +1,6 @@
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { useInstances, useProjects, useRequests, useTeams, useWorkspace } from "../app/queries";
+import { useInstances, useProjects, useRequests, useTeams } from "../app/queries";
 import { deploymentTabs, mostRecentAgent } from "../app/sessions";
 import { DeployDialog } from "../components/DeployDialog";
 import { Button, CountBadge, outlineLink } from "../components/ui";
@@ -27,11 +27,10 @@ export function Project() {
   const { tab, entry } = useSearch({ from: "/projects/$project" });
   const projects = useProjects();
   const requests = useRequests();
-  const workspace = useWorkspace();
   const [deploy, setDeploy] = useState(false);
   const project = projects.data?.find((p) => p.id === id);
   if (projects.isPending) return null;
-  if (!project) return <p className="p-12 text-tx3">No project {id} in this workspace.</p>;
+  if (!project) return <p className="p-12 text-tx3">No project {id}.</p>;
   const open = (requests.data ?? []).filter((r) => r.status === "open" && r.projectId === id);
   return (
     <div className="flex flex-col">
@@ -39,9 +38,7 @@ export function Project() {
         <div className="flex items-start gap-4">
           <div className="flex flex-1 flex-col gap-1">
             <h1 className="m-0 text-[30px] font-semibold tracking-[-0.02em]">{project.id}</h1>
-            <span className="font-mono text-[12.5px] text-tx4">
-              {workspace.data?.path ?? "~"}/{project.id}
-            </span>
+            <span className="font-mono text-[12.5px] text-tx4">{project.path}</span>
             {project.config.description && (
               <p className="m-0 mt-1 text-[15px] text-tx3">{project.config.description}</p>
             )}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -261,29 +260,6 @@ func TestConcurrentPreparesOnOneRepo(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-	}
-}
-
-func TestExcludeKeepsTheSandboxesOutOfAnEnclosingRepo(t *testing.T) {
-	outer := repo(t)
-	project := filepath.Join(outer, "ledger")
-	write(t, filepath.Join(project, ".sandboxes", "mara", "f"), "x\n")
-	g := New()
-	for i := 0; i < 2; i++ {
-		if err := g.Exclude(ctx, filepath.Join(project, ".sandboxes")); err != nil {
-			t.Fatal(err)
-		}
-	}
-	data, _ := os.ReadFile(filepath.Join(outer, ".git", "info", "exclude"))
-	if lines := strings.Split(string(data), "\n"); slices.Index(lines, "/ledger/.sandboxes/") < 0 || strings.Count(string(data), ".sandboxes") != 1 {
-		t.Errorf("exclude file:\n%s", data)
-	}
-	if status, _ := run(ctx, outer, "status", "--porcelain", "--untracked-files=all"); strings.Contains(status, ".sandboxes") {
-		t.Errorf("the sandboxes still show: %q", status)
-	}
-	// Outside any repo there is nothing to do.
-	if err := g.Exclude(ctx, filepath.Join(t.TempDir(), ".sandboxes")); err != nil {
-		t.Errorf("outside a repo: %v", err)
 	}
 }
 

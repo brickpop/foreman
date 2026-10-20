@@ -3,7 +3,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useState } from "react";
 import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client";
 import { agentOf } from "../../app/model";
-import { useBoards, useEntry, useMissing, useMoveCard, useTeams, useTick } from "../../app/queries";
+import {
+  useBoards,
+  useEntry,
+  useMissing,
+  useMoveCard,
+  useProjectRepo,
+  useTeams,
+  useTick,
+} from "../../app/queries";
 import { Avatar } from "../../components/Avatar";
 import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
@@ -343,6 +351,7 @@ function SideSheet({
   path?: string;
   onClose: () => void;
 }) {
+  const repo = useProjectRepo(project);
   const navigate = useNavigate();
   const toast = useToast();
   const entry = useEntry(project, path ?? "");
@@ -365,7 +374,7 @@ function SideSheet({
       title={
         <span className="flex items-center gap-3">
           <span className="font-mono text-[12.5px] font-normal text-tx3">
-            {project}/project/wiki/{path}
+            {repo}/wiki/{path}
           </span>
           <Button variant="small" onClick={() => path && open(path)}>
             Open in wiki

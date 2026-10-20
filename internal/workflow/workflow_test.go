@@ -16,27 +16,31 @@ import (
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/wiki"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 var ctx = context.Background()
 
-var atlas = workspace.Team{ID: "atlas", Config: workspace.TeamConfig{
+var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 	Team: "atlas", Name: "Atlas", Lead: "mara", Order: []string{"mara", "tove", "ivo"},
-	Agents: map[string]workspace.Soul{
+	Agents: map[string]home.Soul{
 		"mara": {Name: "Mara", Role: "team_lead"},
 		"tove": {Name: "Tove", Role: "engineer"},
 		"ivo":  {Name: "Ivo", Role: "engineer"},
 	},
 }}
 
-type config struct{}
+// config is the home: projects in root/<id>, each with its repos api and web
+// and its project repo beside them.
+type config struct{ root string }
 
-func (config) Project(id string) (workspace.Project, error) {
-	return workspace.Project{ID: id, Repos: []string{"api", "web"}, Config: workspace.ProjectConfig{Main: "main"}}, nil
+func (c config) Project(id string) (home.Project, error) {
+	dir := filepath.Join(c.root, id)
+	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Config: home.ProjectConfig{Main: "main"},
+		Repos: []home.Repo{{Name: "api", Path: filepath.Join(dir, "api")}, {Name: "web", Path: filepath.Join(dir, "web")}}}, nil
 }
 
 // entries is a wiki: path to title.
@@ -113,7 +117,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, root: root, m: m, db: db}
-	f.w = New(Deps{Root: root, Git: g, Config: config{}, Messages: m, Now: now, WorkItems: db.WorkItems(),
+	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Now: now, WorkItems: db.WorkItems(),
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
 	return f
@@ -858,7 +862,7 @@ func TestReviewRequests(t *testing.T) {
 		t.Errorf("still open after the rejection: %+v", open)
 	}
 
-	// One made before reviews existed gets its review at the next reconcile.
+	// One whose review couldn't be saved gets it at the next reconcile.
 	if _, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger", AuthorInstance: "mara@ledger",
 		Repo: "api", Branch: "lead/atlas/second", Entry: "backlog/led-44.md"}); err != nil {
 		t.Fatal(err)

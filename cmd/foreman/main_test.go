@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"flag"
 	"net"
 	"net/http"
 	"os"
@@ -13,73 +12,18 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/userdata"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
-func TestFirstRunDeclinedTouchesNothing(t *testing.T) {
-	for _, answer := range []string{"\n", "n\n", "yes\n", "", "Y es\n"} {
-		dir := t.TempDir()
-		var out bytes.Buffer
-		_, err := openOrCreate(dir, false, strings.NewReader(answer), &out)
-		if err == nil {
-			t.Errorf("answer %q: created a workspace", answer)
-		}
-		if _, statErr := os.Stat(filepath.Join(dir, workspace.DirName)); !os.IsNotExist(statErr) {
-			t.Errorf("answer %q: .foreman/ exists after declining", answer)
-		}
-		if !strings.Contains(out.String(), "isn't a Foreman workspace yet") {
-			t.Errorf("answer %q: no prompt shown: %q", answer, out.String())
-		}
+// Foreman takes no folder: it runs from its home. A folder given (an old
+// habit) is refused before anything is made.
+func TestAFolderArgumentIsRefused(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	err := run([]string{"--no-open", "--home", home, "~/dev"}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "foreman takes no folder (~/dev)") {
+		t.Errorf("%v", err)
 	}
-}
-
-func TestFirstRunAcceptedCreatesWorkspace(t *testing.T) {
-	for _, answer := range []string{"y\n", "Y\n", "  y  \n"} {
-		dir := t.TempDir()
-		ws, err := openOrCreate(dir, false, strings.NewReader(answer), &bytes.Buffer{})
-		if err != nil {
-			t.Fatalf("answer %q: %v", answer, err)
-		}
-		if _, err := os.Stat(ws.Path()); err != nil {
-			t.Errorf("answer %q: %v", answer, err)
-		}
-	}
-}
-
-func TestYesSkipsThePromptAndExistingWorkspacesDontAsk(t *testing.T) {
-	dir := t.TempDir()
-	var out bytes.Buffer
-	if _, err := openOrCreate(dir, true, strings.NewReader(""), &out); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := openOrCreate(dir, false, strings.NewReader(""), &out); err != nil {
-		t.Fatalf("reopening asked again or failed: %v", err)
-	}
-	if out.Len() != 0 {
-		t.Errorf("prompted although it shouldn't have: %q", out.String())
-	}
-}
-
-func TestFlagsOnEitherSideOfTheFolder(t *testing.T) {
-	for _, args := range [][]string{
-		{"ws", "--no-open", "--port", "1"},
-		{"--no-open", "ws", "--port", "1"},
-		{"--no-open", "--port", "1", "ws"},
-	} {
-		flags := flag.NewFlagSet("t", flag.ContinueOnError)
-		noOpen := flags.Bool("no-open", false, "")
-		port := flags.String("port", "8888", "")
-		dir, err := parseArgs(flags, args)
-		if err != nil || dir != "ws" || !*noOpen || *port != "1" {
-			t.Errorf("%v: dir=%q noOpen=%v port=%q err=%v", args, dir, *noOpen, *port, err)
-		}
-	}
-	flags := flag.NewFlagSet("t", flag.ContinueOnError)
-	if dir, err := parseArgs(flags, nil); err != nil || dir != "." {
-		t.Errorf("no args: dir=%q err=%v, want the current folder", dir, err)
-	}
-	if _, err := parseArgs(flag.NewFlagSet("t", flag.ContinueOnError), []string{"a", "b"}); err == nil {
-		t.Error("two folders accepted")
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Error("the home was made anyway")
 	}
 }
 
@@ -97,12 +41,11 @@ func TestRelativeProgramsResolveAgainstTheStartFolder(t *testing.T) {
 	}
 }
 
-// The fake harness runs on the host only, so a workspace on Podman refuses
-// it before starting anything.
+// The fake harness runs on the host only, so a Foreman on Podman refuses it
+// before starting anything.
 func TestFakeHarnessNeedsTheDirectEngine(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	dir := t.TempDir()
-	err := run([]string{dir, "--yes", "--no-open", "--home", t.TempDir(), "--fake-harness", "/bin/true"}, strings.NewReader(""), &bytes.Buffer{})
+	err := run([]string{"--no-open", "--home", t.TempDir(), "--fake-harness", "/bin/true"}, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "drop --fake-harness") {
 		t.Errorf("on podman: %v", err)
 	}
@@ -167,7 +110,7 @@ func TestServeUntilReturnsAServingError(t *testing.T) {
 }
 
 // One Foreman per machine: a second one says where the first serves, and
-// touches nothing (no workspace made, no port taken).
+// touches nothing (no global repo made, no port taken).
 func TestASecondForemanPointsAtTheFirst(t *testing.T) {
 	home := t.TempDir()
 	first, err := userdata.TakeLock(home)
@@ -175,18 +118,17 @@ func TestASecondForemanPointsAtTheFirst(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer first.Release()
-	if err := first.Announce("http://127.0.0.1:8888/?token=abc", "/Users/ceo/dev"); err != nil {
+	if err := first.Announce("http://127.0.0.1:8888/?token=abc"); err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
 	var out bytes.Buffer
-	if err := run([]string{dir, "--yes", "--no-open", "--home", home}, strings.NewReader(""), &out); err != nil {
+	if err := run([]string{"--no-open", "--home", home}, &out); err != nil {
 		t.Fatal(err)
 	}
-	if got := out.String(); !strings.Contains(got, "already running") || !strings.Contains(got, "/Users/ceo/dev") || !strings.Contains(got, "http://127.0.0.1:8888/?token=abc") {
+	if got := out.String(); !strings.Contains(got, "already running") || !strings.Contains(got, "http://127.0.0.1:8888/?token=abc") {
 		t.Errorf("%q", got)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".foreman")); !os.IsNotExist(err) {
-		t.Error("the second one made a workspace")
+	if _, err := os.Stat(filepath.Join(home, "config")); !os.IsNotExist(err) {
+		t.Error("the second one made the global repo")
 	}
 }

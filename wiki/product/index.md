@@ -11,11 +11,11 @@ Foreman's product definition. Every entry carries a `status` (`planned` / `parti
 
 Files Foreman reads or owns, and the runtime state it keeps.
 
-- [Workspace](./models/workspace.md): folder layout and the config / state / content split
-- [Project config](./models/project-config.md) (`project/project.toml`)
-- [Team definition](./models/team-definition.md) (`.foreman/teams/<team>.toml`)
+- [Home](./models/home.md): `~/.foreman`, its layout and the config / state / content split
+- [Project config](./models/project-config.md): the project record and `project.toml`
+- [Team definition](./models/team-definition.md) (`config/teams/<team>.toml`)
 - [Agent soul](./models/agent-soul.md)
-- [Workspace settings](./models/workspace-settings.md) (`settings.toml`)
+- [Global settings](./models/global-settings.md) (`config/settings.toml`)
 - [Secrets](./models/secrets.md)
 - Runtime state (`state.db`)
   - [Deployment](./models/deployment.md)
@@ -48,7 +48,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
 - [Requests](./features/requests.md): the five kinds of things that need the CEO
 - [Pipeline and merges](./features/pipeline-and-merges.md)
 - [Notifications](./features/notifications.md)
-- [Workspace settings screen](./features/settings.md)
+- [Settings screen](./features/settings.md)
 
 ## Architecture
 

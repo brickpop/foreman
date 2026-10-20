@@ -9,9 +9,8 @@ import (
 	"syscall"
 )
 
-// RunningError means another Foreman holds the home's lock: it serves URL,
-// on Workspace.
-type RunningError struct{ URL, Workspace string }
+// RunningError means another Foreman holds the home's lock: it serves URL.
+type RunningError struct{ URL string }
 
 func (e *RunningError) Error() string {
 	return "Foreman is already running on this machine"
@@ -39,18 +38,17 @@ func TakeLock(home string) (*Lock, error) {
 			return nil, fmt.Errorf("locking %s: %w", f.Name(), err)
 		}
 		data, _ := os.ReadFile(f.Name())
-		url, workspace, _ := strings.Cut(strings.TrimSpace(string(data)), "\n")
-		return nil, &RunningError{URL: url, Workspace: workspace}
+		return nil, &RunningError{URL: strings.TrimSpace(string(data))}
 	}
 	return &Lock{file: f}, nil
 }
 
 // Announce writes where this Foreman serves, for the next one to say.
-func (l *Lock) Announce(url, workspace string) error {
+func (l *Lock) Announce(url string) error {
 	if err := l.file.Truncate(0); err != nil {
 		return err
 	}
-	_, err := l.file.WriteAt([]byte(url+"\n"+workspace+"\n"), 0)
+	_, err := l.file.WriteAt([]byte(url+"\n"), 0)
 	return err
 }
 

@@ -10,19 +10,20 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/git"
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
 var ctx = context.Background()
 
 type config struct{ root string }
 
-func (c config) Root() string { return c.root }
-func (c config) Project(id string) (workspace.Project, error) {
+// Project is ledger: its repo api, and web, which is missing.
+func (c config) Project(id string) (home.Project, error) {
 	if id != "ledger" {
-		return workspace.Project{}, workspace.ErrNotFound
+		return home.Project{}, home.ErrNotFound
 	}
-	return workspace.Project{ID: id, Repos: []string{"api"}, Config: workspace.ProjectConfig{Main: "trunk"}}, nil
+	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "project"), Config: home.ProjectConfig{Main: "trunk"},
+		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api")}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
 }
 
 func gitIn(t *testing.T, dir string, args ...string) {
@@ -89,7 +90,7 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 	if x := api.Branches[1]; x.Name != "wt/tove/x" || x.Ahead != 1 || !x.Uncommitted {
 		t.Errorf("tove's branch %+v", x)
 	}
-	if _, err := b.Repos(ctx, "nope"); !errors.Is(err, workspace.ErrNotFound) {
+	if _, err := b.Repos(ctx, "nope"); !errors.Is(err, home.ErrNotFound) {
 		t.Errorf("unknown project: %v", err)
 	}
 }
@@ -119,7 +120,7 @@ func TestFilesAsCommitted(t *testing.T) {
 // Only the project's repos, and only what is in them.
 func TestBrowserRefusals(t *testing.T) {
 	b := fixture(t)
-	for _, repo := range []string{"..", ".sandboxes", "outside.txt", "nope", ""} {
+	for _, repo := range []string{"..", ".sandboxes", "outside.txt", "nope", "", "web"} {
 		if _, err := b.Tree(ctx, "ledger", repo, "trunk", ""); !errors.Is(err, ErrNoRepo) {
 			t.Errorf("repo %q: %v", repo, err)
 		}
@@ -152,7 +153,7 @@ type mainIs struct {
 	main string
 }
 
-func (m mainIs) Project(id string) (workspace.Project, error) {
+func (m mainIs) Project(id string) (home.Project, error) {
 	p, err := m.config.Project(id)
 	p.Config.Main = m.main
 	return p, err

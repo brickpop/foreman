@@ -11,7 +11,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 ## Instance lifecycle
 
 1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then an instance for each team member: the lead `starting` (or `queued`), every other member `asleep` ([Lazy starts](#lazy-starts)). Steps 2–3 happen when an instance starts, so an asleep member has no sandbox yet.
-2. **Sandbox**: `Git.Prepare` makes a git worktree of each code repo at `<project>/.sandboxes/<agent>/<repo>` if it doesn't exist yet ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
+2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. `Git.Prepare` makes a git worktree of each code repo at `~/.foreman/sandboxes/<project>/<agent>/<repo>` if it doesn't exist yet ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
    - lead: `lead/<team>/integration` (created from `main` if missing)
    - members: their home branch `wt/<agent>/main` (created from `main`). They create `wt/<agent>/<topic>` when assigned a card.
 3. **Compose prompt** ([Session prompt](./session-prompt.md)) and **spawn** the harness in its container with the sandbox as working directory ([Harness adapters](./harness-adapters.md)).
@@ -56,7 +56,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 
 ## Concurrency
 
-- Workspace setting `max running sessions` (default 12, 1–64; [Workspace settings](../models/workspace-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up. Only an instance that actually waits shows `queued` (one that gets a slot at once goes straight to `starting`; the CEO, 2026-10-18: a passing `queued` warned them about slots for nothing). Raising the limit starts those that now fit at once (any change to `settings.toml`, from the UI or an editor); lowering it stops nothing.
+- Global setting `max running sessions` (default 12, 1–64; [Global settings](../models/global-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up. Only an instance that actually waits shows `queued` (one that gets a slot at once goes straight to `starting`; the CEO, 2026-10-18: a passing `queued` warned them about slots for nothing). Raising the limit starts those that now fit at once (any change to `settings.toml`, from the UI or an editor); lowering it stops nothing.
 - A slot is held by every instance whose container is running, including one waiting on an approval or a reply. An `asleep` instance holds none. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the [Prove epic](../../backlog/epics/prove.md) shows which harnesses support it.
 - The Chief of Staff's session does not count towards the limit: it isn't an agent of a deployment, and the CEO must always be able to reach it ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)).
 
@@ -68,9 +68,9 @@ Instances survive UI disconnects: the Terminal, not the browser, holds the proce
 
 After a crash (or that second Ctrl-C), containers are still running. On the next start:
 1. Load deployments and instances from `state.db` ([Persistence](./persistence.md)).
-2. Ask the runner which containers are still running (`List`), and keep only this workspace's: every container is labelled `foreman.workspace` with the workspace's path, and named with a short hash of it (`foreman-19269e-mara-ledger`), because every workspace on the machine shares one Podman and two may both have a `mara@ledger` (found 2026-10-16: a second workspace stopped the first one's agents). Re-attach to each one whose instance is live; scrollback is replayed from Foreman's own session log, so nothing printed while Foreman was down is visible (an accepted gap, marked in the pane: [Session runner](./session-runner.md#podman-engine-production)).
+2. Ask the runner which containers are still running (`List`), and keep only this home's: every container is labelled `foreman.home` with the home's path, and named with a short hash of it (`foreman-19269e-mara-ledger`), because every Foreman on the machine (the CEO's, `just dev`'s, a test's: one per home) shares one Podman and two may both have a `mara@ledger` (found 2026-10-16: a second Foreman stopped the first one's agents). Re-attach to each one whose instance is live; scrollback is replayed from Foreman's own session log, so nothing printed while Foreman was down is visible (an accepted gap, marked in the pane: [Session runner](./session-runner.md#podman-engine-production)).
 3. Instances that should be live but whose container is gone are restarted (see Restarts below).
-4. This workspace's containers that belong to no live instance are orphans: stopped and reported in the server log. Another workspace's are never touched. Containers from before the label existed are adopted when one of this workspace's instances matches them, and otherwise left alone.
+4. This home's containers that belong to no live instance are orphans: stopped and reported in the server log. Containers without this home's label (another home's, or unlabelled) are never touched nor adopted.
 
 ## Restarts
 
@@ -79,7 +79,7 @@ After a crash (or that second Ctrl-C), containers are still running. On the next
 - **The CEO's Restart** (Project settings, for agents still on another profile): stops a running instance and starts it again at once, on the project's profile as it is now, with its one automatic restart back. One that isn't up is left as it is.
 - **A clean exit is not a crash** (the CEO's decision, 2026-10-16): a harness that ends with code 0 (the CEO's `/exit`, say) goes **asleep**, holding no slot, and wakes like any sleeper, on a message or the CEO's Start, picking up its conversation. Messages already waiting for it wake it at once.
 - **When, automatically:** a crash gets **one** automatic restart (counted in `instances.restarts`) before a blocked request is raised; a second crash, or any rate limit, goes straight to the CEO. A rate limit is never retried automatically. A stopped instance of an active deployment starts again on the CEO's **Start again** (its pane), with its one automatic restart back; messages never revive it, so a crash can't loop.
-- **Stuck sessions:** "no output for N minutes" (`stuck_after_minutes`, default 20, a [workspace setting](../models/workspace-settings.md)) counts silence only while the harness is not signalling a running tool through its hooks, so a long, silent test run isn't "stuck".
+- **Stuck sessions:** "no output for N minutes" (`stuck_after_minutes`, default 20, a [global setting](../models/global-settings.md)) counts silence only while the harness is not signalling a running tool through its hooks, so a long, silent test run isn't "stuck".
 
 ## Memory
 

@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// watching is a workspace of project wikis under Watch: write files with
+// watching is a folder of project wikis under Watch: write files with
 // write(t, w.dir(project), …) and read what it publishes from changes.
 type watching struct {
 	root     string

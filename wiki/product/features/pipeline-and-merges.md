@@ -46,9 +46,9 @@ After Create PR, the forge is watched:
 | Closed without merge | Marks the merge request rejected, resolves the review request, returns its work items to stage 0, tells the lead |
 | Review comments or "changes requested" | Delivers them to the lead (typed into its session when it is idle; [Protocol](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)); the merge request stays open |
 
-**Only the code repos have merge requests.** The [project repo](../models/project-config.md#the-project-repo) gets the lead's `commit()` straight on `main`, and the [workspace repo](../models/workspace.md#the-workspace-repo) gets the UI's saves, the Chief of Staff's confirmed proposals included ([Chief of Staff](./chief-of-staff.md)); both reach their forge only through Sync.
+**Only the code repos have merge requests.** The [project repo](../models/project-config.md#the-project-repo) gets the lead's `commit()` straight on `main`, and the [global repo](../models/home.md#the-global-repo) gets the UI's saves, the Chief of Staff's confirmed proposals included ([Chief of Staff](./chief-of-staff.md)); both reach their forge only through Sync.
 
-The forge is chosen per project ([Project config](../models/project-config.md)); its token lives in workspace [secrets](../models/secrets.md). Supported: GitHub, Forgejo, Gitea, `none`. Without a forge, Create PR is not offered.
+The forge is chosen per project ([Project config](../models/project-config.md)); its token lives in the CEO's [secrets](../models/secrets.md), on this machine. Supported: GitHub, Forgejo, Gitea, `none`. Without a forge, Create PR is not offered.
 
 ### When main moves
 

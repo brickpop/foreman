@@ -52,13 +52,7 @@ func (s workItems) Save(ctx context.Context, w WorkItem) (WorkItem, error) {
 		return w, err
 	}
 	res, err := s.db.ExecContext(ctx, "UPDATE work_items SET deployment_id = ?, author_instance = ?, branch = ?, card_ref = ?, stage = ?, note = ?, checks_status = ?, merge_request_id = ? WHERE seq = ?", append(values, seq)...)
-	if err != nil {
-		return w, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return w, ErrNotFound
-	}
-	return w, nil
+	return w, touched(res, err)
 }
 
 func (s workItems) Find(ctx context.Context, deploymentID, branch string) (WorkItem, error) {

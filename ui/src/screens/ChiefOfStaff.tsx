@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type Proposal, useClient } from "../api/client";
-import type { Look } from "../api/types/workspace";
+import type { Look } from "../api/types/home";
 import { memberChanges, openerOf, soulFields, soulText } from "../app/chiefOfStaff";
 import { harnessLabel, randomLook, roleLabel, roster } from "../app/model";
 import { cosProposalKey, keys, useCosProposal, useProfiles, useTeams } from "../app/queries";

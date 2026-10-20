@@ -4,12 +4,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/brickpop/foreman/internal/workspace"
+	"github.com/brickpop/foreman/internal/home"
 )
 
-var atlas = workspace.TeamConfig{
+var atlas = home.TeamConfig{
 	Team: "atlas", Name: "Atlas", Lead: "mara",
-	Playbook: []workspace.PlaybookStep{
+	Playbook: []home.PlaybookStep{
 		{"lead": "Turns the goal into cards"},
 		{"members": "Build, then hand off"},
 		{"engineer": "Write the tests first"},
@@ -17,7 +17,7 @@ var atlas = workspace.TeamConfig{
 		{"ceo": "Merges"},
 		{"designer": "Draws"},
 	},
-	Agents: map[string]workspace.Soul{
+	Agents: map[string]home.Soul{
 		"mara": {Name: "Mara", Role: "team_lead", Personality: "Calm, decisive."},
 		"tove": {Name: "Tove", Role: "engineer", Instruction: "Own the UI."},
 		"ilya": {Name: "Ilya", Role: "engineer"},
@@ -30,8 +30,8 @@ var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge"
 
 func input(agent string, tools []string) Input {
 	return Input{
-		Agent: agent, Team: atlas, Project: "ledger", Path: "/ws/ledger", Goal: "Ship invoices.\n", Tools: tools,
-		Config: workspace.ProjectConfig{Main: "main", Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
+		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/.foreman/sandboxes/ledger/" + agent, Goal: "Ship invoices.\n", Tools: tools,
+		Config: home.ProjectConfig{Main: "main", Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
 	}
 }
 
@@ -43,13 +43,13 @@ func TestMemberPromptWithoutTeamTools(t *testing.T) {
 Own the UI.
 
 ## This assignment
-Project: ledger  (/ws/ledger)
+Project: ledger
 Goal: Ship invoices.
-Your sandbox: ledger/.sandboxes/tove (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
+Your sandbox: /home/ceo/.foreman/sandboxes/ledger/tove (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
 Branches: you work on wt/tove/main, made for you from main.
-Knowledge base: ledger/.sandboxes/tove/project/wiki (read only, by design, not a fault)
+Knowledge base: /home/ceo/.foreman/sandboxes/ledger/tove/project/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
-Read ledger/.sandboxes/tove/project/AGENTS.md first: how this project's wiki and tasks work.
+Read /home/ceo/.foreman/sandboxes/ledger/tove/project/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on ledger
 - Mara, Team Lead (lead)
@@ -133,7 +133,7 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	in := input("ilya", nil)
 	in.Team.Playbook = nil
-	in.Config = workspace.ProjectConfig{Main: "trunk"}
+	in.Config = home.ProjectConfig{Main: "trunk"}
 	got := Compose(in)
 	for _, absent := range []string{"## Playbook", "## Always escalate", "run:"} {
 		if strings.Contains(got, absent) {
@@ -144,7 +144,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 		t.Error("the project's main branch name isn't used")
 	}
 	solo := input("mara", every)
-	solo.Team.Agents = map[string]workspace.Soul{"mara": atlas.Agents["mara"]}
+	solo.Team.Agents = map[string]home.Soul{"mara": atlas.Agents["mara"]}
 	if got := Compose(solo); strings.Contains(got, "Your teammates") {
 		t.Errorf("a lead alone is told about teammates:\n%s", got)
 	}
@@ -209,7 +209,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove")
-	for _, want := range []string{"Project: {project}  ({path})", "Goal: {goal}", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", "Goal: {goal}", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}

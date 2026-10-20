@@ -17,8 +17,8 @@ import (
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/teamtools"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Instance is the Chief of Staff's id: its terminal's, and its caller's on
@@ -27,11 +27,11 @@ const Instance = "cos"
 
 // Teams is the team files as the Chief of Staff works on them.
 type Teams interface {
-	Teams() []workspace.Team
-	Team(id string) (workspace.Team, error)
+	Teams() []home.Team
+	Team(id string) (home.Team, error)
 	// CheckTeam is what a save would refuse.
-	CheckTeam(c workspace.TeamConfig) []string
-	SaveTeam(ctx context.Context, c workspace.TeamConfig, version string) (workspace.Team, error)
+	CheckTeam(c home.TeamConfig) []string
+	SaveTeam(ctx context.Context, c home.TeamConfig, version string) (home.Team, error)
 }
 
 // Deps are what the Chief of Staff is assembled from.
@@ -87,7 +87,7 @@ func (c *CoS) Call(ctx context.Context, _ string, name string, args json.RawMess
 	if name != ProposeTeam {
 		return teamtools.Refusal("unknown_tool", "%q isn't one of your tools", name)
 	}
-	var team workspace.TeamConfig
+	var team home.TeamConfig
 	dec := json.NewDecoder(bytes.NewReader(args))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&team); err != nil {
@@ -117,7 +117,7 @@ func (c *CoS) Call(ctx context.Context, _ string, name string, args json.RawMess
 }
 
 // current is the team as it is now and its version; nil for a new team.
-func (c *CoS) current(id string) (*workspace.TeamConfig, string) {
+func (c *CoS) current(id string) (*home.TeamConfig, string) {
 	t, err := c.Teams.Team(id)
 	if err != nil {
 		return nil, ""
@@ -139,22 +139,22 @@ func (c *CoS) Proposal() (Proposal, bool) {
 // are the faces the page gave the members proposed without one. Once
 // written, or once the team changed meanwhile, the proposal is gone and the
 // Chief of Staff is told.
-func (c *CoS) Create(ctx context.Context, id int, looks map[string]workspace.Look) (workspace.Team, error) {
+func (c *CoS) Create(ctx context.Context, id int, looks map[string]home.Look) (home.Team, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.proposal == nil || c.proposal.ID != id {
-		return workspace.Team{}, ErrStale
+		return home.Team{}, ErrStale
 	}
 	team := c.proposal.Team
 	team.Agents = cloneWithLooks(team.Agents, looks)
 	saved, err := c.Teams.SaveTeam(ctx, team, c.version)
 	switch {
-	case errors.Is(err, workspace.ErrConflict):
+	case errors.Is(err, home.ErrConflict):
 		c.clear()
 		c.Tell(fmt.Sprintf("From Foreman: %s changed since your proposal, so nothing was written. Read its file again and propose it again.", team.Name))
-		return workspace.Team{}, ErrChanged
+		return home.Team{}, ErrChanged
 	case err != nil:
-		return workspace.Team{}, err
+		return home.Team{}, err
 	}
 	c.clear()
 	verb := "changed"
@@ -182,8 +182,8 @@ func (c *CoS) clear() {
 
 // cloneWithLooks gives each member without a face (no background color) the
 // one the page showed.
-func cloneWithLooks(agents map[string]workspace.Soul, looks map[string]workspace.Look) map[string]workspace.Soul {
-	out := make(map[string]workspace.Soul, len(agents))
+func cloneWithLooks(agents map[string]home.Soul, looks map[string]home.Look) map[string]home.Soul {
+	out := make(map[string]home.Soul, len(agents))
 	for id, s := range agents {
 		if s.Look.Color == "" { // no face yet (the page checks the same)
 			if l, ok := looks[id]; ok {

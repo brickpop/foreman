@@ -65,15 +65,8 @@ func (d deployments) Deploy(ctx context.Context, team, project, goal string) (De
 }
 
 func (d deployments) Stop(ctx context.Context, id string) error {
-	res, err := d.db.ExecContext(ctx, "UPDATE deployments SET status = 'stopped', stopped_at = coalesce(stopped_at, ?) WHERE id = ?",
-		timeText(time.Now()), id)
-	if err != nil {
-		return err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return touched(d.db.ExecContext(ctx, "UPDATE deployments SET status = 'stopped', stopped_at = coalesce(stopped_at, ?) WHERE id = ?",
+		timeText(time.Now()), id))
 }
 
 func (d deployments) Get(ctx context.Context, id string) (Deployment, error) {

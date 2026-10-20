@@ -6,7 +6,7 @@ order: 5
 
 # Chief of Staff
 
-**Goal:** the agent that manages the CEO's teams: creating them from a description, hiring, refining souls (team files, in the workspace repo). A real terminal on its own page; it proposes with `propose_team`, Foreman shows the proposal in a preview and writes it, one commit, only on the CEO's click. No branches or merge requests: those are for code (the CEO, 2026-10-18; [Chief of Staff](../../product/features/chief-of-staff.md)).
+**Goal:** the agent that manages the CEO's teams: creating them from a description, hiring, refining souls (team files, in the global repo). A real terminal on its own page; it proposes with `propose_team`, Foreman shows the proposal in a preview and writes it, one commit, only on the CEO's click. No branches or merge requests: those are for code (the CEO, 2026-10-18; [Chief of Staff](../../product/features/chief-of-staff.md)).
 
 **Usable when done:** a team is created, hired into and tuned entirely by talking to the Chief of Staff.
 

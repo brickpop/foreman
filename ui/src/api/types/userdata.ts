@@ -4,7 +4,7 @@
 // source: types.go
 
 /**
- * Preferences are the CEO's, for every workspace (tygo.yaml).
+ * Preferences are the CEO's, on this machine (tygo.yaml).
  */
 export interface Preferences {
   theme: string; // system, dark or light

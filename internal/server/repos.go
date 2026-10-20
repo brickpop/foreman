@@ -7,8 +7,8 @@ import (
 	"strconv"
 
 	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/repos"
-	"github.com/brickpop/foreman/internal/workspace"
 )
 
 // Repos reads a project's repos for its Repositories tab (implemented by the
@@ -55,7 +55,7 @@ func repoRoutes(mux *http.ServeMux, rs Repos) {
 // that isn't there.
 func writeRead(w http.ResponseWriter, v any, err error) {
 	switch {
-	case errors.Is(err, workspace.ErrNotFound):
+	case errors.Is(err, home.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "No such project")
 	case errors.Is(err, repos.ErrNoRepo):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", "No such repo in this project")

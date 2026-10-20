@@ -1,4 +1,4 @@
-package workspace
+package home
 
 import (
 	"bytes"
@@ -12,24 +12,20 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-
-	"github.com/brickpop/foreman/internal/profiles"
 )
 
 // The config files the CEO owns, all TOML: project.toml
 // (wiki/product/models/project-config.md), team files
 // (wiki/product/models/team-definition.md, souls:
 // wiki/product/models/agent-soul.md) and settings.toml
-// (wiki/product/models/workspace-settings.md).
+// (wiki/product/models/global-settings.md).
 //
 // Parsing never fails as a whole: what is wrong comes back as Problems, one
 // per field, so a half-edited file still shows up with its errors.
 
 // ProjectConfig is project.toml.
 type ProjectConfig struct {
-	Project      string   `toml:"project" json:"project"`
 	Description  string   `toml:"description,omitempty" json:"description"`
-	Repos        []string `toml:"repos,omitempty" json:"repos"`
 	Main         string   `toml:"main,omitempty" json:"main"`
 	Checks       string   `toml:"checks,omitempty" json:"checks"`
 	MergeToMain  string   `toml:"merge_to_main,omitempty" json:"mergeToMain"`
@@ -71,13 +67,8 @@ type Escalation struct {
 
 // Soul is one agent of a team.
 type Soul struct {
-	Name string `toml:"name" json:"name"`
-	Role string `toml:"role" json:"role"`
-	// Harness and Command are from before profiles (the project's profile
-	// names the harness now): read so an old file loads, never used, and
-	// dropped by the next save (encodeTeam).
-	Harness     string   `toml:"harness,omitempty" json:"-"`
-	Command     string   `toml:"command,omitempty" json:"-"`
+	Name        string   `toml:"name" json:"name"`
+	Role        string   `toml:"role" json:"role"`
 	Personality string   `toml:"personality,omitempty" json:"personality"`
 	Skills      []string `toml:"skills,omitempty" json:"skills"`
 	Instruction string   `toml:"instruction,omitempty" json:"instruction"`
@@ -103,13 +94,8 @@ type Settings struct {
 	StuckAfterMinutes int                     `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
 	LogCapMB          int                     `toml:"log_cap_mb" json:"logCapMb"`
 	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
-	WorkspaceForge    WorkspaceForge          `toml:"workspace_forge" json:"workspaceForge"`
+	GlobalForge       GlobalForge             `toml:"global_forge" json:"globalForge"`
 	Notifications     Notifications           `toml:"notifications" json:"notifications"`
-	// ProjectProfiles names the profile each project's agents run on (a
-	// harness and its credentials, internal/profiles); a project not named
-	// uses the default. Kept here, not in project.toml: the lead can write
-	// the project repo, and profiles are this machine's.
-	ProjectProfiles map[string]string `toml:"project_profiles,omitempty" json:"projectProfiles"`
 }
 
 // ForgeAccount is a forge account's host or owner; its token is a secret.
@@ -117,8 +103,8 @@ type ForgeAccount struct {
 	URL string `toml:"url" json:"url"`
 }
 
-// WorkspaceForge is the forge hosting the workspace repo.
-type WorkspaceForge struct {
+// GlobalForge is the forge hosting the global repo (teams and settings).
+type GlobalForge struct {
 	Kind string `toml:"kind" json:"kind"`
 	URL  string `toml:"url,omitempty" json:"url"`
 }
@@ -130,13 +116,13 @@ type Notifications struct {
 	MergeRequested bool `toml:"merge_requested" json:"mergeRequested"`
 }
 
-// DefaultSettings are the settings of a workspace without settings.toml.
+// DefaultSettings are the settings while settings.toml doesn't exist.
 func DefaultSettings() Settings {
 	return Settings{
 		Listen: "local", Port: 8888, MaxSessions: 12, Engine: "podman",
 		StuckAfterMinutes: 20, LogCapMB: 50,
-		WorkspaceForge: WorkspaceForge{Kind: "none"},
-		Notifications:  Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
+		GlobalForge:   GlobalForge{Kind: "none"},
+		Notifications: Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
 	}
 }
 
@@ -174,9 +160,10 @@ func decode(data []byte, v any) (toml.MetaData, problems) {
 	return md, p
 }
 
-// ParseProject parses the project.toml of the project folder named folder.
+// ParseProject parses a project.toml: the project's rules, which travel with
+// its project repo (its name and repos are this machine's, in the database).
 // Defaults are applied (main = "main", merge_to_main = "ceo", forge none).
-func ParseProject(folder string, data []byte) (ProjectConfig, []string) {
+func ParseProject(data []byte) (ProjectConfig, []string) {
 	var c ProjectConfig
 	_, p := decode(data, &c)
 	if c.Main == "" {
@@ -188,20 +175,9 @@ func ParseProject(folder string, data []byte) (ProjectConfig, []string) {
 	if c.Forge.Kind == "" {
 		c.Forge.Kind = "none"
 	}
-	c.Repos, c.AlwaysAskCEO = normalize(c.Repos), normalize(c.AlwaysAskCEO)
-	switch {
-	case c.Project == "":
-		p.add("project: required")
-	case c.Project != folder:
-		p.add("project: %q must equal the folder name %q", c.Project, folder)
-	}
+	c.AlwaysAskCEO = normalize(c.AlwaysAskCEO)
 	if strings.ContainsAny(c.Description, "\n") {
 		p.add("description: one line")
-	}
-	for _, r := range c.Repos {
-		if r == "project" || r == ".sandboxes" || r == "" || strings.ContainsAny(r, `/\`) {
-			p.add("repos: %q is not a code repo folder", r)
-		}
 	}
 	if c.MergeToMain != "ceo" {
 		p.add(`merge_to_main: must be "ceo"`)
@@ -226,7 +202,7 @@ func checkURL(p *problems, field, value string) {
 }
 
 // ParseTeam parses the team file of team id. Rules across teams (agent ids
-// and names unique in the workspace) are checked when the workspace loads.
+// and names unique across teams) are checked when the home loads.
 func ParseTeam(id string, data []byte) (TeamConfig, []string) {
 	var c TeamConfig
 	md, p := decode(data, &c)
@@ -337,27 +313,21 @@ func (s Settings) validate() problems {
 	if s.LogCapMB <= 0 {
 		p.add("log_cap_mb: must be more than 0")
 	}
-	// A profile is a folder name in the user's store: never a path.
-	for _, project := range sortedKeys(s.ProjectProfiles) {
-		if !profiles.Valid(s.ProjectProfiles[project]) {
-			p.add("project_profiles.%s: %q must be lowercase letters, digits and dashes, at most 40", project, s.ProjectProfiles[project])
-		}
-	}
 	for _, k := range sortedKeys(s.Forges) {
 		if k == "none" || !slices.Contains(forgeKinds, k) {
 			p.add("forges.%s: not a forge kind", k)
 		}
 	}
-	if !slices.Contains(forgeKinds, s.WorkspaceForge.Kind) {
-		p.add("workspace_forge.kind: %q is not one of %s", s.WorkspaceForge.Kind, strings.Join(forgeKinds, ", "))
-	} else if s.WorkspaceForge.Kind != "none" {
-		checkURL(&p, "workspace_forge.url", s.WorkspaceForge.URL)
+	if !slices.Contains(forgeKinds, s.GlobalForge.Kind) {
+		p.add("global_forge.kind: %q is not one of %s", s.GlobalForge.Kind, strings.Join(forgeKinds, ", "))
+	} else if s.GlobalForge.Kind != "none" {
+		checkURL(&p, "global_forge.url", s.GlobalForge.URL)
 	}
 	return p
 }
 
 // encode renders v as TOML. A save rewrites the whole file: comments written
-// by hand don't survive it; the workspace repo keeps the earlier versions.
+// by hand don't survive it; the global repo keeps the earlier versions.
 func encode(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := toml.NewEncoder(&buf)
@@ -414,7 +384,6 @@ func encodeTeam(c TeamConfig) ([]byte, error) {
 	}
 	for _, id := range ids {
 		soul := agents[id]
-		soul.Harness, soul.Command = "", "" // from before profiles: dropped
 		chunk, err := encode(map[string]map[string]Soul{"agents": {id: soul}})
 		if err != nil {
 			return nil, err
@@ -443,12 +412,4 @@ func (c TeamConfig) Roster() []string {
 		add(id)
 	}
 	return ids
-}
-
-// ProfileOf is the profile a project's agents run on: its own, else the default.
-func (s Settings) ProfileOf(project string) string {
-	if p := s.ProjectProfiles[project]; p != "" {
-		return p
-	}
-	return profiles.Default
 }

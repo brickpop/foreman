@@ -22,7 +22,7 @@ func (f fakeMaintenance) Rebuild(context.Context) error {
 
 func TestMaintenance(t *testing.T) {
 	f := fakeMaintenance{rebuilt: make(chan struct{})}
-	h := New(Options{Guard: openGuard{}, Workspace: fakeWorkspace("/ws"), Maintenance: f, UI: builtUI})
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Maintenance: f, UI: builtUI})
 	var got map[string]any
 	decodeBody(t, get(t, h, "/api/maintenance"), &got)
 	if got["engine"] != "Podman 5.7.1 · running" || len(got["images"].([]any)) != 1 {

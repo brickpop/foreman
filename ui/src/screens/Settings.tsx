@@ -23,7 +23,13 @@ import {
   useSaveTheme,
   useSettings,
 } from "../app/queries";
-import { settingsSearch, settingsTabs } from "../app/settings";
+import {
+  logCapChoices,
+  settingsSearch,
+  settingsTabs,
+  stuckChoices,
+  withCurrent,
+} from "../app/settings";
 import { asTheme, savedTheme } from "../app/theme";
 import { ConnectDialog } from "../components/ConnectDialog";
 import { Confirm } from "../components/Overlays";
@@ -211,6 +217,34 @@ function RunningSection({ settings }: { settings: SettingsData }) {
           max={64}
           label="Running sessions at once"
           onChange={(n) => save((s) => ({ ...s, maxSessions: n }))}
+        />
+      </Row>
+      <Row
+        title="Stuck after"
+        explanation="An agent mid-turn that sends no sign of activity (a prompt, a tool call, a turn ending) for this long gets a card on the Dashboard. It keeps running; you decide."
+      >
+        <Select
+          label="Stuck after"
+          value={settings.stuckAfterMinutes}
+          options={withCurrent(stuckChoices, settings.stuckAfterMinutes).map((m) => ({
+            value: m,
+            label: `${m} min`,
+          }))}
+          onChange={(m) => save((s) => ({ ...s, stuckAfterMinutes: m }))}
+        />
+      </Row>
+      <Row
+        title="Session logs per agent"
+        explanation="Every byte each agent's terminal printed, kept in Foreman's home. Past this size, the oldest go first."
+      >
+        <Select
+          label="Session logs per agent"
+          value={settings.logCapMb}
+          options={withCurrent(logCapChoices, settings.logCapMb).map((mb) => ({
+            value: mb,
+            label: `${mb} MB`,
+          }))}
+          onChange={(mb) => save((s) => ({ ...s, logCapMb: mb }))}
         />
       </Row>
       <Row

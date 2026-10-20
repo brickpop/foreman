@@ -17,3 +17,10 @@ export function repoName(path: string): string {
 export function inside(folder: string, name: string): string {
   return `${folder.replace(/\/+$/, "")}/${name}`;
 }
+
+/** The "created" toast's body: what became the new project's repo. */
+export function createdBody(created: boolean, cloned: boolean, path: string): string {
+  if (!created) return `Took over the project repo left at ${path}, as it was.`;
+  if (cloned) return `Cloned its project repo into ${path}.`;
+  return `Made its project repo at ${path}, with project.toml and a starter wiki.`;
+}

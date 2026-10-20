@@ -28,9 +28,10 @@ type Config interface {
 	// SaveTeam writes a team file if still at version; returns the saved team.
 	SaveTeam(ctx context.Context, c home.TeamConfig, version string) (home.Team, error)
 	// NewProject creates a project with its project repo, new or cloned from
-	// clone (a URL or a local path), and no code repo yet; RemoveProject
-	// removes one and its history, its project repo only if deleteRepo.
-	NewProject(ctx context.Context, name, clone string) (home.Project, error)
+	// clone (a URL or a local path), and no code repo yet; created is false
+	// when it took over a project repo left there. RemoveProject removes one
+	// and its history, its project repo only if deleteRepo.
+	NewProject(ctx context.Context, name, clone string) (p home.Project, created bool, err error)
 	RemoveProject(ctx context.Context, id string, deleteRepo bool) error
 	// AddRepo adds an existing repo, by its folder; NewRepo creates an empty
 	// one at a new folder and adds it.
@@ -76,7 +77,12 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, clone?}")
 			return
 		}
-		p, err := c.NewProject(r.Context(), req.Name, req.Clone)
+		p, created, err := c.NewProject(r.Context(), req.Name, req.Clone)
+		if err == nil && created {
+			// 201 tells a new project repo from one taken over (200).
+			writeJSON(w, http.StatusCreated, p)
+			return
+		}
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("DELETE /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) {

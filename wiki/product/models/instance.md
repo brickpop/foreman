@@ -26,10 +26,9 @@ Table `instances`.
 | `profile` | String | yes | its project's profile | a profile name, or empty | The [profile](../architecture/session-runner.md#credentials) its current run started on, set at deploy and at each start; empty for a run from before it was kept (2026-10-18). Project settings lists running agents whose profile isn't the project's ([Project settings](../features/project-settings.md)) |
 | `harness_session_id` | String | | | | The harness's own session id, for native resume on restart ([Agent runtime](../architecture/agent-runtime.md#restarts)) |
 | `started_at` | Timestamp | | | | |
-| `last_output_at` | Timestamp | | | | Drives the "stuck" blocked request (no output for N min, default 20) |
 | `restarts` | Number | yes | `0` | ≥ 0 | |
 
-Not stored: its **activity line** (`doing`: a line and its time), what its harness last reported doing in the current run, kept in memory by the Instance manager and sent with the instances ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). **Phasing:** `task` and `last_output_at` are never set yet, so neither is shown; the agent Sessions opens a deployment on is the one with the latest activity line.
+Not stored either: when it last sent a hook event, kept in memory to find a [stuck agent](../architecture/agent-runtime.md#stuck-agents). Not stored: its **activity line** (`doing`: a line and its time), what its harness last reported doing in the current run, kept in memory by the Instance manager and sent with the instances ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). **Phasing:** `task` is never set yet, so it isn't shown; the agent Sessions opens a deployment on is the one with the latest activity line.
 
 ## Statuses
 
@@ -46,7 +45,7 @@ Not stored: its **activity line** (`doing`: a line and its time), what its harne
 
 ## Logs
 
-The raw terminal byte stream is appended to `~/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id). It is the session's history and audit trail; the browser terminal is restored from a snapshot of the server-side screen, not from the log ([Terminal state](../architecture/terminal-state.md)). Logs rotate at a size cap ([Persistence](../architecture/persistence.md#session-logs)).
+The raw terminal byte stream is appended to `~/.foreman/logs/<agent>@<project>/<session-id>.log`, one file per session (a restart starts a new session id), split into parts when it grows. It is the session's history and audit trail, and, until the server-side screen lands ([Terminal state](../architecture/terminal-state.md)), what a newly opened terminal replays. Each agent's logs stay under a size cap ([Persistence](../architecture/persistence.md#session-logs)).
 
 ## Invariants
 

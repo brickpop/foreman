@@ -271,7 +271,7 @@ func TestInstanceRoundTripsEveryField(t *testing.T) {
 	full := Instance{
 		ID: "mara@ledger", DeploymentID: "atlas@ledger", AgentID: "mara", Status: "running",
 		Task: "LED-44", PID: 4242, PtyID: "c0ffee", SandboxPath: "/ws/ledger/.sandboxes/mara",
-		Harness: "claude-code", Profile: "work", HarnessSessionID: "s-1", StartedAt: at, LastOutputAt: at.Add(time.Minute), Restarts: 2,
+		Harness: "claude-code", Profile: "work", HarnessSessionID: "s-1", StartedAt: at, Restarts: 2,
 	}
 	bare := Instance{ID: "tove@ledger", DeploymentID: "atlas@ledger", AgentID: "tove", Status: "starting",
 		SandboxPath: "/ws/ledger/.sandboxes/tove", Harness: "claude-code"}
@@ -283,10 +283,10 @@ func TestInstanceRoundTripsEveryField(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !got.StartedAt.Equal(want.StartedAt) || !got.LastOutputAt.Equal(want.LastOutputAt) {
-			t.Errorf("times %v %v, want %v %v", got.StartedAt, got.LastOutputAt, want.StartedAt, want.LastOutputAt)
+		if !got.StartedAt.Equal(want.StartedAt) {
+			t.Errorf("started %v, want %v", got.StartedAt, want.StartedAt)
 		}
-		got.StartedAt, got.LastOutputAt, want.StartedAt, want.LastOutputAt = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+		got.StartedAt, want.StartedAt = time.Time{}, time.Time{}
 		if got != want {
 			t.Errorf("got %+v\nwant %+v", got, want)
 		}

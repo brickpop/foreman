@@ -179,7 +179,8 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("watching the wikis: %w", err)
 	}
-	logs := sessionlog.Dir{Root: h.LogsDir()}
+	// Each agent's logs stay under the log_cap_mb setting, as it is now.
+	logs := sessionlog.Dir{Root: h.LogsDir(), Cap: func() int64 { return int64(h.Settings().Settings.LogCapMB) << 20 }}
 	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
 	// How a container reaches this machine: the agent port, a model served
 	// here. Agents on the Direct engine are on it.
@@ -252,8 +253,21 @@ func run(args []string, stdout io.Writer) error {
 		Home: h.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: h,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters, Profile: login.Of,
 		OpenLog: openLog, Publish: publish, Agent: agent,
-		Blocked: func() error { return checklist.Blocked() },
+		Blocked: func() error { return checklist.Blocked() }, Requests: state.Requests(),
 	})
+	// An agent quiet mid-turn for the stuck_after_minutes setting gets a card.
+	go func() {
+		tick := time.NewTicker(time.Minute)
+		defer tick.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case now := <-tick.C:
+				manager.CheckStuck(ctx, now)
+			}
+		}
+	}()
 	// Watched from here on: a settings change may let queued agents start.
 	if err := h.Watch(ctx, func(c home.Change) {
 		bus.Publish(configEvent(c))

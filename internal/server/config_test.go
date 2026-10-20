@@ -51,8 +51,10 @@ func (f fakeConfig) SaveTeam(context.Context, home.TeamConfig, string) (home.Tea
 
 // The project routes answer by name: "bad" is invalid, "taken" exists, "busy"
 // is deployed; the project they return says what was called, in Problems.
-func (f fakeConfig) NewProject(_ context.Context, name, clone string) (home.Project, error) {
-	return f.changed("NewProject", "", name, clone)
+// NewProject takes over "kept".
+func (f fakeConfig) NewProject(_ context.Context, name, clone string) (home.Project, bool, error) {
+	p, err := f.changed("NewProject", "", name, clone)
+	return p, name != "kept", err
 }
 func (f fakeConfig) RenameRepo(_ context.Context, project, name, newName string) (home.Project, error) {
 	return f.changed("RenameRepo", project, newName, name)
@@ -130,7 +132,7 @@ func withConfig(bus Events) http.Handler {
 
 func decodeBody(t *testing.T, w *httptest.ResponseRecorder, v any) {
 	t.Helper()
-	if w.Code != http.StatusOK {
+	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("status %d: %s", w.Code, w.Body)
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), v); err != nil {
@@ -373,6 +375,12 @@ func TestProjectRoutes(t *testing.T) {
 		decodeBody(t, send(tc.method, tc.path, tc.body), &p)
 		if strings.Join(p.Problems, "|") != strings.Join(tc.call, "|") {
 			t.Errorf("%s %s: called %v, want %v", tc.method, tc.path, p.Problems, tc.call)
+		}
+	}
+	// A new project repo is created (201); one left there is taken over (200).
+	for name, status := range map[string]int{"aragon": http.StatusCreated, "kept": http.StatusOK} {
+		if w := send(http.MethodPost, "/api/projects", `{"name":"`+name+`"}`); w.Code != status {
+			t.Errorf("new project %s: %d, want %d", name, w.Code, status)
 		}
 	}
 	// What a project repo lacks, and creating it.

@@ -35,7 +35,6 @@ type Instance struct {
 	Profile          string    `json:"profile"`
 	HarnessSessionID string    `json:"-"` // for the harness's own resume
 	StartedAt        time.Time `json:"startedAt"`
-	LastOutputAt     time.Time `json:"lastOutputAt"`
 	Restarts         int       `json:"restarts"`
 	// Doing is what its harness last reported doing in this run, nil until
 	// it says: kept by the instance manager in memory, never stored.

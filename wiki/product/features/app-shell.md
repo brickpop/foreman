@@ -54,7 +54,7 @@ In-app mirrors of [notifications](./notifications.md), shown regardless of brows
 | New request | `<Name> needs you on <project>` | the request summary | `--acc` |
 | Deployed | `<Team> deployed to <project>` | `<N> new sessions starting.` (opens the lead's session) | `--ok` |
 | Stopped | `<Team> stopped on <project>` | `Worktrees are kept. Other deployments keep running.` | `--tx4` |
-| Project created | `<id> created` | `Its project repo is <path>.` (or `Cloned its project repo into <path>.`) | `--ok` |
+| Project created | `<id> created` | `Made its project repo at <path>, with project.toml and a starter wiki.`, `Cloned its project repo into <path>.`, or `Took over the project repo left at <path>, as it was.` | `--ok` |
 | Project removed | `<id> removed` | none | `--tx4` |
 | Stopped by Foreman (its project is gone) | `Foreman stopped <Team> on <project>` | the reason, e.g. `ledger is gone: all its code repos are missing` (opens the Dashboard) | `--err` |
 | Config review resolved | `project.toml` | `Config change merged to main.` (`--ok`) or `Config change rejected.` (`--tx4`) | |

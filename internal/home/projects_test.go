@@ -30,7 +30,7 @@ func entries(t *testing.T, dir string) []string {
 // name is taken in any case.
 func TestNewProject(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "DevProject", "")
+	p, _, err := h.NewProject(ctx, "DevProject", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestNewProject(t *testing.T) {
 		"with/slash":            ErrInvalid,
 		strings.Repeat("x", 64): ErrInvalid,
 	} {
-		if _, err := h.NewProject(ctx, name, ""); !errors.Is(err, want) {
+		if _, _, err := h.NewProject(ctx, name, ""); !errors.Is(err, want) {
 			t.Errorf("%q: %v, want %v", name, err, want)
 		}
 	}
@@ -83,7 +83,7 @@ func TestNewProject(t *testing.T) {
 // never deletes the folder.
 func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 		{"Ledger", "", "name the project ledger"},
 		{"ledger", p.Path, "without Clone"},
 	} {
-		if _, err := h.NewProject(ctx, c.name, c.clone); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), c.want) {
+		if _, _, err := h.NewProject(ctx, c.name, c.clone); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s %q: %v", c.name, c.clone, err)
 		}
 	}
@@ -107,7 +107,7 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 	if err := h.records.Create(ctx, "ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.NewProject(ctx, "ledger", ""); !errors.Is(err, ErrExists) {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); !errors.Is(err, ErrExists) {
 		t.Errorf("record taken: %v", err)
 	}
 	if err := h.records.Remove(ctx, "ledger"); err != nil {
@@ -117,7 +117,7 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 		t.Fatal("a refused takeover deleted the kept project repo")
 	}
 
-	got, err := h.NewProject(ctx, "ledger", "")
+	got, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"loose", "linked"} {
-		if _, err := h.NewProject(ctx, name, ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "isn't a git repo") {
+		if _, _, err := h.NewProject(ctx, name, ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "isn't a git repo") {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -162,14 +162,14 @@ func TestAFailedStepLeavesNothingBehind(t *testing.T) {
 	h := loaded(t, nil)
 	real := h.git
 	h.git = failingGit{real, "Project repo"}
-	if _, err := h.NewProject(ctx, "ledger", ""); err == nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err == nil {
 		t.Error("new project: no error")
 	}
 	if got := entries(t, h.Path("projects")); len(got) != 0 || len(h.Projects()) != 0 {
 		t.Errorf("left behind: %v %+v", got, h.Projects())
 	}
 	h.git = real
-	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	h.git = failingGit{real, "First commit"}
@@ -191,7 +191,7 @@ func TestAFailedStepLeavesNothingBehind(t *testing.T) {
 func TestAddRepo(t *testing.T) {
 	h := loaded(t, nil)
 	for _, id := range []string{"aragon", "app-only"} {
-		if _, err := h.NewProject(ctx, id, ""); err != nil {
+		if _, _, err := h.NewProject(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -261,7 +261,7 @@ func TestAddRepo(t *testing.T) {
 // accepted. Removing one is refused while a team is deployed on the project.
 func TestMissingReposAreLocatedOrRemoved(t *testing.T) {
 	h := loaded(t, nil)
-	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	api := codeRepo(t, "dev/api")
@@ -330,7 +330,7 @@ func TestMissingReposAreLocatedOrRemoved(t *testing.T) {
 // in an existing one inside the folder repos are added from.
 func TestNewRepo(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +367,7 @@ func TestNewRepo(t *testing.T) {
 // never a path.
 func TestSetProfile(t *testing.T) {
 	h := loaded(t, nil)
-	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	var changes []Change
@@ -399,7 +399,7 @@ func TestSetProfile(t *testing.T) {
 // gets only what it lacks, committed on its own.
 func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "old", "")
+	p, _, err := h.NewProject(ctx, "old", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +477,7 @@ func TestScaffoldIsTheStarterFolder(t *testing.T) {
 // A new project's wiki is named after it and passes the engine's check.
 func TestNewProjectWikiChecks(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -512,11 +512,11 @@ func TestNewProjectWikiChecks(t *testing.T) {
 // leaves nothing behind, and a URL can't run a command.
 func TestCloneAProjectRepo(t *testing.T) {
 	h := loaded(t, nil)
-	src, err := h.NewProject(ctx, "origin", "")
+	src, _, err := h.NewProject(ctx, "origin", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p, err := h.NewProject(ctx, "copy", src.Path)
+	p, _, err := h.NewProject(ctx, "copy", src.Path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -525,7 +525,7 @@ func TestCloneAProjectRepo(t *testing.T) {
 	}
 	marker := filepath.Join(t.TempDir(), "ran")
 	for _, source := range []string{filepath.Join(t.TempDir(), "nope"), "--upload-pack=touch " + marker, "ext::sh -c touch% " + marker} {
-		if _, err := h.NewProject(ctx, "bad", source); !errors.Is(err, ErrInvalid) {
+		if _, _, err := h.NewProject(ctx, "bad", source); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v", source, err)
 		}
 		if exists(h.Path("projects", "bad")) {
@@ -556,7 +556,7 @@ func sandboxWorktree(t *testing.T, h *Home, project, agent, repo, path string) s
 // is deployed, while the repo is missing, and onto a taken or bad name.
 func TestRenameRepo(t *testing.T) {
 	h := loaded(t, nil)
-	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	api := codeRepo(t, "dev/api")
@@ -610,7 +610,7 @@ func TestRenameRepo(t *testing.T) {
 func TestRemoveProject(t *testing.T) {
 	h := loaded(t, nil)
 	for _, id := range []string{"ledger", "relay"} {
-		if _, err := h.NewProject(ctx, id, ""); err != nil {
+		if _, _, err := h.NewProject(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -664,7 +664,7 @@ func TestRemoveProject(t *testing.T) {
 // folder; one of several missing isn't gone.
 func TestGone(t *testing.T) {
 	h := loaded(t, nil)
-	p, _ := h.NewProject(ctx, "ledger", "")
+	p, _, _ := h.NewProject(ctx, "ledger", "")
 	if p.Gone() != "" {
 		t.Error("a project without repos is gone")
 	}

@@ -36,7 +36,6 @@ export interface Instance {
    */
   profile: string;
   startedAt: string /* RFC 3339 */;
-  lastOutputAt: string /* RFC 3339 */;
   restarts: number /* int */;
   /**
    * Doing is what its harness last reported doing in this run, nil until

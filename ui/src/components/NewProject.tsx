@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../api/client";
+import { createdBody } from "../app/addProject";
 import { keys } from "../app/queries";
 import { AddRepo } from "./AddRepo";
 import { Modal } from "./Overlays";
@@ -40,7 +41,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
   const create = useMutation({
     mutationFn: () =>
       client.home.newProject(name.trim(), source === "clone" ? clone.trim() : undefined),
-    onSuccess: (p) => {
+    onSuccess: ({ project: p, created }) => {
       queries.invalidateQueries({ queryKey: keys.projects });
       navigate({
         to: "/projects/$project",
@@ -49,10 +50,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
       });
       toast({
         title: `${p.id} created`,
-        body:
-          source === "clone"
-            ? `Cloned its project repo into ${p.path}.`
-            : `Its project repo is ${p.path}.`,
+        body: createdBody(created, source === "clone", p.path),
         color: "var(--ok)",
       });
       onCreated(p);

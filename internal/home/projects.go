@@ -36,15 +36,15 @@ var (
 // from clone (a URL or a local path, as the CEO's git can reach it). The
 // name follows a repo's rules and must be new, in any case, unless a
 // removed project left its project repo there: that is taken over. Nothing
-// is left behind if a step fails.
-func (h *Home) NewProject(ctx context.Context, name, clone string) (Project, error) {
+// is left behind if a step fails. created is false for a takeover.
+func (h *Home) NewProject(ctx context.Context, name, clone string) (p Project, created bool, err error) {
 	h.mu.Lock()
 	defer h.unlock()
 	if !validName(name) {
-		return Project{}, fmt.Errorf("%w: a project name is %s", ErrInvalid, nameRules)
+		return Project{}, false, fmt.Errorf("%w: a project name is %s", ErrInvalid, nameRules)
 	}
 	if existing, ok := h.projectNamed(name); ok {
-		return Project{}, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
+		return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
 	}
 	dir := h.Path(projectsDir, name)
 	create := h.createProjectRepo
@@ -61,7 +61,7 @@ func (h *Home) NewProject(ctx context.Context, name, clone string) (Project, err
 	existing, takeOver := taken(h.Path(projectsDir), name)
 	if takeOver {
 		if err := canTakeOver(h.Path(projectsDir, existing), name, existing, clone); err != nil {
-			return Project{}, err
+			return Project{}, false, err
 		}
 		create = func(context.Context, string, string) error { return nil }
 	}
@@ -72,20 +72,21 @@ func (h *Home) NewProject(ctx context.Context, name, clone string) (Project, err
 		}
 	}
 	if err := os.MkdirAll(h.Path(projectsDir), 0o755); err != nil {
-		return Project{}, err
+		return Project{}, false, err
 	}
 	if err := create(ctx, name, dir); err != nil {
 		drop()
-		return Project{}, err
+		return Project{}, false, err
 	}
 	if err := h.records.Create(ctx, name); err != nil {
 		drop()
 		if errors.Is(err, store.ErrExists) {
-			return Project{}, fmt.Errorf("%w: project %s already exists", ErrExists, name)
+			return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, name)
 		}
-		return Project{}, err
+		return Project{}, false, err
 	}
-	return h.rescan(name)
+	p, err = h.rescan(name)
+	return p, !takeOver, err
 }
 
 // canTakeOver says why the folder left at dir (named existing) can't become

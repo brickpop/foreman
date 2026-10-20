@@ -13,7 +13,7 @@ export interface ImageStatus {
   log: string; // the last build's output (its end, when long)
 }
 /**
- * Maintenance is the engine's state and its images, for Settings → Maintenance.
+ * Maintenance is the engine's state and its images, for Settings → System → Maintenance.
  */
 export interface Maintenance {
   running: string; // the engine running now, "podman" or "direct": a change of the setting waits for a restart

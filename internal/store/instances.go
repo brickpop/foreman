@@ -21,12 +21,12 @@ func (db *DB) Instances() Instances { return instances{db.sql} }
 
 type instances struct{ db *sql.DB }
 
-const instanceColumns = "id, deployment_id, agent_id, status, task, pid, pty_id, sandbox_path, harness, profile, harness_session_id, started_at, last_output_at, restarts"
+const instanceColumns = "id, deployment_id, agent_id, status, task, pid, pty_id, sandbox_path, harness, profile, harness_session_id, started_at, restarts"
 
 func (s instances) Put(ctx context.Context, i Instance) error {
-	_, err := s.db.ExecContext(ctx, "INSERT OR REPLACE INTO instances ("+instanceColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err := s.db.ExecContext(ctx, "INSERT OR REPLACE INTO instances ("+instanceColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		i.ID, i.DeploymentID, i.AgentID, i.Status, nullText(i.Task), nullInt(i.PID), nullText(i.PtyID), i.SandboxPath, i.Harness, i.Profile,
-		nullText(i.HarnessSessionID), timeText(i.StartedAt), timeText(i.LastOutputAt), i.Restarts)
+		nullText(i.HarnessSessionID), timeText(i.StartedAt), i.Restarts)
 	return err
 }
 
@@ -53,10 +53,10 @@ func (s instances) List(ctx context.Context, deploymentID string) ([]Instance, e
 
 func scanInstance(row interface{ Scan(...any) error }) (Instance, error) {
 	var i Instance
-	var task, ptyID, sessionID, started, lastOutput sql.NullString
+	var task, ptyID, sessionID, started sql.NullString
 	var pid sql.NullInt64
 	err := row.Scan(&i.ID, &i.DeploymentID, &i.AgentID, &i.Status, &task, &pid, &ptyID, &i.SandboxPath, &i.Harness, &i.Profile,
-		&sessionID, &started, &lastOutput, &i.Restarts)
+		&sessionID, &started, &i.Restarts)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Instance{}, ErrNotFound
 	}
@@ -64,10 +64,7 @@ func scanInstance(row interface{ Scan(...any) error }) (Instance, error) {
 		return Instance{}, err
 	}
 	i.Task, i.PID, i.PtyID, i.HarnessSessionID = task.String, int(pid.Int64), ptyID.String, sessionID.String
-	if i.StartedAt, err = parseTime(started); err != nil {
-		return Instance{}, err
-	}
-	i.LastOutputAt, err = parseTime(lastOutput)
+	i.StartedAt, err = parseTime(started)
 	return i, err
 }
 

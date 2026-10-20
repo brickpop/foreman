@@ -79,7 +79,17 @@ After a crash (or that second Ctrl-C), containers are still running. On the next
 - **The CEO's Restart** (Project settings, for agents still on another profile): stops a running instance and starts it again at once, on the project's profile as it is now, with its one automatic restart back. One that isn't up is left as it is.
 - **A clean exit is not a crash** (the CEO's decision, 2026-10-16): a harness that ends with code 0 (the CEO's `/exit`, say) goes **asleep**, holding no slot, and wakes like any sleeper, on a message or the CEO's Start, picking up its conversation. Messages already waiting for it wake it at once.
 - **When, automatically:** a crash gets **one** automatic restart (counted in `instances.restarts`) before a blocked request is raised; a second crash, or any rate limit, goes straight to the CEO. A rate limit is never retried automatically. A stopped instance of an active deployment starts again on the CEO's **Start again** (its pane), with its one automatic restart back; messages never revive it, so a crash can't loop.
-- **Stuck sessions:** "no output for N minutes" (`stuck_after_minutes`, default 20, a [global setting](../models/global-settings.md)) counts silence only while the harness is not signalling a running tool through its hooks, so a long, silent test run isn't "stuck".
+
+## Stuck agents
+
+An agent is **stuck** when it is mid-turn (`running`) and **no hook event at all** has come from it for `stuck_after_minutes` (default 20, a [global setting](../models/global-settings.md), read at each check, so a change applies at once). Hooks fire on every prompt, every tool call (Claude Code: before and after each; Pi: as each starts) and every turn end ([Harness adapters → Hooks](./harness-adapters.md#idle-and-waiting-detection)), so a working agent sends one every few seconds to a minute (the CEO, 2026-10-20).
+
+- **One rule for every harness, long tools included:** Pi has no "tool finished" event, so a long tool and long thinking after a tool look the same; a test run that genuinely takes 25 minutes is flagged, and the CEO dismisses it.
+- **Not terminal output:** Claude Code's spinner redraws the screen the whole time it thinks, so a hung turn never goes quiet on screen.
+- **Idle and awaiting agents are never stuck:** they are waiting, not working.
+- **What happens:** the Instance manager checks once a minute and raises one **blocked** [request](../features/requests.md) per stuck agent, "<Name> may be stuck: no activity for <N> min.", with **Restart** (and the card opens the session). The agent keeps running; nothing is restarted for the CEO. The card resolves itself on the agent's next hook event (whatever it says), when its run ends (a restart, a stop, a crash), or when Foreman restarts (its watch starts over, and raises it again if the agent is still quiet).
+- **When activity was last heard** is kept in the manager's memory, never stored: a Foreman restart starts every agent's watch over.
+
 
 ## Memory
 

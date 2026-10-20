@@ -90,6 +90,8 @@ type Deps struct {
 	// Recheck is how long a project found gone is given to come back before
 	// its deployments stop (ProjectsChanged): a minute when zero.
 	Recheck time.Duration
+	// Requests is where a stuck agent's card goes (CheckStuck); nil: none.
+	Requests store.Requests
 }
 
 // AgentLink is foreman-agent as the instances get it: mounted into each
@@ -114,6 +116,11 @@ type Manager struct {
 	doing map[string]store.Doing
 	// gone are the projects found gone, waiting for their recheck.
 	gone map[string]bool
+	// heard is when each live instance last showed activity: a hook, or its run
+	// starting (CheckStuck).
+	heard map[string]time.Time
+	// stuck are the open cards of agents found stuck, by instance.
+	stuck map[string]store.Request
 }
 
 type live struct {
@@ -124,7 +131,8 @@ type live struct {
 
 // New returns a manager.
 func New(d Deps) *Manager {
-	return &Manager{Deps: d, live: map[string]*live{}, doing: map[string]store.Doing{}, gone: map[string]bool{}}
+	return &Manager{Deps: d, live: map[string]*live{}, doing: map[string]store.Doing{}, gone: map[string]bool{},
+		heard: map[string]time.Time{}, stuck: map[string]store.Request{}}
 }
 
 var (
@@ -430,6 +438,7 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 	if adapter == nil || (inst.Status != Running && inst.Status != Idle && inst.Status != Awaiting) {
 		return
 	}
+	m.heardFrom(ctx, id)
 	if status, ok := map[harness.Activity]string{harness.Busy: Running, harness.Idle: Idle, harness.Waiting: Awaiting}[adapter.Interpret(event, payload)]; ok {
 		m.setStatus(ctx, id, status)
 	}
@@ -500,8 +509,10 @@ func (m *Manager) Terminal(id string) (*terminal.Terminal, error) {
 // Restore picks up after a Foreman restart: this home's running containers
 // are re-attached, live instances whose process is gone restart (continuing
 // their conversation), and this home's processes that belong to nothing are
-// stopped. Another home's (a test's, just dev's) are left alone.
+// stopped. Stuck cards from before are resolved: the watch starts over, and
+// raises them again if the agent is still quiet. Another home's (a test's, just dev's) are left alone.
 func (m *Manager) Restore(ctx context.Context) error {
+	m.resolveOldStuck(ctx)
 	procs, err := m.Runner.List(ctx)
 	if err != nil {
 		return err
@@ -568,6 +579,7 @@ func (m *Manager) adopt(ctx context.Context, id string, p runner.Process) error 
 	if inst, err := m.Instances.Get(ctx, id); err != nil || (inst.Status != Idle && inst.Status != Awaiting) {
 		m.setStatus(ctx, id, Running)
 	}
+	m.heardFrom(ctx, id)
 	go m.watch(id, l)
 	return nil
 }
@@ -681,6 +693,7 @@ func (m *Manager) start(id string, l *live) {
 	inst.Status, inst.StartedAt = Running, time.Now()
 	_ = m.Instances.Put(ctx, inst)
 	m.publish("instance.status", StatusChange{ID: id, Status: Running})
+	m.heardFrom(ctx, id)
 	go m.watch(id, l)
 }
 
@@ -810,6 +823,10 @@ func ProcessName(home, id string) string {
 func (m *Manager) watch(id string, l *live) {
 	<-l.term.Done()
 	ctx := context.Background()
+	m.unstuck(ctx, id, "its run ended")
+	m.mu.Lock()
+	delete(m.heard, id)
+	m.mu.Unlock()
 	m.mu.Lock()
 	stopping := l.stopping
 	m.mu.Unlock()
@@ -1079,6 +1096,110 @@ func (m *Manager) stopIfGone(project string) {
 		}
 		if err := m.stop(ctx, d.ID, project+" is gone: "+reason); err != nil {
 			slog.Warn("stopping a gone project's deployment", "deployment", d.ID, "err", err)
+		}
+	}
+}
+
+// heardFrom notes activity from an instance: its stuck card, if any, resolves.
+func (m *Manager) heardFrom(ctx context.Context, id string) {
+	m.mu.Lock()
+	m.heard[id] = time.Now()
+	m.mu.Unlock()
+	m.unstuck(ctx, id, "active again")
+}
+
+// unstuck resolves the instance's stuck card, if it has one, with why.
+func (m *Manager) unstuck(ctx context.Context, id, why string) {
+	m.mu.Lock()
+	r, ok := m.stuck[id]
+	delete(m.stuck, id)
+	m.mu.Unlock()
+	if !ok {
+		return
+	}
+	r.Status, r.Answer, r.ResolvedAt = store.RequestResolved, why, time.Now().UTC()
+	if _, err := m.Requests.Save(ctx, r); err != nil {
+		slog.Warn("resolving a stuck card", "instance", id, "err", err)
+		return
+	}
+	m.publish("request.resolved", r)
+}
+
+// CheckStuck raises a card for each agent mid-turn (running) from which no
+// hook has come for the stuck_after_minutes setting: hooks fire on every
+// prompt, tool call and turn end, so a working agent is never that quiet. The
+// agent keeps running, and the CEO decides (wiki/product/architecture/agent-runtime.md#stuck-agents).
+func (m *Manager) CheckStuck(ctx context.Context, now time.Time) {
+	if m.Requests == nil {
+		return
+	}
+	limit := time.Duration(m.Config.Settings().Settings.StuckAfterMinutes) * time.Minute
+	m.mu.Lock()
+	var quiet []string
+	for id, l := range m.live {
+		if l.term == nil || m.stuck[id].ID != "" {
+			continue
+		}
+		heard, ok := m.heard[id]
+		if !ok {
+			m.heard[id] = now
+			continue
+		}
+		if now.Sub(heard) >= limit {
+			quiet = append(quiet, id)
+		}
+	}
+	m.mu.Unlock()
+	for _, id := range quiet {
+		inst, err := m.Instances.Get(ctx, id)
+		if err != nil || inst.Status != Running {
+			continue
+		}
+		dep, err := m.Deployments.Get(ctx, inst.DeploymentID)
+		if err != nil {
+			continue
+		}
+		r, err := m.Requests.Save(ctx, store.Request{Kind: "blocked", Source: "foreman",
+			ProjectID: dep.ProjectID, DeploymentID: dep.ID, InstanceID: id, Options: []string{"Restart"},
+			Summary: fmt.Sprintf("%s may be stuck: no activity for %d min.", m.agentName(dep, inst.AgentID), int(limit.Minutes()))})
+		if err != nil {
+			slog.Warn("raising a stuck card", "instance", id, "err", err)
+			continue
+		}
+		m.mu.Lock()
+		m.stuck[id] = r
+		m.mu.Unlock()
+		m.publish("request.created", r)
+	}
+}
+
+// agentName is the instance's agent as its team names it, else its id.
+func (m *Manager) agentName(dep store.Deployment, agent string) string {
+	if team, err := m.Config.Team(dep.TeamID); err == nil {
+		if a, ok := team.Config.Agents[agent]; ok && a.Name != "" {
+			return a.Name
+		}
+	}
+	return agent
+}
+
+// resolveOldStuck resolves the stuck cards a previous Foreman left open:
+// Foreman's blocked cards about an agent.
+func (m *Manager) resolveOldStuck(ctx context.Context) {
+	if m.Requests == nil {
+		return
+	}
+	open, err := m.Requests.Open(ctx)
+	if err != nil {
+		slog.Warn("listing stuck cards", "err", err)
+		return
+	}
+	for _, r := range open {
+		if r.Kind == "blocked" && r.Source == "foreman" && r.InstanceID != "" {
+			m.mu.Lock()
+			m.stuck[r.InstanceID] = r
+			m.mu.Unlock()
+			m.unstuck(ctx, r.InstanceID, "Foreman restarted")
 		}
 	}
 }

@@ -19,8 +19,6 @@ The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10
 
 Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`).
 
-**Not shown yet:** `stuck_after_minutes` and `log_cap_mb` are in `settings.toml` but nothing uses them: stuck detection and log rotation aren't built, so a row would change nothing. They join **Running agents** when their features land.
-
 ## Running agents
 
 On **Agents**, kept in the global repo.
@@ -28,6 +26,8 @@ On **Agents**, kept in the global repo.
 | Row | Explanation | Control |
 |---|---|---|
 | Running sessions at once | Extra sessions wait in a queue until a slot frees up. | Stepper, 1–64, default 12 ([Agent runtime](../architecture/agent-runtime.md#concurrency)) |
+| Stuck after | An agent mid-turn that sends no sign of activity (a prompt, a tool call, a turn ending) for this long gets a card on the Dashboard. It keeps running; you decide. | Select `5`, `10`, `15`, `20` (default), `30`, `45`, `60`, `90`, `120 min`, plus the file's own value when written by hand ([Agent runtime → Stuck agents](../architecture/agent-runtime.md#stuck-agents)) |
+| Session logs per agent | Every byte each agent's terminal printed, kept in Foreman's home. Past this size, the oldest go first. | Select `10`, `25`, `50` (default), `100`, `250`, `500`, `1000 MB`, plus the file's own value ([Persistence → Session logs](../architecture/persistence.md#session-logs)) |
 | Run agents in | Containers isolate each agent from your machine. Without them, agents run as plain processes with full access to it. | Segmented `Containers (Podman)` / `Directly (no isolation)`. Choosing Directly asks for confirmation; while agents run directly, a warning stays visible here. **Takes effect when Foreman restarts** (decided 2026-10-15): until then the row says `Restart Foreman to switch` and Maintenance shows the engine still running. `Containers` can't be chosen while Podman isn't installed (on macOS: no machine), and the row says why: Foreman wouldn't start with it ([Global settings](../models/global-settings.md)) |
 
 ## Home

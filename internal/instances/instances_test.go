@@ -99,7 +99,7 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	if err := hm.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api); err != nil {
@@ -1351,7 +1351,7 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 // its branches and worktrees would collide there. Another team can.
 func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
+	if _, _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api")); err != nil {
@@ -1418,5 +1418,116 @@ func TestAGoneProjectStopsAfterARecheck(t *testing.T) {
 	}
 	if stopped == nil || stopped.StopReason != d.StopReason {
 		t.Errorf("the event: %+v", stopped)
+	}
+}
+
+// An agent mid-turn with no hook for stuck_after_minutes gets one card, and
+// keeps running; any hook, or its run ending, resolves the card. Idle and
+// awaiting agents are never stuck.
+func TestAQuietAgentIsFlaggedStuck(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
+	f.deps.Requests = f.db.Requests()
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	open := func() []store.Request {
+		t.Helper()
+		list, err := f.db.Requests().Open(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return list
+	}
+	after := func(d time.Duration) { f.m.CheckStuck(ctx, time.Now().Add(d)) }
+
+	after(19 * time.Minute)
+	if list := open(); len(list) != 0 {
+		t.Fatalf("flagged before 20 min: %+v", list)
+	}
+	after(21 * time.Minute)
+	after(40 * time.Minute) // still one card
+	list := open()
+	if len(list) != 1 {
+		t.Fatalf("cards: %+v", list)
+	}
+	r := list[0]
+	if r.Kind != "blocked" || r.Source != "foreman" || r.InstanceID != "mara@ledger" || r.DeploymentID != "atlas@ledger" ||
+		r.ProjectID != "ledger" || r.Summary != "Mara may be stuck: no activity for 20 min." || !slices.Equal(r.Options, []string{"Restart"}) {
+		t.Errorf("card %+v", r)
+	}
+	if s := f.status("mara@ledger"); s.Status != Running || !f.m.Live("mara@ledger") {
+		t.Errorf("a stuck agent was touched: %s", s.Status)
+	}
+	// Any hook resolves it, whatever it says.
+	f.m.Hook("mara@ledger", "", nil)
+	if list := open(); len(list) != 0 {
+		t.Errorf("still open after a hook: %+v", list)
+	}
+	f.mu.Lock()
+	var kinds []string
+	for _, e := range f.events {
+		if strings.HasPrefix(e.Type, "request.") {
+			kinds = append(kinds, e.Type)
+		}
+	}
+	f.mu.Unlock()
+	if !slices.Equal(kinds, []string{"request.created", "request.resolved"}) {
+		t.Errorf("events %v", kinds)
+	}
+
+	// Idle or awaiting, silence is fine.
+	for _, event := range []string{"idle", "waiting"} {
+		f.m.Hook("mara@ledger", event, nil)
+		after(3 * time.Hour)
+		if list := open(); len(list) != 0 {
+			t.Errorf("flagged while %s: %+v", event, list)
+		}
+	}
+
+	// Its run ending resolves it too.
+	f.m.Hook("mara@ledger", "busy", nil)
+	after(21 * time.Minute)
+	if len(open()) != 1 {
+		t.Fatal("not flagged again")
+	}
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Stopped)
+	deadline := time.Now().Add(5 * time.Second)
+	for len(open()) != 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if list := open(); len(list) != 0 {
+		t.Errorf("still open after the stop: %+v", list)
+	}
+}
+
+// A previous Foreman's stuck cards are resolved on Restore: the watch starts
+// over. Other requests stay open.
+func TestRestoreResolvesOldStuckCards(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Requests = f.db.Requests()
+	f.m = New(f.deps)
+	stuck, err := f.db.Requests().Save(ctx, store.Request{Kind: "blocked", Source: "foreman", InstanceID: "mara@ledger", Summary: "Mara may be stuck"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := f.db.Requests().Save(ctx, store.Request{Kind: "question", Source: "agent", InstanceID: "mara@ledger", Summary: "Which budget?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	list, err := f.db.Requests().Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].ID != other.ID {
+		t.Errorf("open after Restore: %+v (stuck was %s)", list, stuck.ID)
 	}
 }

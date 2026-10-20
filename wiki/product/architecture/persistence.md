@@ -33,8 +33,8 @@ Minimum tables, one model entry each: projects and project_repos ([Project confi
 ### Session logs
 
 - The Terminal block appends every byte read from a session to its current log file before fanning it out ([Building blocks](./building-blocks.md#2-terminal-terminal)). A new session id (and file) per harness start.
-- Scrollback for a newly attached terminal is replayed from the tail of the log, so the UI shows history after a reload or a server restart.
-- **Retention:** logs rotate per instance at a size cap (50 MB by default, a [global setting](../models/global-settings.md)); the oldest files beyond it are deleted. Logs hold whatever the harness printed, minus the secrets Foreman redacts ([Secrets](../models/secrets.md#invariants)).
+- Scrollback for a newly attached terminal is replayed from the tail of the log (its last 1 MB, across the session's parts), so the UI shows history after a reload or a server restart; the server-side screen replaces it with [Terminal fidelity](../../backlog/terminal-fidelity.md).
+- **Retention** (the CEO, 2026-10-20): each agent's folder, `logs/<agent>@<project>/`, stays under `log_cap_mb` (50 MB by default, a [global setting](../models/global-settings.md), read as logs are written). A session goes on in a new **part** each time its current one reaches a quarter of the cap (`<session-id>.log`, then `<session-id>.p000002.log` and on, so names sort oldest first); after each new part, and when a session starts, the oldest files go until the folder fits, older sessions before the session's own first parts, never the part being written. So up to about three quarters of the cap of the latest output is always kept, and the replayed tail reads across parts. Logs hold whatever the harness printed, minus the secrets Foreman redacts ([Secrets](../models/secrets.md#invariants)).
 - The activity line shown in [Project settings](../features/project-settings.md) comes from the harness's hooks and lives in the Instance manager's memory, never stored: a Foreman restart starts every instance without one, until its next hook ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)).
 
 ## File watching

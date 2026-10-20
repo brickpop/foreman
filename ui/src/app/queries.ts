@@ -242,7 +242,11 @@ export function useAnswer() {
   const toast = useToast();
   return useMutation({
     mutationFn: ({ request, answer }: { request: Request; answer: string }) =>
-      c.requests.resolve(request.id, answer),
+      // A blocked card's Restart restarts its agent, and the agent's new run
+      // resolves the card (wiki/product/features/requests.md).
+      request.kind === "blocked" && answer === "Restart" && request.instanceId
+        ? c.agents.restart(request.instanceId)
+        : c.requests.resolve(request.id, answer),
     onError: (e: Error) =>
       toast({ title: "Answer not sent", body: e.message, color: "var(--err)" }),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),

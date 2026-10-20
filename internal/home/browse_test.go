@@ -56,7 +56,7 @@ func TestBrowse(t *testing.T) {
 func TestTheStartFolderBoundsAddingRepos(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	p, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}

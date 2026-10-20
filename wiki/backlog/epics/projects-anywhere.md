@@ -1,6 +1,6 @@
 ---
 type: epic
-status: in-progress
+status: done
 order: 3
 ---
 
@@ -48,7 +48,7 @@ order: 3
 
 ## Cards
 
-- [The home and the lock](../home-and-lock.md): `~/.foreman`, the lock, the CLI, per-machine data in it, the global repo and its `.gitignore`.
+- [The home and the lock](../archive/home-and-lock.md): `~/.foreman`, the lock, the CLI, per-machine data in it, the global repo and its `.gitignore`.
 - [Projects as records, sandboxes under the home](../archive/projects-as-records.md): projects and repos in the database, project repos under `~/.foreman/projects/`, missing repos, the API, worktrees and mounts under the home, the prompt's paths.
 - [Add a project, anywhere](../archive/add-project-anywhere.md): the dialog (New or Clone, then pick repos), Project settings' repos (add, rename, locate, remove), removing a project.
 - [Settings by topic](../archive/settings-by-topic.md): the Settings tabs split by topic, now that both of today's are machine-wide.

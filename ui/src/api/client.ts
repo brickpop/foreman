@@ -98,8 +98,9 @@ export interface HomeArea {
   /** Saves settings.toml, guarded by the version read. */
   saveSettings(settings: Settings, version: string): Promise<SettingsFile>;
   /** Creates a project and its project repo: new (a starter wiki), or cloned
-   * from clone (a URL or a local path, with the CEO's own git). */
-  newProject(name: string, clone?: string): Promise<Project>;
+   * from clone (a URL or a local path, with the CEO's own git). created is
+   * false when it took over a project repo a removed project left there. */
+  newProject(name: string, clone?: string): Promise<{ project: Project; created: boolean }>;
   /** Removes a project and its history; its project repo too when deleteRepo. */
   removeProject(project: string, deleteRepo: boolean): Promise<void>;
   /** Adds an existing repo by its folder; newRepo creates an empty one at a new folder. */
@@ -334,8 +335,11 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/settings", { settings, version })
         ).json() as Promise<SettingsFile>,
-      newProject: async (name, clone) =>
-        (await request("POST", "/api/projects", { name, clone })).json() as Promise<Project>,
+      newProject: async (name, clone) => {
+        const r = await request("POST", "/api/projects", { name, clone });
+        // 201: a new project repo; 200: one taken over.
+        return { project: (await r.json()) as Project, created: r.status === 201 };
+      },
       removeProject: (project, deleteRepo) =>
         send("DELETE", `/api/projects/${id(project)}${deleteRepo ? "?deleteRepo=true" : ""}`),
       addRepo: async (project, name, path) =>

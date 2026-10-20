@@ -122,7 +122,9 @@ func run(args []string, stdout io.Writer) error {
 		active, _ := manager.DeploymentsIn(ctx, store.DeploymentActive)
 		return slices.ContainsFunc(active, func(d store.Deployment) bool { return d.ProjectID == project })
 	}
-	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed}); err != nil {
+	// Repos are added from where Foreman was started (the folder browser's top).
+	start, _ := os.Getwd()
+	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start}); err != nil {
 		return err
 	}
 	// The engine is chosen once: a change of the setting takes effect on restart.
@@ -177,7 +179,7 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("watching the wikis: %w", err)
 	}
-	logs := sessionlog.Dir{Root: h.Path("logs")}
+	logs := sessionlog.Dir{Root: h.LogsDir()}
 	openLog := func(instance string) (terminal.Log, error) { return logs.Open(instance) }
 	// How a container reaches this machine: the agent port, a model served
 	// here. Agents on the Direct engine are on it.
@@ -258,12 +260,17 @@ func run(args []string, stdout io.Writer) error {
 		switch c.Kind {
 		case "projects":
 			followWikis()
+			manager.ProjectsChanged(ctx)
+		case "project":
+			manager.ProjectsChanged(ctx)
 		case "settings":
 			manager.LimitChanged()
 		}
 	}); err != nil {
 		return fmt.Errorf("watching the home: %w", err)
 	}
+	// A project gone while Foreman was off stops its deployments too.
+	manager.ProjectsChanged(ctx)
 	// Messaging and Workflow need each other: a hand-off is a message, and its
 	// delivery moves the hand-off's work item.
 	var flow *workflow.Workflow

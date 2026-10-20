@@ -2,7 +2,7 @@
 -- (wiki/backlog/epics/projects-anywhere.md); later changes are migrations
 -- after this one.
 
--- wiki/product/models/project.md: a project is a record, its repos anywhere
+-- wiki/product/models/project-config.md#the-project-record: a project is a record, its repos anywhere
 -- on disk. Names are unique in any case: a Mac's filesystem takes two
 -- spellings for one folder (the project repo's, under projects/).
 CREATE TABLE projects (

@@ -27,8 +27,11 @@ type Config interface {
 	SaveSettings(ctx context.Context, s home.Settings, version string) (string, error)
 	// SaveTeam writes a team file if still at version; returns the saved team.
 	SaveTeam(ctx context.Context, c home.TeamConfig, version string) (home.Team, error)
-	// NewProject creates a project with its project repo, and no code repo yet.
-	NewProject(ctx context.Context, name string) (home.Project, error)
+	// NewProject creates a project with its project repo, new or cloned from
+	// clone (a URL or a local path), and no code repo yet; RemoveProject
+	// removes one and its history, its project repo only if deleteRepo.
+	NewProject(ctx context.Context, name, clone string) (home.Project, error)
+	RemoveProject(ctx context.Context, id string, deleteRepo bool) error
 	// AddRepo adds an existing repo, by its folder; NewRepo creates an empty
 	// one at a new folder and adds it.
 	AddRepo(ctx context.Context, project, name, path string) (home.Project, error)
@@ -37,6 +40,12 @@ type Config interface {
 	// repo out of the project (refused while a team is deployed on it).
 	LocateRepo(ctx context.Context, project, name, path string) (home.Project, error)
 	RemoveRepo(ctx context.Context, project, name string) (home.Project, error)
+	// RenameRepo renames a repo, its agents' worktrees with it (refused while
+	// a team is deployed on the project).
+	RenameRepo(ctx context.Context, project, name, newName string) (home.Project, error)
+	// Browse lists a folder for picking repos, inside the folder they are
+	// added from ("" is that folder).
+	Browse(path string) (home.Folder, error)
 	// SetProfile names the profile the project's agents run on.
 	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
@@ -60,14 +69,37 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
+			Name  string `json:"name"`
+			Clone string `json:"clone"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, clone?}")
+			return
+		}
+		p, err := c.NewProject(r.Context(), req.Name, req.Clone)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("DELETE /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if err := c.RemoveProject(r.Context(), r.PathValue("id"), r.URL.Query().Get("deleteRepo") == "true"); err != nil {
+			writeProject(w, nil, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}/name", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
 			Name string `json:"name"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name}")
 			return
 		}
-		p, err := c.NewProject(r.Context(), req.Name)
+		p, err := c.RenameRepo(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Name)
 		writeProject(w, p, err)
+	})
+	mux.HandleFunc("GET /api/folders", func(w http.ResponseWriter, r *http.Request) {
+		f, err := c.Browse(r.URL.Query().Get("path"))
+		writeProject(w, f, err)
 	})
 	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -195,9 +227,9 @@ func writeFound(w http.ResponseWriter, v any, err error, what string) {
 	}
 }
 
-// writeProject answers a request that changed a project (made it, or one of
-// its repos), with the project as it is now; a refusal says why.
-func writeProject(w http.ResponseWriter, p home.Project, err error) {
+// writeProject answers a request on a project or what it is made of (its
+// repos, the folders they are picked from), with v; a refusal says why.
+func writeProject(w http.ResponseWriter, v any, err error) {
 	switch {
 	case errors.Is(err, home.ErrInvalid):
 		writeError(w, http.StatusBadRequest, "INVALID", strings.TrimPrefix(err.Error(), home.ErrInvalid.Error()+": "))
@@ -206,7 +238,7 @@ func writeProject(w http.ResponseWriter, p home.Project, err error) {
 	case errors.Is(err, home.ErrDeployed):
 		writeError(w, http.StatusConflict, "DEPLOYED", strings.TrimPrefix(err.Error(), home.ErrDeployed.Error()+": "))
 	default:
-		writeFound(w, p, err, "project")
+		writeFound(w, v, err, "project")
 	}
 }
 

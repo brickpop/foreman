@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
 import { agentOf, forgeLabel, harnessLabel, onOtherProfile, when } from "../../app/model";
 import {
@@ -11,7 +12,10 @@ import {
   useTeams,
 } from "../../app/queries";
 import { rosterOrder } from "../../app/sessions";
+import { AddRepo } from "../../components/AddRepo";
 import { Avatar } from "../../components/Avatar";
+import { Confirm, Modal } from "../../components/Overlays";
+import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { Button, Empty, Panel } from "../../components/ui";
@@ -245,6 +249,7 @@ function Configuration({ project }: { project: Project }) {
           <pre className="m-0 overflow-x-auto rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2 select-text">
             {project.source}
           </pre>
+          <RemoveProject project={project} />
         </Block>
       </div>
     </section>
@@ -305,8 +310,24 @@ function ProfileChoice({ project }: { project: Project }) {
 }
 
 /** The project's code repos, wherever they are on disk, each with what keeps
- * agents from using it. */
+ * agents from using it; added, created, located, renamed and removed here.
+ * Renaming and removing wait until no team is deployed on the project. */
 function CodeRepos({ project }: { project: Project }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
+  const [adding, setAdding] = useState(false);
+  const [locating, setLocating] = useState<string>();
+  const [renaming, setRenaming] = useState<{ name: string; to: string }>();
+  const [removing, setRemoving] = useState<string>();
+  const change = useMutation({
+    mutationFn: (run: () => Promise<Project>) => run(),
+    onSuccess: () => queries.invalidateQueries({ queryKey: keys.projects }),
+    onError: (e: Error) =>
+      toast({ title: "Repos not changed", body: e.message, color: "var(--err)" }),
+  });
+  const stopFirst = deployed ? "Stop the team on this project first" : undefined;
   return (
     <Block title="Code repos">
       {project.repos.length === 0 ? (
@@ -314,17 +335,173 @@ function CodeRepos({ project }: { project: Project }) {
           None yet: agents need at least one repo to work on.
         </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {project.repos.map((r) => (
             <li key={r.name} className="flex flex-col gap-0.5">
-              <span className="font-mono text-[13px]">
-                <span className="text-tx">{r.name}</span> <span className="text-tx3">{r.path}</span>
-              </span>
+              {renaming?.name === r.name ? (
+                <form
+                  className="flex items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const to = renaming.to.trim();
+                    if (to && to !== r.name)
+                      change.mutate(() => client.home.renameRepo(project.id, r.name, to), {
+                        onSuccess: () => setRenaming(undefined),
+                      });
+                  }}
+                >
+                  <input
+                    value={renaming.to}
+                    onChange={(e) => setRenaming({ name: r.name, to: e.target.value })}
+                    aria-label={`New name for ${r.name}`}
+                    spellCheck={false}
+                    // biome-ignore lint/a11y/noAutofocus: opened by the Rename click, to type the name
+                    autoFocus
+                    className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
+                  />
+                  <Button type="submit" variant="small" disabled={change.isPending}>
+                    Rename
+                  </Button>
+                  <Button variant="small" onClick={() => setRenaming(undefined)}>
+                    Cancel
+                  </Button>
+                </form>
+              ) : (
+                <span className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 font-mono text-[13px] break-all">
+                    <span className="text-tx">{r.name}</span>{" "}
+                    <span className="text-tx3">{r.path}</span>
+                  </span>
+                  {r.problem && (
+                    <Button variant="small" onClick={() => setLocating(r.name)}>
+                      Locate…
+                    </Button>
+                  )}
+                  <Button
+                    variant="small"
+                    disabled={deployed}
+                    title={stopFirst}
+                    onClick={() => setRenaming({ name: r.name, to: r.name })}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    variant="small"
+                    disabled={deployed}
+                    title={stopFirst}
+                    onClick={() => setRemoving(r.name)}
+                  >
+                    Remove
+                  </Button>
+                </span>
+              )}
               {r.problem && <span className="text-[13px] text-err">{r.problem}</span>}
             </li>
           ))}
         </ul>
       )}
+      <span>
+        <Button variant="small" onClick={() => setAdding(true)}>
+          Add a repo
+        </Button>
+      </span>
+      <Modal open={adding} onClose={() => setAdding(false)} title={`Add a repo to ${project.id}`}>
+        {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
+      </Modal>
+      <Modal
+        open={locating !== undefined}
+        onClose={() => setLocating(undefined)}
+        title={`Locate ${locating}`}
+      >
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-[13.5px] text-tx2">
+            Pick its folder now. It must be the same repo: Foreman checks they share a commit.
+          </p>
+          {locating && (
+            <RepoPicker
+              pick="repo"
+              onPick={(path) =>
+                change.mutate(() => client.home.locateRepo(project.id, locating, path), {
+                  onSuccess: () => setLocating(undefined),
+                })
+              }
+            />
+          )}
+        </div>
+      </Modal>
+      <Confirm
+        open={removing !== undefined}
+        title={`Remove ${removing} from ${project.id}?`}
+        body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
+        action="Remove"
+        onConfirm={() =>
+          removing && change.mutate(() => client.home.removeRepo(project.id, removing))
+        }
+        onClose={() => setRemoving(undefined)}
+      />
+    </Block>
+  );
+}
+
+/** Removes the project and its history; its project repo folder only when asked. */
+function RemoveProject({ project }: { project: Project }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
+  const [open, setOpen] = useState(false);
+  const [deleteRepo, setDeleteRepo] = useState(false);
+  const remove = useMutation({
+    mutationFn: () => client.home.removeProject(project.id, deleteRepo),
+    onSuccess: () => {
+      queries.invalidateQueries({ queryKey: keys.projects });
+      navigate({ to: "/" });
+      toast({ title: `${project.id} removed`, body: "", color: "var(--tx4)" });
+    },
+    onError: (e: Error) =>
+      toast({ title: "Project not removed", body: e.message, color: "var(--err)" }),
+  });
+  return (
+    <Block title="Remove this project">
+      <span className="text-[13.5px] text-tx2">
+        {deployed
+          ? "Stop the teams on it first."
+          : "Its record, its agents' sandboxes and its history go. Your code repos keep their branches."}
+      </span>
+      <span>
+        <Button
+          variant="small"
+          disabled={deployed || remove.isPending}
+          onClick={() => {
+            setDeleteRepo(false);
+            setOpen(true);
+          }}
+        >
+          Remove project
+        </Button>
+      </span>
+      <Confirm
+        open={open}
+        title={`Remove ${project.id}?`}
+        body="Its record, its agents' sandboxes (their uncommitted work included) and its history (deployments, messages, requests, merge requests, session logs) go for good. Your code repos and their branches stay."
+        action="Remove"
+        onConfirm={() => remove.mutate()}
+        onClose={() => setOpen(false)}
+      >
+        <label className="flex items-start gap-2 text-[13.5px] text-tx2">
+          <input
+            type="checkbox"
+            checked={deleteRepo}
+            onChange={(e) => setDeleteRepo(e.target.checked)}
+            className="mt-1"
+          />
+          <span>
+            Also delete its project repo folder, <span className="font-mono">{project.path}</span>:
+            its wiki and project.toml. Unless you pushed it, it has no other copy.
+          </span>
+        </label>
+      </Confirm>
     </Block>
   );
 }

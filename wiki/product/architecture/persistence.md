@@ -27,6 +27,7 @@ Where Foreman keeps what, and how changes on disk reach the UI. The principle (c
 Minimum tables, one model entry each: projects and project_repos ([Project config](../models/project-config.md#the-project-record)), [deployments](../models/deployment.md), [instances](../models/instance.md), [requests](../models/request.md), [team_messages](../models/team-message.md), [work_items](../models/work-item.md), [merge_requests](../models/merge-request.md), and [read_markers / ui_prefs](../models/ui-state.md). Schema changes ship as ordered migrations applied at startup; they were squashed into one `001_schema.sql` with the projects' tables (2026-10-20: databases from before are deleted once). Driver and migration tooling: [Tech stack](./tech-stack.md).
 
 - Resolved requests stay in the table as history.
+- Removing a project deletes its rows in every table, in one transaction, and its session logs ([Add a project → Removing a project](../features/add-project.md#removing-a-project)): ids are built from names, so rows left behind would come back with a project of the same name.
 - On restart, deployments and instances are restored from here ([Agent runtime](./agent-runtime.md#recovery)).
 
 ### Session logs

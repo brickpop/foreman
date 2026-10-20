@@ -149,6 +149,44 @@ func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) 
 	return err
 }
 
+// Clone clones source (a URL or a local path) into dir, a folder that doesn't
+// exist yet, as the CEO: their SSH keys, agent and credential helper. It
+// never prompts: with no terminal (its own session) and GIT_TERMINAL_PROMPT=0,
+// a missing credential fails with git's message. Only the usual transports
+// are allowed, so a URL can't run a command (ext::).
+func (g *CLI) Clone(ctx context.Context, source, dir string) error {
+	if strings.HasPrefix(source, "-") {
+		return fmt.Errorf("%q is not a git URL or path", source)
+	}
+	cmd := command(ctx, filepath.Dir(dir), "-c", "protocol.allow=never", "-c", "protocol.https.allow=always", "-c", "protocol.http.allow=always",
+		"-c", "protocol.ssh.allow=always", "-c", "protocol.git.allow=always", "-c", "protocol.file.allow=always",
+		"clone", "--quiet", "--", source, dir)
+	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	var errOut bytes.Buffer
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("git clone: %w: %s", err, strings.TrimSpace(errOut.String()))
+	}
+	return nil
+}
+
+// MoveWorktree moves one of repo's worktrees from one folder to another
+// (a repo renamed in its project).
+func (g *CLI) MoveWorktree(ctx context.Context, repo, from, to string) error {
+	defer g.lock(ctx, repo)()
+	_, err := run(ctx, repo, "worktree", "move", from, to)
+	return err
+}
+
+// PruneWorktrees makes repo forget its worktrees whose folder is gone (a
+// project's sandboxes removed); their branches stay.
+func (g *CLI) PruneWorktrees(ctx context.Context, repo string) error {
+	defer g.lock(ctx, repo)()
+	_, err := run(ctx, repo, "worktree", "prune")
+	return err
+}
+
 // command is git with Foreman's settings, in dir. Its messages are always in
 // English (LC_ALL=C): Foreman reads some of them, and a CEO's git in another
 // language would otherwise hide what happened (found 2026-10-17, a Catalan

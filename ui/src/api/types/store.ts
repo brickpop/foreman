@@ -15,6 +15,7 @@ export interface Deployment {
   status: string; // DeploymentActive or DeploymentStopped
   createdAt: string /* RFC 3339 */;
   stoppedAt: string /* RFC 3339 */; // zero while active
+  stopReason: string; // why Foreman stopped it on its own; "" when the CEO did, or while active
 }
 /**
  * Instance is one agent running in one deployment

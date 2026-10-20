@@ -98,7 +98,7 @@ func TestTheRouterChecksBeforeAnyBlock(t *testing.T) {
 	if res := r.Call(ctx, "tove@ledger", "handoff", nil); res.Error || len(s.calls) != 1 || s.calls[0] != "tove@ledger handoff {}" {
 		t.Errorf("a member's handoff: %+v, calls %v", res, s.calls)
 	}
-	if err := db.Deployments().Stop(ctx, "atlas@ledger"); err != nil {
+	if err := db.Deployments().Stop(ctx, "atlas@ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	if res := r.Call(ctx, "tove@ledger", "ask", nil); !strings.HasPrefix(res.Text, "deployment_stopped:") || len(s.calls) != 1 {

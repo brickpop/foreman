@@ -8,7 +8,7 @@ epic: terminal-multiplexer
 
 # Full image chain: harness layer, overrides, Refresh, Prune
 
-**Why:** phase 1 runs one image for every project ([Image builder](./image-builder.md)). The target ([Agent images](../product/architecture/tech-stack.md#agent-images)) separates the layers so harnesses update without rebuilding toolchains, and so the CEO and each project can add tools.
+**Why:** phase 1 runs one image for every project ([Image builder](./archive/image-builder.md)). The target ([Agent images](../product/architecture/tech-stack.md#agent-images)) separates the layers so harnesses update without rebuilding toolchains, and so the CEO and each project can add tools.
 
 **Done when:** the four-layer chain (base → harness with every supported harness → global → project) is built, with global and project Containerfile overrides as transparent tags when absent, cascade invalidation, Refresh with optional prune, Prune, and the full [Settings → Maintenance](../product/features/settings.md#maintenance) screen.
 

@@ -8,7 +8,7 @@ tags: [model, home, config]
 
 Foreman's folder on this machine, `~/.foreman` (or `--home`), on macOS and Linux alike. One Foreman runs per machine: `server.lock` keeps a second one from starting, and that one prints the first one's URL instead (the CEO, 2026-10-20). The home holds the **global repo** (`config/`), each project's **project repo** (`projects/<name>/`), the agents' **sandboxes**, and Foreman's state. Nothing else under the home is in a repo.
 
-A project is a record plus its project repo, and its code repos live anywhere in the CEO's home folder ([Project config](./project-config.md)). Foreman never clones code: the repos it creates are the global repo, each project repo, and, on the CEO's request, a new **empty code repo** at a path the CEO picks (a README in a first commit, on `main`).
+A project is a record plus its project repo, and its code repos live anywhere in the CEO's home folder ([Project config](./project-config.md)). Foreman never clones code: the repos it creates are the global repo, each project repo (new, or cloned from a URL or a local path), and, on the CEO's request, a new **empty code repo** at a path the CEO picks (a README in a first commit, on `main`).
 
 ## Config vs. state vs. content
 
@@ -40,6 +40,7 @@ foreman [--home <dir>] [--no-open] [--port 8888] [--new-token]
 ```
 
 - Foreman takes no folder: given one, it refuses to start and says projects are added in its UI.
+- The folder it is started in is the **start folder** (its real path; `$HOME` when that is outside `$HOME`): repos are added only from inside it, and the folder browser never goes above it (the CEO, 2026-10-20). Run Foreman from `~/dev/aragon` to add repos from there. Repos already added stay usable wherever they are ([Add a project → Picking repos](../features/add-project.md#picking-repos)).
 - On every start Foreman prints the URL with the [access token](../architecture/security.md#access-token) and opens it in the default browser; `--no-open` only prints it. A second `foreman` while one runs prints the first one's URL (and opens it) and exits, touching nothing.
 - `--home <dir>` runs on another home (tests, `just dev`); a relative one is made absolute.
 - `--port` sets the UI port (default `8888`); the interface it binds to follows the `listen` [setting](./global-settings.md).

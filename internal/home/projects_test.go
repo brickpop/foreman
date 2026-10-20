@@ -30,14 +30,14 @@ func entries(t *testing.T, dir string) []string {
 // name is taken in any case.
 func TestNewProject(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "DevProject")
+	p, err := h.NewProject(ctx, "DevProject", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if p.ID != "DevProject" || p.Path != h.Path("projects", "DevProject") || p.Profile != "default" || len(p.Repos) != 0 || len(p.Problems) != 0 {
 		t.Errorf("project %+v", p)
 	}
-	if p.Source != starterProject || p.Config.Main != "main" {
+	if want, _ := starterFile("DevProject", "project.toml"); p.Source != want || p.Config.Main != "main" {
 		t.Errorf("project.toml %q %+v", p.Source, p.Config)
 	}
 	if log := gitOut(t, p.Path, "log", "--format=%s"); log != "Project repo" {
@@ -68,7 +68,7 @@ func TestNewProject(t *testing.T) {
 		"with/slash":            ErrInvalid,
 		strings.Repeat("x", 64): ErrInvalid,
 	} {
-		if _, err := h.NewProject(ctx, name); !errors.Is(err, want) {
+		if _, err := h.NewProject(ctx, name, ""); !errors.Is(err, want) {
 			t.Errorf("%q: %v, want %v", name, err, want)
 		}
 	}
@@ -95,14 +95,14 @@ func TestAFailedStepLeavesNothingBehind(t *testing.T) {
 	h := loaded(t, nil)
 	real := h.git
 	h.git = failingGit{real, "Project repo"}
-	if _, err := h.NewProject(ctx, "ledger"); err == nil {
+	if _, err := h.NewProject(ctx, "ledger", ""); err == nil {
 		t.Error("new project: no error")
 	}
 	if got := entries(t, h.Path("projects")); len(got) != 0 || len(h.Projects()) != 0 {
 		t.Errorf("left behind: %v %+v", got, h.Projects())
 	}
 	h.git = real
-	if _, err := h.NewProject(ctx, "ledger"); err != nil {
+	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	h.git = failingGit{real, "First commit"}
@@ -124,7 +124,7 @@ func TestAFailedStepLeavesNothingBehind(t *testing.T) {
 func TestAddRepo(t *testing.T) {
 	h := loaded(t, nil)
 	for _, id := range []string{"aragon", "app-only"} {
-		if _, err := h.NewProject(ctx, id); err != nil {
+		if _, err := h.NewProject(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -194,7 +194,7 @@ func TestAddRepo(t *testing.T) {
 // accepted. Removing one is refused while a team is deployed on the project.
 func TestMissingReposAreLocatedOrRemoved(t *testing.T) {
 	h := loaded(t, nil)
-	if _, err := h.NewProject(ctx, "ledger"); err != nil {
+	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	api := codeRepo(t, "dev/api")
@@ -260,10 +260,10 @@ func TestMissingReposAreLocatedOrRemoved(t *testing.T) {
 }
 
 // A new repo is made empty, on the project's main branch, at a new folder
-// in an existing one inside the CEO's home folder.
+// in an existing one inside the folder repos are added from.
 func TestNewRepo(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "ledger")
+	p, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,8 +286,9 @@ func TestNewRepo(t *testing.T) {
 	for _, tc := range []struct{ name, path, says string }{
 		{"a folder that exists", path, "already exists"},
 		{"a relative path", "dev/x", "not an absolute path"},
-		{"in a folder that doesn't exist", filepath.Join(os.Getenv("HOME"), "nope", "x"), "inside your home folder"},
-		{"outside the CEO's home folder", filepath.Join(t.TempDir(), "x"), "inside your home folder"},
+		{"in a folder that doesn't exist", filepath.Join(os.Getenv("HOME"), "nope", "x"), "a new folder in an existing one"},
+		{"outside the CEO's home folder", filepath.Join(t.TempDir(), "x"), "where repos are added from"},
+		{"inside Foreman's home", h.Path("x"), "inside Foreman's home"},
 	} {
 		if _, err := h.NewRepo(ctx, "ledger", "web", tc.path); err == nil || !strings.Contains(err.Error(), tc.says) {
 			t.Errorf("%s: %v", tc.name, err)
@@ -299,7 +300,7 @@ func TestNewRepo(t *testing.T) {
 // never a path.
 func TestSetProfile(t *testing.T) {
 	h := loaded(t, nil)
-	if _, err := h.NewProject(ctx, "ledger"); err != nil {
+	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	var changes []Change
@@ -331,7 +332,7 @@ func TestSetProfile(t *testing.T) {
 // gets only what it lacks, committed on its own.
 func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "old")
+	p, err := h.NewProject(ctx, "old", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +410,7 @@ func TestScaffoldIsTheStarterFolder(t *testing.T) {
 // A new project's wiki is named after it and passes the engine's check.
 func TestNewProjectWikiChecks(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "ledger")
+	p, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,5 +438,182 @@ func TestNewProjectWikiChecks(t *testing.T) {
 	}
 	if out, err := exec.Command(bin, "--root", filepath.Join(repo, "wiki"), "check").CombinedOutput(); err != nil || !strings.Contains(string(out), "no issues") {
 		t.Errorf("wiki check: %v\n%s", err, out)
+	}
+}
+
+// A project repo can be cloned, from a local path here; a clone that fails
+// leaves nothing behind, and a URL can't run a command.
+func TestCloneAProjectRepo(t *testing.T) {
+	h := loaded(t, nil)
+	src, err := h.NewProject(ctx, "origin", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := h.NewProject(ctx, "copy", src.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Source != src.Source || len(p.Problems) != 0 || gitOut(t, p.Path, "log", "--format=%s") != "Project repo" {
+		t.Errorf("cloned %+v", p)
+	}
+	marker := filepath.Join(t.TempDir(), "ran")
+	for _, source := range []string{filepath.Join(t.TempDir(), "nope"), "--upload-pack=touch " + marker, "ext::sh -c touch% " + marker} {
+		if _, err := h.NewProject(ctx, "bad", source); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%s: %v", source, err)
+		}
+		if exists(h.Path("projects", "bad")) {
+			t.Errorf("%s: left its folder", source)
+		}
+		if _, err := h.Project("bad"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s: left its record", source)
+		}
+	}
+	if exists(marker) {
+		t.Error("a URL ran a command")
+	}
+}
+
+// sandboxWorktree makes the agent's worktree of a project's repo, as a start
+// would.
+func sandboxWorktree(t *testing.T, h *Home, project, agent, repo, path string) string {
+	t.Helper()
+	wt := h.Path("sandboxes", project, agent, repo)
+	if err := os.MkdirAll(filepath.Dir(wt), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, path, "worktree", "add", "--quiet", "-b", "wt/"+agent+"/main", wt, "main")
+	return wt
+}
+
+// Renaming a repo moves its agents' worktrees with it; refused while a team
+// is deployed, while the repo is missing, and onto a taken or bad name.
+func TestRenameRepo(t *testing.T) {
+	h := loaded(t, nil)
+	if _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	api := codeRepo(t, "dev/api")
+	web := codeRepo(t, "dev/web")
+	for name, path := range map[string]string{"api": api, "web": web} {
+		if _, err := h.AddRepo(ctx, "ledger", name, path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := sandboxWorktree(t, h, "ledger", "mara", "api", api)
+	deployed := true
+	h.deployed = func(context.Context, string) bool { return deployed }
+	if _, err := h.RenameRepo(ctx, "ledger", "api", "ledger-api"); !errors.Is(err, ErrDeployed) {
+		t.Errorf("while deployed: %v", err)
+	}
+	deployed = false
+	for newName, want := range map[string]error{"WEB": ErrExists, "project": ErrInvalid, "a/b": ErrInvalid} {
+		if _, err := h.RenameRepo(ctx, "ledger", "api", newName); !errors.Is(err, want) {
+			t.Errorf("onto %q: %v", newName, err)
+		}
+	}
+	if _, err := h.RenameRepo(ctx, "ledger", "nope", "x"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such repo: %v", err)
+	}
+	p, err := h.RenameRepo(ctx, "ledger", "api", "ledger-api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dir, ok := p.RepoDir("ledger-api"); !ok || dir != api {
+		t.Errorf("renamed: %+v", p.Repos)
+	}
+	moved := h.Path("sandboxes", "ledger", "mara", "ledger-api")
+	if exists(old) || gitOut(t, moved, "branch", "--show-current") != "wt/mara/main" {
+		t.Errorf("the worktree didn't move")
+	}
+	if list := gitOut(t, api, "worktree", "list", "--porcelain"); !strings.Contains(list, "worktree "+moved) {
+		t.Errorf("the repo doesn't know the moved worktree:\n%s", list)
+	}
+	// A missing repo can't move its worktrees.
+	if err := os.Rename(web, web+"-moved"); err != nil {
+		t.Fatal(err)
+	}
+	h.reload()
+	if _, err := h.RenameRepo(ctx, "ledger", "web", "site"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a missing repo: %v", err)
+	}
+}
+
+// Removing a project takes its sandboxes, its logs and its record; its code
+// repos keep their branches, and its project repo stays unless asked.
+func TestRemoveProject(t *testing.T) {
+	h := loaded(t, nil)
+	for _, id := range []string{"ledger", "relay"} {
+		if _, err := h.NewProject(ctx, id, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	api := codeRepo(t, "dev/api")
+	if _, err := h.AddRepo(ctx, "ledger", "api", api); err != nil {
+		t.Fatal(err)
+	}
+	sandboxWorktree(t, h, "ledger", "mara", "api", api)
+	writeFile(t, h.Path("logs", "mara@ledger", "1.log"), "x")
+	writeFile(t, h.Path("logs", "kai@relay", "1.log"), "x")
+	deployed := true
+	h.deployed = func(_ context.Context, project string) bool { return deployed && project == "ledger" }
+	if err := h.RemoveProject(ctx, "ledger", false); !errors.Is(err, ErrDeployed) {
+		t.Errorf("while deployed: %v", err)
+	}
+	deployed = false
+	if err := h.RemoveProject(ctx, "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.Project("ledger"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("still a project: %v", err)
+	}
+	if exists(h.Path("sandboxes", "ledger")) || exists(h.Path("logs", "mara@ledger")) || !exists(h.Path("logs", "kai@relay")) {
+		t.Error("sandboxes or logs: wrong ones left")
+	}
+	if !exists(h.Path("projects", "ledger", "project.toml")) {
+		t.Error("the project repo went, unasked")
+	}
+	if list := gitOut(t, api, "worktree", "list", "--porcelain"); strings.Count(list, "worktree ") != 1 {
+		t.Errorf("the repo still has the sandbox's worktree:\n%s", list)
+	}
+	if gitOut(t, api, "branch", "--list", "wt/mara/main") == "" {
+		t.Error("the agent's branch went")
+	}
+	reload(t, h)
+	if _, err := h.Project("ledger"); !errors.Is(err, ErrNotFound) {
+		t.Error("back after a restart")
+	}
+	if err := h.RemoveProject(ctx, "relay", true); err != nil {
+		t.Fatal(err)
+	}
+	if exists(h.Path("projects", "relay")) {
+		t.Error("the project repo stayed, though asked to go")
+	}
+	if err := h.RemoveProject(ctx, "relay", true); !errors.Is(err, ErrNotFound) {
+		t.Errorf("removed twice: %v", err)
+	}
+}
+
+// A project is gone when its project repo's folder is, or every code repo's
+// folder; one of several missing isn't gone.
+func TestGone(t *testing.T) {
+	h := loaded(t, nil)
+	p, _ := h.NewProject(ctx, "ledger", "")
+	if p.Gone() != "" {
+		t.Error("a project without repos is gone")
+	}
+	api, web := codeRepo(t, "dev/api"), codeRepo(t, "dev/web")
+	h.AddRepo(ctx, "ledger", "api", api)
+	p, _ = h.AddRepo(ctx, "ledger", "web", web)
+	_ = os.RemoveAll(api)
+	if p.Gone() != "" {
+		t.Error("gone with one repo left")
+	}
+	_ = os.RemoveAll(web)
+	if p.Gone() != "all its code repos are missing" {
+		t.Errorf("all repos missing: %q", p.Gone())
+	}
+	_ = os.RemoveAll(p.Path)
+	if !strings.Contains(p.Gone(), "its project repo") {
+		t.Errorf("project repo deleted: %q", p.Gone())
 	}
 }

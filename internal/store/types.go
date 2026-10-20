@@ -7,13 +7,14 @@ import "time"
 // Deployment is a team assigned to a project with a goal
 // (wiki/product/models/deployment.md).
 type Deployment struct {
-	ID        string    `json:"id"` // team@project
-	TeamID    string    `json:"teamId"`
-	ProjectID string    `json:"projectId"`
-	Goal      string    `json:"goal"`
-	Status    string    `json:"status"` // DeploymentActive or DeploymentStopped
-	CreatedAt time.Time `json:"createdAt"`
-	StoppedAt time.Time `json:"stoppedAt"` // zero while active
+	ID         string    `json:"id"` // team@project
+	TeamID     string    `json:"teamId"`
+	ProjectID  string    `json:"projectId"`
+	Goal       string    `json:"goal"`
+	Status     string    `json:"status"` // DeploymentActive or DeploymentStopped
+	CreatedAt  time.Time `json:"createdAt"`
+	StoppedAt  time.Time `json:"stoppedAt"`  // zero while active
+	StopReason string    `json:"stopReason"` // why Foreman stopped it on its own; "" when the CEO did, or while active
 }
 
 // Instance is one agent running in one deployment

@@ -272,7 +272,7 @@ func TestRefusals(t *testing.T) {
 	}
 	// A stopped deployment takes no new messages, and what waited expires.
 	f.call("mara@ledger", "ask", map[string]string{"teammate": "tove", "request": "one more"})
-	if err := f.db.Deployments().Stop(ctx, "atlas@ledger"); err != nil {
+	if err := f.db.Deployments().Stop(ctx, "atlas@ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	f.m.DeploymentStopped("atlas@ledger")

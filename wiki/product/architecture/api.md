@@ -17,9 +17,11 @@ The PRD's surface (indicative; names may still change during implementation, thi
 ```
 GET    /api/home                              {path}: Foreman's home on this machine
 GET    /api/projects | /api/projects/:id      the record (name, profile, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
-POST   /api/projects                          {name} → New: the record and its project repo under the home, with a starter wiki (400 INVALID, 409 EXISTS)
+POST   /api/projects                          {name, clone?} → New: the record and its project repo under the home, with a starter wiki; with clone (a git URL or a local path), its project repo cloned with the CEO's own git (400 INVALID, with git's message for a failed clone; 409 EXISTS)
+DELETE /api/projects/:id                      ?deleteRepo=true → remove the project: its record, sandboxes, session logs and history; its project repo folder only with deleteRepo (204; 409 DEPLOYED)
 POST   /api/projects/:id/repos                {name, path, new?} → add an existing code repo at path, or with new, create an empty one at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
 PUT    /api/projects/:id/repos/:repo          {path} → Locate: the repo's new path, which must hold its root commit (400 INVALID)
+PUT    /api/projects/:id/repos/:repo/name     {name} → rename it; agents' worktrees move, open merge requests follow (400 INVALID, 409 EXISTS, 409 DEPLOYED)
 DELETE /api/projects/:id/repos/:repo          remove it from the project; its folder and branches stay (409 DEPLOYED while a team is deployed on the project)
 PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
@@ -27,6 +29,7 @@ GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, fol
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip= a page of history, newest first: {commits, next}, 50 commits; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
+GET    /api/folders                           ?path= a folder for picking repos, inside the start folder (none: the start folder): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
@@ -94,7 +97,7 @@ GET    /api/events                            SSE: requests, status, file change
 
 A project's Activity tab pages its traffic with `/api/activity` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
 Its Repositories tab reads its repos read-only with `/api/projects/:id/repos…` ([Repositories](../features/repositories.md)).
-The project routes answer with the project as it is now; a refusal is 400 INVALID, 409 EXISTS or 409 DEPLOYED with the reason. Removing a project comes with [Add a project, anywhere](../../backlog/add-project-anywhere.md).
+The project routes answer with the project as it is now; a refusal is 400 INVALID, 409 EXISTS or 409 DEPLOYED with the reason. Removing a project deletes its history too ([Add a project → Removing a project](../features/add-project.md#removing-a-project)).
 Resource ids: project = its name (unique in any case); team = team id; instance = `agent@project` (agent ids are unique across teams, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
 ## Error format

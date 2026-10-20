@@ -65,7 +65,7 @@ type fixture struct {
 	root     string
 	m        *Manager
 	db       *store.DB
-	ws       *home.Home
+	hm       *home.Home
 	deps     Deps
 	mu       sync.Mutex
 	events   []events.Event
@@ -80,7 +80,7 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	root := t.TempDir()
 	t.Setenv("HOME", root)
-	ws, err := home.Open(filepath.Join(root, ".foreman"))
+	hm, err := home.Open(filepath.Join(root, ".foreman"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,32 +89,32 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	write(t, filepath.Join(api, "README"), "hello\n", 0o644)
 	gitRun(t, "-C", api, "add", "README")
 	gitRun(t, "-C", api, "commit", "--quiet", "-m", "first")
-	write(t, ws.Path("config", "teams", "atlas.toml"), teamFile, 0o644)
-	write(t, ws.Path("config", "settings.toml"), fmt.Sprintf("max_sessions = %d\n", maxSessions), 0o644)
-	db, err := store.Open(ctx, ws.Path("state.db"))
+	write(t, hm.Path("config", "teams", "atlas.toml"), teamFile, 0o644)
+	write(t, hm.Path("config", "settings.toml"), fmt.Sprintf("max_sessions = %d\n", maxSessions), 0o644)
+	db, err := store.Open(ctx, hm.Path("state.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if err := ws.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
+	if err := hm.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ws.NewProject(ctx, "ledger"); err != nil {
+	if _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ws.AddRepo(ctx, "ledger", "ledger-api", api); err != nil {
+	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api); err != nil {
 		t.Fatal(err)
 	}
 	program := filepath.Join(t.TempDir(), "harness.sh")
 	write(t, program, "#!/bin/sh\n"+script+"\n", 0o755)
-	f := &fixture{t: t, root: root, db: db, ws: ws}
-	logs := sessionlog.Dir{Root: ws.Path("logs")}
+	f := &fixture{t: t, root: root, db: db, hm: hm}
+	logs := sessionlog.Dir{Root: hm.Path("logs")}
 	f.profiles = profiles.Store{Root: t.TempDir()}
 	if err := f.profiles.Ensure("claude-code"); err != nil {
 		t.Fatal(err)
 	}
 	f.deps = Deps{
-		Home: ws.Root(), Runner: direct.Runner{}, Images: direct.Images{}, Git: git.New(), Config: ws,
+		Home: hm.Root(), Runner: direct.Runner{}, Images: direct.Images{}, Git: git.New(), Config: hm,
 		Deployments: db.Deployments(), Instances: db.Instances(),
 		Adapters: map[string]harness.Adapter{"claude-code": fake.Adapter{Program: program}},
 		Profile:  f.profileOf,
@@ -213,7 +213,7 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 	if s := f.status("tove@ledger"); s.Status != Asleep || !s.StartedAt.IsZero() {
 		t.Errorf("tove before any work: %+v", s)
 	}
-	if _, err := os.Stat(f.ws.Sandbox("ledger", "tove")); !os.IsNotExist(err) {
+	if _, err := os.Stat(f.hm.Sandbox("ledger", "tove")); !os.IsNotExist(err) {
 		t.Errorf("an asleep member has a sandbox: %v", err)
 	}
 	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
@@ -224,17 +224,17 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 		t.Errorf("a member got an opener: %q", got)
 	}
 	for _, id := range []string{"mara@ledger", "tove@ledger"} {
-		if inst := f.status(id); inst.StartedAt.IsZero() || inst.SandboxPath != f.ws.Sandbox("ledger", strings.Split(id, "@")[0]) {
+		if inst := f.status(id); inst.StartedAt.IsZero() || inst.SandboxPath != f.hm.Sandbox("ledger", strings.Split(id, "@")[0]) {
 			t.Errorf("%s: %+v", id, inst)
 		}
 	}
-	if b := f.branch(filepath.Join(f.ws.Sandbox("ledger", "mara"), "ledger-api")); b != "lead/atlas/integration" {
+	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api")); b != "lead/atlas/integration" {
 		t.Errorf("the lead's branch %q", b)
 	}
-	if b := f.branch(filepath.Join(f.ws.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/tove/main" {
+	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/tove/main" {
 		t.Errorf("a member's branch %q", b)
 	}
-	prompt, _ := os.ReadFile(filepath.Join(f.ws.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
+	prompt, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
 	if !strings.Contains(string(prompt), "Goal: Ship invoices") || strings.Contains(string(prompt), "## Tools") {
 		t.Errorf("tove's prompt:\n%s", prompt)
 	}
@@ -291,9 +291,9 @@ func TestDeployRefusals(t *testing.T) {
 	// The project's profile decides what its agents run on: one that doesn't
 	// exist, one whose harness isn't supported, one not connected; each
 	// refused before anything is created.
-	write(t, f.ws.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.Path("config", "teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
-	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	f.useProfile("ledger", "nope")
@@ -382,9 +382,9 @@ func TestStopWhileStarting(t *testing.T) {
 		t.Errorf("a stopped instance kept its terminal: %v", err)
 	}
 	// Its one slot is free: another deployment's lead starts.
-	write(t, f.ws.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.Path("config", "teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
-	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "orion", "ledger", "g"); err != nil {
@@ -414,7 +414,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 	if d, _ := f.db.Deployments().Get(ctx, "atlas@ledger"); d.Status != store.DeploymentStopped {
 		t.Errorf("deployment %+v", d)
 	}
-	if _, err := os.Stat(filepath.Join(f.ws.Sandbox("ledger", "tove"), "ledger-api", "README")); err != nil {
+	if _, err := os.Stat(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api", "README")); err != nil {
 		t.Error("stopping removed the worktree")
 	}
 	// Redeploying starts again, fresh.
@@ -475,10 +475,10 @@ func TestARaisedLimitStartsTheQueued(t *testing.T) {
 	f.waitStatus("mara@ledger", Running)
 	_ = f.m.Wake(ctx, "tove@ledger")
 	f.waitStatus("tove@ledger", Queued)
-	settings := f.ws.Settings()
+	settings := f.hm.Settings()
 	s := settings.Settings
 	s.MaxSessions = 2
-	if _, err := f.ws.SaveSettings(ctx, s, settings.Version); err != nil {
+	if _, err := f.hm.SaveSettings(ctx, s, settings.Version); err != nil {
 		t.Fatal(err)
 	}
 	f.m.LimitChanged()
@@ -497,7 +497,7 @@ func TestACrashRestartsOnceThenStops(t *testing.T) {
 	if inst.Restarts != 1 {
 		t.Errorf("restarts %d, want 1", inst.Restarts)
 	}
-	openers, _ := os.ReadFile(filepath.Join(f.ws.Sandbox("ledger", "mara"), ".harness", "fake", "PROMPT.md.openers"))
+	openers, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "mara"), ".harness", "fake", "PROMPT.md.openers"))
 	if string(openers) != "[Your goal on ledger: g]\n[Your goal on ledger: g]\n" {
 		t.Errorf("openers per start: %q", openers)
 	}
@@ -523,7 +523,7 @@ func TestRestore(t *testing.T) {
 	for agent, status := range map[string]string{"mara": Running, "tove": Running, "ivo": Asleep} {
 		_ = f.db.Instances().Put(ctx, store.Instance{
 			ID: agent + "@ledger", DeploymentID: dep.ID, AgentID: agent, Status: status, Harness: "claude-code",
-			SandboxPath: f.ws.Sandbox("ledger", agent), StartedAt: time.Now().Add(-time.Hour),
+			SandboxPath: f.hm.Sandbox("ledger", agent), StartedAt: time.Now().Add(-time.Hour),
 		})
 	}
 	start := func(id, home string) runner.Process {
@@ -539,7 +539,7 @@ func TestRestore(t *testing.T) {
 		t.Cleanup(func() { _ = p.Stop(time.Second) })
 		return p
 	}
-	survivor, orphan := start("mara@ledger", f.ws.Root()), start("ghost@ledger", f.ws.Root())
+	survivor, orphan := start("mara@ledger", f.hm.Root()), start("ghost@ledger", f.hm.Root())
 	// Another home on the machine, with the same names, and unlabelled ones:
 	// never touched.
 	theirs, theirOrphan := start("tove@ledger", "/elsewhere"), start("ghost2@ledger", "/elsewhere")
@@ -626,7 +626,7 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	given, _ := os.ReadFile(filepath.Join(f.ws.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
+	given, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
 	if shown != string(given) || !strings.Contains(shown, "Goal: Ship invoices") {
 		t.Errorf("shown:\n%s\ngiven:\n%s", shown, given)
 	}
@@ -809,8 +809,8 @@ func (g *failingSync) SyncSubmodules(_ context.Context, dir string, recursive bo
 // fetched doesn't keep the agent from starting.
 func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	write(t, f.ws.Path("projects", "ledger", "project.toml"), "recursive_submodules = true\n", 0o644)
-	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+	write(t, f.hm.Path("projects", "ledger", "project.toml"), "recursive_submodules = true\n", 0o644)
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	g := &failingSync{Git: f.deps.Git}
@@ -822,7 +822,7 @@ func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	f.waitStatus("mara@ledger", Running)
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	want := []string{filepath.Join(f.ws.Sandbox("ledger", "mara"), "ledger-api") + " recursive=true"}
+	want := []string{filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api") + " recursive=true"}
 	if !slices.Equal(g.synced, want) {
 		t.Errorf("synced %q, want %q", g.synced, want)
 	}
@@ -869,7 +869,7 @@ func closeOnce(c chan struct{}) {
 // what to do.
 func TestDeployRefusesAProjectWithoutRepos(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.ws.RemoveRepo(ctx, "ledger", "ledger-api"); err != nil {
+	if _, err := f.hm.RemoveRepo(ctx, "ledger", "ledger-api"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no code repo") {
@@ -1151,7 +1151,7 @@ func TestShutdownKeepsWhatItCouldntStop(t *testing.T) {
 
 // profileOf is the project's profile, as the composition root finds it.
 func (f *fixture) profileOf(project string) (profiles.Profile, string, error) {
-	pr, err := f.ws.Project(project)
+	pr, err := f.hm.Project(project)
 	if err != nil {
 		return profiles.Profile{}, "", err
 	}
@@ -1162,7 +1162,7 @@ func (f *fixture) profileOf(project string) (profiles.Profile, string, error) {
 // useProfile sets the project's profile.
 func (f *fixture) useProfile(project, profile string) {
 	f.t.Helper()
-	if _, err := f.ws.SetProfile(ctx, project, profile); err != nil {
+	if _, err := f.hm.SetProfile(ctx, project, profile); err != nil {
 		f.t.Fatal(err)
 	}
 }
@@ -1276,7 +1276,7 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	if err := os.Symlink(filepath.Join(f.root, "dev", "ledger-api"), link); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.ws.LocateRepo(ctx, "ledger", "ledger-api", link); err != nil {
+	if _, err := f.hm.LocateRepo(ctx, "ledger", "ledger-api", link); err != nil {
 		t.Fatal(err)
 	}
 	rec := &specs{}
@@ -1287,22 +1287,22 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	}
 	f.waitStatus("mara@ledger", Running)
 	realAPI, _ := filepath.EvalSymlinks(filepath.Join(f.root, "dev", "ledger-api"))
-	project := f.ws.Path("projects", "ledger")
-	mara := f.ws.Sandbox("ledger", "mara")
+	project := f.hm.Path("projects", "ledger")
+	mara := f.hm.Sandbox("ledger", "mara")
 	want := []runner.Mount{
 		{Source: mara, Target: mara},
 		{Source: filepath.Join(realAPI, ".git"), Target: filepath.Join(realAPI, ".git"), ReadOnly: true},
 		{Source: project, Target: filepath.Join(mara, "project")},
 		{Source: filepath.Join(project, ".git"), Target: filepath.Join(mara, "project", ".git"), ReadOnly: true},
 	}
-	if got := rec.last(); !slices.Equal(got.Mounts, want) || got.Labels[HomeLabel] != f.ws.Root() {
+	if got := rec.last(); !slices.Equal(got.Mounts, want) || got.Labels[HomeLabel] != f.hm.Root() {
 		t.Errorf("the lead's mounts:\n%+v\nwant\n%+v\nlabels %v", got.Mounts, want, got.Labels)
 	}
 	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("tove@ledger", Running)
-	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: project, Target: filepath.Join(f.ws.Sandbox("ledger", "tove"), "project"), ReadOnly: true}) {
+	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: project, Target: filepath.Join(f.hm.Sandbox("ledger", "tove"), "project"), ReadOnly: true}) {
 		t.Errorf("a member's project repo: %+v", got.Mounts[2])
 	}
 }
@@ -1316,7 +1316,7 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
-	worktree := filepath.Join(f.ws.Sandbox("ledger", "mara"), "ledger-api")
+	worktree := filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api")
 	write(t, filepath.Join(worktree, "work.txt"), "mara's\n", 0o644)
 	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
 		t.Fatal(err)
@@ -1332,7 +1332,7 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "is missing") {
 		t.Fatalf("deploying with a missing repo: %v", err)
 	}
-	if _, err := f.ws.LocateRepo(ctx, "ledger", "ledger-api", moved); err != nil {
+	if _, err := f.hm.LocateRepo(ctx, "ledger", "ledger-api", moved); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "again"); err != nil {
@@ -1351,15 +1351,15 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 // its branches and worktrees would collide there. Another team can.
 func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.ws.NewProject(ctx, "suite"); err != nil {
+	if _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.ws.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api")); err != nil {
+	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api")); err != nil {
 		t.Fatal(err)
 	}
-	write(t, f.ws.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.Path("config", "teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
-	if err := f.ws.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
@@ -1374,4 +1374,49 @@ func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 		t.Errorf("another team: %v", err)
 	}
 	f.waitStatus("nora@suite", Running)
+}
+
+// A project whose code repos all vanish gets a recheck before its deployment
+// stops: back in time, nothing happens; still gone, it stops with the reason.
+func TestAGoneProjectStopsAfterARecheck(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.m.Recheck = 100 * time.Millisecond
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	repo := filepath.Join(f.root, "dev", "ledger-api")
+	away := repo + "-away"
+	if err := os.Rename(repo, away); err != nil {
+		t.Fatal(err)
+	}
+	f.m.ProjectsChanged(ctx)
+	f.m.ProjectsChanged(ctx) // one recheck per project, however often called
+	if err := os.Rename(away, repo); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if d, _ := f.db.Deployments().Get(ctx, "atlas@ledger"); d.Status != store.DeploymentActive {
+		t.Fatalf("stopped though the repo came back: %+v", d)
+	}
+	if err := os.Rename(repo, away); err != nil {
+		t.Fatal(err)
+	}
+	f.m.ProjectsChanged(ctx)
+	f.waitStatus("mara@ledger", Stopped)
+	d, _ := f.db.Deployments().Get(ctx, "atlas@ledger")
+	if d.Status != store.DeploymentStopped || d.StopReason != "ledger is gone: all its code repos are missing" {
+		t.Errorf("deployment %+v", d)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var stopped *store.Deployment
+	for _, e := range f.events {
+		if dep, ok := e.Data.(store.Deployment); ok && e.Type == "deployment.stopped" {
+			stopped = &dep
+		}
+	}
+	if stopped == nil || stopped.StopReason != d.StopReason {
+		t.Errorf("the event: %+v", stopped)
+	}
 }

@@ -1,6 +1,7 @@
 import { Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { Instance, Project, Request, Team } from "../api/client";
+import { NewProject } from "../components/NewProject";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { useOpenChiefOfStaff } from "./chiefOfStaff";
@@ -27,6 +28,7 @@ export function Shell() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [menu]);
+  const [newProject, setNewProject] = useState(false);
   return (
     <Toasts>
       <LiveEvents />
@@ -49,12 +51,18 @@ export function Shell() {
             className="fixed inset-0 z-[35] hidden bg-black/40 max-[760px]:block"
           />
         )}
-        <Sidebar open={menu} onClose={() => setMenu(false)} />
+        <Sidebar
+          onNewProject={() => setNewProject(true)}
+          open={menu}
+          onClose={() => setMenu(false)}
+        />
         {/* Under 760px the content starts below the menu button. */}
         <main className="min-h-0 min-w-0 overflow-auto max-[760px]:pt-12">
           <Outlet />
         </main>
       </div>
+      {/* Mounted only while open: each opening starts fresh. */}
+      {newProject && <NewProject onClose={() => setNewProject(false)} />}
     </Toasts>
   );
 }
@@ -100,9 +108,11 @@ const rowItem =
   "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
 
 function Sidebar({
+  onNewProject,
   open,
   onClose,
 }: {
+  onNewProject: () => void;
   /** Open as an overlay, on narrow screens. */
   open: boolean;
   onClose: () => void;
@@ -159,6 +169,13 @@ function Sidebar({
               {p.needsYou && <Dot title="Needs you" />}
             </Link>
           ))}
+          <button
+            type="button"
+            onClick={onNewProject}
+            className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
+          >
+            + New project
+          </button>
         </section>
         <section className="flex flex-col gap-0.5">
           <Label>Teams</Label>

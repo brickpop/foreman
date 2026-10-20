@@ -41,6 +41,25 @@ type Repo struct {
 // Ready says whether agents can use the repo.
 func (r Repo) Ready() bool { return r.Problem == "" }
 
+// Gone says why the project is gone, as found on disk now, or "" while it
+// isn't: its project repo's folder deleted, or every code repo's folder
+// missing (a repo moved elsewhere counts; one holding another repo doesn't).
+// A gone project's deployments stop (instances.Manager.ProjectsChanged).
+func (p Project) Gone() string {
+	if !exists(p.Path) {
+		return "its project repo, " + p.Path + ", is gone"
+	}
+	if len(p.Repos) == 0 {
+		return ""
+	}
+	for _, r := range p.Repos {
+		if exists(r.Path) {
+			return ""
+		}
+	}
+	return "all its code repos are missing"
+}
+
 // RepoDir is the folder of one of the project's repos, by name: a code repo
 // agents can use, or its project repo ("project").
 func (p Project) RepoDir(name string) (string, bool) {
@@ -101,6 +120,7 @@ const (
 	sandboxesDir = "sandboxes" // the agents' worktrees, <project>/<agent>/<repo>
 	projectRepo  = "project"   // the project repo's name among the repos, and its folder in a sandbox
 	wikiDir      = "wiki"      // the wiki bundle, inside the project repo
+	logsDir      = "logs"      // the session logs, one folder per instance (<agent>@<project>)
 )
 
 // gitignore keeps the temp files of atomic writes out of the global repo,
@@ -117,7 +137,10 @@ func (h *Home) Load(ctx context.Context, d Deps) error {
 	if err != nil {
 		return err
 	}
-	h.allowed = allowed
+	h.allowed, h.start = allowed, allowed
+	if real, err := filepath.EvalSymlinks(d.Start); d.Start != "" && err == nil && inside(real, allowed) {
+		h.start = real
+	}
 	if err := h.ensureRepo(ctx); err != nil {
 		return fmt.Errorf("global repo: %w", err)
 	}
@@ -134,6 +157,13 @@ func (h *Home) config(elem ...string) string {
 
 // TeamsDir is the team files' folder.
 func (h *Home) TeamsDir() string { return h.config(teamsDir) }
+
+// LogsDir is where the session logs are, one folder per instance.
+func (h *Home) LogsDir() string { return h.Path(logsDir) }
+
+// Start is the folder repos are added from: where Foreman was started, or the
+// CEO's home folder (a real path).
+func (h *Home) Start() string { return h.start }
 
 // homeFolder is the CEO's home folder, its real path: repos must be inside it
 // (on macOS, what the Podman machine shares).

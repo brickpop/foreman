@@ -12,7 +12,7 @@ import (
 // name (in any case) or that path.
 var ErrExists = errors.New("store: already exists")
 
-// Projects is the projects and their repos (wiki/product/models/project.md):
+// Projects is the projects and their repos (wiki/product/models/project-config.md#the-project-record):
 // what makes a project, on this machine. Its rules are in its project repo.
 type Projects interface {
 	// List returns every project by id, each with its repos by name.
@@ -29,6 +29,15 @@ type Projects interface {
 	MoveRepo(ctx context.Context, project, name, path string) error
 	// RemoveRepo takes a repo out of the project.
 	RemoveRepo(ctx context.Context, project, name string) error
+	// RenameRepo renames a repo, and moves the project's open merge requests
+	// on it to the new name; closed ones keep the old name. ErrExists if the
+	// project has a repo of that name.
+	RenameRepo(ctx context.Context, project, name, newName string) error
+	// Remove deletes the project, its repos and its whole history: its
+	// deployments and everything recorded for them (instances, messages,
+	// actions, work items, merge requests, requests), so a project added
+	// again under that name starts clean (ids are built from the name).
+	Remove(ctx context.Context, id string) error
 }
 
 // ProjectRecord is a project as the database keeps it.
@@ -124,4 +133,53 @@ func (p projects) MoveRepo(ctx context.Context, project, name, path string) erro
 
 func (p projects) RemoveRepo(ctx context.Context, project, name string) error {
 	return touched(p.db.ExecContext(ctx, "DELETE FROM project_repos WHERE project_id = ? AND name = ?", project, name))
+}
+
+func (p projects) RenameRepo(ctx context.Context, project, name, newName string) error {
+	tx, err := p.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	res, err := tx.ExecContext(ctx, "UPDATE project_repos SET name = ? WHERE project_id = ? AND name = ?", newName, project, name)
+	if err != nil {
+		return unique(err)
+	}
+	if err := touched(res, nil); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE merge_requests SET repo = ? WHERE project_id = ? AND repo = ? AND state = ?",
+		newName, project, name, MergeOpen); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (p projects) Remove(ctx context.Context, id string) error {
+	tx, err := p.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	// Children first: they reference the deployments.
+	const ofProject = "deployment_id IN (SELECT id FROM deployments WHERE project_id = ?)"
+	for _, q := range []string{
+		"DELETE FROM instances WHERE " + ofProject,
+		"DELETE FROM team_messages WHERE " + ofProject,
+		"DELETE FROM team_actions WHERE " + ofProject,
+		"DELETE FROM work_items WHERE " + ofProject,
+		"DELETE FROM merge_requests WHERE project_id = ?1 OR deployment_id IN (SELECT id FROM deployments WHERE project_id = ?1)",
+		"DELETE FROM requests WHERE project_id = ?1 OR deployment_id IN (SELECT id FROM deployments WHERE project_id = ?1)",
+		"DELETE FROM deployments WHERE project_id = ?",
+		"DELETE FROM project_repos WHERE project_id = ?",
+	} {
+		if _, err := tx.ExecContext(ctx, q, id); err != nil {
+			return err
+		}
+	}
+	res, err := tx.ExecContext(ctx, "DELETE FROM projects WHERE id = ?", id)
+	if err := touched(res, err); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

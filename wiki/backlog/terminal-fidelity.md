@@ -10,7 +10,7 @@ epic: terminal-multiplexer
 
 **Why:** agents' harnesses are full-screen programs; reloads and late viewers must see them exactly ([Terminal state](../product/architecture/terminal-state.md)). Most of it is built and parked in `internal/screen` (round-trip tests, every-byte-offset test, query answers).
 
-Unblocked: [Restructure along the building blocks](./restructure-to-blocks.md) is done.
+Unblocked: [Restructure along the building blocks](./archive/restructure-to-blocks.md) is done.
 
 **Done when:** the Terminal uses `Screen` snapshots on attach, the browser never answers terminal queries (xterm.js handlers overridden), and the round-trip tests pass on synthetic streams and on recordings from the CEO's Mac (`vim`, `htop`, `less`, Claude Code).
 

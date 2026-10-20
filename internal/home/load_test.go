@@ -87,7 +87,13 @@ func loaded(t *testing.T, setup func(root string)) *Home {
 // reload loads h again, as a restart would.
 func reload(t *testing.T, h *Home) {
 	t.Helper()
-	if err := h.Load(ctx, Deps{Git: h.git, Projects: h.records, Deployed: h.deployed}); err != nil {
+	startedIn(t, h, h.start)
+}
+
+// startedIn loads h again as if Foreman were started in dir.
+func startedIn(t *testing.T, h *Home, dir string) {
+	t.Helper()
+	if err := h.Load(ctx, Deps{Git: h.git, Projects: h.records, Deployed: h.deployed, Start: dir}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -128,7 +134,7 @@ func TestLoadMakesTheGlobalRepoWithWhatIsThere(t *testing.T) {
 // problems; one that is gone is a problem, with the defaults.
 func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 	h := loaded(t, nil)
-	p, err := h.NewProject(ctx, "ledger")
+	p, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -271,7 +277,7 @@ func TestSaveSettings(t *testing.T) {
 func TestWatchReportsChangesOnDisk(t *testing.T) {
 	h := loaded(t, nil)
 	root := h.Root()
-	ledger, err := h.NewProject(ctx, "ledger")
+	ledger, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,7 +331,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 
 	// A project made after the watch started is watched too, and a repo added
 	// is told at once.
-	relay, err := h.NewProject(ctx, "relay")
+	relay, err := h.NewProject(ctx, "relay", "")
 	if err != nil {
 		t.Fatal(err)
 	}

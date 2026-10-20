@@ -6,7 +6,7 @@ tags: [feature, ui, requests, pipeline]
 
 # Project pipeline
 
-What needs the CEO on a project, the work moving towards `main`, and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/project-code-tab.md)):
+What needs the CEO on a project, the work moving towards `main`, and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/archive/project-code-tab.md)):
 
 - **Needs you** opens the project's **Overview**, above the wiki, only when something waits ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)). The Overview tab carries the count badge of open requests.
 - **In flight** and **Merged** open the **Repositories** tab, above the repos: they are git facts ([Repositories](./repositories.md)).

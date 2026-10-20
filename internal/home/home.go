@@ -30,6 +30,7 @@ type Home struct {
 	records  store.Projects
 	deployed func(ctx context.Context, project string) bool
 	allowed  string // repos must be inside it: the CEO's home folder, its real path
+	start    string // new repos are added from inside it: where Foreman was started (inside allowed), its real path
 
 	mu     sync.Mutex // guards snap, saves and pending
 	snap   snapshot
@@ -114,6 +115,12 @@ type Git interface {
 	RootCommit(ctx context.Context, dir string) (string, error)
 	// Resolve is the commit ref names; an error when the repo hasn't it.
 	Resolve(ctx context.Context, dir, ref string) (string, error)
+	// Clone clones source (a URL or a local path) into dir, as the CEO.
+	Clone(ctx context.Context, source, dir string) error
+	// MoveWorktree moves one of repo's worktrees (a repo renamed).
+	MoveWorktree(ctx context.Context, repo, from, to string) error
+	// PruneWorktrees makes repo forget its worktrees whose folder is gone.
+	PruneWorktrees(ctx context.Context, repo string) error
 }
 
 // Deps is what Load needs besides the home's files.
@@ -123,4 +130,8 @@ type Deps struct {
 	// Deployed says whether a team is deployed on the project: its repos
 	// can't be taken away from under its agents.
 	Deployed func(ctx context.Context, project string) bool
+	// Start is the folder Foreman was started in: repos are added from inside
+	// it (the browser starts there and never goes above it), or from the
+	// CEO's home folder when it is outside that, or empty.
+	Start string
 }

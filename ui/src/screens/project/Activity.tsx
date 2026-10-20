@@ -146,6 +146,9 @@ function OlderSessions({ deployments, teams }: { deployments: Deployment[]; team
                 stopped {when(d.stoppedAt)}
                 {d.goal && ` · ${d.goal}`}
               </span>
+              {d.stopReason && (
+                <span className="text-[13px] text-err">by Foreman: {d.stopReason}</span>
+              )}
             </button>
             {shown === d.id && <Timeline scope={{ deployment: d.id }} teams={teams} />}
           </div>

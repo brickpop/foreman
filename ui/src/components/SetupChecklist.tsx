@@ -7,6 +7,7 @@ import { keys } from "../app/queries";
 import { cpuChoices, logTail, memoryChoices, stepTitle } from "../app/setup";
 import { ConnectDialog } from "./ConnectDialog";
 import { CheckIcon } from "./icons";
+import { NewProject } from "./NewProject";
 import { Select } from "./Select";
 import { Button, Panel, SectionLabel } from "./ui";
 
@@ -137,6 +138,26 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
         <Button variant="small" onClick={() => openChiefOfStaff({ start: "create-team" })}>
           Create a team
         </Button>
+      );
+    case "project":
+      return (
+        <>
+          <Button variant="small" onClick={() => setDialog(true)}>
+            New project
+          </Button>
+          {dialog && <NewProject onClose={() => setDialog(false)} />}
+        </>
+      );
+    case "repo":
+      return (
+        <Link
+          to="/projects/$project"
+          params={{ project: s.subject }}
+          search={{ tab: "settings" }}
+          className="text-[13px] text-accTx hover:underline"
+        >
+          Add a repo
+        </Link>
       );
     default:
       return null;

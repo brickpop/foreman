@@ -6,7 +6,7 @@ tags: [feature, ui, git]
 
 # Repositories
 
-A project's **Repositories** tab ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)): what the project holds, read-only and as committed. Decided by the CEO on 2026-10-17 ([Repositories card](../../backlog/project-code-tab.md)). Body padding `24px 48px 64px`, 36px between sections.
+A project's **Repositories** tab ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)): what the project holds, read-only and as committed. Decided by the CEO on 2026-10-17 ([Repositories card](../../backlog/archive/project-code-tab.md)). Body padding `24px 48px 64px`, 36px between sections.
 
 ## In flight, then Merged
 

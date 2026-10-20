@@ -93,6 +93,27 @@ describe("noticeFor", () => {
     vi.unstubAllGlobals();
   });
 
+  it("tells, as a toast only, when Foreman stopped a deployment on its own", () => {
+    const stopped = (stopReason: string) =>
+      noticeFor(
+        {
+          type: "deployment.stopped",
+          data: { id: "atlas@ledger", teamId: "atlas", projectId: "ledger", stopReason },
+        },
+        [{ ...team, config: { ...team.config, name: "Atlas" } } as Team],
+        instances,
+      );
+    expect(stopped("ledger is gone: all its code repos are missing")).toMatchObject({
+      title: "Foreman stopped Atlas on ledger",
+      body: "ledger is gone: all its code repos are missing",
+      deployment: "atlas@ledger",
+      instance: "",
+    });
+    expect(stopped("ledger is gone: x")?.toggle).toBeUndefined();
+    // The CEO stopped it: nothing to tell.
+    expect(stopped("")).toBeUndefined();
+  });
+
   it("ignores everything else", () => {
     for (const type of ["request.resolved", "team.message", "wiki.changed", "config.changed"]) {
       expect(noticeFor({ type, data: {} }, [team], instances)).toBeUndefined();

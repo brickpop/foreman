@@ -21,8 +21,9 @@ type Deployments interface {
 	// stopped one with the new goal (one row per pair, keeping its history).
 	// ErrActive if it is already active.
 	Deploy(ctx context.Context, team, project, goal string) (Deployment, error)
-	// Stop marks it stopped; stopping a stopped deployment changes nothing.
-	Stop(ctx context.Context, id string) error
+	// Stop marks it stopped, with why when Foreman stopped it on its own (""
+	// for the CEO's Stop); stopping a stopped deployment changes nothing.
+	Stop(ctx context.Context, id, reason string) error
 	Get(ctx context.Context, id string) (Deployment, error)
 	// List returns every deployment, active and stopped, by id.
 	List(ctx context.Context) ([]Deployment, error)
@@ -33,7 +34,7 @@ func (db *DB) Deployments() Deployments { return deployments{db.sql} }
 
 type deployments struct{ db *sql.DB }
 
-const deploymentColumns = "id, team_id, project_id, goal, status, created_at, stopped_at"
+const deploymentColumns = "id, team_id, project_id, goal, status, created_at, stopped_at, stop_reason"
 
 func (d deployments) Deploy(ctx context.Context, team, project, goal string) (Deployment, error) {
 	tx, err := d.db.BeginTx(ctx, nil)
@@ -52,7 +53,7 @@ func (d deployments) Deploy(ctx context.Context, team, project, goal string) (De
 	case status == DeploymentActive:
 		return Deployment{}, ErrActive
 	default:
-		_, err = tx.ExecContext(ctx, "UPDATE deployments SET goal = ?, status = 'active', stopped_at = NULL WHERE id = ?", goal, id)
+		_, err = tx.ExecContext(ctx, "UPDATE deployments SET goal = ?, status = 'active', stopped_at = NULL, stop_reason = '' WHERE id = ?", goal, id)
 	}
 	if err != nil {
 		return Deployment{}, err
@@ -64,9 +65,10 @@ func (d deployments) Deploy(ctx context.Context, team, project, goal string) (De
 	return dep, tx.Commit()
 }
 
-func (d deployments) Stop(ctx context.Context, id string) error {
-	return touched(d.db.ExecContext(ctx, "UPDATE deployments SET status = 'stopped', stopped_at = coalesce(stopped_at, ?) WHERE id = ?",
-		timeText(time.Now()), id))
+func (d deployments) Stop(ctx context.Context, id, reason string) error {
+	// A stopped one keeps when and why it stopped.
+	return touched(d.db.ExecContext(ctx, "UPDATE deployments SET stop_reason = CASE WHEN status = 'active' THEN ? ELSE stop_reason END, status = 'stopped', stopped_at = coalesce(stopped_at, ?) WHERE id = ?",
+		reason, timeText(time.Now()), id))
 }
 
 func (d deployments) Get(ctx context.Context, id string) (Deployment, error) {
@@ -93,7 +95,7 @@ func (d deployments) List(ctx context.Context) ([]Deployment, error) {
 func scanDeployment(row interface{ Scan(...any) error }) (Deployment, error) {
 	var dep Deployment
 	var created, stopped sql.NullString
-	err := row.Scan(&dep.ID, &dep.TeamID, &dep.ProjectID, &dep.Goal, &dep.Status, &created, &stopped)
+	err := row.Scan(&dep.ID, &dep.TeamID, &dep.ProjectID, &dep.Goal, &dep.Status, &created, &stopped, &dep.StopReason)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Deployment{}, ErrNotFound
 	}

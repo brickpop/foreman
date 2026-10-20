@@ -6,7 +6,7 @@ tags: [feature, ui, messaging]
 
 # Project activity
 
-A project's **Activity** tab ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)): what its teams did there, their messages and git actions, across every deployment on the project. The [project pipeline](./project-pipeline.md) (needs you on Overview, in flight and merged on [Repositories](./repositories.md)) is what moves towards `main`; this tab is the traffic. Decided by the CEO on 2026-10-16 and 2026-10-17 ([Project → Activity tab](../../backlog/project-activity-tab.md)).
+A project's **Activity** tab ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)): what its teams did there, their messages and git actions, across every deployment on the project. The [project pipeline](./project-pipeline.md) (needs you on Overview, in flight and merged on [Repositories](./repositories.md)) is what moves towards `main`; this tab is the traffic. Decided by the CEO on 2026-10-16 and 2026-10-17 ([Project → Activity tab](../../backlog/archive/project-activity-tab.md)).
 
 ## The timeline
 
@@ -22,7 +22,7 @@ Body padding `24px 48px 64px`, the full width.
 
 ## Older sessions
 
-Below the timeline, only when the project has stopped deployments: **`Older sessions · N`** (a section label with a chevron), collapsed. Opened, one line per stopped deployment: chevron, the team's name (600), `stopped <time> · <goal>` (`--tx4`). Each opens its own timeline, paged the same way, without team names (the line above says it) and without `Open … pane` (a stopped deployment has no sessions).
+Below the timeline, only when the project has stopped deployments: **`Older sessions · N`** (a section label with a chevron), collapsed. Opened, one line per stopped deployment: chevron, the team's name (600), `stopped <time> · <goal>` (`--tx4`), then, when Foreman stopped it on its own, `by Foreman: <reason>` (`--err`, [Deployment](../models/deployment.md)). Each opens its own timeline, paged the same way, without team names (the line above says it) and without `Open … pane` (a stopped deployment has no sessions).
 
 A redeployed pair reactivates its old row ([Deployment](../models/deployment.md)), so its earlier runs' traffic is in the timeline, not in Older sessions.
 

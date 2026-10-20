@@ -20,6 +20,7 @@ type fakeConfig struct {
 	projects []home.Project
 	teams    []home.Team
 	settings home.SettingsFile
+	removed  *[]string // RemoveProject's calls, when set
 }
 
 func (f fakeConfig) Projects() []home.Project { return f.projects }
@@ -50,8 +51,30 @@ func (f fakeConfig) SaveTeam(context.Context, home.TeamConfig, string) (home.Tea
 
 // The project routes answer by name: "bad" is invalid, "taken" exists, "busy"
 // is deployed; the project they return says what was called, in Problems.
-func (f fakeConfig) NewProject(_ context.Context, name string) (home.Project, error) {
-	return f.changed("NewProject", "", name, "")
+func (f fakeConfig) NewProject(_ context.Context, name, clone string) (home.Project, error) {
+	return f.changed("NewProject", "", name, clone)
+}
+func (f fakeConfig) RenameRepo(_ context.Context, project, name, newName string) (home.Project, error) {
+	return f.changed("RenameRepo", project, newName, name)
+}
+func (f fakeConfig) RemoveProject(_ context.Context, id string, deleteRepo bool) error {
+	_, err := f.changed("RemoveProject", "", id, "")
+	if err == nil && f.removed != nil {
+		*f.removed = append(*f.removed, fmt.Sprint(id, " deleteRepo=", deleteRepo))
+	}
+	return err
+}
+
+// Browse lists /home/ceo/dev (the start folder) and below; anything else is
+// outside it.
+func (f fakeConfig) Browse(path string) (home.Folder, error) {
+	if path == "" {
+		path = "/home/ceo/dev"
+	}
+	if !strings.HasPrefix(path, "/home/ceo/dev") {
+		return home.Folder{}, fmt.Errorf("%w: %s is outside /home/ceo/dev", home.ErrInvalid, path)
+	}
+	return home.Folder{Path: path, Entries: []home.FolderEntry{{Name: "app", Path: path + "/app", Repo: true}}}, nil
 }
 func (f fakeConfig) AddRepo(_ context.Context, project, name, path string) (home.Project, error) {
 	return f.changed("AddRepo", project, name, path)
@@ -343,6 +366,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
+		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git"}},
+		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"site"}`, []string{"RenameRepo", "site", "web"}},
 	} {
 		var p home.Project
 		decodeBody(t, send(tc.method, tc.path, tc.body), &p)
@@ -377,9 +402,38 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPost, "/api/projects", `not json`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodGet, "/api/candidates", ``, http.StatusNotFound, `"NOT_FOUND"`},
+		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"busy"}`, http.StatusConflict, `"DEPLOYED"`},
+		{http.MethodDelete, "/api/projects/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
+		{http.MethodGet, "/api/folders?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 	} {
 		if w := send(tc.method, tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s %s %s: %d %s", tc.method, tc.path, tc.body, w.Code, w.Body)
+		}
+	}
+}
+
+// Removing a project answers 204, its project repo deleted only when asked;
+// the browser lists a folder, the start folder when none is given.
+func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
+	var removed []string
+	c := config
+	c.removed = &removed
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: c, UI: builtUI})
+	for _, path := range []string{"/api/projects/ledger", "/api/projects/relay?deleteRepo=true"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, path, nil))
+		if w.Code != http.StatusNoContent {
+			t.Errorf("DELETE %s: %d %s", path, w.Code, w.Body)
+		}
+	}
+	if strings.Join(removed, ", ") != "ledger deleteRepo=false, relay deleteRepo=true" {
+		t.Errorf("removed %v", removed)
+	}
+	for path, want := range map[string]string{"/api/folders": "/home/ceo/dev", "/api/folders?path=/home/ceo/dev/aragon": "/home/ceo/dev/aragon"} {
+		var f home.Folder
+		decodeBody(t, get(t, h, path), &f)
+		if f.Path != want || len(f.Entries) != 1 || !f.Entries[0].Repo {
+			t.Errorf("%s: %+v", path, f)
 		}
 	}
 }

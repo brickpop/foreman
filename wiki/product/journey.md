@@ -24,7 +24,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **4. Connect the forge.** Settings → Forge accounts → GitHub → **Connect**: host and token, checked against GitHub, never shown again.
 - *Under the hood:* Forge adapter (validates the token); the secret store (`~/.foreman/secrets`, 0600, never mounted into containers).
 
-**5. Add the project.** Sidebar → **+ New project** asks for a name, `ledger`, and a project repo: **New**. Then its repos: the CEO adds `~/dev/ledger-api` → **Add project** ([Add a project](./features/add-project.md); the dialog comes with [Add a project, anywhere](../backlog/add-project-anywhere.md)).
+**5. Add the project.** Sidebar → **+ New project** asks for a name, `ledger`, and a project repo: **New**. Then its repos: the CEO picks `~/dev/ledger-api` in the folder browser → **Add repo**, then **Done** ([Add a project](./features/add-project.md)).
 - *Under the hood:* Home & config stores the project record (`POST /api/projects`) and creates the project repo `~/.foreman/projects/ledger/`: `git init`, `project.toml` (`forge`), `AGENTS.md` and a starter `wiki/` with `index.md` and `wiki.toml` (one Backlog board), as its first commit. Adding `ledger-api` (`POST /api/projects/ledger/repos`) checks it is a git repo with a commit, inside the CEO's home folder, and keeps its path and root commit on the record. The sidebar updates through the Event bus (`projects.changed`).
 
 **6. Read the project.** Project → **Overview** shows the wiki's `index.md`; **Board** shows the Backlog board (empty); **Settings** shows `project.toml` read-only.

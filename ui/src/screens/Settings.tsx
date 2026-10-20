@@ -25,7 +25,7 @@ import {
 } from "../app/queries";
 import { asTheme, savedTheme } from "../app/theme";
 import { ConnectDialog } from "../components/ConnectDialog";
-import { Modal } from "../components/Overlays";
+import { Confirm } from "../components/Overlays";
 import { Select } from "../components/Select";
 import { useToast } from "../components/Toasts";
 import { terminalFont, terminalFontSizes, terminalFonts } from "../components/terminalFonts";
@@ -136,43 +136,6 @@ function Row({
       </div>
       <div className="flex items-center gap-2">{children}</div>
     </div>
-  );
-}
-
-/** Asks before a setting that weakens safety, or before deleting. */
-function Confirm({
-  open,
-  title,
-  body,
-  action,
-  onConfirm,
-  onClose,
-}: {
-  open: boolean;
-  title: string;
-  body: string;
-  action: string;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} title={title}>
-      <div className="flex flex-col gap-4">
-        <p className="m-0 text-tx2">{body}</p>
-        <div className="flex justify-end gap-2">
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-          >
-            {action}
-          </Button>
-        </div>
-      </div>
-    </Modal>
   );
 }
 

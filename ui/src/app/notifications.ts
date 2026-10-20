@@ -1,4 +1,4 @@
-import type { Instance, Request, Team } from "../api/client";
+import type { Deployment, Instance, Request, Team } from "../api/client";
 import type { Event } from "../api/types/events";
 import type { Notifications } from "../api/types/home";
 import { agentOf } from "./model";
@@ -64,6 +64,18 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
       instance: id,
       deployment,
       color: "var(--info)",
+    };
+  }
+  if (e.type === "deployment.stopped") {
+    // Foreman stopped it on its own (its project is gone); the CEO's own Stop says nothing.
+    const d = e.data as Deployment;
+    if (!d.stopReason) return undefined;
+    return {
+      title: `Foreman stopped ${teams.find((t) => t.id === d.teamId)?.config.name ?? d.teamId} on ${d.projectId}`,
+      body: d.stopReason,
+      instance: "",
+      deployment: d.id,
+      color: "var(--err)",
     };
   }
   return undefined;

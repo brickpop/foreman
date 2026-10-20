@@ -15,7 +15,7 @@ epic: install-first-run
 - **The engine is Podman**, never switched on its own. `direct` stays an explicit setting for development, with its warning. Foreman notices Podman once it is installed or its machine is running, with no restart.
 - **On macOS, Foreman offers to create and start the Podman machine** (one button, with Podman's own output shown), since that is the step people miss.
 - **The agent image builds in the background as soon as Podman is ready**, not on the first deploy; its progress shows in the checklist and in Settings → Maintenance.
-- **A setup checklist on Home** while anything is missing, in order: Podman (installed, and running), the agent image, each harness the teams use (Connect), a project, a team. A project without a code repo is a step too (its button, New repo, built 2026-10-16, is gone until [Add a project, anywhere](./add-project-anywhere.md)). Each row says what to do and has its button; it goes away when everything is done, and comes back if something breaks (Podman stopped, logged out).
+- **A setup checklist on Home** while anything is missing, in order: Podman (installed, and running), the agent image, each harness the teams use (Connect), a project, a team. A project without a code repo is a step too (its link, Add a repo, opens the project's Settings, where Code repos adds one). Each row says what to do and has its button; it goes away when everything is done, and comes back if something breaks (Podman stopped, logged out).
 - **Deploy refuses with the first missing step**, linking to it (it already does so for a harness login).
 - **Development stays out of the way:** `--fake-harness` and `--ui-dir` are development flags only, and `just dev` (Claude Code) and `just dev fake` each have their own home (done 2026-10-16).
 
@@ -37,6 +37,6 @@ epic: install-first-run
 - [x] the image builds in the background once Podman is ready
 - [x] `GET /api/setup`: each step and its state, with `setup.changed` events; the Home checklist
 - [x] Deploy refuses with the first missing step (the server with `NOT_READY` before its other checks; the dialog beforehand)
-- [ ] Linux: verify the containers' host alias reaches the agent port (the open item from [experiment C](./prove-c-agent-port.md)), so the checklist is right there too. Nothing ships or runs beside Foreman either way: a fix is a network option in the container spec Foreman sends Podman (pasta mapping the host loopback), or the agent port bound to the host side of Podman's network (never 0.0.0.0)
+- [ ] Linux: verify the containers' host alias reaches the agent port (the open item from [experiment C](./archive/prove-c-agent-port.md)), so the checklist is right there too. Nothing ships or runs beside Foreman either way: a fix is a network option in the container spec Foreman sends Podman (pasta mapping the host loopback), or the agent port bound to the host side of Podman's network (never 0.0.0.0)
 - [x] tests: each step's state, Podman appearing after startup and coming back, only launch and Start starting the machine, the restore retried, the image build starting on its own, deploy and wake refused meanwhile, the routes, the machine's bounds
 - [x] on the Mac: `just test-podman` (Open, Connect, State), the checklist seen live: stop the machine (Start), and on a Mac without a machine the form (or with `podman machine rm` on a spare machine)

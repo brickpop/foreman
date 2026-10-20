@@ -87,6 +87,9 @@ type Deps struct {
 	// Blocked is nil when agents can start, or why not (Podman isn't running);
 	// deploying and waking refuse meanwhile. nil: always ready.
 	Blocked func() error
+	// Recheck is how long a project found gone is given to come back before
+	// its deployments stop (ProjectsChanged): a minute when zero.
+	Recheck time.Duration
 }
 
 // AgentLink is foreman-agent as the instances get it: mounted into each
@@ -109,6 +112,8 @@ type Manager struct {
 	closing bool             // Foreman is exiting: nothing starts any more
 	// doing is each instance's activity line in its current run (Hook).
 	doing map[string]store.Doing
+	// gone are the projects found gone, waiting for their recheck.
+	gone map[string]bool
 }
 
 type live struct {
@@ -119,7 +124,7 @@ type live struct {
 
 // New returns a manager.
 func New(d Deps) *Manager {
-	return &Manager{Deps: d, live: map[string]*live{}, doing: map[string]store.Doing{}}
+	return &Manager{Deps: d, live: map[string]*live{}, doing: map[string]store.Doing{}, gone: map[string]bool{}}
 }
 
 var (
@@ -307,9 +312,14 @@ func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (hom
 	return team, project, on, nil
 }
 
-// Stop stops a deployment's instances and marks it stopped. Their worktrees
-// stay on disk.
+// Stop stops a deployment's instances and marks it stopped (the CEO's Stop).
+// Their worktrees stay on disk.
 func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
+	return m.stop(ctx, deploymentID, "")
+}
+
+// stop is Stop, with why when Foreman stops it on its own.
+func (m *Manager) stop(ctx context.Context, deploymentID, reason string) error {
 	dep, err := m.Deployments.Get(ctx, deploymentID)
 	if err != nil {
 		return err
@@ -338,8 +348,11 @@ func (m *Manager) Stop(ctx context.Context, deploymentID string) error {
 		}
 		m.setStatus(ctx, inst.ID, Stopped)
 	}
-	if err := m.Deployments.Stop(ctx, deploymentID); err != nil {
+	if err := m.Deployments.Stop(ctx, deploymentID, reason); err != nil {
 		return err
+	}
+	if dep.Status == store.DeploymentActive {
+		dep.StopReason = reason
 	}
 	dep.Status = store.DeploymentStopped
 	m.publish("deployment.stopped", dep)
@@ -1004,4 +1017,68 @@ func samePath(a, b string) bool {
 		return filepath.Clean(a) == filepath.Clean(b)
 	}
 	return ra == rb
+}
+
+// ProjectsChanged looks for active deployments whose project is gone
+// (home.Project.Gone: its project repo deleted, or every code repo missing)
+// and gives each such project Recheck to come back (a move or a git
+// operation in progress); still gone then, its deployments stop, with the
+// reason (wiki/product/models/deployment.md#lifecycle). Called when the
+// projects change, and once the instances are restored.
+func (m *Manager) ProjectsChanged(ctx context.Context) {
+	deps, err := m.DeploymentsIn(ctx, store.DeploymentActive)
+	if err != nil {
+		slog.Warn("looking for gone projects", "err", err)
+		return
+	}
+	recheck := m.Recheck
+	if recheck == 0 {
+		recheck = time.Minute
+	}
+	for _, d := range deps {
+		p, err := m.Config.Project(d.ProjectID)
+		if err != nil || p.Gone() == "" {
+			continue
+		}
+		m.mu.Lock()
+		pending := m.gone[p.ID]
+		m.gone[p.ID] = true
+		m.mu.Unlock()
+		if !pending {
+			time.AfterFunc(recheck, func() { m.stopIfGone(p.ID) })
+		}
+	}
+}
+
+// stopIfGone stops the project's active deployments if it is still gone.
+func (m *Manager) stopIfGone(project string) {
+	ctx := context.Background()
+	m.mu.Lock()
+	delete(m.gone, project)
+	closing := m.closing
+	m.mu.Unlock()
+	if closing {
+		return
+	}
+	p, err := m.Config.Checked(project)
+	if err != nil {
+		return
+	}
+	reason := p.Gone()
+	if reason == "" {
+		return
+	}
+	deps, err := m.DeploymentsIn(ctx, store.DeploymentActive)
+	if err != nil {
+		slog.Warn("stopping a gone project's deployments", "project", project, "err", err)
+		return
+	}
+	for _, d := range deps {
+		if d.ProjectID != project {
+			continue
+		}
+		if err := m.stop(ctx, d.ID, project+" is gone: "+reason); err != nil {
+			slog.Warn("stopping a gone project's deployment", "deployment", d.ID, "err", err)
+		}
+	}
 }

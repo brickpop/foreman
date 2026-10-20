@@ -175,14 +175,14 @@ func TestDeployStopAndRedeploy(t *testing.T) {
 		t.Errorf("second deploy while active: %v", err)
 	}
 
-	if err := deps.Stop(ctx, d.ID); err != nil {
+	if err := deps.Stop(ctx, d.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	stopped, _ := deps.Get(ctx, d.ID)
 	if stopped.Status != DeploymentStopped || stopped.StoppedAt.IsZero() {
 		t.Errorf("stopped %+v", stopped)
 	}
-	if err := deps.Stop(ctx, d.ID); err != nil {
+	if err := deps.Stop(ctx, d.ID, ""); err != nil {
 		t.Errorf("stopping twice: %v", err)
 	}
 	if again, _ := deps.Get(ctx, d.ID); !again.StoppedAt.Equal(stopped.StoppedAt) {
@@ -204,7 +204,7 @@ func TestDeploymentLookupsAndRules(t *testing.T) {
 	if _, err := deps.Get(ctx, "nobody@nowhere"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("get unknown: %v", err)
 	}
-	if err := deps.Stop(ctx, "nobody@nowhere"); !errors.Is(err, ErrNotFound) {
+	if err := deps.Stop(ctx, "nobody@nowhere", ""); !errors.Is(err, ErrNotFound) {
 		t.Errorf("stop unknown: %v", err)
 	}
 	for _, pair := range [][2]string{{"atlas", "relay"}, {"atlas", "ledger"}, {"build", "ledger"}} {
@@ -751,5 +751,132 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 	list, _ = p.List(ctx)
 	if !slices.Equal(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee"}}) || list[1].Repos[0] != app {
 		t.Errorf("after locate and remove: %+v", list)
+	}
+}
+
+// Renaming a repo moves the open merge requests on it; closed ones keep the
+// name they had.
+func TestRenameRepo(t *testing.T) {
+	db := open(t)
+	p := db.Projects()
+	if err := p.Create(ctx, "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range []RepoRecord{{Name: "api", Path: "/h/api", RootCommit: "a"}, {Name: "web", Path: "/h/web", RootCommit: "b"}} {
+		if err := p.AddRepo(ctx, "ledger", r); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mrs := db.MergeRequests()
+	open, _ := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/integration"})
+	closed, _ := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/old", State: MergeMerged})
+	other, _ := mrs.Save(ctx, MergeRequest{ProjectID: "relay", AuthorInstance: "kai@relay", Repo: "api", Branch: "lead/orion/integration"})
+	if err := p.RenameRepo(ctx, "ledger", "api", "ledger-api"); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		id, want string
+	}{{open.ID, "ledger-api"}, {closed.ID, "api"}, {other.ID, "api"}} {
+		if got, _ := mrs.Get(ctx, c.id); got.Repo != c.want {
+			t.Errorf("%s: repo %q, want %q", c.id, got.Repo, c.want)
+		}
+	}
+	list, _ := p.List(ctx)
+	if names := []string{list[0].Repos[0].Name, list[0].Repos[1].Name}; names[0] != "ledger-api" || names[1] != "web" {
+		t.Errorf("repos %v", names)
+	}
+	if err := p.RenameRepo(ctx, "ledger", "ledger-api", "WEB"); !errors.Is(err, ErrExists) {
+		t.Errorf("onto another repo's name, in another case: %v", err)
+	}
+	if err := p.RenameRepo(ctx, "ledger", "gone", "x"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such repo: %v", err)
+	}
+	if got, _ := mrs.Get(ctx, open.ID); got.Repo != "ledger-api" {
+		t.Error("a refused rename changed a merge request")
+	}
+}
+
+// Removing a project deletes it and its whole history, and nothing of
+// another project's; the name can then start clean.
+func TestRemoveDeletesAProjectsHistory(t *testing.T) {
+	db := open(t)
+	p := db.Projects()
+	for _, id := range []string{"ledger", "relay"} {
+		if err := p.Create(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+		if err := p.AddRepo(ctx, id, RepoRecord{Name: "api", Path: "/h/" + id, RootCommit: "a"}); err != nil {
+			t.Fatal(err)
+		}
+		dep, err := db.Deployments().Deploy(ctx, "atlas", id, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		inst := "mara@" + id
+		if err := db.Instances().Put(ctx, Instance{ID: inst, DeploymentID: dep.ID, AgentID: "mara", Status: "asleep", SandboxPath: "/s", Harness: "fake"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Messages().Add(ctx, TeamMessage{DeploymentID: dep.ID, FromInstance: inst, ToInstance: inst, Kind: "ask", Body: "b"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Actions().Add(ctx, TeamAction{DeploymentID: dep.ID, Instance: inst, Tool: "commit"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.WorkItems().Save(ctx, WorkItem{DeploymentID: dep.ID, AuthorInstance: inst, Branch: "wt/mara/x"}); err != nil {
+			t.Fatal(err)
+		}
+		mr, err := db.MergeRequests().Save(ctx, MergeRequest{ProjectID: id, DeploymentID: dep.ID, AuthorInstance: inst, Repo: "api", Branch: "lead/atlas/integration"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Requests().Save(ctx, Request{Kind: "review", ProjectID: id, DeploymentID: dep.ID, Summary: "s", Source: "agent", MergeRequestID: mr.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := p.Remove(ctx, "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	for _, table := range []string{"projects", "project_repos", "deployments", "instances", "team_messages", "team_actions", "work_items", "merge_requests", "requests"} {
+		var n int
+		if err := db.sql.QueryRowContext(ctx, "SELECT count(*) FROM "+table).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		if n != 1 {
+			t.Errorf("%s has %d rows, want relay's one", table, n)
+		}
+	}
+	if err := p.Remove(ctx, "ledger"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("removed twice: %v", err)
+	}
+	// Added again: a new deployment, not the old one revived.
+	if err := p.Create(ctx, "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	dep, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "fresh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if insts, _ := db.Instances().List(ctx, dep.ID); len(insts) != 0 {
+		t.Errorf("the old instances came back: %+v", insts)
+	}
+}
+
+// Foreman's own stop keeps its reason; the CEO's later Stop doesn't replace
+// it, and a redeploy clears it.
+func TestStopReason(t *testing.T) {
+	deps := open(t).Deployments()
+	d, _ := deps.Deploy(ctx, "atlas", "ledger", "")
+	if err := deps.Stop(ctx, d.ID, "its project is gone"); err != nil {
+		t.Fatal(err)
+	}
+	if err := deps.Stop(ctx, d.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := deps.Get(ctx, d.ID); got.StopReason != "its project is gone" {
+		t.Errorf("reason %q", got.StopReason)
+	}
+	r, _ := deps.Deploy(ctx, "atlas", "ledger", "")
+	if r.StopReason != "" {
+		t.Errorf("redeployed with reason %q", r.StopReason)
 	}
 }

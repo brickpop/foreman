@@ -1,5 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import type { ReactNode } from "react";
+import { Button } from "./ui";
 
 // Modals and drawers (wiki/product/features/app-shell.md#overlays), over Radix
 // Dialog: focus trap, Escape closes the topmost, the backdrop closes a modal.
@@ -81,5 +82,46 @@ export function Drawer({
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** Asks before a setting that weakens safety, or before deleting. */
+export function Confirm({
+  open,
+  title,
+  body,
+  action,
+  onConfirm,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  body: string;
+  action: string;
+  onConfirm: () => void;
+  onClose: () => void;
+  /** Options of the action, under the body (Remove project: also delete its repo). */
+  children?: ReactNode;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={title}>
+      <div className="flex flex-col gap-4">
+        <p className="m-0 text-tx2">{body}</p>
+        {children}
+        <div className="flex justify-end gap-2">
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+          >
+            {action}
+          </Button>
+        </div>
+      </div>
+    </Modal>
   );
 }

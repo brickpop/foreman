@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/brickpop/foreman/internal/userdata"
 	"github.com/brickpop/foreman/internal/workspace"
 )
 
@@ -101,7 +102,7 @@ func TestRelativeProgramsResolveAgainstTheStartFolder(t *testing.T) {
 func TestFakeHarnessNeedsTheDirectEngine(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	dir := t.TempDir()
-	err := run([]string{dir, "--yes", "--no-open", "--fake-harness", "/bin/true"}, strings.NewReader(""), &bytes.Buffer{})
+	err := run([]string{dir, "--yes", "--no-open", "--home", t.TempDir(), "--fake-harness", "/bin/true"}, strings.NewReader(""), &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "drop --fake-harness") {
 		t.Errorf("on podman: %v", err)
 	}
@@ -162,5 +163,30 @@ func TestServeUntilReturnsAServingError(t *testing.T) {
 	err = serveUntil(context.Background(), func() {}, &bytes.Buffer{}, &http.Server{}, l, func() { t.Error("shut down") })
 	if err == nil || errors.Is(err, http.ErrServerClosed) {
 		t.Errorf("err %v", err)
+	}
+}
+
+// One Foreman per machine: a second one says where the first serves, and
+// touches nothing (no workspace made, no port taken).
+func TestASecondForemanPointsAtTheFirst(t *testing.T) {
+	home := t.TempDir()
+	first, err := userdata.TakeLock(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Release()
+	if err := first.Announce("http://127.0.0.1:8888/?token=abc", "/Users/ceo/dev"); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	var out bytes.Buffer
+	if err := run([]string{dir, "--yes", "--no-open", "--home", home}, strings.NewReader(""), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := out.String(); !strings.Contains(got, "already running") || !strings.Contains(got, "/Users/ceo/dev") || !strings.Contains(got, "http://127.0.0.1:8888/?token=abc") {
+		t.Errorf("%q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".foreman")); !os.IsNotExist(err) {
+		t.Error("the second one made a workspace")
 	}
 }

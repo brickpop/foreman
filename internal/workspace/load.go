@@ -70,8 +70,10 @@ const (
 )
 
 // gitignore keeps Foreman's runtime files out of the workspace repo; temp
-// files are those of atomic writes.
-const gitignore = "state.db*\nlogs/\nsecrets\ncredentials/\naccess-token\ncos/\n*.tmp\n"
+// files are those of atomic writes. The last four are a home's
+// (internal/userdata), for a workspace whose .foreman is also Foreman's home
+// (just dev); anchored, since profiles and images may be symlinks there.
+const gitignore = "state.db*\nlogs/\nsecrets\ncredentials/\naccess-token\ncos/\n*.tmp\n/profiles\n/images\n/preferences.toml\n/server.lock\n"
 
 // Load makes .foreman/ the workspace repo if it isn't yet, then reads every
 // config file.

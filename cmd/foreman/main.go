@@ -66,7 +66,7 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	newToken := flags.Bool("new-token", false, "replace the access token (logs every browser out)")
 	uiDir := flags.String("ui-dir", "", "development: serve the web UI from this folder instead of the embedded build")
 	fakeHarness := flags.String("fake-harness", "", "development: run agents and logins on this program (cmd/fakeharness) instead of Claude Code")
-	userDirFlag := flags.String("user-data", "", "tests: keep what is the CEO's on this machine (profiles, preferences, image builds) in this folder instead of ~/.local/share/foreman")
+	homeFlag := flags.String("home", "", "Foreman's home on this machine (profiles, preferences, image builds, the lock), instead of ~/.foreman: for tests and development")
 	flags.Usage = func() {
 		fmt.Fprintln(flags.Output(), "Usage: foreman [<workspace-dir>] [flags]")
 		flags.PrintDefaults()
@@ -74,6 +74,34 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	dir, err := parseArgs(flags, args)
 	if err != nil {
 		return err
+	}
+
+	// What is the CEO's on this machine, the same for every workspace, and
+	// the lock that keeps Foreman to one server per machine.
+	userDir := *homeFlag
+	if userDir == "" {
+		if userDir, err = userdata.Dir(); err != nil {
+			return fmt.Errorf("finding Foreman's home: %w", err)
+		}
+	}
+	lock, err := userdata.TakeLock(userDir)
+	var other *userdata.RunningError
+	if errors.As(err, &other) {
+		fmt.Fprintf(stdout, "Foreman is already running on this machine (one per machine), serving %s\nOpen: %s\n", other.Workspace, other.URL)
+		if !*noOpen && other.URL != "" {
+			openBrowser(other.URL, stdout)
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer lock.Release()
+	// Under the lock, so two starts never move at once.
+	if *homeFlag == "" {
+		if err := userdata.MoveIn(userDir); err != nil {
+			return err
+		}
 	}
 
 	ws, err := openOrCreate(dir, *yes, stdin, stdout)
@@ -94,13 +122,6 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	// The fake harness is a host binary: a container can't run it.
 	if *fakeHarness != "" && running != "direct" {
 		return fmt.Errorf("this workspace runs on %s, where --fake-harness can't run (it is a host program): drop --fake-harness to run Claude Code, or set engine = \"direct\" in settings.toml", running)
-	}
-	// What is the CEO's on this machine, the same for every workspace.
-	userDir := *userDirFlag
-	if userDir == "" {
-		if userDir, err = userdata.Dir(); err != nil {
-			return fmt.Errorf("the user data folder: %w", err)
-		}
 	}
 	engineRunner, engineImages, pod := engine(running, filepath.Join(userDir, "images"), stdout)
 	if pod != nil {
@@ -123,6 +144,9 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return fmt.Errorf("the agent port: %w", err)
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%s/?token=%s", *port, token)
+	if err := lock.Announce(url, ws.Root()); err != nil {
+		return err
+	}
 	fmt.Fprintf(stdout, "Foreman is serving %s\nOpen: %s\n", ws.Root(), url)
 	if !*noOpen {
 		openBrowser(url, stdout)

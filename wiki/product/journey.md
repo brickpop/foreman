@@ -19,7 +19,7 @@ Cast: the CEO; the workspace `~/agents-ws`; project `ledger` (code repo `ledger-
 - *Under the hood:* Image builder (Podman): builds `localhost/foreman/base`, then `…/harness` (Claude Code, Pi…); workspace and project layers are transparent tags. Build logs stream to the page; the Event bus pushes the state changes.
 
 **3. Log in to Claude Code.** Settings → Global → Profiles → `default` (Claude Code) → **Connect**, or the same button on Home's setup checklist. A dialog shows a terminal running `claude /login`; the CEO completes the browser sign-in. Once: every workspace's projects on `default` use it.
-- *Under the hood:* a one-off **login container**: Execution engine starts it from the harness image with the profile's folder (`~/.local/share/foreman/profiles/default/`) mounted read-write; a Terminal streams it into the dialog exactly like any session. When it exits, Settings shows `connected`.
+- *Under the hood:* a one-off **login container**: Execution engine starts it from the harness image with the profile's folder (`~/.foreman/profiles/default/`) mounted read-write; a Terminal streams it into the dialog exactly like any session. When it exits, Settings shows `connected`.
 
 **4. Connect the forge.** Settings → Forge accounts → GitHub → **Connect**: host and token, checked against GitHub, never shown again.
 - *Under the hood:* Forge adapter (validates the token); the secret store (`.foreman/secrets`, 0600, never mounted into containers).

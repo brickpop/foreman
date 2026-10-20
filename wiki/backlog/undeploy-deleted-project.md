@@ -3,10 +3,12 @@ type: task
 status: todo
 priority: low
 tags: [feature]
-epic: install-first-run
+epic: projects-anywhere
 ---
 
 # Stop a deployment whose project folder was deleted
+
+**Folded into [Projects anywhere](./epics/projects-anywhere.md) (2026-10-20):** projects become records whose repos can go missing; a deployment whose repos all vanished stops there. Kept for its open points, decided with that epic.
 
 **Why (the CEO, 2026-10-17, very low priority):** when the CEO deletes a project's folder from the workspace while a team is deployed on it, the deployment is left pointing at nothing: its agents' worktrees and the project repo are gone under them. Foreman already notices the project disappearing (`workspace.changed`, [API → Events](../product/architecture/api.md#events)); it should then undeploy, as **Stop** does ([Deployment → Lifecycle](../product/models/deployment.md#lifecycle)).
 

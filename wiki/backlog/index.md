@@ -6,7 +6,7 @@ The epics, in order:
 0. [Prove](./epics/prove.md) and, alongside it, [Full UI on a demo client](./epics/full-ui-demo.md) (done)
 1. [Terminal multiplexer](./epics/terminal-multiplexer.md)
 2. [Messaging and hand-offs](./epics/messaging-handoffs.md) and, alongside it, [Install and first run](./epics/install-first-run.md)
-3. [Git](./epics/git.md)
+3. [Git](./epics/git.md) and, beside it, [Projects anywhere](./epics/projects-anywhere.md) (the CEO, 2026-10-20: before the first Foundry projects)
 4. [Workflow with the CEO](./epics/workflow.md)
 5. [Chief of Staff](./epics/chief-of-staff.md): its first card, [Create a team, hire, refine](./cos-create-team.md), is pulled ahead (the CEO, 2026-10-18)
 

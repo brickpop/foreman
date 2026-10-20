@@ -134,10 +134,25 @@ func startClaudeWorkspace(t *testing.T, profile string) *claudeWorkspace {
 		gitIn(t, filepath.Join(root, dir), "-c", "user.name=test", "-c", "user.email=test@localhost", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "first")
 	}
 
+	// Its own home, so it runs beside the CEO's Foreman (one per home), with
+	// the CEO's profiles and image builds linked in.
+	home := filepath.Join(root, ".home")
+	mine, err := userdata.Dir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"profiles", "images"} {
+		if err := os.Symlink(filepath.Join(mine, name), filepath.Join(home, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	port := freePorts(t)
 	var out bytes.Buffer
 	go func() {
-		err := run([]string{root, "--yes", "--no-open", "--port", port}, strings.NewReader(""), &out)
+		err := run([]string{root, "--yes", "--no-open", "--port", port, "--home", home}, strings.NewReader(""), &out)
 		t.Logf("foreman stopped: %v\n%s", err, out.String())
 	}()
 	c := &claudeWorkspace{t: t, root: root, base: "http://127.0.0.1:" + port, statuses: map[string][]string{}}

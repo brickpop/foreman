@@ -26,7 +26,7 @@ var atlas = workspace.TeamConfig{
 }
 
 // every team tool, as the finished epic will offer them
-var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "handoff", "contribute", "escalate", "request_merge"}
+var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "set_submodule", "handoff", "contribute", "escalate", "request_merge"}
 
 func input(agent string, tools []string) Input {
 	return Input{
@@ -158,6 +158,7 @@ func TestTodaysTools(t *testing.T) {
 			"Work with them only through the tools below.",
 			"ask(teammate, request)", "reply(request_id, output)", "read_message(id)",
 			"switch(branch)", "commit(commits)", "merge(branch)", "abort_merge()", "contribute(kind, title, body)",
+			"set_submodule(repo, path, ref, url) Pin a submodule",
 			"branch, commit\nand merge only through switch(), commit() and merge().",
 			"Messages arrive in this session as one line",
 			"resume the task\nthat asked for it.\n",

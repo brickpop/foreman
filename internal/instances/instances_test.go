@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -528,6 +529,8 @@ func TestRestore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		// The other workspace's are never stopped by the manager: never left running either.
+		t.Cleanup(func() { _ = p.Stop(time.Second) })
 		return p
 	}
 	survivor, orphan := start("mara@ledger", f.root), start("ghost@ledger", f.root)
@@ -783,6 +786,43 @@ func (g *slowGit) Prepare(ctx context.Context, repo, worktree, branch, base stri
 		<-g.release
 	}
 	return g.Git.Prepare(ctx, repo, worktree, branch, base)
+}
+
+// failingSync records the submodule syncs and fails each, as offline.
+type failingSync struct {
+	Git
+	mu     sync.Mutex
+	synced []string
+}
+
+func (g *failingSync) SyncSubmodules(_ context.Context, dir string, recursive bool) error {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.synced = append(g.synced, fmt.Sprintf("%s recursive=%v", dir, recursive))
+	return errors.New("offline")
+}
+
+// Each worktree gets its submodules, as the project says; one that can't be
+// fetched doesn't keep the agent from starting.
+func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	write(t, filepath.Join(f.root, "ledger", "project", "project.toml"), "project = \"ledger\"\nrecursive_submodules = true\n", 0o644)
+	if err := f.ws.Load(ctx, git.New()); err != nil {
+		t.Fatal(err)
+	}
+	g := &failingSync{Git: f.deps.Git}
+	f.deps.Git = g
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	want := []string{filepath.Join(f.root, "ledger", ".sandboxes", "mara", "ledger-api") + " recursive=true"}
+	if !slices.Equal(g.synced, want) {
+		t.Errorf("synced %q, want %q", g.synced, want)
+	}
 }
 
 // A stop while the lead is still starting, then a redeploy at once: the new

@@ -28,6 +28,7 @@ always_ask_ceo = [                     # gates: these always raise an approval r
   "touches shared staging",
   "scope change vs an accepted ADR",
 ]
+recursive_submodules = false           # also the submodules of submodules, in the agents' worktrees
 
 [forge]
 kind = "forgejo"                       # github | forgejo | gitea | none
@@ -49,6 +50,7 @@ project_repo = "https://localhost:3000/ledger/ledger-project"  # the project rep
 | `forge.url` | String (URL) | when `kind` ≠ `none` | | | Org/owner base URL; the repo name on the forge = repo folder name |
 | `forge.project_repo` | String (URL) | when `kind` ≠ `none` | | | The [project repo](#the-project-repo) on the forge, given in full: its name is free, since `project` would clash between projects under one owner. Sync pushes `main` there |
 | `always_ask_ceo` | Array of String | | `[]` | | Gates. Hitting one makes the agent raise an approval [request](../features/requests.md). Listed in each [session prompt](../architecture/session-prompt.md) |
+| `recursive_submodules` | Boolean | | `false` | | Also check out the submodules of submodules in the agents' worktrees ([Sandboxes and git policy → Submodules](../architecture/sandboxes-and-git.md#submodules)). Off by default (the CEO, 2026-10-19) |
 
 The wiki has no field: it is always `project/wiki/`.
 

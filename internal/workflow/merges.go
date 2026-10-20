@@ -45,10 +45,8 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 	if _, err := t.w.Wiki.Entry(t.project.ID, entry); err != nil {
 		return teamtools.Refusal("entry_not_found", "no wiki entry %q: give its path in the wiki, e.g. backlog/export-csv.md", entry)
 	}
-	if dirty, err := t.dirty(ctx, t.worktrees()); err != nil {
-		return gitError(err)
-	} else if len(dirty) > 0 {
-		return teamtools.Refusal("uncommitted_changes", "commit first, in %s: a merge request is your committed work", strings.Join(dirty, ", "))
+	if res, ok := t.unsettled(ctx, t.worktrees(), "a merge request is your committed work"); !ok {
+		return res
 	}
 	t.integrate(ctx) // hand-offs merged since the last check go with it
 	main := t.project.Config.Main

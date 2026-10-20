@@ -426,6 +426,16 @@ function ActionText({ action: a }: { action: TeamAction }) {
           {refused ? "tried to abort a merge" : "aborted a merge"}
         </span>
       );
+    case "set_submodule":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? (
+            "tried to set a submodule"
+          ) : (
+            <span className="text-tx">“{a.repos[0]?.message}”</span>
+          )}
+        </span>
+      );
     case "request_merge":
       return (
         <span className="text-[12.5px] text-tx2">

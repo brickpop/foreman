@@ -34,7 +34,10 @@ type ProjectConfig struct {
 	Checks       string   `toml:"checks,omitempty" json:"checks"`
 	MergeToMain  string   `toml:"merge_to_main,omitempty" json:"mergeToMain"`
 	AlwaysAskCEO []string `toml:"always_ask_ceo,omitempty" json:"alwaysAskCeo"`
-	Forge        Forge    `toml:"forge,omitempty" json:"forge"`
+	// RecursiveSubmodules also checks out the submodules of submodules in the
+	// agents' worktrees.
+	RecursiveSubmodules bool  `toml:"recursive_submodules,omitempty" json:"recursiveSubmodules"`
+	Forge               Forge `toml:"forge,omitempty" json:"forge"`
 }
 
 // Forge is where the CEO can create PRs.

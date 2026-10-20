@@ -91,7 +91,8 @@ type TeamMessage struct {
 }
 
 // TeamAction is one git tool an agent called (switch, commit, merge,
-// abort_merge) and what it did (wiki/product/architecture/protocol.md#team-actions).
+// abort_merge, set_submodule, request_merge) and what it did
+// (wiki/product/architecture/protocol.md#team-actions).
 type TeamAction struct {
 	ID           int64        `json:"id"`
 	DeploymentID string       `json:"deploymentId"`

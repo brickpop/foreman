@@ -14,6 +14,11 @@ export interface ProjectConfig {
   checks: string;
   mergeToMain: string;
   alwaysAskCeo: string[];
+  /**
+   * RecursiveSubmodules also checks out the submodules of submodules in the
+   * agents' worktrees.
+   */
+  recursiveSubmodules: boolean;
   forge: Forge;
 }
 /**

@@ -98,7 +98,8 @@ export interface TeamMessage {
 }
 /**
  * TeamAction is one git tool an agent called (switch, commit, merge,
- * abort_merge) and what it did (wiki/product/architecture/protocol.md#team-actions).
+ * abort_merge, set_submodule, request_merge) and what it did
+ * (wiki/product/architecture/protocol.md#team-actions).
  */
 export interface TeamAction {
   id: number /* int64 */;

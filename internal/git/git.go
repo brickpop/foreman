@@ -26,6 +26,9 @@ var fallbackIdentity = []string{"-c", "user.name=Foreman", "-c", "user.email=for
 type CLI struct {
 	mu    sync.Mutex
 	repos map[string]*sync.Mutex
+	// FetchProtocols are what submodules are fetched over: https when empty.
+	// Tests add file, for their local repos.
+	FetchProtocols []string
 }
 
 // New returns a git runner.

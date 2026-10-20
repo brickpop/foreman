@@ -48,9 +48,11 @@ const (
 	Stopped  = "stopped"
 )
 
-// Git is what instances need of the Git block: a worktree per code repo.
+// Git is what instances need of the Git block: a worktree per code repo,
+// with its submodules.
 type Git interface {
 	Prepare(ctx context.Context, repo, worktree, branch, base string) error
+	SyncSubmodules(ctx context.Context, dir string, recursive bool) error
 	Exclude(ctx context.Context, path string) error
 }
 
@@ -711,8 +713,15 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {
 		repoDir := filepath.Join(projectDir, repo)
-		if err := m.Git.Prepare(ctx, repoDir, filepath.Join(inst.SandboxPath, repo), branch, project.Config.Main); err != nil {
+		worktree := filepath.Join(inst.SandboxPath, repo)
+		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, project.Config.Main); err != nil {
 			return nil, err
+		}
+		// An agent starts without a submodule that can't be fetched (offline,
+		// a private repo) rather than not at all: its next switch or merge
+		// tries again, and says so.
+		if err := m.Git.SyncSubmodules(ctx, worktree, project.Config.RecursiveSubmodules); err != nil {
+			slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo, "err", err)
 		}
 		// Agents read git; only Foreman writes it.
 		mounts = append(mounts, runner.Mount{Source: filepath.Join(repoDir, ".git"), Target: filepath.Join(repoDir, ".git"), ReadOnly: true})

@@ -50,7 +50,7 @@ PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countd
 GET    /api/requests                          the open requests (today: reviews of merge requests; Request → Phasing)
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
-GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge), oldest first
+GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge, set_submodule, request_merge), oldest first
 GET    /api/activity?project=|deployment=     [&before=<cursor>] a page of team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; a project means its active deployments; 400 BAD_REQUEST for neither, both or a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/merge-requests/:id                one merge request

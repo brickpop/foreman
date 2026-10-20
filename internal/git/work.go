@@ -93,8 +93,9 @@ func (g *CLI) Contains(ctx context.Context, dir, into, branch string) (bool, err
 }
 
 // Clean reports whether the worktree has no changes and no unfinished merge.
+// Changes inside a submodule count, whatever .gitmodules says to ignore.
 func (g *CLI) Clean(ctx context.Context, dir string) (bool, error) {
-	out, err := run(ctx, dir, "status", "--porcelain")
+	out, err := run(ctx, dir, "status", "--porcelain", "--ignore-submodules=none")
 	if err != nil {
 		return false, err
 	}
@@ -145,10 +146,22 @@ func (g *CLI) Switch(ctx context.Context, dir, branch, base string) (created boo
 
 // CommitAll commits everything changed in the worktree on the branch checked
 // out there, by the author, and returns the commit. After a merge with
-// conflicts it concludes the merge, unless a conflicted file still holds
-// markers (*ConflictsError).
+// conflicts it concludes the merge, unless a submodule is still conflicted
+// (*SubmoduleConflictError) or a conflicted file still holds markers
+// (*ConflictsError). A repo inside the worktree that isn't a submodule is
+// refused (*NestedReposError): git would commit a pointer to it, nothing more.
 func (g *CLI) CommitAll(ctx context.Context, dir, message string, by Author) (string, error) {
 	defer g.lock(ctx, dir)()
+	if paths, err := unmergedSubmodules(ctx, dir); err != nil {
+		return "", err
+	} else if len(paths) > 0 {
+		return "", &SubmoduleConflictError{Paths: paths}
+	}
+	if paths, err := nestedRepos(ctx, dir); err != nil {
+		return "", err
+	} else if len(paths) > 0 {
+		return "", &NestedReposError{Paths: paths}
+	}
 	if files, err := g.markersLeft(ctx, dir); err != nil {
 		return "", err
 	} else if len(files) > 0 {

@@ -35,7 +35,7 @@ export function Modal({
             onEscapeKeyDown={(e) => buttonsOnly && e.preventDefault()}
             onPointerDownOutside={(e) => buttonsOnly && e.preventDefault()}
             style={{ width: `min(${width}px, 100%)` }}
-            className="rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
+            className="max-h-[calc(100dvh-40px)] overflow-y-auto rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
           >
             <Dialog.Title className="mb-4 text-xl font-semibold">{title}</Dialog.Title>
             {children}

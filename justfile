@@ -30,9 +30,9 @@ dev harness="real" workspace="":
     if [ ! -d "$teams" ]; then
         mkdir -p "$teams"
         printf '%s\n' 'team = "dev-team"' 'name = "DevTeam"' 'lead = "tic"' '' \
-            '[agents.tic]' 'name = "Tic"' 'role = "team_lead"' 'harness = "claude-code"' '' \
-            '[agents.tac]' 'name = "Tac"' 'role = "engineer"' 'harness = "claude-code"' '' \
-            '[agents.toe]' 'name = "Toe"' 'role = "reviewer"' 'harness = "claude-code"' > "$teams/dev-team.toml"
+            '[agents.tic]' 'name = "Tic"' 'role = "team_lead"' '' \
+            '[agents.tac]' 'name = "Tac"' 'role = "engineer"' '' \
+            '[agents.toe]' 'name = "Toe"' 'role = "reviewer"' > "$teams/dev-team.toml"
     fi
     dev_project="$ws/DevProject"
     if [ ! -d "$dev_project" ]; then

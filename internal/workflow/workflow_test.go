@@ -81,6 +81,7 @@ func newFixture(t *testing.T) *fixture {
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root := t.TempDir()
 	g := git.New()
+	g.FetchProtocols = []string{"file"} // the tests' submodules are local repos
 	for _, r := range []string{"api", "web", "project"} {
 		dir := filepath.Join(root, "ledger", r)
 		if err := os.MkdirAll(filepath.Join(dir, "wiki"), 0o755); err != nil {
@@ -321,7 +322,7 @@ func TestMergeWithConflictsThenCommit(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
 	f.ok("mara", "commit", commits("api", "mara's readme"))
 	text := f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
-	if text != "Merged wt/tove/main into web. Conflicts in api (README): resolve the markers, then commit those repos to finish the merge, or abort_merge() to back out." {
+	if text != "Merged wt/tove/main into web. Conflicts in api (README): resolve the markers (a submodule: pick its commit with set_submodule), then commit those repos to finish the merge, or abort_merge() to back out." {
 		t.Errorf("%q", text)
 	}
 	if text := f.refused("mara", "commit", commits("api", "merged"), "conflicts_left"); !strings.Contains(text, "api/README") {

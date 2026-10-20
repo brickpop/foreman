@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "handoff" | "contribute" | "escalate" | "request_merge"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -109,6 +109,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `commit` | anyone | until the commit is made (seconds) | Workflow (+ Git) |
 | `merge` | anyone | until the merge is done (seconds) | Workflow (+ Git) |
 | `abort_merge` | anyone | until the merge is backed out (seconds) | Workflow (+ Git) |
+| `set_submodule` | anyone | until the submodule is fetched and committed (seconds; longer for a large first fetch) | Workflow (+ Git) |
 | `handoff` | members (the lead has no `wt/` branch to hand off) | no: returns once the branch is checked; checks run after | Workflow (+ Messaging for the delivery) |
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
 | `escalate` | anyone | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
@@ -158,7 +159,7 @@ type SwitchResult struct { Created bool; Repos []string }               // creat
 
 - Effect: Workflow asks Git to switch the caller's worktrees, in each of its code repos, to `Branch`, creating it from `main` where it doesn't exist yet. `Branch` must be one of the caller's own: `wt/<agent>/<topic>` for a member, `lead/<team>/<topic>` for the lead (the lead never works on `wt/` branches). The same call starts new work and goes back to earlier work (e.g. a branch whose merge request was rejected). A lead can keep several lead branches, and so several merge requests, at once. Agents can't create branches themselves: each repo's `.git` is read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)).
 - Nothing is delivered; no marker.
-- Errors: `uncommitted_changes` (commit first, so no work is carried from one branch to another), `branch_not_allowed` (not one of the caller's own), `bad_branch` (not a valid branch name), `git_error`.
+- Errors: `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first, so no work is carried from one branch to another), `branch_not_allowed` (not one of the caller's own), `bad_branch` (not a valid branch name), `git_error`.
 
 ### `commit`
 
@@ -171,7 +172,7 @@ type RepoCommit   struct { Repo string; Branch string; Commit string }
 
 - Effect: for each repo named, Workflow asks Git to stage everything changed in it and commit it, with that repo's message, on the branch checked out there, authored as the agent (from its token). A repo is the caller's worktree of that code repo (its folder name in the sandbox) or, for the lead only, `project`: the live project repo, committed on its `main` (other agents can't write that checkout). Repos not named keep their changes (the CEO, 2026-10-17: the lead commits the wiki without its half-done code, and a commit's message fits its repo). Every entry is checked before anything is committed. A repo named with nothing changed is said in the result (`Nothing changed in web.`), not refused, unless no repo had changes. Agents can't commit themselves: every repo's `.git`, the project repo's included, is mounted read-only ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). After a `merge` with conflicts, committing a repo concludes its merge.
 - Nothing is delivered; no marker.
-- Errors: `empty` (no repo named, or a repo without a message), `unknown_repo` (not one of the caller's: the refusal lists them), `repeated_repo`, `nothing_to_commit` (in none of the repos named), `conflicts_left` (conflict markers still in a file of an unfinished merge; the repos without them are committed meanwhile), `git_error` (with git's message).
+- Errors: `empty` (no repo named, or a repo without a message), `unknown_repo` (not one of the caller's: the refusal lists them), `repeated_repo`, `nothing_to_commit` (in none of the repos named), `submodule_conflict` (a submodule an unfinished merge left on no commit: settle it with `set_submodule`), `nested_repo` (a git repo inside the worktree that isn't a submodule: delete it, or add it with `set_submodule`), `conflicts_left` (conflict markers still in a file of an unfinished merge), `git_error` (with git's message). With the first three of these refusals, the repos without them are committed meanwhile.
 
 ### `merge`
 
@@ -183,7 +184,8 @@ type RepoMerge   struct { Repo string; Merged bool; Conflicts []string } // file
 
 - Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and commits those repos, which finishes the merge (it refuses while markers are left), or backs out with `abort_merge`. Agents never rebase: branches are shared from their first commit (a teammate may already have merged one), and integration detection and the forge's PRs follow commits, which a rebase would replace (decided 2026-10-16).
 - Nothing is delivered; a merge into a lead branch may let Workflow detect an integration ([Work items and merge requests](#work-items-and-merge-requests)).
-- Errors: `branch_not_found` (in none of the caller's repos), `uncommitted_changes` (commit first, so a merge never mixes with unsaved work), `git_error`.
+- Errors: `branch_not_found` (in none of the caller's repos), `submodule_changed` (files changed in a submodule, which no commit records: restore them, or `set_submodule`), `uncommitted_changes` (commit first, so a merge never mixes with unsaved work), `git_error`.
+- After it, the submodules follow the branch ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)); a submodule that can't be updated is said in the result, the merge stands. A submodule conflict has no markers: `set_submodule` settles it.
 - `merge` was called `update` until 2026-10-16: the git word, which agents already know.
 
 ### `abort_merge`
@@ -197,6 +199,17 @@ type AbortMergeResult struct { Repos []string } // where a merge was backed out
 - Nothing is delivered; no marker.
 - Errors: `no_merge` (no merge under way in the caller's repos), `git_error`.
 
+### `set_submodule`
+
+```go
+type SetSubmoduleArgs   struct { Repo, Path, Ref string; URL string } // URL only to add a submodule
+type SetSubmoduleResult struct { Repo, Branch, Commit string }         // Commit "" during a merge: staged only
+```
+
+- Effect: in the caller's worktree of `Repo`, Workflow asks Git to put the submodule at `Path` on `Ref` (a branch of its repo, a tag, or a commit, fetched by its id when no branch or tag reaches it), discarding what was changed in its files, and to commit that on the branch checked out there, authored as the caller (`Move submodule lib/forge-std to v1.9.0`). With `URL` it first adds the submodule: a clone into the worktree's own git dir, then `.gitmodules` and the pin, in one commit (`Add submodule lib/forge-std at v1.9.0 (<url>)`). During a merge it only stages: that settles a submodule conflict, and the caller's `commit` concludes the merge. Fetches go without the CEO's credentials, over https only ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)).
+- Nothing is delivered; no marker.
+- Errors: `unknown_repo` (not one of the caller's code repos: the project repo has no submodules), `empty` (no path or no ref), `bad_path` (not a path inside the repo), `not_a_submodule` (nothing at `Path` to move: give `URL` to add one), `path_taken` (adding over a submodule or files), `bad_url` (not https), `unknown_ref` (no such branch, tag or commit in the submodule's repo), `needs_credentials` (a private repo: the CEO adds it), `git_error`.
+
 ### `handoff`
 
 ```go
@@ -208,7 +221,7 @@ type HandoffResult struct { WorkItem string; Checks string }                  //
 - Checks pass: the hand-off is delivered to the teammate: `Message msg-43 from Tove (handoff of wt/tove/LED-44): <the summary's start>… Read it with read_message("msg-43").` The caller gets `From Foreman: checks pass, wt/tove/LED-44 was handed to Mara.` as a delivery when idle.
 - Checks fail: nothing goes to the teammate; the caller gets `From Foreman: checks fail on wt/tove/LED-44: <first line>. Fix it and hand off again.`
 - Markers: `Tove → Mara · handoff · wt/tove/LED-44`, then the checks outcome.
-- Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `uncommitted_changes` (commit first), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
+- Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
 - Phasing: since the [Git](../../backlog/epics/git.md) epic's first card (2026-10-17) a hand-off creates or advances its work item; the checks come with the next card, `git-checks`. Until then a hand-off goes to "handed to lead" at once, with no checks.
 
 ### `contribute`
@@ -254,7 +267,7 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 - Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`) and that `Entry` exists in the project's wiki, runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
-- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `uncommitted_changes` (commit first).
+- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
 - Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on Home or on the project's Overview.
 
 ### Deliveries Foreman originates
@@ -307,20 +320,20 @@ Lifecycle:
 
 ## Team actions
 
-What the git tools did, for the CEO to follow (the CEO's decision, 2026-10-16): each call of `switch`, `commit`, `merge` or `abort_merge` is kept in `team_actions`, refusals included (a hand-off and a contribution are messages already). Workflow records it after the call and publishes `team.action`.
+What the git tools did, for the CEO to follow (the CEO's decision, 2026-10-16): each call of `switch`, `commit`, `merge`, `abort_merge`, `set_submodule` or `request_merge` is kept in `team_actions`, refusals included (a hand-off and a contribution are messages already). Workflow records it after the call and publishes `team.action`.
 
 ```go
 type TeamAction struct {
     ID           int64
     DeploymentID string
     Instance     string        // who called it
-    Tool         string        // switch, commit, merge, abort_merge
-    Branch       string        // switch: to; merge: from
+    Tool         string        // switch, commit, merge, abort_merge, set_submodule, request_merge
+    Branch       string        // switch: to; merge: from; set_submodule: the branch committed on
     Repos        []ActionRepo  // what happened in each repo
     Error        string        // the refusal the agent got; "" when it went through
     CreatedAt    time.Time
 }
-type ActionRepo struct { Repo, Branch, Message, Commit string; Created bool; Conflicts []string } // Message: commit's, for this repo
+type ActionRepo struct { Repo, Branch, Message, Commit string; Created bool; Conflicts []string } // Message: commit's, for this repo; set_submodule's, which says what it did
 ```
 
 Shown in the [Activity](../features/sessions.md#activity) panel, between the threads.

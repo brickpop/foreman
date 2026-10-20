@@ -99,8 +99,10 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className={label}>Project name</span>
+          {/* A project is named after its folder: a selected row shows that name,
+              and editing it goes back to a new folder. */}
           <input
-            value={name}
+            value={selected?.folder ?? name}
             onChange={(e) => {
               setName(e.target.value);
               if (chosen) {
@@ -113,6 +115,10 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
           />
           {clash ? (
             <span className="text-[12.5px] text-err">{clash}</span>
+          ) : selected ? (
+            <span className={hint}>
+              A project takes its folder’s name. Edit it to create a new folder instead.
+            </span>
           ) : (
             <span className={hint}>
               Only letters, digits, dots, hyphens and underscores, starting with a letter or digit.
@@ -135,51 +141,56 @@ export function AddProject({ open, onClose }: { open: boolean; onClose: () => vo
             <legend className="mt-2 mb-1.5 text-[13px] font-medium text-tx4">
               or add an existing folder (Foreman never clones: put your repos in it first)
             </legend>
-            {list.map((c) => {
-              const on = c.folder === chosen;
-              return (
-                <div
-                  key={c.folder}
-                  className={`flex flex-col gap-3 rounded-[9px] border px-3.5 py-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-acc ${
-                    on ? "border-acc bg-accSoft" : "border-line2 hover:border-line3"
-                  }`}
-                >
-                  <label className="flex cursor-pointer flex-col gap-0.5">
-                    <input
-                      type="radio"
-                      name="folder"
-                      value={c.folder}
-                      checked={on}
-                      onChange={() => {
-                        setChosen(c.folder);
-                        setName("");
-                        setRepo(c.repos.length === 0 ? c.folder : "");
-                      }}
-                      className="sr-only"
-                    />
-                    <span className="font-mono text-sm font-medium">{c.folder}/</span>
-                    <span className="text-[13px] text-tx3">{repoDetail(c.repos)}</span>
-                  </label>
-                  {on && (
-                    <p className="m-0 text-[13px] text-tx2">
-                      Creates {c.folder}/project/: a git repo with project.toml and a starter wiki.
-                    </p>
-                  )}
-                  {on && c.repos.length === 0 && (
-                    <label className="flex flex-col gap-1.5">
-                      <span className={label}>Repo name</span>
+            {/* Its own scroll, so a workspace with many folders keeps the fields
+                and the buttons in view; the padding leaves room for the focus ring. */}
+            <div className="-m-0.5 flex max-h-[min(320px,40vh)] flex-col gap-1.5 overflow-y-auto p-0.5">
+              {list.map((c) => {
+                const on = c.folder === chosen;
+                return (
+                  <div
+                    key={c.folder}
+                    className={`flex flex-col gap-3 rounded-[9px] border px-3.5 py-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-acc ${
+                      on ? "border-acc bg-accSoft" : "border-line2 hover:border-line3"
+                    }`}
+                  >
+                    <label className="flex cursor-pointer flex-col gap-0.5">
                       <input
-                        value={repoValue}
-                        onChange={(e) => setRepo(e.target.value)}
-                        spellCheck={false}
-                        className={field}
+                        type="radio"
+                        name="folder"
+                        value={c.folder}
+                        checked={on}
+                        onChange={() => {
+                          setChosen(c.folder);
+                          setName("");
+                          setRepo(c.repos.length === 0 ? c.folder : "");
+                        }}
+                        className="sr-only"
                       />
-                      <span className={hint}>{repoHint(c.folder, repoValue.trim())}</span>
+                      <span className="font-mono text-sm font-medium">{c.folder}/</span>
+                      <span className="text-[13px] text-tx3">{repoDetail(c.repos)}</span>
                     </label>
-                  )}
-                </div>
-              );
-            })}
+                    {on && (
+                      <p className="m-0 text-[13px] text-tx2">
+                        Creates {c.folder}/project/: a git repo with project.toml and a starter
+                        wiki.
+                      </p>
+                    )}
+                    {on && c.repos.length === 0 && (
+                      <label className="flex flex-col gap-1.5">
+                        <span className={label}>Repo name</span>
+                        <input
+                          value={repoValue}
+                          onChange={(e) => setRepo(e.target.value)}
+                          spellCheck={false}
+                          className={field}
+                        />
+                        <span className={hint}>{repoHint(c.folder, repoValue.trim())}</span>
+                      </label>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </fieldset>
         )}
         {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}

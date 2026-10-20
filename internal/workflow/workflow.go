@@ -45,6 +45,9 @@ type Git interface {
 	Contains(ctx context.Context, dir, into, branch string) (bool, error)
 	MergeInto(ctx context.Context, dir, target, branch, message string) error
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
+	SyncSubmodules(ctx context.Context, dir string, recursive bool) error
+	DirtySubmodules(ctx context.Context, dir string) ([]string, error)
+	SetSubmodule(ctx context.Context, dir, path, ref, url, message string, by git.Author) (string, error)
 }
 
 // Config is the projects, as loaded.
@@ -112,6 +115,11 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
 	{Name: "abort_merge", Description: "Back out of an unfinished merge, in every repo where one is under way: your branch and files are as they were before it.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
+	{Name: "set_submodule", Description: "Put a submodule of one of your repos (e.g. lib/forge-std) on a branch, tag or commit of its own repo, and commit that on your branch; with url, add the submodule first. What was changed in its files is discarded. During a merge it settles a submodule conflict instead, and committing the repo finishes the merge. Foreman fetches over https without credentials: a private repo needs the CEO.",
+		InputSchema: object(`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. contracts"},`+
+			`"path":{"type":"string","description":"The submodule's path in that repo, e.g. lib/forge-std"},`+
+			`"ref":{"type":"string","description":"A branch, tag or commit of the submodule's repo, e.g. v1.9.0"},`+
+			`"url":{"type":"string","description":"Only to add a new submodule: its https URL"}`, "repo", "path", "ref")},
 	{Name: "handoff", Description: "Pass finished, committed work on a branch of yours to a teammate (usually the lead): they get your summary and the branch, and Foreman records the hand-off. Commit first. Your part ends.",
 		InputSchema: object(`"teammate":{"type":"string","description":"A teammate's name or id"},`+
 			`"branch":{"type":"string","description":"wt/<you>/<topic>"},`+
@@ -138,6 +146,10 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		Kind     string `json:"kind"`
 		Title    string `json:"title"`
 		Body     string `json:"body"`
+		Repo     string `json:"repo"`
+		Path     string `json:"path"`
+		Ref      string `json:"ref"`
+		URL      string `json:"url"`
 		Commits  []struct {
 			Repo    string `json:"repo"`
 			Message string `json:"message"`
@@ -167,6 +179,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		res = t.merge(ctx, act.Branch)
 	case "abort_merge":
 		res = t.abortMerge(ctx)
+	case "set_submodule":
+		res = t.setSubmodule(ctx, strings.TrimSpace(a.Repo), strings.TrimSpace(a.Path), strings.TrimSpace(a.Ref), strings.TrimSpace(a.URL))
 	case "handoff":
 		return t.handoff(ctx, a.Teammate, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Summary))
 	case "request_merge":
@@ -268,6 +282,47 @@ func (t tool) dirty(ctx context.Context, repos []repo) ([]string, error) {
 	return names, nil
 }
 
+// unsettled refuses (ok false) when a repo has what the action would carry
+// along or trip on: first files changed in a submodule, which no commit
+// records, then uncommitted changes; why says what the action needs.
+func (t tool) unsettled(ctx context.Context, repos []repo, why string) (agentlink.Result, bool) {
+	var subs []string
+	for _, r := range repos {
+		paths, err := t.w.Git.DirtySubmodules(ctx, r.dir)
+		if err != nil {
+			return gitError(err), false
+		}
+		for _, p := range paths {
+			subs = append(subs, r.name+"/"+p)
+		}
+	}
+	if len(subs) > 0 {
+		return teamtools.Refusal("submodule_changed", "files changed in the submodule %s, which no commit records: restore them, or put it on a commit with set_submodule(repo, path, ref), which discards them", strings.Join(subs, ", ")), false
+	}
+	if dirty, err := t.dirty(ctx, repos); err != nil {
+		return gitError(err), false
+	} else if len(dirty) > 0 {
+		return teamtools.Refusal("uncommitted_changes", "commit first, in %s: %s", strings.Join(dirty, ", "), why), false
+	}
+	return agentlink.Result{}, true
+}
+
+// synced puts the repos' submodules at the commits their branch pins, after
+// an action that moved it, and says where that failed: the action itself went
+// through.
+func (t tool) synced(ctx context.Context, repos []repo) string {
+	var failed []string
+	for _, r := range repos {
+		if err := t.w.Git.SyncSubmodules(ctx, r.dir, t.project.Config.RecursiveSubmodules); err != nil {
+			failed = append(failed, fmt.Sprintf("%s (%v)", r.name, err))
+		}
+	}
+	if len(failed) == 0 {
+		return ""
+	}
+	return " Its submodules couldn't be updated in " + strings.Join(failed, "; ") + ": tell the CEO if you need them."
+}
+
 func names(repos []repo) string {
 	var n []string
 	for _, r := range repos {
@@ -288,10 +343,8 @@ func (t tool) switchTo(ctx context.Context, branch string) agentlink.Result {
 		return teamtools.Refusal("no_repos", "you have no worktree in this project")
 	}
 	// Checked in every repo first, so a switch never stops halfway.
-	if dirty, err := t.dirty(ctx, repos); err != nil {
-		return gitError(err)
-	} else if len(dirty) > 0 {
-		return teamtools.Refusal("uncommitted_changes", "commit first, in %s: a switch never carries changes along", strings.Join(dirty, ", "))
+	if res, ok := t.unsettled(ctx, repos, "a switch never carries changes along"); !ok {
+		return res
 	}
 	var created []string
 	for _, r := range repos {
@@ -308,7 +361,7 @@ func (t tool) switchTo(ctx context.Context, branch string) agentlink.Result {
 	if len(created) > 0 {
 		text += fmt.Sprintf(" New in %s, made from %s.", strings.Join(created, ", "), t.project.Config.Main)
 	}
-	return agentlink.Result{Text: text}
+	return agentlink.Result{Text: text + t.synced(ctx, repos)}
 }
 
 // committable are the repos the caller may commit, by name: its worktrees,
@@ -348,12 +401,14 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 			return teamtools.Refusal("empty", "give %s a commit message", a.Repo)
 		}
 	}
-	var done, unchanged, conflicts []string
+	var done, unchanged, conflicts, unsettled, nested []string
 	for i := range asked {
 		a := &asked[i]
 		r := repos[a.Repo]
 		sha, err := t.w.Git.CommitAll(ctx, r.dir, a.Message, t.author())
 		var left *git.ConflictsError
+		var sub *git.SubmoduleConflictError
+		var inside *git.NestedReposError
 		switch {
 		case errors.Is(err, git.ErrNothingToCommit):
 			unchanged = append(unchanged, r.name)
@@ -361,6 +416,15 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 			a.Conflicts = left.Files
 			for _, f := range left.Files {
 				conflicts = append(conflicts, r.name+"/"+f)
+			}
+		case errors.As(err, &sub):
+			a.Conflicts = sub.Paths
+			for _, p := range sub.Paths {
+				unsettled = append(unsettled, r.name+"/"+p)
+			}
+		case errors.As(err, &inside):
+			for _, p := range inside.Paths {
+				nested = append(nested, r.name+"/"+p)
 			}
 		case err != nil:
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
@@ -370,13 +434,17 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 			done = append(done, fmt.Sprintf("%s (%s, %.8s)", r.name, a.Branch, sha))
 		}
 	}
+	meanwhile := ""
+	if len(done) > 0 {
+		meanwhile = ". Committed meanwhile: " + strings.Join(done, ", ")
+	}
 	switch {
+	case len(unsettled) > 0:
+		return teamtools.Refusal("submodule_conflict", "the merge left the submodule %s on no commit: pick one with set_submodule(repo, path, ref), then commit again%s", strings.Join(unsettled, ", "), meanwhile)
+	case len(nested) > 0:
+		return teamtools.Refusal("nested_repo", "%s is a git repo inside your worktree, which a commit can't hold: delete it, or add it as a submodule with set_submodule(repo, path, ref, url)%s", strings.Join(nested, ", "), meanwhile)
 	case len(conflicts) > 0:
-		text := "conflict markers are still in " + strings.Join(conflicts, ", ") + ": resolve them, then commit again"
-		if len(done) > 0 {
-			text += ". Committed meanwhile: " + strings.Join(done, ", ")
-		}
-		return teamtools.Refusal("conflicts_left", "%s", text)
+		return teamtools.Refusal("conflicts_left", "conflict markers are still in %s: resolve them, then commit again%s", strings.Join(conflicts, ", "), meanwhile)
 	case len(done) == 0:
 		return teamtools.Refusal("nothing_to_commit", "nothing changed in %s since your last commit", strings.Join(unchanged, ", "))
 	}
@@ -400,10 +468,8 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 	if len(repos) == 0 {
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	}
-	if dirty, err := t.dirty(ctx, repos); err != nil {
-		return gitError(err)
-	} else if len(dirty) > 0 {
-		return teamtools.Refusal("uncommitted_changes", "commit first, in %s: a merge never mixes with unsaved work", strings.Join(dirty, ", "))
+	if res, ok := t.unsettled(ctx, repos, "a merge never mixes with unsaved work"); !ok {
+		return res
 	}
 	var merged, conflicted []string
 	for _, r := range repos {
@@ -424,9 +490,9 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 		text = append(text, fmt.Sprintf("Merged %s into %s.", branch, strings.Join(merged, ", ")))
 	}
 	if len(conflicted) > 0 {
-		text = append(text, fmt.Sprintf("Conflicts in %s: resolve the markers, then commit those repos to finish the merge, or abort_merge() to back out.", strings.Join(conflicted, "; ")))
+		text = append(text, fmt.Sprintf("Conflicts in %s: resolve the markers (a submodule: pick its commit with set_submodule), then commit those repos to finish the merge, or abort_merge() to back out.", strings.Join(conflicted, "; ")))
 	}
-	return agentlink.Result{Text: strings.Join(text, " ")}
+	return agentlink.Result{Text: strings.Join(text, " ") + t.synced(ctx, repos)}
 }
 
 func (t tool) handoff(ctx context.Context, teammate, branch, summary string) agentlink.Result {
@@ -444,10 +510,8 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 		return teamtools.Refusal("too_long", "a summary is at most %d characters; put the rest in the branch or a wiki entry", teamtools.MaxBody)
 	}
 	// Nothing pending: what is handed off is exactly what is committed.
-	if dirty, err := t.dirty(ctx, t.worktrees()); err != nil {
-		return gitError(err)
-	} else if len(dirty) > 0 {
-		return teamtools.Refusal("uncommitted_changes", "commit first, in %s: a hand-off is your committed work", strings.Join(dirty, ", "))
+	if res, ok := t.unsettled(ctx, t.worktrees(), "a hand-off is your committed work"); !ok {
+		return res
 	}
 	found, ahead := false, false
 	for _, r := range t.worktrees() {
@@ -581,5 +645,54 @@ func (t tool) abortMerge(ctx context.Context) agentlink.Result {
 	if len(aborted) == 0 {
 		return teamtools.Refusal("no_merge", "no merge is under way in your repos")
 	}
-	return agentlink.Result{Text: fmt.Sprintf("Merge aborted in %s: your branch is as it was before it.", strings.Join(aborted, ", "))}
+	return agentlink.Result{Text: fmt.Sprintf("Merge aborted in %s: your branch is as it was before it.", strings.Join(aborted, ", ")) + t.synced(ctx, t.worktrees())}
+}
+
+// setSubmodule puts a submodule of one of the caller's worktrees on ref
+// (adding it from url first), committed on its branch, or staged during a
+// merge (wiki/product/architecture/sandboxes-and-git.md#submodules).
+func (t tool) setSubmodule(ctx context.Context, name, path, ref, url string) agentlink.Result {
+	var r repo
+	repos := t.worktrees()
+	for _, w := range repos {
+		if w.name == name {
+			r = w
+		}
+	}
+	switch {
+	case r.dir == "":
+		return teamtools.Refusal("unknown_repo", "%q isn't one of your code repos: yours are %s", name, names(repos))
+	case path == "" || ref == "":
+		return teamtools.Refusal("empty", "give the submodule's path and the ref to put it on")
+	}
+	message := fmt.Sprintf("Move submodule %s to %s", path, ref)
+	if url != "" {
+		message = fmt.Sprintf("Add submodule %s at %s (%s)", path, ref, url)
+	}
+	sha, err := t.w.Git.SetSubmodule(ctx, r.dir, path, ref, url, message, t.author())
+	switch {
+	case errors.Is(err, git.ErrBadPath):
+		return teamtools.Refusal("bad_path", "%q isn't a path inside %s", path, r.name)
+	case errors.Is(err, git.ErrNotSubmodule):
+		return teamtools.Refusal("not_a_submodule", "%s isn't a submodule of %s: give its url to add one", path, r.name)
+	case errors.Is(err, git.ErrSubmoduleExists):
+		return teamtools.Refusal("path_taken", "%s already holds something in %s: leave out url to move a submodule there", path, r.name)
+	case errors.Is(err, git.ErrBadURL):
+		return teamtools.Refusal("bad_url", "%v", err)
+	case errors.Is(err, git.ErrUnknownRef):
+		return teamtools.Refusal("unknown_ref", "%s's repo has no branch, tag or commit %q", path, ref)
+	case errors.Is(err, git.ErrNeedsCredentials):
+		return teamtools.Refusal("needs_credentials", "%s needs credentials, and Foreman fetches without the CEO's: ask the CEO to add it", path)
+	case err != nil:
+		return gitError(fmt.Errorf("%s: %w", r.name, err))
+	}
+	branch, _ := t.w.Git.Branch(ctx, r.dir)
+	t.act.Branch = branch
+	t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, Message: message, Commit: sha})
+	text := fmt.Sprintf("Committed in %s (%s, %.8s): %s.", r.name, branch, sha, message)
+	if sha == "" {
+		text = fmt.Sprintf("%s is on %s in %s: commit %s to finish the merge.", path, ref, r.name, r.name)
+	}
+	// Its own submodules, when the project wants them.
+	return agentlink.Result{Text: text + t.synced(ctx, []repo{r})}
 }

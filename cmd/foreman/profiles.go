@@ -16,7 +16,7 @@ import (
 // profileLogins is the CEO's profiles as Foreman uses them
 // (wiki/product/architecture/session-runner.md#credentials): each a harness
 // and its credentials, with the harness's login run in a container
-// (Settings → Global → Profiles → Connect), and the profile each project's
+// (Settings → Agents → Profiles → Connect), and the profile each project's
 // agents run on.
 type profileLogins struct {
 	store    profiles.Store

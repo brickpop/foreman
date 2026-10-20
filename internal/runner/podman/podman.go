@@ -69,7 +69,7 @@ func (r *Runner) client() (*client, error) {
 	return r.c, nil
 }
 
-// Version is Podman's version, for Settings → Maintenance.
+// Version is Podman's version, for Settings → System → Maintenance.
 func (r *Runner) Version(ctx context.Context) (string, error) {
 	c, err := r.client()
 	if err != nil {

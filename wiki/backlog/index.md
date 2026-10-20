@@ -26,6 +26,7 @@ See `WORKFLOW.md` at the project root for the conventions.
 
 Raised during design, no cards yet; they get one when an epic needs them.
 
+- **Stuck sessions and log rotation**: specced ([Agent runtime → stuck sessions](../product/architecture/agent-runtime.md), [Persistence → retention](../product/architecture/persistence.md#session-logs)), and their settings (`stuck_after_minutes`, `log_cap_mb`) are validated in `settings.toml`, but nothing reads them: no stuck request is raised and logs grow without a cap. Settings shows no row for them until they are built (found 2026-10-20 by [Settings by topic](./archive/settings-by-topic.md)).
 - **What agent "skills" mean technically**: plain text in the session prompt, or the harness's own skills feature; it decides what the Agent page's skill chips actually change.
 - **Resource lifecycle**: cleanup of logs, images, agent memory and stopped deployments, and what happens when the laptop sleeps or the Podman VM wakes; without it, disk use grows forever and agents may stall after a sleep.
 - **Config changed outside Foreman, at startup** (the CEO's idea, low priority): a CLI prompt when the server starts, Keep mine / Take theirs, for team or settings files changed outside Foreman. What exactly it compares (uncommitted edits in the global repo?) is to be defined.

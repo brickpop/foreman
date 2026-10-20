@@ -156,7 +156,7 @@ export function DeployDialog({
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
             <span className="flex-1">Podman isn’t running yet, so agents can’t start.</span>
             <Link to="/" onClick={onClose} className="text-accTx hover:underline">
-              Setup on Home
+              Setup on the Dashboard
             </Link>
           </div>
         )}

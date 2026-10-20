@@ -73,8 +73,8 @@ type File struct {
 	Mode os.FileMode
 }
 
-// ErrNotConnected means the harness has no login yet: Settings → Harnesses → Connect.
-var ErrNotConnected = errors.New("harness: not connected (Settings → Harnesses → Connect)")
+// ErrNotConnected means the harness has no login yet: Settings → Agents → Profiles → Connect.
+var ErrNotConnected = errors.New("harness: not connected (Settings → Agents → Profiles → Connect)")
 
 // Adapter is one harness's adapter (claudecode.Adapter, fake.Adapter, …), as
 // runner.Runner is one engine (direct.Runner, podman.Runner).
@@ -90,7 +90,7 @@ type Adapter interface {
 	// Describe says, for the CEO, what a hook event shows it doing ("Bash: go
 	// test ./...", "Finished its turn"); "" when the event says nothing new.
 	Describe(event string, payload []byte) string
-	// Login is how to run the harness's own login (Settings → Harnesses →
+	// Login is how to run the harness's own login (Settings → Agents → Profiles →
 	// Connect) into the login folder dir, in a terminal the CEO types into.
 	Login(dir string) (Launch, error)
 	// Connected reports whether the login folder dir holds a login.

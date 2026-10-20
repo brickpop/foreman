@@ -176,7 +176,7 @@ func (s *Setup) Blocked() error {
 	defer s.mu.Unlock()
 	switch {
 	case s.Deps.Engine != nil && !s.last.Running:
-		return fmt.Errorf("%w: see the setup checklist on Home", ErrNotReady)
+		return fmt.Errorf("%w: see the setup checklist on the Dashboard", ErrNotReady)
 	case !s.ready:
 		return errors.New("foreman is still restoring the agents")
 	}
@@ -231,7 +231,7 @@ func (s *Setup) Steps(ctx context.Context) []Step {
 		step := Step{Kind: "profile", Subject: p.Name, State: "done"}
 		switch {
 		case p.Harness == "":
-			step.State, step.Detail = "failed", "No such profile: create it under Settings → Global → Profiles, or pick another in the project's settings"
+			step.State, step.Detail = "failed", "No such profile: create it under Settings → Agents → Profiles, or pick another in the project's settings"
 		case !p.Connected:
 			step.State, step.Detail = "todo", "Not connected yet: its agents can't start"
 		}
@@ -302,7 +302,7 @@ func imageStep(im runner.ImageStatus) Step {
 	case "building":
 		step.State, step.Detail = "working", "Building the agent image (a few minutes, once)"
 	case "failed":
-		step.State, step.Detail = "failed", "The agent image didn't build (Settings → Maintenance: Rebuild)"
+		step.State, step.Detail = "failed", "The agent image didn't build (Settings → System → Maintenance: Rebuild)"
 	default:
 		step.State, step.Detail = "todo", "Builds once Podman runs"
 	}

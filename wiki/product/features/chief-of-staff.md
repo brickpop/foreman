@@ -6,7 +6,7 @@ tags: [feature, ui, agents, teams]
 
 # Chief of Staff
 
-Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Nothing else: it raises no requests, appears on no Home, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [global repo](../models/home.md#the-global-repo), only on the CEO's click.
+Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Nothing else: it raises no requests, appears on no Dashboard, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [global repo](../models/home.md#the-global-repo), only on the CEO's click.
 
 ## How it runs
 
@@ -47,7 +47,7 @@ A 1-2-3 flow:
    - **`Adjust team`** closes the preview and puts the focus back in the terminal, where the CEO says what to change; the CoS proposes again. `Show preview` in the header reopens the last one.
 3. **Create.** **`Create <Name>`** (a new team) or **`Save <Name>`** (an existing one) writes the file, one commit. A new team opens its [Team page](./team-page.md) (Members); for a changed one the preview closes and the header shows `✓ Saved <Name>`. A refusal (the team changed meanwhile, a newer proposal) shows under the buttons.
 
-Leaving the page stops the session, a second later (coming straight back, or opening it from another entry point, keeps it; closing the browser tab stops it at once); a proposal not yet created is dropped (the CoS still has it in its conversation and can propose it again). The session can't start while Podman isn't ready, nor before the `default` profile is connected: the page says so, with a link to Settings → Global → Profiles. Under 900px wide, the preview takes the whole width while open.
+Leaving the page stops the session, a second later (coming straight back, or opening it from another entry point, keeps it; closing the browser tab stops it at once); a proposal not yet created is dropped (the CoS still has it in its conversation and can propose it again). The session can't start while Podman isn't ready, nor before the `default` profile is connected: the page says so, with a link to Settings → Agents → Profiles. Under 900px wide, the preview takes the whole width while open.
 
 ## Flows
 

@@ -55,8 +55,8 @@ func TestNewProject(t *testing.T) {
 		t.Errorf("after a restart: %v", err)
 	}
 
-	// A project removed with its project repo kept leaves its folder: the name
-	// is taken until it goes.
+	// A folder left there that isn't a project repo keeps its name taken
+	// (TestNewProjectTakesOverAKeptProjectRepo).
 	writeFile(t, h.Path("projects", "Kept", "project.toml"), "")
 	for name, want := range map[string]error{
 		"devproject":            ErrExists,
@@ -74,6 +74,73 @@ func TestNewProject(t *testing.T) {
 	}
 	if got := entries(t, h.Path("projects")); !slices.Equal(got, []string{"DevProject", "Kept"}) {
 		t.Errorf("projects/ holds %v", got)
+	}
+}
+
+// A project removed with its project repo kept leaves its folder; a new
+// project of exactly that name takes it over as it is, its history and edits
+// included. Anything else there keeps the name taken, and a failed takeover
+// never deletes the folder.
+func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
+	h := loaded(t, nil)
+	p, err := h.NewProject(ctx, "ledger", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(p.Path, "wiki", "notes.md"), "kept\n")
+	gitOut(t, p.Path, "add", "-A")
+	gitOut(t, p.Path, "commit", "--quiet", "-m", "Notes")
+	if err := h.RemoveProject(ctx, "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+
+	// Refusals leave it as it is.
+	for _, c := range []struct{ name, clone, want string }{
+		{"Ledger", "", "name the project ledger"},
+		{"ledger", p.Path, "without Clone"},
+	} {
+		if _, err := h.NewProject(ctx, c.name, c.clone); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s %q: %v", c.name, c.clone, err)
+		}
+	}
+	// A record the snapshot doesn't know yet makes the record step fail.
+	if err := h.records.Create(ctx, "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.NewProject(ctx, "ledger", ""); !errors.Is(err, ErrExists) {
+		t.Errorf("record taken: %v", err)
+	}
+	if err := h.records.Remove(ctx, "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(filepath.Join(p.Path, "wiki", "notes.md")) {
+		t.Fatal("a refused takeover deleted the kept project repo")
+	}
+
+	got, err := h.NewProject(ctx, "ledger", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Path != p.Path || got.Source != p.Source || len(got.Problems) != 0 {
+		t.Errorf("taken over %+v", got)
+	}
+	if log := gitOut(t, got.Path, "log", "--format=%s"); log != "Notes\nProject repo" {
+		t.Errorf("its history changed: %q", log)
+	}
+
+	// A folder that isn't a repo's top, or a symlink to one elsewhere, stays taken.
+	writeFile(t, h.Path("projects", "loose", "project.toml"), "")
+	outside := codeRepo(t, "dev/elsewhere")
+	if err := os.Symlink(outside, h.Path("projects", "linked")); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"loose", "linked"} {
+		if _, err := h.NewProject(ctx, name, ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "isn't a git repo") {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if !exists(h.Path("projects", "loose", "project.toml")) || !exists(h.Path("projects", "linked")) {
+		t.Error("a refused takeover removed the folder")
 	}
 }
 

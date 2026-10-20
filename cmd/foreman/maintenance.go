@@ -7,7 +7,7 @@ import (
 	"github.com/brickpop/foreman/internal/runner"
 )
 
-// maintenance serves Settings → Maintenance from the engine and its images.
+// maintenance serves Settings → System → Maintenance from the engine and its images.
 type maintenance struct {
 	running   string                                // "podman" or "direct", chosen at startup
 	version   func(context.Context) (string, error) // the engine's, nil for direct

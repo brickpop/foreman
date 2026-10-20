@@ -6,9 +6,9 @@ tags: [feature]
 epic: terminal-multiplexer
 ---
 
-# Wire Sessions and Home to the real backend
+# Wire Sessions and Dashboard to the real backend
 
-**Why:** the screens exist ([Home and Sessions screens](./archive/ui-home-sessions.md)) and run on the real server since the UI went live; this card finishes what they need from it ([Sessions](../product/features/sessions.md), [Home](../product/features/home.md)).
+**Why:** the screens exist ([Dashboard and Sessions screens](./archive/ui-home-sessions.md)) and run on the real server since the UI went live; this card finishes what they need from it ([Sessions](../product/features/sessions.md), [Dashboard](../product/features/dashboard.md)).
 
 **Done when:** deployments, instances, statuses and terminals come from the real server (endpoints and events), with their activity lines and exact snapshots; requests say "Not built yet" until epic 4.
 

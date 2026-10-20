@@ -52,7 +52,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
         body:
           source === "clone"
             ? `Cloned its project repo into ${p.path}.`
-            : `Made its project repo at ${p.path}, with project.toml and a starter wiki.`,
+            : `Its project repo is ${p.path}.`,
         color: "var(--ok)",
       });
       onCreated(p);
@@ -102,7 +102,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
         )}
         <span className={hint}>
           {source === "new"
-            ? "Its wiki and project.toml, in a new git repo under Foreman's home."
+            ? "Its wiki and project.toml, in a new git repo under Foreman's home. One left there by a removed project of this name is taken over as it is."
             : "Cloned with your own git: your SSH keys and credential helper. Foreman stores nothing."}
         </span>
       </div>

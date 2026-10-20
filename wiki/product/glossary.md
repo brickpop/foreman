@@ -6,7 +6,7 @@ tags: [architecture, home]
 
 # Glossary
 
-- **Home**: Foreman's folder on this machine, `~/.foreman` (or `--home`); one Foreman runs per machine. It holds the global repo, the project repos, the agents' sandboxes and Foreman's state. See [Home](./models/home.md).
+- **Dashboard**: Foreman's folder on this machine, `~/.foreman` (or `--home`); one Foreman runs per machine. It holds the global repo, the project repos, the agents' sandboxes and Foreman's state. See [Home](./models/home.md).
 - **Global repo**: `~/.foreman/config/`, a git repo holding the team files and `settings.toml`; every UI save is one commit. Nothing else in the home is in a repo. See [Home → The global repo](./models/home.md#the-global-repo).
 - **Project**: a project record plus its project repo; its code repos live anywhere in the CEO's home folder. See [Project config](./models/project-config.md).
 - **Project record**: a project's row in `state.db`: its name, its code repos (name, path, root commit) and its profile. Edited from the UI, never in a file. See [Project config → The project record](./models/project-config.md#the-project-record).
@@ -38,6 +38,6 @@ tags: [architecture, home]
 - **Card** (board card): a wiki task entry shown on a [board](./features/board.md). "Card" means only this; members usually work on one card per topic branch (`wt/<agent>/<card>`).
 - **Work item**: one agent's branch on its way into the lead branch (in worktree → handed to lead → lead reviewing → integrated). Informational: it never needs the CEO. See [Work item](./models/work-item.md).
 - **Merge request**: the lead's request, through `request_merge(branch, entry)`, to merge a lead branch into `main` of one repo, explained by a wiki entry and carrying the integrated work items; the only pipeline entry that raises a request (the review), whose actions are Merge to main, Create PR on the forge and Reject. A **pull request (PR)** is a merge request's forge side, made only by Create PR. See [Merge request](./models/merge-request.md) and [Pipeline and merges](./features/pipeline-and-merges.md).
-- **Request panel**: the UI component that shows one [request](./models/request.md) on Home and on a project's Overview (Needs you).
+- **Request panel**: the UI component that shows one [request](./models/request.md) on the Dashboard and on a project's Overview (Needs you).
 - **Chief of Staff (CoS)**: the built-in, Foreman-owned agent session that creates teams, hires and refines members, from its own page. See [Chief of Staff](./features/chief-of-staff.md).
 - **CEO**: the single human user of Foreman.

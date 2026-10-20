@@ -15,10 +15,10 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **1. Start Foreman.** `foreman`. It prints the URL with the access token and opens the browser (a second `foreman` would only print and open the same URL).
 - *Under the hood:* Home & config (opens or creates the home `~/.foreman` and takes its lock; the global repo `config/`: `git init` and its `.gitignore`; the access token); Web server (listens on 127.0.0.1:8888, access guard swaps the URL token for a cookie); Instance manager (re-attaches to agent containers still running from last time: none yet); Execution engine (Podman service started if needed: `podman system service` on Linux, `podman machine start` on macOS).
 
-**2. Prepare the agent images.** Settings → Maintenance shows Base and Harnesses `not built yet`. The CEO presses **Refresh** (or the first deploy does it).
+**2. Prepare the agent images.** Settings → System → Maintenance shows Base and Harnesses `not built yet`. The CEO presses **Refresh** (or the first deploy does it).
 - *Under the hood:* Image builder (Podman): builds `localhost/foreman/base`, then `…/harness` (Claude Code, Pi…); a project layer is a transparent tag. Build logs stream to the page; the Event bus pushes the state changes.
 
-**3. Log in to Claude Code.** Settings → Global → Profiles → `default` (Claude Code) → **Connect**, or the same button on Home's setup checklist. A dialog shows a terminal running `claude /login`; the CEO completes the browser sign-in. Once: every project on `default` uses it.
+**3. Log in to Claude Code.** Settings → Agents → Profiles → `default` (Claude Code) → **Connect**, or the same button on the Dashboard's setup checklist. A dialog shows a terminal running `claude /login`; the CEO completes the browser sign-in. Once: every project on `default` uses it.
 - *Under the hood:* a one-off **login container**: Execution engine starts it from the harness image with the profile's folder (`~/.foreman/profiles/default/`) mounted read-write; a Terminal streams it into the dialog exactly like any session. When it exits, Settings shows `connected`.
 
 **4. Connect the forge.** Settings → Forge accounts → GitHub → **Connect**: host and token, checked against GitHub, never shown again.
@@ -50,7 +50,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
   7. **Kickoff:** only Mara, the lead, starts now: her harness starts with the goal as its opening message (`Your goal on ledger: …`), so she starts working at once. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
-**10. Watch.** Home: "4 sessions working across 1 deployment". **Sessions** → tab "Atlas · ledger" → Mara's pane (the lead's tab is first).
+**10. Watch.** Dashboard: "4 sessions working across 1 deployment". **Sessions** → tab "Atlas · ledger" → Mara's pane (the lead's tab is first).
 - *Under the hood:* Web server → Terminal `Attach` → a View: the snapshot of Mara's screen, then live output (WebSocket, raw bytes).
 
 **11. Talk to the lead.** The CEO types into Mara's pane: "Use the existing request-id header; keep the API backwards compatible."
@@ -75,9 +75,9 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 - *Under the hood:* `merge` → Workflow → Git merges the branch on the host, in Mara's worktree (a conflict would leave markers for her to resolve, then `commit`). Workflow notices the integration through Git (the branch is contained in a `lead/atlas/*` branch) when Mara next goes idle: the work item moves to *integrated*. (If she wanted changes instead: an `ask` back to Tove, which moves nothing; his next hand-off of the branch brings the work item back to her: [Protocol → Work items and merge requests](./architecture/protocol.md#work-items-and-merge-requests).)
 
 **18. The merge request.** Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`: the card explains what was done.
-- *Under the hood:* Workflow checks the branch and the entry, runs the project checks (in a throwaway container from the project image), creates the merge request for `ledger-api` (titled from the card, carrying the integrated work items) and a **review request**. Nothing is pushed. Home shows it, the browser notifies, Mara receives "Merge requested".
+- *Under the hood:* Workflow checks the branch and the entry, runs the project checks (in a throwaway container from the project image), creates the merge request for `ledger-api` (titled from the card, carrying the integrated work items) and a **review request**. Nothing is pushed. Dashboard shows it, the browser notifies, Mara receives "Merge requested".
 
-**19. The CEO merges.** The review waits on Home and on the project's Overview, under Needs you. The CEO picks **Create PR on GitHub**, then **Open PR ↗**, reviews and merges on GitHub. (Or **Merge to main**, and Foreman merges locally; or **Reject** with a reason, which goes back to Mara.)
+**19. The CEO merges.** The review waits on the Dashboard and on the project's Overview, under Needs you. The CEO picks **Create PR on GitHub**, then **Open PR ↗**, reviews and merges on GitHub. (Or **Merge to main**, and Foreman merges locally; or **Reject** with a reason, which goes back to Mara.)
 - *Under the hood:* Create PR: Git pushes the branch to GitHub from the host, with the CEO's GitHub token, and the Forge adapter opens PR #128. Forge adapter polling then sees `merged`; Workflow resolves the request, marks the merge request and its work items merged, delivers "merged into main" to Mara, and tells the leads of other open merge requests on `ledger-api` to merge `main` in (`merge("main")`). Git fetches the new `main` into `ledger-api` (`Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. (With Merge to main, Git merges on the host instead, and nothing reaches GitHub.)
 
 ## Part 3: intervene
@@ -85,13 +85,13 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **20. A direct instruction.** In Sessions, the CEO presses **Split** and clicks Ilya's tab: his pane opens on the right with his current screen, banner "Direct line to Ilya. He'll tell Mara if it matters." The CEO types "Use the decimal library already in the repo."
 - *Under the hood:* a second Terminal `Attach` (snapshot + live); keystrokes raw to Ilya's terminal. Ilya's prompt tells him to inform the lead if relevant, which he does with `ask`/`reply` like any message.
 
-**21. An approval.** Ilya wants a new dependency, a project gate: he calls `escalate(approval, "Add decimal.js?", ["Approve", "Deny"])`. Home shows the request, the browser notifies. The CEO clicks **Approve**; Ilya continues.
-- *Under the hood:* Agent link → Workflow: a request; **the tool call stays open**, so Ilya is paused; Event bus → Home and notification. `Resolve` returns "Approve" as the tool's result and Ilya resumes.
+**21. An approval.** Ilya wants a new dependency, a project gate: he calls `escalate(approval, "Add decimal.js?", ["Approve", "Deny"])`. Dashboard shows the request, the browser notifies. The CEO clicks **Approve**; Ilya continues.
+- *Under the hood:* Agent link → Workflow: a request; **the tool call stays open**, so Ilya is paused; Event bus → Dashboard and notification. `Resolve` returns "Approve" as the tool's result and Ilya resumes.
 
-**22. The harness itself waits.** Pi stops at its own question ("Overwrite migrations? 1/2"). Home shows "Rhea is waiting in her session" with the choices; the CEO picks one, and it is typed into the session.
+**22. The harness itself waits.** Pi stops at its own question ("Overwrite migrations? 1/2"). Dashboard shows "Rhea is waiting in her session" with the choices; the CEO picks one, and it is typed into the session.
 - *Under the hood:* the harness's hook → `foreman-agent hook` → Agent link → Instance manager; the Harness adapter's `Interpret` says *waiting for the user* (not just idle) → Workflow raises the request; the answer goes through `Deliver`.
 
-**23. A crash.** Ilya's harness hits its rate limit and exits. Home: a **blocked** request, "Retry now · Retry in 30 min · Switch profile" (another account or harness for Ilya: later, [Profiles per agent](../backlog/profiles-per-agent.md)).
+**23. A crash.** Ilya's harness hits its rate limit and exits. Dashboard: a **blocked** request, "Retry now · Retry in 30 min · Switch profile" (another account or harness for Ilya: later, [Profiles per agent](../backlog/profiles-per-agent.md)).
 - *Under the hood:* Terminal `Done` → Instance manager → Harness adapter `Diagnose(exit code, last output)` → Workflow raises the blocked request; **Retry** makes the Instance manager start the instance again (same worktrees, same private config).
 
 **24. A second team.** The CEO deploys **Vesper** (a challenge team) on `ledger` too. Kestrel finds a race and calls `escalate(finding, …, ["Atlas fixes it now", "Add to backlog", "Not an issue"])`. The CEO picks "Atlas fixes it now".

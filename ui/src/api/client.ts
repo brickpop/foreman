@@ -184,7 +184,7 @@ export interface MaintenanceArea {
   rebuild(): Promise<void>;
 }
 
-/** The setup checklist on Home (first-run.md). */
+/** The setup checklist on the Dashboard (first-run.md). */
 export interface SetupArea {
   steps(): Promise<SetupStep[]>;
   /** Starts the stopped Podman machine; the steps follow its progress. */

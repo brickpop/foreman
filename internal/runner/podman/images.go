@@ -42,7 +42,7 @@ func (r *Runner) Images(name string, containerfile []byte, dir string) *Images {
 	return &Images{r: r, name: name, containerfile: containerfile, shared: sharedBuild{dir: dir, key: key}}
 }
 
-// maxLog bounds the build log shown in Settings → Maintenance (its end).
+// maxLog bounds the build log shown in Settings → System → Maintenance (its end).
 const maxLog = 256 << 10
 
 func (im *Images) ref() string {

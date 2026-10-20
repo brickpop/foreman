@@ -8,7 +8,7 @@ tags: [feature, pipeline, git, forge]
 
 How work moves from a member's worktree to `main`. Only the team **lead** asks for changes to reach `main`, with a **merge request**; only the **CEO** decides: Merge to main (Foreman merges locally), Create PR on the forge, or Reject. Nothing reaches a forge unless the CEO asks. Branch rules: [Sandboxes and git policy](../architecture/sandboxes-and-git.md). Forge calls: [Forge adapters](../architecture/forge-adapters.md).
 
-The pipeline has two kinds of entries, both shown in the [project pipeline](./project-pipeline.md) (In flight and Merged on [Repositories](./repositories.md)). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests, decided from Home or the project's Overview, under Needs you ([Merge request → Phasing](../models/merge-request.md#phasing)).
+The pipeline has two kinds of entries, both shown in the [project pipeline](./project-pipeline.md) (In flight and Merged on [Repositories](./repositories.md)). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests, decided from the Dashboard or the project's Overview, under Needs you ([Merge request → Phasing](../models/merge-request.md#phasing)).
 
 - **Work items** ([model](../models/work-item.md)): one agent's branch on its way into the lead branch. Informational only: a handoff never creates a request and needs nothing from the CEO.
 - **Merge requests** ([model](../models/merge-request.md)): the lead's request to merge a lead branch into `main`, carrying every work item integrated since the last one. A merge request is the only pipeline entry that raises a [request](./requests.md): the **review**.

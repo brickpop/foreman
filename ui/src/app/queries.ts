@@ -465,7 +465,7 @@ export function useMaintenance() {
   });
 }
 
-/** The setup checklist (Home). Polled while anything is left: installing
+/** The setup checklist (Dashboard). Polled while anything is left: installing
  * Podman or logging in happens outside Foreman, and a machine's creation or
  * an image build reports its output only when asked. */
 export function useSetup() {

@@ -10,7 +10,7 @@ type ImageStatus struct {
 	Log   string `json:"log"`   // the last build's output (its end, when long)
 }
 
-// Maintenance is the engine's state and its images, for Settings → Maintenance.
+// Maintenance is the engine's state and its images, for Settings → System → Maintenance.
 type Maintenance struct {
 	Running string        `json:"running"` // the engine running now, "podman" or "direct": a change of the setting waits for a restart
 	Engine  string        `json:"engine"`  // its state, e.g. "Podman 5.7.1 · running", or "direct (no isolation)"

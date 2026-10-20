@@ -47,14 +47,14 @@ export function ordered(requests: Request[]): Request[] {
   );
 }
 
-/** Home's title (wiki/product/features/home.md#header). */
-export function homeTitle(open: number): string {
+/** The Dashboard's title (wiki/product/features/dashboard.md#header). */
+export function dashboardTitle(open: number): string {
   if (open === 0) return "All clear";
   return open === 1 ? "1 thing needs you" : `${open} things need you`;
 }
 
-/** Home's subtitle: running sessions across active deployments. */
-export function homeSubtitle(instances: Instance[]): string {
+/** The Dashboard's subtitle: running sessions across active deployments. */
+export function dashboardSubtitle(instances: Instance[]): string {
   const running = instances.filter((i) => i.status === "running").length;
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean)).size;
   return `${plural(running, "session")} working across ${plural(deployments, "deployment")}.`;
@@ -90,7 +90,7 @@ export function projectRows(
   });
 }
 
-/** A checks result as words (Home's review text). */
+/** A checks result as words (the Dashboard's review text). */
 export function checksSentence(status: string): string {
   switch (status) {
     case "pass":

@@ -18,7 +18,7 @@ Three actors, and every interaction enters through exactly one channel:
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
-| CEO | Answering a request (Home, project Overview) | `Answer` | Web server → **Workflow** `Resolve` |
+| CEO | Answering a request (Dashboard, project Overview) | `Answer` | Web server → **Workflow** `Resolve` |
 | CEO | Merge to main, Create PR on the forge, Reject (a merge request) | `MergeAction` | Web server → **Workflow** |
 | Foreman | Process exit, silence, rate limit, git or build error | internal | **Instance manager** / **Workflow** → blocked [request](#requests) |
 | Foreman | Forge poll, project-repo watch | internal | **Workflow** → [merge request](#work-items-and-merge-requests) transitions |
@@ -73,14 +73,14 @@ The harness adapter's `Interpret` maps each harness's hooks to the normalised `E
 | `started` | The harness is up and at its prompt | `SessionStart` | `starting` → `idle` |
 | `busy` | A turn started (it accepted input) | `UserPromptSubmit` | `running` |
 | `idle` | The turn ended; it waits at its prompt | `Stop` | `idle`, or `done` right after a handoff ([Instance](../models/instance.md#statuses)) |
-| `waiting` | It waits **for the user**: a permission dialog, a multiple-choice question, or a question it asked in plain text before stopping | `Notification` | `awaiting`, with a request on Home ([Waiting for the CEO](#waiting-for-the-ceo)) |
+| `waiting` | It waits **for the user**: a permission dialog, a multiple-choice question, or a question it asked in plain text before stopping | `Notification` | `awaiting`, with a request on the Dashboard ([Waiting for the CEO](#waiting-for-the-ceo)) |
 | `ended` | The harness is exiting | `SessionEnd` | (the Terminal's exit sets `stopped`) |
 
 `awaiting` means a request of the instance blocks it: an open `escalate(approval)`, or a `waiting` hook. `idle` and `waiting` must never be confused: an instance merely idle after finishing raises nothing ([Harness adapters → Idle and waiting detection](./harness-adapters.md#idle-and-waiting-detection)).
 
 ### Waiting for the CEO
 
-Whenever the harness reports it is waiting for the user, Workflow raises a request on Home, as if the agent had escalated:
+Whenever the harness reports it is waiting for the user, Workflow raises a request on the Dashboard, as if the agent had escalated:
 
 - **Kind:** `approval` when the harness exposes choices (a permission dialog, a multiple-choice question), with those choices as `Options`; otherwise `question`. `Source: harness` (the panel reads "waiting in its session").
 - **Content:** the question text and the choices, when the harness's hook payload carries them; otherwise "<Name> is waiting for your input" and an `Open session` action.
@@ -246,7 +246,7 @@ type EscalateArgs struct {
     Wait    bool     // question only: block like an approval
 }
 type EscalateResult struct {
-    RequestID string // the request on Home
+    RequestID string // the request on the Dashboard
     Answer    string // set when the call blocked until the CEO answered
     Pending   bool   // the call stopped blocking before an answer (see below)
 }
@@ -268,7 +268,7 @@ type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks 
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
 - Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
-- Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on Home or on the project's Overview.
+- Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on the Dashboard or on the project's Overview.
 
 ### Deliveries Foreman originates
 
@@ -434,12 +434,12 @@ Every state change is published on the in-process event bus; the web server stre
 
 | Event | Payload | Emitted by | Used by |
 |---|---|---|---|
-| `instance.status` | instance id, status, task | Instance manager | Sessions tabs, Home, Project and Team rows, avatars |
+| `instance.status` | instance id, status, task | Instance manager | Sessions tabs, Dashboard, Project and Team rows, avatars |
 | `instance.doing` | instance id, its activity line and when ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | Instance manager, from the harness's hooks | Project settings rows; the agent Sessions opens on |
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity panel |
 | `team.action` | an [action](#team-actions), once recorded | Workflow | Activity panel |
-| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Home, project Overview, sidebar badges, notifications |
+| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, project Overview, sidebar badges, notifications |
 | `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Repositories |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
 | `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Overview, Board, Settings |

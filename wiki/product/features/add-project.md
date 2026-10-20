@@ -13,10 +13,10 @@ A project is a record in Foreman's database plus its [project repo](../models/pr
 A modal ([App shell](./app-shell.md#overlays)) opened from **`+ New project`** in the sidebar and from the checklist's **A project** row ([First run](./first-run.md#the-checklist)), fresh at each opening. Two steps:
 
 1. **New project**: the **Project name** (the rules under [Names](#names) as its hint), then the **Project repo**, a segmented New | Clone:
-   - **New**: "Its wiki and project.toml, in a new git repo under Foreman's home."
+   - **New**: "Its wiki and project.toml, in a new git repo under Foreman's home. One left there by a removed project of this name is taken over as it is."
    - **Clone**: a field for a git URL or a local path ("Cloned with your own git: your SSH keys and credential helper. Foreman stores nothing."). The button reads `Cloning…` while it runs.
 
-   **Create project** (Enter too) calls `POST /api/projects`; a refusal shows under the fields, git's own message for a failed clone. On success the project's Overview opens behind the dialog, with the toast `<name> created` ("Made its project repo at <path>, with project.toml and a starter wiki.", or "Cloned its project repo into <path>.").
+   **Create project** (Enter too) calls `POST /api/projects`; a refusal shows under the fields, git's own message for a failed clone. On success the project's Overview opens behind the dialog, with the toast `<name> created` ("Its project repo is <path>.", or "Cloned its project repo into <path>.").
 2. **Repos of `<name>`**: [picking repos](#picking-repos), as many as the CEO likes, each added at once; the line above lists those added. **Later** (none yet) or **Done** closes it. The project exists from step 1: closing the dialog keeps it, and its repos are added later in [Project settings](./project-settings.md).
 
 ## Picking repos
@@ -38,7 +38,8 @@ A project's name and a repo's follow a repo's rules: letters of either case, dig
 
 `POST /api/projects {name, clone?}` ([API](../architecture/api.md)). Without `clone`, **New**:
 
-1. Refuses a name that breaks the rules (`400 INVALID`), or one taken, in any case, by a project or by a folder left in `~/.foreman/projects/` (`409 EXISTS`).
+1. Refuses a name that breaks the rules (`400 INVALID`), or one taken, in any case, by a project (`409 EXISTS`).
+   **A folder already there** (`~/.foreman/projects/<name>/`, left by a project removed with its project repo kept) is **taken over** as it is, its history and edits included, with no new commit: steps 2 to 4 are skipped and the record is made (the CEO, 2026-10-20). Only a git repo's own top folder of exactly that name is taken over; otherwise `409 EXISTS` with what to do: the name in another case ("name the project <Name> to take it over"), Clone asked for ("create the project without Clone to take it over"), or not a git repo, a symlink included, since it would put the project repo outside the home ("move it away, or pick another name"). A failed takeover never deletes that folder.
 2. Creates `~/.foreman/projects/<name>/`.
 3. Writes `project.toml`, the scaffold's first file (`internal/home/starter/project.toml`), with the defaults ([Project config](../models/project-config.md)): `main = "main"`, `merge_to_main = "ceo"`, an empty `checks`, the gates as a commented-out starter list (`# always_ask_ceo = ["new dependency", "touches shared staging"]`) so the CEO sees the option, and a `[forge]` table with `kind = "none"`.
 4. Creates the **scaffold**: the project repo's files besides `project.toml`, from Foreman's starter, a folder laid out as in the repo and built into the binary (`internal/home/starter/`, `{project}` standing for the project's name). One definition, also used to [fill a project repo that lacks them](./wiki-reader.md#no-wiki-yet). The default is modelled on Foreman's own wiki and workflow (the CEO, 2026-10-17):
@@ -54,7 +55,7 @@ A project's name and a repo's follow a repo's rules: letters of either case, dig
 
 With `clone` (a git URL or a local path), **Clone**: the same refusals, then `git clone` into `~/.foreman/projects/<name>/` with the CEO's own git on the host (their SSH keys, agent and credential helper; Foreman stores nothing), then the record. A local folder is copied, never moved in. Hardened, since the source is typed in: only the `https`, `http`, `ssh`, `git` and `file` transports (`protocol.allow`), a source starting with `-` refused, `--` before the arguments, and no terminal to prompt on (a session of its own, `GIT_TERMINAL_PROMPT=0`), so a source that wants a password fails with git's message instead of hanging. A failure is `400 INVALID` with git's message. The clone is taken as it is: one without `project.toml` or a wiki shows the usual notices and their `Create it` ([Wiki reader → No wiki yet](./wiki-reader.md#no-wiki-yet)).
 
-Nothing is left behind if a step fails: the new folder is removed whole. Marking every existing wiki entry as seen is not built yet: it needs the [UI state](../models/ui-state.md) API.
+Nothing is left behind if a step fails: a folder the call made is removed whole (a taken-over one stays). Marking every existing wiki entry as seen is not built yet: it needs the [UI state](../models/ui-state.md) API.
 
 ## Code repos
 
@@ -73,4 +74,4 @@ A project starts with none, and deploying refuses until it has one. Each route a
 1. Its agents' sandboxes (`~/.foreman/sandboxes/<id>/`) go, uncommitted work included, and each code repo prunes its worktrees' records (`git worktree prune`). The repos and their branches stay.
 2. Its session logs (`~/.foreman/logs/*@<id>/`) go.
 3. Its record and its **history** go, in one transaction: deployments, instances, team messages, actions, work items, merge requests, requests (the CEO, 2026-10-20). Ids are built from the name (`atlas@ledger`), so a redeploy after re-adding the name would otherwise revive the old rows: re-adding it starts clean.
-4. With the option (off by default), its project repo folder goes too. Without it, the folder stays in `~/.foreman/projects/`, and re-adding the name is refused until it is moved away (a folder left there takes the name).
+4. With the option (off by default), its project repo folder goes too. Without it, the folder stays in `~/.foreman/projects/`, and a new project of the same name takes it over ([Effect](#effect)).

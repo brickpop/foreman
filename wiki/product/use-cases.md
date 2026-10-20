@@ -42,11 +42,11 @@ Acceptance:
 
 ## 4. Approval gate
 
-Ilya wants a new dependency. An approval request appears on Home and on the project's Overview, with a notification. The CEO approves and Ilya resumes.
+Ilya wants a new dependency. An approval request appears on the Dashboard and on the project's Overview, with a notification. The CEO approves and Ilya resumes.
 
 Acceptance:
 - [ ] Ilya's `escalate(approval, …)` creates an open approval [request](./models/request.md); Ilya's instance becomes `awaiting`.
-- [ ] The request shows on [Home](./features/home.md) and on ledger's Overview, under [Needs you](./features/project-pipeline.md#1-needs-you); a toast and (if permitted) a browser [notification](./features/notifications.md) fire.
+- [ ] The request shows on [Dashboard](./features/dashboard.md) and on ledger's Overview, under [Needs you](./features/project-pipeline.md#1-needs-you); a toast and (if permitted) a browser [notification](./features/notifications.md) fire.
 - [ ] Picking "Approve" resolves the request, delivers the answer to Ilya's paused tool call, and Ilya's instance leaves `awaiting`.
 
 ## 5. Merge review

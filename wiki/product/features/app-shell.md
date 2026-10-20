@@ -14,7 +14,7 @@ A two-column grid: sidebar **220px**, main area `minmax(0, 1fr)`, full viewport 
 
 **One breakpoint** (basic responsiveness): under ~760px the sidebar collapses behind a menu button at the top left and opens as an overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)).
 
-Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./wiki-reader.md) with the [project pipeline](./project-pipeline.md)'s Needs you, [Board](./board.md), [Repositories](./repositories.md), [Activity](./project-activity.md), [Project settings](./project-settings.md)), [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on Home (or the last screen, see [UI state](../models/ui-state.md)).
+Screens: [Dashboard](./dashboard.md), [Sessions](./sessions.md), Project ([Wiki reader](./wiki-reader.md) with the [project pipeline](./project-pipeline.md)'s Needs you, [Board](./board.md), [Repositories](./repositories.md), [Activity](./project-activity.md), [Project settings](./project-settings.md)), [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on the Dashboard (or the last screen, see [UI state](../models/ui-state.md)).
 
 ## Sidebar
 
@@ -22,7 +22,7 @@ Screens: [Home](./home.md), [Sessions](./sessions.md), Project ([Wiki reader](./
 
 1. **Brand** (padding `20px 18px 16px`, gap 9): a 22×22 amber tile (radius 5) with "F" in `--accInk` (Mono 700 12px), and "Foreman" (600 15px).
 2. **Scrolling area** (padding `0 10px 12px`, gap 18 between groups):
-   - **Nav**: `Home`, with a count badge of open requests when there are any ([Requests](./requests.md)), and `Sessions`. Items: padding `8px 10px`, radius 6, 500. Active: `--raised`, `--tx`. Inactive: transparent, `--tx2`.
+   - **Nav**: `Dashboard`, with a count badge of open requests when there are any ([Requests](./requests.md)), and `Sessions`. Items: padding `8px 10px`, radius 6, 500. Active: `--raised`, `--tx`. Inactive: transparent, `--tx2`.
    - **Projects** label, then one row per project (padding `6px 10px`, 13.5px). A project that needs the CEO shows a 7px amber dot. Active while that project's screen is open. Then **`+ New project`** (13px `--tx4`), which opens [Add a project](./add-project.md).
    - **Teams** label, then one row per team with, right-aligned (12px `--tx4`), where it is deployed: the project id if one deployment, `N projects` if more, `—` if none. A team row is active on its Team page and on the Agent page of any of its members. Then **`+ New team`**, which opens the [Chief of Staff](./chief-of-staff.md) "Create a team" flow.
    - Section labels are plain labels: not links, not collapsible. There is no Teams index screen (the prototype has one that nothing links to): the sidebar already lists every team.
@@ -54,7 +54,7 @@ In-app mirrors of [notifications](./notifications.md), shown regardless of brows
 | New request | `<Name> needs you on <project>` | the request summary | `--acc` |
 | Deployed | `<Team> deployed to <project>` | `<N> new sessions starting.` (opens the lead's session) | `--ok` |
 | Stopped | `<Team> stopped on <project>` | `Worktrees are kept. Other deployments keep running.` | `--tx4` |
-| Project created | `<id> created` | `Made its project repo at <path>, with project.toml and a starter wiki.` (or `Cloned its project repo into <path>.`) | `--ok` |
+| Project created | `<id> created` | `Its project repo is <path>.` (or `Cloned its project repo into <path>.`) | `--ok` |
 | Project removed | `<id> removed` | none | `--tx4` |
 | Stopped by Foreman (its project is gone) | `Foreman stopped <Team> on <project>` | the reason, e.g. `ledger is gone: all its code repos are missing` (opens the Dashboard) | `--err` |
 | Config review resolved | `project.toml` | `Config change merged to main.` (`--ok`) or `Config change rejected.` (`--tx4`) | |

@@ -328,7 +328,7 @@ func (h *Home) repoFolder(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if info, err := os.Stat(filepath.Join(real, ".git")); err != nil || !info.IsDir() {
+	if !topOfRepo(real) {
 		return "", fmt.Errorf("%s is not a git repo's top folder (with its own .git folder)", path)
 	}
 	if !inside(real, h.allowed) {
@@ -338,6 +338,13 @@ func (h *Home) repoFolder(path string) (string, error) {
 		return "", fmt.Errorf("%s is inside Foreman's home (%s)", path, h.root)
 	}
 	return real, nil
+}
+
+// topOfRepo says whether dir is a git repo's top folder, with its own .git
+// folder (not a worktree's .git file).
+func topOfRepo(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, ".git"))
+	return err == nil && info.IsDir()
 }
 
 // inside says whether path is dir or under it (both real paths).

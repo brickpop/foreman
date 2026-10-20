@@ -59,8 +59,7 @@ func (h *Home) Browse(path string) (Folder, error) {
 		if info, err := os.Stat(child); err != nil || !info.IsDir() {
 			continue
 		}
-		git, err := os.Stat(filepath.Join(child, ".git"))
-		f.Entries = append(f.Entries, FolderEntry{Name: e.Name(), Path: filepath.Join(real, e.Name()), Repo: err == nil && git.IsDir()})
+		f.Entries = append(f.Entries, FolderEntry{Name: e.Name(), Path: filepath.Join(real, e.Name()), Repo: topOfRepo(child)})
 	}
 	sort.Slice(f.Entries, func(i, j int) bool { return strings.ToLower(f.Entries[i].Name) < strings.ToLower(f.Entries[j].Name) })
 	return f, nil

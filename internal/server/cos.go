@@ -47,7 +47,7 @@ func cosRoutes(mux *http.ServeMux, c ChiefOfStaff) {
 		case errors.Is(err, instances.ErrNotReady):
 			writeError(w, http.StatusConflict, "NOT_READY", err.Error())
 		case errors.Is(err, harness.ErrNotConnected):
-			writeError(w, http.StatusConflict, "NOT_CONNECTED", "Connect the default profile in Settings → Global → Profiles first")
+			writeError(w, http.StatusConflict, "NOT_CONNECTED", "Connect the default profile in Settings → Agents → Profiles first")
 		case err != nil:
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 		default:

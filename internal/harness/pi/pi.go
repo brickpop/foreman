@@ -224,7 +224,7 @@ func (Adapter) Connected(dir string) bool {
 
 // Login isn't Pi's way: its profile is set in a form (Endpoint, SetEndpoint).
 func (Adapter) Login(string) (harness.Launch, error) {
-	return harness.Launch{}, errors.New("a Pi profile is a model server, set in a form: Settings → Profiles → Connect")
+	return harness.Launch{}, errors.New("a Pi profile is a model server, set in a form: Settings → Agents → Profiles → Connect")
 }
 
 // Endpoint is the profile's server and model; zero when none is set.

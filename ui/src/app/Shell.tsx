@@ -146,7 +146,7 @@ function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-2.5 pb-3">
         <nav className="flex flex-col gap-0.5">
           <Link to="/" className={navItem} activeProps={navActive} activeOptions={{ exact: true }}>
-            Home <CountBadge count={model.openRequests} />
+            Dashboard <CountBadge count={model.openRequests} />
           </Link>
           <Link to="/sessions" className={navItem} activeProps={navActive}>
             Sessions
@@ -229,7 +229,7 @@ function LiveEvents() {
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
     if (!n) return;
-    // No instance (Foreman itself): the request waits on Home.
+    // No instance (Foreman itself): the request waits on the Dashboard.
     const open = () =>
       n.instance
         ? navigate({ to: "/sessions", search: { deployment: n.deployment, agent: n.instance } })

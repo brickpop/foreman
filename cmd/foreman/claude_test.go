@@ -42,7 +42,7 @@ func TestClaudeCode(t *testing.T) {
 	}
 	login := profiles.In(dir).Dir(profile)
 	if _, err := os.Stat(filepath.Join(login, ".credentials.json")); err != nil {
-		t.Fatalf("no login in %s: connect the profile under Settings → Global → Profiles first", login)
+		t.Fatalf("no login in %s: connect the profile under Settings → Agents → Profiles first", login)
 	}
 	if agentbin.Binary(runtime.GOARCH) == nil {
 		t.Fatal("foreman-agent isn't built: run just agent")

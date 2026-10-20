@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: in-progress
 order: 3
 ---
 
@@ -44,15 +44,15 @@ order: 3
 - **Repo folders are picked with a folder browser served by Foreman** (listing git repos) **or a pasted path.** A browser can't tell where a dropped folder is on disk, by design. The browser is behind the access token like every request ([Security](../../product/architecture/security.md)).
 - **Repos must be inside `$HOME`** (their real path, symlinks resolved), on every OS: anything else is refused when added, with the reason. On macOS that is also what the Podman machine shares by default; one rule everywhere keeps it predictable. Adding one is narrower still: only from inside the folder Foreman was started in ([Add a project, anywhere](../archive/add-project-anywhere.md)); repos already added stay usable.
 - **A fresh start:** the current workspaces aren't imported. Their deployments, messages and requests stay behind.
-- **Removing a project:** refused while a team is deployed; after a confirmation naming what goes, its record and its sandboxes go; **deleting its project repo folder is an option** of that confirmation, off by default (a project repo never pushed has no other copy). Code repos keep their branches. Its history (deployments, messages, requests, merge requests, session logs) is deleted with it, so re-adding the name starts clean (the CEO, 2026-10-20: ids are built from the name, so keeping the history would revive it).
+- **Removing a project:** refused while a team is deployed; after a confirmation naming what goes, its record and its sandboxes go; **deleting its project repo folder is an option** of that confirmation, off by default (a project repo never pushed has no other copy). A kept one is taken over by a new project of the same name (the CEO, 2026-10-20). Code repos keep their branches. Its history (deployments, messages, requests, merge requests, session logs) is deleted with it, so re-adding the name starts clean (the CEO, 2026-10-20: ids are built from the name, so keeping the history would revive it).
 
 ## Cards
 
 - [The home and the lock](../home-and-lock.md): `~/.foreman`, the lock, the CLI, per-machine data in it, the global repo and its `.gitignore`.
 - [Projects as records, sandboxes under the home](../archive/projects-as-records.md): projects and repos in the database, project repos under `~/.foreman/projects/`, missing repos, the API, worktrees and mounts under the home, the prompt's paths.
 - [Add a project, anywhere](../archive/add-project-anywhere.md): the dialog (New or Clone, then pick repos), Project settings' repos (add, rename, locate, remove), removing a project.
-- [Settings by topic](../settings-by-topic.md): the Settings tabs split by topic, now that both of today's are machine-wide.
-- [Home becomes Dashboard](../dashboard-rename.md): the Home screen renamed, so "home" means only `~/.foreman`.
+- [Settings by topic](../archive/settings-by-topic.md): the Settings tabs split by topic, now that both of today's are machine-wide.
+- [Dashboard becomes Dashboard](../archive/dashboard-rename.md): the Home screen renamed Dashboard, so "home" means only `~/.foreman`.
 
 **Specs it changes:** Workspace (rewritten as the home), Project config, Workspace settings, Persistence, Sandboxes and git policy (mounts), Session runner (mounts, credentials' folder), Session prompt (`{path}`), Add a project, Project settings, Settings, First run, App shell, API, Glossary, Security, Chief of Staff (its mounts).
 

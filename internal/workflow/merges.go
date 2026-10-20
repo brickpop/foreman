@@ -268,7 +268,7 @@ func (w *Workflow) announce(mr store.MergeRequest) {
 }
 
 // review makes sure an open merge request has its open review request: the
-// CEO's "Needs you" on Home and in Changes (wiki/product/models/request.md).
+// CEO's "Needs you" on the Dashboard and in Changes (wiki/product/models/request.md).
 func (w *Workflow) review(ctx context.Context, mr store.MergeRequest) {
 	if _, err := w.Requests.ForMergeRequest(ctx, mr.ID); err == nil || !errors.Is(err, store.ErrNotFound) {
 		return

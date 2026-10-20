@@ -73,7 +73,7 @@ One meaning per mark: the **dot is the instance status**, everywhere a status is
 | 24 | Agent tab (Sessions), request panel on the project's Overview (Needs you) | dot on tabs (`dotBorder --side`) |
 | 26 | Pane header, In-flight row | dot on pane header (`dotBorder --term`) |
 | 28 | Team rosters in lists | none, tooltip `<Name> · <Role>` |
-| 32 | Home request panel; project settings member rows | amber ring on Home; dot on settings rows (`dotBorder --panel`) |
+| 32 | Dashboard request panel; project settings member rows | amber ring on the Dashboard; dot on settings rows (`dotBorder --panel`) |
 | 38 | Team Members tab | none |
 | 72 | Agent page header | none |
 

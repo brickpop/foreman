@@ -8,7 +8,7 @@ import (
 	"github.com/brickpop/foreman/internal/setup"
 )
 
-// Setup is the setup checklist on Home (wiki/product/features/first-run.md).
+// Setup is the setup checklist on the Dashboard (wiki/product/features/first-run.md).
 type Setup interface {
 	Steps(ctx context.Context) []setup.Step
 	// StartPodman starts the stopped Podman machine, in the background.

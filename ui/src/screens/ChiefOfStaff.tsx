@@ -123,8 +123,8 @@ function StartError({ error }: { error: Error }) {
     <div className="flex flex-col gap-2 p-6 text-[13.5px]">
       <p className="m-0 text-err">{error.message}</p>
       {code === "NOT_CONNECTED" && (
-        <Link to="/settings" search={{ tab: "global" }} className="text-accTx">
-          Open Settings → Global → Profiles
+        <Link to="/settings" className="text-accTx">
+          Open Settings → Agents → Profiles
         </Link>
       )}
     </div>

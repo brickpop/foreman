@@ -16,7 +16,7 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 
 ```
 ┌──────────────────────────────── Browser ──────────────────────────────────┐
-│ Screens: Home · Sessions · Project · Team · Agent · Settings · Chief of Staff│
+│ Screens: Dashboard · Sessions · Project · Team · Agent · Settings · Chief of Staff│
 │                 │ never talk to the network themselves                       │
 │ ForemanClient ──── real client: HTTP + event stream + terminal WebSockets    │
 │ (main.tsx)          (an area not built yet refuses: "Not built yet")        │
@@ -156,7 +156,7 @@ type Images interface {
     Ensure(ctx, project) (ref string, err error) // builds or tags the chain as needed: base → harness → global → project
     Refresh(ctx, layer) error                    // rebuild without cache (new harness versions), then everything below
     Prune(ctx) (reclaimed int64, err error)      // Foreman's outdated images only
-    Status(ctx) []ImageStatus                    // Settings → Maintenance
+    Status(ctx) []ImageStatus                    // Settings → System → Maintenance
 }
 ```
 
@@ -261,7 +261,7 @@ Details: [Team tools](./team-tools.md), [Team message](../models/team-message.md
 
 ### 7. Workflow (`workflow`)
 
-Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on Home (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's Merge to main, Create PR or Reject → Git and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
+Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on the Dashboard (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's Merge to main, Create PR or Reject → Git and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
 
 ```go
 type Workflow interface {
@@ -305,7 +305,7 @@ No open risk here: standard techniques. Each is still behind its own interface.
 The [home](../models/home.md) and what the CEO owns in it: the [global repo](../models/home.md#the-global-repo) (team files, settings), the projects' [records](../models/project-config.md#the-project-record) (kept in the State store) and each project's [project repo](../models/project-config.md#the-project-repo) (`project.toml`); the checks of the code repos (on load, on every reload and before each start); and the file watcher that notices changes. All TOML.
 
 ```go
-type Home interface {
+type Dashboard interface {
     Projects() []Project;  Project(id) (Project, error)
     Checked(id) (Project, error)                     // the project with its code repos checked now (before a start)
     NewProject(name) (Project, error)                // the record and its project repo: project.toml and a starter wiki
@@ -442,7 +442,7 @@ Mara's harness   foreman-agent   Agent link   Messaging                       In
 **4. An agent needs the CEO** (approval; epic 4)
 
 ```
-Agent ── escalate(approval, …) ──▶ Agent link ──▶ Workflow: create request ──▶ Event bus ──▶ Home + notification
+Agent ── escalate(approval, …) ──▶ Agent link ──▶ Workflow: create request ──▶ Event bus ──▶ Dashboard + notification
       (the tool call stays open: the agent is paused)
 CEO answers in the UI ──▶ Workflow.Resolve ──▶ the open tool call returns the answer ──▶ the agent resumes
 ```
@@ -454,7 +454,7 @@ Member ── switch(branch), then commit(commits) ──▶ Workflow: Git.Switc
 Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pending work), policy check, work item (one repo: nothing to fetch)
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
 Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
-Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Home
+Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Dashboard
 CEO: Merge to main ──▶ Workflow ──▶ Git.MergeToMain  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Reject ──▶ reason delivered to the lead
 (after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
 ```
@@ -484,7 +484,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 - `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
-- `internal/home`: Home & config (`home.Home`): the home's layout (its lock is `internal/userdata`'s), the projects' records (with `store.Projects`) and their code repos' checks, `project.toml`, team files and settings (TOML, validated), the global repo, version-guarded saves (one commit each), the file watcher, New project, and adding, creating, locating and removing code repos.
+- `internal/home`: Home & config (`home.Dashboard`): the home's layout (its lock is `internal/userdata`'s), the projects' records (with `store.Projects`) and their code repos' checks, `project.toml`, team files and settings (TOML, validated), the global repo, version-guarded saves (one commit each), the file watcher, New project, and adding, creating, locating and removing code repos.
 - `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager; it repairs a worktree whose repo was located elsewhere), `RootCommit`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
 - `internal/instances`: the Instance manager.
 - `internal/setup`: the setup checklist and the engine's watcher: reaches Podman whenever it is there, restores the instances the first time, builds the agent image in the background, and holds deploying and waking until then ([First run](../features/first-run.md)).

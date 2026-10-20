@@ -7,7 +7,7 @@ import (
 	"github.com/brickpop/foreman/internal/runner"
 )
 
-// Maintenance is Settings → Maintenance: the engine and its images.
+// Maintenance is Settings → System → Maintenance: the engine and its images.
 type Maintenance interface {
 	Status(ctx context.Context) runner.Maintenance
 	// Rebuild rebuilds the images without cache (new harness versions).

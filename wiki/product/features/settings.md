@@ -1,25 +1,54 @@
 ---
 type: spec
-status: planned
+status: partial
 tags: [feature, ui, home, config, security]
 ---
 
 # Settings screen
 
-The **Settings** screen (sidebar footer), in two tabs (the CEO, 2026-10-18), `Workspace | Global` (`/settings?tab=global`; the same tab bar as a project's). **Workspace** (the label stays until the tabs are rethought): the global repo's `~/.foreman/config/settings.toml` ([Global settings](../models/global-settings.md)), and tokens stored as [secrets](../models/secrets.md): [General](#general), [Forge accounts](#forge-accounts) and [Notifications](#notifications). **Global**: the CEO's, on this machine, outside the global repo: [Profiles](#profiles), [Maintenance](#maintenance) (one Podman and one agent image for every project; the CEO, 2026-10-18) and [Appearance](#appearance). Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`).
+The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: with no workspace any more, the old `Workspace | Global` split said nothing, both being machine-wide). The tab is in the URL, `/settings?tab=git|look|system`; **Agents**, the first, has none, and any other value, the old `workspace` and `global` included, opens Agents. The same tab bar as a project's.
 
-## General
+| Tab | Sections |
+|---|---|
+| **Agents** | [Profiles](#profiles), [Running agents](#running-agents) |
+| **Git & forges** | [Forge accounts](#forge-accounts), [Global repo](#global-repo) |
+| **Notifications & look** | [Notifications](#notifications), [Appearance](#appearance) |
+| **System** | [Home](#home), [Network](#network), [Maintenance](#maintenance) |
+
+**Each section says where it is kept**, after its label (` · kept in the global repo`, `--tx4`, not bold): **in the global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **on this machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **hosts in the global repo, tokens on this machine** ([secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
+
+Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`).
+
+**Not shown yet:** `stuck_after_minutes` and `log_cap_mb` are in `settings.toml` but nothing uses them: stuck detection and log rotation aren't built, so a row would change nothing. They join **Running agents** when their features land.
+
+## Running agents
+
+On **Agents**, kept in the global repo.
+
+| Row | Explanation | Control |
+|---|---|---|
+| Running sessions at once | Extra sessions wait in a queue until a slot frees up. | Stepper, 1–64, default 12 ([Agent runtime](../architecture/agent-runtime.md#concurrency)) |
+| Run agents in | Containers isolate each agent from your machine. Without them, agents run as plain processes with full access to it. | Segmented `Containers (Podman)` / `Directly (no isolation)`. Choosing Directly asks for confirmation; while agents run directly, a warning stays visible here. **Takes effect when Foreman restarts** (decided 2026-10-15): until then the row says `Restart Foreman to switch` and Maintenance shows the engine still running. `Containers` can't be chosen while Podman isn't installed (on macOS: no machine), and the row says why: Foreman wouldn't start with it ([Global settings](../models/global-settings.md)) |
+
+## Home
+
+On **System**. A fact, not a setting.
 
 | Row | Explanation | Control |
 |---|---|---|
 | Home | Foreman’s folder on this machine: the global repo (teams, settings), each project’s repo, the agents’ sandboxes and its state. | The path (`GET /api/home`, [Home](../models/home.md)), read-only (Mono 13px `--tx2`) |
+
+## Network
+
+On **System**, kept in the global repo.
+
+| Row | Explanation | Control |
+|---|---|---|
 | Listen on | Anyone with the URL Foreman printed at start has full control. Keep this on your own machine unless you trust the network. | Segmented `This machine` / `Local network`. Choosing Local network asks for confirmation with a warning that anyone on the network can drive the agents ([Security](../architecture/security.md)). Takes effect on restart |
-| Running sessions at once | Extra sessions wait in a queue until a slot frees up. | Stepper, 1–64, default 12 ([Agent runtime](../architecture/agent-runtime.md#concurrency)) |
-| Run agents in | Containers isolate each agent from your machine. Without them, agents run as plain processes with full access to it. | Segmented `Containers (Podman)` / `Directly (no isolation)`. Choosing Directly asks for confirmation; while agents run directly, a warning stays visible here. **Takes effect when Foreman restarts** (decided 2026-10-15): until then the row says `Restart Foreman to switch` and Maintenance shows the engine still running. `Containers` can't be chosen while Podman isn't installed (on macOS: no machine), and the row says why: Foreman wouldn't start with it ([Global settings](../models/global-settings.md)) |
 
 ## Profiles
 
-On the **Global** tab. "Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every project can use it; a project uses default unless its settings pick another." See [Session runner → Credentials](../architecture/session-runner.md#credentials).
+On **Agents**, kept on this machine. "Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every project can use it; a project uses default unless its settings pick another." See [Session runner → Credentials](../architecture/session-runner.md#credentials).
 
 Rows (grid `1fr auto auto`): the profile's name (Mono 600) and its harness label (13px `--tx4`); its state, `connected` (`--ok`) or `not connected` (`--tx4`); **`Connect`** / **`Reconnect`**, and **`Delete`** on every profile but `default`. Delete asks first: "Delete the <name> profile? Its credentials go with it. Projects that use it can't start agents until they pick another profile." No rename for now: projects' records name it.
 
@@ -31,20 +60,24 @@ Under the rows, **`New profile`** turns into a form: `Name` (Mono, placeholder `
 
 ## Forge accounts
 
-"Tokens Foreman uses when you ask it to create a PR or sync a repo, and to watch those PRs. They stay on this machine. Each project's config names its forge."
+On **Git & forges**, hosts in the global repo, tokens on this machine. "Tokens Foreman uses when you ask it to create a PR or sync a repo, and to watch those PRs. They stay on this machine. Each project's config names its forge."
 
 One row each for **GitHub**, **Forgejo** and **Gitea**: the host and owner (or `—`), the token status (`token set` `--ok`, or `not connected` `--tx4`), and **`Connect`** / **`Change`**. Connect or Change opens an inline form: host URL (prefilled `github.com` for GitHub) and a write-only token field; Save validates the token against the forge and stores it ([Forge adapters](../architecture/forge-adapters.md), `PUT /api/secrets/forge/:kind`). A stored token is never shown again.
 
-Below the rows, **Global repo**: "Where your team definitions and settings are hosted, so Sync can push them there. Without a forge they stay on this machine. Nothing is pushed automatically." Where the [global repo](../models/home.md#the-global-repo) is hosted, so its `main` can be pushed there: `No forge` (the default; it stays on this machine) or one of the connected forges, with the repo's URL (`global_forge` in [Global settings](../models/global-settings.md#schema)). With a forge set, a small outline **`Sync`** button fetches the forge's `main`, merges it in and pushes the global repo's `main` there, stopping with a message on a conflict; nothing is pushed automatically ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)). **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
+## Global repo
+
+On **Git & forges**, kept in the global repo. "Where your team definitions and settings are hosted, so Sync can push them there. Without a forge they stay on this machine. Nothing is pushed automatically." Where the [global repo](../models/home.md#the-global-repo) is hosted, so its `main` can be pushed there: `No forge` (the default; it stays on this machine) or one of the connected forges, with the repo's URL (`global_forge` in [Global settings](../models/global-settings.md#schema)). With a forge set, a small outline **`Sync`** button fetches the forge's `main`, merges it in and pushes the global repo's `main` there, stopping with a message on a conflict; nothing is pushed automatically ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)). **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
 
 ## Notifications
+
+On **Notifications & look**, kept in the global repo.
 
 - **Browser notifications**: the permission state (raised only while the tab is hidden: when the CEO is looking, the toast says it already), `on` (`--ok`), `blocked` (`--err`), `turn on` (`--accTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
 - Toggles (default on): `An agent needs me`, `An agent finishes`, `A merge is requested` ([Notifications](./notifications.md)).
 
 ## Maintenance
 
-On the **Global** tab: Podman and the shared images serve every project, so a rebuild reaches new agents of all of them. One build runs at a time (a lock in `~/.foreman/images/`; a second one waits for it, then finds the image built), and the build's state and log are kept there, so one whose Foreman stopped mid-way shows as `failed`, with its log (built 2026-10-18). When the image chain lands, the **global** layer (the CEO's own tools, on the Workspace tab) and each project's layer, each built from its own Containerfile, show there and with their project instead; Base and Harnesses stay here. **Phasing:** phase 1 has one image for every project ([Agent images](../architecture/tech-stack.md#agent-images)), so the section shows Podman's state and that one image: its state, its last build log, and **`Rebuild`** (without cache, picking up the latest Claude Code). Phase 1 shows the state without the build time, and no harness versions yet (neither here nor on the Harnesses rows). The chain rows, Refresh with prune, Customize hints and Prune below are the target, built with the [full image chain](../../backlog/image-chain.md).
+On **System**, kept on this machine: Podman and the shared images serve every project, so a rebuild reaches new agents of all of them. One build runs at a time (a lock in `~/.foreman/images/`; a second one waits for it, then finds the image built), and the build's state and log are kept there, so one whose Foreman stopped mid-way shows as `failed`, with its log (built 2026-10-18). When the image chain lands, the **global** layer (the CEO's own tools) and each project's layer, each built from its own Containerfile, show here too, and each project's also with its project. **Phasing:** phase 1 has one image for every project ([Agent images](../architecture/tech-stack.md#agent-images)), so the section shows Podman's state and that one image: its state, its last build log, and **`Rebuild`** (without cache, picking up the latest Claude Code). Phase 1 shows the state without the build time, and no harness versions yet (neither here nor on the Harnesses rows). The chain rows, Refresh with prune, Customize hints and Prune below are the target, built with the [full image chain](../../backlog/image-chain.md).
 
 "The images agent sessions run in. Foreman builds them as a chain: base, harnesses, your own tools, each project. A layer without its own Containerfile simply passes the one above through."
 
@@ -65,6 +98,6 @@ A failed build also raises a **blocked** [request](./requests.md), so it reaches
 
 ## Appearance
 
-On the **Global** tab. `Theme`: segmented `System` / `Dark` / `Light`, default `System` (follows the operating system's `prefers-color-scheme`, live). One of the CEO's preferences, in `~/.foreman/preferences.toml`, outside the global repo (`GET/PUT /api/preferences`). It shows at once, is put back if the save is refused, and another open tab picks it up when it comes back into focus. The browser keeps a copy only to paint the first frame ([UI state](../models/ui-state.md), [Design system](../design/design-system.md)).
+On **Notifications & look**, kept on this machine. `Theme`: segmented `System` / `Dark` / `Light`, default `System` (follows the operating system's `prefers-color-scheme`, live). One of the CEO's preferences, in `~/.foreman/preferences.toml`, outside the global repo (`GET/PUT /api/preferences`). It shows at once, is put back if the save is refused, and another open tab picks it up when it comes back into focus. The browser keeps a copy only to paint the first frame ([UI state](../models/ui-state.md), [Design system](../design/design-system.md)).
 
 `Terminal font`: a font and a size, for every agent terminal, also a preference (`terminal_font`, `terminal_font_size` in the same file; the CEO, 2026-10-19). Fonts: **Geist Mono** (the default, as in the rest of the UI), **JetBrains Mono**, **IBM Plex Mono**, **Fira Code**, **Source Code Pro**, all shipped with Foreman (it works offline), and **System monospace** (SF Mono or Menlo on the Mac, nothing to download). A shipped font is fetched only once picked. Sizes 10 to 24 px, default 13. Open terminals switch at once, once the font has loaded (the terminal measures its cells on the font it has). A value in the file that can't be kept (an unknown font, a size out of range) reads as its default; the other values stay.

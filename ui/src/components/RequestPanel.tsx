@@ -4,9 +4,9 @@ import type { Look } from "../api/types/home";
 import { Avatar } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
-// One request to the CEO. Home and a project's Overview (Needs you) use this same panel,
+// One request to the CEO. The Dashboard and a project's Overview (Needs you) use this same panel,
 // so they can't drift; the variant only changes what the specs say differs
-// (wiki/product/features/home.md#request-list, wiki/product/features/changes.md#1-needs-you).
+// (wiki/product/features/dashboard.md#request-list, wiki/product/features/changes.md#1-needs-you).
 
 type Props = {
   request: Request;
@@ -20,10 +20,10 @@ type Props = {
   /** An answer is on its way: the options wait. */
   answering?: boolean;
   onOpenSession: () => void;
-  /** Home: a review's Review button (opens the project's Overview). */
+  /** Dashboard: a review's Review button (opens the project's Overview). */
   onReview?: () => void;
-  /** Home: avatar 32 with the amber ring. A project: kind chip first, avatar 24, the source. */
-  variant?: "home" | "project";
+  /** Dashboard: avatar 32 with the amber ring. A project: kind chip first, avatar 24, the source. */
+  variant?: "dashboard" | "project";
   /** A project: where it came from (`escalate(approval)`, `request_merge()`…). */
   source?: string;
   /** Under the text: e.g. the link line. */
@@ -41,7 +41,7 @@ export function RequestPanel({
   answering = false,
   onOpenSession,
   onReview,
-  variant = "home",
+  variant = "dashboard",
   source,
   children,
   actions,
@@ -49,7 +49,7 @@ export function RequestPanel({
   const onProject = variant === "project";
   const [answer, setAnswer] = useState("");
   const freeText = r.kind === "approval" || r.kind === "question";
-  // On Home the whole card opens the session of who raised it; its controls keep
+  // On the Dashboard the whole card opens the session of who raised it; its controls keep
   // their own action, and selecting text opens nothing.
   const opens = !onProject && r.instanceId !== "";
   const openCard = (e: MouseEvent<HTMLElement>) => {
@@ -121,7 +121,7 @@ export function RequestPanel({
               </Button>
             ))
           ))}
-        {/* On Home the card itself opens it; on a project this button does. Nothing to
+        {/* On the Dashboard the card itself opens it; on a project this button does. Nothing to
             open for a Foreman-raised request. */}
         {onProject && r.instanceId !== "" && (
           <Button variant="ghost" onClick={onOpenSession}>

@@ -50,7 +50,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
       // The CEO can act on it (the limit is theirs), but it isn't worth a browser notification.
       return {
         title: `${name(id)} is waiting for a session slot`,
-        body: "Every slot is taken, idle agents included. They start when one frees; the limit is in Settings → Workspace.",
+        body: "Every slot is taken, idle agents included. They start when one frees; the limit is in Settings → Agents.",
         instance: id,
         deployment,
         color: "var(--tx4)",

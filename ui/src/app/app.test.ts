@@ -84,14 +84,14 @@ describe("staleKeys", () => {
   });
 });
 
-import { checksSentence, homeSubtitle, homeTitle, ordered, projectRows } from "./model";
+import { checksSentence, dashboardSubtitle, dashboardTitle, ordered, projectRows } from "./model";
 
 const req = (id: string, kind: string, createdAt: string, projectId = "ledger") =>
   ({ id, kind, createdAt, projectId, status: "open" }) as Request;
 const inst = (id: string, status: string, deploymentId: string) =>
   ({ id, status, deploymentId }) as Instance;
 
-describe("Home's model", () => {
+describe("the Dashboard's model", () => {
   it("orders requests by kind, oldest first within one", () => {
     const list = ordered([
       req("q", "question", "2026-10-14T09:00:00Z"),
@@ -105,19 +105,19 @@ describe("Home's model", () => {
   });
 
   it("titles and subtitles", () => {
-    expect([homeTitle(0), homeTitle(1), homeTitle(3)]).toEqual([
+    expect([dashboardTitle(0), dashboardTitle(1), dashboardTitle(3)]).toEqual([
       "All clear",
       "1 thing needs you",
       "3 things need you",
     ]);
     expect(
-      homeSubtitle([
+      dashboardSubtitle([
         inst("mara@ledger", "running", "atlas@ledger"),
         inst("tove@ledger", "idle", "atlas@ledger"),
         inst("lumen@relay", "running", "orion@relay"),
       ]),
     ).toBe("2 sessions working across 2 deployments.");
-    expect(homeSubtitle([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
+    expect(dashboardSubtitle([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
       "1 session working across 1 deployment.",
     );
   });

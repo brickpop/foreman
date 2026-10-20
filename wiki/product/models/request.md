@@ -6,7 +6,7 @@ tags: [model, requests, runtime]
 
 # Request
 
-Something that needs the CEO, stored in `state.db`. The kinds, who raises them, the CEO's actions and the resolution rules are in [Requests](../features/requests.md); this entry is the stored shape. Requests show on [Home](../features/home.md) and on the project's Overview, under [Needs you](../features/project-pipeline.md#1-needs-you), and trigger [notifications](../features/notifications.md).
+Something that needs the CEO, stored in `state.db`. The kinds, who raises them, the CEO's actions and the resolution rules are in [Requests](../features/requests.md); this entry is the stored shape. Requests show on [Dashboard](../features/dashboard.md) and on the project's Overview, under [Needs you](../features/project-pipeline.md#1-needs-you), and trigger [notifications](../features/notifications.md).
 
 ## Schema
 
@@ -35,9 +35,9 @@ Table `requests`.
 - Resolved requests stay in `state.db` as history.
 - Duplicates are merged: same instance, kind and summary within 10 minutes, comparing summaries normalized (case-folded, whitespace collapsed). Known limit: an agent rephrasing the same ask still creates a second request, and two different asks worded identically merge.
 - Only `open` requests count toward "needs you".
-- An instance can have **many open requests**, each its own request panel on Home and on the project's Overview. Because `escalate(approval)` blocks the caller, one agent naturally waits on one approval at a time (a harness issuing parallel tool calls can still open several, which is allowed); questions and findings don't block and can pile up. The [instance](./instance.md) is `awaiting` while any blocking approval of it is open.
+- An instance can have **many open requests**, each its own request panel on the Dashboard and on the project's Overview. Because `escalate(approval)` blocks the caller, one agent naturally waits on one approval at a time (a harness issuing parallel tool calls can still open several, which is allowed); questions and findings don't block and can pile up. The [instance](./instance.md) is `awaiting` while any blocking approval of it is open.
 - The panel's **source label** is derived, not stored: `escalate(<kind>)` for `source: agent` on approval, question and finding; `request_merge()` for review; `waiting in its session` for `source: harness`; `raised by Foreman` for `source: foreman`.
 
 ## Phasing
 
-Built (2026-10-17, ahead of the Workflow epic, at the CEO's request: a merge request waiting for the CEO must show on Home): the table and `GET /api/requests` (the open ones), with `request.created` and `request.resolved`; **review** requests only. `request_merge` raises one per merge request (a refresh raises no second), and the merge request leaving `open` resolves it (`answer`: `merged` or `rejected`); one whose review couldn't be saved (a database error) gets it at the next reconcile. Home and the project's Overview (Needs you) decide it with the review panel. Not yet: `escalate` and the other kinds, answering (`POST /api/requests/:id/resolve`), `harness` and `foreman` sources, duplicate merging.
+Built (2026-10-17, ahead of the Workflow epic, at the CEO's request: a merge request waiting for the CEO must show on the Dashboard): the table and `GET /api/requests` (the open ones), with `request.created` and `request.resolved`; **review** requests only. `request_merge` raises one per merge request (a refresh raises no second), and the merge request leaving `open` resolves it (`answer`: `merged` or `rejected`); one whose review couldn't be saved (a database error) gets it at the next reconcile. Dashboard and the project's Overview (Needs you) decide it with the review panel. Not yet: `escalate` and the other kinds, answering (`POST /api/requests/:id/resolve`), `harness` and `foreman` sources, duplicate merging.

@@ -3,9 +3,9 @@ import { isNotBuilt, type Request, type Team } from "../api/client";
 import {
   agentOf,
   checksSentence,
+  dashboardSubtitle,
+  dashboardTitle,
   forgeOf,
-  homeSubtitle,
-  homeTitle,
   ordered,
   projectRows,
 } from "../app/model";
@@ -26,9 +26,9 @@ import { ReviewPanel } from "../components/ReviewPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
 import { Empty, NotBuilt, PageTitle, SectionLabel } from "../components/ui";
 
-// The CEO's inbox (wiki/product/features/home.md): every open request across
+// The CEO's inbox (wiki/product/features/dashboard.md): every open request across
 // projects, then one line per project.
-export function Home() {
+export function Dashboard() {
   const requests = useRequests();
   const instances = useInstances();
   const projects = useProjects();
@@ -44,8 +44,8 @@ export function Home() {
   return (
     <div className="mx-auto flex w-full max-w-[920px] flex-col gap-10 px-12 pt-12 pb-16">
       <PageTitle
-        title={isNotBuilt(requests.error) ? "Home" : homeTitle(open.length)}
-        subtitle={homeSubtitle(instances.data ?? [])}
+        title={isNotBuilt(requests.error) ? "Dashboard" : dashboardTitle(open.length)}
+        subtitle={dashboardSubtitle(instances.data ?? [])}
       />
       {setup.data && setupPending(setup.data) && <SetupChecklist steps={setup.data} />}
       <section className="flex flex-col gap-2.5">
@@ -54,7 +54,7 @@ export function Home() {
         ) : open.length === 0 ? (
           <Empty>Nothing needs you. You'll get a browser notification when something does.</Empty>
         ) : (
-          open.map((r) => <HomeRequest key={r.id} request={r} teams={teams.data ?? []} />)
+          open.map((r) => <DashboardRequest key={r.id} request={r} teams={teams.data ?? []} />)
         )}
       </section>
       <section className="flex flex-col">
@@ -91,14 +91,14 @@ export function Home() {
   );
 }
 
-function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] }) {
+function DashboardRequest({ request: r, teams }: { request: Request; teams: Team[] }) {
   const navigate = useNavigate();
   const answer = useAnswer();
   const projects = useProjects();
   const agent = agentOf(teams, r.instanceId);
   const main = projects.data?.find((p) => p.id === r.projectId)?.config.main ?? "main";
   const reviewText = useReviewText(r, main, agent?.soul.name);
-  // A review is decided right here (home.md#request-list): its merge request
+  // A review is decided right here (dashboard.md#request-list): its merge request
   // carries the change to look at.
   const mr = useMergeRequest(r.kind === "review" ? r.mergeRequestId : "");
   const where = `on ${r.projectId}`;
@@ -117,7 +117,7 @@ function HomeRequest({ request: r, teams }: { request: Request; teams: Team[] })
         context={context}
         reviewText={reviewText}
         author={agent?.soul.name ?? "the lead"}
-        variant="home"
+        variant="dashboard"
         onOpenSession={openSession}
       />
     );

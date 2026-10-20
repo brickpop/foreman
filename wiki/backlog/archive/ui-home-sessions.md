@@ -8,7 +8,7 @@ epic: full-ui-demo
 
 # Home and Sessions screens
 
-**Why:** the CEO's daily view: what needs them, and the agents' terminals ([Home](../../product/features/home.md), [Sessions](../../product/features/sessions.md), [Requests](../../product/features/requests.md)).
+**Why:** the CEO's daily view: what needs them, and the agents' terminals ([Home](../../product/features/dashboard.md), [Sessions](../../product/features/sessions.md), [Requests](../../product/features/requests.md)).
 
 Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.md) are in place.
 

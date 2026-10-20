@@ -10,7 +10,7 @@ import (
 	"github.com/brickpop/foreman/internal/profiles"
 )
 
-// Profiles is Settings → Global → Profiles: each a harness and its
+// Profiles is Settings → Agents → Profiles: each a harness and its
 // credentials, shared by every project (wiki/product/architecture/session-runner.md#credentials).
 type Profiles interface {
 	// List returns the profiles with their state, the default first.

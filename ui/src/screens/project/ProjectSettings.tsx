@@ -165,7 +165,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Enforced by Foreman",
-              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Repositories → In flight), wakes requesters when replies land, sends escalations to Home, and only lets the lead request merges to main.",
+              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Repositories → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main.",
             ],
           ].map(([title, body]) => (
             <div key={title} className="flex flex-col gap-0.5">
@@ -300,8 +300,8 @@ function ProfileChoice({ project }: { project: Project }) {
       <span className="text-[13.5px] text-tx2">
         Its agents run on this harness and login, from their next start. Profiles are yours on this
         machine, in{" "}
-        <Link to="/settings" search={{ tab: "global" }} className="text-accTx hover:underline">
-          Settings → Global
+        <Link to="/settings" className="text-accTx hover:underline">
+          Settings → Agents
         </Link>
         .
       </span>
@@ -498,7 +498,8 @@ function RemoveProject({ project }: { project: Project }) {
           />
           <span>
             Also delete its project repo folder, <span className="font-mono">{project.path}</span>:
-            its wiki and project.toml. Unless you pushed it, it has no other copy.
+            its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, it's taken
+            over by a new project of the same name.
           </span>
         </label>
       </Confirm>

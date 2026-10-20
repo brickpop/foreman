@@ -34,8 +34,9 @@ var (
 // NewProject creates a project with no repos yet: its record, and its project
 // repo, new (project.toml and a starter wiki, in one first commit) or cloned
 // from clone (a URL or a local path, as the CEO's git can reach it). The
-// name follows a repo's rules and must be new, in any case. Nothing is left
-// behind if a step fails.
+// name follows a repo's rules and must be new, in any case, unless a
+// removed project left its project repo there: that is taken over. Nothing
+// is left behind if a step fails.
 func (h *Home) NewProject(ctx context.Context, name, clone string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -45,14 +46,7 @@ func (h *Home) NewProject(ctx context.Context, name, clone string) (Project, err
 	if existing, ok := h.projectNamed(name); ok {
 		return Project{}, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
 	}
-	// Left by a project removed with its project repo kept.
-	if existing, ok := taken(h.Path(projectsDir), name); ok {
-		return Project{}, fmt.Errorf("%w: %s already exists (move it away, or pick another name)", ErrExists, h.Path(projectsDir, existing))
-	}
 	dir := h.Path(projectsDir, name)
-	if err := os.MkdirAll(h.Path(projectsDir), 0o755); err != nil {
-		return Project{}, err
-	}
 	create := h.createProjectRepo
 	if clone != "" {
 		create = func(ctx context.Context, _, dir string) error {
@@ -62,18 +56,55 @@ func (h *Home) NewProject(ctx context.Context, name, clone string) (Project, err
 			return nil
 		}
 	}
+	// A project removed with its project repo kept left its folder: a project
+	// of that name takes it over, as it is (the CEO, 2026-10-20).
+	existing, takeOver := taken(h.Path(projectsDir), name)
+	if takeOver {
+		if err := canTakeOver(h.Path(projectsDir, existing), name, existing, clone); err != nil {
+			return Project{}, err
+		}
+		create = func(context.Context, string, string) error { return nil }
+	}
+	// Only a folder this call made goes when a step fails.
+	drop := func() {
+		if !takeOver {
+			_ = os.RemoveAll(dir)
+		}
+	}
+	if err := os.MkdirAll(h.Path(projectsDir), 0o755); err != nil {
+		return Project{}, err
+	}
 	if err := create(ctx, name, dir); err != nil {
-		_ = os.RemoveAll(dir)
+		drop()
 		return Project{}, err
 	}
 	if err := h.records.Create(ctx, name); err != nil {
-		_ = os.RemoveAll(dir)
+		drop()
 		if errors.Is(err, store.ErrExists) {
 			return Project{}, fmt.Errorf("%w: project %s already exists", ErrExists, name)
 		}
 		return Project{}, err
 	}
 	return h.rescan(name)
+}
+
+// canTakeOver says why the folder left at dir (named existing) can't become
+// project name's repo: another case of the name, a clone asked for, or not a
+// git repo's top folder of its own (a symlink would put the project repo
+// outside the home).
+func canTakeOver(dir, name, existing, clone string) error {
+	info, err := os.Lstat(dir)
+	switch {
+	case err != nil:
+		return err
+	case existing != name:
+		return fmt.Errorf("%w: %s is there already: name the project %s to take it over, or move it away", ErrExists, dir, existing)
+	case clone != "":
+		return fmt.Errorf("%w: %s is there already: create the project without Clone to take it over, or move it away", ErrExists, dir)
+	case !info.IsDir() || !topOfRepo(dir):
+		return fmt.Errorf("%w: %s is there already and isn't a git repo: move it away, or pick another name", ErrExists, dir)
+	}
+	return nil
 }
 
 // projectNamed finds a project named name in any case. Called with h.mu held.

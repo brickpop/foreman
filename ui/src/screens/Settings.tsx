@@ -23,6 +23,7 @@ import {
   useSaveTheme,
   useSettings,
 } from "../app/queries";
+import { settingsSearch, settingsTabs } from "../app/settings";
 import { asTheme, savedTheme } from "../app/theme";
 import { ConnectDialog } from "../components/ConnectDialog";
 import { Confirm } from "../components/Overlays";
@@ -31,31 +32,27 @@ import { useToast } from "../components/Toasts";
 import { terminalFont, terminalFontSizes, terminalFonts } from "../components/terminalFonts";
 import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui";
 
-// Settings (wiki/product/features/settings.md), in two tabs: the global
-// repo's settings.toml, and Global, the CEO's on this machine outside any
-// repo (profiles, maintenance, appearance). Every change saves at once.
+// Settings (wiki/product/features/settings.md), in tabs by topic. Each
+// section says where it is kept: the global repo's settings.toml, the same on
+// every machine you clone it to, or this machine only. Every change saves at once.
 
-export type SettingsTab = "workspace" | "global";
-
-const tabs: { tab: SettingsTab; label: string }[] = [
-  { tab: "workspace", label: "Workspace" },
-  { tab: "global", label: "Global" },
-];
+const inGlobalRepo = "in the global repo";
+const onThisMachine = "on this machine";
 
 export function Settings() {
-  const tab = useSearch({ from: "/settings" }).tab ?? "workspace";
+  const tab = useSearch({ from: "/settings" }).tab ?? "agents";
   const file = useSettings();
   const s = file.data?.settings;
   return (
     <div className="mx-auto flex w-full max-w-[760px] flex-col gap-9 px-12 pt-12 pb-16">
       <div className="flex flex-col gap-4">
         <PageTitle title="Settings" />
-        <nav className="flex border-b border-line">
-          {tabs.map((t) => (
+        <nav className="flex flex-wrap border-b border-line">
+          {settingsTabs.map((t) => (
             <Link
               key={t.tab}
               to="/settings"
-              search={{ tab: t.tab === "workspace" ? undefined : t.tab }}
+              search={settingsSearch({ tab: t.tab })}
               className={`-mb-px border-b-2 px-3.5 py-[9px] font-medium ${
                 t.tab === tab ? "border-acc text-tx" : "border-transparent text-tx3 hover:text-tx2"
               }`}
@@ -65,26 +62,34 @@ export function Settings() {
           ))}
         </nav>
       </div>
-      {tab === "global" ? (
+      {file.data && file.data.problems.length > 0 && (
+        <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
+          settings.toml: {file.data.problems.join(" · ")}
+        </p>
+      )}
+      {tab === "agents" && (
         <>
           <ProfilesSection />
-          <MaintenanceSection />
+          {s && <RunningSection settings={s} />}
+        </>
+      )}
+      {tab === "git" && s && (
+        <>
+          <ForgeSection settings={s} />
+          <GlobalRepoSection settings={s} />
+        </>
+      )}
+      {tab === "look" && (
+        <>
+          {s && <NotificationsSection settings={s} />}
           <AppearanceSection />
         </>
-      ) : (
+      )}
+      {tab === "system" && (
         <>
-          {file.data && file.data.problems.length > 0 && (
-            <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
-              settings.toml: {file.data.problems.join(" · ")}
-            </p>
-          )}
-          {s && (
-            <>
-              <GeneralSection settings={s} />
-              <ForgeSection settings={s} />
-              <NotificationsSection settings={s} />
-            </>
-          )}
+          <HomeSection />
+          {s && <NetworkSection settings={s} />}
+          <MaintenanceSection />
         </>
       )}
     </div>
@@ -103,16 +108,22 @@ function useSave() {
 
 function Section({
   label,
+  kept,
   intro,
   children,
 }: {
   label: string;
+  /** Where what it sets is kept; none for what isn't a setting. */
+  kept?: string;
   intro?: string;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col">
-      <h2 className="m-0 mb-1 text-[13px] font-medium text-tx4">{label}</h2>
+      <h2 className="m-0 mb-1 text-[13px] font-medium text-tx4">
+        {label}
+        {kept && <span className="font-normal"> · kept {kept}</span>}
+      </h2>
       {intro && <p className="m-0 mb-2 text-[13.5px] text-tx3">{intro}</p>}
       {children}
     </section>
@@ -139,19 +150,25 @@ function Row({
   );
 }
 
-function GeneralSection({ settings }: { settings: SettingsData }) {
-  const save = useSave();
+function HomeSection() {
   const home = useHomeFolder();
-  const engine = useMaintenance();
-  const [confirm, setConfirm] = useState<"lan" | "direct">();
   return (
-    <Section label="General">
+    <Section label="Home">
       <Row
         title="Home"
         explanation="Foreman’s folder on this machine: the global repo (teams, settings), each project’s repo, the agents’ sandboxes and its state."
       >
         <span className="font-mono text-[13px] text-tx2">{home.data?.path}</span>
       </Row>
+    </Section>
+  );
+}
+
+function NetworkSection({ settings }: { settings: SettingsData }) {
+  const save = useSave();
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <Section label="Network" kept={inGlobalRepo}>
       <Row
         title="Listen on"
         explanation="Anyone with the URL Foreman printed at start has full control. Keep this on your own machine unless you trust the network. Takes effect on restart."
@@ -159,13 +176,31 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
         <Segmented
           label="Listen on"
           value={settings.listen}
-          onChange={(v) => (v === "lan" ? setConfirm("lan") : save((s) => ({ ...s, listen: v })))}
+          onChange={(v) => (v === "lan" ? setConfirm(true) : save((s) => ({ ...s, listen: v })))}
           options={[
             { value: "local", label: "This machine" },
             { value: "lan", label: "Local network" },
           ]}
         />
       </Row>
+      <Confirm
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        title="Listen on the local network?"
+        body="Anyone on your network who gets the URL can drive your agents, and through them your code and your machine. Only do this on a network you trust. Takes effect when Foreman restarts."
+        action="Listen on the network"
+        onConfirm={() => save((s) => ({ ...s, listen: "lan" }))}
+      />
+    </Section>
+  );
+}
+
+function RunningSection({ settings }: { settings: SettingsData }) {
+  const save = useSave();
+  const engine = useMaintenance();
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <Section label="Running agents" kept={inGlobalRepo}>
       <Row
         title="Running sessions at once"
         explanation="Extra sessions wait in a queue until a slot frees up."
@@ -206,9 +241,7 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
         <Segmented
           label="Run agents in"
           value={settings.engine}
-          onChange={(v) =>
-            v === "direct" ? setConfirm("direct") : save((s) => ({ ...s, engine: v }))
-          }
+          onChange={(v) => (v === "direct" ? setConfirm(true) : save((s) => ({ ...s, engine: v })))}
           options={[
             // Containers can't be chosen without Podman: Foreman wouldn't start.
             {
@@ -221,16 +254,8 @@ function GeneralSection({ settings }: { settings: SettingsData }) {
         />
       </Row>
       <Confirm
-        open={confirm === "lan"}
-        onClose={() => setConfirm(undefined)}
-        title="Listen on the local network?"
-        body="Anyone on your network who gets the URL can drive your agents, and through them your code and your machine. Only do this on a network you trust. Takes effect when Foreman restarts."
-        action="Listen on the network"
-        onConfirm={() => save((s) => ({ ...s, listen: "lan" }))}
-      />
-      <Confirm
-        open={confirm === "direct"}
-        onClose={() => setConfirm(undefined)}
+        open={confirm}
+        onClose={() => setConfirm(false)}
         title="Run agents with no isolation?"
         body="Agents run as plain processes on this machine, with permission checks off: they can read and change anything your user can. Use this for development only."
         action="Run directly"
@@ -303,6 +328,7 @@ function ProfilesSection() {
   return (
     <Section
       label="Profiles"
+      kept={onThisMachine}
       intro="Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every project can use it; a project uses default unless its settings pick another."
     >
       {profiles.isError && <p className="m-0 text-[13px] text-err">{profiles.error.message}</p>}
@@ -432,10 +458,10 @@ function ForgeSection({ settings }: { settings: SettingsData }) {
   const client = useClient();
   const accounts = useQuery({ queryKey: keys.forge, queryFn: () => client.forge.accounts() });
   const [editing, setEditing] = useState<string>();
-  const connected = (accounts.data ?? []).filter((a) => a.tokenSet).map((a) => a.kind);
   return (
     <Section
       label="Forge accounts"
+      kept="hosts in the global repo, tokens on this machine"
       intro="Tokens Foreman uses when you ask it to create a PR or sync a repo, and to watch those PRs. They stay on this machine. Each project’s config names its forge."
     >
       {isNotBuilt(accounts.error) ? (
@@ -452,7 +478,6 @@ function ForgeSection({ settings }: { settings: SettingsData }) {
           />
         ))
       )}
-      <GlobalRepo settings={settings} connected={connected} />
     </Section>
   );
 }
@@ -542,8 +567,11 @@ function ForgeRow({
 }
 
 /** Where the global repo is hosted, so Sync can push its main there. */
-function GlobalRepo({ settings, connected }: { settings: SettingsData; connected: string[] }) {
+function GlobalRepoSection({ settings }: { settings: SettingsData }) {
+  const client = useClient();
   const save = useSave();
+  const accounts = useQuery({ queryKey: keys.forge, queryFn: () => client.forge.accounts() });
+  const connected = (accounts.data ?? []).filter((a) => a.tokenSet).map((a) => a.kind);
   const current = settings.globalForge;
   // A forge needs its repo URL before it can be saved (settings validation).
   const [kind, setKind] = useState(current.kind);
@@ -560,37 +588,40 @@ function GlobalRepo({ settings, connected }: { settings: SettingsData; connected
     save((s) => ({ ...s, globalForge: { kind, url: next } }));
   };
   return (
-    <div className="flex flex-col gap-2.5 py-3.5">
-      <div className="flex flex-col gap-0.5">
-        <span className="font-medium">Global repo</span>
-        <span className="text-[13.5px] leading-[1.5] text-tx3">
-          Where your team definitions and settings are hosted, so Sync can push them there. Without
-          a forge they stay on this machine. Nothing is pushed automatically.
-        </span>
+    <Section
+      label="Global repo"
+      kept={inGlobalRepo}
+      intro="Where your team definitions and settings are hosted, so Sync can push them there. Without
+          a forge they stay on this machine. Nothing is pushed automatically."
+    >
+      <div className="flex flex-col gap-2.5 py-1.5">
+        <Segmented
+          label="Global repo forge"
+          value={kind}
+          onChange={choose}
+          options={kinds.map((k) => ({
+            value: k,
+            label: k === "none" ? "No forge" : forgeLabel(k),
+          }))}
+        />
+        {kind !== "none" && (
+          <span className="flex items-center gap-2">
+            <input
+              aria-label="Global repo URL"
+              placeholder="https://…/foreman-config"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onBlur={commitUrl}
+              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              className="flex-1 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
+            />
+            <Button variant="small" disabled title="Comes with the Git epic">
+              Sync
+            </Button>
+          </span>
+        )}
       </div>
-      <Segmented
-        label="Global repo forge"
-        value={kind}
-        onChange={choose}
-        options={kinds.map((k) => ({ value: k, label: k === "none" ? "No forge" : forgeLabel(k) }))}
-      />
-      {kind !== "none" && (
-        <span className="flex items-center gap-2">
-          <input
-            aria-label="Global repo URL"
-            placeholder="https://…/foreman-config"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            onBlur={commitUrl}
-            onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-            className="flex-1 rounded-[7px] border border-line2 bg-transparent px-2.5 py-1.5 font-mono text-[13px] text-tx"
-          />
-          <Button variant="small" disabled title="Comes with the Git epic">
-            Sync
-          </Button>
-        </span>
-      )}
-    </div>
+    </Section>
   );
 }
 
@@ -611,7 +642,7 @@ function NotificationsSection({ settings }: { settings: SettingsData }) {
     { key: "mergeRequested", label: "A merge is requested" },
   ];
   return (
-    <Section label="Notifications">
+    <Section label="Notifications" kept={inGlobalRepo}>
       <Row
         title="Browser notifications"
         explanation="Shown while Foreman isn’t the tab you’re looking at. In-app toasts always show."
@@ -669,6 +700,7 @@ function MaintenanceSection() {
   return (
     <Section
       label="Maintenance"
+      kept={onThisMachine}
       intro="The image agent sessions run in. Rebuild picks up the latest harness versions; running sessions keep their image, new and restarted ones use the new one."
     >
       <Row title="Engine">
@@ -744,7 +776,7 @@ function AppearanceSection() {
         ? asTheme(prefs.data.theme)
         : savedTheme();
   return (
-    <Section label="Appearance">
+    <Section label="Appearance" kept={onThisMachine}>
       <Row title="Theme" explanation="System follows your operating system.">
         <Segmented
           label="Theme"

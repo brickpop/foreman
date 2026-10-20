@@ -1,21 +1,22 @@
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { Agent } from "../screens/Agent";
 import { ChiefOfStaff } from "../screens/ChiefOfStaff";
-import { Home } from "../screens/Home";
+import { Dashboard } from "../screens/Dashboard";
 import { Project, type ProjectTab } from "../screens/Project";
 import { Sessions } from "../screens/Sessions";
-import { Settings, type SettingsTab } from "../screens/Settings";
+import { Settings } from "../screens/Settings";
 import { Team, type TeamTab } from "../screens/Team";
 import { cosSearch } from "./chiefOfStaff";
 import { Shell } from "./Shell";
 import type { SessionsSearch } from "./sessions";
+import { settingsSearch } from "./settings";
 
 // One route per screen (wiki/product/features/app-shell.md), with typed path
 // and search params: project / tab / entry, team / tab.
 
 const root = createRootRoute({ component: Shell });
 
-const home = createRoute({ getParentRoute: () => root, path: "/", component: Home });
+const dashboard = createRoute({ getParentRoute: () => root, path: "/", component: Dashboard });
 
 const sessions = createRoute({
   getParentRoute: () => root,
@@ -66,15 +67,13 @@ const chiefOfStaff = createRoute({
 const settings = createRoute({
   getParentRoute: () => root,
   path: "settings",
-  validateSearch: (s: Record<string, unknown>): { tab?: SettingsTab } => ({
-    tab: s.tab === "global" ? "global" : undefined,
-  }),
+  validateSearch: settingsSearch,
   component: Settings,
 });
 
 export const router = createRouter({
   routeTree: root.addChildren([
-    home,
+    dashboard,
     sessions,
     projectRoute,
     teamRoute,

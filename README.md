@@ -8,8 +8,8 @@ Run several teams of AI coding agents across several projects on your own machin
 
 Foreman is one binary with everything it needs inside: the web UI, the agent image's recipe, and the helper its agents use, for Apple silicon and for Intel or AMD machines. Beside it you need:
 
-- [Podman](https://podman.io/docs/installation), where the agents run: `brew install podman` on macOS, `sudo dnf install podman` on Fedora. Foreman starts without it, and its setup checklist on Home walks you through the rest (on macOS, creating the Podman machine, sized for your agents).
-- A Claude Code login, made once from Foreman (Settings → Global → Profiles, or the setup checklist on Home) and shared by all your projects. Foreman keeps everything in its home, `~/.foreman/`, on macOS too: the global repo `config/` (your teams and `settings.toml`, in git), each project's repo under `projects/`, the agents' sandboxes, the profiles and their logins, and its state. Claude Code itself runs in the agents' image: nothing to install on your machine.
+- [Podman](https://podman.io/docs/installation), where the agents run: `brew install podman` on macOS, `sudo dnf install podman` on Fedora. Foreman starts without it, and its setup checklist on the Dashboard walks you through the rest (on macOS, creating the Podman machine, sized for your agents).
+- A Claude Code login, made once from Foreman (Settings → Agents → Profiles, or the setup checklist on the Dashboard) and shared by all your projects. Foreman keeps everything in its home, `~/.foreman/`, on macOS too: the global repo `config/` (your teams and `settings.toml`, in git), each project's repo under `projects/`, the agents' sandboxes, the profiles and their logins, and its state. Claude Code itself runs in the agents' image: nothing to install on your machine.
 
 There are no published binaries yet: build one from source as below.
 
@@ -41,7 +41,7 @@ Ctrl-C stops Foreman and its agents: they go to sleep, and wake with their conve
 ## Develop
 
 ```sh
-just dev       # rebuild the UI on change and serve a scratch home (.dev/real; its repo in .dev/real-repos) with a sample team and project, agents on Claude Code (Podman; log in under Settings → Global → Profiles)
+just dev       # rebuild the UI on change and serve a scratch home (.dev/real; its repo in .dev/real-repos) with a sample team and project, agents on Claude Code (Podman; log in under Settings → Agents → Profiles)
 just dev fake  # the same on the fake harness, a stand-in that echoes (.dev/fake; no Podman, no login, no tokens)
 just test      # all tests
 just lint      # gofmt, go vet, staticcheck, Biome

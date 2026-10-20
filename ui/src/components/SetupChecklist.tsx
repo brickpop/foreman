@@ -11,7 +11,7 @@ import { NewProject } from "./NewProject";
 import { Select } from "./Select";
 import { Button, Panel, SectionLabel } from "./ui";
 
-// The setup checklist (wiki/product/features/first-run.md): Home shows it
+// The setup checklist (wiki/product/features/first-run.md): the Dashboard shows it
 // while any step is left, in order, each row with what to do and its button.
 export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
   const done = steps.filter((s) => s.state === "done").length;
@@ -109,7 +109,7 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
       return s.state === "failed" ? (
         <Link
           to="/settings"
-          search={{ tab: "global" }}
+          search={{ tab: "system" }}
           className="text-[13px] text-accTx hover:underline"
         >
           Maintenance
@@ -118,11 +118,7 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
     case "profile":
       // One that doesn't exist (failed) is created or swapped in Settings.
       return s.state === "failed" ? (
-        <Link
-          to="/settings"
-          search={{ tab: "global" }}
-          className="text-[13px] text-accTx hover:underline"
-        >
+        <Link to="/settings" className="text-[13px] text-accTx hover:underline">
           Profiles
         </Link>
       ) : (

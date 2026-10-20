@@ -8,7 +8,7 @@ import { RequestPanel } from "./RequestPanel";
 
 // A review request with its merge request: what to look at (the link line
 // opens the change) and what to decide: Merge to main, Create PR on the forge,
-// or Reject with a message that goes back to the lead. Home and a project's
+// or Reject with a message that goes back to the lead. The Dashboard and a project's
 // Overview use this same panel (wiki/product/features/changes.md).
 
 export function ReviewPanel({
@@ -35,7 +35,7 @@ export function ReviewPanel({
   reviewText?: string;
   /** Who a rejection is sent to: the lead. */
   author: string;
-  variant: "home" | "project";
+  variant: "dashboard" | "project";
   source?: string;
   onOpenSession: () => void;
 }) {

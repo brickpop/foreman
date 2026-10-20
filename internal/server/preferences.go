@@ -8,7 +8,7 @@ import (
 	"github.com/brickpop/foreman/internal/userdata"
 )
 
-// Preferences are the CEO's (Settings → Global → Appearance), kept outside
+// Preferences are the CEO's (Settings → Notifications & look → Appearance), kept outside
 // the global repo.
 type Preferences interface {
 	Get() userdata.Preferences

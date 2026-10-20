@@ -299,7 +299,7 @@ func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (hom
 	}
 	p, login, err := m.Profile(projectID)
 	if err != nil {
-		return team, project, on, fmt.Errorf("%w: project %s's profile: %v (Settings → Global → Profiles, and its Project settings)", ErrInvalid, projectID, err)
+		return team, project, on, fmt.Errorf("%w: project %s's profile: %v (Settings → Agents → Profiles, and its Project settings)", ErrInvalid, projectID, err)
 	}
 	on = runsOn{profile: p.Name, harness: p.Harness, adapter: m.Adapters[p.Harness], login: login}
 	if on.adapter == nil {
@@ -307,7 +307,7 @@ func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (hom
 	}
 	// Refused here, not when the agent starts, where it would only reach the log.
 	if !on.adapter.Connected(login) {
-		return team, project, on, fmt.Errorf("%w: profile %s isn't connected yet: Connect it under Settings → Global → Profiles", ErrInvalid, p.Name)
+		return team, project, on, fmt.Errorf("%w: profile %s isn't connected yet: Connect it under Settings → Agents → Profiles", ErrInvalid, p.Name)
 	}
 	return team, project, on, nil
 }

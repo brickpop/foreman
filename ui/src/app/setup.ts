@@ -1,4 +1,4 @@
-// The setup checklist on Home (wiki/product/features/first-run.md): which
+// The setup checklist on the Dashboard (wiki/product/features/first-run.md): which
 // steps show, and what each row says.
 import type { MachineSize, SetupStep } from "../api/client";
 

@@ -51,7 +51,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (400/500/600) for c
 
 | Role | Size / weight / extras |
 |---|---|
-| Page H1 (Home, Project, Team, Settings) | 30px / 600 / `letter-spacing: -0.02em` |
+| Page H1 (Dashboard, Project, Team, Settings) | 30px / 600 / `letter-spacing: -0.02em` |
 | Agent page H1 | 26px / 600 / -0.02em |
 | Wiki H1 (reader) | 30px / 600 / -0.02em / line-height 1.2 |
 | Wiki H1 (side sheet) | 22px / 600 |
@@ -65,7 +65,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (400/500/600) for c
 | Brand | 15px / 600 / -0.01em |
 | Nav item | 14px / 500 |
 | Sidebar project / team row | 13.5px |
-| Request text | Home 16px, project Overview (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
+| Request text | Dashboard 16px, project Overview (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
 | Kind chip | Mono 600 10.5px, `letter-spacing: .05em`, uppercase |
 | Meta mono (paths, branches) | Mono 400 11.5–12.5px, `--tx4` or `--tx3` |
 | Terminal | Mono 400 13px / line-height 1.6 |
@@ -93,11 +93,11 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 
 ## Spacing and layout
 
-- Page padding: Home, Settings `48px 48px 64px`; Project and Team header `40px 48px 0`; Agent `40px 48px 64px`.
+- Page padding: Dashboard, Settings `48px 48px 64px`; Project and Team header `40px 48px 0`; Agent `40px 48px 64px`.
 - Project tab bodies: every tab `24px 48px 64px`, the full width, so each lines up with the project header ([Wiki reader](../features/wiki-reader.md#project-header-and-tabs)); the Settings tab's configuration part starts `28px` below its divider.
 - Team tab bodies: Deployments `24px 48px 64px`; Members `20px 48px 64px`; Playbook and File `28px 48px 64px`.
-- Max widths: Home and Team tabs 920px; Settings 760px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
-- Vertical gaps: 40px between Home sections; 36px between Settings sections and between pipeline and Repositories sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
+- Max widths: Dashboard and Team tabs 920px; Settings 760px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
+- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between pipeline and Repositories sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
 - Row padding: list rows `14px 4px` or `16px 6px`; table-like rows `12px 16px`; settings rows `14px 0` or `12px 0` with a bottom border.
 
 ## Surfaces
@@ -123,7 +123,7 @@ Instance status ([Instance](../models/instance.md)) maps to one color everywhere
 | `queued` (waiting for a session slot) | `--tx4` dot drawn as a dashed outline (no fill), so it reads differently from `idle` |
 | `asleep` (no session until it is woken) | `--tx4` dot drawn as a solid outline (no fill) |
 
-Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--tx4`.
+Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle` `--tx4`.
 
 ## Chips and badges
 
@@ -150,7 +150,7 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | **Raised** | `--raised`, 1px `--line2`, `--tx` | Open sessions, Sessions |
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Reject. Always behind a confirmation |
-| **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on Home approval request panels |
+| **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
 | **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Listen on, Theme; and the on/off toggles Split and Messages, which look the same |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |
 | **Select** (`components/Select.tsx`, the one dropdown; the CEO, 2026-10-18) | A trigger like an input (`--panel`, 1px `--line2`, radius 7, 13px, the chosen label and a `▾`; `--acc` border while open), opening a menu like the Board's (`--panel`, `--line2`, radius 8, `--shadow`, at least the trigger's width, at most 360px tall, scrolling): one row per choice, `✓` beside the chosen one, a detail on the right in `--tx4`. Arrow keys and typing a letter move through it | The repo picker, a project's profile, a new profile's harness, the Podman machine's memory and CPUs. No native `<select>` |
@@ -158,7 +158,7 @@ Project state text (Home): `needs you` `--accTx`, `on track` `--ok`, `idle` `--t
 | **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Connect, Edit, Rebuild |
 | **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | Terminal pane header only: Line, Copy, × |
 
-**Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on Home and 13px on the project's Overview (Needs you).
+**Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on the Dashboard and 13px on the project's Overview (Needs you).
 
 ## Form controls
 

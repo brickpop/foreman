@@ -68,6 +68,6 @@ type Images interface {
 	// Refresh rebuilds without cache and with the latest base image (new
 	// harness versions). Running processes keep their image.
 	Refresh(ctx context.Context) error
-	// Status is the state of each image, for Settings → Maintenance.
+	// Status is the state of each image, for Settings → System → Maintenance.
 	Status(ctx context.Context) []ImageStatus
 }

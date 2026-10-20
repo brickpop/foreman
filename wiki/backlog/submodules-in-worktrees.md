@@ -12,7 +12,7 @@ epic: git
 
 **Decided (the CEO, 2026-10-19):** Foreman keeps the submodules in step on the host; agents add or move one with `set_submodule(repo, path, ref, url?)`; nested submodules only with `recursive_submodules = true` in `project.toml`, off by default. The design is in [Sandboxes and git policy → Submodules](../product/architecture/sandboxes-and-git.md#submodules) and [Protocol → `set_submodule`](../product/architecture/protocol.md#set_submodule).
 
-**Built (2026-10-19), not yet run:** the code and its tests are written, but the sandbox they were written in ran out of processes before they could run (zombies under a PID 1 that never reaps them): the git layer's tests passed once on their first full run, then nothing that forks from Go could run. To do in a fresh session: `go test ./cmd/... ./internal/...`, `go vet`, staticcheck, and the UI checks.
+**Built (2026-10-19), checked (2026-10-20):** every Go test (five runs of the submodule ones), vet, staticcheck and the UI checks pass. The first run found that `set_submodule` to the commit a submodule is already on failed (nothing to commit), though that is how an agent throws away its edits in one: it now discards them and says so, without a commit.
 
 Found while building it (git 2.47, checked by hand before writing the code):
 - `submodule update --init` in a worktree writes nothing to the repo's `.git/config` when each URL is given on the command line (`-c submodule.<name>.url=…`); without that, `init` writes the agent-chosen URL into the CEO's config.
@@ -25,5 +25,5 @@ Found while building it (git 2.47, checked by hand before writing the code):
 - [x] `recursive_submodules`
 - [x] integration tests on real repos (git: added, moved, removed, conflicting, nested, a worktree per agent, credentials over a real HTTP git server; workflow: the tool end to end)
 - [x] specs: Sandboxes and git policy, Team tools, Protocol, Session prompt, Project config, glossary, building blocks, sessions, API
-- [ ] run every check in a fresh session
+- [x] run every check in a fresh session
 - [ ] the CEO tries a Foundry repo

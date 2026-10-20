@@ -207,8 +207,8 @@ var toolRows = map[string][]string{
 		"set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a branch, tag or commit;",
 		"                                    url adds a new one. Switch and merge keep submodules in step.",
 	},
-	"handoff":     {"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."},
-	"contribute":  {"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."},
+	"handoff":    {"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."},
+	"contribute": {"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."},
 	"escalate": {
 		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
 		"                                    For an approval, wait for the answer before that step.",

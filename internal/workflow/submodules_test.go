@@ -75,7 +75,13 @@ func TestChangesInASubmoduleBlockWhatNeedsCommittedWork(t *testing.T) {
 			t.Errorf("%s: %q", tool, text)
 		}
 	}
-	f.ok("tove", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v1"})
+	head := f.git(f.wt("tove", "api"), "rev-parse", "HEAD")
+	if text := f.ok("tove", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v1"}); text != "lib/forge-std was on v1 already in api: what was changed in its files is discarded, nothing to commit." {
+		t.Errorf("%q", text)
+	}
+	if f.git(f.wt("tove", "api"), "rev-parse", "HEAD") != head {
+		t.Error("an empty commit was made")
+	}
 	if got := f.read(filepath.Join(f.wt("tove", "api"), "lib/forge-std/Test.sol")); got != "v1\n" {
 		t.Errorf("the edit stayed: %q", got)
 	}

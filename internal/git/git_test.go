@@ -371,3 +371,25 @@ func TestACancelledGitIsTerminated(t *testing.T) {
 		t.Errorf("ended %v", cmd.ProcessState)
 	}
 }
+
+// git's housekeeping after a commit stays inside the command, under the
+// repo's lock: never a detached process holding the repo's locks.
+func TestHousekeepingNeverDetaches(t *testing.T) {
+	dir := repo(t)
+	trace := filepath.Join(t.TempDir(), "trace.json")
+	t.Setenv("GIT_TRACE2_EVENT", trace)
+	write(t, filepath.Join(dir, "a"), "a\n")
+	if err := New().Commit(ctx, dir, "a", "a"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `"--detach"`) {
+		t.Error("git ran its housekeeping detached")
+	}
+	if strings.Contains(string(data), `"maintenance"`) && !strings.Contains(string(data), `"--no-detach"`) {
+		t.Error("maintenance ran without --no-detach")
+	}
+}

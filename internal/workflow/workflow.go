@@ -670,6 +670,9 @@ func (t tool) setSubmodule(ctx context.Context, name, path, ref, url string) age
 		message = fmt.Sprintf("Add submodule %s at %s (%s)", path, ref, url)
 	}
 	sha, err := t.w.Git.SetSubmodule(ctx, r.dir, path, ref, url, message, t.author())
+	if errors.Is(err, git.ErrNothingToCommit) {
+		return agentlink.Result{Text: fmt.Sprintf("%s was on %s already in %s: what was changed in its files is discarded, nothing to commit.", path, ref, r.name)}
+	}
 	switch {
 	case errors.Is(err, git.ErrBadPath):
 		return teamtools.Refusal("bad_path", "%q isn't a path inside %s", path, r.name)

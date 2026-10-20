@@ -60,7 +60,7 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git %s: %w: %s", args[0], err, strings.TrimSpace(errOut.String()))
+		return "", fmt.Errorf("git %s: %w: %s", verb(args), err, strings.TrimSpace(errOut.String()))
 	}
 	return out.String(), nil
 }
@@ -179,11 +179,28 @@ func (g *CLI) Exclude(ctx context.Context, path string) error {
 // worktree never get in the way of the agent's own git. And a cancelled
 // command gets SIGTERM, on which git removes its lock files, before a kill:
 // a SIGKILL left a stale index.lock behind (found 2026-10-18).
+//
+// git's housekeeping after a commit (maintenance, gc) runs inside the command,
+// never detached: a detached one escapes the one-command-per-repo lock and
+// can hold the repo's locks while Foreman's next command needs them (found
+// 2026-10-20, as orphaned processes under an init that doesn't reap them).
 func command(ctx context.Context, dir string, args ...string) *exec.Cmd {
-	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "commit.gpgsign=false", "-C", dir}
+	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "commit.gpgsign=false",
+		"-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", "-C", dir}
 	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 5 * time.Second
 	return cmd
+}
+
+// verb is the git command args run, past the -c settings before it.
+func verb(args []string) string {
+	for i := 0; i < len(args); i++ {
+		if args[i] != "-c" {
+			return args[i]
+		}
+		i++
+	}
+	return "git"
 }

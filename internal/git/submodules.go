@@ -222,7 +222,7 @@ func (g *CLI) DirtySubmodules(ctx context.Context, dir string) ([]string, error)
 // the submodule first, the path being free. The change is committed by the
 // author with message, except during a merge, where it is only staged (it
 // settles a submodule conflict) and the merge's commit records it; commit is
-// then "".
+// then "". Already on ref, it only discards (ErrNothingToCommit).
 func (g *CLI) SetSubmodule(ctx context.Context, dir, path, ref, url, message string, by Author) (commit string, err error) {
 	path = filepath.ToSlash(filepath.Clean(path))
 	if !filepath.IsLocal(path) || slices.Contains(strings.Split(path, "/"), ".git") {
@@ -299,6 +299,10 @@ func (g *CLI) SetSubmodule(ctx context.Context, dir, path, ref, url, message str
 	}
 	if merging, err := g.Merging(ctx, dir); err != nil || merging {
 		return "", err
+	}
+	// Already on that commit: only its changed files were discarded.
+	if _, err := run(ctx, dir, append([]string{"diff", "--cached", "--quiet", "--"}, files...)...); err == nil {
+		return "", ErrNothingToCommit
 	}
 	args := append(by.config(), append([]string{"commit", "--quiet", "--no-verify", "-m", message, "--"}, files...)...)
 	if _, err := run(ctx, dir, args...); err != nil {

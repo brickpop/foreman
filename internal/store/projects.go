@@ -176,6 +176,8 @@ func (p projects) Remove(ctx context.Context, id string) error {
 		"DELETE FROM team_messages WHERE " + ofProject,
 		"DELETE FROM team_actions WHERE " + ofProject,
 		"DELETE FROM work_items WHERE " + ofProject,
+		"DELETE FROM review_comments WHERE review_id IN (SELECT 'rev-' || seq FROM reviews WHERE project_id = ?1)",
+		"DELETE FROM reviews WHERE project_id = ?1",
 		"DELETE FROM merge_requests WHERE project_id = ?1 OR deployment_id IN (SELECT id FROM deployments WHERE project_id = ?1)",
 		"DELETE FROM requests WHERE project_id = ?1 OR deployment_id IN (SELECT id FROM deployments WHERE project_id = ?1)",
 		"DELETE FROM deployments WHERE project_id = ?",

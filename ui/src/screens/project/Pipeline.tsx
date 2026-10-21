@@ -7,7 +7,7 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { agentOf, forgeOf, mainOf, ordered, when } from "../../app/model";
+import { agentOf, inbox, mainOf, when } from "../../app/model";
 import {
   useAnswer,
   useEntryTitle,
@@ -18,11 +18,10 @@ import {
 } from "../../app/queries";
 import { Avatar } from "../../components/Avatar";
 import { RequestPanel } from "../../components/RequestPanel";
-import { ReviewPanel } from "../../components/ReviewPanel";
 import { Button, Empty, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 
 // A project's pipeline (wiki/product/features/changes.md): what needs the CEO
-// opens its Overview; the work moving towards main, and what recently merged,
+// opens its Overview (a review links to its page, wiki/product/features/reviews.md); the work moving towards main, and what recently merged,
 // open its Repositories tab.
 
 /** Where a request came from, as the panel's header says it. */
@@ -34,28 +33,18 @@ export function sourceLabel(r: Request): string {
 
 const stageLabels = ["in worktree", "handed to lead", "lead reviewing", "integrated"];
 
-/** What waits on the CEO on this project, first on its Overview; nothing when
- * nothing does. */
+/** What waits on the CEO on this project, first on its Overview, but its
+ * reviews (in Reviews); nothing when nothing does. */
 export function NeedsYou({ project }: { project: Project }) {
   const requests = useRequests();
-  const pipeline = usePipeline(project.id);
   const teams = useTeams();
-  const open = ordered(
-    (requests.data ?? []).filter((r) => r.status === "open" && r.projectId === project.id),
-  );
-  const mrs = pipeline.data?.mergeRequests ?? [];
+  const open = inbox(requests.data ?? []).filter((r) => r.projectId === project.id);
   if (open.length === 0) return null;
   return (
     <section className="flex flex-col gap-2.5 px-12 pt-6">
       <SectionLabel>Needs you</SectionLabel>
       {open.map((r) => (
-        <ProjectRequest
-          key={r.id}
-          request={r}
-          project={project}
-          teams={teams.data ?? []}
-          mr={mrs.find((m) => m.id === r.mergeRequestId)}
-        />
+        <ProjectRequest key={r.id} request={r} project={project} teams={teams.data ?? []} />
       ))}
     </section>
   );
@@ -125,6 +114,7 @@ export function InFlight({ project }: { project: Project }) {
               key={m.id}
               mr={m}
               project={project.id}
+              main={mainOf(project, m.repo)}
               teams={teams.data ?? []}
               items={items.filter((w) => w.mergeRequestId === m.id)}
             />
@@ -139,38 +129,18 @@ function ProjectRequest({
   request: r,
   project,
   teams,
-  mr,
 }: {
   request: Request;
   project: Project;
   teams: Team[];
-  mr?: MergeRequest;
 }) {
   const navigate = useNavigate();
   const answer = useAnswer();
   const agent = agentOf(teams, r.instanceId);
-  const title = useEntryTitle(project.id, mr?.entry ?? "");
   const openSession = () =>
     navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
   const context = agent ? `${agent.team.config.name} on ${project.id}` : `on ${project.id}`;
   const who = agent && { name: agent.soul.name, look: agent.soul.look };
-  if (r.kind === "review" && mr) {
-    return (
-      <ReviewPanel
-        request={r}
-        mr={mr}
-        main={mainOf(project, mr.repo)}
-        forge={forgeOf(project)}
-        who={who}
-        context={context}
-        reviewText={`${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into ${mainOf(project, mr.repo)} in ${mr.repo}.`}
-        author={agent?.soul.name ?? "the lead"}
-        variant="project"
-        source={sourceLabel(r)}
-        onOpenSession={openSession}
-      />
-    );
-  }
   return (
     <RequestPanel
       request={r}
@@ -254,7 +224,7 @@ function MergeRow({
   const title = useEntryTitle(project, mr.entry);
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
-      <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3">
+      <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3">
         <Avatar look={lead?.soul.look} size={26} />
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium">
@@ -271,6 +241,12 @@ function MergeRow({
         <span className="rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx2">
           {mr.forgePrNumber ? "PR open" : "merge requested"}
         </span>
+        <Button
+          variant="small"
+          onClick={() => navigate({ to: "/reviews/$review", params: { review: mr.reviewId } })}
+        >
+          Review
+        </Button>
         {mr.forgePrUrl ? (
           <Button variant="small" onClick={() => window.open(mr.forgePrUrl, "_blank", "noopener")}>
             Open PR ↗
@@ -290,7 +266,7 @@ function MergeRow({
         ) : (
           <span className="text-xs text-tx4">stopped</span>
         )}
-      </div>{" "}
+      </div>
       {items.map((w) => (
         <CarriedItem key={w.id} item={w} project={project} teams={teams} />
       ))}
@@ -321,11 +297,14 @@ function CarriedItem({
 function MergedRow({
   mr,
   project,
+  main,
   teams,
   items,
 }: {
   mr: MergeRequest;
   project: string;
+  /** The main it merged into: its repo's. */
+  main: string;
   teams: Team[];
   items: WorkItem[];
 }) {
@@ -336,7 +315,9 @@ function MergedRow({
         <span className="text-ok">✓</span>
         <span className="font-medium">{title.data ?? mr.entry}</span>
         {mr.forgePrNumber > 0 && <span className="text-tx3">PR #{mr.forgePrNumber}</span>}
-        <span className="text-[13px] text-tx4">Merged to main · {when(mr.mergedAt)}</span>
+        <span className="text-[13px] text-tx4">
+          {mr.repo} · merged to {main} · {when(mr.mergedAt)}
+        </span>
       </span>
       {items.map((w) => (
         <CarriedItem key={w.id} item={w} project={project} teams={teams} />

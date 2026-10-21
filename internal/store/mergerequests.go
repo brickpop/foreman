@@ -3,10 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -31,6 +28,11 @@ type MergeRequests interface {
 	// every open one.
 	ForProject(ctx context.Context, projectID string) ([]MergeRequest, error)
 	Open(ctx context.Context) ([]MergeRequest, error)
+	// ForReview lists a review's merge requests, oldest first.
+	ForReview(ctx context.Context, reviewID string) ([]MergeRequest, error)
+	// OpenReview is the review an open merge request of the project's branch
+	// is in, in any repo: "" when none is open.
+	OpenReview(ctx context.Context, projectID, branch string) (string, error)
 }
 
 // MergeRequests returns the merge_requests table.
@@ -38,7 +40,7 @@ func (db *DB) MergeRequests() MergeRequests { return mergeRequests{db.sql} }
 
 type mergeRequests struct{ db *sql.DB }
 
-const mergeRequestColumns = "seq, project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, forge_pr_url, forge_pr_number, note, created_at, merged_at, rejected_at"
+const mergeRequestColumns = "seq, project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, forge_pr_url, forge_pr_number, note, created_at, merged_at, rejected_at, review_id, reviewed_head"
 
 func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, error) {
 	if m.State == "" {
@@ -49,9 +51,9 @@ func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, 
 	}
 	values := []any{nullText(m.ProjectID), nullText(m.DeploymentID), m.AuthorInstance, m.Repo, m.Branch, nullText(m.Entry), m.State,
 		nullText(m.ChecksStatus), m.Conflicting, nullText(m.ForgePRURL), m.ForgePRNumber, nullText(m.Note),
-		timeText(m.CreatedAt), timeText(m.MergedAt), timeText(m.RejectedAt)}
+		timeText(m.CreatedAt), timeText(m.MergedAt), timeText(m.RejectedAt), nullText(m.ReviewID), nullText(m.ReviewedHead)}
 	if m.ID == "" {
-		res, err := s.db.ExecContext(ctx, "INSERT INTO merge_requests (project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, forge_pr_url, forge_pr_number, note, created_at, merged_at, rejected_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
+		res, err := s.db.ExecContext(ctx, "INSERT INTO merge_requests (project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, forge_pr_url, forge_pr_number, note, created_at, merged_at, rejected_at, review_id, reviewed_head) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
 		if err != nil {
 			return m, err
 		}
@@ -59,16 +61,16 @@ func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, 
 		m.ID = "mr-" + strconv.FormatInt(seq, 10)
 		return m, err
 	}
-	seq, err := mergeRequestSeq(m.ID)
+	seq, err := seqOf(m.ID, "mr-", "merge request")
 	if err != nil {
 		return m, err
 	}
-	res, err := s.db.ExecContext(ctx, "UPDATE merge_requests SET project_id = ?, deployment_id = ?, author_instance = ?, repo = ?, branch = ?, entry = ?, state = ?, checks_status = ?, conflicting = ?, forge_pr_url = ?, forge_pr_number = ?, note = ?, created_at = ?, merged_at = ?, rejected_at = ? WHERE seq = ?", append(values, seq)...)
+	res, err := s.db.ExecContext(ctx, "UPDATE merge_requests SET project_id = ?, deployment_id = ?, author_instance = ?, repo = ?, branch = ?, entry = ?, state = ?, checks_status = ?, conflicting = ?, forge_pr_url = ?, forge_pr_number = ?, note = ?, created_at = ?, merged_at = ?, rejected_at = ?, review_id = ?, reviewed_head = ? WHERE seq = ?", append(values, seq)...)
 	return m, touched(res, err)
 }
 
 func (s mergeRequests) Get(ctx context.Context, id string) (MergeRequest, error) {
-	seq, err := mergeRequestSeq(id)
+	seq, err := seqOf(id, "mr-", "merge request")
 	if err != nil {
 		return MergeRequest{}, err
 	}
@@ -85,6 +87,18 @@ func (s mergeRequests) ForProject(ctx context.Context, projectID string) ([]Merg
 
 func (s mergeRequests) Open(ctx context.Context) ([]MergeRequest, error) {
 	return s.query(ctx, "WHERE state = ?", MergeOpen)
+}
+
+func (s mergeRequests) ForReview(ctx context.Context, reviewID string) ([]MergeRequest, error) {
+	return s.query(ctx, "WHERE review_id = ?", reviewID)
+}
+
+func (s mergeRequests) OpenReview(ctx context.Context, projectID, branch string) (string, error) {
+	list, err := s.query(ctx, "WHERE project_id = ? AND branch = ? AND state = ? AND review_id IS NOT NULL", projectID, branch, MergeOpen)
+	if err != nil || len(list) == 0 {
+		return "", err
+	}
+	return list[0].ReviewID, nil
 }
 
 func one(list []MergeRequest, err error) (MergeRequest, error) {
@@ -107,13 +121,14 @@ func (s mergeRequests) query(ctx context.Context, where string, args ...any) ([]
 	for rows.Next() {
 		var m MergeRequest
 		var seq int64
-		var project, deployment, entry, checks, prURL, note, created, merged, rejected sql.NullString
+		var project, deployment, entry, checks, prURL, note, created, merged, rejected, review, reviewed sql.NullString
 		if err := rows.Scan(&seq, &project, &deployment, &m.AuthorInstance, &m.Repo, &m.Branch, &entry, &m.State, &checks,
-			&m.Conflicting, &prURL, &m.ForgePRNumber, &note, &created, &merged, &rejected); err != nil {
+			&m.Conflicting, &prURL, &m.ForgePRNumber, &note, &created, &merged, &rejected, &review, &reviewed); err != nil {
 			return nil, err
 		}
 		m.ID = "mr-" + strconv.FormatInt(seq, 10)
 		m.ProjectID, m.DeploymentID, m.Entry, m.ChecksStatus, m.ForgePRURL, m.Note = project.String, deployment.String, entry.String, checks.String, prURL.String, note.String
+		m.ReviewID, m.ReviewedHead = review.String, reviewed.String
 		if m.CreatedAt, err = parseTime(created); err != nil {
 			return nil, err
 		}
@@ -126,12 +141,4 @@ func (s mergeRequests) query(ctx context.Context, where string, args ...any) ([]
 		list = append(list, m)
 	}
 	return list, rows.Err()
-}
-
-func mergeRequestSeq(id string) (int64, error) {
-	seq, err := strconv.ParseInt(strings.TrimPrefix(id, "mr-"), 10, 64)
-	if err != nil || !strings.HasPrefix(id, "mr-") {
-		return 0, errors.Join(ErrNotFound, fmt.Errorf("no merge request %q", id))
-	}
-	return seq, nil
 }

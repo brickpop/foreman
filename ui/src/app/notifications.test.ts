@@ -34,13 +34,19 @@ describe("noticeFor", () => {
 
   it("calls a review a merge request, gated by its own toggle", () => {
     const n = noticeFor(
-      request({ kind: "review", instanceId: "mara@ledger", summary: "Settlement v2" }),
+      request({
+        kind: "review",
+        instanceId: "mara@ledger",
+        summary: "Settlement v2",
+        reviewId: "rev-3",
+      }),
       [team],
       instances,
     );
     expect(n).toMatchObject({
       toggle: "mergeRequested",
       title: "Mara requested a merge on ledger",
+      review: "rev-3",
     });
   });
 

@@ -128,7 +128,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [keys.instances, keys.deployments];
     case "request.created":
     case "request.resolved":
-      return [keys.requests];
+      // A review's request opening or closing is its status changing.
+      return [keys.requests, reviewsKey];
     case "team.message":
       return [keys.messages, keys.activity];
     case "team.action":
@@ -234,7 +235,7 @@ export function usePipeline(project: string) {
 
 const wikiKey = (project: string) => ["wiki", project] as const;
 
-/** An entry's title (a review names its wiki card). */
+/** An entry's title (a merge request and a work item name their wiki card). */
 export function useEntryTitle(project: string, path: string) {
   const c = useClient();
   return useQuery({
@@ -447,23 +448,50 @@ export function useSaveSettings() {
     current.change(change).finally(() => queries.invalidateQueries({ queryKey: keys.settings }));
 }
 
-/** One merge request, wherever it is (under ["pipeline"], so pipeline events refresh it). */
-export function useMergeRequest(id: string) {
+/** The reviews (under ["pipeline"], so merge requests' events refresh them). */
+const reviewsKey = ["pipeline", "reviews"] as const;
+
+/** Every review, newest first. */
+export function useReviews() {
+  const c = useClient();
+  return useQuery({ queryKey: reviewsKey, queryFn: () => c.reviews.list() });
+}
+
+/** One review, with its comments where they are now. */
+export function useReview(id: string) {
   const c = useClient();
   return useQuery({
-    queryKey: ["pipeline", "mr", id],
-    queryFn: () => c.pipeline.mergeRequest(id),
+    queryKey: [...reviewsKey, id],
+    queryFn: () => c.reviews.get(id),
     enabled: id !== "",
   });
 }
 
-/** What a merge request changes. */
-export function useDiff(mergeRequest: string) {
+/** A review's change, repo by repo: against main, or since the CEO's last look. */
+export function useReviewDiff(id: string, since: boolean) {
   const c = useClient();
   return useQuery({
-    queryKey: ["pipeline", "diff", mergeRequest],
-    queryFn: () => c.pipeline.diff(mergeRequest),
-    enabled: mergeRequest !== "",
+    queryKey: [...reviewsKey, id, "diff", since],
+    queryFn: () => c.reviews.diff(id, since),
+    enabled: id !== "",
+  });
+}
+
+/** A change to a review (a comment, a decision): the review, the pipeline and
+ * the requests are refetched after it, whether it worked or not. */
+export function useReviewChange<T>(
+  change: (c: ForemanClient, input: T) => Promise<void>,
+  onError: (e: Error) => void,
+) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(c, input),
+    onError,
+    onSettled: () => {
+      queries.invalidateQueries({ queryKey: ["pipeline"] });
+      queries.invalidateQueries({ queryKey: keys.requests });
+    },
   });
 }
 

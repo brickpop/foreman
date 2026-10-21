@@ -56,3 +56,13 @@ packages:
       home.TeamConfig: "home.TeamConfig"
     frontmatter: |
       import type * as home from "./home";
+  - path: github.com/brickpop/foreman/internal/workflow
+    output_path: ui/src/api/types/workflow.ts
+    include_files: [reviews.go]
+    type_mappings:
+      time.Time: "string /* RFC 3339 */"
+      store.Review: "store.Review"
+      store.ReviewComment: "store.ReviewComment"
+      store.MergeRequest: "store.MergeRequest"
+    frontmatter: |
+      import type * as store from "./store";

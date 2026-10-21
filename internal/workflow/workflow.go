@@ -34,7 +34,6 @@ type Git interface {
 	Clean(ctx context.Context, dir string) (bool, error)
 	Branch(ctx context.Context, dir string) (string, error)
 	HasBranch(ctx context.Context, dir, branch string) bool
-	Ahead(ctx context.Context, dir, branch, base string) (int, error)
 	Switch(ctx context.Context, dir, branch, base string) (bool, error)
 	CommitAll(ctx context.Context, dir, message string, by git.Author) (string, error)
 	CommitAs(ctx context.Context, dir, message string, by git.Author, files ...string) error
@@ -43,8 +42,12 @@ type Git interface {
 	AbortMerge(ctx context.Context, dir string) error
 	Branches(ctx context.Context, dir, prefix string) ([]string, error)
 	Contains(ctx context.Context, dir, into, branch string) (bool, error)
-	MergeInto(ctx context.Context, dir, target, branch, message string) error
+	Merged(ctx context.Context, dir, into, branch string) (bool, error)
+	Squash(ctx context.Context, dir, target, branch, head, message string) error
+	MoveBranch(ctx context.Context, dir, branch, from, to string) error
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
+	Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error)
+	Resolve(ctx context.Context, dir, ref string) (string, error)
 	SyncSubmodules(ctx context.Context, dir string, recursive bool) error
 	DirtySubmodules(ctx context.Context, dir string) ([]string, error)
 	SetSubmodule(ctx context.Context, dir, path, ref, url, message string, by git.Author) (string, error)
@@ -80,9 +83,13 @@ type Deps struct {
 	// (the title of the entry that explains the work).
 	MergeRequests store.MergeRequests
 	Wiki          Wiki
-	// Requests are what waits for the CEO: a merge request's review (request.created, request.resolved).
+	// Requests are what waits for the CEO: a review waiting on them (request.created, request.resolved).
 	Requests store.Requests
-	Now      func() time.Time // the contributions' dates; time.Now when nil
+	// Reviews group a lead branch's merge requests for the CEO; ReviewComments
+	// are the CEO's comments on them.
+	Reviews        store.Reviews
+	ReviewComments store.ReviewComments
+	Now            func() time.Time // the contributions' dates; time.Now when nil
 }
 
 // Workflow serves its team tools.
@@ -513,23 +520,23 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 	if res, ok := t.unsettled(ctx, t.worktrees(), "a hand-off is your committed work"); !ok {
 		return res
 	}
-	found, ahead := false, false
+	found, news := false, false
 	for _, r := range t.worktrees() {
 		if !t.w.Git.HasBranch(ctx, r.dir, branch) {
 			continue
 		}
 		found = true
-		n, err := t.w.Git.Ahead(ctx, r.dir, branch, t.project.Main(r.name))
+		merged, err := t.w.Git.Merged(ctx, r.dir, t.project.Main(r.name), branch)
 		if err != nil {
 			return gitError(err)
 		}
-		ahead = ahead || n > 0
+		news = news || !merged
 	}
 	switch {
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
-	case !ahead:
-		return teamtools.Refusal("nothing_new", "%s has no commits beyond its repo's main branch", branch)
+	case !news:
+		return teamtools.Refusal("nothing_new", "%s changes nothing in its repo's main branch", branch)
 	}
 	msg, err := t.w.Messages.Send(ctx, store.TeamMessage{DeploymentID: t.c.Deployment.ID, FromInstance: t.c.Instance.ID,
 		ToInstance: to, Kind: "handoff", Body: summary, ArtifactRef: branch})

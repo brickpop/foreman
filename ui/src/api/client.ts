@@ -37,6 +37,7 @@ import type {
 } from "./types/store";
 import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Node } from "./types/wiki";
+import type { RepoDiff, Review, Comment as ReviewComment } from "./types/workflow";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -74,8 +75,11 @@ export type {
   Proposal,
   Repo,
   RepoBranch,
+  RepoDiff,
   RepoFile,
   Request,
+  Review,
+  ReviewComment,
   Settings,
   SettingsFile,
   SetupStep,
@@ -229,13 +233,37 @@ export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
 
 export interface PipelineArea {
   list(project: string): Promise<Pipeline>;
-  /** One merge request. */
-  mergeRequest(id: string): Promise<MergeRequest>;
-  /** What it changes: a unified diff of its branch against main. */
-  diff(mergeRequest: string): Promise<string>;
-  merge(mergeRequest: string): Promise<void>;
-  createPr(mergeRequest: string): Promise<void>;
-  reject(mergeRequest: string, reason: string): Promise<void>;
+}
+
+/** A comment the CEO writes: on a line of a repo's diff (its side, line, and
+ * the head it was read at), or general (no repo). */
+export type NewComment = {
+  repo: string;
+  path: string;
+  side: "" | "new" | "old";
+  line: number;
+  commit: string;
+  snippet: string;
+  body: string;
+};
+
+/** The CEO's reviews of the leads' branches (wiki/product/features/reviews.md). */
+export interface ReviewsArea {
+  /** Every review, newest first, without their comments. */
+  list(): Promise<Review[]>;
+  get(review: string): Promise<Review>;
+  /** Each repo's change: against its main, or since the CEO last requested changes. */
+  diff(review: string, since: boolean): Promise<RepoDiff[]>;
+  addComment(review: string, c: NewComment): Promise<void>;
+  editComment(review: string, comment: string, body: string): Promise<void>;
+  deleteComment(review: string, comment: string): Promise<void>;
+  /** Sends the draft comments and the note to the lead. */
+  requestChanges(review: string, note: string): Promise<void>;
+  /** Merges the repos named, each at the head the CEO read (repo → commit);
+   * the rest stay open. A repo whose branch moved since isn't merged. */
+  merge(review: string, heads: Record<string, string>): Promise<void>;
+  /** Ends it unmerged, the reason going to the lead. */
+  close(review: string, reason: string): Promise<void>;
 }
 
 export interface WikiArea {
@@ -300,6 +328,7 @@ export interface ForemanClient {
   requests: RequestsArea;
   messages: MessagesArea;
   pipeline: PipelineArea;
+  reviews: ReviewsArea;
   repos: ReposArea;
   wiki: WikiArea;
   chiefOfStaff: ChiefOfStaffArea;
@@ -461,19 +490,25 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     pipeline: {
       list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
-      mergeRequest: (mergeRequest) => getJSON(`/api/merge-requests/${id(mergeRequest)}`),
-      diff: async (mergeRequest) =>
-        (await getJSON<{ diff: string }>(`/api/merge-requests/${id(mergeRequest)}/diff`)).diff,
-      merge: (mergeRequest) => send("POST", `/api/merge-requests/${id(mergeRequest)}/merge`),
-      // Create PR comes with the Git epic's git-forge card.
-      createPr: notBuilt("pull requests"),
-      reject: (mergeRequest, reason) =>
-        send("POST", `/api/merge-requests/${id(mergeRequest)}/reject`, { reason }),
+    },
+    reviews: {
+      list: () => getJSON("/api/reviews"),
+      get: (review) => getJSON(`/api/reviews/${id(review)}`),
+      diff: (review, since) => getJSON(`/api/reviews/${id(review)}/diff${since ? "?since=1" : ""}`),
+      addComment: (review, c) => send("POST", `/api/reviews/${id(review)}/comments`, c),
+      editComment: (review, comment, body) =>
+        send("PUT", `/api/reviews/${id(review)}/comments/${id(comment)}`, { body }),
+      deleteComment: (review, comment) =>
+        send("DELETE", `/api/reviews/${id(review)}/comments/${id(comment)}`),
+      requestChanges: (review, note) =>
+        send("POST", `/api/reviews/${id(review)}/changes`, { note }),
+      merge: (review, heads) => send("POST", `/api/reviews/${id(review)}/merge`, { heads }),
+      close: (review, reason) => send("POST", `/api/reviews/${id(review)}/close`, { reason }),
     },
     requests: {
       list: () => getJSON("/api/requests"),
       // Answering comes with escalate (the Workflow epic): today's requests are
-      // reviews, decided on their merge request.
+      // reviews, decided on their review page.
       resolve: notBuilt("answering requests"),
     },
     // The areas below wait on their server side: each screen says "Not built yet".

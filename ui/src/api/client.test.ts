@@ -221,14 +221,46 @@ describe("httpClient", () => {
     expect(calls[0].url).toBe("http://x/api/requests");
   });
 
-  it("decides on merge requests", async () => {
+  it("comments on and decides a review", async () => {
     const calls = stubFetch(204, undefined);
     const c = httpClient("http://x");
-    await c.pipeline.merge("mr-1");
-    await c.pipeline.reject("mr-1", "split it");
+    const general = {
+      repo: "",
+      path: "",
+      side: "" as const,
+      line: 0,
+      commit: "",
+      snippet: "",
+      body: "Why?",
+    };
+    await c.reviews.addComment("rev-1", general);
+    await c.reviews.editComment("rev-1", "com-2", "Why not?");
+    await c.reviews.deleteComment("rev-1", "com-2");
+    await c.reviews.requestChanges("rev-1", "see the comments");
+    await c.reviews.merge("rev-1", { api: "a1b2" });
+    await c.reviews.close("rev-1", "not needed");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
-      ["POST", "http://x/api/merge-requests/mr-1/merge", undefined],
-      ["POST", "http://x/api/merge-requests/mr-1/reject", { reason: "split it" }],
+      ["POST", "http://x/api/reviews/rev-1/comments", general],
+      ["PUT", "http://x/api/reviews/rev-1/comments/com-2", { body: "Why not?" }],
+      ["DELETE", "http://x/api/reviews/rev-1/comments/com-2", undefined],
+      ["POST", "http://x/api/reviews/rev-1/changes", { note: "see the comments" }],
+      ["POST", "http://x/api/reviews/rev-1/merge", { heads: { api: "a1b2" } }],
+      ["POST", "http://x/api/reviews/rev-1/close", { reason: "not needed" }],
+    ]);
+  });
+
+  it("reads the reviews and a review's change", async () => {
+    const calls = stubFetch(200, []);
+    const c = httpClient("http://x");
+    await c.reviews.list();
+    await c.reviews.get("rev-1");
+    await c.reviews.diff("rev-1", false);
+    await c.reviews.diff("rev-1", true);
+    expect(calls.map((c) => c.url)).toEqual([
+      "http://x/api/reviews",
+      "http://x/api/reviews/rev-1",
+      "http://x/api/reviews/rev-1/diff",
+      "http://x/api/reviews/rev-1/diff?since=1",
     ]);
   });
 
@@ -260,10 +292,7 @@ describe("httpClient", () => {
   it("refuses the areas the server doesn't serve yet, without asking it", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");
-    for (const call of [
-      () => c.requests.resolve("req-1", "yes"),
-      () => c.pipeline.createPr("mr-1"),
-    ]) {
+    for (const call of [() => c.requests.resolve("req-1", "yes")]) {
       const e = await call().catch((e: unknown) => e);
       expect(isNotBuilt(e)).toBe(true);
     }

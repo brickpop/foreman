@@ -26,7 +26,7 @@ Table `requests`.
 | `answer` | String | | | | The chosen option or typed text |
 | `created_at` | Timestamp | yes | now | | |
 | `resolved_at` | Timestamp | | | | |
-| `merge_request_id` | String → Merge request | | | | For `review` only: the [merge request](./merge-request.md) it reviews |
+| `review_id` | String → Review | | | | For `review` only: the [review](./review.md) it asks for (its branch, every repo it changed) |
 | `links_json` | JSON | | | | Extra links shown on the panel (e.g. a branch, a wiki entry) |
 
 ## Invariants
@@ -40,4 +40,4 @@ Table `requests`.
 
 ## Phasing
 
-Built (2026-10-17, ahead of the Workflow epic, at the CEO's request: a merge request waiting for the CEO must show on the Dashboard): the table and `GET /api/requests` (the open ones), with `request.created` and `request.resolved`; **review** requests only. `request_merge` raises one per merge request (a refresh raises no second), and the merge request leaving `open` resolves it (`answer`: `merged` or `rejected`); one whose review couldn't be saved (a database error) gets it at the next reconcile. Dashboard and the project's Overview (Needs you) decide it with the review panel. Not yet: `escalate` and the other kinds, answering (`POST /api/requests/:id/resolve`), `harness` and `foreman` sources, duplicate merging.
+Built (2026-10-17, ahead of the Workflow epic, at the CEO's request: a merge request waiting for the CEO must show on the Dashboard): the table and `GET /api/requests` (the open ones), with `request.created` and `request.resolved`; **review** requests only. Since 2026-10-21 a review request is one per [review](./review.md), not per merge request: `request_merge` raises it while the review needs the CEO (a refresh raises no second), Request changes resolves it (`changes requested`) until the lead's next `request_merge`, and the review having nothing open resolves it (`merged` or `closed`); one whose request couldn't be saved (a database error) gets it at the next reconcile. Its summary is `Merge <branch>: <entry title>.`; the Dashboard and the project's Overview (Needs you) show it with a **Review** button that opens its page ([Reviews](../features/reviews.md)). Not yet: `escalate` and the other kinds, answering (`POST /api/requests/:id/resolve`), `harness` and `foreman` sources, duplicate merging.

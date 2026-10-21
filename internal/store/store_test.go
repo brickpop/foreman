@@ -619,13 +619,32 @@ func TestMergeRequests(t *testing.T) {
 	if got, err := mrs.OpenFor(ctx, "ledger", "api", "lead/atlas/integration"); err != nil || got.ID != "mr-1" {
 		t.Errorf("open for api: %+v %v", got, err)
 	}
+	// A review is found by any of its branch's open merge requests.
+	m.ReviewID = "rev-1"
+	if m, err = mrs.Save(ctx, m); err != nil {
+		t.Fatal(err)
+	}
+	if id, err := mrs.OpenReview(ctx, "ledger", "lead/atlas/integration"); err != nil || id != "rev-1" {
+		t.Errorf("open review %q %v", id, err)
+	}
+	if id, err := mrs.OpenReview(ctx, "ledger", "lead/atlas/other"); err != nil || id != "" {
+		t.Errorf("no open review %q %v", id, err)
+	}
+	if list, _ := mrs.ForReview(ctx, "rev-1"); len(list) != 1 || list[0].ID != "mr-1" {
+		t.Errorf("for review %+v", list)
+	}
 	m.State, m.MergedAt, m.Conflicting, m.Note = MergeMerged, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC), true, "x"
+	m.ReviewedHead = "abc123"
 	if _, err := mrs.Save(ctx, m); err != nil {
 		t.Fatal(err)
 	}
 	got, err := mrs.Get(ctx, "mr-1")
-	if err != nil || got.State != MergeMerged || !got.MergedAt.Equal(m.MergedAt) || !got.Conflicting || got.Entry != "backlog/led-44.md" {
+	if err != nil || got.State != MergeMerged || !got.MergedAt.Equal(m.MergedAt) || !got.Conflicting || got.Entry != "backlog/led-44.md" || got.ReviewID != "rev-1" || got.ReviewedHead != "abc123" {
 		t.Errorf("got %+v %v", got, err)
+	}
+	// A merged one is no longer the branch's open review.
+	if id, _ := mrs.OpenReview(ctx, "ledger", "lead/atlas/integration"); id != "" {
+		t.Errorf("open review after the merge %q", id)
 	}
 	// Once merged, the branch can be requested again.
 	if _, err := mrs.OpenFor(ctx, "ledger", "api", "lead/atlas/integration"); !errors.Is(err, ErrNotFound) {
@@ -651,22 +670,22 @@ func TestRequests(t *testing.T) {
 	db := open(t)
 	reqs := db.Requests()
 	r, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", DeploymentID: "atlas@ledger", InstanceID: "mara@ledger",
-		Summary: "Mara wants it merged", Source: "agent", MergeRequestID: "mr-1", Links: []Link{{Label: "branch", Href: "x"}}})
+		Summary: "Mara wants it merged", Source: "agent", ReviewID: "rev-1", Links: []Link{{Label: "branch", Href: "x"}}})
 	if err != nil || r.ID != "req-1" || r.Status != RequestOpen || r.CreatedAt.IsZero() {
 		t.Fatalf("saved %+v %v", r, err)
 	}
-	if _, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", Summary: "other", Source: "agent", MergeRequestID: "mr-2"}); err != nil {
+	if _, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", Summary: "other", Source: "agent", ReviewID: "rev-2"}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := reqs.ForMergeRequest(ctx, "mr-1")
+	got, err := reqs.ForReview(ctx, "rev-1")
 	if err != nil || got.ID != "req-1" || got.Options == nil || len(got.Links) != 1 || got.Links[0].Label != "branch" {
-		t.Errorf("for mr-1: %+v %v", got, err)
+		t.Errorf("for rev-1: %+v %v", got, err)
 	}
 	r.Status, r.Answer, r.ResolvedAt = RequestResolved, "merged", time.Now().UTC()
 	if _, err := reqs.Save(ctx, r); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reqs.ForMergeRequest(ctx, "mr-1"); !errors.Is(err, ErrNotFound) {
+	if _, err := reqs.ForReview(ctx, "rev-1"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("a resolved review is not open: %v", err)
 	}
 	if open, _ := reqs.Open(ctx); len(open) != 1 || open[0].ID != "req-2" {
@@ -843,14 +862,21 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := db.Requests().Save(ctx, Request{Kind: "review", ProjectID: id, DeploymentID: dep.ID, Summary: "s", Source: "agent", MergeRequestID: mr.ID}); err != nil {
+		rev, err := db.Reviews().Save(ctx, Review{ProjectID: id, Branch: mr.Branch})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.ReviewComments().Save(ctx, ReviewComment{ReviewID: rev.ID, Body: "b"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Requests().Save(ctx, Request{Kind: "review", ProjectID: id, DeploymentID: dep.ID, Summary: "s", Source: "agent", ReviewID: rev.ID}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := p.Remove(ctx, "ledger"); err != nil {
 		t.Fatal(err)
 	}
-	for _, table := range []string{"projects", "project_repos", "deployments", "instances", "team_messages", "team_actions", "work_items", "merge_requests", "requests"} {
+	for _, table := range []string{"projects", "project_repos", "deployments", "instances", "team_messages", "team_actions", "work_items", "merge_requests", "requests", "reviews", "review_comments"} {
 		var n int
 		if err := db.sql.QueryRowContext(ctx, "SELECT count(*) FROM "+table).Scan(&n); err != nil {
 			t.Fatal(err)
@@ -924,5 +950,111 @@ func TestARepoFromBeforeItsOwnMainIsOnMain(t *testing.T) {
 	list, err := projects{db}.List(ctx)
 	if err != nil || len(list) != 1 || len(list[0].Repos) != 1 || list[0].Repos[0].Main != "main" {
 		t.Errorf("%+v %v", list, err)
+	}
+}
+
+func TestReviewsAndTheirComments(t *testing.T) {
+	db := open(t)
+	revs, comments := db.Reviews(), db.ReviewComments()
+	r, err := revs.Save(ctx, Review{ProjectID: "ledger", Branch: "lead/atlas/integration"})
+	if err != nil || r.ID != "rev-1" || r.CreatedAt.IsZero() || !r.ChangesRequestedAt.IsZero() {
+		t.Fatalf("saved %+v %v", r, err)
+	}
+	r.ChangesRequestedAt = time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
+	if _, err := revs.Save(ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := revs.Get(ctx, "rev-1"); err != nil || !got.ChangesRequestedAt.Equal(r.ChangesRequestedAt) || got.Branch != r.Branch {
+		t.Errorf("got %+v %v", got, err)
+	}
+	if _, err := revs.Save(ctx, Review{ProjectID: "other", Branch: "lead/x/y"}); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := revs.List(ctx); len(list) != 2 || list[0].ID != "rev-1" {
+		t.Errorf("list %+v", list)
+	}
+
+	line, err := comments.Save(ctx, ReviewComment{ReviewID: "rev-1", Repo: "api", Path: "a.go", Side: "new", Line: 12, Commit: "c0ffee", Snippet: "x := 1", Body: "why 1?"})
+	if err != nil || line.ID != "com-1" || line.State != CommentDraft || line.CreatedAt.IsZero() {
+		t.Fatalf("saved %+v %v", line, err)
+	}
+	if _, err := comments.Save(ctx, ReviewComment{ReviewID: "rev-1", Body: "general"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := comments.Save(ctx, ReviewComment{ReviewID: "rev-2", Body: "elsewhere"}); err != nil {
+		t.Fatal(err)
+	}
+	line.State, line.SentAt = CommentSent, time.Now().UTC()
+	if _, err := comments.Save(ctx, line); err != nil {
+		t.Fatal(err)
+	}
+	got, err := comments.ForReview(ctx, "rev-1")
+	if err != nil || len(got) != 2 || got[0].State != CommentSent || got[0].SentAt.IsZero() || got[0].Line != 12 || got[0].Snippet != "x := 1" || got[1].Repo != "" {
+		t.Errorf("for rev-1 %+v %v", got, err)
+	}
+	if err := comments.Delete(ctx, "com-2"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := comments.Get(ctx, "com-2"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("deleted: %v", err)
+	}
+	for _, id := range []string{"com-9", "rev-1", ""} {
+		if err := comments.Delete(ctx, id); !errors.Is(err, ErrNotFound) {
+			t.Errorf("delete %q: %v", id, err)
+		}
+	}
+	if _, err := revs.Get(ctx, "mr-1"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("a merge request id is no review: %v", err)
+	}
+}
+
+// Open merge requests from before reviews: one review per branch, their review
+// requests merged into one; closed ones keep none.
+func TestOpenMergeRequestsFromBeforeGetAReviewPerBranch(t *testing.T) {
+	db := rawDB(t)
+	all, err := fs.Sub(migrationFiles, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upTo4 := fstest.MapFS{}
+	for _, name := range []string{"001_schema.sql", "002_stop_reason.sql", "003_drop_last_output.sql", "004_repo_main_and_stop_reason.sql"} {
+		data, err := fs.ReadFile(all, "migrations/"+name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upTo4["migrations/"+name] = &fstest.MapFile{Data: data}
+	}
+	if err := migrate(ctx, db, upTo4); err != nil {
+		t.Fatal(err)
+	}
+	const at = "2026-10-20T00:00:00Z"
+	if _, err := db.Exec(`
+		INSERT INTO merge_requests (project_id, author_instance, repo, branch, state, created_at) VALUES
+			('ledger', 'mara@ledger', 'api', 'lead/atlas/integration', 'open', '` + at + `'),
+			('ledger', 'mara@ledger', 'web', 'lead/atlas/integration', 'open', '` + at + `'),
+			('ledger', 'mara@ledger', 'api', 'lead/atlas/old', 'merged', '` + at + `'),
+			('ledger', 'mara@ledger', 'api', 'lead/atlas/v2', 'open', '` + at + `');
+		INSERT INTO requests (kind, project_id, summary, options, source, status, created_at, merge_request_id, links) VALUES
+			('review', 'ledger', 'api', '[]', 'agent', 'open', '` + at + `', 'mr-1', '[]'),
+			('review', 'ledger', 'web', '[]', 'agent', 'open', '` + at + `', 'mr-2', '[]'),
+			('review', 'ledger', 'old', '[]', 'agent', 'resolved', '` + at + `', 'mr-3', '[]'),
+			('review', 'ledger', 'v2', '[]', 'agent', 'open', '` + at + `', 'mr-4', '[]');`); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db, all); err != nil {
+		t.Fatal(err)
+	}
+	mrs := mergeRequests{db}
+	for id, want := range map[string]string{"mr-1": "rev-1", "mr-2": "rev-1", "mr-3": "", "mr-4": "rev-2"} {
+		if m, err := mrs.Get(ctx, id); err != nil || m.ReviewID != want {
+			t.Errorf("%s in %q, want %q (%v)", id, m.ReviewID, want, err)
+		}
+	}
+	open, err := requests{db}.Open(ctx)
+	if err != nil || len(open) != 2 || open[0].ID != "req-1" || open[0].ReviewID != "rev-1" || open[1].ReviewID != "rev-2" {
+		t.Errorf("open requests %+v %v", open, err)
+	}
+	if list, _ := (reviews{db}).List(ctx); len(list) != 2 || list[0].Branch != "lead/atlas/integration" || list[1].Branch != "lead/atlas/v2" {
+		t.Errorf("reviews %+v", list)
 	}
 }

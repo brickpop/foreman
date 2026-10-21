@@ -54,17 +54,21 @@ POST   /api/instances/:id/restart         stops a running instance (starting, ru
 POST   /api/instances/:id/line            {text}: types the CEO's line into the session and sends it (204; 409 NOT_RUNNING)
 PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countdown of messages waiting on the CEO's draft (204)
 
-GET    /api/requests                          the open requests (today: reviews of merge requests; Request → Phasing)
+GET    /api/requests                          the open requests (today: review requests, one per review; Request → Phasing)
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
 GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge, set_submodule, request_merge), oldest first
 GET    /api/activity?project=|deployment=     [&before=<cursor>] a page of team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; a project means its active deployments; 400 BAD_REQUEST for neither, both or a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
-GET    /api/merge-requests/:id                one merge request
-GET    /api/merge-requests/:id/diff           {diff}: its branch against main, as a unified diff
-POST   /api/merge-requests/:id/merge          Merge to main: Foreman merges the branch locally (Pipeline and merges → Merge to main); 204; 409 CONFLICT (the lead is told to merge main in), LOCAL_CHANGES (the CEO's checkout is in the way), NOT_OPEN
-POST   /api/merge-requests/:id/create-pr      Create PR on the repo's forge: push the branch, open the PR
-POST   /api/merge-requests/:id/reject         {reason}: close its PR if any, deliver the reason, work items back to stage 0
+GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
+GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404
+GET    /api/reviews/:id/diff                  [?since=1] [{repo, main, head, since, diff}] per repo open in it: against its main, or from the head at the last Request changes
+POST   /api/reviews/:id/comments              {repo, path, side, line, commit, snippet, body} (no repo: general): a draft comment; 200 the comment; 400 INVALID; 409 NOT_OPEN
+PUT    /api/reviews/:id/comments/:comment     {body}: edits a draft; 204; 409 SENT
+DELETE /api/reviews/:id/comments/:comment     deletes a draft; 204; 409 SENT
+POST   /api/reviews/:id/changes               {note}: Request changes: the drafts and the note to the lead in one message; 204; 400 INVALID (neither)
+POST   /api/reviews/:id/merge                 {heads: {<repo>: <commit>}}: merges each repo named, at the commit the CEO read, its full hash (Pipeline and merges → Merge to main); 204; 409 NOT_MERGED says, per repo, why one didn't (a conflict: the lead is told to merge main in; the CEO's checkout in the way; the branch moved since that commit), the others merged; 409 NOT_OPEN
+POST   /api/reviews/:id/close                 {reason}: closes it unmerged in every repo open, the reason to the lead, work items back to stage 0; 204; 409 NOT_OPEN
 POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 

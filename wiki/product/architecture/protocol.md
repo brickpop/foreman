@@ -19,7 +19,7 @@ Three actors, and every interaction enters through exactly one channel:
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
 | CEO | Answering a request (Dashboard, project Overview) | `Answer` | Web server → **Workflow** `Resolve` |
-| CEO | Merge to main, Create PR on the forge, Reject (a merge request) | `MergeAction` | Web server → **Workflow** |
+| CEO | On a [review](../models/review.md): comments, Request changes, Merge (the repos ticked), Close; later Create PR on the forge | `ReviewAction` | Web server → **Workflow** |
 | Foreman | Process exit, silence, rate limit, git or build error | internal | **Instance manager** / **Workflow** → blocked [request](#requests) |
 | Foreman | Forge poll, project-repo watch | internal | **Workflow** → [merge request](#work-items-and-merge-requests) transitions |
 
@@ -221,7 +221,7 @@ type HandoffResult struct { WorkItem string; Checks string }                  //
 - Checks pass: the hand-off is delivered to the teammate: `Message msg-43 from Tove (handoff of wt/tove/LED-44): <the summary's start>… Read it with read_message("msg-43").` The caller gets `From Foreman: checks pass, wt/tove/LED-44 was handed to Mara.` as a delivery when idle.
 - Checks fail: nothing goes to the teammate; the caller gets `From Foreman: checks fail on wt/tove/LED-44: <first line>. Fix it and hand off again.`
 - Markers: `Tove → Mara · handoff · wt/tove/LED-44`, then the checks outcome.
-- Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first), `branch_not_found`, `nothing_new` (the branch has no commits beyond `main`).
+- Errors (returned at once): `unknown_teammate`, `branch_not_allowed` (not `wt/<self>/*`), `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first), `branch_not_found`, `nothing_new` (merging the branch into `main` would change nothing).
 - Phasing: since the [Git](../../backlog/epics/git.md) epic's first card (2026-10-17) a hand-off creates or advances its work item; the checks come with the next card, `git-checks`. Until then a hand-off goes to "handed to lead" at once, with no checks.
 
 ### `contribute`
@@ -261,25 +261,27 @@ type EscalateResult struct {
 
 ```go
 type RequestMergeArgs   struct { Branch string; Entry string } // branch: lead/<own team>/<topic>; entry: a wiki path, e.g. "backlog/LED-44.md"
-type RequestMergeResult struct { MergeRequests []string; Refreshed bool; Checks string } // one per repo with new commits; refreshed: open ones on this branch were updated
+type RequestMergeResult struct { Review string; MergeRequests []string; Refreshed bool; Checks string } // the branch's review; one merge request per repo with new commits; refreshed: open ones on this branch were updated
 ```
 
-- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`) and that `Entry` exists in the project's wiki, runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which the branch has commits beyond `main`, each with its **review** request. Nothing is pushed anywhere: the CEO chooses Merge to main, Create PR on the forge, or Reject ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
+- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<team>/*`) and that `Entry` exists in the project's wiki, runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which merging the branch into `main` would change something, all in the branch's open [review](../models/review.md) (or a new one), and raises its **review** request unless one is open. Nothing is pushed anywhere: the CEO reviews it, then merges, requests changes or closes it ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)). The tool's text says `Review rev-1, api (mr-1), web (mr-2): waiting for the CEO.`, with `, refreshed` when it refreshed.
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
-- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (no commits beyond `main` in any repo), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
+- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (merging it would change nothing, in any repo), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
 - Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on the Dashboard or on the project's Overview.
 
 ### Deliveries Foreman originates
 
 | When | To | Delivered text |
 |---|---|---|
-| A merge request is merged (Merge to main, or on the forge) | its lead | `From Foreman: lead/atlas/integration was merged into main in ledger-api.` |
+| A merge request is merged (Merge to main, or on the forge) | its lead | `From Foreman: lead/atlas/integration was merged into main in ledger-api, as one commit. lead/atlas/integration now starts from main.`; when the branch couldn't move to the new `main` ([Merge to main](../features/pipeline-and-merges.md#merge-to-main)), the second sentence is `lead/atlas/integration has commits since, or changes in the way, so it still holds what was merged: merge main into it with merge("main") before you go on.` |
 | Another merge request on the same repo is merged | the lead of every other open one | `From Foreman: main moved (lead/atlas/integration was merged). Merge it into lead/atlas/settlement-v2 with merge("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
 | Merge to main finds a conflict, or the forge reports one | that merge request's lead | `From Foreman: lead/atlas/settlement-v2 conflicts with main in ledger-api, so the CEO couldn't merge it. Merge main in with merge("main"), resolve the conflicts and commit(), then call request_merge again.` |
 | The CEO chooses Create PR | the merge request's lead | `From Foreman: the CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
 | Review comments on the forge (after Create PR) | the merge request's lead | `From Foreman: a review comment on PR #128 by <user>: <its start>… Read it with read_message("msg-N").` (stored as a message, kind `notice`) |
-| Reject, or its PR closed on the forge | the merge request's lead | `From the CEO: the merge of lead/atlas/settlement-v2 in ledger-api was rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` |
+| Request changes on its review | the review's lead | `From the CEO: changes requested on lead/atlas/settlement-v2 (backlog/LED-44.md).`, the note, one line per comment, then `Fix them, commit(), then call request_merge again on the same branch.` ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)) |
+| Close on its review | the review's lead | `From the CEO: the review of lead/atlas/settlement-v2 was closed without merging (ledger-api): <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` |
+| Its PR closed on the forge | the merge request's lead | `From the CEO: the merge of lead/atlas/settlement-v2 in ledger-api was rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` |
 | "Owning team fixes now" on a finding | the named team's lead | `From the CEO: <team> fixes "<finding>" now.` |
 | A soul or team edit | each running instance | `From Foreman: your definition changed. Read it with read_message("msg-N").` (the changed sections, stored as a message of kind `notice`; [Session prompt → Updates](./session-prompt.md#updates)) |
 
@@ -377,7 +379,7 @@ How the answer travels back:
 |---|---|
 | `approval`, `question` with `wait` | The open tool call (`CallID`) returns the answer; if it already returned `Pending`, a delivery carries it |
 | `question`, `finding` | A delivery to the raiser (`From the CEO, on <request>: …`); a finding's action may also deliver to another team's lead |
-| `review` | No answer: Merge to main, Create PR and Reject are `MergeAction`s. The request resolves when its merge request leaves `open` |
+| `review` | No answer: the decisions are `ReviewAction`s on its review. Request changes resolves it (the drafts go to the lead in one delivery); so does the review having nothing left open |
 | `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch profile (later) |
 | `source: harness` (approval or question) | Typed into the session with the harness adapter's `Deliver`; also resolved by the next `busy` hook if the CEO answered in the terminal |
 
@@ -416,16 +418,16 @@ Work item:
 Merge request:
 
 ```
-          request_merge (checks pass)           Merge to main, or merged on the forge (after Create PR)
+          request_merge (checks pass)           Merge (on its review), or merged on the forge (after Create PR)
   (none) ─────────────────────────────▶ open ─────────────────────────────────────────▶ merged
                                          │ ▲
                request_merge again       │ │  (refreshed: checks rerun; pushed to its PR if any; same request)
                                          │ └──┘
-                                         └── Reject · its PR closed on the forge ───────▶ rejected
+                                         └── Close (its review) · its PR closed on the forge ▶ rejected
 ```
 
 - Create PR on the forge doesn't change the state: the merge request stays `open`, now with a PR to watch.
-- `merged` and `rejected` are final. Entering either resolves the review request and delivers to the lead. Entering `merged` sends the "main moved" notice to the leads of every other open merge request on the same repo.
+- `merged` and `rejected` are final. Entering either delivers to the lead, and resolves its review's request once the review has nothing left open. Entering `merged` sends the "main moved" notice to the leads of every other open merge request on the same repo.
 - Several merge requests can be open at once: one per (repo, lead branch).
 
 ## Events

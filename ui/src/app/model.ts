@@ -15,7 +15,7 @@ export function onOtherProfile(
   );
 }
 
-import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
+import type { Deployment, Instance, MergeRequest, Project, Request, Team } from "../api/client";
 import type { Look, Soul, TeamConfig } from "../api/types/home";
 
 // Pure derivations the screens share: who an instance is, how requests are
@@ -47,10 +47,23 @@ export function ordered(requests: Request[]): Request[] {
   );
 }
 
-/** The Dashboard's title (wiki/product/features/dashboard.md#header). */
-export function dashboardTitle(open: number): string {
-  if (open === 0) return "All clear";
-  return open === 1 ? "1 thing needs you" : `${open} things need you`;
+/** The open requests answered where they show (Dashboard, a project's
+ * Overview): every kind but reviews, which are decided in Reviews
+ * (wiki/product/features/requests.md). In list order. */
+export function inbox(requests: Request[]): Request[] {
+  return ordered(requests.filter((r) => r.status === "open" && r.kind !== "review"));
+}
+
+/** The Dashboard's title, by the time of day (wiki/product/features/dashboard.md#header). */
+export function greeting(now = new Date()): string {
+  const h = now.getHours();
+  return h < 5
+    ? "Good night"
+    : h < 12
+      ? "Good morning"
+      : h < 18
+        ? "Good afternoon"
+        : "Good evening";
 }
 
 /** The Dashboard's subtitle: running sessions across active deployments. */
@@ -58,6 +71,85 @@ export function dashboardSubtitle(instances: Instance[]): string {
   const running = instances.filter((i) => i.status === "running").length;
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean)).size;
   return `${plural(running, "session")} working across ${plural(deployments, "deployment")}.`;
+}
+
+export type SessionGroup = {
+  deployment: string;
+  project: string;
+  team?: Team;
+  goal: string;
+  /** The lead first, then the team's order. */
+  agents: { instance: Instance; agent?: Agent; lead: boolean }[];
+};
+
+/** The open sessions, one group per deployment, by project then team; asleep
+ * agents (not started yet, woken when needed) are left out, and a deployment
+ * with no other is too. */
+export function sessionGroups(
+  instances: Instance[],
+  deployments: Deployment[],
+  teams: Team[],
+): SessionGroup[] {
+  const groups = new Map<string, SessionGroup>();
+  for (const i of instances) {
+    if (!i.deploymentId || i.status === "asleep") continue;
+    let g = groups.get(i.deploymentId);
+    if (!g) {
+      const [teamId, project] = i.deploymentId.split("@");
+      g = {
+        deployment: i.deploymentId,
+        project: project ?? "",
+        team: teams.find((t) => t.id === teamId),
+        goal: deployments.find((d) => d.id === i.deploymentId)?.goal ?? "",
+        agents: [],
+      };
+      groups.set(i.deploymentId, g);
+    }
+    g.agents.push({
+      instance: i,
+      agent: agentOf(teams, i.id),
+      lead: g.team?.config.lead === i.agentId,
+    });
+  }
+  return [...groups.values()]
+    .map((g) => {
+      const order = g.team ? roster(g.team.config) : [];
+      const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+      const agents = [...g.agents].sort(
+        (a, b) =>
+          rank(a.instance.agentId) - rank(b.instance.agentId) ||
+          a.instance.agentId.localeCompare(b.instance.agentId),
+      );
+      return { ...g, agents };
+    })
+    .sort((a, b) => a.project.localeCompare(b.project) || a.deployment.localeCompare(b.deployment));
+}
+
+export type TeamCard = {
+  id: string;
+  name: string;
+  purpose: string;
+  /** Its members' souls, the lead first. */
+  members: Soul[];
+  /** The projects it is deployed on. */
+  on: string[];
+};
+
+/** One card per team: who is in it and where it works. */
+export function teamCards(teams: Team[], instances: Instance[]): TeamCard[] {
+  return teams.map((t) => ({
+    id: t.id,
+    name: t.config.name || t.id,
+    purpose: t.config.purpose,
+    members: roster(t.config).map((id) => t.config.agents[id]),
+    on: [
+      ...new Set(
+        instances
+          .filter((i) => i.deploymentId.startsWith(`${t.id}@`))
+          .map((i) => i.deploymentId.split("@")[1]),
+      ),
+    ].sort(),
+  }));
 }
 
 export type ProjectRow = {
@@ -88,20 +180,6 @@ export function projectRows(
       state: open ? "needs you" : working > 0 ? "on track" : "idle",
     };
   });
-}
-
-/** A checks result as words (the Dashboard's review text). */
-export function checksSentence(status: string): string {
-  switch (status) {
-    case "pass":
-      return " Checks pass.";
-    case "fail":
-      return " Checks fail.";
-    case "running":
-      return " Checks running.";
-    default:
-      return "";
-  }
 }
 
 const harnessLabels: Record<string, string> = {
@@ -214,7 +292,7 @@ export function forgeLabel(kind: string): string {
   return forgeLabels[kind] ?? kind;
 }
 
-/** A merge request's link line: its PR, its repo and branch, and its checks. */
+/** A merge request's line on its review's decision bar: its PR, its repo and branch, and its checks. */
 export function linkLine(mr: MergeRequest, forge: string, main = "main"): string {
   const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
   // No checks status: the project has no checks (or they haven't run): nothing to say.
@@ -223,7 +301,7 @@ export function linkLine(mr: MergeRequest, forge: string, main = "main"): string
     : mr.checksStatus
       ? `checks ${mr.checksStatus}`
       : "";
-  // The repo first: each repo of a branch is its own merge request, decided on its own.
+  // The repo first: a review ticks its repos one by one.
   return `${pr}${mr.repo} · ${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
 }
 

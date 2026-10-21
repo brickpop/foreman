@@ -28,5 +28,5 @@ A Foreman-raised request (no instance, e.g. a failed build) is titled `Foreman n
 ## Behaviour
 
 - Each notification is tagged per instance (`agent@project`), so a newer one replaces an older one from the same instance. The same tag also collapses duplicates when several Foreman tabs are open (every tab receives the event; the browser shows one notification per tag). To check in every browser in scope.
-- Clicking a notification focuses the Foreman tab and opens that instance's session.
+- Clicking a notification (or its toast) focuses the Foreman tab and opens that instance's session; a review's opens the review's page in [Reviews](./reviews.md) instead (the CEO, 2026-10-21).
 - Notifications are raised by any open Foreman tab; with several tabs open, only one shows each notification.

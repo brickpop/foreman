@@ -119,6 +119,7 @@ func newFixture(t *testing.T) *fixture {
 	f := &fixture{t: t, root: root, m: m, db: db}
 	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Now: now, WorkItems: db.WorkItems(),
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
+		Reviews: db.Reviews(), ReviewComments: db.ReviewComments(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
 	return f
 }
@@ -660,51 +661,178 @@ func TestRequestMergeRefusals(t *testing.T) {
 	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/led-44.md"), "uncommitted_changes")
 }
 
+// mr is a merge request as kept.
+func (f *fixture) mr(id string) store.MergeRequest {
+	f.t.Helper()
+	mr, err := f.db.MergeRequests().Get(ctx, id)
+	if err != nil {
+		f.t.Fatalf("merge request %s: %v", id, err)
+	}
+	return mr
+}
+
+// review is a review as the CEO reads it.
+func (f *fixture) review(id string) Review {
+	f.t.Helper()
+	v, err := f.w.Review(ctx, id)
+	if err != nil {
+		f.t.Fatalf("review %s: %v", id, err)
+	}
+	return v
+}
+
+// shown is what the CEO's Merge sends for those repos: the head each was
+// shown at, as the review page has it from the diff.
+func (f *fixture) shown(id string, repos ...string) map[string]string {
+	f.t.Helper()
+	diffs, err := f.w.ReviewDiff(ctx, id, false)
+	if err != nil {
+		f.t.Fatalf("diff of %s: %v", id, err)
+	}
+	heads := map[string]string{}
+	for _, repo := range repos {
+		heads[repo] = ""
+		for _, d := range diffs {
+			if d.Repo == repo {
+				heads[repo] = d.Head
+			}
+		}
+	}
+	return heads
+}
+
+var integration = map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
+
 func TestFromHandoffToMain(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
-	req := map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
-	// One merge request, in the one repo with new commits, carrying the hand-off.
-	if text := f.ok("mara", "request_merge", req); text != "Merge request mr-1 (api): waiting for the CEO." {
+	// One merge request, in the one repo with new commits, carrying the hand-off, in the branch's review.
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1): waiting for the CEO." {
 		t.Fatalf("%q", text)
 	}
 	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-1" {
 		t.Errorf("work item %+v", w)
 	}
-	if text := f.ok("mara", "request_merge", req); text != "Merge request mr-1 (api), refreshed: waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1), refreshed: waiting for the CEO." {
 		t.Errorf("again: %q", text)
 	}
 	p, _ := f.w.Pipeline(ctx, "ledger")
-	if len(p.MergeRequests) != 1 || p.MergeRequests[0].Entry != "backlog/led-44.md" || p.MergeRequests[0].AuthorInstance != "mara@ledger" {
+	if len(p.MergeRequests) != 1 || p.MergeRequests[0].Entry != "backlog/led-44.md" || p.MergeRequests[0].ReviewID != "rev-1" {
 		t.Fatalf("pipeline %+v", p.MergeRequests)
 	}
-	if diff, err := f.w.Diff(ctx, "mr-1"); err != nil || !strings.Contains(diff, "LED-44.go") {
-		t.Errorf("diff %q %v", diff, err)
+	v := f.review("rev-1")
+	if v.Status != ReviewNeedsYou || v.Title != "Export invoices" || v.Lead != "mara@ledger" || v.Branch != "lead/atlas/integration" || len(v.MergeRequests) != 1 {
+		t.Errorf("review %+v", v)
+	}
+	diffs, err := f.w.ReviewDiff(ctx, "rev-1", false)
+	if err != nil || len(diffs) != 1 || diffs[0].Repo != "api" || diffs[0].Main != "main" || !strings.Contains(diffs[0].Diff, "LED-44.go") ||
+		diffs[0].Head != f.git(f.wt("mara", "api"), "rev-parse", "HEAD") {
+		t.Errorf("diff %+v %v", diffs, err)
+	}
+	// Never reviewed yet: "since" is against main too.
+	if since, _ := f.w.ReviewDiff(ctx, "rev-1", true); len(since) != 1 || since[0].Since != "" || since[0].Diff != diffs[0].Diff {
+		t.Errorf("since %+v", since)
 	}
 
 	// The CEO's checkout of api is on main: the merge happens there.
 	api := filepath.Join(f.root, "ledger", "api")
-	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
 		t.Fatal(err)
 	}
-	if subject := f.git(api, "log", "-1", "--format=%s", "main"); subject != "Merge Export invoices" {
-		t.Errorf("main's head %q", subject)
+	// One commit, the agents credited.
+	if msg := f.git(api, "log", "-1", "--format=%B", "main"); msg != "Export invoices\n\nCo-Authored-By: Tove <tove@foreman.invalid>" {
+		t.Errorf("main's head %q", msg)
+	}
+	if parents := f.git(api, "log", "-1", "--format=%P", "main"); strings.Contains(parents, " ") {
+		t.Errorf("a merge commit: %q", parents)
 	}
 	if _, err := os.Stat(filepath.Join(api, "LED-44.go")); err != nil {
 		t.Error("the CEO's checkout didn't move with main")
 	}
-	mr, _ := f.w.MergeRequest(ctx, "mr-1")
-	if mr.State != store.MergeMerged || mr.MergedAt.IsZero() {
+	// The lead's branch, checked out in its worktree, starts from the new main.
+	if head, main := f.git(f.wt("mara", "api"), "rev-parse", "HEAD"), f.git(api, "rev-parse", "main"); head != main {
+		t.Errorf("the lead's branch is at %s, main at %s", head, main)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeMerged || mr.MergedAt.IsZero() {
 		t.Errorf("merge request %+v", mr)
 	}
-	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" || !strings.Contains(n.Body, "lead/atlas/integration was merged into main in api.") {
+	if v := f.review("rev-1"); v.Status != ReviewMerged {
+		t.Errorf("status %q", v.Status)
+	}
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" || n.Body != "From Foreman: lead/atlas/integration was merged into main in api, as one commit. lead/atlas/integration now starts from main." {
 		t.Errorf("notice %+v", n)
 	}
-	if err := f.w.MergeToMain(ctx, "mr-1"); !errors.Is(err, ErrNotOpen) {
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); !errors.Is(err, ErrNotOpen) {
 		t.Errorf("merged twice: %v", err)
 	}
-	if err := f.w.Reject(ctx, "mr-1", "x"); !errors.Is(err, ErrNotOpen) {
-		t.Errorf("rejected once merged: %v", err)
+	if err := f.w.CloseReview(ctx, "rev-1", "x"); !errors.Is(err, ErrNotOpen) {
+		t.Errorf("closed once merged: %v", err)
+	}
+	if _, err := f.w.Review(ctx, "rev-9"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("unknown review: %v", err)
+	}
+	// Asked again once everything merged: a new review.
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "next.go"), "package n\n")
+	f.ok("mara", "commit", commits("api", "next"))
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-2, api (mr-2): waiting for the CEO." {
+		t.Errorf("next: %q", text)
+	}
+}
+
+// A branch that changed several repos is one review: the CEO merges the repos
+// they pick, the rest stay open in it, and its request stays until none is.
+func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "a.go"), "package a\n")
+	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>\n")
+	f.ok("mara", "commit", commits("api", "a", "web", "page"))
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1), web (mr-2): waiting for the CEO." {
+		t.Fatalf("%q", text)
+	}
+	open, _ := f.w.OpenRequests(ctx)
+	if len(open) != 1 || open[0].ReviewID != "rev-1" {
+		t.Fatalf("one request for the review: %+v", open)
+	}
+	if err := f.w.MergeReview(ctx, "rev-1", nil); !errors.Is(err, ErrInvalid) {
+		t.Errorf("no repo picked: %v", err)
+	}
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api", "docs")); !errors.Is(err, ErrNotOpen) || f.mr("mr-1").State != store.MergeOpen {
+		t.Errorf("a repo not in it merges nothing: %v", err)
+	}
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
+		t.Fatal(err)
+	}
+	if f.mr("mr-1").State != store.MergeMerged || f.mr("mr-2").State != store.MergeOpen {
+		t.Errorf("api merged, web open: %+v %+v", f.mr("mr-1"), f.mr("mr-2"))
+	}
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 1 {
+		t.Errorf("still waiting on the CEO for web: %+v", open)
+	}
+	if v := f.review("rev-1"); v.Status != ReviewNeedsYou {
+		t.Errorf("status %q", v.Status)
+	}
+	// web left open: the lead's next request on the branch is the same review.
+	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>2\n")
+	f.ok("mara", "commit", commits("web", "page 2"))
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, web (mr-2), refreshed: waiting for the CEO." {
+		t.Errorf("%q", text)
+	}
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "web")); err != nil {
+		t.Fatal(err)
+	}
+	web := filepath.Join(f.root, "ledger", "web")
+	if subject := f.git(web, "log", "-1", "--format=%s", "trunk"); subject != "Export invoices" {
+		t.Errorf("trunk's head %q", subject)
+	}
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
+		t.Errorf("resolved once nothing is open: %+v", open)
+	}
+	if v := f.review("rev-1"); v.Status != ReviewMerged {
+		t.Errorf("status %q", v.Status)
+	}
+	list, err := f.w.ListReviews(ctx)
+	if err != nil || len(list) != 1 || list[0].Comments != nil || list[0].Title != "Export invoices" {
+		t.Errorf("list %+v %v", list, err)
 	}
 }
 
@@ -712,18 +840,19 @@ func TestMergeToMainConflicts(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "the lead's\n")
 	f.ok("mara", "commit", commits("api", "readme"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", integration)
 	api := filepath.Join(f.root, "ledger", "api")
 	writeFile(t, filepath.Join(api, "README"), "main's\n")
 	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "main moved")
 	head := f.git(api, "rev-parse", "main")
-	if err := f.w.MergeToMain(ctx, "mr-1"); !errors.Is(err, ErrConflict) {
+	err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api"))
+	if !errors.Is(err, ErrConflict) || !strings.HasPrefix(err.Error(), "api: ") {
 		t.Fatalf("err %v", err)
 	}
 	if f.git(api, "rev-parse", "main") != head {
 		t.Error("main moved on a conflict")
 	}
-	if mr, _ := f.w.MergeRequest(ctx, "mr-1"); !mr.Conflicting || mr.State != store.MergeOpen {
+	if mr := f.mr("mr-1"); !mr.Conflicting || mr.State != store.MergeOpen {
 		t.Errorf("merge request %+v", mr)
 	}
 	if n := f.lastNotice(); !strings.Contains(n.Body, `merge("main")`) {
@@ -733,13 +862,13 @@ func TestMergeToMainConflicts(t *testing.T) {
 	f.ok("mara", "merge", map[string]string{"branch": "main"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "both\n")
 	f.ok("mara", "commit", commits("api", "main merged in"))
-	if text := f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}); !strings.Contains(text, "mr-1 (api), refreshed") {
+	if text := f.ok("mara", "request_merge", integration); !strings.Contains(text, "api (mr-1), refreshed") {
 		t.Errorf("%q", text)
 	}
-	if mr, _ := f.w.MergeRequest(ctx, "mr-1"); mr.Conflicting {
+	if f.mr("mr-1").Conflicting {
 		t.Error("still marked conflicting")
 	}
-	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
 		t.Fatal(err)
 	}
 	if data, _ := os.ReadFile(filepath.Join(api, "README")); string(data) != "both\n" {
@@ -747,51 +876,243 @@ func TestMergeToMainConflicts(t *testing.T) {
 	}
 }
 
-func TestRejectReturnsTheWork(t *testing.T) {
+func TestCloseReturnsTheWork(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
-	if err := f.w.Reject(ctx, "mr-1", "split it in two"); err != nil {
+	f.ok("mara", "request_merge", integration)
+	if err := f.w.CloseReview(ctx, "rev-1", "split it in two"); err != nil {
 		t.Fatal(err)
 	}
-	mr, _ := f.w.MergeRequest(ctx, "mr-1")
-	if mr.State != store.MergeRejected || mr.Note != "split it in two" || mr.RejectedAt.IsZero() {
+	if mr := f.mr("mr-1"); mr.State != store.MergeRejected || mr.Note != "split it in two" || mr.RejectedAt.IsZero() {
 		t.Errorf("merge request %+v", mr)
 	}
 	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "" || w.Stage != store.StageInWorktree || w.Note != "rejected: split it in two" {
 		t.Errorf("work item %+v", w)
 	}
-	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "ceo" || !strings.Contains(n.Body, "the merge of lead/atlas/integration in api was rejected: split it in two") {
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "ceo" || !strings.Contains(n.Body, "the review of lead/atlas/integration was closed without merging (api): split it in two") {
 		t.Errorf("notice %+v", n)
 	}
-	// The branch stays: the lead asks again, a new merge request.
-	if text := f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}); !strings.HasPrefix(text, "Merge request mr-2 (api)") {
+	if v := f.review("rev-1"); v.Status != ReviewClosed {
+		t.Errorf("status %q", v.Status)
+	}
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
+		t.Errorf("still open after closing: %+v", open)
+	}
+	// The branch stays: the lead asks again, a new review.
+	if text := f.ok("mara", "request_merge", integration); !strings.HasPrefix(text, "Review rev-2, api (mr-2)") {
 		t.Errorf("%q", text)
+	}
+}
+
+// The CEO comments on lines and in general, then requests changes: the lead
+// gets them in one message, the review waits on the lead until it asks again,
+// and the CEO then reads only what changed since, with the comments following
+// their lines.
+func TestRequestChangesSendsTheDraftAndWaitsOnTheLead(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "calc.go"), "package calc\n\nfunc One() int { return 1 }\n\nfunc Two() int { return 3 }\n")
+	f.ok("mara", "commit", commits("api", "calc"))
+	f.ok("mara", "request_merge", integration)
+	head := f.git(f.wt("mara", "api"), "rev-parse", "HEAD")
+	line := func(n int, snippet, body string) store.ReviewComment {
+		return store.ReviewComment{Repo: "api", Path: "calc.go", Side: "new", Line: n, Commit: head, Snippet: snippet, Body: body}
+	}
+	if err := f.w.RequestChanges(ctx, "rev-1", " "); !errors.Is(err, ErrInvalid) {
+		t.Errorf("nothing to send: %v", err)
+	}
+	for _, bad := range []store.ReviewComment{
+		line(3, "", "  "),
+		{Repo: "docs", Path: "x", Side: "new", Line: 1, Commit: head, Body: "b"},
+		{Repo: "api", Path: "calc.go", Side: "new", Line: 1, Body: "no commit"},
+		{Repo: "api", Path: "calc.go", Side: "left", Line: 1, Commit: head, Body: "b"},
+		{Repo: "api", Path: "calc.go", Side: "new", Line: 0, Commit: head, Body: "b"},
+		{Path: "calc.go", Body: "general, with a file"},
+	} {
+		if _, err := f.w.AddComment(ctx, "rev-1", bad); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%+v: %v", bad, err)
+		}
+	}
+	two, err := f.w.AddComment(ctx, "rev-1", line(5, "func Two() int { return 3 }", "Two is 2"))
+	if err != nil || two.ID != "com-1" || two.State != store.CommentDraft {
+		t.Fatalf("%+v %v", two, err)
+	}
+	one, _ := f.w.AddComment(ctx, "rev-1", line(3, "func One() int { return 1 }", "fine, but name it"))
+	gone, _ := f.w.AddComment(ctx, "rev-1", store.ReviewComment{Body: "drop me"})
+	general, _ := f.w.AddComment(ctx, "rev-1", store.ReviewComment{Body: "Add a test"})
+	if _, err := f.w.EditComment(ctx, "rev-1", one.ID, "One is fine"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.w.DeleteComment(ctx, "rev-1", gone.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.w.DeleteComment(ctx, "rev-2", one.ID); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("another review's comment: %v", err)
+	}
+
+	sent := len(f.m.sent)
+	if err := f.w.RequestChanges(ctx, "rev-1", "Nearly there."); err != nil {
+		t.Fatal(err)
+	}
+	if news := f.m.sent[sent:]; len(news) != 1 || news[0].FromInstance != "ceo" || news[0].ToInstance != "mara@ledger" ||
+		news[0].Body != "From the CEO: changes requested on lead/atlas/integration (backlog/led-44.md).\n\nNearly there.\n\n"+
+			"- api calc.go:5 `func Two() int { return 3 }`: Two is 2\n\n- api calc.go:3 `func One() int { return 1 }`: One is fine\n\n- Add a test\n\n"+
+			"Fix them, commit(), then call request_merge again on the same branch." {
+		t.Errorf("message %+v", news)
+	}
+	v := f.review("rev-1")
+	if v.Status != ReviewChangesRequested || len(v.Comments) != 3 || v.Comments[0].State != store.CommentSent || v.Comments[0].SentAt.IsZero() {
+		t.Errorf("review %+v", v)
+	}
+	if f.mr("mr-1").ReviewedHead != head {
+		t.Errorf("reviewed head %q", f.mr("mr-1").ReviewedHead)
+	}
+	if _, err := f.w.EditComment(ctx, "rev-1", general.ID, "x"); !errors.Is(err, ErrSent) {
+		t.Errorf("edit a sent one: %v", err)
+	}
+	f.w.Reconcile(ctx)
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
+		t.Errorf("waiting on the lead, not the CEO: %+v", open)
+	}
+
+	// The lead adds two lines above One and fixes Two, then asks again.
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "calc.go"), "package calc\n\n// One is one.\n// Really.\nfunc One() int { return 1 }\n\nfunc Two() int { return 2 }\n")
+	f.ok("mara", "commit", commits("api", "fix Two"))
+	f.ok("mara", "request_merge", integration)
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 1 || open[0].ReviewID != "rev-1" {
+		t.Errorf("waiting on the CEO again: %+v", open)
+	}
+	v = f.review("rev-1")
+	if v.Status != ReviewNeedsYou {
+		t.Errorf("status %q", v.Status)
+	}
+	byID := map[string]Comment{}
+	for _, c := range v.Comments {
+		byID[c.ID] = c
+	}
+	if c := byID[one.ID]; c.Now != 5 || c.Outdated {
+		t.Errorf("One's comment follows its line: %+v", c)
+	}
+	if c := byID[two.ID]; !c.Outdated {
+		t.Errorf("Two's line changed: %+v", c)
+	}
+	if c := byID[general.ID]; c.Outdated || c.Now != 0 {
+		t.Errorf("a general one stays: %+v", c)
+	}
+	since, err := f.w.ReviewDiff(ctx, "rev-1", true)
+	if err != nil || len(since) != 1 || since[0].Since != head || !strings.Contains(since[0].Diff, "+// Really.") || strings.Contains(since[0].Diff, "+package calc") {
+		t.Errorf("since %+v %v", since, err)
+	}
+}
+
+func TestFollowLine(t *testing.T) {
+	for _, c := range []struct {
+		name     string
+		diff     string
+		line     int
+		want     int
+		outdated bool
+	}{
+		{"no change", "", 10, 10, false},
+		{"lines added above", "@@ -2,0 +3,2 @@\n+a\n+b", 10, 12, false},
+		{"lines removed above", "@@ -2,3 +1,0 @@\n-a\n-b\n-c", 10, 7, false},
+		{"its line changed", "@@ -10 +10 @@\n-x\n+y", 10, 10, true},
+		{"its line removed", "@@ -9,2 +8,0 @@\n-x\n-y", 10, 10, true},
+		{"changed below", "@@ -11,2 +11,5 @@\n-x", 10, 10, false},
+		{"added right after it", "@@ -10,0 +11 @@\n+z", 10, 10, false},
+		{"added right before it", "@@ -9,0 +10 @@\n+z", 10, 11, false},
+		{"several hunks", "@@ -1,0 +2 @@\n+a\n@@ -4,2 +5,0 @@\n-b\n-c\n@@ -20 +19 @@", 10, 9, false},
+		{"a header it can't read", "@@ nonsense @@", 10, 10, true},
+	} {
+		if got, outdated := followLine(c.diff, c.line); got != c.want || outdated != c.outdated {
+			t.Errorf("%s: %d %v, want %d %v", c.name, got, outdated, c.want, c.outdated)
+		}
+	}
+}
+
+func TestMergeOnlyWhatTheCEORead(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	read := f.shown("rev-1", "api")
+	api := filepath.Join(f.root, "ledger", "api")
+	main := f.git(api, "rev-parse", "main")
+	// The lead commits after the CEO loaded the review.
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "late.go"), "package late\n")
+	f.ok("mara", "commit", commits("api", "late"))
+	if err := f.w.MergeReview(ctx, "rev-1", read); !errors.Is(err, ErrBranchMoved) || !strings.HasPrefix(err.Error(), "api: ") {
+		t.Fatalf("err %v, want api: ErrBranchMoved", err)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeOpen || f.git(api, "rev-parse", "main") != main {
+		t.Errorf("merged anyway: %+v", mr)
+	}
+	if err := f.w.MergeReview(ctx, "rev-1", map[string]string{"api": ""}); !errors.Is(err, ErrInvalid) {
+		t.Errorf("no commit named: %v", err)
+	}
+	// Read again, it merges, late commit included.
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(api, "late.go")); err != nil {
+		t.Error("the late commit wasn't merged")
+	}
+}
+
+func TestAMergedBranchThatCantMoveIsLeftToTheLead(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	// main changes README meanwhile, and the lead has an uncommitted edit there.
+	api, lead := filepath.Join(f.root, "ledger", "api"), f.wt("mara", "api")
+	writeFile(t, filepath.Join(api, "README"), "the CEO's\n")
+	f.git(api, "add", "README")
+	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "readme")
+	head := f.git(lead, "rev-parse", "HEAD")
+	writeFile(t, filepath.Join(lead, "README"), "the lead's\n")
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
+		t.Fatal(err)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeMerged {
+		t.Errorf("merge request %+v", mr)
+	}
+	if f.git(lead, "rev-parse", "HEAD") != head {
+		t.Error("the lead's branch moved over its uncommitted change")
+	}
+	if data, _ := os.ReadFile(filepath.Join(lead, "README")); string(data) != "the lead's\n" {
+		t.Errorf("the lead's change was lost: %q", data)
+	}
+	if n := f.lastNotice(); !strings.HasSuffix(n.Body, `so it still holds what was merged: merge main into it with merge("main") before you go on.`) {
+		t.Errorf("notice %q", n.Body)
 	}
 }
 
 func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", integration)
 	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
 	f.ok("mara", "commit", commits("api", "second"))
 	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
-	// The CEO merges the first by hand, in their own checkout.
+	// The CEO squashes the first by hand, in their own checkout, as a forge
+	// would: its commits never reach main.
 	api := filepath.Join(f.root, "ledger", "api")
-	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "by hand", "lead/atlas/integration")
+	f.git(api, "merge", "-q", "--squash", "lead/atlas/integration")
+	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "by hand")
 	sent := len(f.m.sent)
 	f.w.Reconcile(ctx)
-	if mr, _ := f.w.MergeRequest(ctx, "mr-1"); mr.State != store.MergeMerged {
+	if mr := f.mr("mr-1"); mr.State != store.MergeMerged {
 		t.Errorf("not noticed: %+v", mr)
 	}
-	if mr, _ := f.w.MergeRequest(ctx, "mr-2"); mr.State != store.MergeOpen {
+	if mr := f.mr("mr-2"); mr.State != store.MergeOpen || mr.ReviewID != "rev-2" {
 		t.Errorf("the other one moved: %+v", mr)
 	}
 	// Its lead is told it's merged, and the other open one's that main moved.
-	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/atlas/integration was merged into main in api.") || !strings.Contains(news[1].Body, "main moved in api (lead/atlas/integration was merged). Merge it into lead/atlas/second") {
+	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/atlas/integration was merged into main in api, as one commit. lead/atlas/integration now starts from main.") || !strings.Contains(news[1].Body, "main moved in api (lead/atlas/integration was merged). Merge it into lead/atlas/second") {
 		t.Errorf("notices %+v", news)
+	}
+	// Not checked out anywhere, it moved too.
+	if f.git(api, "rev-parse", "lead/atlas/integration") != f.git(api, "rev-parse", "main") {
+		t.Error("the merged branch didn't move to main")
 	}
 	f.w.Reconcile(ctx)
 	if len(f.m.sent) != sent+2 {
@@ -804,7 +1125,7 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 func TestRequestMergeIsKeptAsAnAction(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", integration)
 	f.refused("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/nope.md"}, "entry_not_found")
 	list, err := f.db.Actions().List(ctx, "atlas@ledger")
 	if err != nil {
@@ -827,22 +1148,21 @@ func TestRequestMergeIsKeptAsAnAction(t *testing.T) {
 	}
 }
 
-// A merge request waits for the CEO as a review request, until it's merged or rejected.
+// A review waits for the CEO as one review request, until nothing in it is open.
 func TestReviewRequests(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
-	req := map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
-	f.ok("mara", "request_merge", req)
-	f.ok("mara", "request_merge", req) // a refresh raises no second one
+	f.ok("mara", "request_merge", integration)
+	f.ok("mara", "request_merge", integration) // a refresh raises no second one
 	open, _ := f.w.OpenRequests(ctx)
 	if len(open) != 1 {
 		t.Fatalf("open %+v", open)
 	}
-	if r := open[0]; r.Kind != "review" || r.MergeRequestID != "mr-1" || r.InstanceID != "mara@ledger" || r.ProjectID != "ledger" ||
-		r.Source != "agent" || r.Summary != "Merge lead/atlas/integration into main in api: Export invoices." {
+	if r := open[0]; r.Kind != "review" || r.ReviewID != "rev-1" || r.InstanceID != "mara@ledger" || r.ProjectID != "ledger" ||
+		r.Source != "agent" || r.Summary != "Merge lead/atlas/integration: Export invoices." {
 		t.Errorf("review %+v", r)
 	}
-	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
 		t.Fatal(err)
 	}
 	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
@@ -858,26 +1178,18 @@ func TestReviewRequests(t *testing.T) {
 		t.Errorf("events %v", kinds)
 	}
 
-	// Rejected: resolved too.
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
-	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
-	f.ok("mara", "commit", commits("api", "second"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
-	if err := f.w.Reject(ctx, "mr-2", "no"); err != nil {
+	// One whose request couldn't be saved gets it at the next reconcile, once.
+	rev, err := f.db.Reviews().Save(ctx, store.Review{ProjectID: "ledger", Branch: "lead/atlas/second"})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
-		t.Errorf("still open after the rejection: %+v", open)
-	}
-
-	// One whose review couldn't be saved gets it at the next reconcile.
 	if _, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger", AuthorInstance: "mara@ledger",
-		Repo: "api", Branch: "lead/atlas/second", Entry: "backlog/led-44.md"}); err != nil {
+		Repo: "api", Branch: "lead/atlas/second", Entry: "backlog/led-44.md", ReviewID: rev.ID}); err != nil {
 		t.Fatal(err)
 	}
 	f.w.Reconcile(ctx)
 	f.w.Reconcile(ctx)
-	if open, _ := f.w.OpenRequests(ctx); len(open) != 1 || open[0].MergeRequestID != "mr-3" {
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 1 || open[0].ReviewID != rev.ID {
 		t.Errorf("backfilled %+v", open)
 	}
 }
@@ -887,22 +1199,20 @@ func TestEachRepoMergesIntoItsOwnMain(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>\n")
 	f.ok("mara", "commit", commits("web", "a page"))
-	req := map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
-	if text := f.ok("mara", "request_merge", req); text != "Merge request mr-1 (web): waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, web (mr-1): waiting for the CEO." {
 		t.Fatalf("%q", text)
 	}
-	r, err := f.db.Requests().ForMergeRequest(ctx, "mr-1")
-	if err != nil || r.Summary != "Merge lead/atlas/integration into trunk in web: Export invoices." {
-		t.Errorf("review %+v %v", r, err)
+	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); len(diffs) != 1 || diffs[0].Main != "trunk" || !strings.Contains(diffs[0].Diff, "page.html") {
+		t.Errorf("diff against trunk %+v", diffs)
 	}
 	web := filepath.Join(f.root, "ledger", "web")
-	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "web")); err != nil {
 		t.Fatal(err)
 	}
-	if subject := f.git(web, "log", "-1", "--format=%s", "trunk"); subject != "Merge Export invoices" {
+	if subject := f.git(web, "log", "-1", "--format=%s", "trunk"); subject != "Export invoices" {
 		t.Errorf("trunk's head %q", subject)
 	}
-	if n := f.lastNotice(); !strings.Contains(n.Body, "lead/atlas/integration was merged into trunk in web.") {
+	if n := f.lastNotice(); !strings.Contains(n.Body, "lead/atlas/integration was merged into trunk in web, as one commit. lead/atlas/integration now starts from trunk.") {
 		t.Errorf("notice %+v", n)
 	}
 	// A teammate's hand-off is new against web's trunk, not a main it hasn't.

@@ -1,22 +1,27 @@
 import { describe, expect, it } from "vitest";
-import type { Instance, Project, Request, Team } from "../api/client";
+import type { Deployment, Instance, Project, Request, Team } from "../api/client";
 import { keys, staleKeys } from "./queries";
 import { sidebarModel } from "./Shell";
 
 const project = (id: string) => ({ id }) as Project;
 const team = (id: string, name: string) => ({ id, config: { name } }) as Team;
 const instance = (deploymentId: string) => ({ deploymentId }) as Instance;
-const request = (projectId: string, status = "open") => ({ projectId, status }) as Request;
+const request = (projectId: string, status = "open", kind = "question") =>
+  ({ projectId, status, kind }) as Request;
 
 describe("sidebarModel", () => {
-  it("counts open requests and marks the projects that need the CEO", () => {
+  it("counts the open reviews, and marks the projects that need the CEO", () => {
     const m = sidebarModel(
       [project("ledger"), project("relay")],
       [],
       [],
-      [request("ledger"), request("ledger"), request("relay", "resolved")],
+      [
+        request("ledger"),
+        request("ledger", "open", "review"),
+        request("relay", "resolved", "review"),
+      ],
     );
-    expect(m.openRequests).toBe(2);
+    expect(m.reviews).toBe(1);
     expect(m.projects).toEqual([
       { id: "ledger", needsYou: true },
       { id: "relay", needsYou: false },
@@ -65,7 +70,11 @@ describe("staleKeys", () => {
     ]);
     expect(staleKeys({ type: "setup.changed", data: {} })).toEqual([keys.setup, keys.maintenance]);
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
-    expect(staleKeys({ type: "request.created", data: {} })).toEqual([keys.requests]);
+    // A review request opening or closing is its review's status changing.
+    expect(staleKeys({ type: "request.created", data: {} })).toEqual([
+      keys.requests,
+      ["pipeline", "reviews"],
+    ]);
     expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages, keys.activity]);
     expect(staleKeys({ type: "team.action", data: {} })).toEqual([
       keys.actions,
@@ -84,7 +93,15 @@ describe("staleKeys", () => {
   });
 });
 
-import { checksSentence, dashboardSubtitle, dashboardTitle, ordered, projectRows } from "./model";
+import {
+  dashboardSubtitle,
+  greeting,
+  inbox,
+  ordered,
+  projectRows,
+  sessionGroups,
+  teamCards,
+} from "./model";
 
 const req = (id: string, kind: string, createdAt: string, projectId = "ledger") =>
   ({ id, kind, createdAt, projectId, status: "open" }) as Request;
@@ -104,12 +121,30 @@ describe("the Dashboard's model", () => {
     expect(list.map((r) => r.id)).toEqual(["b", "a1", "a2", "r", "q", "f"]);
   });
 
-  it("titles and subtitles", () => {
-    expect([dashboardTitle(0), dashboardTitle(1), dashboardTitle(3)]).toEqual([
-      "All clear",
-      "1 thing needs you",
-      "3 things need you",
+  it("keeps reviews out of the requests answered in place", () => {
+    const list = inbox([
+      req("r", "review", "2026-10-14T07:00:00Z"),
+      req("q", "question", "2026-10-14T09:00:00Z"),
+      { ...req("old", "approval", "2026-10-14T06:00:00Z"), status: "resolved" },
+      req("b", "blocked", "2026-10-14T09:40:00Z"),
     ]);
+    expect(list.map((r) => r.id)).toEqual(["b", "q"]);
+  });
+
+  it("greets by the time of day", () => {
+    const at = (h: number) => greeting(new Date(2026, 9, 21, h, 30));
+    expect([at(3), at(5), at(11), at(12), at(17), at(18), at(23)]).toEqual([
+      "Good night",
+      "Good morning",
+      "Good morning",
+      "Good afternoon",
+      "Good afternoon",
+      "Good evening",
+      "Good evening",
+    ]);
+  });
+
+  it("titles and subtitles", () => {
     expect(
       dashboardSubtitle([
         inst("mara@ledger", "running", "atlas@ledger"),
@@ -120,6 +155,77 @@ describe("the Dashboard's model", () => {
     expect(dashboardSubtitle([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
       "1 session working across 1 deployment.",
     );
+  });
+
+  it("groups the sessions by deployment, the lead first, then the team's order", () => {
+    const atlas = {
+      id: "atlas",
+      config: {
+        name: "Atlas",
+        lead: "mara",
+        order: ["tove", "mara", "ines"],
+        agents: { mara: { name: "Mara" }, tove: { name: "Tove" }, ines: { name: "Ines" } },
+      },
+    } as unknown as Team;
+    const agentInst = (agentId: string, deploymentId: string) =>
+      ({
+        id: `${agentId}@${deploymentId.split("@")[1]}`,
+        agentId,
+        deploymentId,
+        status: "running",
+      }) as Instance;
+    const groups = sessionGroups(
+      [
+        agentInst("lumen", "orion@relay"),
+        agentInst("ines", "atlas@ledger"),
+        agentInst("mara", "atlas@ledger"),
+        agentInst("zed", "atlas@ledger"),
+        agentInst("tove", "atlas@ledger"),
+        { ...agentInst("x", "atlas@ledger"), deploymentId: "" },
+        { ...agentInst("ines", "atlas@harbor"), status: "asleep" },
+        { ...agentInst("nap", "atlas@ledger"), status: "asleep" },
+      ],
+      [{ id: "atlas@ledger", goal: "Ship invoices" } as Deployment],
+      [atlas],
+    );
+    expect(groups.map((g) => [g.deployment, g.project, g.team?.id, g.goal])).toEqual([
+      ["atlas@ledger", "ledger", "atlas", "Ship invoices"],
+      ["orion@relay", "relay", undefined, ""],
+    ]);
+    // Agents the team file doesn't name (zed) come last; with no team file, as they come.
+    expect(groups[0].agents.map((a) => [a.instance.agentId, a.lead, a.agent?.soul.name])).toEqual([
+      ["mara", true, "Mara"],
+      ["tove", false, "Tove"],
+      ["ines", false, "Ines"],
+      ["zed", false, undefined],
+    ]);
+    expect(groups[1].agents.map((a) => a.instance.agentId)).toEqual(["lumen"]);
+  });
+
+  it("gives each team its card: members lead first, the projects it's on", () => {
+    const atlas = {
+      id: "atlas",
+      config: {
+        name: "",
+        purpose: "Builds the ledger",
+        lead: "mara",
+        order: ["tove"],
+        agents: { mara: { name: "Mara" }, tove: { name: "Tove" } },
+      },
+    } as unknown as Team;
+    const [card] = teamCards(
+      [atlas],
+      [
+        inst("tove@relay", "running", "atlas@relay"),
+        inst("mara@ledger", "idle", "atlas@ledger"),
+        inst("tove@ledger", "idle", "atlas@ledger"),
+        inst("lumen@ledger", "idle", "atlantis@ledger"),
+      ],
+    );
+    expect(card.name).toBe("atlas");
+    expect(card.purpose).toBe("Builds the ledger");
+    expect(card.members.map((s) => s.name)).toEqual(["Mara", "Tove"]);
+    expect(card.on).toEqual(["ledger", "relay"]);
   });
 
   it("gives each project its line and state", () => {
@@ -137,15 +243,6 @@ describe("the Dashboard's model", () => {
       { id: "ledger", line: "Atlas · 2 agents working", state: "needs you" },
       { id: "relay", line: "Orion · 0 agents working", state: "idle" },
       { id: "harbor", line: "No team deployed", state: "idle" },
-    ]);
-  });
-
-  it("says how checks went", () => {
-    expect(["pass", "fail", "running", ""].map(checksSentence)).toEqual([
-      " Checks pass.",
-      " Checks fail.",
-      " Checks running.",
-      "",
     ]);
   });
 });

@@ -8,14 +8,14 @@ tags: [feature, ui, requests, pipeline]
 
 What needs the CEO on a project, the work moving towards `main`, and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/archive/project-code-tab.md)):
 
-- **Needs you** opens the project's **Overview**, above the wiki, only when something waits ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)). The Overview tab carries the count badge of open requests.
+- **Needs you** opens the project's **Overview**, above the wiki, only when something waits ([Wiki reader → Project header and tabs](./wiki-reader.md#project-header-and-tabs)). The Overview tab carries the count badge of the requests it lists.
 - **In flight** and **Merged** open the **Repositories** tab, above the repos: they are git facts ([Repositories](./repositories.md)).
 
 Each section keeps the project tabs' 48px sides, with 36px between sections. An old link to `?tab=changes` lands on Overview.
 
 ## 1. Needs you
 
-This project's open [requests](../models/request.md), one **request panel** each. Semantics of each kind: [Requests](./requests.md).
+This project's open [requests](../models/request.md), one **request panel** each, but its reviews: they are decided in [Reviews](./reviews.md), and the repos' **Review** buttons (In flight) open them (the CEO, 2026-10-21). Semantics of each kind: [Requests](./requests.md). Today only review requests are built, so the section doesn't show yet.
 
 - **Request panel**: `--panel`, radius 12, padding `16px 18px`, gap 12.
 - **Header**: the **kind chip first**, Avatar 24 (no ring), the agent name, the context (`<Team> on <project>`), a spacer, and the **source** (Mono 11.5px `--tx4`): `escalate(approval)`, `escalate(question)`, `escalate(finding)`, `request_merge()` or `raised by Foreman` (blocked), derived from the request's `kind` and `source` ([Request](../models/request.md)).
@@ -27,15 +27,7 @@ By kind:
 
 | Request | Text / link | Actions |
 |---|---|---|
-| Review (a merge request) | `<Lead> wants <entry title> merged into main in <repo>.` Link: `<branch> → main · checks <pass│fail│running>`, then the entry (opens it in the wiki reader) | **`Merge to main`** (primary; Foreman merges locally), **`Create PR on <Forgejo│GitHub│Gitea>`** (outline, only when the repo has a forge), **`Reject`** (danger style), **`Open session`** ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)) |
-| Review, after Create PR | the same text; the link line becomes `PR #<n> on <forge> · <repo> · <branch> → main · checks <…>` | **`Open PR ↗`** (primary, the PR in a new tab; the CEO merges there and the request closes when Foreman sees it), **`Reject`** (also closes the PR), **`Open session`** |
 | Approval, Question | the request | its options, plus an inline input `Or type an answer…` (flex 1, min 180px); Enter submits |
-
-When Merge to main finds a conflict, or the forge reports the PR as conflicting with `main`, the review panel's link line ends with **conflicts with main** (`--err`) instead of the checks; the lead has already been asked to merge `main` in ([When main moves](./pipeline-and-merges.md#when-main-moves)).
-
-The **link line** of a review shows the change, `<repo> · <branch> → <main>` and its checks: the repo first, since each repo a branch changed is its own merge request, decided on its own (the CEO, 2026-10-21). Clicking it opens its diff against the repo's main in a dialog titled the same way, one box per file (the CEO, 2026-10-21): a header with its path and `new`, `deleted` or `renamed`, sticky while its lines scroll, then its hunks, each line marked added, removed or kept. Or it opens the PR on the forge once there is one. That is what the CEO reads before deciding.
-
-**Reject** expands an inline editor under the request panel: a textarea (3 rows, placeholder `What should <Author> change? (optional)`), then `Cancel` and the danger-style `Reject and tell <Author>`. The message is optional; when given, it goes to the author (the lead). Only one editor is open at a time; closing it clears the reason. Effect: [Pipeline and merges](./pipeline-and-merges.md#review-and-merge).
 
 **Empty**: the section is left out (the Overview opens with the wiki).
 
@@ -52,8 +44,8 @@ Label "In flight" with the subtitle `worktree → lead → main`. One panel list
 
 **Open merge requests** ([Merge request](../models/merge-request.md)), after the work items:
 
-- Avatar 26 of the lead, the entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <main>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<main>` is the project's protected branch (`main` in `project.toml`), here and on every Merge button.
-- The stage chip `merge requested` (or `PR open`), and **`Open PR ↗`** (once a PR exists) or **`Session`**.
+- Avatar 26 of the lead, the entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <main>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<main>` is that repo's main branch (its `main` in `project.toml`), here and on every Merge button.
+- The stage chip `merge requested` (or `PR open`), **`Review`** (opens its [review](./reviews.md)), and **`Open PR ↗`** (once a PR exists) or **`Session`**.
 - Under it, a compact line per work item it carries: Avatar 20 of the author, the board card title, the branch (Mono `--tx4`).
 
 Entries of a stopped [deployment](../models/deployment.md) stay listed with a `stopped` chip (`--tx4`) instead of the Session button.
@@ -62,4 +54,4 @@ Entries of a stopped [deployment](../models/deployment.md) stay listed with a `s
 
 ## 3. Merged
 
-Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `Merged to main · 14:05` (local time, with the date when not today); under each, its work items as compact lines (author avatar, board card title).
+Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and that repo's main; local time, with the date when not today); under each, its work items as compact lines (author avatar, board card title).

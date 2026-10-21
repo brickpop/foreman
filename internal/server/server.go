@@ -32,6 +32,7 @@ type Options struct {
 	Activity     Activity
 	Repos        Repos
 	Pipeline     Pipeline
+	Reviews      Reviews
 	Requests     Requests
 	Harnesses    Harnesses
 	Profiles     Profiles
@@ -56,6 +57,7 @@ func New(o Options) http.Handler {
 	activityRoutes(mux, o.Activity, o.Agents)
 	repoRoutes(mux, o.Repos)
 	pipelineRoutes(mux, o.Pipeline)
+	reviewRoutes(mux, o.Reviews)
 	requestRoutes(mux, o.Requests)
 	harnessRoutes(mux, o.Harnesses)
 	profileRoutes(mux, o.Profiles)

@@ -4,9 +4,10 @@ import type { Look } from "../api/types/home";
 import { Avatar } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
-// One request to the CEO. The Dashboard and a project's Overview (Needs you) use this same panel,
-// so they can't drift; the variant only changes what the specs say differs
-// (wiki/product/features/dashboard.md#request-list, wiki/product/features/changes.md#1-needs-you).
+// One request to the CEO, but a review (decided in Reviews). The Dashboard and a
+// project's Overview (Needs you) use this same panel, so they can't drift; the
+// variant only changes what the specs say differs
+// (wiki/product/features/dashboard.md#needs-you, wiki/product/features/project-pipeline.md#1-needs-you).
 
 type Props = {
   request: Request;
@@ -14,37 +15,28 @@ type Props = {
   who?: { name: string; look: Look };
   /** `<Team> on <project>`. */
   context: string;
-  /** For a review: the sentence that replaces the summary. */
-  reviewText?: string;
   onAnswer: (answer: string) => void;
   /** An answer is on its way: the options wait. */
   answering?: boolean;
   onOpenSession: () => void;
-  /** Dashboard: a review's Review button (opens the project's Overview). */
-  onReview?: () => void;
   /** Dashboard: avatar 32 with the amber ring. A project: kind chip first, avatar 24, the source. */
   variant?: "dashboard" | "project";
   /** A project: where it came from (`escalate(approval)`, `request_merge()`…). */
   source?: string;
   /** Under the text: e.g. the link line. */
   children?: ReactNode;
-  /** Replaces the option buttons (a project: a review's merge actions). */
-  actions?: ReactNode;
 };
 
 export function RequestPanel({
   request: r,
   who,
   context,
-  reviewText,
   onAnswer,
   answering = false,
   onOpenSession,
-  onReview,
   variant = "dashboard",
   source,
   children,
-  actions,
 }: Props) {
   const onProject = variant === "project";
   const [answer, setAnswer] = useState("");
@@ -99,28 +91,21 @@ export function RequestPanel({
         )}
       </header>
       <p className={`leading-[1.5] text-pretty ${onProject ? "text-[15.5px]" : "text-base"}`}>
-        {r.kind === "review" && reviewText ? reviewText : r.summary}
+        {r.summary}
       </p>
       {children}
       <div className="flex flex-wrap items-center gap-2">
-        {actions ??
-          (r.kind === "review" && onReview ? (
-            <Button variant="primary" onClick={onReview}>
-              Review
-            </Button>
-          ) : (
-            r.options.map((option, i) => (
-              <Button
-                key={option}
-                variant={i === 0 ? "primary" : "secondary"}
-                disabled={answering}
-                className={`${i === 1 ? "!text-tx" : ""} ${onProject ? "" : "!text-[13.5px]"}`}
-                onClick={() => onAnswer(option)}
-              >
-                {option}
-              </Button>
-            ))
-          ))}
+        {r.options.map((option, i) => (
+          <Button
+            key={option}
+            variant={i === 0 ? "primary" : "secondary"}
+            disabled={answering}
+            className={`${i === 1 ? "!text-tx" : ""} ${onProject ? "" : "!text-[13.5px]"}`}
+            onClick={() => onAnswer(option)}
+          >
+            {option}
+          </Button>
+        ))}
         {/* On the Dashboard the card itself opens it; on a project this button does. Nothing to
             open for a Foreman-raised request. */}
         {onProject && r.instanceId !== "" && (

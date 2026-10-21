@@ -15,7 +15,7 @@ A **forge** is where pull requests live. Foreman connects to an existing one; it
 | `github` | GitHub REST | `forge.url` is the owner base, e.g. `https://github.com/acme` |
 | `forgejo` | Gitea-compatible REST | e.g. `https://localhost:3000/ledger` |
 | `gitea` | Gitea REST | Same API family as Forgejo, so one implementation can serve both |
-| `none` | local | No forge: merge requests offer Merge to main and Reject only, and there is nothing to Sync. A `project.toml` without a `forge` table means `none` |
+| `none` | local | No forge: a review merges locally, with no Create PR, and there is nothing to Sync. A `project.toml` without a `forge` table means `none` |
 
 The repo name on the forge equals the repo's name in the project, under the `forge.url` owner/org. The [project repo](../models/project-config.md#the-project-repo) is named in full by `forge.project_repo`, and the [global repo](../models/home.md#the-global-repo) by `global_forge.url`. A per-repo name override is not in v1; it would be an optional field in `project.toml`, added only when a real project needs it.
 
@@ -29,9 +29,9 @@ Every adapter implements the same small set, so kinds are interchangeable. Forem
 | open PR (title, body, head, base = `main`) → URL, number | **Create PR**: the title and body come from the merge request's wiki entry |
 | read PR state | polling, below |
 | read check status | after opening and while polling; shown as "checks pass" on review request panels ([Needs you](../features/project-pipeline.md#1-needs-you)), next to Foreman's own run of the project `checks` |
-| comment, close PR | CEO **Reject** on a merge request that has a PR: the reason is posted on the PR and the PR is closed (the reason is also delivered to the lead) |
+| comment, close PR | CEO **Close** on a review whose merge request has a PR: the reason is posted on the PR and the PR is closed (the reason is also delivered to the lead) |
 
-For `none` there is no PR and nothing to push: the CEO uses Merge to main, and Reject only reaches the lead's session.
+For `none` there is no PR and nothing to push: the CEO uses Merge to main, and Close only reaches the lead's session.
 
 ### PR state
 
@@ -42,7 +42,7 @@ While a [merge request](../models/merge-request.md) with a PR is open, Foreman p
 - **closed** without merge: the merge request is rejected, the review request resolves, its work items go back to stage 0, the lead is told.
 - **new review comments** and "changes requested" reviews since the last poll: delivered to the lead (typed into its session when idle).
 
-In every repo, with or without a forge, Foreman also reads `main` on the same interval and marks an open merge request merged when `main` contains its branch head (`git merge-base --is-ancestor`): the CEO may merge by hand with git.
+In every repo, with or without a forge, Foreman also reads `main` on the same interval and marks an open merge request merged when merging its branch into `main` would change nothing ([Merge to main](../features/pipeline-and-merges.md#merge-to-main)): the CEO may merge by hand with git, and the forge with any merge method. A merged branch then moves to the new `main`, so pushing it again for a next PR can't be a plain fast-forward: how (a forced push, or a new branch on the forge) is open until [The forge](../../backlog/git-forge.md) is built.
 
 ### Sync (the reserved repos)
 

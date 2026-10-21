@@ -3,6 +3,8 @@ import { Agent } from "../screens/Agent";
 import { ChiefOfStaff } from "../screens/ChiefOfStaff";
 import { Dashboard } from "../screens/Dashboard";
 import { Project, type ProjectTab } from "../screens/Project";
+import { Review } from "../screens/Review";
+import { Reviews } from "../screens/Reviews";
 import { Sessions } from "../screens/Sessions";
 import { Settings } from "../screens/Settings";
 import { Team, type TeamTab } from "../screens/Team";
@@ -12,7 +14,7 @@ import type { SessionsSearch } from "./sessions";
 import { settingsSearch } from "./settings";
 
 // One route per screen (wiki/product/features/app-shell.md), with typed path
-// and search params: project / tab / entry, team / tab.
+// and search params: project / tab / entry, team / tab, review / since.
 
 const root = createRootRoute({ component: Shell });
 
@@ -28,6 +30,17 @@ const sessions = createRoute({
     view: s.view === "activity" ? "activity" : undefined,
   }),
   component: Sessions,
+});
+
+const reviews = createRoute({ getParentRoute: () => root, path: "reviews", component: Reviews });
+
+const review = createRoute({
+  getParentRoute: () => root,
+  path: "reviews/$review",
+  // since: the change since the CEO last requested changes, instead of against main.
+  validateSearch: (s: Record<string, unknown>): { since?: true } =>
+    s.since === true || s.since === "1" ? { since: true } : {},
+  component: Review,
 });
 
 const projectTabs: ProjectTab[] = ["overview", "board", "repositories", "activity", "settings"];
@@ -75,6 +88,8 @@ export const router = createRouter({
   routeTree: root.addChildren([
     dashboard,
     sessions,
+    reviews,
+    review,
     projectRoute,
     teamRoute,
     agentRoute,

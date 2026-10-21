@@ -16,19 +16,24 @@ import (
 	"github.com/brickpop/foreman/internal/teamtools"
 )
 
-// Merge requests: the lead's request_merge, then the CEO's Merge to main or
-// Reject (wiki/product/features/pipeline-and-merges.md#review-and-merge,
+// Merge requests: the lead's request_merge, one per repo, grouped in the
+// branch's review, where the CEO decides (reviews.go;
+// wiki/product/features/pipeline-and-merges.md#review-and-merge,
 // wiki/product/models/merge-request.md).
 
 var (
-	// ErrNotOpen means the merge request was already merged or rejected.
-	ErrNotOpen = errors.New("workflow: the merge request isn't open")
+	// ErrNotOpen means the review has no open merge request left (they were
+	// merged or closed already), or none in the repos named.
+	ErrNotOpen = errors.New("workflow: nothing open to decide")
 	// ErrConflict means the branch doesn't merge cleanly into main: the
 	// merge request is marked so and the lead told to merge main in.
 	ErrConflict = git.ErrConflict
 	// ErrLocalChanges means the CEO's checkout has main checked out with
 	// uncommitted changes the merge would overwrite.
 	ErrLocalChanges = git.ErrLocalChanges
+	// ErrBranchMoved means the branch isn't at the commit the CEO read: the
+	// lead committed since, and the CEO hasn't seen it.
+	ErrBranchMoved = git.ErrMoved
 )
 
 func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.Result {
@@ -49,6 +54,12 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 		return res
 	}
 	t.integrate(ctx) // hand-offs merged since the last check go with it
+	// The branch's open review takes every repo's merge request; with none
+	// open, the first one made starts a new review.
+	reviewID, err := t.w.MergeRequests.OpenReview(ctx, t.project.ID, branch)
+	if err != nil {
+		return teamtools.Refusal("internal", "%v", err)
+	}
 	var made []string
 	found := false
 	for _, r := range t.worktrees() {
@@ -56,10 +67,17 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 			continue
 		}
 		found = true
-		if n, err := t.w.Git.Ahead(ctx, r.dir, branch, t.project.Main(r.name)); err != nil {
+		if merged, err := t.w.Git.Merged(ctx, r.dir, t.project.Main(r.name), branch); err != nil {
 			return gitError(err)
-		} else if n == 0 {
+		} else if merged {
 			continue
+		}
+		if reviewID == "" {
+			review, err := t.w.Reviews.Save(ctx, store.Review{ProjectID: t.project.ID, Branch: branch})
+			if err != nil {
+				return teamtools.Refusal("internal", "%v", err)
+			}
+			reviewID = review.ID
 		}
 		mr, err := t.w.MergeRequests.OpenFor(ctx, t.project.ID, r.name, branch)
 		refreshed := err == nil
@@ -69,16 +87,15 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 		if !refreshed {
 			mr = store.MergeRequest{ProjectID: t.project.ID, Repo: r.name, Branch: branch}
 		}
-		mr.DeploymentID, mr.AuthorInstance, mr.Entry = t.c.Deployment.ID, t.c.Instance.ID, entry
+		mr.DeploymentID, mr.AuthorInstance, mr.Entry, mr.ReviewID = t.c.Deployment.ID, t.c.Instance.ID, entry, reviewID
 		mr.Conflicting, mr.Note = false, ""
 		if mr, err = t.w.MergeRequests.Save(ctx, mr); err != nil {
 			return teamtools.Refusal("internal", "%v", err)
 		}
 		t.w.announce(mr)
-		t.w.review(ctx, mr)
 		t.carry(ctx, r.dir, mr)
 		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, MergeRequest: mr.ID})
-		what := mr.ID + " (" + r.name + ")"
+		what := r.name + " (" + mr.ID + ")"
 		if refreshed {
 			what += ", refreshed"
 		}
@@ -88,9 +105,17 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case len(made) == 0:
-		return teamtools.Refusal("nothing_to_merge", "%s has no commits beyond its repo's main branch in any repo", branch)
+		return teamtools.Refusal("nothing_to_merge", "%s changes nothing in its repo's main branch, in any repo", branch)
 	}
-	return agentlink.Result{Text: fmt.Sprintf("Merge request %s: waiting for the CEO.", strings.Join(made, ", "))}
+	// Asked again after changes were requested: the review waits on the CEO again.
+	if review, err := t.w.Reviews.Get(ctx, reviewID); err == nil && !review.ChangesRequestedAt.IsZero() {
+		review.ChangesRequestedAt = time.Time{}
+		if _, err := t.w.Reviews.Save(ctx, review); err != nil {
+			slog.Warn("keeping a review", "review", reviewID, "err", err)
+		}
+	}
+	t.w.review(ctx, reviewID)
+	return agentlink.Result{Text: fmt.Sprintf("Review %s, %s: waiting for the CEO.", reviewID, strings.Join(made, ", "))}
 }
 
 // carry gives the merge request the integrated work items its branch
@@ -112,36 +137,20 @@ func (t tool) carry(ctx context.Context, dir string, mr store.MergeRequest) {
 	}
 }
 
-// MergeRequest returns one merge request.
-func (w *Workflow) MergeRequest(ctx context.Context, id string) (store.MergeRequest, error) {
-	return w.MergeRequests.Get(ctx, id)
-}
-
-// Diff is what a merge request's branch changes against main.
-func (w *Workflow) Diff(ctx context.Context, id string) (string, error) {
-	mr, main, dir, err := w.target(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	return w.Git.Diff(ctx, dir, main, mr.Branch)
-}
-
-// MergeToMain is the CEO's Merge to main: a merge commit "Merge <entry
-// title>", in the CEO's checkout when it has main checked out, without a
-// working tree otherwise (wiki/product/features/pipeline-and-merges.md#merge-to-main).
-func (w *Workflow) MergeToMain(ctx context.Context, id string) error {
-	mr, main, dir, err := w.target(ctx, id)
+// mergeToMain squashes one merge request's branch, at head (the commit the
+// CEO read), into its repo's main: one commit "<entry title>", in the CEO's
+// checkout when it has main checked out, without a working tree otherwise
+// (wiki/product/features/pipeline-and-merges.md#merge-to-main).
+func (w *Workflow) mergeToMain(ctx context.Context, mr store.MergeRequest, head string) error {
+	main, dir, err := w.repoOf(mr)
 	if err != nil {
 		return err
-	}
-	if mr.State != store.MergeOpen {
-		return ErrNotOpen
 	}
 	title := mr.Entry
 	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil {
 		title = e.Title
 	}
-	switch err := w.Git.MergeInto(ctx, dir, main, mr.Branch, "Merge "+title); {
+	switch err := w.Git.Squash(ctx, dir, main, mr.Branch, head, title); {
 	case errors.Is(err, git.ErrConflict):
 		mr.Conflicting, mr.Note = true, "conflicts with "+main
 		w.saveMerge(ctx, mr)
@@ -150,23 +159,15 @@ func (w *Workflow) MergeToMain(ctx context.Context, id string) error {
 	case err != nil:
 		return err
 	}
-	w.merged(ctx, mr, main)
+	w.merged(ctx, mr, main, dir, head)
 	return nil
 }
 
-// Reject is the CEO's Reject: the reason goes to the lead, its work items
-// back to "in worktree", and the branch stays for the lead to rework.
-func (w *Workflow) Reject(ctx context.Context, id, reason string) error {
-	mr, err := w.MergeRequests.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if mr.State != store.MergeOpen {
-		return ErrNotOpen
-	}
+// reject ends one merge request unmerged: its work items go back to "in
+// worktree", and the branch stays for the lead to rework.
+func (w *Workflow) reject(ctx context.Context, mr store.MergeRequest, reason string) {
 	mr.State, mr.RejectedAt, mr.Note = store.MergeRejected, time.Now().UTC(), reason
 	w.saveMerge(ctx, mr)
-	w.resolveReview(ctx, mr, "rejected")
 	items, _ := w.WorkItems.ForDeployment(ctx, mr.DeploymentID)
 	for _, item := range items {
 		if item.MergeRequestID == mr.ID {
@@ -177,17 +178,11 @@ func (w *Workflow) Reject(ctx context.Context, id, reason string) error {
 			w.save(ctx, item)
 		}
 	}
-	why := ""
-	if reason != "" {
-		why = ": " + reason
-	}
-	w.tell(ctx, mr, "ceo", fmt.Sprintf("From the CEO: the merge of %s in %s was rejected%s. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.", mr.Branch, mr.Repo, why))
-	return nil
 }
 
-// Reconcile notices open merge requests whose branch is in main already,
-// whoever merged it (the CEO's own git, a forge), and gives one whose
-// review couldn't be saved (a database error) its review.
+// Reconcile notices open merge requests whose branch changes nothing in main,
+// whoever merged it (the CEO's own git, a forge), and gives a review whose
+// request couldn't be saved (a database error) its request.
 func (w *Workflow) Reconcile(ctx context.Context) {
 	open, err := w.MergeRequests.Open(ctx)
 	if err != nil {
@@ -195,25 +190,36 @@ func (w *Workflow) Reconcile(ctx context.Context) {
 		return
 	}
 	for _, mr := range open {
-		_, main, dir, err := w.target(ctx, mr.ID)
+		main, dir, err := w.repoOf(mr)
 		if err != nil {
 			continue
 		}
-		if in, err := w.Git.Contains(ctx, dir, main, mr.Branch); err == nil && in {
-			w.merged(ctx, mr, main)
+		head, err := w.Git.Resolve(ctx, dir, "refs/heads/"+mr.Branch)
+		if merged, merr := w.Git.Merged(ctx, dir, main, mr.Branch); err == nil && merr == nil && merged {
+			w.merged(ctx, mr, main, dir, head)
 		} else {
-			w.review(ctx, mr) // one whose review couldn't be saved gets it now
+			w.review(ctx, mr.ReviewID)
 		}
 	}
 }
 
 // merged ends a merge request as merged, tells its lead, and tells the
-// leads of the other open ones on the same repo that main moved.
-func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main string) {
+// leads of the other open ones on the same repo that main moved. Its review
+// request is resolved once nothing in the review is left open. The branch,
+// still at head (the commit merged), moves to the new main: a squash left
+// its commits out of main, and a next review on it would show them again.
+func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main, dir, head string) {
 	mr.State, mr.MergedAt, mr.Conflicting, mr.Note = store.MergeMerged, time.Now().UTC(), false, ""
 	w.saveMerge(ctx, mr)
-	w.resolveReview(ctx, mr, "merged")
-	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: %s was merged into %s in %s.", mr.Branch, main, mr.Repo))
+	if !w.anyOpen(ctx, mr.ReviewID) {
+		w.resolveReview(ctx, mr.ReviewID, "merged")
+	}
+	next := fmt.Sprintf("%s now starts from %s.", mr.Branch, main)
+	if err := w.Git.MoveBranch(ctx, dir, mr.Branch, head, main); err != nil {
+		slog.Info("keeping a merged branch", "merge request", mr.ID, "err", err)
+		next = fmt.Sprintf("%s has commits since, or changes in the way, so it still holds what was merged: merge %s into it with merge(%q) before you go on.", mr.Branch, main, main)
+	}
+	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: %s was merged into %s in %s, as one commit. %s", mr.Branch, main, mr.Repo, next))
 	open, err := w.MergeRequests.Open(ctx)
 	if err != nil {
 		return
@@ -225,22 +231,35 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main strin
 	}
 }
 
-// target is a merge request with its repo's main branch and the
-// repo's own checkout (the CEO's).
-func (w *Workflow) target(ctx context.Context, id string) (store.MergeRequest, string, string, error) {
-	mr, err := w.MergeRequests.Get(ctx, id)
-	if err != nil {
-		return mr, "", "", err
+// anyOpen reports whether a review still has an open merge request.
+func (w *Workflow) anyOpen(ctx context.Context, reviewID string) bool {
+	if reviewID == "" {
+		return false
 	}
+	mrs, err := w.MergeRequests.ForReview(ctx, reviewID)
+	if err != nil {
+		return true // unknown: keep its request
+	}
+	for _, mr := range mrs {
+		if mr.State == store.MergeOpen {
+			return true
+		}
+	}
+	return false
+}
+
+// repoOf is a merge request's repo: its main branch and its own checkout
+// (the CEO's).
+func (w *Workflow) repoOf(mr store.MergeRequest) (main, dir string, err error) {
 	project, err := w.Config.Project(mr.ProjectID)
 	if err != nil {
-		return mr, "", "", err
+		return "", "", err
 	}
 	dir, ok := project.RepoDir(mr.Repo)
 	if !ok {
-		return mr, "", "", fmt.Errorf("%w: %s has no repo %s agents can use", home.ErrNotFound, project.ID, mr.Repo)
+		return "", "", fmt.Errorf("%w: %s has no repo %s agents can use", home.ErrNotFound, project.ID, mr.Repo)
 	}
-	return mr, project.Main(mr.Repo), dir, nil
+	return project.Main(mr.Repo), dir, nil
 }
 
 // tell delivers a notice to the merge request's lead, from Foreman or the CEO.
@@ -266,38 +285,65 @@ func (w *Workflow) announce(mr store.MergeRequest) {
 	}
 }
 
-// review makes sure an open merge request has its open review request: the
-// CEO's "Needs you" on the Dashboard and in Changes (wiki/product/models/request.md).
-func (w *Workflow) review(ctx context.Context, mr store.MergeRequest) {
-	if _, err := w.Requests.ForMergeRequest(ctx, mr.ID); err == nil || !errors.Is(err, store.ErrNotFound) {
+// review makes sure a review waiting on the CEO has its open review request:
+// the CEO's "Needs you" on the Dashboard and the project's Overview
+// (wiki/product/models/request.md). None while changes are requested (it
+// waits on the lead) or once nothing in it is open.
+func (w *Workflow) review(ctx context.Context, reviewID string) {
+	if reviewID == "" {
 		return
 	}
-	main, title := "main", mr.Entry
-	if project, err := w.Config.Project(mr.ProjectID); err == nil {
-		main = project.Main(mr.Repo)
+	if _, err := w.Requests.ForReview(ctx, reviewID); err == nil || !errors.Is(err, store.ErrNotFound) {
+		return
 	}
-	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil {
-		title = e.Title
+	r, err := w.Reviews.Get(ctx, reviewID)
+	if err != nil || !r.ChangesRequestedAt.IsZero() {
+		return
 	}
-	r, err := w.Requests.Save(ctx, store.Request{Kind: "review", ProjectID: mr.ProjectID, DeploymentID: mr.DeploymentID,
-		InstanceID: mr.AuthorInstance, Source: "agent", MergeRequestID: mr.ID,
-		Summary: fmt.Sprintf("Merge %s into %s in %s: %s.", mr.Branch, main, mr.Repo, title)})
+	mrs, err := w.MergeRequests.ForReview(ctx, reviewID)
 	if err != nil {
-		slog.Warn("raising a review", "merge request", mr.ID, "err", err)
 		return
 	}
-	w.publishRequest("request.created", r)
+	var open []store.MergeRequest
+	for _, mr := range mrs {
+		if mr.State == store.MergeOpen {
+			open = append(open, mr)
+		}
+	}
+	if len(open) == 0 {
+		return
+	}
+	latest := open[len(open)-1]
+	req, err := w.Requests.Save(ctx, store.Request{Kind: "review", ProjectID: r.ProjectID, DeploymentID: latest.DeploymentID,
+		InstanceID: latest.AuthorInstance, Source: "agent", ReviewID: reviewID,
+		Summary: fmt.Sprintf("Merge %s: %s.", r.Branch, w.titleOf(latest))})
+	if err != nil {
+		slog.Warn("raising a review", "review", reviewID, "err", err)
+		return
+	}
+	w.publishRequest("request.created", req)
 }
 
-// resolveReview closes a merge request's review once it left open.
-func (w *Workflow) resolveReview(ctx context.Context, mr store.MergeRequest, answer string) {
-	r, err := w.Requests.ForMergeRequest(ctx, mr.ID)
+// titleOf is the title of the entry a merge request names, else its path.
+func (w *Workflow) titleOf(mr store.MergeRequest) string {
+	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil && e.Title != "" {
+		return e.Title
+	}
+	return mr.Entry
+}
+
+// resolveReview closes a review's open request.
+func (w *Workflow) resolveReview(ctx context.Context, reviewID, answer string) {
+	if reviewID == "" {
+		return
+	}
+	r, err := w.Requests.ForReview(ctx, reviewID)
 	if err != nil {
 		return
 	}
 	r.Status, r.Answer, r.ResolvedAt = store.RequestResolved, answer, time.Now().UTC()
 	if r, err = w.Requests.Save(ctx, r); err != nil {
-		slog.Warn("resolving a review", "merge request", mr.ID, "err", err)
+		slog.Warn("resolving a review", "review", reviewID, "err", err)
 		return
 	}
 	w.publishRequest("request.resolved", r)

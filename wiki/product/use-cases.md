@@ -51,15 +51,16 @@ Acceptance:
 
 ## 5. Merge review
 
-Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO merges to main from Foreman, or creates a PR on Forgejo and merges there, or rejects it with a reason.
+Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO reviews it in Foreman and merges to main, requests changes with comments, or closes it with a reason; or creates a PR on Forgejo and merges there.
 
 Acceptance:
 - [ ] `request_merge` from the lead runs the project checks and creates a [merge request](./models/merge-request.md) for each repo with new commits, titled from the entry and carrying every integrated work item (they leave "In flight" and are listed under it). Nothing is pushed to the forge.
-- [ ] A review request appears with the entry's title, the branch and checks, and Merge to main / Create PR on Forgejo / Reject / Open session.
+- [ ] A review request appears with the entry's title and the repos, and a Review button that opens its review: the files changed by repo, the diff, the checks per repo, and Merge to main / Request changes / Close (Create PR on Forgejo comes with the forge).
+- [ ] Comments on lines and general ones stay drafts until Request changes sends them to the lead in one message, each with its repo, file and line; the lead's next `request_merge` shows the new diff, a comment whose line changed is marked outdated, and "Since your last review" shows only what changed.
 - [ ] Merge to main merges the branch into `main` on the host, resolves the request, tells the lead, and lists the merge request with its work items under Merged. A branch that doesn't merge cleanly changes nothing, shows "conflicts with main" and asks the lead to merge `main` in.
 - [ ] Create PR pushes the branch and opens a PR on the forge; the panel then shows Open PR ↗. When the CEO merges it on the forge, Foreman notices within a polling interval, resolves the request and notifies the lead; closing it without merging rejects the merge request and returns its work items to stage 0; review comments made on the forge reach the lead's session.
 - [ ] On a repo without a forge, Create PR is not offered.
-- [ ] Reject asks for a reason, delivers it to the lead (typed into its session when idle), closes the PR if there is one, returns the work items to stage 0, and keeps the branch, so the lead can `switch` back to it.
+- [ ] Close asks for a reason, delivers it to the lead (typed into its session when idle), closes the PR if there is one, returns the work items to stage 0, and keeps the branch, so the lead can `switch` back to it.
 - [ ] A non-lead calling `request_merge` is refused; so is an entry that doesn't exist in the wiki.
 - [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<own team>/*` is refused.
 - [ ] When one merge request is merged, the lead of every other open one on the same repo gets a "main moved" line asking it to merge `main` in with `merge("main")`; after that, `request_merge` on the same branch refreshes the existing merge request (checks rerun, its PR pushed again if it has one) instead of creating a new one.

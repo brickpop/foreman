@@ -15,6 +15,8 @@ export type Notice = {
   /** agent@project: a newer notice replaces an older one from the same instance. */
   instance: string;
   deployment: string;
+  /** A review's notice opens the review, not the lead's session. */
+  review?: string;
   /** The toast's dot (a token). */
   color: string;
 };
@@ -31,6 +33,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
     if (r.kind === "review") {
       return {
         ...base,
+        review: r.reviewId,
         toggle: "mergeRequested",
         title: `${who} requested a merge${where}`,
         color: "var(--ok)",
@@ -97,7 +100,8 @@ export function notifiesBrowser(n: Notice, toggles: Notifications, hidden: boole
   return n.toggle !== undefined && toggles[n.toggle] && permission() === "on" && hidden;
 }
 
-/** Shows a browser notification; its click focuses the tab and opens the session. */
+/** Shows a browser notification; its click focuses the tab and opens what
+ * it is about (a review, else the session). */
 export function showBrowserNotification(n: Notice, open: () => void) {
   // The tag collapses duplicates from several open Foreman tabs, and replaces
   // an older notice from the same instance.

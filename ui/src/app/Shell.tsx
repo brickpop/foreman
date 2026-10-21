@@ -68,7 +68,9 @@ export function Shell() {
 }
 
 export type SidebarModel = {
-  openRequests: number;
+  /** The reviews waiting on the CEO: their review requests open; the only
+   * count in the nav. */
+  reviews: number;
   projects: { id: string; needsYou: boolean }[];
   teams: { id: string; name: string; deployedOn: string }[];
 };
@@ -83,7 +85,7 @@ export function sidebarModel(
   const open = requests.filter((r) => r.status === "open");
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean));
   return {
-    openRequests: open.length,
+    reviews: open.filter((r) => r.kind === "review").length,
     projects: projects.map((p) => ({
       id: p.id,
       needsYou: open.some((r) => r.projectId === p.id),
@@ -146,10 +148,13 @@ function Sidebar({
       <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-2.5 pb-3">
         <nav className="flex flex-col gap-0.5">
           <Link to="/" className={navItem} activeProps={navActive} activeOptions={{ exact: true }}>
-            Dashboard <CountBadge count={model.openRequests} />
+            Dashboard
           </Link>
           <Link to="/sessions" className={navItem} activeProps={navActive}>
             Sessions
+          </Link>
+          <Link to="/reviews" className={navItem} activeProps={navActive}>
+            Reviews <CountBadge count={model.reviews} />
           </Link>
         </nav>
         <section className="flex flex-col gap-0.5">
@@ -229,11 +234,14 @@ function LiveEvents() {
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
     if (!n) return;
-    // No instance (Foreman itself): the request waits on the Dashboard.
+    // A review opens its page; otherwise who it is about, and with no
+    // instance (Foreman itself) the request waits on the Dashboard.
     const open = () =>
-      n.instance
-        ? navigate({ to: "/sessions", search: { deployment: n.deployment, agent: n.instance } })
-        : navigate({ to: "/" });
+      n.review
+        ? navigate({ to: "/reviews/$review", params: { review: n.review } })
+        : n.instance
+          ? navigate({ to: "/sessions", search: { deployment: n.deployment, agent: n.instance } })
+          : navigate({ to: "/" });
     toast({ title: n.title, body: n.body, color: n.color, onOpen: open });
     const toggles = settings.data?.settings.notifications;
     if (toggles && notifiesBrowser(n, toggles, document.hidden)) showBrowserNotification(n, open);

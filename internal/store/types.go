@@ -53,20 +53,20 @@ type Doing struct {
 
 // Request is something waiting for the CEO (wiki/product/models/request.md).
 type Request struct {
-	ID             string    `json:"id"`
-	Kind           string    `json:"kind"` // approval, question, review, finding or blocked
-	ProjectID      string    `json:"projectId"`
-	DeploymentID   string    `json:"deploymentId"` // "" with no instance
-	InstanceID     string    `json:"instanceId"`   // who raised it, or who it is about; "" when Foreman raised it about no instance
-	Summary        string    `json:"summary"`
-	Options        []string  `json:"options"` // the first is the primary action
-	Source         string    `json:"source"`  // agent, harness or foreman
-	Status         string    `json:"status"`  // open, resolved or expired
-	Answer         string    `json:"answer"`
-	CreatedAt      time.Time `json:"createdAt"`
-	ResolvedAt     time.Time `json:"resolvedAt"`
-	MergeRequestID string    `json:"mergeRequestId"` // for a review
-	Links          []Link    `json:"links"`
+	ID           string    `json:"id"`
+	Kind         string    `json:"kind"` // approval, question, review, finding or blocked
+	ProjectID    string    `json:"projectId"`
+	DeploymentID string    `json:"deploymentId"` // "" with no instance
+	InstanceID   string    `json:"instanceId"`   // who raised it, or who it is about; "" when Foreman raised it about no instance
+	Summary      string    `json:"summary"`
+	Options      []string  `json:"options"` // the first is the primary action
+	Source       string    `json:"source"`  // agent, harness or foreman
+	Status       string    `json:"status"`  // open, resolved or expired
+	Answer       string    `json:"answer"`
+	CreatedAt    time.Time `json:"createdAt"`
+	ResolvedAt   time.Time `json:"resolvedAt"`
+	ReviewID     string    `json:"reviewId"` // for a review
+	Links        []Link    `json:"links"`
 }
 
 // Link is an extra link on a request's panel (a branch, a wiki entry).
@@ -152,6 +152,35 @@ type MergeRequest struct {
 	CreatedAt      time.Time `json:"createdAt"`
 	MergedAt       time.Time `json:"mergedAt"`
 	RejectedAt     time.Time `json:"rejectedAt"`
+	ReviewID       string    `json:"reviewId"`     // the review it is decided in
+	ReviewedHead   string    `json:"reviewedHead"` // the branch head at the CEO's last Request changes
+}
+
+// Review groups the merge requests one lead branch opened, one per repo, for
+// the CEO to read and decide at once (wiki/product/models/review.md).
+type Review struct {
+	ID                 string    `json:"id"`
+	ProjectID          string    `json:"projectId"`
+	Branch             string    `json:"branch"`
+	CreatedAt          time.Time `json:"createdAt"`
+	ChangesRequestedAt time.Time `json:"changesRequestedAt"` // zero unless it waits on the lead
+}
+
+// ReviewComment is the CEO's comment on a review: on a line of a repo's
+// diff, or general (no repo).
+type ReviewComment struct {
+	ID        string    `json:"id"`
+	ReviewID  string    `json:"reviewId"`
+	Repo      string    `json:"repo"`
+	Path      string    `json:"path"`
+	Side      string    `json:"side"` // new (the branch) or old (main); "" for a general one
+	Line      int       `json:"line"` // on its side, in the commit it was written on
+	Commit    string    `json:"commit"`
+	Snippet   string    `json:"snippet"` // the line's text then
+	Body      string    `json:"body"`
+	State     string    `json:"state"` // draft or sent
+	CreatedAt time.Time `json:"createdAt"`
+	SentAt    time.Time `json:"sentAt"`
 }
 
 // ActivityItem is one item of a project's activity: a message or a git action.

@@ -195,7 +195,7 @@ function Configuration({ project }: { project: Project }) {
               [
                 "review",
                 "text-ok",
-                "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you choose: Merge to main, Create PR on your forge, or Reject.",
+                "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you review it: merge it, request changes, or close it.",
               ],
               [
                 "finding",
@@ -223,8 +223,8 @@ function Configuration({ project }: { project: Project }) {
           <span className="font-medium">{forgeLabel(forge.kind)}</span>
           <span className="text-[13.5px] text-tx2">
             {forge.kind === "none"
-              ? "No forge. You merge requested branches into main from the Overview, under Needs you; Foreman does the merge."
-              : `Merge to main from the Overview, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
+              ? "No forge. You merge requested branches into main from their review, in Reviews; Foreman does the merge."
+              : `Merge to main from a branch's review, in Reviews, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
           </span>
           {forge.projectRepo && (
             <span className="flex items-center gap-3 text-[13px] text-tx3">

@@ -33,7 +33,7 @@ Table `work_items`.
 - Stage 3 ("integrated") is set when the branch is merged into any of the lead's `lead/<team>/*` branches in the lead's worktree: checked right after the lead's `merge` or `commit`, in every repo that has the branch.
 - `merge_request_id` is set only by the lead's `request_merge`, only on stage-3 work items of the same deployment that have no `merge_request_id` yet and whose branch head is contained in the merge request's branch (git ancestry), at creation or at a later refresh of it. A work item with a `merge_request_id` is listed under its merge request, not on its own.
 - A work item is merged when its merge request is merged; it has no merge time of its own.
-- Its merge request being rejected (Reject, or its PR closed on the forge) clears `merge_request_id` and resets the work item to stage 0 with the note; the lead decides who reworks.
+- Its merge request being rejected (Close on its review, or its PR closed on the forge) clears `merge_request_id` and resets the work item to stage 0 with the note; the lead decides who reworks.
 - The note's **tone** (`ok`, `err`, `ask`, neutral), which Repositories → In flight colors it by, is derived from the work item's state (checks, stage), never stored.
 
 ## Phasing

@@ -72,7 +72,7 @@ export interface Request {
   answer: string;
   createdAt: string /* RFC 3339 */;
   resolvedAt: string /* RFC 3339 */;
-  mergeRequestId: string; // for a review
+  reviewId: string; // for a review
   links: Link[];
 }
 /**
@@ -167,6 +167,37 @@ export interface MergeRequest {
   createdAt: string /* RFC 3339 */;
   mergedAt: string /* RFC 3339 */;
   rejectedAt: string /* RFC 3339 */;
+  reviewId: string; // the review it is decided in
+  reviewedHead: string; // the branch head at the CEO's last Request changes
+}
+/**
+ * Review groups the merge requests one lead branch opened, one per repo, for
+ * the CEO to read and decide at once (wiki/product/models/review.md).
+ */
+export interface Review {
+  id: string;
+  projectId: string;
+  branch: string;
+  createdAt: string /* RFC 3339 */;
+  changesRequestedAt: string /* RFC 3339 */; // zero unless it waits on the lead
+}
+/**
+ * ReviewComment is the CEO's comment on a review: on a line of a repo's
+ * diff, or general (no repo).
+ */
+export interface ReviewComment {
+  id: string;
+  reviewId: string;
+  repo: string;
+  path: string;
+  side: string; // new (the branch) or old (main); "" for a general one
+  line: number /* int */; // on its side, in the commit it was written on
+  commit: string;
+  snippet: string; // the line's text then
+  body: string;
+  state: string; // draft or sent
+  createdAt: string /* RFC 3339 */;
+  sentAt: string /* RFC 3339 */;
 }
 /**
  * ActivityItem is one item of a project's activity: a message or a git action.

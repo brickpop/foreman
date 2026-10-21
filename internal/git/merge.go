@@ -3,9 +3,9 @@ package git
 import (
 	"context"
 	"errors"
-	"os"
 	"os/exec"
-	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -18,78 +18,180 @@ var (
 	// ErrLocalChanges means the repo's checkout has the target checked out
 	// with uncommitted changes the merge would overwrite: nothing was changed.
 	ErrLocalChanges = errors.New("git: uncommitted changes in the way")
+	// ErrMoved means the branch isn't at the commit it was expected at
+	// anymore: nothing was changed.
+	ErrMoved = errors.New("git: the branch moved")
 )
 
-// MergeInto merges branch into target with a merge commit (always, never a
-// fast-forward) by the CEO's git identity, or Foreman's when there is none.
-// When dir (the repo's own checkout, the CEO's) has target checked out, the
-// merge runs there so its files move with target; otherwise it is made
-// without a working tree, leaving the checkout's files alone.
-func (g *CLI) MergeInto(ctx context.Context, dir, target, branch, message string) error {
+// Squash puts what branch changes onto target as one new commit, by the
+// CEO's git identity (Foreman's when there is none): message, then a
+// Co-Authored-By line per author of branch's commits, so the agents keep the
+// credit. Only while branch is at head (the commit the CEO read, its full
+// hash): ErrMoved otherwise. When target has all of it already, nothing is committed. When
+// dir (the repo's own checkout, the CEO's) has target checked out, its files
+// move with target; otherwise they are left alone.
+func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message string) error {
 	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, target) {
 		return ErrBadBranch
 	}
+	if !hash.MatchString(head) {
+		return ErrNoRef
+	}
 	defer g.lock(ctx, dir)()
+	at, err := g.Resolve(ctx, dir, "refs/heads/"+branch)
+	if err != nil {
+		return err
+	} else if at != head {
+		return ErrMoved
+	}
+	tree, err := mergedTree(ctx, dir, "refs/heads/"+target, at)
+	if err != nil {
+		return err
+	}
+	old, err := g.Resolve(ctx, dir, "refs/heads/"+target)
+	if err != nil {
+		return err
+	}
+	if was, err := treeOf(ctx, dir, old); err != nil || was == tree {
+		return err
+	}
+	authors, err := run(ctx, dir, "log", "--reverse", "--format=%an <%ae>", old+".."+at)
+	if err != nil {
+		return err
+	}
 	var who []string
 	if !hasIdentity(ctx, dir) {
 		who = fallbackIdentity
 	}
-	if current, _ := run(ctx, dir, "branch", "--show-current"); strings.TrimSpace(current) == target {
-		return mergeCheckedOut(ctx, dir, branch, message, who)
+	commit, err := run(ctx, dir, append(who, "commit-tree", tree, "-p", old, "-m", message+coAuthors(authors))...)
+	if err != nil {
+		return err
 	}
-	return mergeWithoutWorktree(ctx, dir, target, branch, message, who)
-}
-
-func mergeCheckedOut(ctx context.Context, dir, branch, message string, who []string) error {
-	_, err := run(ctx, dir, append(who, "merge", "--no-ff", "--no-edit", "-m", message, branch)...)
-	if err == nil {
+	commit = strings.TrimSpace(commit)
+	if current, _ := run(ctx, dir, "branch", "--show-current"); strings.TrimSpace(current) == target {
+		// A fast-forward to the new commit: the checkout's files follow, and
+		// git refuses when the CEO's own changes are in the way.
+		if _, err := run(ctx, dir, "merge", "--ff-only", "--quiet", commit); err != nil {
+			if strings.Contains(err.Error(), "would be overwritten") {
+				return ErrLocalChanges
+			}
+			return err
+		}
 		return nil
 	}
-	// A merge left half-way is a conflict: back out, so nothing changed.
-	if gitDir, gerr := run(ctx, dir, "rev-parse", "--absolute-git-dir"); gerr == nil {
-		if _, serr := os.Stat(filepath.Join(strings.TrimSpace(gitDir), "MERGE_HEAD")); serr == nil {
-			_, _ = run(ctx, dir, "merge", "--abort")
-			return ErrConflict
-		}
-	}
-	if strings.Contains(err.Error(), "would be overwritten") || strings.Contains(err.Error(), "local changes") {
-		return ErrLocalChanges
-	}
+	// Moved only if target is still where it was read: never over someone else's move.
+	_, err = run(ctx, dir, "update-ref", "refs/heads/"+target, commit, old)
 	return err
 }
 
-func mergeWithoutWorktree(ctx context.Context, dir, target, branch, message string, who []string) error {
-	out, err := run(ctx, dir, "merge-tree", "--write-tree", "refs/heads/"+target, "refs/heads/"+branch)
+// coAuthors is the trailer naming each author once, in the order they
+// first committed.
+func coAuthors(authors string) string {
+	var b strings.Builder
+	seen := map[string]bool{}
+	for _, a := range strings.Split(authors, "\n") {
+		if a = strings.TrimSpace(a); a != "" && !seen[a] {
+			if len(seen) == 0 {
+				b.WriteString("\n")
+			}
+			seen[a] = true
+			b.WriteString("\nCo-Authored-By: " + a)
+		}
+	}
+	return b.String()
+}
+
+// Merged reports whether merging branch into into would change nothing: all
+// of branch's changes are there, however they got there (a squash, a merge
+// commit, a rebase on a forge).
+func (g *CLI) Merged(ctx context.Context, dir, into, branch string) (bool, error) {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, into) {
+		return false, ErrBadBranch
+	}
+	tree, err := mergedTree(ctx, dir, "refs/heads/"+into, "refs/heads/"+branch)
+	if errors.Is(err, ErrConflict) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	was, err := treeOf(ctx, dir, "refs/heads/"+into)
+	return was == tree, err
+}
+
+// mergedTree is the tree merging commit into target (both refs or hashes)
+// would make, without touching any checkout; ErrConflict when it doesn't
+// merge cleanly.
+func mergedTree(ctx context.Context, dir, target, commit string) (string, error) {
+	out, err := run(ctx, dir, "merge-tree", "--write-tree", target, commit)
 	var exit *exec.ExitError
 	switch {
 	case errors.As(err, &exit) && exit.ExitCode() == 1: // merge-tree's "conflicts"
-		return ErrConflict
+		return "", ErrConflict
 	case err != nil:
-		return err
+		return "", err
 	}
-	tree := strings.Fields(out)[0]
-	old, err := run(ctx, dir, "rev-parse", "refs/heads/"+target)
+	return strings.Fields(out)[0], nil
+}
+
+func treeOf(ctx context.Context, dir, commit string) (string, error) {
+	out, err := run(ctx, dir, "rev-parse", "--verify", "--quiet", commit+"^{tree}")
+	return strings.TrimSpace(out), err
+}
+
+// MoveBranch moves branch from the commit from to where branch to is. Where
+// a worktree has branch checked out, its files follow, keeping the
+// uncommitted changes git can carry over (git reset --keep); it fails,
+// changing nothing, when they are in the way or a merge is unfinished there.
+// ErrMoved when branch isn't at from anymore.
+func (g *CLI) MoveBranch(ctx context.Context, dir, branch, from, to string) error {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, to) {
+		return ErrBadBranch
+	}
+	defer g.lock(ctx, dir)()
+	if head, err := g.Resolve(ctx, dir, "refs/heads/"+branch); err != nil {
+		return err
+	} else if head != from {
+		return ErrMoved
+	}
+	target, err := g.Resolve(ctx, dir, "refs/heads/"+to)
 	if err != nil {
 		return err
 	}
-	head, err := run(ctx, dir, "rev-parse", "refs/heads/"+branch)
+	trees, err := g.Worktrees(ctx, dir)
 	if err != nil {
 		return err
 	}
-	commit, err := run(ctx, dir, append(who, "commit-tree", tree, "-p", strings.TrimSpace(old), "-p", strings.TrimSpace(head), "-m", message)...)
-	if err != nil {
+	if tree, ok := trees[branch]; ok {
+		_, err = run(ctx, tree, "reset", "--quiet", "--keep", target)
 		return err
 	}
-	// Moved only if target is still where it was read: never over someone else's move.
-	_, err = run(ctx, dir, "update-ref", "refs/heads/"+target, strings.TrimSpace(commit), strings.TrimSpace(old))
+	_, err = run(ctx, dir, "update-ref", "refs/heads/"+branch, target, from)
 	return err
 }
 
-// Diff is what branch changes against target since they parted, as a
-// unified diff.
-func (g *CLI) Diff(ctx context.Context, dir, target, branch string) (string, error) {
-	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, target) {
+// Diff is what the commit head changes against branch target since they
+// parted, as a unified diff.
+func (g *CLI) Diff(ctx context.Context, dir, target, head string) (string, error) {
+	if !ValidBranch(ctx, target) {
 		return "", ErrBadBranch
 	}
-	return run(ctx, dir, "diff", "refs/heads/"+target+"...refs/heads/"+branch)
+	if !hash.MatchString(head) {
+		return "", ErrNoRef
+	}
+	return run(ctx, dir, "diff", "refs/heads/"+target+"..."+head)
+}
+
+// hash is a commit's id as git prints it, in full or abbreviated.
+var hash = regexp.MustCompile(`^[0-9a-f]{4,64}$`)
+
+// Compare is what changed from one commit to another (both hashes), as a
+// unified diff with that many lines of context around each change; only in paths when any are
+// named. Unlike Diff it compares the two commits themselves, not since they
+// parted.
+func (g *CLI) Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error) {
+	if !hash.MatchString(from) || !hash.MatchString(to) || lines < 0 {
+		return "", ErrNoRef
+	}
+	args := append([]string{"diff", "--unified=" + strconv.Itoa(lines), from, to, "--"}, paths...)
+	return run(ctx, dir, args...)
 }

@@ -1,5 +1,6 @@
 import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
+import { inbox } from "../app/model";
 import { useInstances, useProjects, useRequests, useTeams } from "../app/queries";
 import { deploymentTabs, mostRecentAgent } from "../app/sessions";
 import { DeployDialog } from "../components/DeployDialog";
@@ -31,7 +32,7 @@ export function Project() {
   const project = projects.data?.find((p) => p.id === id);
   if (projects.isPending) return null;
   if (!project) return <p className="p-12 text-tx3">No project {id}.</p>;
-  const open = (requests.data ?? []).filter((r) => r.status === "open" && r.projectId === id);
+  const open = inbox(requests.data ?? []).filter((r) => r.projectId === id);
   return (
     <div className="flex min-h-full flex-col">
       <header className="flex flex-col gap-4 px-12 pt-10">

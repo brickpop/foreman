@@ -97,13 +97,14 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 - Project tab bodies: every tab `24px 48px 64px`, the full width, so each lines up with the project header ([Wiki reader](../features/wiki-reader.md#project-header-and-tabs)); the Settings tab's configuration part starts `28px` below its divider.
 - Team tab bodies: Deployments `24px 48px 64px`; Members `20px 48px 64px`; Playbook and File `28px 48px 64px`.
 - Max widths: Dashboard and Team tabs 920px; Settings 760px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
-- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between pipeline and Repositories sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
+- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between the Worktrees tab's sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
 - Row padding: list rows `14px 4px` or `16px 6px`; table-like rows `12px 16px`; settings rows `14px 0` or `12px 0` with a bottom border.
 
 ## Surfaces
 
 - Default border: `1px solid var(--line)`. Inputs and buttons: `1px solid var(--line2)`.
 - **Panel**: `--panel` background, `--line` border, radius 12. A list inside a panel separates rows with a `--line` bottom border and clips with `overflow: hidden`.
+- **Loading** (`Loading`): where data is still on its way, faint bars (12px, `--hover`, pulsing unless the CEO's system asks for reduced motion) in a panel, in place of the content and never its empty state, which would read as "there's none". Every list, page and file view that waits on the server shows it (the CEO, 2026-10-21).
 - **Empty state**: `1px dashed var(--line2)`, radius 12, `--tx3` text, centered copy.
 - **Not built yet**: an empty state where the server doesn't serve an area yet: "**Not built yet.** The server doesn't serve <the wiki>." ("Not built yet." in `--tx2`, 500), in place of what the area would show.
 - **Overlays** (drawers, side sheet, modals, toasts) use `--panel` and `--shadow`. Layering: side sheet 44, modals 50, toasts 60. See [App shell](../features/app-shell.md).

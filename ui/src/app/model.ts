@@ -78,13 +78,15 @@ export type SessionGroup = {
   project: string;
   team?: Team;
   goal: string;
-  /** The lead first, then the team's order. */
+  /** Its awake agents, the lead first, then the team's order. */
   agents: { instance: Instance; agent?: Agent; lead: boolean }[];
+  /** Its asleep agents (not started yet, woken when needed), in the same
+   * order: only counted, they'd be noise as rows. */
+  asleep: { instance: Instance; agent?: Agent; lead: boolean }[];
 };
 
-/** The open sessions, one group per deployment, by project then team; asleep
- * agents (not started yet, woken when needed) are left out, and a deployment
- * with no other is too. */
+/** Every active deployment, one group per deployment, by project then team,
+ * its asleep agents apart from the others. */
 export function sessionGroups(
   instances: Instance[],
   deployments: Deployment[],
@@ -92,7 +94,7 @@ export function sessionGroups(
 ): SessionGroup[] {
   const groups = new Map<string, SessionGroup>();
   for (const i of instances) {
-    if (!i.deploymentId || i.status === "asleep") continue;
+    if (!i.deploymentId) continue;
     let g = groups.get(i.deploymentId);
     if (!g) {
       const [teamId, project] = i.deploymentId.split("@");
@@ -102,10 +104,11 @@ export function sessionGroups(
         team: teams.find((t) => t.id === teamId),
         goal: deployments.find((d) => d.id === i.deploymentId)?.goal ?? "",
         agents: [],
+        asleep: [],
       };
       groups.set(i.deploymentId, g);
     }
-    g.agents.push({
+    (i.status === "asleep" ? g.asleep : g.agents).push({
       instance: i,
       agent: agentOf(teams, i.id),
       lead: g.team?.config.lead === i.agentId,
@@ -115,12 +118,10 @@ export function sessionGroups(
     .map((g) => {
       const order = g.team ? roster(g.team.config) : [];
       const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
-      const agents = [...g.agents].sort(
-        (a, b) =>
-          rank(a.instance.agentId) - rank(b.instance.agentId) ||
-          a.instance.agentId.localeCompare(b.instance.agentId),
-      );
-      return { ...g, agents };
+      const byRank = (a: SessionGroup["agents"][number], b: SessionGroup["agents"][number]) =>
+        rank(a.instance.agentId) - rank(b.instance.agentId) ||
+        a.instance.agentId.localeCompare(b.instance.agentId);
+      return { ...g, agents: [...g.agents].sort(byRank), asleep: [...g.asleep].sort(byRank) };
     })
     .sort((a, b) => a.project.localeCompare(b.project) || a.deployment.localeCompare(b.deployment));
 }

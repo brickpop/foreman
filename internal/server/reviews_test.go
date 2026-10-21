@@ -70,9 +70,9 @@ func (f *fakeReviews) MergeReview(_ context.Context, id string, heads map[string
 	return f.err
 }
 
-func (f *fakeReviews) CloseReview(_ context.Context, id, reason string) error {
-	f.did = append(f.did, "close "+id+" "+reason)
-	return f.err
+func (f *fakeReviews) CloseReview(_ context.Context, id string, c workflow.Close) (workflow.Closed, error) {
+	f.did = append(f.did, fmt.Sprintf("close %s %s drop=%v stop=%v", id, c.Note, c.DropBranches, c.StopTeam))
+	return workflow.Closed{Kept: []workflow.KeptBranch{{Repo: "api", Branch: "lead/atlas/x", Why: "changes in the way"}}}, f.err
 }
 
 // errorCode is an error answer as "CODE: message".
@@ -134,10 +134,12 @@ func TestReviewRoutes(t *testing.T) {
 	if w := send(h, "POST", "/api/reviews/rev-1/merge", `{"heads":{"api":"a1b2","web":"c3d4"}}`); w.Code != http.StatusNoContent || len(f.merges) != 2 || f.merges["api"] != "a1b2" || f.merges["web"] != "c3d4" {
 		t.Errorf("merge: %d %v", w.Code, f.merges)
 	}
-	if w := send(h, "POST", "/api/reviews/rev-1/close", `{"reason":"not now"}`); w.Code != http.StatusNoContent {
-		t.Errorf("close: %d", w.Code)
+	// The close answers with the branches it kept, for the CEO.
+	if w := send(h, "POST", "/api/reviews/rev-1/close", `{"note":"not now","dropBranches":true,"stopTeam":true}`); w.Code != http.StatusOK ||
+		strings.TrimSpace(w.Body.String()) != `{"kept":[{"repo":"api","branch":"lead/atlas/x","why":"changes in the way"}]}` {
+		t.Errorf("close: %d %s", w.Code, w.Body)
 	}
-	if got, want := strings.Join(f.did, "; "), "edit rev-1 com-2 better; delete rev-1 com-2; changes rev-1 see below; close rev-1 not now"; got != want {
+	if got, want := strings.Join(f.did, "; "), "edit rev-1 com-2 better; delete rev-1 com-2; changes rev-1 see below; close rev-1 not now drop=true stop=true"; got != want {
 		t.Errorf("did %q, want %q", got, want)
 	}
 

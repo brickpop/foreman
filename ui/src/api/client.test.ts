@@ -238,14 +238,23 @@ describe("httpClient", () => {
     await c.reviews.deleteComment("rev-1", "com-2");
     await c.reviews.requestChanges("rev-1", "see the comments");
     await c.reviews.merge("rev-1", { api: "a1b2" });
-    await c.reviews.close("rev-1", "not needed");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["POST", "http://x/api/reviews/rev-1/comments", general],
       ["PUT", "http://x/api/reviews/rev-1/comments/com-2", { body: "Why not?" }],
       ["DELETE", "http://x/api/reviews/rev-1/comments/com-2", undefined],
       ["POST", "http://x/api/reviews/rev-1/changes", { note: "see the comments" }],
       ["POST", "http://x/api/reviews/rev-1/merge", { heads: { api: "a1b2" } }],
-      ["POST", "http://x/api/reviews/rev-1/close", { reason: "not needed" }],
+    ]);
+  });
+
+  it("closes a review, answering with the branches kept", async () => {
+    const kept = [{ repo: "api", branch: "lead/atlas/x", why: "changes in the way" }];
+    const calls = stubFetch(200, { kept });
+    const c = httpClient("http://x");
+    const close = { note: "", dropBranches: true, stopTeam: true };
+    expect(await c.reviews.close("rev-1", close)).toEqual({ kept });
+    expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
+      ["POST", "http://x/api/reviews/rev-1/close", close],
     ]);
   });
 

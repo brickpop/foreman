@@ -42,6 +42,28 @@ export interface Comment extends store.ReviewComment {
   outdated: boolean;
 }
 /**
+ * Close is the CEO's Close of a review: what becomes of its branches and team.
+ */
+export interface Close {
+  note: string; // to the lead, when its team keeps working
+  dropBranches: boolean;
+  stopTeam: boolean;
+}
+/**
+ * Closed is what a close did not do as asked: the branches it couldn't drop.
+ */
+export interface Closed {
+  kept: KeptBranch[];
+}
+/**
+ * KeptBranch is a branch a close kept, and why, for the CEO.
+ */
+export interface KeptBranch {
+  repo: string;
+  branch: string;
+  why: string;
+}
+/**
  * RepoDiff is one repo's change in a review.
  */
 export interface RepoDiff {

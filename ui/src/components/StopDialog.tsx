@@ -4,6 +4,7 @@ import type { Deployment } from "../api/client";
 import { useClient } from "../api/client";
 import { plural } from "../app/model";
 import { keys, useInstances } from "../app/queries";
+import { StopIcon } from "./icons";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
@@ -55,7 +56,13 @@ export function StopDialog({
         {stop.error && <p className="m-0 text-[13px] text-err">{stop.error.message}</p>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="danger" disabled={stop.isPending} onClick={() => stop.mutate()}>
+          <Button
+            variant="danger"
+            className="inline-flex items-center gap-1.5"
+            disabled={stop.isPending}
+            onClick={() => stop.mutate()}
+          >
+            <StopIcon />
             Stop
           </Button>
         </div>

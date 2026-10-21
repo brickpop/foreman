@@ -320,6 +320,15 @@ func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (hom
 	return team, project, on, nil
 }
 
+// Active reports whether a deployment still runs (it isn't stopped).
+func (m *Manager) Active(ctx context.Context, deploymentID string) (bool, error) {
+	dep, err := m.Deployments.Get(ctx, deploymentID)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	return dep.Status == store.DeploymentActive, err
+}
+
 // Stop stops a deployment's instances and marks it stopped (the CEO's Stop).
 // Their worktrees stay on disk.
 func (m *Manager) Stop(ctx context.Context, deploymentID string) error {

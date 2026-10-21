@@ -4,7 +4,7 @@ import { agentOf, when } from "../app/model";
 import { useReviews, useTeams } from "../app/queries";
 import { reviewGroups, statusLabel } from "../app/reviews";
 import { Avatar } from "../components/Avatar";
-import { Empty, NotBuilt, PageTitle, Panel, SectionLabel } from "../components/ui";
+import { Empty, Loading, NotBuilt, PageTitle, Panel, SectionLabel } from "../components/ui";
 
 // Every review across projects (wiki/product/features/reviews.md): what needs
 // the CEO, what waits on a lead, and the last ones done. A row opens its page.
@@ -24,7 +24,9 @@ export function Reviews() {
         <NotBuilt what="reviews" />
       ) : reviews.error ? (
         <p className="text-err">{reviews.error.message}</p>
-      ) : reviews.data && sections.length === 0 ? (
+      ) : reviews.isPending ? (
+        <Loading rows={4} />
+      ) : sections.length === 0 ? (
         <Empty>No reviews yet. A lead's request_merge() opens one.</Empty>
       ) : (
         sections.map((s) => (

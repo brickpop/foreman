@@ -14,7 +14,7 @@ epic: workflow
 
 - A lead tool, `withdraw_merge(branch, reason, superseded_by?)`, on its own open review only: its open merge requests end, its review request resolves (`withdrawn`), and it leaves "Needs you". The branch stays.
 - On the review page: a status **Withdrawn**, with the lead's reason and, when given, a link to the review of `superseded_by`.
-- The work items it carried are freed (no merge request) but stay `integrated`: their commits are still on the lead branch, and the next `request_merge` of a branch that contains them takes them. That's unlike Close, which sends them back to "in worktree".
+- The work items it carried are freed (no merge request) but stay `integrated`: their commits are still on the lead branch, and the next `request_merge` of a branch that contains them takes them. That's unlike Close, after which they stay with the closed merge request (the work isn't wanted).
 
 ## Open questions
 

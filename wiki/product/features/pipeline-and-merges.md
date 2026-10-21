@@ -8,7 +8,7 @@ tags: [feature, pipeline, git, forge]
 
 How work moves from a member's worktree to `main`. Only the team **lead** asks for changes to reach `main`, with a **merge request**; only the **CEO** decides, on the branch's [review](./reviews.md): Merge (Foreman merges locally), Request changes, or Close; Create PR on the forge comes later. Nothing reaches a forge unless the CEO asks. Branch rules: [Sandboxes and git policy](../architecture/sandboxes-and-git.md). Forge calls: [Forge adapters](../architecture/forge-adapters.md).
 
-The pipeline has two kinds of entries, both shown in the [project pipeline](./project-pipeline.md) (In flight and Merged on [Repositories](./repositories.md)). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests ([Merge request → Phasing](../models/merge-request.md#phasing)); since 2026-10-21 decided on their branch's page in [Reviews](./reviews.md).
+The pipeline has two kinds of entries, both shown in the [project pipeline](./project-pipeline.md) (In flight and Merged on [Worktrees](./worktrees.md)). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests ([Merge request → Phasing](../models/merge-request.md#phasing)); since 2026-10-21 decided on their branch's page in [Reviews](./reviews.md).
 
 - **Work items** ([model](../models/work-item.md)): one agent's branch on its way into the lead branch. Informational only: a handoff never creates a request and needs nothing from the CEO.
 - **Merge requests** ([model](../models/merge-request.md)): the lead's request to merge a lead branch into `main`, carrying every work item integrated since the last one. A merge request is the only pipeline entry that raises a [request](./requests.md): the **review**.
@@ -24,7 +24,7 @@ Approvals, questions, findings and blocked requests are independent of the pipel
 | 2 | lead reviewing | The handoff is delivered into the lead's session. Requesting changes (an `ask` to the author) moves nothing; the author's next hand-off of the branch brings it back to stage 1 ([Protocol → Work items and merge requests](../architecture/protocol.md#work-items-and-merge-requests)) |
 | 3 | integrated | Merged into one of the lead's `lead/<team>/*` branches in the lead's worktree; checks run |
 
-Each work item carries a short **note**. Repositories → In flight colors it by a **tone** (`ok`, `err`, `ask`, neutral) derived from the work item's state, never stored, e.g. "checks pass" (`ok`) or "2 review comments" (`ask`).
+Each work item carries a short **note**. Worktrees → In flight colors it by a **tone** (`ok`, `err`, `ask`, neutral) derived from the work item's state, never stored, e.g. "checks pass" (`ok`) or "2 review comments" (`ask`).
 
 ## Review and merge
 
@@ -37,14 +37,14 @@ The review request's card shows the entry's title and the repos, and opens the r
 | **`Merge to <main>`** (primary), for the repos ticked | Merges the branch into each ticked repo's `main` on the host, as [below](#merge-to-main). Each merged merge request and its work items move to "Merged", the lead is told, the review request resolves once nothing is left open, and merged branches are deleted under the existing rule ([Branches](../architecture/sandboxes-and-git.md#branches)). If the branch doesn't merge cleanly, nothing changes: the merge request is marked "conflicts with main" and the lead is asked to merge `main` in (*When main moves*) |
 | **`Create PR on <forge>`** (only when the repo has a forge) | Pushes the branch and opens a pull request on the forge, recording its URL and number; the request then shows **`Open PR ↗`** instead, and the CEO merges there. Foreman polls the PR ([Forge adapters](../architecture/forge-adapters.md#pr-state)), see below |
 | **`Request changes`** | Sends the draft comments (each with its repo, file and line, or general) and an optional note to the lead in one message ([Reviews → What the lead gets](./reviews.md#what-the-lead-gets)). The review waits on the lead; its next `request_merge` on the branch raises the review again, with the new diff |
-| **`Close`** | Asks for an optional reason, delivers it to the lead (typed into its session when idle), closes every repo still open (and its forge PR, once there are PRs, posting the reason as a comment), and returns the work items to stage 0. The branch stays: the lead can `switch` back to it, rework and request again, which opens a new review |
+| **`Close`** | The work isn't wanted. Asks what becomes of its team and branches ([Reviews → A review's page](./reviews.md#a-reviews-page)): the team keeps working, or stops; the branches stay, or are dropped, only with a team stopped or no longer running (its agents work in them). One request: the team stops first, and when it can't, nothing is closed. Then every repo still open closes (and its forge PR, once there are PRs), and a team that keeps working has its lead told to stop work on it ([Reviews → What the lead gets](./reviews.md#what-the-lead-gets)). Its work items stay with the closed merge requests, out of In flight, until a new hand-off of one of their branches frees it. **Dropped branches**: the lead branch and the members' branches its work items carry, in each repo; each head is first kept under `refs/foreman/closed/<review>/<branch>`, recoverable by hand. A branch checked out in a worktree can't be deleted, so it moves to `main` instead (`git reset --keep`). One whose worktree holds changes not committed, or a merge not finished, stays as it is, with no backup, and the close answers which and why |
 
 After Create PR, the forge is watched:
 
 | On the forge | Foreman |
 |---|---|
 | Merged | Marks the merge request merged (`merged_at`), resolves the review request, tells the lead. The merge request and its work items move to "Merged". Foreman fetches the new `main` into the repo, where every worktree sees it |
-| Closed without merge | Marks the merge request rejected, resolves the review request, returns its work items to stage 0, tells the lead |
+| Closed without merge | As Close with the team working and the branches kept: marks the merge request rejected, resolves the review request, tells the lead to stop work on it. Not built: [The forge](../../backlog/git-forge.md) |
 | Review comments or "changes requested" | Delivers them to the lead (typed into its session when it is idle; [Protocol](../architecture/protocol.md#text-into-a-session-deliveries-and-markers)); the merge request stays open |
 
 **Only the code repos have merge requests.** The [project repo](../models/project-config.md#the-project-repo) gets the lead's `commit()` straight on `main`, and the [global repo](../models/home.md#the-global-repo) gets the UI's saves, the Chief of Staff's confirmed proposals included ([Chief of Staff](./chief-of-staff.md)); both reach their forge only through Sync.

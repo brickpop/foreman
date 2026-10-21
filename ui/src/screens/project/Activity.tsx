@@ -6,7 +6,7 @@ import { when } from "../../app/model";
 import { useActivity, useDeployments, useStoppedDeployments, useTeams } from "../../app/queries";
 import { ActionRow, namesOf, ThreadRow } from "../../components/ActivityPanel";
 import { Chevron } from "../../components/icons";
-import { Button, Empty, Panel, SectionLabel, Segmented } from "../../components/ui";
+import { Button, Empty, Loading, Panel, SectionLabel, Segmented } from "../../components/ui";
 
 // The project's Activity tab (wiki/product/features/project-activity.md): its
 // teams' messages and git actions as one timeline, newest first, 50 at a
@@ -75,7 +75,7 @@ function Timeline({
   const activity = useActivity(scope);
   const name = namesOf(teams);
   const list = pageEntries(activity.data?.pages ?? []);
-  if (activity.isPending) return null;
+  if (activity.isPending) return <Loading rows={5} />;
   if (activity.isError) {
     return <p className="m-0 text-[13px] text-err">{activity.error.message}</p>;
   }

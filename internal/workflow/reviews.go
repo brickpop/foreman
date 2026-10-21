@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 )
@@ -53,6 +54,25 @@ type Comment struct {
 	store.ReviewComment `tstype:",extends"`
 	Now                 int  `json:"now"` // its line on the branch's head; Line while it can't move
 	Outdated            bool `json:"outdated"`
+}
+
+// Close is the CEO's Close of a review: what becomes of its branches and team.
+type Close struct {
+	Note         string `json:"note"` // to the lead, when its team keeps working
+	DropBranches bool   `json:"dropBranches"`
+	StopTeam     bool   `json:"stopTeam"`
+}
+
+// Closed is what a close did not do as asked: the branches it couldn't drop.
+type Closed struct {
+	Kept []KeptBranch `json:"kept"`
+}
+
+// KeptBranch is a branch a close kept, and why, for the CEO.
+type KeptBranch struct {
+	Repo   string `json:"repo"`
+	Branch string `json:"branch"`
+	Why    string `json:"why"`
 }
 
 // RepoDiff is one repo's change in a review.
@@ -483,27 +503,92 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 }
 
 // CloseReview ends the review unmerged, in every repo still open in it: the
-// CEO's reason goes to the lead, the work items back to "in worktree", and
-// the branch stays for the lead to rework and request again.
-func (w *Workflow) CloseReview(ctx context.Context, id, reason string) error {
+// work isn't wanted (the CEO, 2026-10-21). Its work items leave In flight.
+// With StopTeam its deployment stops first (nothing closes when it can't),
+// and nobody is told; while it keeps running, the lead is told to stop work
+// on it, with the CEO's note. With DropBranches its branches go: the lead
+// branch and the members' branches it carried, each kept under
+// refs/foreman/closed/<review>/ (a branch checked out moves to main
+// instead), only while no agent works in them: ErrInvalid when the team
+// runs on. A branch that can't go stays, listed in Closed with why.
+func (w *Workflow) CloseReview(ctx context.Context, id string, c Close) (Closed, error) {
 	v, err := w.openReview(ctx, id)
 	if err != nil {
-		return err
+		return Closed{}, err
 	}
-	reason = strings.TrimSpace(reason)
+	running, err := w.Teams.Active(ctx, v.DeploymentID)
+	if err != nil {
+		return Closed{}, err
+	}
+	if c.DropBranches && running && !c.StopTeam {
+		return Closed{}, fmt.Errorf("%w: stop the team to drop its branches: its agents work in them", ErrInvalid)
+	}
+	if running && c.StopTeam {
+		if err := w.Teams.Stop(ctx, v.DeploymentID); err != nil {
+			return Closed{}, fmt.Errorf("stopping the team: %w", err)
+		}
+	}
+	note := strings.TrimSpace(c.Note)
+	closed := Closed{Kept: []KeptBranch{}} // [] on the wire, never null
 	var lead store.MergeRequest
 	var repos []string
 	for _, mr := range v.MergeRequests {
-		if mr.State == store.MergeOpen {
-			w.reject(ctx, mr, reason)
-			lead, repos = mr, append(repos, mr.Repo)
+		if mr.State != store.MergeOpen {
+			continue
+		}
+		w.reject(ctx, mr, note)
+		lead, repos = mr, append(repos, mr.Repo)
+		if !c.DropBranches {
+			continue
+		}
+		for _, branch := range w.branchesOf(ctx, mr) {
+			if err := w.dropBranch(ctx, mr, branch, id); err != nil {
+				closed.Kept = append(closed.Kept, KeptBranch{Repo: mr.Repo, Branch: branch, Why: keptWhy(err)})
+			}
 		}
 	}
 	w.resolveReview(ctx, id, "closed")
-	why := ""
-	if reason != "" {
-		why = ": " + reason
+	if running && !c.StopTeam {
+		text := fmt.Sprintf("From Foreman: the CEO closed the review of %s without merging (%s). Stop work on it, and don't request it again.", v.Branch, strings.Join(repos, ", "))
+		if note != "" {
+			text += " The CEO's note: " + note
+		}
+		w.tell(ctx, lead, "foreman", text)
 	}
-	w.tell(ctx, lead, "ceo", fmt.Sprintf("From the CEO: the review of %s was closed without merging (%s)%s. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.", v.Branch, strings.Join(repos, ", "), why))
-	return nil
+	return closed, nil
+}
+
+// keptWhy says why a closed review's branch couldn't be dropped.
+func keptWhy(err error) string {
+	if errors.Is(err, git.ErrLocalChanges) {
+		return "its worktree holds changes not committed, or a merge not finished, that dropping it would discard"
+	}
+	return err.Error()
+}
+
+// branchesOf are a merge request's branches in its repo: the lead branch,
+// then the members' branches its work items carry.
+func (w *Workflow) branchesOf(ctx context.Context, mr store.MergeRequest) []string {
+	_, dir, err := w.repoOf(mr)
+	if err != nil {
+		return nil
+	}
+	branches := []string{mr.Branch}
+	items, _ := w.WorkItems.ForDeployment(ctx, mr.DeploymentID)
+	for _, item := range items {
+		if item.MergeRequestID == mr.ID && !slices.Contains(branches, item.Branch) && w.Git.HasBranch(ctx, dir, item.Branch) {
+			branches = append(branches, item.Branch)
+		}
+	}
+	return branches
+}
+
+// dropBranch discards one of a closed review's branches in a merge
+// request's repo, keeping its head under refs/foreman/closed/<review>/.
+func (w *Workflow) dropBranch(ctx context.Context, mr store.MergeRequest, branch, review string) error {
+	main, dir, err := w.repoOf(mr)
+	if err != nil {
+		return err
+	}
+	return w.Git.DropBranch(ctx, dir, branch, "refs/foreman/closed/"+review+"/"+branch, main)
 }

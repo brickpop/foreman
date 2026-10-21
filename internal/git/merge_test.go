@@ -297,3 +297,80 @@ func TestCompareTwoCommits(t *testing.T) {
 		t.Errorf("negative context: %v", err)
 	}
 }
+
+func TestDropBranch(t *testing.T) {
+	g, dir := mergeFixture(t)
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if err := g.DropBranch(ctx, dir, "lead/atlas/x", "refs/foreman/closed/rev-1/lead/atlas/x", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if g.HasBranch(ctx, dir, "lead/atlas/x") {
+		t.Error("the branch is still there")
+	}
+	if kept := mustRun(t, dir, "rev-parse", "refs/foreman/closed/rev-1/lead/atlas/x"); kept != head {
+		t.Errorf("backup at %s, want %s", kept, head)
+	}
+	// Not a branch: no listing shows it.
+	if branches := mustRun(t, dir, "branch", "--list"); strings.Contains(branches, "closed") {
+		t.Errorf("branches %q", branches)
+	}
+	for _, bad := range [][2]string{{"-x", "refs/foreman/closed/x"}, {"main", "refs/heads/other"}, {"main", ""}} {
+		if err := g.DropBranch(ctx, dir, bad[0], bad[1], "main"); !errors.Is(err, ErrBadBranch) {
+			t.Errorf("%q: %v", bad, err)
+		}
+	}
+}
+
+func TestDropBranchCheckedOutInAWorktree(t *testing.T) {
+	g, dir := mergeFixture(t)
+	wt := filepath.Join(t.TempDir(), "lead")
+	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
+	head := mustRun(t, wt, "rev-parse", "HEAD")
+
+	backup := "refs/foreman/closed/rev-1/lead/atlas/x"
+	// Kept, as it was, with no backup left behind.
+	kept := func(why string) {
+		t.Helper()
+		if err := g.DropBranch(ctx, dir, "lead/atlas/x", backup, "main"); !errors.Is(err, ErrLocalChanges) {
+			t.Errorf("%s: %v", why, err)
+		}
+		if mustRun(t, wt, "rev-parse", "HEAD") != head {
+			t.Fatalf("%s: moved anyway", why)
+		}
+		if _, err := g.Resolve(ctx, dir, backup); err == nil {
+			t.Errorf("%s: a backup of a branch that stayed", why)
+		}
+	}
+
+	// A change git can't carry over (feature.go isn't on main): the branch stays.
+	write(t, filepath.Join(wt, "feature.go"), "package f // the lead's\n")
+	kept("a change in the way")
+	mustRun(t, wt, "checkout", "--", "feature.go")
+
+	// A merge left unfinished in the worktree, with its conflict.
+	write(t, filepath.Join(dir, "README"), "main's\n")
+	mustRun(t, dir, "commit", "-q", "-am", "main's")
+	write(t, filepath.Join(wt, "README"), "the lead's\n")
+	mustRun(t, wt, "commit", "-q", "-am", "the lead's")
+	head = mustRun(t, wt, "rev-parse", "HEAD")
+	if _, err := run(ctx, wt, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "main"); err == nil {
+		t.Fatal("no conflict to leave unfinished")
+	}
+	kept("an unfinished merge")
+	mustRun(t, wt, "merge", "--abort")
+	main := mustRun(t, dir, "rev-parse", "main")
+
+	// Clean: it moves to main, the worktree on it, its commit kept aside.
+	if err := g.DropBranch(ctx, dir, "lead/atlas/x", "refs/foreman/closed/rev-1/lead/atlas/x", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if mustRun(t, wt, "rev-parse", "HEAD") != main || mustRun(t, wt, "branch", "--show-current") != "lead/atlas/x" {
+		t.Error("the worktree's branch isn't at main")
+	}
+	if _, err := os.Stat(filepath.Join(wt, "feature.go")); err == nil {
+		t.Error("the dropped work is still in the worktree")
+	}
+	if mustRun(t, dir, "rev-parse", "refs/foreman/closed/rev-1/lead/atlas/x") != head {
+		t.Error("no backup")
+	}
+}

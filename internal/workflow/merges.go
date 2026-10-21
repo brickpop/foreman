@@ -119,7 +119,8 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 }
 
 // carry gives the merge request the integrated work items its branch
-// contains that have none yet.
+// contains that have none yet, or only a closed one (the lead asked again
+// on a branch the CEO closed but kept).
 func (t tool) carry(ctx context.Context, dir string, mr store.MergeRequest) {
 	items, err := t.w.WorkItems.ForDeployment(ctx, t.c.Deployment.ID)
 	if err != nil {
@@ -127,7 +128,7 @@ func (t tool) carry(ctx context.Context, dir string, mr store.MergeRequest) {
 		return
 	}
 	for _, item := range items {
-		if item.Stage != store.StageIntegrated || item.MergeRequestID != "" || !t.w.Git.HasBranch(ctx, dir, item.Branch) {
+		if item.Stage != store.StageIntegrated || !t.w.free(ctx, item) || !t.w.Git.HasBranch(ctx, dir, item.Branch) {
 			continue
 		}
 		if in, err := t.w.Git.Contains(ctx, dir, mr.Branch, item.Branch); err == nil && in {
@@ -163,21 +164,22 @@ func (w *Workflow) mergeToMain(ctx context.Context, mr store.MergeRequest, head 
 	return nil
 }
 
-// reject ends one merge request unmerged: its work items go back to "in
-// worktree", and the branch stays for the lead to rework.
+// free says whether a work item is carried by no merge request, or only by
+// a closed one.
+func (w *Workflow) free(ctx context.Context, item store.WorkItem) bool {
+	if item.MergeRequestID == "" {
+		return true
+	}
+	mr, err := w.MergeRequests.Get(ctx, item.MergeRequestID)
+	return err == nil && mr.State == store.MergeRejected
+}
+
+// reject ends one merge request unmerged. Its work items stay carried by
+// it, so they leave In flight with it: the work isn't wanted. A new
+// hand-off of one of their branches frees it (handed).
 func (w *Workflow) reject(ctx context.Context, mr store.MergeRequest, reason string) {
 	mr.State, mr.RejectedAt, mr.Note = store.MergeRejected, time.Now().UTC(), reason
 	w.saveMerge(ctx, mr)
-	items, _ := w.WorkItems.ForDeployment(ctx, mr.DeploymentID)
-	for _, item := range items {
-		if item.MergeRequestID == mr.ID {
-			item.MergeRequestID, item.Stage, item.Note = "", store.StageInWorktree, "rejected: "+reason
-			if reason == "" {
-				item.Note = "rejected"
-			}
-			w.save(ctx, item)
-		}
-	}
 }
 
 // Reconcile notices open merge requests whose branch changes nothing in main,

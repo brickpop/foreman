@@ -21,7 +21,7 @@ Three sections, each left out when empty, one panel of rows each: **Needs you** 
 
 `/reviews/<id>`, with `?since=1` for the change since the last review.
 
-- **Header**: a square `←` button (32px, outline; back to Reviews) left of the entry's title (26px), then the lead's avatar and `<Lead> on <project> · <branch> · <status> · <time>` (the project links to its Repositories tab).
+- **Header**: a square `←` button (32px, outline; back to Reviews) left of the entry's title (26px), then the lead's avatar and `<Lead> on <project> · <branch> · <status> · <time>` (the project links to its Worktrees tab, the branch to its code in Repositories, in the first repo of the review).
 - **Which change** (a segmented control, only once the CEO requested changes on a repo still open): **Against main** (the default: what a merge takes, `main...branch`) or **Since your last review** (from the branch head at the last Request changes to its head now).
 - **Layout**: the header on top; under it two panes, each scrolling on its own (the tree, and the diffs with the comments), so going to a file moves only the diffs and the tree stays where it was (the CEO, 2026-10-21); the decision bar at the foot.
 - **File tree** (240px, on the left, a `--line` border to its right; hidden under 900px): one group per repo open in the review, `<repo> → <main>`, then its files (rows padded `6px 8px`) with `+added −removed`; a click unfolds the file and scrolls the diffs to it. `No changes.` for a repo with none.
@@ -31,7 +31,7 @@ Three sections, each left out when empty, one panel of rows each: **Needs you** 
 - **A comment** shows `draft` (amber outline) with **Edit** and **Delete**, or `sent <time>`. A sent one can't change.
 - **Decision bar** (at the foot, `--side`, while the review is open): when changes are requested, `Changes requested: waiting on <Lead> to fix them and ask again.`; a checkbox per repo still open, all ticked at first, labeled with its link line (`<repo> · <branch> → <main> · checks <…>`, or `· conflicts with <main>` in `--err`); then **Close** (danger), **Request changes (n)** (the draft count) and **Merge to <main>** (primary; `Merge` when the ticked repos' mains differ; disabled with none ticked, or until the ticked repos' diffs have loaded).
   - **Request changes** opens a note (`A note for <Lead>, with the n draft comments (optional)`) and `Send to <Lead>`, which needs a draft or a note.
-  - **Close** opens a reason (`Why it closes, for <Lead> (optional)`) and `Close and tell <Lead>`.
+  - **Close** (the work isn't wanted) opens **What becomes of it**, radios, the first one picked. While the lead's deployment runs: `<Team> keeps working on <project>; the branches stay`, `Stop <Team> on <project>; the branches stay`, `Stop <Team> on <project> and drop the branches (kept aside, recoverable by hand)`. The branches go only with the team, as its agents work in them. Once it no longer runs: `Keep the branches`, `Drop the branches (kept aside, recoverable by hand)`. Only when the team keeps working is there a note (`A note for <Lead> (optional): <Lead> is told to stop work on it either way`). The button reads `Close now`, or `Close and send` with a note (the CEO, 2026-10-21). A branch that couldn't be dropped shows in a toast, `Closed, but some branches stay`, a line each: `<branch> in <repo>: <why>.`
   - **Merge** merges each ticked repo; a toast says which merged. One that conflicts stays open, marked, and the toast names it with the reason.
   - **Only what the CEO read** (the CEO, 2026-10-21): Merge sends, for each ticked repo, the head its diff was shown at, and a repo whose branch moved since (the lead committed meanwhile) isn't merged: the toast says `<repo>: the branch has new commits since you loaded this page. Read them, then merge again`, and the page reloads its diff. The other repos merge as usual.
 
@@ -53,7 +53,7 @@ Fix them, commit(), then call request_merge again on the same branch.
 
 The comments come in the order they were written: a line comment as `<repo> <path>:<line>` (its line now; `<repo> <path>, removed line <n>` on `main`'s side; ` (changed since)` once outdated) with the line's text, a general one as its text. The review request resolves, and the review waits on the lead until its next `request_merge` on the branch, which raises it again with the new diff.
 
-**Close** ends the review unmerged in every repo still open, with one message: `From the CEO: the review of <branch> was closed without merging (<repos>): <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` Its work items return to stage 0 and the branch stays ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)).
+**Close** means the work isn't wanted: it ends the review unmerged in every repo still open. While the team keeps working, the lead is told to stop, by Foreman, note or not: `From Foreman: the CEO closed the review of <branch> without merging (<repos>). Stop work on it, and don't request it again.`, then ` The CEO's note: <note>` when there is one. A team being stopped, or no longer running, is told nothing: there is nobody to read it. Its work items stay with the closed merge requests, so they leave In flight ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)).
 
 ## Phasing
 

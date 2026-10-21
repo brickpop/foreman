@@ -15,7 +15,7 @@ import {
 import { Avatar } from "../../components/Avatar";
 import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
-import { Button, NotBuilt, Segmented } from "../../components/ui";
+import { Button, Loading, NotBuilt, Segmented } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 
@@ -124,7 +124,12 @@ export function Board({ project }: { project: string }) {
   );
   const list = boards.data ?? [];
   const board = list.find((b) => b.id === chosen) ?? list[0];
-  if (boards.isPending) return null;
+  if (boards.isPending)
+    return (
+      <div className="px-12 pt-6">
+        <Loading rows={5} />
+      </div>
+    );
   if (isNotBuilt(boards.error))
     return (
       <div className="px-12 pt-6">

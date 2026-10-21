@@ -24,7 +24,7 @@ Table `work_items`.
 | `stage` | Integer | yes | `0` | 0–3 | 0 in worktree · 1 handed to lead · 2 lead reviewing · 3 integrated |
 | `note` | String | | | | Latest status line (e.g. "tests pass", the CEO's reason for rejecting its merge request) |
 | `checks_status` | String | | | | Result of the project `checks` run before the handoff was accepted |
-| `merge_request_id` | String → Merge request | | | | Set when the lead's `request_merge` includes it; cleared when its merge request is rejected |
+| `merge_request_id` | String → Merge request | | | | Set when the lead's `request_merge` includes it; kept when its merge request is rejected, until a new hand-off of its branch |
 
 ## Invariants
 
@@ -33,9 +33,9 @@ Table `work_items`.
 - Stage 3 ("integrated") is set when the branch is merged into any of the lead's `lead/<team>/*` branches in the lead's worktree: checked right after the lead's `merge` or `commit`, in every repo that has the branch.
 - `merge_request_id` is set only by the lead's `request_merge`, only on stage-3 work items of the same deployment that have no `merge_request_id` yet and whose branch head is contained in the merge request's branch (git ancestry), at creation or at a later refresh of it. A work item with a `merge_request_id` is listed under its merge request, not on its own.
 - A work item is merged when its merge request is merged; it has no merge time of its own.
-- Its merge request being rejected (Close on its review, or its PR closed on the forge) clears `merge_request_id` and resets the work item to stage 0 with the note; the lead decides who reworks.
-- The note's **tone** (`ok`, `err`, `ask`, neutral), which Repositories → In flight colors it by, is derived from the work item's state (checks, stage), never stored.
+- Its merge request being rejected (Close on its review, or its PR closed on the forge) leaves it carried by that merge request, at its stage: the work isn't wanted, so it leaves In flight with it. A new hand-off of its branch frees it (clears `merge_request_id`) and starts it over as new work; so does a later `request_merge` taking it, as a work item carried by a rejected merge request counts as free.
+- The note's **tone** (`ok`, `err`, `ask`, neutral), which Worktrees → In flight colors it by, is derived from the work item's state (checks, stage), never stored.
 
 ## Phasing
 
-Built (2026-10-17, the Git epic's `git-work-items`): the table, stages 1–3 from hand-offs, deliveries and the lead's merges, and In flight (now on the Repositories tab) from `GET /api/pipeline` with `pipeline.changed`. Not yet: `checks_status` and the "checks fail" stay at 0 ([git-checks](../../backlog/git-checks.md)); `card_ref`, which nothing fills yet (In flight shows the branch instead).
+Built (2026-10-17, the Git epic's `git-work-items`): the table, stages 1–3 from hand-offs, deliveries and the lead's merges, and In flight (now on the Worktrees tab) from `GET /api/pipeline` with `pipeline.changed`. Not yet: `checks_status` and the "checks fail" stay at 0 ([git-checks](../../backlog/git-checks.md)); `card_ref`, which nothing fills yet (In flight shows the branch instead).

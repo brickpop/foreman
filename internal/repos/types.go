@@ -15,6 +15,7 @@ type Branch struct {
 	Name        string `json:"name"`
 	Ahead       int    `json:"ahead"`       // commits main doesn't have
 	Uncommitted bool   `json:"uncommitted"` // its worktree has changes not committed yet
+	Agent       string `json:"agent"`       // whose worktree has it checked out (an agent id); "" for none
 }
 
 // File is a file at a ref: its text, or why there is none to show.

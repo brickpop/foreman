@@ -188,10 +188,16 @@ describe("the Dashboard's model", () => {
       [{ id: "atlas@ledger", goal: "Ship invoices" } as Deployment],
       [atlas],
     );
+    // A deployment whose agents are all asleep is still listed (harbor).
     expect(groups.map((g) => [g.deployment, g.project, g.team?.id, g.goal])).toEqual([
+      ["atlas@harbor", "harbor", "atlas", ""],
       ["atlas@ledger", "ledger", "atlas", "Ship invoices"],
       ["orion@relay", "relay", undefined, ""],
     ]);
+    expect(groups[0].agents).toEqual([]);
+    expect(groups[0].asleep.map((a) => a.instance.agentId)).toEqual(["ines"]);
+    expect(groups[1].asleep.map((a) => a.instance.agentId)).toEqual(["nap"]);
+    groups.shift();
     // Agents the team file doesn't name (zed) come last; with no team file, as they come.
     expect(groups[0].agents.map((a) => [a.instance.agentId, a.lead, a.agent?.soul.name])).toEqual([
       ["mara", true, "Mara"],

@@ -4,20 +4,28 @@ import { inbox } from "../app/model";
 import { useInstances, useProjects, useRequests, useTeams } from "../app/queries";
 import { deploymentTabs, mostRecentAgent } from "../app/sessions";
 import { DeployDialog } from "../components/DeployDialog";
-import { Button, CountBadge, outlineLink } from "../components/ui";
+import { Button, CountBadge, Loading, outlineLink } from "../components/ui";
 import { Activity } from "./project/Activity";
 import { Board } from "./project/Board";
 import { Overview } from "./project/Overview";
 import { NeedsYou } from "./project/Pipeline";
 import { ProjectSettings } from "./project/ProjectSettings";
 import { Repositories } from "./project/Repositories";
+import { Worktrees } from "./project/Worktrees";
 
-export type ProjectTab = "overview" | "board" | "repositories" | "activity" | "settings";
+export type ProjectTab =
+  | "overview"
+  | "board"
+  | "repositories"
+  | "worktrees"
+  | "activity"
+  | "settings";
 
 const tabs: { tab: ProjectTab; label: string }[] = [
   { tab: "overview", label: "Overview" },
   { tab: "board", label: "Board" },
   { tab: "repositories", label: "Repositories" },
+  { tab: "worktrees", label: "Worktrees" },
   { tab: "activity", label: "Activity" },
   { tab: "settings", label: "Settings" },
 ];
@@ -30,7 +38,7 @@ export function Project() {
   const requests = useRequests();
   const [deploy, setDeploy] = useState(false);
   const project = projects.data?.find((p) => p.id === id);
-  if (projects.isPending) return null;
+  if (projects.isPending) return <Loading rows={5} className="m-12" />;
   if (!project) return <p className="p-12 text-tx3">No project {id}.</p>;
   const open = inbox(requests.data ?? []).filter((r) => r.projectId === id);
   return (
@@ -72,6 +80,7 @@ export function Project() {
       )}
       {tab === "activity" && <Activity key={id} project={id} />}
       {tab === "repositories" && <Repositories key={id} project={project} />}
+      {tab === "worktrees" && <Worktrees key={id} project={project} />}
       {tab === "board" && <Board key={id} project={id} />}
       {tab === "settings" && (
         <ProjectSettings key={id} project={project} onDeploy={() => setDeploy(true)} />

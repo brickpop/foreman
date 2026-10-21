@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { Team } from "../api/client";
-import { branchOwner, bytes, crumbs, folderOf, isMarkdown } from "./repos";
+import type { Repo, RepoBranch, Team } from "../api/client";
+import {
+  branchOwner,
+  bytes,
+  crumbs,
+  folderOf,
+  isMarkdown,
+  reposWith,
+  shownAt,
+  worktrees,
+} from "./repos";
 
 const atlas = {
   id: "atlas",
@@ -34,5 +43,63 @@ describe("the Repositories tab's model", () => {
     expect(isMarkdown("docs/README.MD")).toBe(true);
     expect(isMarkdown("main.go")).toBe(false);
     expect([bytes(12), bytes(3482), bytes(1258291)]).toEqual(["12 B", "3.4 KB", "1.2 MB"]);
+  });
+});
+
+describe("worktrees", () => {
+  const branch = (name: string, more: Partial<RepoBranch> = {}) =>
+    ({ name, ahead: 0, uncommitted: false, agent: "", ...more }) as RepoBranch;
+  const repos = [
+    {
+      name: "api",
+      project: false,
+      main: "main",
+      branches: [
+        branch("main"),
+        branch("wt/tove/LED-44", { agent: "tove", ahead: 2, uncommitted: true }),
+        branch("lead/atlas/integration", { agent: "mara" }),
+        branch("wt/ines/old", { ahead: 1 }),
+      ],
+    },
+    {
+      name: "web",
+      project: false,
+      main: "trunk",
+      branches: [branch("trunk"), branch("wt/tove/LED-44", { agent: "tove" })],
+    },
+    { name: "project", project: true, main: "main", branches: [branch("main")] },
+  ] as Repo[];
+
+  it("gives each agent its checked-out branch per repo", () => {
+    expect(
+      worktrees(repos).map((w) => [w.agent, w.branches.map((b) => `${b.repo}:${b.branch.name}`)]),
+    ).toEqual([
+      ["mara", ["api:lead/atlas/integration"]],
+      ["tove", ["api:wt/tove/LED-44", "web:wt/tove/LED-44"]],
+    ]);
+  });
+
+  it("finds where a branch is read, repos with commits on it first", () => {
+    expect(reposWith(repos, "wt/tove/LED-44")).toEqual(["api", "web"]);
+    expect(reposWith(repos, "wt/ines/old")).toEqual(["api"]);
+    expect(reposWith(repos, "nowhere")).toEqual([]);
+    const webFirst = [repos[1], repos[0]];
+    expect(reposWith(webFirst, "wt/tove/LED-44")).toEqual(["api", "web"]);
+  });
+
+  it("shows the repo and branch asked for, else a sensible default", () => {
+    expect(shownAt(repos, "web", "wt/tove/LED-44")).toEqual({
+      repo: "web",
+      branch: "wt/tove/LED-44",
+    });
+    expect(shownAt(repos, "web", "gone")).toEqual({ repo: "web", branch: "trunk" });
+    // An unknown repo falls back to the first; the branch asked for stays when it has it.
+    expect(shownAt(repos, "nope", "wt/tove/LED-44")).toEqual({
+      repo: "api",
+      branch: "wt/tove/LED-44",
+    });
+    expect(shownAt(repos, "nope", "gone")).toEqual({ repo: "api", branch: "main" });
+    expect(shownAt(repos)).toEqual({ repo: "api", branch: "main" });
+    expect(shownAt([])).toBeUndefined();
   });
 });

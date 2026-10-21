@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   isNotBuilt,
   type MergeRequest,
@@ -13,12 +13,14 @@ import {
   useEntryTitle,
   useInstances,
   usePipeline,
+  useRepos,
   useRequests,
   useTeams,
 } from "../../app/queries";
+import { reposWith } from "../../app/repos";
 import { Avatar } from "../../components/Avatar";
 import { RequestPanel } from "../../components/RequestPanel";
-import { Button, Empty, NotBuilt, Panel, SectionLabel } from "../../components/ui";
+import { Button, Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 
 // A project's pipeline (wiki/product/features/changes.md): what needs the CEO
 // opens its Overview (a review links to its page, wiki/product/features/reviews.md); the work moving towards main, and what recently merged,
@@ -50,12 +52,14 @@ export function NeedsYou({ project }: { project: Project }) {
   );
 }
 
-/** The work on its way to main, and what merged in the last 7 days: first on
- * the Repositories tab. */
+/** The work on its way to main, and what merged in the last 7 days: on the
+ * Worktrees tab, under the agents' worktrees. Each branch links to its code
+ * in Repositories. */
 export function InFlight({ project }: { project: Project }) {
   const pipeline = usePipeline(project.id);
   const teams = useTeams();
   const instances = useInstances();
+  const repos = useRepos(project.id).data ?? [];
   const mrs = pipeline.data?.mergeRequests ?? [];
   const items = pipeline.data?.workItems ?? [];
   const live = new Set((instances.data ?? []).map((i) => i.deploymentId));
@@ -65,10 +69,10 @@ export function InFlight({ project }: { project: Project }) {
     .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))
     .slice(0, 20);
   const openMrs = mrs.filter((m) => m.state === "open");
-  // In flight on their own: every work item not carried by an open or merged merge
-  // request, integrated ones included (they wait for the lead's request_merge).
-  const carried = (w: (typeof items)[number]) =>
-    mrs.some((m) => m.id === w.mergeRequestId && (m.state === "open" || m.state === "merged"));
+  // In flight on their own: every work item no merge request carries, integrated
+  // ones included (they wait for the lead's request_merge). A closed review's
+  // items stay with it, out of the way, until a new hand-off frees them.
+  const carried = (w: (typeof items)[number]) => mrs.some((m) => m.id === w.mergeRequestId);
   const loose = items.filter((w) => !carried(w));
   if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
   // Side by side when both fit (the CEO, 2026-10-17); one alone takes the width.
@@ -79,7 +83,9 @@ export function InFlight({ project }: { project: Project }) {
           <SectionLabel>In flight</SectionLabel>
           <span className="text-xs text-tx4">worktree → lead → main</span>
         </div>
-        {loose.length === 0 && openMrs.length === 0 ? (
+        {pipeline.isPending ? (
+          <Loading />
+        ) : loose.length === 0 && openMrs.length === 0 ? (
           <Empty>No work in flight.</Empty>
         ) : (
           <Panel>
@@ -88,6 +94,7 @@ export function InFlight({ project }: { project: Project }) {
                 key={w.id}
                 item={w}
                 project={project.id}
+                repo={reposWith(repos, w.branch)[0]}
                 teams={teams.data ?? []}
                 live={live.has(w.deploymentId)}
               />
@@ -155,14 +162,33 @@ function ProjectRequest({
   );
 }
 
+/** A branch, linked to its code in Repositories when a repo has it. */
+function BranchLink({ project, repo, branch }: { project: string; repo?: string; branch: string }) {
+  if (!repo) return <span className="font-mono">{branch}</span>;
+  return (
+    <Link
+      to="/projects/$project"
+      params={{ project }}
+      search={{ tab: "repositories", repo, branch }}
+      title={`Read ${branch} in ${repo}`}
+      className="font-mono text-accTx hover:underline"
+    >
+      {branch}
+    </Link>
+  );
+}
+
 function WorkRow({
   item: w,
   project,
+  repo,
   teams,
   live,
 }: {
   item: WorkItem;
   project: string;
+  /** Where its branch is read: the first repo with commits on it. */
+  repo?: string;
   teams: Team[];
   live: boolean;
 }) {
@@ -177,7 +203,8 @@ function WorkRow({
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{title.data ?? (w.cardRef || w.branch)}</span>
         <span className="truncate text-[12.5px] text-tx3">
-          {author?.soul.name ?? w.authorInstance} · <span className="font-mono">{w.branch}</span>
+          {author?.soul.name ?? w.authorInstance} ·{" "}
+          <BranchLink project={project} repo={repo} branch={w.branch} />
           {w.note && <span className={tone}> · {w.note}</span>}
         </span>
       </span>
@@ -233,7 +260,7 @@ function MergeRow({
           </span>
           <span className="truncate text-[12.5px] text-tx3">
             {lead?.soul.name ?? mr.authorInstance} · {mr.repo} ·{" "}
-            <span className="font-mono">{mr.branch}</span> → {main}
+            <BranchLink project={project} repo={mr.repo} branch={mr.branch} /> → {main}
             {mr.checksStatus && ` · checks ${mr.checksStatus}`}
             {mr.note && <span className={mr.conflicting ? "text-err" : ""}> · {mr.note}</span>}
           </span>

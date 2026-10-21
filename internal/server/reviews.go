@@ -25,7 +25,9 @@ type Reviews interface {
 	// MergeReview: workflow.ErrConflict, ErrLocalChanges or ErrBranchMoved
 	// for each repo that couldn't be merged (the others are).
 	MergeReview(ctx context.Context, id string, heads map[string]string) error
-	CloseReview(ctx context.Context, id, reason string) error
+	// CloseReview: workflow.ErrInvalid when dropping the branches of a team
+	// left running.
+	CloseReview(ctx context.Context, id string, c workflow.Close) (workflow.Closed, error)
 }
 
 func reviewRoutes(mux *http.ServeMux, rv Reviews) {
@@ -81,13 +83,12 @@ func reviewRoutes(mux *http.ServeMux, rv Reviews) {
 		writeReview(w, nil, rv.MergeReview(r.Context(), r.PathValue("id"), req.Heads))
 	})
 	mux.HandleFunc("POST /api/reviews/{id}/close", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Reason string `json:"reason"`
-		}
-		if !decode(w, r, &req, "expected {reason}") {
+		var req workflow.Close
+		if !decode(w, r, &req, "expected {note, dropBranches, stopTeam}") {
 			return
 		}
-		writeReview(w, nil, rv.CloseReview(r.Context(), r.PathValue("id"), req.Reason))
+		closed, err := rv.CloseReview(r.Context(), r.PathValue("id"), req)
+		writeReview(w, closed, err)
 	})
 }
 

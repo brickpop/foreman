@@ -43,13 +43,26 @@ const review = createRoute({
   component: Review,
 });
 
-const projectTabs: ProjectTab[] = ["overview", "board", "repositories", "activity", "settings"];
+const projectTabs: ProjectTab[] = [
+  "overview",
+  "board",
+  "repositories",
+  "worktrees",
+  "activity",
+  "settings",
+];
+const text = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
 export const projectRoute = createRoute({
   getParentRoute: () => root,
   path: "projects/$project",
-  validateSearch: (s: Record<string, unknown>): { tab: ProjectTab; entry?: string } => ({
+  // entry: the wiki entry open on Overview; repo and branch: what Repositories shows.
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { tab: ProjectTab; entry?: string; repo?: string; branch?: string } => ({
     tab: projectTabs.includes(s.tab as ProjectTab) ? (s.tab as ProjectTab) : "overview",
-    entry: typeof s.entry === "string" ? s.entry : undefined,
+    entry: text(s.entry),
+    repo: text(s.repo),
+    branch: text(s.branch),
   }),
   component: Project,
 });

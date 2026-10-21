@@ -1,15 +1,30 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../api/client";
 import { type DiffLine, diffFiles, type FileDiff } from "../app/diff";
 import { agentOf, forgeOf, linkLine, mainOf, when } from "../app/model";
-import { useProjects, useReview, useReviewChange, useReviewDiff, useTeams } from "../app/queries";
 import {
+  keys,
+  useDeployments,
+  useProjects,
+  useReview,
+  useReviewChange,
+  useReviewDiff,
+  useTeams,
+} from "../app/queries";
+import {
+  type CloseChoice,
+  closeChoices,
+  closeLabel,
+  closeRequest,
+  closingTeam,
   commentAt,
   diffKey,
   drafts,
   hasSince,
   isOpen,
+  keptLines,
   lineKey,
   mergeHeads,
   mergeLabel,
@@ -19,7 +34,7 @@ import {
 } from "../app/reviews";
 import { Avatar } from "../components/Avatar";
 import { useToast } from "../components/Toasts";
-import { Button, Empty, SectionLabel, Segmented } from "../components/ui";
+import { Button, Empty, Loading, SectionLabel, Segmented } from "../components/ui";
 
 // One review of a lead's branch (wiki/product/features/reviews.md): its files
 // by repo, each file's diff with the CEO's comments on its lines, the general
@@ -50,6 +65,7 @@ export function Review() {
   const diff = useReviewDiff(v ? id : "", since);
   const projects = useProjects();
   const teams = useTeams();
+  const deployments = useDeployments();
   const toast = useToast();
   const failed = (e: Error) => toast({ title: "Not done", body: e.message, color: "var(--err)" });
   const [composing, compose] = useState<NewComment>();
@@ -77,7 +93,12 @@ export function Review() {
         <p className="text-err">{review.error.message}</p>
       </Page>
     );
-  if (!v) return <Page />;
+  if (!v)
+    return (
+      <Page>
+        <Loading rows={6} />
+      </Page>
+    );
   const project = projects.data?.find((p) => p.id === v.projectId);
   const lead = agentOf(teams.data ?? [], v.lead);
   const repos = (diff.data ?? []).map((d) => ({ ...d, files: diffFiles(d.diff) }));
@@ -122,13 +143,22 @@ export function Review() {
             <Link
               to="/projects/$project"
               params={{ project: v.projectId }}
-              search={{ tab: "repositories" }}
+              search={{ tab: "worktrees" }}
               className="text-tx2 hover:text-tx"
             >
               {v.projectId}
             </Link>{" "}
-            · <span className="font-mono">{v.branch}</span> · {statusLabel(v.status)} ·{" "}
-            {when(v.updatedAt)}
+            ·{" "}
+            <Link
+              to="/projects/$project"
+              params={{ project: v.projectId }}
+              search={{ tab: "repositories", repo: v.mergeRequests[0]?.repo, branch: v.branch }}
+              title="Read the branch in Repositories"
+              className="font-mono text-tx2 hover:text-tx"
+            >
+              {v.branch}
+            </Link>{" "}
+            · {statusLabel(v.status)} · {when(v.updatedAt)}
           </span>
         </p>
         {hasSince(v) && (
@@ -179,6 +209,7 @@ export function Review() {
         <div className="min-w-0 flex-1 overflow-auto px-8">
           <div className="flex flex-col gap-5 py-5">
             {diff.error && <p className="text-err">{diff.error.message}</p>}
+            {diff.isPending && <Loading rows={8} />}
             {diff.data?.length === 0 && <Empty>Nothing open to read: every repo is decided.</Empty>}
             {repos.map((r) =>
               r.files.map((f) => (
@@ -213,6 +244,10 @@ export function Review() {
           mainOf={(repo) => mainOf(project, repo)}
           forge={forgeOf(project)}
           diffs={diff.data}
+          closeAs={closeChoices(
+            closingTeam(v, deployments.data ?? [], teams.data ?? []),
+            v.projectId,
+          )}
           failed={failed}
         />
       )}
@@ -473,13 +508,15 @@ function Composer({
 
 /** The decision, at the page's foot: the repos to merge (all ticked at
  * first) at the heads the diffs show, Request changes with the draft, or
- * Close. */
+ * Close: the work isn't wanted, and the CEO picks what becomes of its team
+ * and branches (closeAs, the first the default). */
 function DecisionBar({
   review: v,
   lead,
   mainOf,
   forge,
   diffs,
+  closeAs,
   failed,
 }: {
   review: ReviewData;
@@ -487,15 +524,21 @@ function DecisionBar({
   mainOf: (repo: string) => string;
   forge: string;
   diffs: RepoDiff[] | undefined;
+  closeAs: CloseChoice[];
   failed: (e: Error) => void;
 }) {
   const toast = useToast();
+  const queries = useQueryClient();
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<"" | "changes" | "close">("");
   const [text, setText] = useState("");
+  const [chosen, choose] = useState<CloseChoice["value"]>("keep");
+  // The team may stop meanwhile, taking its choices along: back to the default.
+  const closing = closeAs.find((c) => c.value === chosen) ?? closeAs[0];
   const done = () => {
     setForm("");
     setText("");
+    choose("keep");
   };
   const merge = useReviewChange(
     (c, heads: Record<string, string>) => c.reviews.merge(v.id, heads),
@@ -505,7 +548,10 @@ function DecisionBar({
     (c, note: string) => c.reviews.requestChanges(v.id, note),
     failed,
   );
-  const close = useReviewChange((c, reason: string) => c.reviews.close(v.id, reason), failed);
+  const close = useReviewChange(
+    (c, choice: CloseChoice) => c.reviews.close(v.id, closeRequest(choice, text)),
+    failed,
+  );
   const busy = merge.isPending || changes.isPending || close.isPending;
   const repos = openRepos(v, mainOf);
   const ticked = repos.filter((r) => !unticked.has(r.repo));
@@ -577,21 +623,57 @@ function DecisionBar({
           onSubmit={(e) => {
             e.preventDefault();
             if (form === "changes") changes.mutate(text.trim(), { onSuccess: done });
-            else close.mutate(text.trim(), { onSuccess: done });
+            else
+              close.mutate(closing, {
+                onSuccess: (closed) => {
+                  done();
+                  if (closing.stopTeam) {
+                    queries.invalidateQueries({ queryKey: keys.instances });
+                    queries.invalidateQueries({ queryKey: keys.deployments });
+                  }
+                  if (closing.dropBranches) queries.invalidateQueries({ queryKey: keys.repos });
+                  if (closed.kept.length > 0)
+                    toast({
+                      title: "Closed, but some branches stay",
+                      body: keptLines(closed),
+                      color: "var(--err)",
+                    });
+                },
+              });
           }}
         >
-          <textarea
-            rows={3}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={
-              form === "changes"
-                ? `A note for ${lead}, with the ${draft} draft comment${draft === 1 ? "" : "s"} (optional)`
-                : `Why it closes, for ${lead} (optional)`
-            }
-            aria-label={form === "changes" ? `Note to ${lead}` : `Reason for ${lead}`}
-            className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
-          />
+          {form === "close" && (
+            <fieldset className="flex flex-col gap-1 text-[13.5px] text-tx2">
+              <legend className="mb-1 text-[12.5px] font-medium text-tx4">
+                What becomes of it
+              </legend>
+              {closeAs.map((c) => (
+                <label key={c.value} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="close"
+                    checked={closing.value === c.value}
+                    onChange={() => choose(c.value)}
+                  />
+                  {c.label}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {(form === "changes" || closing.tells) && (
+            <textarea
+              rows={3}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={
+                form === "changes"
+                  ? `A note for ${lead}, with the ${draft} draft comment${draft === 1 ? "" : "s"} (optional)`
+                  : `A note for ${lead} (optional): ${lead} is told to stop work on it either way`
+              }
+              aria-label={form === "changes" ? `Note to ${lead}` : `Note for ${lead}`}
+              className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
+            />
+          )}
           <span className="flex justify-end gap-2">
             <Button onClick={done}>Cancel</Button>
             <Button
@@ -599,7 +681,7 @@ function DecisionBar({
               variant={form === "close" ? "danger" : "primary"}
               disabled={busy || (form === "changes" && draft === 0 && !text.trim())}
             >
-              {form === "changes" ? `Send to ${lead}` : `Close and tell ${lead}`}
+              {form === "changes" ? `Send to ${lead}` : closeLabel(closing, text)}
             </Button>
           </span>
         </form>

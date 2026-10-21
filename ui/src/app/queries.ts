@@ -479,8 +479,8 @@ export function useReviewDiff(id: string, since: boolean) {
 
 /** A change to a review (a comment, a decision): the review, the pipeline and
  * the requests are refetched after it, whether it worked or not. */
-export function useReviewChange<T>(
-  change: (c: ForemanClient, input: T) => Promise<void>,
+export function useReviewChange<T, R = void>(
+  change: (c: ForemanClient, input: T) => Promise<R>,
   onError: (e: Error) => void,
 ) {
   const c = useClient();

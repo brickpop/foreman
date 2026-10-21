@@ -20,6 +20,7 @@ export interface Branch {
   name: string;
   ahead: number /* int */; // commits main doesn't have
   uncommitted: boolean; // its worktree has changes not committed yet
+  agent: string; // whose worktree has it checked out (an agent id); "" for none
 }
 /**
  * File is a file at a ref: its text, or why there is none to show.

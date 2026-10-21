@@ -395,8 +395,14 @@ func TestStopWhileStarting(t *testing.T) {
 
 func TestStopKeepsTheWorktrees(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
+	if active, err := f.m.Active(ctx, "atlas@ledger"); err != nil || active {
+		t.Errorf("active before any deploy: %v %v", active, err)
+	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
 		t.Fatal(err)
+	}
+	if active, err := f.m.Active(ctx, "atlas@ledger"); err != nil || !active {
+		t.Errorf("not active once deployed: %v %v", active, err)
 	}
 	_ = f.m.Wake(ctx, "tove@ledger")
 	f.waitStatus("tove@ledger", Running)
@@ -413,6 +419,9 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 	}
 	if d, _ := f.db.Deployments().Get(ctx, "atlas@ledger"); d.Status != store.DeploymentStopped {
 		t.Errorf("deployment %+v", d)
+	}
+	if active, err := f.m.Active(ctx, "atlas@ledger"); err != nil || active {
+		t.Errorf("active once stopped: %v %v", active, err)
 	}
 	if _, err := os.Stat(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api", "README")); err != nil {
 		t.Error("stopping removed the worktree")

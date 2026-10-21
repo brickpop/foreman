@@ -169,6 +169,46 @@ func (g *CLI) MoveBranch(ctx context.Context, dir, branch, from, to string) erro
 	return err
 }
 
+// DropBranch discards branch, its head first kept under backup (a ref
+// outside refs/heads, e.g. refs/foreman/closed/rev-3/lead/atlas/x), so a
+// mistake can be undone by hand. A branch checked out in a worktree can't
+// go: it moves to where branch main is instead, its uncommitted changes kept
+// as MoveBranch does; ErrLocalChanges, nothing changed and no backup left,
+// when they are in the way or a merge is unfinished there.
+func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, main string) error {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, main) || !strings.HasPrefix(backup, "refs/foreman/") {
+		return ErrBadBranch
+	}
+	defer g.lock(ctx, dir)()
+	head, err := g.Resolve(ctx, dir, "refs/heads/"+branch)
+	if err != nil {
+		return err
+	}
+	trees, err := g.Worktrees(ctx, dir)
+	if err != nil {
+		return err
+	}
+	if _, err := run(ctx, dir, "update-ref", backup, head); err != nil {
+		return err
+	}
+	if tree, ok := trees[branch]; ok {
+		target, err := g.Resolve(ctx, dir, "refs/heads/"+main)
+		if err == nil {
+			_, err = run(ctx, tree, "reset", "--quiet", "--keep", target)
+		}
+		if err != nil {
+			_, _ = run(ctx, dir, "update-ref", "-d", backup, head)
+		}
+		if err != nil && (strings.Contains(err.Error(), "not uptodate") || strings.Contains(err.Error(), "middle of a merge")) {
+			return ErrLocalChanges
+		}
+		return err
+	}
+	// Deleted only if still where it was read.
+	_, err = run(ctx, dir, "update-ref", "-d", "refs/heads/"+branch, head)
+	return err
+}
+
 // Diff is what the commit head changes against branch target since they
 // parted, as a unified diff.
 func (g *CLI) Diff(ctx context.Context, dir, target, head string) (string, error) {

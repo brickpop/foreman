@@ -280,8 +280,8 @@ type RequestMergeResult struct { Review string; MergeRequests []string; Refreshe
 | The CEO chooses Create PR | the merge request's lead | `From Foreman: the CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
 | Review comments on the forge (after Create PR) | the merge request's lead | `From Foreman: a review comment on PR #128 by <user>: <its start>… Read it with read_message("msg-N").` (stored as a message, kind `notice`) |
 | Request changes on its review | the review's lead | `From the CEO: changes requested on lead/atlas/settlement-v2 (backlog/LED-44.md).`, the note, one line per comment, then `Fix them, commit(), then call request_merge again on the same branch.` ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)) |
-| Close on its review | the review's lead | `From the CEO: the review of lead/atlas/settlement-v2 was closed without merging (ledger-api): <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` |
-| Its PR closed on the forge | the merge request's lead | `From the CEO: the merge of lead/atlas/settlement-v2 in ledger-api was rejected: <reason>. Its work items are back in your hands; switch back to the branch to rework it, then call request_merge again.` |
+| Close on its review, its team kept working | the review's lead | `From Foreman: the CEO closed the review of lead/atlas/settlement-v2 without merging (ledger-api). Stop work on it, and don't request it again.`, then `The CEO's note: <note>` when there is one ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)). A team stopped with the close, or not running, is told nothing |
+| Its PR closed on the forge (not built) | the merge request's lead | As Close on its review, its team kept working |
 | "Owning team fixes now" on a finding | the named team's lead | `From the CEO: <team> fixes "<finding>" now.` |
 | A soul or team edit | each running instance | `From Foreman: your definition changed. Read it with read_message("msg-N").` (the changed sections, stored as a message of kind `notice`; [Session prompt → Updates](./session-prompt.md#updates)) |
 
@@ -442,7 +442,7 @@ Every state change is published on the in-process event bus; the web server stre
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity panel |
 | `team.action` | an [action](#team-actions), once recorded | Workflow | Activity panel |
 | `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, project Overview, sidebar badges, notifications |
-| `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Repositories |
+| `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Worktrees |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
 | `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Overview, Board, Settings |
 

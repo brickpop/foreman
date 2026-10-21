@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"path/filepath"
 	"slices"
 
 	"github.com/brickpop/foreman/internal/git"
@@ -28,6 +29,8 @@ var ErrNoRepo = errors.New("repos: no such repo")
 // Config is what the browser needs of the home.
 type Config interface {
 	Project(id string) (home.Project, error)
+	// Sandbox is an agent's folder of worktrees in the project.
+	Sandbox(project, agent string) string
 }
 
 // Git is what the browser needs of the Git block.
@@ -81,7 +84,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 		if err != nil {
 			return nil, err
 		}
-		branches, err := b.branches(ctx, dir, main)
+		branches, err := b.branches(ctx, project, dir, main)
 		if err != nil {
 			return nil, err
 		}
@@ -90,7 +93,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 	return list, nil
 }
 
-func (b Browser) branches(ctx context.Context, dir, main string) ([]Branch, error) {
+func (b Browser) branches(ctx context.Context, project, dir, main string) ([]Branch, error) {
 	names, err := b.Git.RecentBranches(ctx, dir)
 	if err != nil {
 		return nil, err
@@ -113,6 +116,7 @@ func (b Browser) branches(ctx context.Context, dir, main string) ([]Branch, erro
 		if tree, ok := trees[name]; ok {
 			clean, err := b.Git.Clean(ctx, tree)
 			br.Uncommitted = err == nil && !clean
+			br.Agent = b.agentOf(project, tree)
 		}
 		list = append(list, br)
 	}
@@ -127,6 +131,29 @@ func (b Browser) branches(ctx context.Context, dir, main string) ([]Branch, erro
 		return 0
 	})
 	return list, nil
+}
+
+// agentOf is the agent whose sandbox holds the worktree (its folder is
+// <sandbox>/<repo>), or "" when it is no agent's (the CEO's checkout).
+func (b Browser) agentOf(project, tree string) string {
+	sandbox := filepath.Dir(tree)
+	agent := filepath.Base(sandbox)
+	if samePath(b.Config.Sandbox(project, agent), sandbox) {
+		return agent
+	}
+	return ""
+}
+
+// samePath compares two folders as the file system sees them: git reports
+// worktrees with symlinks resolved (macOS's /var is /private/var).
+func samePath(a, b string) bool {
+	resolve := func(p string) string {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return r
+		}
+		return filepath.Clean(p)
+	}
+	return resolve(a) == resolve(b)
 }
 
 // at is the repo's folder and the commit ref names.

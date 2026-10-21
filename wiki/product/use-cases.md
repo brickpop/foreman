@@ -27,7 +27,7 @@ Acceptance:
 - [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the Activity panel (who calls whom, and the exchange).
 - [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
-- [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Repositories](./features/repositories.md) tab, under In flight.
+- [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Worktrees](./features/worktrees.md) tab, under In flight.
 - [ ] Tove's `contribute(finding, …)` writes a note in `~/.foreman/projects/ledger/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
 - [ ] When the lead updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
 
@@ -58,9 +58,9 @@ Acceptance:
 - [ ] A review request appears with the entry's title and the repos, and a Review button that opens its review: the files changed by repo, the diff, the checks per repo, and Merge to main / Request changes / Close (Create PR on Forgejo comes with the forge).
 - [ ] Comments on lines and general ones stay drafts until Request changes sends them to the lead in one message, each with its repo, file and line; the lead's next `request_merge` shows the new diff, a comment whose line changed is marked outdated, and "Since your last review" shows only what changed.
 - [ ] Merge to main merges the branch into `main` on the host, resolves the request, tells the lead, and lists the merge request with its work items under Merged. A branch that doesn't merge cleanly changes nothing, shows "conflicts with main" and asks the lead to merge `main` in.
-- [ ] Create PR pushes the branch and opens a PR on the forge; the panel then shows Open PR ↗. When the CEO merges it on the forge, Foreman notices within a polling interval, resolves the request and notifies the lead; closing it without merging rejects the merge request and returns its work items to stage 0; review comments made on the forge reach the lead's session.
+- [ ] Create PR pushes the branch and opens a PR on the forge; the panel then shows Open PR ↗. When the CEO merges it on the forge, Foreman notices within a polling interval, resolves the request and notifies the lead; closing it without merging rejects the merge request and tells the lead to stop work on it; review comments made on the forge reach the lead's session.
 - [ ] On a repo without a forge, Create PR is not offered.
-- [ ] Close asks for a reason, delivers it to the lead (typed into its session when idle), closes the PR if there is one, returns the work items to stage 0, and keeps the branch, so the lead can `switch` back to it.
+- [ ] Close (the work isn't wanted) keeps the team working (its lead told to stop, with an optional note), or stops it, keeping or dropping the branches (dropped ones recoverable under `refs/foreman/closed/`; never under a team left running); closes the PR if there is one; its work items leave In flight.
 - [ ] A non-lead calling `request_merge` is refused; so is an entry that doesn't exist in the wiki.
 - [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<own team>/*` is refused.
 - [ ] When one merge request is merged, the lead of every other open one on the same repo gets a "main moved" line asking it to merge `main` in with `merge("main")`; after that, `request_merge` on the same branch refreshes the existing merge request (checks rerun, its PR pushed again if it has one) instead of creating a new one.

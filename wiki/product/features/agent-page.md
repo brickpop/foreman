@@ -15,7 +15,7 @@ Padding `40px 48px 64px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, g
 ## Left column
 
 - **Header**: Avatar 72 (no dot), H1 name (26px), and `<Role> · <Team>` (`--tx3`; opens the team's Members tab, [Team page](./team-page.md)).
-- **"Running on"**: one row per deployment (grid `auto 80px 1fr auto`, `--panel`, radius 9): an 8px status dot, the project (600), the current task (ellipsis), and a **`Session`** button ([Sessions](./sessions.md)). If the team isn't deployed: `Not running. <Team> isn't deployed to any project.`
+- **"Running on"**: one row per deployment (grid `auto auto 1fr auto`, `--panel`, radius 9): an 8px status dot, the project (600, never wrapped), the current task (ellipsis), and a **`Session`** button ([Sessions](./sessions.md)). If the team isn't deployed: `Not running. <Team> isn't deployed to any project.`
 - **"Look"**, with **`Shuffle`** (12.5px `--accTx` link) on the right ([Avatar](../design/avatar.md)):
   - Swatch rows (84px label column): `Background` (8), `Skin` (5), `Hair color` (5).
   - Trait rows of option buttons labelled with the values: `Hair` (short, long, curly, bun, bald), `Eyes` (dots, glasses, shades, sleepy), `Beard` (none, stubble, full, mustache).

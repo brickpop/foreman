@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { MergeRequest, Review, ReviewComment } from "../api/client";
+import type { Deployment, MergeRequest, Review, ReviewComment, Team } from "../api/client";
 import {
+  closeChoices,
+  closeLabel,
+  closeRequest,
+  closingTeam,
   commentAt,
   diffKey,
   drafts,
   hasSince,
+  keptLines,
   lineKey,
   mergeHeads,
   mergeLabel,
@@ -124,6 +129,63 @@ describe("reviewGroups", () => {
     expect(g.needsYou.map((v) => v.id)).toEqual(["r2", "r5"]);
     expect(g.waiting.map((v) => v.id)).toEqual(["r3"]);
     expect(g.done.map((v) => v.id)).toEqual(["r1", "r4"]);
+  });
+});
+
+describe("Close", () => {
+  const v = { deploymentId: "atlas@ledger" } as Review;
+  const teams = [{ id: "atlas", config: { name: "Atlas" } }] as Team[];
+  const atlas = [{ id: "atlas@ledger" }] as Deployment[];
+  const running = closeChoices({ name: "Atlas", live: true }, "ledger");
+  const stopped = closeChoices({ name: "Atlas", live: false }, "ledger");
+  const shape = (c: (typeof running)[number]) => [c.value, c.stopTeam, c.dropBranches, c.tells];
+
+  it("knows the review's team by name, and whether it still runs", () => {
+    expect(closingTeam(v, atlas, teams)).toEqual({ name: "Atlas", live: true });
+    expect(closingTeam(v, [{ id: "atlas@other" } as Deployment], [])).toEqual({
+      name: "atlas",
+      live: false,
+    });
+  });
+
+  it("drops branches only with their team, and tells only a team that keeps working", () => {
+    expect(running.map(shape)).toEqual([
+      ["keep", false, false, true],
+      ["stop", true, false, false],
+      ["drop", true, true, false],
+    ]);
+    // Nobody runs: nothing to stop, nobody to tell.
+    expect(stopped.map(shape)).toEqual([
+      ["keep", false, false, false],
+      ["drop", false, true, false],
+    ]);
+    expect(running[0].label).toBe("Atlas keeps working on ledger; the branches stay");
+  });
+
+  it("sends the note, and says so, only when someone hears it", () => {
+    const [keep, stop] = running;
+    expect(closeRequest(keep, "  not now ")).toEqual({
+      note: "not now",
+      dropBranches: false,
+      stopTeam: false,
+    });
+    expect(closeLabel(keep, "not now")).toBe("Close and send");
+    expect(closeLabel(keep, "  ")).toBe("Close now");
+    // A note typed, then a choice that stops the team: it goes nowhere.
+    expect(closeRequest(stop, "not now").note).toBe("");
+    expect(closeLabel(stop, "not now")).toBe("Close now");
+  });
+
+  it("says which branches stayed, and why", () => {
+    expect(keptLines({ kept: [] })).toBe("");
+    expect(
+      keptLines({
+        kept: [
+          { repo: "api", branch: "lead/atlas/x", why: "changes in the way" },
+          { repo: "web", branch: "wt/tove/y", why: "busy" },
+        ],
+      }),
+    ).toBe("lead/atlas/x in api: changes in the way.\nwt/tove/y in web: busy.");
   });
 });
 

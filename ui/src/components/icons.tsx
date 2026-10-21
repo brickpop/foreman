@@ -55,6 +55,15 @@ export function CopyIcon() {
   );
 }
 
+/** A filled square: Stop (a deployment's sessions end). */
+export function StopIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3 shrink-0">
+      <rect x="3" y="3" width="10" height="10" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
 /** A tick: done (Copied). */
 export function CheckIcon() {
   return (

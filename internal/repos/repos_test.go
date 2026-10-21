@@ -26,6 +26,10 @@ func (c config) Project(id string) (home.Project, error) {
 		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api"), Main: "trunk"}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
 }
 
+func (c config) Sandbox(project, agent string) string {
+	return filepath.Join(c.root, project, ".sandboxes", agent)
+}
+
 func gitIn(t *testing.T, dir string, args ...string) {
 	t.Helper()
 	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false"}, args...)...)
@@ -87,8 +91,12 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 	if api.Main != "trunk" || len(api.Branches) != 2 || api.Branches[0].Name != "trunk" {
 		t.Fatalf("api %+v", api)
 	}
-	if x := api.Branches[1]; x.Name != "wt/tove/x" || x.Ahead != 1 || !x.Uncommitted {
+	if x := api.Branches[1]; x.Name != "wt/tove/x" || x.Ahead != 1 || !x.Uncommitted || x.Agent != "tove" {
 		t.Errorf("tove's branch %+v", x)
+	}
+	// trunk is checked out in the CEO's own checkout: no agent's.
+	if trunk := api.Branches[0]; trunk.Agent != "" {
+		t.Errorf("trunk %+v", trunk)
 	}
 	if _, err := b.Repos(ctx, "nope"); !errors.Is(err, home.ErrNotFound) {
 		t.Errorf("unknown project: %v", err)

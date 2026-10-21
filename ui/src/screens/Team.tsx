@@ -6,9 +6,10 @@ import { roleLabel, roster } from "../app/model";
 import { useDeployments, useHomeFolder, useInstances, useRequests, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
+import { StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { TeamPlaybook } from "../components/TeamPlaybook";
-import { Button, Dot, Empty, Panel } from "../components/ui";
+import { Button, Dot, Empty, Loading, Panel } from "../components/ui";
 
 export type TeamTab = "deployments" | "members" | "playbook" | "file";
 
@@ -29,7 +30,7 @@ export function Team() {
   const openChiefOfStaff = useOpenChiefOfStaff();
   const [deploy, setDeploy] = useState(false);
   const team = teams.data?.find((t) => t.id === id);
-  if (teams.isPending) return null;
+  if (teams.isPending) return <Loading rows={5} className="m-12" />;
   if (!team) return <p className="p-12 text-tx3">No team {id}.</p>;
   const mine = (deployments.data ?? []).filter((d) => d.teamId === id);
   return (
@@ -123,7 +124,12 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                     {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
                   </Link>
                 </div>
-                <Button variant="danger" className="relative z-10" onClick={() => setStopping(d)}>
+                <Button
+                  variant="danger"
+                  className="relative z-10 inline-flex items-center gap-1.5"
+                  onClick={() => setStopping(d)}
+                >
+                  <StopIcon />
                   Stop
                 </Button>
               </div>

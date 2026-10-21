@@ -67,11 +67,33 @@ func (m *messages) Send(_ context.Context, msg store.TeamMessage) (store.TeamMes
 	return msg, nil
 }
 
+// teams fakes the instance manager: the deployments running, those stopped,
+// and stopping failing with fail.
+type teams struct {
+	running map[string]bool
+	stopped []string
+	fail    error
+}
+
+func (t *teams) Active(_ context.Context, deployment string) (bool, error) {
+	return t.running[deployment], nil
+}
+
+func (t *teams) Stop(_ context.Context, deployment string) error {
+	if t.fail != nil {
+		return t.fail
+	}
+	t.stopped = append(t.stopped, deployment)
+	t.running[deployment] = false
+	return nil
+}
+
 type fixture struct {
 	t      *testing.T
 	root   string
 	w      *Workflow
 	m      *messages
+	teams  *teams
 	db     *store.DB
 	events []events.Event
 }
@@ -116,8 +138,8 @@ func newFixture(t *testing.T) *fixture {
 	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{t: t, root: root, m: m, db: db}
-	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Now: now, WorkItems: db.WorkItems(),
+	f := &fixture{t: t, root: root, m: m, db: db, teams: &teams{running: map[string]bool{"atlas@ledger": true}}}
+	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Reviews: db.Reviews(), ReviewComments: db.ReviewComments(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
@@ -765,7 +787,7 @@ func TestFromHandoffToMain(t *testing.T) {
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); !errors.Is(err, ErrNotOpen) {
 		t.Errorf("merged twice: %v", err)
 	}
-	if err := f.w.CloseReview(ctx, "rev-1", "x"); !errors.Is(err, ErrNotOpen) {
+	if _, err := f.w.CloseReview(ctx, "rev-1", Close{Note: "x"}); !errors.Is(err, ErrNotOpen) {
 		t.Errorf("closed once merged: %v", err)
 	}
 	if _, err := f.w.Review(ctx, "rev-9"); !errors.Is(err, store.ErrNotFound) {
@@ -876,20 +898,26 @@ func TestMergeToMainConflicts(t *testing.T) {
 	}
 }
 
-func TestCloseReturnsTheWork(t *testing.T) {
+func TestCloseKeepingTheBranches(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
-	if err := f.w.CloseReview(ctx, "rev-1", "split it in two"); err != nil {
-		t.Fatal(err)
+	head := f.git(f.wt("mara", "api"), "rev-parse", "HEAD")
+	if closed, err := f.w.CloseReview(ctx, "rev-1", Close{Note: "  not this quarter "}); err != nil || len(closed.Kept) != 0 {
+		t.Fatal(closed, err)
 	}
-	if mr := f.mr("mr-1"); mr.State != store.MergeRejected || mr.Note != "split it in two" || mr.RejectedAt.IsZero() {
+	if len(f.teams.stopped) != 0 {
+		t.Errorf("stopped %v", f.teams.stopped)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeRejected || mr.Note != "not this quarter" || mr.RejectedAt.IsZero() {
 		t.Errorf("merge request %+v", mr)
 	}
-	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "" || w.Stage != store.StageInWorktree || w.Note != "rejected: split it in two" {
+	// The work item stays with the closed merge request: it leaves In flight with it.
+	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-1" || w.Stage != store.StageIntegrated {
 		t.Errorf("work item %+v", w)
 	}
-	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "ceo" || !strings.Contains(n.Body, "the review of lead/atlas/integration was closed without merging (api): split it in two") {
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" ||
+		n.Body != "From Foreman: the CEO closed the review of lead/atlas/integration without merging (api). Stop work on it, and don't request it again. The CEO's note: not this quarter" {
 		t.Errorf("notice %+v", n)
 	}
 	if v := f.review("rev-1"); v.Status != ReviewClosed {
@@ -898,9 +926,148 @@ func TestCloseReturnsTheWork(t *testing.T) {
 	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
 		t.Errorf("still open after closing: %+v", open)
 	}
-	// The branch stays: the lead asks again, a new review.
+	if f.git(f.wt("mara", "api"), "rev-parse", "HEAD") != head {
+		t.Error("the branch moved")
+	}
+	// Kept, it can be asked again (the CEO changed their mind): a new review
+	// carrying the work item again.
 	if text := f.ok("mara", "request_merge", integration); !strings.HasPrefix(text, "Review rev-2, api (mr-2)") {
 		t.Errorf("%q", text)
+	}
+	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-2" {
+		t.Errorf("work item %+v", w)
+	}
+}
+
+func TestCloseDroppingTheBranches(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	api, lead, member := filepath.Join(f.root, "ledger", "api"), f.wt("mara", "api"), f.wt("tove", "api")
+	leadHead, memberHead := f.git(lead, "rev-parse", "HEAD"), f.git(api, "rev-parse", "wt/tove/LED-44")
+	sent := len(f.m.sent)
+	closed, err := f.w.CloseReview(ctx, "rev-1", Close{Note: "nobody hears this", DropBranches: true, StopTeam: true})
+	if err != nil || closed.Kept == nil || len(closed.Kept) != 0 {
+		t.Fatal(closed, err)
+	}
+	if strings.Join(f.teams.stopped, ",") != "atlas@ledger" {
+		t.Errorf("stopped %v", f.teams.stopped)
+	}
+	// A team being stopped isn't told anything.
+	if len(f.m.sent) != sent {
+		t.Errorf("told a stopped team: %+v", f.m.sent[sent:])
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeRejected || mr.Note != "nobody hears this" {
+		t.Errorf("merge request %+v", mr)
+	}
+	// Checked out in the lead's worktree: it starts from main, nothing of the work left.
+	if f.git(lead, "rev-parse", "HEAD") != f.git(api, "rev-parse", "main") {
+		t.Error("the lead branch still holds the work")
+	}
+	if _, err := os.Stat(filepath.Join(lead, "LED-44.go")); err == nil {
+		t.Error("the work is still in the lead's worktree")
+	}
+	// Tove's branch: gone, or at main when still checked out.
+	if f.git(member, "branch", "--show-current") == "wt/tove/LED-44" {
+		if f.git(member, "rev-parse", "HEAD") != f.git(api, "rev-parse", "main") {
+			t.Error("tove's branch still holds the work")
+		}
+	} else if out := f.git(api, "branch", "--list", "wt/tove/LED-44"); out != "" {
+		t.Errorf("tove's branch is still there: %q", out)
+	}
+	// Each kept aside, out of the branch list.
+	if f.git(api, "rev-parse", "refs/foreman/closed/rev-1/lead/atlas/integration") != leadHead ||
+		f.git(api, "rev-parse", "refs/foreman/closed/rev-1/wt/tove/LED-44") != memberHead {
+		t.Error("no backups")
+	}
+}
+
+// Its agents work in its branches: they go only with the team.
+func TestDroppingTheBranchesOfATeamLeftRunningIsRefused(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	head := f.git(f.wt("mara", "api"), "rev-parse", "HEAD")
+	if _, err := f.w.CloseReview(ctx, "rev-1", Close{DropBranches: true}); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("dropped under a running team: %v", err)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeOpen || f.git(f.wt("mara", "api"), "rev-parse", "HEAD") != head {
+		t.Errorf("changed anyway: %+v", mr)
+	}
+}
+
+// A team that can't be stopped leaves the review as it was: the CEO tries again.
+func TestCloseWhenTheTeamCantStopClosesNothing(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	f.teams.fail = errors.New("podman is gone")
+	if _, err := f.w.CloseReview(ctx, "rev-1", Close{StopTeam: true}); err == nil || !strings.Contains(err.Error(), "podman is gone") {
+		t.Fatalf("closed: %v", err)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeOpen {
+		t.Errorf("closed anyway: %+v", mr)
+	}
+}
+
+// A team no longer deployed: nobody to stop or tell, and its branches can go.
+func TestCloseAfterTheTeamStopped(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	f.teams.running["atlas@ledger"] = false
+	sent := len(f.m.sent)
+	if _, err := f.w.CloseReview(ctx, "rev-1", Close{Note: "kept on the review", DropBranches: true, StopTeam: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.teams.stopped) != 0 || len(f.m.sent) != sent {
+		t.Errorf("stopped %v, told %+v", f.teams.stopped, f.m.sent[sent:])
+	}
+	api := filepath.Join(f.root, "ledger", "api")
+	if f.git(f.wt("mara", "api"), "rev-parse", "HEAD") != f.git(api, "rev-parse", "main") {
+		t.Error("the lead branch wasn't dropped")
+	}
+}
+
+func TestCloseKeepsABranchWithChangesInTheWay(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	lead := f.wt("mara", "api")
+	head := f.git(lead, "rev-parse", "HEAD")
+	writeFile(t, filepath.Join(lead, "LED-44.go"), "package cal // the lead's, uncommitted\n")
+	closed, err := f.w.CloseReview(ctx, "rev-1", Close{DropBranches: true, StopTeam: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.git(lead, "rev-parse", "HEAD") != head {
+		t.Error("moved over the lead's change")
+	}
+	// The CEO hears which stayed, and why; tove's went.
+	if len(closed.Kept) != 1 || closed.Kept[0].Repo != "api" || closed.Kept[0].Branch != "lead/atlas/integration" ||
+		!strings.Contains(closed.Kept[0].Why, "changes not committed") {
+		t.Errorf("kept %+v", closed.Kept)
+	}
+	if out := f.git(filepath.Join(f.root, "ledger", "api"), "for-each-ref", "refs/foreman/closed/rev-1/lead/"); out != "" {
+		t.Errorf("a backup of the branch kept: %q", out)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeRejected {
+		t.Errorf("not closed: %+v", mr)
+	}
+}
+
+func TestAHandOffAfterACloseIsNewWork(t *testing.T) {
+	f := newFixture(t)
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	if _, err := f.w.CloseReview(ctx, "rev-1", Close{}); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "more.go"), "package cal\n")
+	f.ok("tove", "commit", commits("api", "more"))
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "again"})
+	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "" || w.Stage != store.StageHanded {
+		t.Errorf("work item %+v", w)
 	}
 }
 

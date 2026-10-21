@@ -37,6 +37,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Wiki reader](./features/wiki-reader.md) (Overview tab)
   - [Project activity](./features/project-activity.md)
   - [Repositories](./features/repositories.md)
+  - [Worktrees](./features/worktrees.md)
   - [Project pipeline](./features/project-pipeline.md)
   - [Board](./features/board.md)
   - [Project settings](./features/project-settings.md)

@@ -1,4 +1,13 @@
-import type { NewComment, RepoDiff, Review, ReviewComment } from "../api/client";
+import type {
+  Close,
+  Closed,
+  Deployment,
+  NewComment,
+  RepoDiff,
+  Review,
+  ReviewComment,
+  Team,
+} from "../api/client";
 import {
   ReviewChangesRequested,
   ReviewClosed,
@@ -16,6 +25,75 @@ const statusLabels: Record<string, string> = {
   [ReviewMerged]: "Merged",
   [ReviewClosed]: "Closed",
 };
+
+/** One way to Close a review: what becomes of its team and branches, and
+ * whether the lead hears of it (only while its team keeps working). */
+export type CloseChoice = {
+  value: "keep" | "stop" | "drop";
+  label: string;
+  stopTeam: boolean;
+  dropBranches: boolean;
+  tells: boolean;
+};
+
+/** The review's team, by name, and whether its deployment still runs. */
+export function closingTeam(v: Review, active: Deployment[], teams: Team[]) {
+  const teamId = v.deploymentId.split("@")[0];
+  return {
+    name: teams.find((t) => t.id === teamId)?.config.name || teamId,
+    live: active.some((d) => d.id === v.deploymentId),
+  };
+}
+
+/** The ways to Close, the first the default. Branches go only with their
+ * team, as its agents work in them (the CEO, 2026-10-21). */
+export function closeChoices(
+  team: { name: string; live: boolean },
+  project: string,
+): CloseChoice[] {
+  const aside = "(kept aside, recoverable by hand)";
+  const choice = (value: CloseChoice["value"], label: string, stop: boolean, drop: boolean) => ({
+    value,
+    label,
+    stopTeam: stop,
+    dropBranches: drop,
+    tells: team.live && !stop,
+  });
+  return team.live
+    ? [
+        choice("keep", `${team.name} keeps working on ${project}; the branches stay`, false, false),
+        choice("stop", `Stop ${team.name} on ${project}; the branches stay`, true, false),
+        choice(
+          "drop",
+          `Stop ${team.name} on ${project} and drop the branches ${aside}`,
+          true,
+          true,
+        ),
+      ]
+    : [
+        choice("keep", "Keep the branches", false, false),
+        choice("drop", `Drop the branches ${aside}`, false, true),
+      ];
+}
+
+/** The Close to send: the note only when the lead will hear it. */
+export function closeRequest(choice: CloseChoice, note: string): Close {
+  return {
+    note: choice.tells ? note.trim() : "",
+    dropBranches: choice.dropBranches,
+    stopTeam: choice.stopTeam,
+  };
+}
+
+/** The Close button: it sends only a note someone hears. */
+export function closeLabel(choice: CloseChoice, note: string): string {
+  return choice.tells && note.trim() ? "Close and send" : "Close now";
+}
+
+/** The branches a close kept, and why, one line each. */
+export function keptLines(closed: Closed): string {
+  return closed.kept.map((k) => `${k.branch} in ${k.repo}: ${k.why}.`).join("\n");
+}
 
 /** A review's status as the screens say it. */
 export function statusLabel(status: string): string {

@@ -1,41 +1,39 @@
-import { useState } from "react";
+import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import type { Project, Repo } from "../../api/client";
 import { when } from "../../app/model";
 import { useRepoFile, useRepoLog, useRepos, useRepoTree, useTeams } from "../../app/queries";
-import { branchOwner, bytes, crumbs, folderOf, isMarkdown } from "../../app/repos";
+import { branchOwner, bytes, crumbs, folderOf, isMarkdown, shownAt } from "../../app/repos";
 import { FileMarkdown } from "../../components/Markdown";
 import { Select } from "../../components/Select";
-import { Button, Empty, Panel, SectionLabel, Segmented } from "../../components/ui";
-import { InFlight } from "./Pipeline";
+import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
 
-// The project's Repositories tab (wiki/product/features/repositories.md): the
-// work on its way to main, then its repos, read-only and as committed: each
-// repo's branches, and a branch's files and history.
+// The project's Repositories tab (wiki/product/features/repositories.md): its
+// repos, read-only and as committed: each repo's branches, and a branch's
+// files and history. The repo and branch shown are in the URL, so a link
+// (an agent's worktree, on Worktrees) opens them.
 
 type At = { repo: string; branch: string };
 
 export function Repositories({ project }: { project: Project }) {
   const repos = useRepos(project.id);
-  const [chosen, setChosen] = useState<At>();
+  const search = useSearch({ from: "/projects/$project" });
+  const navigate = useNavigate({ from: "/projects/$project" });
   const list = repos.data ?? [];
-  // Until the CEO picks one: the first repo's first branch (main, when it has one).
-  const at =
-    chosen ??
-    (list[0] && { repo: list[0].name, branch: list[0].branches[0]?.name ?? list[0].main });
+  const at = shownAt(list, search.repo, search.branch);
+  const choose = (next: At) =>
+    navigate({ search: (s) => ({ ...s, repo: next.repo, branch: next.branch }), replace: true });
   return (
-    <div className="flex flex-col gap-9 px-12 pt-6 pb-16">
-      <InFlight project={project} />
-      <section className="flex flex-col gap-2.5">
-        <SectionLabel>Repositories</SectionLabel>
-        {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
-        {at && (
-          <div className="grid h-[70vh] min-h-[360px] grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
-            <Branches repos={list} at={at} onChoose={setChosen} />
-            {/* Keyed by branch: another branch starts at its root. */}
-            <Browser key={`${at.repo} ${at.branch}`} project={project.id} at={at} />
-          </div>
-        )}
-      </section>
+    <div className="flex flex-col gap-2.5 px-12 pt-6 pb-16">
+      {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
+      {repos.isPending && <Loading rows={6} />}
+      {at && (
+        <div className="grid h-[calc(100vh-220px)] min-h-[360px] grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
+          <Branches repos={list} at={at} onChoose={choose} />
+          {/* Keyed by branch: another branch starts at its root. */}
+          <Browser key={`${at.repo} ${at.branch}`} project={project.id} at={at} />
+        </div>
+      )}
     </div>
   );
 }
@@ -46,6 +44,12 @@ export function Repositories({ project }: { project: Project }) {
 function Branches({ repos, at, onChoose }: { repos: Repo[]; at: At; onChoose: (at: At) => void }) {
   const teams = useTeams().data ?? [];
   const repo = repos.find((r) => r.name === at.repo) ?? repos[0];
+  // The branch shown scrolls into the column's view, when a link opened one far down.
+  const selected = useRef<HTMLButtonElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: when the branch shown changes only, never on a refetch (it would undo the CEO's own scrolling)
+  useEffect(() => {
+    selected.current?.scrollIntoView({ block: "nearest" });
+  }, [at.repo, at.branch]);
   const choose = (name: string) => {
     const r = repos.find((x) => x.name === name);
     if (r) onChoose({ repo: r.name, branch: r.branches[0]?.name ?? r.main });
@@ -74,6 +78,7 @@ function Branches({ repos, at, onChoose }: { repos: Repo[]; at: At; onChoose: (a
           return (
             <button
               key={b.name}
+              ref={on ? selected : undefined}
               type="button"
               aria-pressed={on}
               onClick={() => onChoose({ repo: repo.name, branch: b.name })}
@@ -176,7 +181,7 @@ function Folder({
   onOpen: (path: string, isFile: boolean) => void;
 }) {
   const tree = useRepoTree(project, at.repo, at.branch, path);
-  if (tree.isPending) return null;
+  if (tree.isPending) return <Loading rows={6} />;
   if (tree.isError) return <p className="m-0 text-[13px] text-err">{tree.error.message}</p>;
   if (tree.data.length === 0) return <Empty>Nothing committed here yet.</Empty>;
   return (
@@ -227,7 +232,7 @@ function FileView({
   const file = useRepoFile(project, at.repo, at.branch, path);
   const markdown = isMarkdown(path);
   const [source, setSource] = useState(false);
-  if (file.isPending) return null;
+  if (file.isPending) return <Loading rows={8} />;
   if (file.isError) return <p className="m-0 text-[13px] text-err">{file.error.message}</p>;
   const f = file.data;
   const note = f.binary
@@ -295,7 +300,7 @@ function Lines({ text }: { text: string }) {
 
 function History({ project, at }: { project: string; at: At }) {
   const log = useRepoLog(project, at.repo, at.branch);
-  if (log.isPending) return null;
+  if (log.isPending) return <Loading rows={6} />;
   if (log.isError) return <p className="m-0 text-[13px] text-err">{log.error.message}</p>;
   const commits = log.data.pages.flatMap((p) => p.commits);
   return (

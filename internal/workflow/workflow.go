@@ -45,6 +45,7 @@ type Git interface {
 	Merged(ctx context.Context, dir, into, branch string) (bool, error)
 	Squash(ctx context.Context, dir, target, branch, head, message string) error
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error
+	DropBranch(ctx context.Context, dir, branch, backup, main string) error
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
 	Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error)
 	Resolve(ctx context.Context, dir, ref string) (string, error)
@@ -68,11 +69,20 @@ type Messages interface {
 	Send(ctx context.Context, msg store.TeamMessage) (store.TeamMessage, error)
 }
 
+// Teams are the deployments a closed review's team runs in (the instance
+// manager): the CEO may stop it with the close.
+type Teams interface {
+	// Active reports whether the deployment still runs.
+	Active(ctx context.Context, deployment string) (bool, error)
+	Stop(ctx context.Context, deployment string) error
+}
+
 // Deps are the blocks Workflow is assembled from.
 type Deps struct {
 	Git      Git
 	Config   Config
 	Messages Messages
+	Teams    Teams
 	// Actions keeps each git tool call and what it did (the Team traffic
 	// panel); Publish announces it (team.action). Either may be nil.
 	Actions store.Actions

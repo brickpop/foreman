@@ -37,11 +37,11 @@ import {
 import { ActivityPanel } from "../components/ActivityPanel";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
-import { CheckIcon, CopyIcon, PromptIcon } from "../components/icons";
+import { CheckIcon, CopyIcon, PromptIcon, StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, Dot, LeadTag, outlineLink, Segmented } from "../components/ui";
+import { Button, Dot, LeadTag, Loading, outlineLink, Segmented } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): deployment
 // tabs, agent tabs, one or two panes of real terminals, and the Activity
@@ -86,7 +86,7 @@ export function Sessions() {
   const setPanes = (p: Panes) => show(p, activity);
   const setActivity = (on: boolean) => show(panes, on);
 
-  if (instances.isPending) return <Centered>…</Centered>;
+  if (instances.isPending) return <Loading rows={5} className="m-12" />;
   if (tabs.length === 0)
     return (
       <Centered>
@@ -107,7 +107,7 @@ export function Sessions() {
           onChange={(d) =>
             navigate({ to: "/sessions", search: lastView.get(d) ?? { deployment: d } })
           }
-          onClose={{ label: "Stop", close: setStopping }}
+          onClose={{ label: "Stop", close: setStopping, icon: <StopIcon /> }}
           onReorder={(dragged, target) => {
             tabOrder = moved(
               tabs.map((t) => t.id),

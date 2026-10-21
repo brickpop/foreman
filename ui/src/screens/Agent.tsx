@@ -7,7 +7,7 @@ import { palettes, randomLook, roleLabel } from "../app/model";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { useToast } from "../components/Toasts";
-import { Button, Dot } from "../components/ui";
+import { Button, Dot, Loading } from "../components/ui";
 
 // One agent's soul (wiki/product/features/agent-page.md): who it is, and
 // the exact prompt each deployment gives it (what it runs on is its project's
@@ -21,7 +21,7 @@ export function Agent() {
   const teams = useTeams();
   const team = teams.data?.find((t) => t.id === teamId);
   const soul = team?.config.agents[id];
-  if (teams.isPending) return null;
+  if (teams.isPending) return <Loading rows={5} className="m-12" />;
   if (!team || !soul)
     return (
       <p className="p-12 text-tx3">
@@ -145,10 +145,10 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
           running.map((i) => (
             <div
               key={i.id}
-              className="grid grid-cols-[auto_80px_1fr_auto] items-center gap-3 rounded-[9px] border border-line bg-panel px-3 py-2"
+              className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-3 rounded-[9px] border border-line bg-panel px-3 py-2"
             >
               <Dot status={i.status} size={8} />
-              <span className="font-semibold">{i.id.split("@")[1]}</span>
+              <span className="whitespace-nowrap font-semibold">{i.id.split("@")[1]}</span>
               <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
               <Button
                 variant="small"

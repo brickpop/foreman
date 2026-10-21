@@ -56,7 +56,8 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
   label: string;
   /** Gives each option a × (Sessions' deployment tabs: Stop). */
-  onClose?: { label: string; close: (value: T) => void };
+  /** A button after each option (× unless icon says otherwise). */
+  onClose?: { label: string; close: (value: T) => void; icon?: ReactNode };
   /** Lets the options be dragged onto one another to reorder them. */
   onReorder?: (dragged: T, target: T) => void;
 }) {
@@ -114,7 +115,7 @@ export function Segmented<T extends string>({
               onClick={() => onClose.close(o.value)}
               className="rounded px-1 text-tx4 hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"
             >
-              ×
+              {onClose.icon ?? "×"}
             </button>
           </span>
         );
@@ -207,6 +208,27 @@ export function Panel({ children, className = "" }: { children: ReactNode; class
   return (
     <div className={`overflow-hidden rounded-xl border border-line bg-panel ${className}`}>
       {children}
+    </div>
+  );
+}
+
+/** Where data is still on its way: faint bars pulsing in a panel, in place of
+ * the content (never its empty state, which would read as "there's none"). */
+export function Loading({ rows = 3, className = "" }: { rows?: number; className?: string }) {
+  return (
+    <div
+      role="status"
+      aria-label="Loading"
+      className={`flex flex-col gap-3 rounded-xl border border-line bg-panel px-4 py-4 ${className}`}
+    >
+      {Array.from({ length: rows }, (_, i) => (
+        <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: placeholder bars, all alike
+          key={i}
+          className="h-3 rounded bg-hover motion-safe:animate-pulse"
+          style={{ width: `${[72, 56, 64][i % 3]}%` }}
+        />
+      ))}
     </div>
   );
 }

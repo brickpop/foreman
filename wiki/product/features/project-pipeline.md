@@ -28,12 +28,12 @@ By kind:
 | Request | Text / link | Actions |
 |---|---|---|
 | Review (a merge request) | `<Lead> wants <entry title> merged into main in <repo>.` Link: `<branch> → main · checks <pass│fail│running>`, then the entry (opens it in the wiki reader) | **`Merge to main`** (primary; Foreman merges locally), **`Create PR on <Forgejo│GitHub│Gitea>`** (outline, only when the repo has a forge), **`Reject`** (danger style), **`Open session`** ([Pipeline and merges](./pipeline-and-merges.md#review-and-merge)) |
-| Review, after Create PR | the same text; the link line becomes `PR #<n> on <forge> · <branch> → main · checks <…>` | **`Open PR ↗`** (primary, the PR in a new tab; the CEO merges there and the request closes when Foreman sees it), **`Reject`** (also closes the PR), **`Open session`** |
+| Review, after Create PR | the same text; the link line becomes `PR #<n> on <forge> · <repo> · <branch> → main · checks <…>` | **`Open PR ↗`** (primary, the PR in a new tab; the CEO merges there and the request closes when Foreman sees it), **`Reject`** (also closes the PR), **`Open session`** |
 | Approval, Question | the request | its options, plus an inline input `Or type an answer…` (flex 1, min 180px); Enter submits |
 
 When Merge to main finds a conflict, or the forge reports the PR as conflicting with `main`, the review panel's link line ends with **conflicts with main** (`--err`) instead of the checks; the lead has already been asked to merge `main` in ([When main moves](./pipeline-and-merges.md#when-main-moves)).
 
-The **link line** of a review shows the change: clicking it opens its diff against `main` in a dialog (each line marked added, removed or kept), or the PR on the forge once there is one. That is what the CEO reads before deciding.
+The **link line** of a review shows the change, `<repo> · <branch> → <main>` and its checks: the repo first, since each repo a branch changed is its own merge request, decided on its own (the CEO, 2026-10-21). Clicking it opens its diff against the repo's main in a dialog titled the same way, one box per file (the CEO, 2026-10-21): a header with its path and `new`, `deleted` or `renamed`, sticky while its lines scroll, then its hunks, each line marked added, removed or kept. Or it opens the PR on the forge once there is one. That is what the CEO reads before deciding.
 
 **Reject** expands an inline editor under the request panel: a textarea (3 rows, placeholder `What should <Author> change? (optional)`), then `Cancel` and the danger-style `Reject and tell <Author>`. The message is optional; when given, it goes to the author (the lead). Only one editor is open at a time; closing it clears the reason. Effect: [Pipeline and merges](./pipeline-and-merges.md#review-and-merge).
 

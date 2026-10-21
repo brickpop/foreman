@@ -62,7 +62,7 @@ Not used, on purpose: web frameworks, ORMs, dependency-injection containers, a m
 | Terminal | `@xterm/xterm` with the fit, web-links and serialize addons | Real ANSI terminal, resize, clickable links; "serialize" backs the Copy button. |
 | Wiki rendering | `react-markdown` with `remark-gfm` and a callout plugin, raw HTML off, as [wikiview](https://github.com/agentic-wiki/wikiview) does (the CEO, 2026-10-17: reuse its proven building blocks) | The server sends an entry's Markdown as on disk plus the engine's answers as lookup tables (each link resolved, heading ids, checkbox lines), so the browser renders without re-implementing a wiki rule ([Wiki engine](./wiki-engine.md#rendering)). Wiki content is written by agents, so it is untrusted: no raw HTML, script URLs dropped, and only the wiki's own images load ([Security](./security.md)). |
 | Board drag and drop | Native HTML5 drag and drop, plus a status menu on each board card as the keyboard and touch alternative | No dependency for a one-axis drop. |
-| Fonts | Geist and Geist Mono, **self-hosted** from the `geist` npm package | The prototype loads Google Fonts, which breaks "offline" and "no telemetry". |
+| Fonts | Geist and Geist Mono for the UI, JetBrains Mono, Fira Code and Source Code Pro for the terminals, **self-hosted** from their `@fontsource-variable` npm packages | The prototype loads Google Fonts, which breaks "offline" and "no telemetry". |
 | Avatars | A React SVG component ported from the [Avatar](../design/avatar.md) spec | No image assets. |
 | Lint and format | Biome | One tool, fast, replaces ESLint and Prettier. |
 

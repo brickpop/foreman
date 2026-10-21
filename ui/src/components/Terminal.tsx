@@ -2,6 +2,8 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { Terminal as XTerm } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+// The terminal's default font, always at hand (the UI uses Geist Mono).
+import "@fontsource-variable/jetbrains-mono";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { useClient } from "../api/client";
 import type { PtyConnection } from "../api/pty";

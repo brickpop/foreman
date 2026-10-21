@@ -47,7 +47,7 @@ One pane, or **two** side by side (equal columns, 1px `--line` divider); two is 
 
 **Direct-line banner** on every non-lead pane (padding `7px 16px`, 12.5px `--tx3`, `--side`, bottom border): `Direct line to <Name>. They'll tell <Lead>, the lead, if it matters.`
 
-**Body**: a real terminal emulator on `--term`, Geist Mono 13px / 1.6.
+**Body**: a real terminal emulator on `--term`, in the CEO's terminal font (JetBrains Mono 13px by default, [Settings](./settings.md#appearance)), line height 1.25.
 - Full ANSI (colors, cursor movement, alternate screen), as the harness renders it.
 - Scrollback is replayed from the session log when a pane opens ([Persistence](../architecture/persistence.md)); the live stream follows.
 - Native text selection, copy and paste; clickable links. When the harness turns on mouse reporting (Claude Code does in some views), a drag goes to it rather than selecting: Option-drag on a Mac (Shift-drag elsewhere) still selects (found by the CEO, 2026-10-16).

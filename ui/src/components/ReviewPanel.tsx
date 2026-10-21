@@ -26,7 +26,7 @@ export function ReviewPanel({
 }: {
   request: Request;
   mr: MergeRequest;
-  /** The branch it merges into: the project's protected branch (`main` in project.toml). */
+  /** The branch it merges into: its repo's main branch. */
   main?: string;
   /** The forge of the repo it targets ("none": no Create PR). */
   forge: string;
@@ -77,7 +77,11 @@ export function ReviewPanel({
         )}
       </RequestPanel>
       {viewing && (
-        <DiffView mergeRequest={mr.id} title={mr.branch} onClose={() => setViewing(false)} />
+        <DiffView
+          mergeRequest={mr.id}
+          title={`${mr.repo} · ${mr.branch} → ${main}`}
+          onClose={() => setViewing(false)}
+        />
       )}
       <RejectForm decision={decision} author={author} />
     </div>

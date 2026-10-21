@@ -1,8 +1,9 @@
 // The terminal's fonts (wiki/product/features/settings.md#appearance), one of
 // the CEO's preferences. The ids are the ones the server accepts
-// (userdata.TerminalFonts). JetBrains Mono comes with the app (it is the UI's
-// monospace too); each other bundled font is fetched only once it is picked,
-// so unused ones cost nothing.
+// (userdata.TerminalFonts). They are the terminal's only: the rest of the UI
+// keeps Geist Mono (the CEO, 2026-10-21). JetBrains Mono, the default, comes
+// with the terminal; each other font is fetched only once it is picked, so
+// unused ones cost nothing.
 
 export type TerminalFont = {
   id: string;

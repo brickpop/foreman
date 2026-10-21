@@ -214,7 +214,7 @@ export function forgeLabel(kind: string): string {
   return forgeLabels[kind] ?? kind;
 }
 
-/** A merge request's link line: its PR, its branch, and its checks. */
+/** A merge request's link line: its PR, its repo and branch, and its checks. */
 export function linkLine(mr: MergeRequest, forge: string, main = "main"): string {
   const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
   // No checks status: the project has no checks (or they haven't run): nothing to say.
@@ -223,7 +223,8 @@ export function linkLine(mr: MergeRequest, forge: string, main = "main"): string
     : mr.checksStatus
       ? `checks ${mr.checksStatus}`
       : "";
-  return `${pr}${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
+  // The repo first: each repo of a branch is its own merge request, decided on its own.
+  return `${pr}${mr.repo} · ${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
 }
 
 /** The main branch of a project's repo, which its merges go to; main until

@@ -57,7 +57,7 @@ PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countd
 GET    /api/requests                          the open requests (today: review requests, one per review; Request → Phasing)
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
-GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge, set_submodule, request_merge), oldest first
+GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge, discard, set_submodule, request_merge), oldest first
 GET    /api/activity?project=|deployment=     [&before=<cursor>] a page of team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; a project means its active deployments; 400 BAD_REQUEST for neither, both or a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
@@ -68,7 +68,7 @@ PUT    /api/reviews/:id/comments/:comment     {body}: edits a draft; 204; 409 SE
 DELETE /api/reviews/:id/comments/:comment     deletes a draft; 204; 409 SENT
 POST   /api/reviews/:id/changes               {note}: Request changes: the drafts and the note to the lead in one message; 204; 400 INVALID (neither)
 POST   /api/reviews/:id/merge                 {heads: {<repo>: <commit>}}: merges each repo named, at the commit the CEO read, its full hash (Pipeline and merges → Merge to main); 204; 409 NOT_MERGED says, per repo, why one didn't (a conflict: the lead is told to merge main in; the CEO's checkout in the way; the branch moved since that commit), the others merged; 409 NOT_OPEN
-POST   /api/reviews/:id/close                 {note, dropBranches, stopTeam}: stops the team first when asked (an error closes nothing), closes it unmerged in every repo open, drops its branches (kept under refs/foreman/closed/) when asked, and tells a lead whose team keeps working to stop, with the note if any → {kept: [{repo, branch, why}]}, the branches it couldn't drop; 400 INVALID to drop the branches of a team left running; 409 NOT_OPEN
+POST   /api/reviews/:id/close                 {note, dropBranches, stopTeam}: stops the team first when asked (an error closes nothing), closes it unmerged in every repo open, drops its branches (kept under refs/foreman/closed/) when asked, and tells a lead whose team keeps working to stop, with the note if any → {kept: [{repo, branch, why}]}, the branches it couldn't drop (a git error); 400 INVALID to drop the branches of a team left running; 409 NOT_OPEN
 POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 

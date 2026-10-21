@@ -508,9 +508,10 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 // and nobody is told; while it keeps running, the lead is told to stop work
 // on it, with the CEO's note. With DropBranches its branches go: the lead
 // branch and the members' branches it carried, each kept under
-// refs/foreman/closed/<review>/ (a branch checked out moves to main
-// instead), only while no agent works in them: ErrInvalid when the team
-// runs on. A branch that can't go stays, listed in Closed with why.
+// refs/foreman/closed/ (a branch checked out moves to main instead, what its
+// worktree held not committed kept too), only while no agent works in them:
+// ErrInvalid when the team runs on. A branch that can't go (a git error)
+// stays, listed in Closed with why.
 func (w *Workflow) CloseReview(ctx context.Context, id string, c Close) (Closed, error) {
 	v, err := w.openReview(ctx, id)
 	if err != nil {
@@ -543,7 +544,7 @@ func (w *Workflow) CloseReview(ctx context.Context, id string, c Close) (Closed,
 		}
 		for _, branch := range w.branchesOf(ctx, mr) {
 			if err := w.dropBranch(ctx, mr, branch, id); err != nil {
-				closed.Kept = append(closed.Kept, KeptBranch{Repo: mr.Repo, Branch: branch, Why: keptWhy(err)})
+				closed.Kept = append(closed.Kept, KeptBranch{Repo: mr.Repo, Branch: branch, Why: err.Error()})
 			}
 		}
 	}
@@ -556,14 +557,6 @@ func (w *Workflow) CloseReview(ctx context.Context, id string, c Close) (Closed,
 		w.tell(ctx, lead, "foreman", text)
 	}
 	return closed, nil
-}
-
-// keptWhy says why a closed review's branch couldn't be dropped.
-func keptWhy(err error) string {
-	if errors.Is(err, git.ErrLocalChanges) {
-		return "its worktree holds changes not committed, or a merge not finished, that dropping it would discard"
-	}
-	return err.Error()
 }
 
 // branchesOf are a merge request's branches in its repo: the lead branch,
@@ -584,11 +577,12 @@ func (w *Workflow) branchesOf(ctx context.Context, mr store.MergeRequest) []stri
 }
 
 // dropBranch discards one of a closed review's branches in a merge
-// request's repo, keeping its head under refs/foreman/closed/<review>/.
+// request's repo, keeping its head under refs/foreman/closed/<time>/<review>/.
 func (w *Workflow) dropBranch(ctx context.Context, mr store.MergeRequest, branch, review string) error {
 	main, dir, err := w.repoOf(mr)
 	if err != nil {
 		return err
 	}
-	return w.Git.DropBranch(ctx, dir, branch, "refs/foreman/closed/"+review+"/"+branch, main)
+	defer w.pruneBackups(ctx, dir)
+	return w.Git.DropBranch(ctx, dir, branch, git.BackupRef("closed", w.Now(), review+"/"+branch), main)
 }

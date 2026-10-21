@@ -28,6 +28,7 @@ import (
 	"unicode"
 
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/profiles"
@@ -737,10 +738,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err := os.MkdirAll(inst.SandboxPath, 0o755); err != nil {
 		return nil, err
 	}
-	branch := "wt/" + inst.AgentID + "/main"
-	if lead {
-		branch = "lead/" + team.ID + "/integration"
-	}
+	branch := git.HomeBranch(inst.AgentID, team.ID, lead)
 	var mounts []runner.Mount
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {

@@ -169,12 +169,12 @@ func (g *CLI) MoveBranch(ctx context.Context, dir, branch, from, to string) erro
 	return err
 }
 
-// DropBranch discards branch, its head first kept under backup (a ref
-// outside refs/heads, e.g. refs/foreman/closed/rev-3/lead/atlas/x), so a
-// mistake can be undone by hand. A branch checked out in a worktree can't
-// go: it moves to where branch main is instead, its uncommitted changes kept
-// as MoveBranch does; ErrLocalChanges, nothing changed and no backup left,
-// when they are in the way or a merge is unfinished there.
+// DropBranch discards branch, its head first kept under backup (a BackupRef),
+// so a mistake can be undone by hand. A branch checked out in a worktree
+// can't go: it moves to where branch main is instead, and the worktree is
+// made clean, an unfinished merge abandoned; what it held not committed is
+// kept first under backup + "@uncommitted". Only for a worktree nobody works
+// in.
 func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, main string) error {
 	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, main) || !strings.HasPrefix(backup, "refs/foreman/") {
 		return ErrBadBranch
@@ -194,13 +194,10 @@ func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, main string) 
 	if tree, ok := trees[branch]; ok {
 		target, err := g.Resolve(ctx, dir, "refs/heads/"+main)
 		if err == nil {
-			_, err = run(ctx, tree, "reset", "--quiet", "--keep", target)
+			_, err = saveChanges(ctx, tree, backup+"@uncommitted")
 		}
-		if err != nil {
-			_, _ = run(ctx, dir, "update-ref", "-d", backup, head)
-		}
-		if err != nil && (strings.Contains(err.Error(), "not uptodate") || strings.Contains(err.Error(), "middle of a merge")) {
-			return ErrLocalChanges
+		if err == nil {
+			err = clean(ctx, tree, target)
 		}
 		return err
 	}

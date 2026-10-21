@@ -11,6 +11,7 @@ import {
   hasSince,
   keptLines,
   lineKey,
+  lostNote,
   mergeHeads,
   mergeLabel,
   openRepos,
@@ -174,6 +175,17 @@ describe("Close", () => {
     // A note typed, then a choice that stops the team: it goes nowhere.
     expect(closeRequest(stop, "not now").note).toBe("");
     expect(closeLabel(stop, "not now")).toBe("Close now");
+  });
+
+  it("warns when a note typed won't reach the lead", () => {
+    expect(lostNote(running[0], "not now", "Mara")).toBeUndefined();
+    expect(lostNote(running[1], "  ", "Mara")).toBeUndefined();
+    expect(lostNote(running[1], "not now", "Mara")).toBe(
+      "Mara won't get your note: the team stops.",
+    );
+    expect(lostNote(stopped[0], "not now", "Mara")).toBe(
+      "Mara won't get your note: the team isn't running.",
+    );
   });
 
   it("says which branches stayed, and why", () => {

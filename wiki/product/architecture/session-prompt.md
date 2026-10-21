@@ -46,6 +46,7 @@ commit(commits)                     Commit the repos you name, each with its own
 merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.
                                     On conflicts: resolve the markers, then commit those repos.
 abort_merge()                       Back out of an unfinished merge.
+discard(repos)                      Throw away what you didn't commit (all repos if none named).
 set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a branch, tag or commit;
                                     url adds a new one. Switch and merge keep submodules in step.
 handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends. (members only)

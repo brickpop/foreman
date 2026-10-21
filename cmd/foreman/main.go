@@ -298,16 +298,20 @@ func run(args []string, stdout io.Writer) error {
 		MergeRequests: state.MergeRequests(), Wiki: wikis, Requests: state.Requests(),
 		Reviews: state.Reviews(), ReviewComments: state.ReviewComments()})
 	// A merge request merged outside Foreman (the CEO's own git, a forge) is
-	// noticed within half a minute.
+	// noticed within half a minute; backups past their time go hourly.
 	go func() {
-		tick := time.NewTicker(30 * time.Second)
+		tick, hourly := time.NewTicker(30*time.Second), time.NewTicker(time.Hour)
 		defer tick.Stop()
+		defer hourly.Stop()
+		flow.PruneBackups(ctx)
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
 				flow.Reconcile(ctx)
+			case <-hourly.C:
+				flow.PruneBackups(ctx)
 			}
 		}
 	}()

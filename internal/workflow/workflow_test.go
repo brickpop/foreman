@@ -43,6 +43,14 @@ func (c config) Project(id string) (home.Project, error) {
 	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Main: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Main: "trunk"}}}, nil
 }
 
+func (c config) Projects() []home.Project {
+	p, _ := c.Project("ledger")
+	return []home.Project{p}
+}
+
+// closedRef is a closed review's backup, as made at the fixture's time.
+const closedRef = "refs/foreman/closed/2026-10-16T09-00-00Z/"
+
 // entries is a wiki: path to title.
 type entries map[string]string
 
@@ -503,6 +511,47 @@ func TestAbortMerge(t *testing.T) {
 		t.Error(err)
 	}
 	f.refused("mara", "abort_merge", nil, "no_merge")
+}
+
+// An agent drops its uncommitted work without editing it out by hand; Foreman
+// keeps a copy.
+func TestDiscard(t *testing.T) {
+	f := newFixture(t)
+	api, web := f.wt("tove", "api"), f.wt("tove", "web")
+	if text := f.ok("tove", "discard", nil); text != "Nothing to discard in api, web: it's as committed." {
+		t.Errorf("%q", text)
+	}
+	writeFile(t, filepath.Join(api, "README"), "rewritten\n")
+	writeFile(t, filepath.Join(api, "scratch.go"), "package scratch\n")
+	writeFile(t, filepath.Join(web, "keep.txt"), "web's, kept\n")
+	f.refused("tove", "discard", map[string]any{"repos": []string{"docs"}}, "unknown_repo")
+	f.refused("tove", "discard", map[string]any{"repos": []string{"api", "api"}}, "repeated_repo")
+	// Only the repo named.
+	if text := f.ok("tove", "discard", map[string]any{"repos": []string{"api"}}); text != "Discarded what wasn't committed in api: back to the branch as committed. Foreman kept a copy." {
+		t.Errorf("%q", text)
+	}
+	if status := f.git(api, "status", "--porcelain"); status != "" {
+		t.Errorf("api not clean: %q", status)
+	}
+	if _, err := os.Stat(filepath.Join(web, "keep.txt")); err != nil {
+		t.Error("web was discarded too")
+	}
+	saved := "refs/foreman/discarded/2026-10-16T09-00-00Z/tove/api"
+	if f.git(api, "show", saved+":README") != "rewritten" || f.git(api, "show", saved+":scratch.go") != "package scratch" {
+		t.Error("no copy kept")
+	}
+	// A merge under way: abort it first, nothing discarded.
+	writeFile(t, filepath.Join(f.wt("mara", "web"), "README"), "mara\n")
+	f.ok("mara", "commit", commits("web", "mara's readme"))
+	f.git(web, "checkout", "--", ".")
+	writeFile(t, filepath.Join(web, "README"), "tove\n")
+	f.ok("tove", "commit", commits("web", "tove's readme"))
+	f.call("tove", "merge", map[string]string{"branch": "lead/atlas/integration"})
+	writeFile(t, filepath.Join(api, "more.go"), "package more\n")
+	f.refused("tove", "discard", nil, "merge_under_way")
+	if _, err := os.Stat(filepath.Join(api, "more.go")); err != nil {
+		t.Error("discarded api despite the merge in web")
+	}
 }
 
 // actions records what Workflow keeps.
@@ -976,8 +1025,8 @@ func TestCloseDroppingTheBranches(t *testing.T) {
 		t.Errorf("tove's branch is still there: %q", out)
 	}
 	// Each kept aside, out of the branch list.
-	if f.git(api, "rev-parse", "refs/foreman/closed/rev-1/lead/atlas/integration") != leadHead ||
-		f.git(api, "rev-parse", "refs/foreman/closed/rev-1/wt/tove/LED-44") != memberHead {
+	if f.git(api, "rev-parse", closedRef+"rev-1/lead/atlas/integration") != leadHead ||
+		f.git(api, "rev-parse", closedRef+"rev-1/wt/tove/LED-44") != memberHead {
 		t.Error("no backups")
 	}
 }
@@ -1029,30 +1078,57 @@ func TestCloseAfterTheTeamStopped(t *testing.T) {
 	}
 }
 
-func TestCloseKeepsABranchWithChangesInTheWay(t *testing.T) {
+// What the lead's idle worktree held not committed goes with the branch,
+// kept aside: nothing stays in the way, nothing is lost.
+func TestCloseDropsABranchWithChangesNotCommitted(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
-	lead := f.wt("mara", "api")
+	api, lead := filepath.Join(f.root, "ledger", "api"), f.wt("mara", "api")
 	head := f.git(lead, "rev-parse", "HEAD")
 	writeFile(t, filepath.Join(lead, "LED-44.go"), "package cal // the lead's, uncommitted\n")
 	closed, err := f.w.CloseReview(ctx, "rev-1", Close{DropBranches: true, StopTeam: true})
-	if err != nil {
+	if err != nil || len(closed.Kept) != 0 {
+		t.Fatal(closed, err)
+	}
+	if f.git(lead, "rev-parse", "HEAD") != f.git(api, "rev-parse", "main") || f.git(lead, "status", "--porcelain") != "" {
+		t.Error("the lead's worktree isn't clean at main")
+	}
+	saved := closedRef + "rev-1/lead/atlas/integration@uncommitted"
+	if f.git(api, "rev-parse", saved+"^") != head || f.git(api, "show", saved+":LED-44.go") != "package cal // the lead's, uncommitted" {
+		t.Error("the change not committed isn't kept")
+	}
+}
+
+// Backups older than 30 days go, in every project's repos.
+func TestOldBackupsArePruned(t *testing.T) {
+	f := newFixture(t)
+	api := filepath.Join(f.root, "ledger", "api")
+	old := "refs/foreman/closed/2026-09-01T00-00-00Z/rev-0/lead/atlas/x"
+	recent := "refs/foreman/discarded/2026-10-01T00-00-00Z/tove/api"
+	f.git(api, "update-ref", old, "main")
+	f.git(api, "update-ref", recent, "main")
+	f.w.PruneBackups(ctx)
+	if out := f.git(api, "for-each-ref", "--format=%(refname)", "refs/foreman/"); out != recent {
+		t.Errorf("backups left: %q", out)
+	}
+}
+
+// After a merge, idle desks follow the new main; one with work stays.
+func TestAMergeBringsIdleDesksUpToMain(t *testing.T) {
+	f := newFixture(t)
+	f.integrated() // tove now on wt/tove/LED-44: wt/tove/main idles, not checked out
+	api := filepath.Join(f.root, "ledger", "api")
+	f.ok("mara", "request_merge", integration)
+	before := f.git(api, "rev-parse", "wt/tove/main")
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
 		t.Fatal(err)
 	}
-	if f.git(lead, "rev-parse", "HEAD") != head {
-		t.Error("moved over the lead's change")
+	if main := f.git(api, "rev-parse", "main"); main == before || f.git(api, "rev-parse", "wt/tove/main") != main {
+		t.Error("tove's idle desk didn't follow main")
 	}
-	// The CEO hears which stayed, and why; tove's went.
-	if len(closed.Kept) != 1 || closed.Kept[0].Repo != "api" || closed.Kept[0].Branch != "lead/atlas/integration" ||
-		!strings.Contains(closed.Kept[0].Why, "changes not committed") {
-		t.Errorf("kept %+v", closed.Kept)
-	}
-	if out := f.git(filepath.Join(f.root, "ledger", "api"), "for-each-ref", "refs/foreman/closed/rev-1/lead/"); out != "" {
-		t.Errorf("a backup of the branch kept: %q", out)
-	}
-	if mr := f.mr("mr-1"); mr.State != store.MergeRejected {
-		t.Errorf("not closed: %+v", mr)
+	if f.git(f.wt("tove", "api"), "branch", "--show-current") != "wt/tove/LED-44" {
+		t.Error("tove's work moved")
 	}
 }
 

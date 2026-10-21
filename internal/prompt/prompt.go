@@ -29,7 +29,7 @@ type Input struct {
 
 // built are the team tools that exist so far (the Messaging and hand-offs
 // epic brings them in steps), in the order the prompt lists them.
-var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "set_submodule", "handoff", "contribute", "request_merge"}
+var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "request_merge"}
 
 // Offered is the team tools an agent gets: what is built, as its role allows
 // (handoff for members, request_merge for the lead). The team-tool router
@@ -222,6 +222,7 @@ var toolRows = map[string][]string{
 		"                                    On conflicts: resolve the markers, then commit those repos.",
 	},
 	"abort_merge": {"abort_merge()                       Back out of an unfinished merge."},
+	"discard":     {"discard(repos)                      Throw away what you didn't commit (all repos if none named)."},
 	"set_submodule": {
 		"set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a branch, tag or commit;",
 		"                                    url adds a new one. Switch and merge keep submodules in step.",
@@ -237,7 +238,7 @@ var toolRows = map[string][]string{
 // tools is the Tools section: a row per tool offered, then how they work.
 func tools(in Input, lead bool, has func(string) bool) string {
 	var rows []string
-	for _, t := range []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "set_submodule", "handoff", "contribute", "escalate"} {
+	for _, t := range []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate"} {
 		if has(t) {
 			rows = append(rows, toolRows[t]...)
 		}

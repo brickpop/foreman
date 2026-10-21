@@ -44,6 +44,23 @@ func ValidBranch(ctx context.Context, name string) bool {
 	return err == nil && !strings.HasPrefix(name, "-")
 }
 
+// HomeBranch is where an agent's worktree starts and idles: wt/<agent>/main
+// for a member, lead/<team>/integration for the lead
+// (wiki/product/architecture/sandboxes-and-git.md#branches).
+func HomeBranch(agent, team string, lead bool) string {
+	if lead {
+		return "lead/" + team + "/integration"
+	}
+	return "wt/" + agent + "/main"
+}
+
+// IsHomeBranch reports whether branch is some agent's HomeBranch.
+func IsHomeBranch(branch string) bool {
+	parts := strings.Split(branch, "/")
+	return len(parts) == 3 && parts[1] != "" &&
+		(parts[0] == "wt" && parts[2] == "main" || parts[0] == "lead" && parts[2] == "integration")
+}
+
 // HasBranch reports whether the repo of dir has the branch.
 func (g *CLI) HasBranch(ctx context.Context, dir, branch string) bool {
 	_, err := run(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
@@ -118,6 +135,49 @@ func (g *CLI) Merging(ctx context.Context, dir string) (bool, error) {
 	}
 	_, err = os.Stat(strings.TrimSpace(head))
 	return err == nil, nil
+}
+
+// Freshen moves branch up to where branch main is, when it holds nothing main
+// lacks (merging it would change nothing) and the worktree that has it
+// checked out, if one does, holds nothing not committed: an idle desk follows
+// main. moved says it did.
+func (g *CLI) Freshen(ctx context.Context, repo, branch, main string) (moved bool, err error) {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, main) {
+		return false, ErrBadBranch
+	}
+	defer g.lock(ctx, repo)()
+	return g.freshen(ctx, repo, branch, main)
+}
+
+func (g *CLI) freshen(ctx context.Context, repo, branch, main string) (bool, error) {
+	if !g.HasBranch(ctx, repo, branch) {
+		return false, nil
+	}
+	head, err := g.Resolve(ctx, repo, "refs/heads/"+branch)
+	if err != nil {
+		return false, err
+	}
+	target, err := g.Resolve(ctx, repo, "refs/heads/"+main)
+	if err != nil || head == target {
+		return false, err
+	}
+	if merged, err := g.Merged(ctx, repo, main, branch); err != nil || !merged {
+		return false, err
+	}
+	trees, err := g.Worktrees(ctx, repo)
+	if err != nil {
+		return false, err
+	}
+	tree, ok := trees[branch]
+	if !ok {
+		_, err = run(ctx, repo, "update-ref", "refs/heads/"+branch, target, head)
+		return err == nil, err
+	}
+	if clean, err := g.Clean(ctx, tree); err != nil || !clean {
+		return false, err
+	}
+	_, err = run(ctx, tree, "reset", "--quiet", "--keep", target)
+	return err == nil, err
 }
 
 // Switch checks the worktree out on branch, creating it from base when the

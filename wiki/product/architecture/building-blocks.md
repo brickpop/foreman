@@ -83,7 +83,7 @@ Every arrow, in words:
 | Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
-| Agent link | Workflow | `switch`, `commit`, `merge`, `abort_merge`, `set_submodule`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
+| Agent link | Workflow | `switch`, `commit`, `merge`, `abort_merge`, `discard`, `set_submodule`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
 | Agent link | Instance manager | Hook events (busy, idle, waiting for the CEO) |
 | Instance manager | Git | The instance's worktrees, before it starts |
 | Instance manager | Image builder | The project's image |
@@ -265,13 +265,13 @@ Gives events their meaning: `switch`, `commit` and `merge` → git writes in the
 
 ```go
 type Workflow interface {
-    Handle(ToolCall) (Result, error)   // switch, commit, merge, abort_merge, set_submodule, escalate, handoff, contribute, request_merge, Chief of Staff tools
+    Handle(ToolCall) (Result, error)   // switch, commit, merge, abort_merge, discard, set_submodule, escalate, handoff, contribute, request_merge, Chief of Staff tools
     Resolve(request, answer) error     // the CEO answers a request
     Requests(filter) []Request
 }
 ```
 
-Built so far (`internal/workflow`): `switch`, `commit`, `merge`, `abort_merge` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the live project repo), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in `project/wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
+Built so far (`internal/workflow`): `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the live project repo), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in `project/wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
 
 Details: [Requests](../features/requests.md), [Pipeline and merges](../features/pipeline-and-merges.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and merge requests](./protocol.md#work-items-and-merge-requests).
 

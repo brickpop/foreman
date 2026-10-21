@@ -20,12 +20,31 @@ Each [instance](../models/instance.md) works in its **own git worktree** of each
 
 ## Branches
 
-- **Dashboard branch** `wt/<agent>/main`: each member's own starting point (the lead's is `lead/<team>/integration`: the lead never has `wt/` branches) in a repo, created from `main` when its worktree is first made. Git lets a branch be checked out in only one worktree at a time, so no agent checks out `main` itself; members idle here.
+- **Home branch** `wt/<agent>/main`: each member's own starting point (the lead's is `lead/<team>/integration`: the lead never has `wt/` branches) in a repo, created from `main` when its worktree is first made. Git lets a branch be checked out in only one worktree at a time, so no agent checks out `main` itself; members idle here.
 - **Topic branch** `wt/<agent>/<topic>` (e.g. `wt/tove/LED-44`, the topic usually a card id): where a member does one piece of work. Agents can't create branches themselves: `switch(branch)` has Foreman switch the agent's worktrees to it, creating it from `main` the first time ([Agents and git](#agents-and-git)).
 - **Lead branches** `lead/<team>/<topic>` (e.g. `lead/atlas/settlement-v2`): where the lead integrates hand-offs, any number of them, each reached (and made the first time) with `switch(branch)`; `lead/<team>/integration` is the default topic, created from `main` at deploy and checked out in the lead's worktree. They are the only source of merge requests to `main`, one open merge request per lead branch at a time. The team is part of the name because two teams can be deployed on the same project.
 - `main` (name from `project.toml` `main`) changes **only by the CEO's decision**: Merge to main (Foreman merges on the CEO's click), a PR merged on the forge, or the CEO's own git; Foreman never merges on its own.
 
-On deploy ([Agent runtime](./agent-runtime.md#instance-lifecycle)), `Git.Prepare` makes each missing worktree (an existing one is reused as it is). Since every worktree shares the repo, a new `main` is visible to all of them as soon as the repo has it. Stopping a deployment keeps the worktrees on disk; they are removed (`git worktree remove`) only on an explicit CEO action. **Branches are cleaned up:** once a deployment ends, Foreman deletes each of its agents' `wt/*` branches that is merged into `main` (`Git.Prune`); unmerged ones stay. A branch still checked out in a kept worktree can't be deleted, so it goes when that worktree is removed.
+On deploy ([Agent runtime](./agent-runtime.md#instance-lifecycle)), `Git.Prepare` makes each missing worktree (an existing one is reused as it is). Since every worktree shares the repo, a new `main` is visible to all of them as soon as the repo has it.
+
+**A deployment resumes; new work starts from `main`** (the CEO, 2026-10-22). Stop then Deploy brings the same team back to the same worktrees and branches, with the new goal; branch names are never salted per deployment, as topics already keep pieces of work apart, and `switch(<new topic>)` starts each new one from `main`. So that leftovers never get in the way:
+
+- **Idle desks follow `main`.** A home branch holding nothing `main` lacks (merging it would change nothing), with nothing uncommitted where it is checked out, moves to `main` (`Git.Freshen`): whenever an agent's worktrees are prepared (deploy, wake, restart) and after every merge into `main` ([Pipeline and merges → Merge to main](../features/pipeline-and-merges.md#merge-to-main)). A desk with work stays as it is: the agent resumes it, or commits it to its topic and switches.
+- **Work not wanted goes cleanly.** An agent drops what it didn't commit with `discard()`; the CEO drops a closed review's branches with Close ([Pipeline and merges → Review and merge](../features/pipeline-and-merges.md#review-and-merge)). Either way a copy is kept ([Backups](#backups)).
+
+Stopping a deployment keeps the worktrees on disk; they are removed (`git worktree remove`) only on an explicit CEO action ([not built](../../backlog/remove-worktrees.md)). **Branches are cleaned up:** once a deployment ends, Foreman deletes each of its agents' `wt/*` branches that is merged into `main` (`Git.Prune`, [not built](../../backlog/after-merge-cleanup.md)); unmerged ones stay. A branch still checked out in a kept worktree can't be deleted, so it goes when that worktree is removed.
+
+## Backups
+
+What Foreman throws away, it keeps first, as a ref under `refs/foreman/<kind>/<time>/…` (time as `2026-10-22T09-30-00Z`, UTC): out of the branch list, restorable by hand, and deleted **30 days** after it was made (at Foreman's start, then hourly, and whenever a new one is made in that repo). A ref under `refs/foreman/` whose name carries no time is left alone.
+
+| Kind | What | Made by |
+|---|---|---|
+| `closed/<time>/<review>/<branch>` | a dropped branch's head | Close, dropping its branches |
+| `closed/<time>/<review>/<branch>@uncommitted` | what the worktree holding it hadn't committed (a merge not finished included), as a commit on its head | the same |
+| `discarded/<time>/<agent>/<repo>` | what the agent hadn't committed, as a commit on its branch's head | `discard()` |
+
+A copy of what wasn't committed is made through an index of its own (`GIT_INDEX_FILE`), so it records every file as it was (conflict markers included) and leaves the worktree's own index alone; files ignored by `.gitignore` aren't in it. A copy is never written over another: two made in the same second fail instead. To restore one: `git restore --source=<ref> -- .` in the worktree, or `git branch <name> <ref>`.
 
 ## Mounts
 
@@ -48,6 +67,7 @@ A worktree's `.git` is a file pointing at `<repo path>/.git/worktrees/<name>` by
 - **`commit(commits)`**: for each repo the agent names, with its own message, stages everything changed there and commits it on the branch checked out there, authored as the agent (`<Name> <agent.invalid>`, author and committer: the CEO's identity never signs an agent's work). Repos not named keep their changes (the CEO, 2026-10-17). The lead may name `project`, the live project repo.
 - **`merge(branch)`**: merges a named branch (the lead's, `main`, a teammate's) into the agent's worktrees. On a conflict the markers stay in the files; the agent resolves them and calls `commit`, which concludes the merge. Agents never rebase: branches are shared, and tracking follows commits.
 - **`abort_merge()`**: backs out of an unfinished merge, branch and files as before it.
+- **`discard(repos?)`**: throws away what the agent changed and didn't commit, in each repo it names (all when none): the files go back to the branch as committed, files not committed yet are removed (ignored ones stay). The changes are first kept ([Backups](#backups)). Refused during an unfinished merge (`abort_merge()` first). Agents can't do this with git: `git restore` and `git checkout -- <file>` write the index, which lives under the read-only `.git`.
 - **`set_submodule(repo, path, ref, url?)`**: puts a submodule on a commit of its own repo, and adds it first with `url` ([below](#submodules)).
 - **`handoff`** never commits: it names a committed branch, and refuses while the agent has uncommitted changes. `commit` is the one way to commit.
 
@@ -85,7 +105,7 @@ A hand-off is a message naming a branch: `handoff(mara, "wt/tove/LED-44", summar
 
 By Foreman, never by hooks in the repo: agents can't write `.git` at all, and Foreman is the only one that writes it, through the tools:
 
-- **`switch`**, **`commit`**, **`merge`**, **`abort_merge`** and **`set_submodule`** act only on the caller's own worktrees and the branches checked out there; **`handoff`** accepts only `wt/<self>/*`; **`request_merge`** only the caller's own `lead/<team>/*` ([Protocol → Team tools](./protocol.md#team-tools)).
+- **`switch`**, **`commit`**, **`merge`**, **`abort_merge`**, **`discard`** and **`set_submodule`** act only on the caller's own worktrees and the branches checked out there; **`handoff`** accepts only `wt/<self>/*`; **`request_merge`** only the caller's own `lead/<team>/*` ([Protocol → Team tools](./protocol.md#team-tools)).
 - **Agents never push, and nothing is pushed on its own.** Only the CEO's **Create PR** on a merge request makes Foreman push the lead branch to the **forge** from the host, with the forge account's token ([Forge adapters](./forge-adapters.md)); agents never receive forge tokens. Calling `request_merge` again on a lead branch whose merge request is still open refreshes it (after merging `main` in, or new integrations): Foreman reruns the checks, and pushes again if it has a PR. Lead branches only ever move forward: nothing is rebased.
 - **Merge to main** is Foreman merging the branch into `main` on the host, on the CEO's click; with or without a forge ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)).
 

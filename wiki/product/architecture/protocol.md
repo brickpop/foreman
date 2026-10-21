@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -109,6 +109,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `commit` | anyone | until the commit is made (seconds) | Workflow (+ Git) |
 | `merge` | anyone | until the merge is done (seconds) | Workflow (+ Git) |
 | `abort_merge` | anyone | until the merge is backed out (seconds) | Workflow (+ Git) |
+| `discard` | anyone | until the worktrees are clean (seconds) | Workflow (+ Git) |
 | `set_submodule` | anyone | until the submodule is fetched and committed (seconds; longer for a large first fetch) | Workflow (+ Git) |
 | `handoff` | members (the lead has no `wt/` branch to hand off) | no: returns once the branch is checked; checks run after | Workflow (+ Messaging for the delivery) |
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
@@ -198,6 +199,18 @@ type AbortMergeResult struct { Repos []string } // where a merge was backed out
 - Effect: Workflow asks Git to back out of the unfinished merge in each of the caller's worktrees that has one (`git merge --abort`): the branch and its files are as they were before the merge. A repo whose merge finished cleanly keeps it.
 - Nothing is delivered; no marker.
 - Errors: `no_merge` (no merge under way in the caller's repos), `git_error`.
+
+### `discard`
+
+```go
+type DiscardArgs   struct { Repos []string } // the caller's repos, by folder; all when empty
+type DiscardResult struct { Repos []string } // where something was thrown away
+```
+
+- Effect: in each repo named (every one of the caller's worktrees when none), Workflow asks Git to keep what isn't committed as a commit on the branch's head under `refs/foreman/discarded/<time>/<agent>/<repo>`, then to put the worktree back to its branch as committed (`git reset --hard`, `git clean -d --force`: ignored files stay) ([Sandboxes and git policy → Backups](./sandboxes-and-git.md#backups)). Then the submodules follow the branch.
+- Every repo is checked first, so it never stops halfway. A repo with nothing to throw away is left alone; with nothing anywhere, the result says so (no error).
+- Nothing is delivered; no marker. Kept as a [team action](#team-actions) with the repos it cleaned.
+- Errors: `unknown_repo`, `repeated_repo`, `merge_under_way` (an unfinished merge in one of them: `abort_merge()` first), `no_repos`, `git_error`.
 
 ### `set_submodule`
 
@@ -329,7 +342,7 @@ type TeamAction struct {
     ID           int64
     DeploymentID string
     Instance     string        // who called it
-    Tool         string        // switch, commit, merge, abort_merge, set_submodule, request_merge
+    Tool         string        // switch, commit, merge, abort_merge, discard, set_submodule, request_merge
     Branch       string        // switch: to; merge: from; set_submodule: the branch committed on
     Repos        []ActionRepo  // what happened in each repo
     Error        string        // the refusal the agent got; "" when it went through

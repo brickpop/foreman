@@ -46,6 +46,9 @@ type Git interface {
 	Squash(ctx context.Context, dir, target, branch, head, message string) error
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error
 	DropBranch(ctx context.Context, dir, branch, backup, main string) error
+	Discard(ctx context.Context, worktree, backup string) (bool, error)
+	Freshen(ctx context.Context, repo, branch, main string) (bool, error)
+	PruneBackups(ctx context.Context, dir string, before time.Time) error
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
 	Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error)
 	Resolve(ctx context.Context, dir, ref string) (string, error)
@@ -57,6 +60,7 @@ type Git interface {
 // Config is the projects, as loaded.
 type Config interface {
 	Project(id string) (home.Project, error)
+	Projects() []home.Project
 }
 
 // Wiki reads a project's wiki entries (the Wiki block).
@@ -129,6 +133,8 @@ var definitions = []agentlink.Tool{
 			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
 	{Name: "merge", Description: "Merge a branch (main, the lead's, a teammate's) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
+	{Name: "discard", Description: "Throw away what you changed and didn't commit, in each repo you name (all of them if none): its files go back to the branch as committed, new files removed (ignored ones stay). Foreman keeps a copy. After a merge, abort_merge() first.",
+		InputSchema: object(`"repos":{"type":"array","items":{"type":"string"},"description":"Your repos' folders, e.g. api; all of them when left out"}`)},
 	{Name: "abort_merge", Description: "Back out of an unfinished merge, in every repo where one is under way: your branch and files are as they were before it.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "set_submodule", Description: "Put a submodule of one of your repos (e.g. lib/forge-std) on a branch, tag or commit of its own repo, and commit that on your branch; with url, add the submodule first. What was changed in its files is discarded. During a merge it settles a submodule conflict instead, and committing the repo finishes the merge. Foreman fetches over https without credentials: a private repo needs the CEO.",
@@ -155,17 +161,18 @@ func (w *Workflow) Tools() []agentlink.Tool { return definitions }
 // Call implements teamtools.Block.
 func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, args json.RawMessage) agentlink.Result {
 	var a struct {
-		Branch   string `json:"branch"`
-		Teammate string `json:"teammate"`
-		Entry    string `json:"entry"`
-		Summary  string `json:"summary"`
-		Kind     string `json:"kind"`
-		Title    string `json:"title"`
-		Body     string `json:"body"`
-		Repo     string `json:"repo"`
-		Path     string `json:"path"`
-		Ref      string `json:"ref"`
-		URL      string `json:"url"`
+		Branch   string   `json:"branch"`
+		Teammate string   `json:"teammate"`
+		Entry    string   `json:"entry"`
+		Summary  string   `json:"summary"`
+		Kind     string   `json:"kind"`
+		Title    string   `json:"title"`
+		Body     string   `json:"body"`
+		Repo     string   `json:"repo"`
+		Path     string   `json:"path"`
+		Ref      string   `json:"ref"`
+		URL      string   `json:"url"`
+		Repos    []string `json:"repos"`
 		Commits  []struct {
 			Repo    string `json:"repo"`
 			Message string `json:"message"`
@@ -195,6 +202,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		res = t.merge(ctx, act.Branch)
 	case "abort_merge":
 		res = t.abortMerge(ctx)
+	case "discard":
+		res = t.discard(ctx, a.Repos)
 	case "set_submodule":
 		res = t.setSubmodule(ctx, strings.TrimSpace(a.Repo), strings.TrimSpace(a.Path), strings.TrimSpace(a.Ref), strings.TrimSpace(a.URL))
 	case "handoff":
@@ -663,6 +672,61 @@ func (t tool) abortMerge(ctx context.Context) agentlink.Result {
 		return teamtools.Refusal("no_merge", "no merge is under way in your repos")
 	}
 	return agentlink.Result{Text: fmt.Sprintf("Merge aborted in %s: your branch is as it was before it.", strings.Join(aborted, ", ")) + t.synced(ctx, t.worktrees())}
+}
+
+// discard puts the caller's worktrees named (all when none) back to their
+// branch as committed; what it throws away is kept under
+// refs/foreman/discarded/ (wiki/product/architecture/sandboxes-and-git.md#backups).
+func (t tool) discard(ctx context.Context, asked []string) agentlink.Result {
+	repos := t.worktrees()
+	if len(repos) == 0 {
+		return teamtools.Refusal("no_repos", "you have no worktree in this project")
+	}
+	if len(asked) > 0 {
+		var chosen []repo
+		for _, name := range asked {
+			name = strings.TrimSpace(name)
+			i := slices.IndexFunc(repos, func(r repo) bool { return r.name == name })
+			if i < 0 {
+				return teamtools.Refusal("unknown_repo", "%q isn't one of your repos: yours are %s", name, names(repos))
+			}
+			if slices.Contains(chosen, repos[i]) {
+				return teamtools.Refusal("repeated_repo", "%s is named twice", name)
+			}
+			chosen = append(chosen, repos[i])
+		}
+		repos = chosen
+	}
+	// Checked in every repo first, so a discard never stops halfway.
+	var merging []string
+	for _, r := range repos {
+		if m, err := t.w.Git.Merging(ctx, r.dir); err != nil {
+			return gitError(err)
+		} else if m {
+			merging = append(merging, r.name)
+		}
+	}
+	if len(merging) > 0 {
+		return teamtools.Refusal("merge_under_way", "a merge is under way in %s: abort_merge() first", strings.Join(merging, ", "))
+	}
+	at := t.w.Now()
+	var done []string
+	for _, r := range repos {
+		branch, _ := t.w.Git.Branch(ctx, r.dir)
+		saved, err := t.w.Git.Discard(ctx, r.dir, git.BackupRef("discarded", at, t.c.Instance.AgentID+"/"+r.name))
+		if err != nil {
+			return gitError(fmt.Errorf("%s: %w", r.name, err))
+		}
+		if saved {
+			done = append(done, r.name)
+			t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch})
+			t.w.pruneBackups(ctx, r.dir)
+		}
+	}
+	if len(done) == 0 {
+		return agentlink.Result{Text: fmt.Sprintf("Nothing to discard in %s: it's as committed.", names(repos))}
+	}
+	return agentlink.Result{Text: fmt.Sprintf("Discarded what wasn't committed in %s: back to the branch as committed. Foreman kept a copy.", strings.Join(done, ", ")) + t.synced(ctx, repos)}
 }
 
 // setSubmodule puts a submodule of one of the caller's worktrees on ref

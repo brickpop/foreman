@@ -85,6 +85,15 @@ export function closeRequest(choice: CloseChoice, note: string): Close {
   };
 }
 
+/** Why a note typed won't reach the lead with this choice, if it won't
+ * (typed, then a choice that stops the team): the CEO is warned. */
+export function lostNote(choice: CloseChoice, note: string, lead: string): string | undefined {
+  if (choice.tells || !note.trim()) return undefined;
+  return choice.stopTeam
+    ? `${lead} won't get your note: the team stops.`
+    : `${lead} won't get your note: the team isn't running.`;
+}
+
 /** The Close button: it sends only a note someone hears. */
 export function closeLabel(choice: CloseChoice, note: string): string {
   return choice.tells && note.trim() ? "Close and send" : "Close now";

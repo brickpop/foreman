@@ -26,6 +26,7 @@ import {
   isOpen,
   keptLines,
   lineKey,
+  lostNote,
   mergeHeads,
   mergeLabel,
   openRepos,
@@ -660,7 +661,8 @@ function DecisionBar({
               ))}
             </fieldset>
           )}
-          {(form === "changes" || closing.tells) && (
+          {/* A note typed stays in view when the choice won't send it, with why. */}
+          {(form === "changes" || closing.tells || text.trim() !== "") && (
             <textarea
               rows={3}
               value={text}
@@ -673,6 +675,11 @@ function DecisionBar({
               aria-label={form === "changes" ? `Note to ${lead}` : `Note for ${lead}`}
               className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
             />
+          )}
+          {form === "close" && lostNote(closing, text, lead) && (
+            <p role="alert" className="text-[13px] text-err">
+              {lostNote(closing, text, lead)}
+            </p>
           )}
           <span className="flex justify-end gap-2">
             <Button onClick={done}>Cancel</Button>

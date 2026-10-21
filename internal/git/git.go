@@ -56,7 +56,11 @@ func (g *CLI) lock(ctx context.Context, dir string) func() {
 // Foreman's commits are unsigned: they are automatic, and a signing agent would
 // prompt (or fail) on every save.
 func run(ctx context.Context, dir string, args ...string) (string, error) {
-	cmd := command(ctx, dir, args...)
+	return output(command(ctx, dir, args...), args)
+}
+
+// output runs a git command made by command, for its standard output.
+func output(cmd *exec.Cmd, args []string) (string, error) {
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	if err := cmd.Run(); err != nil {
@@ -110,13 +114,16 @@ func hasIdentity(ctx context.Context, dir string) bool {
 	return err1 == nil && err2 == nil && strings.TrimSpace(name) != "" && strings.TrimSpace(email) != ""
 }
 
-// Prepare makes worktree a git worktree of repo on branch, creating the branch
-// from base when it doesn't exist. A worktree already there is reused as it
-// is, on whatever branch its agent switched to
+// Prepare makes worktree a git worktree of repo on branch (its agent's home
+// branch), creating the branch from base when it doesn't exist. A worktree
+// already there is reused as it is, on whatever branch its agent switched to
 // (wiki/product/architecture/sandboxes-and-git.md), and relinked to repo if
-// repo moved since (Locate).
+// repo moved since (Locate). Either way branch, when idle, follows base
+// (Freshen).
 func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) error {
 	defer g.lock(ctx, repo)()
+	// An idle desk not brought up to date is no reason to fail a deploy.
+	defer func() { _, _ = g.freshen(ctx, repo, branch, base) }()
 	common, err := run(ctx, repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return fmt.Errorf("%s is not a git repo: %w", repo, err)

@@ -11,7 +11,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 ## Instance lifecycle
 
 1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then an instance for each team member: the lead `starting` (or `queued`), every other member `asleep` ([Lazy starts](#lazy-starts)). Steps 2–3 happen when an instance starts, so an asleep member has no sandbox yet.
-2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. `Git.Prepare` makes a git worktree of each code repo at `~/.foreman/sandboxes/<project>/<agent>/<repo>` if it doesn't exist yet ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
+2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. `Git.Prepare` makes a git worktree of each code repo at `~/.foreman/sandboxes/<project>/<agent>/<repo>` if it doesn't exist yet, and brings the agent's home branch up to `main` when it is idle ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
    - lead: `lead/<team>/integration` (created from `main` if missing)
    - members: their home branch `wt/<agent>/main` (created from `main`). They create `wt/<agent>/<topic>` when assigned a card.
 3. **Compose prompt** ([Session prompt](./session-prompt.md)) and **spawn** the harness in its container with the sandbox as working directory ([Harness adapters](./harness-adapters.md)).

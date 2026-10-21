@@ -222,6 +222,7 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main, dir,
 		next = fmt.Sprintf("%s has commits since, or changes in the way, so it still holds what was merged: merge %s into it with merge(%q) before you go on.", mr.Branch, main, main)
 	}
 	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: %s was merged into %s in %s, as one commit. %s", mr.Branch, main, mr.Repo, next))
+	w.freshenDesks(ctx, dir, main)
 	open, err := w.MergeRequests.Open(ctx)
 	if err != nil {
 		return
@@ -230,6 +231,48 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main, dir,
 		if other.ProjectID == mr.ProjectID && other.Repo == mr.Repo {
 			w.tell(ctx, other, "foreman", fmt.Sprintf("From Foreman: %s moved in %s (%s was merged). Merge it into %s with merge(%q), resolve any conflicts and commit(), then call request_merge again.", main, mr.Repo, mr.Branch, other.Branch, main))
 		}
+	}
+}
+
+// freshenDesks brings the repo's idle desks up to its new main: every agent's
+// home branch holding nothing main lacks, with nothing uncommitted where it is
+// checked out (git.Freshen). A desk with work stays as it is.
+func (w *Workflow) freshenDesks(ctx context.Context, dir, main string) {
+	for _, prefix := range []string{"wt/", "lead/"} {
+		branches, err := w.Git.Branches(ctx, dir, prefix)
+		if err != nil {
+			slog.Info("listing the idle desks", "repo", dir, "err", err)
+			return
+		}
+		for _, b := range branches {
+			if !git.IsHomeBranch(b) {
+				continue
+			}
+			if _, err := w.Git.Freshen(ctx, dir, b, main); err != nil {
+				slog.Info("bringing a desk up to main", "repo", dir, "branch", b, "err", err)
+			}
+		}
+	}
+}
+
+// backupsKept is how long a backup under refs/foreman/ is kept.
+const backupsKept = 30 * 24 * time.Hour
+
+// PruneBackups deletes the backups older than backupsKept in every project's
+// code repos.
+func (w *Workflow) PruneBackups(ctx context.Context) {
+	for _, p := range w.Config.Projects() {
+		for _, r := range p.Repos {
+			if dir, ok := p.RepoDir(r.Name); ok {
+				w.pruneBackups(ctx, dir)
+			}
+		}
+	}
+}
+
+func (w *Workflow) pruneBackups(ctx context.Context, dir string) {
+	if err := w.Git.PruneBackups(ctx, dir, w.Now().Add(-backupsKept)); err != nil {
+		slog.Info("deleting old backups", "repo", dir, "err", err)
 	}
 }
 

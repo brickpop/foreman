@@ -1,7 +1,7 @@
 /* Design tokens: wiki/product/design/design-system.md is the source of truth. */
 @import "tailwindcss";
 @import "@fontsource-variable/geist";
-@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/jetbrains-mono";
 
 :root {
   --bg: #0e0f11;
@@ -113,7 +113,7 @@
   --color-ask: var(--ask);
   --shadow-overlay: var(--shadow);
   --font-sans: "Geist Variable", system-ui, sans-serif;
-  --font-mono: "Geist Mono Variable", monospace;
+  --font-mono: "JetBrains Mono Variable", monospace;
 }
 
 html,

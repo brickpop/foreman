@@ -42,8 +42,8 @@ import { Button, NotBuilt, PageTitle, Segmented, Switch } from "../components/ui
 // section says where it is kept: the global repo's settings.toml, the same on
 // every machine you clone it to, or this machine only. Every change saves at once.
 
-const inGlobalRepo = "in the global repo";
-const onThisMachine = "on this machine";
+const inGlobalRepo = "Global repo";
+const onThisMachine = "This machine";
 
 export function Settings() {
   const tab = useSearch({ from: "/settings" }).tab ?? "agents";
@@ -128,7 +128,7 @@ function Section({
     <section className="flex flex-col">
       <h2 className="m-0 mb-1 text-[13px] font-medium text-tx4">
         {label}
-        {kept && <span className="font-normal"> · kept {kept}</span>}
+        {kept && <span className="font-normal"> · {kept}</span>}
       </h2>
       {intro && <p className="m-0 mb-2 text-[13.5px] text-tx3">{intro}</p>}
       {children}
@@ -495,7 +495,7 @@ function ForgeSection({ settings }: { settings: SettingsData }) {
   return (
     <Section
       label="Forge accounts"
-      kept="hosts in the global repo, tokens on this machine"
+      kept="Global repo + this machine"
       intro="Tokens Foreman uses when you ask it to create a PR or sync a repo, and to watch those PRs. They stay on this machine. Each project’s config names its forge."
     >
       {isNotBuilt(accounts.error) ? (

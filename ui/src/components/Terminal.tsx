@@ -65,7 +65,7 @@ export function Terminal({
   useEffect(() => {
     if (!host.current) return;
     const term = new XTerm({
-      fontFamily: '"Geist Mono Variable", monospace',
+      fontFamily: '"JetBrains Mono Variable", monospace',
       fontSize: 13,
       lineHeight: 1.25,
       scrollback: 10000,

@@ -52,18 +52,26 @@ func TestPreferences(t *testing.T) {
 	if err := os.WriteFile(f.Path, []byte(edit), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.Get(); got != (Preferences{Theme: "light", TerminalFont: "geist-mono", TerminalFontSize: 13}) {
+	if got := f.Get(); got != (Preferences{Theme: "light", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}) {
 		t.Errorf("one bad value: %+v", got)
 	}
 	// A file from before the terminal settings has their defaults.
 	if err := os.WriteFile(f.Path, []byte(`theme = "dark"`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.Get(); got != (Preferences{Theme: "dark", TerminalFont: "geist-mono", TerminalFontSize: 13}) {
+	if got := f.Get(); got != (Preferences{Theme: "dark", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}) {
 		t.Errorf("an older file: %+v", got)
+	}
+	// A font no longer offered (Geist Mono, IBM Plex Mono until 2026-10-20) reads as the default.
+	if err := os.WriteFile(f.Path, []byte("terminal_font = \"geist-mono\"\nterminal_font_size = 15\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.Get(); got != (Preferences{Theme: "system", TerminalFont: "jetbrains-mono", TerminalFontSize: 15}) {
+		t.Errorf("a retired font: %+v", got)
 	}
 	for _, bad := range []Preferences{
 		{Theme: "dark", TerminalFont: "comic-sans", TerminalFontSize: 13},
+		{Theme: "dark", TerminalFont: "ibm-plex-mono", TerminalFontSize: 13},
 		{Theme: "dark", TerminalFont: "system", TerminalFontSize: MinFontSize - 1},
 		{Theme: "dark", TerminalFont: "system", TerminalFontSize: MaxFontSize + 1},
 	} {

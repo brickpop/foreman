@@ -47,7 +47,7 @@ Global rules: `html, body` have no margin, `--bg` background and `--tx` color. L
 
 ## Type
 
-Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (400/500/600) for code, paths, branches, ids and chips. App root: Geist, `system-ui` fallback, 14px.
+Fonts: **Geist** (400/500/600/700) for UI and **JetBrains Mono** (variable; the CEO, 2026-10-20, replacing Geist Mono) for code, paths, branches, ids and chips, and the terminals' default. App root: Geist, `system-ui` fallback, 14px.
 
 | Role | Size / weight / extras |
 |---|---|

@@ -20,7 +20,7 @@ var themes = []string{"system", "dark", "light"}
 
 // TerminalFonts are the terminal's fonts (the UI's terminalFonts lists the
 // same ids); system is the operating system's monospace.
-var TerminalFonts = []string{"geist-mono", "jetbrains-mono", "ibm-plex-mono", "fira-code", "source-code-pro", "system"}
+var TerminalFonts = []string{"jetbrains-mono", "fira-code", "source-code-pro", "system"}
 
 // The terminal's font sizes, in px.
 const (
@@ -30,7 +30,7 @@ const (
 
 // DefaultPreferences are the preferences before any is set.
 func DefaultPreferences() Preferences {
-	return Preferences{Theme: "system", TerminalFont: "geist-mono", TerminalFontSize: 13}
+	return Preferences{Theme: "system", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}
 }
 
 // PreferencesIn is preferences.toml in the CEO's folder.

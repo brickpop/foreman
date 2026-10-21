@@ -1,7 +1,8 @@
 // The terminal's fonts (wiki/product/features/settings.md#appearance), one of
 // the CEO's preferences. The ids are the ones the server accepts
-// (userdata.TerminalFonts). Geist Mono comes with the app; each other bundled
-// font is fetched only once it is picked, so unused ones cost nothing.
+// (userdata.TerminalFonts). JetBrains Mono comes with the app (it is the UI's
+// monospace too); each other bundled font is fetched only once it is picked,
+// so unused ones cost nothing.
 
 export type TerminalFont = {
   id: string;
@@ -11,24 +12,7 @@ export type TerminalFont = {
 };
 
 export const terminalFonts: TerminalFont[] = [
-  { id: "geist-mono", label: "Geist Mono", family: '"Geist Mono Variable"' },
-  {
-    id: "jetbrains-mono",
-    label: "JetBrains Mono",
-    family: '"JetBrains Mono Variable"',
-    load: () => import("@fontsource-variable/jetbrains-mono"),
-  },
-  {
-    id: "ibm-plex-mono",
-    label: "IBM Plex Mono",
-    family: '"IBM Plex Mono"',
-    // Not variable: regular and bold, so bold text isn't faked.
-    load: () =>
-      Promise.all([
-        import("@fontsource/ibm-plex-mono/400.css"),
-        import("@fontsource/ibm-plex-mono/700.css"),
-      ]),
-  },
+  { id: "jetbrains-mono", label: "JetBrains Mono", family: '"JetBrains Mono Variable"' },
   {
     id: "fira-code",
     label: "Fira Code",
@@ -48,7 +32,7 @@ export const terminalFonts: TerminalFont[] = [
   },
 ];
 
-/** The font with that id; Geist Mono for anything else. */
+/** The font with that id; JetBrains Mono for anything else. */
 export function terminalFont(id: string | undefined): TerminalFont {
   return terminalFonts.find((f) => f.id === id) ?? terminalFonts[0];
 }

@@ -53,8 +53,9 @@ func note(body string) string { return "---\ntype: note\n---\n" + body }
 func TestTreeOrderAndFolders(t *testing.T) {
 	w, _ := fixture(t, map[string]string{
 		"index.md":                  "# Home\n",
-		"zeta.md":                   note(""),
-		"alpha.md":                  "---\ntype: note\ntitle: The Alpha\n---\n",
+		"zeta.md":                   note("Intro.\n\n## Not a title\n\n# Zeta Heading\n\n# Second\n"),
+		"alpha.md":                  "---\ntype: note\ntitle: The Alpha\n---\n# Not this one\n",
+		"fenced.md":                 note("```\n# a comment, not a heading\n```\n"),
 		"backlog/index.md":          "# Backlog\n",
 		"backlog/002-second.md":     note(""),
 		"backlog/001-first.md":      note(""),
@@ -75,7 +76,7 @@ func TestTreeOrderAndFolders(t *testing.T) {
 		}
 		return out
 	}
-	if got, want := paths(tree), []string{"index.md", "adr", "backlog", "alpha.md", "zeta.md"}; !slices.Equal(got, want) {
+	if got, want := paths(tree), []string{"index.md", "adr", "backlog", "alpha.md", "fenced.md", "zeta.md"}; !slices.Equal(got, want) {
 		t.Fatalf("top level = %v, want %v", got, want)
 	}
 	backlog := tree[2]
@@ -99,6 +100,10 @@ func TestTreeOrderAndFolders(t *testing.T) {
 	}
 	if tree[3].Title != "The Alpha" || backlog.Children[2].Title != "001 First" || tree[1].Children[1].Title != "014 Settlement v2" {
 		t.Errorf("titles: %q %q %q", tree[3].Title, backlog.Children[2].Title, tree[1].Children[1].Title)
+	}
+	// Without a title field: the first level-1 heading, never one in a code fence.
+	if tree[0].Title != "Home" || tree[5].Title != "Zeta Heading" || tree[4].Title != "Fenced" {
+		t.Errorf("heading titles: %q %q %q", tree[0].Title, tree[5].Title, tree[4].Title)
 	}
 	// Entries carry an empty list, never null, so the UI can walk any node.
 	if tree[0].Children == nil {

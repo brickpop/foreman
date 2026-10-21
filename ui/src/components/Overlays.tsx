@@ -54,18 +54,26 @@ export function Drawer({
   title,
   width,
   children,
+  keepOpenOn,
 }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
   width: number;
   children: ReactNode;
+  /** A selector for what a click outside may land on without closing it: on
+   * the board, another card, which the drawer then shows. */
+  keepOpenOn?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()} modal={false}>
       <Dialog.Portal>
         <Dialog.Content
           aria-describedby={undefined}
+          onInteractOutside={(e) => {
+            const at = e.target instanceof Element ? e.target : null;
+            if (keepOpenOn && at?.closest(keepOpenOn)) e.preventDefault();
+          }}
           className="fixed top-0 right-0 flex h-full flex-col border-l border-line2 bg-panel shadow-overlay focus:outline-none"
           style={{ width: `min(${width}px, 100vw)`, zIndex: 44 }}
         >

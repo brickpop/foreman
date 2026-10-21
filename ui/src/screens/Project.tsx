@@ -33,7 +33,7 @@ export function Project() {
   if (!project) return <p className="p-12 text-tx3">No project {id}.</p>;
   const open = (requests.data ?? []).filter((r) => r.status === "open" && r.projectId === id);
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-full flex-col">
       <header className="flex flex-col gap-4 px-12 pt-10">
         <div className="flex items-start gap-4">
           <div className="flex flex-1 flex-col gap-1">

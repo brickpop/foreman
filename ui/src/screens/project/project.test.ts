@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
 import { forgeOf, linkLine, mainOf } from "../../app/model";
-import { columnLabel, laneLabel, moveOf } from "./Board";
+import { cellLook, columnLabel, laneLabel, lanesShown, moveOf, revealBy } from "./Board";
 import { sourceLabel } from "./Pipeline";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;
@@ -38,6 +38,30 @@ describe("Board", () => {
     expect(moveOf(lanes, a, "done", "")).toBeUndefined(); // removing the lane isn't either
     expect(moveOf(lanes, b, "todo", "")).toEqual({ column: "todo", lane: "" }); // gets a status
     expect(moveOf(lanes, b, "todo", "high")).toEqual({ column: "todo", lane: "high" });
+  });
+
+  it("lists in a column only the lanes with its cards, in lane order, and every lane while dragging", () => {
+    const lanes = ["high", "medium", "low", ""];
+    const cards = [card("a", "todo", "low"), card("b", "todo", ""), card("c", "todo", "high")];
+    expect(lanesShown(lanes, cards, false)).toEqual(["high", "low", ""]);
+    expect(lanesShown(lanes, [], false)).toEqual([]);
+    expect(lanesShown(lanes, [], true)).toEqual(lanes);
+  });
+
+  it("keeps a drop cell's size while a card is over it: only its color changes", () => {
+    const size = (look: string) => look.split(" ").filter((c) => !c.startsWith("border"));
+    expect(size(cellLook(true, true))).toEqual(size(cellLook(true, false)));
+    expect(cellLook(true, false)).toContain("min-h-12");
+    expect(cellLook(true, true)).toContain("border-acc");
+    expect(cellLook(false, false)).toBe("border-transparent"); // no drag, or a cell that takes none
+  });
+
+  it("scrolls an opened card out from under the sheet, 16px clear of it", () => {
+    // A 1600px window: the 460px sheet leaves 1124px, so a card may end at 1124.
+    expect(revealBy(1000, 1600)).toBe(0); // already beside it
+    expect(revealBy(1124, 1600)).toBe(0); // exactly at the edge
+    expect(revealBy(1400, 1600)).toBe(276); // under it
+    expect(revealBy(1400.2, 1600)).toBe(277); // never short of a pixel
   });
 });
 

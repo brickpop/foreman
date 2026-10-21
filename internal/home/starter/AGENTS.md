@@ -89,7 +89,7 @@ What and why, and what "done" means. Link the specs it touches.
 
 - **`status`**: `backlog` (captured, not scheduled), `todo` (scheduled: ready to start), `blocked` (it can't move: say on what in its body, on a line of its own: `Blocked by [Title](./other-task.md)`, or the CEO's answer, a teammate's reply; remove the line when it moves again), `in-progress` (its assignee is on it, including while it is reviewed), `done` (merged or accepted). These five values, no others: a board shows any other value as a column of its own. **Only `todo` tasks are picked up**: the lead (or the CEO, on the Backlog board) schedules a task by moving it from `backlog` to `todo`.
 - **`priority`**: `quick` (no uncertainty: it can be done right now, without issue), then `high`, `medium`, `low`.
-- **`title`** is what the board shows; without it, the board shows the file name. **`assignee`** is an agent id, so the board shows who has it.
+- **`title`** is what the board shows, and Foreman shows it as the entry's heading: don't repeat it as a `# heading` in the body. **`assignee`** is an agent id, so the board shows who has it.
 - **Steps** are `- [ ]` checkboxes in the body; the CEO can tick them too.
 - **Tags**: `decision` is a question the CEO must answer before work can rely on it; `spike` is throwaway exploration whose outcome goes into a spec.
 - **The lead keeps the boards true**: creates the tasks, assigns them, and updates `status` as work moves (a teammate's reply or handoff is the signal). A teammate who needs a task changed tells the lead, or `contribute()`s a proposal.

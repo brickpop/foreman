@@ -1,6 +1,6 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useNavigate } from "@tanstack/react-router";
-import { type DragEvent, useState } from "react";
+import { type DragEvent, useEffect, useRef, useState } from "react";
 import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client";
 import { agentOf } from "../../app/model";
 import {
@@ -25,6 +25,20 @@ import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 // Every column 240–320px (the CEO, 2026-10-17): readable cards, never a
 // stretched one on a wide screen; the board scrolls sideways when it must.
 const columnTrack = "minmax(240px, 320px)";
+
+// The side sheet's width. While it is open the board gets as much room on its
+// right (the CEO, 2026-10-21), so any column can be scrolled out from under
+// the sheet to sit beside it.
+const sheetWidth = 460;
+
+/**
+ * How far to scroll the board right so an opened card sits beside the sheet,
+ * 16px clear of it: 0 when it already does. Measured on the screen: the
+ * card's right edge, and the window's width the sheet takes its share of.
+ */
+export function revealBy(cardRight: number, windowWidth: number): number {
+  return Math.max(0, Math.ceil(cardRight - (windowWidth - sheetWidth - 16)));
+}
 
 const columnLabels: Record<string, string> = {
   todo: "To do",
@@ -68,6 +82,26 @@ export function moveOf(
   return { column, lane: hasLanes && lane !== card.lane ? lane : "" };
 }
 
+/**
+ * The lanes a column lists, columns first and lanes inside them (the CEO,
+ * 2026-10-21): those holding its cards, in the board's lane order; while a
+ * card is dragged, every lane, so each is a place to drop it.
+ */
+export function lanesShown(lanes: string[], cards: Card[], dragging: boolean): string[] {
+  return dragging ? lanes : lanes.filter((l) => cards.some((c) => c.lane === l));
+}
+
+/**
+ * A cell's outline while a card is dragged: every cell that takes it is
+ * outlined, at least 48px tall, and the one under the pointer turns accent.
+ * Being under the pointer never changes its size: a cell that shrank would
+ * slip out from under the pointer, and flicker.
+ */
+export function cellLook(takesDrop: boolean, over: boolean): string {
+  if (!takesDrop) return "border-transparent";
+  return `min-h-12 border-dashed ${over ? "border-acc" : "border-line2"}`;
+}
+
 const priorityColor: Record<string, string> = {
   quick: "text-ok",
   high: "text-err",
@@ -82,6 +116,8 @@ export function Board({ project }: { project: string }) {
   const [chosen, setChosen] = useState<string>();
   const [toml, setToml] = useState(false);
   const [sheet, setSheet] = useState<string>();
+  const [dragging, setDragging] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
   const toast = useToast();
   const move = useMoveCard(project, (e) =>
     toast({ title: "Card not moved", body: e.message, color: "var(--err)" }),
@@ -107,6 +143,15 @@ export function Board({ project }: { project: string }) {
   if (!board) return <p className="px-12 pt-6 text-tx3">No board is declared in wiki.toml.</p>;
   const { columns, lanes } = board;
 
+  const open = (path: string, card: HTMLElement) => {
+    setSheet(path);
+    // Next frame: the room beside the sheet is laid out by then.
+    requestAnimationFrame(() => {
+      const by = revealBy(card.getBoundingClientRect().right, window.innerWidth);
+      if (by > 0) scroller.current?.scrollBy({ left: by, behavior: "smooth" });
+    });
+  };
+
   const drop = (card: Card, column: string, lane: string) => {
     const to = moveOf(board, card, column, lane);
     if (!to) return;
@@ -130,7 +175,7 @@ export function Board({ project }: { project: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-4 px-12 pt-6 pb-16">
+    <div className="flex flex-1 flex-col gap-4 px-12 pt-6 pb-16">
       {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
       <div className="flex items-center gap-3">
         {list.length > 1 && (
@@ -154,45 +199,52 @@ export function Board({ project }: { project: string }) {
       {board.problems.length > 0 && (
         <p className="text-[13px] text-err">{board.problems.join(" · ")}</p>
       )}
-      <div className="overflow-x-auto">
-        <div className="min-w-fit">
-          <div
-            className="grid gap-2"
-            style={{ gridTemplateColumns: `repeat(${columns.length}, ${columnTrack})` }}
-          >
-            {columns.map((c) => (
-              <div key={c} className="px-1 pb-1 text-[13px]">
-                <span className="font-medium text-tx3">{columnLabel(c)}</span>{" "}
-                <span className="text-tx4">{board.cards.filter((x) => x.column === c).length}</span>
+      {/* Columns reach down to the footer note, all as tall as the tallest (the CEO, 2026-10-21). */}
+      <div ref={scroller} className="flex flex-1 flex-col overflow-x-auto">
+        <div
+          className="grid min-w-fit flex-1 gap-2"
+          style={{
+            gridTemplateColumns: `repeat(${columns.length}, ${columnTrack})`,
+            // As wide again as the sheet, so the columns keep their width.
+            width: sheet ? `calc(100% + ${sheetWidth}px)` : undefined,
+            paddingRight: sheet ? sheetWidth : 0,
+          }}
+        >
+          {columns.map((column) => {
+            const cards = board.cards.filter((x) => x.column === column);
+            const cell = (lane: string, label?: string) => (
+              <Cell
+                key={lane}
+                label={label}
+                cards={lanes.length === 0 ? cards : cards.filter((x) => x.lane === lane)}
+                // A cell for no status (or no lane value) takes no drops: see moveOf.
+                droppable={column !== "" && (lanes.length === 0 || lane !== "")}
+                dragging={dragging}
+                onDrop={(card) => drop(card, column, lane)}
+                onDrag={setDragging}
+                allCards={board.cards}
+                menu={(card) => (
+                  <MoveMenu board={board} card={card} onMove={(c, l) => drop(card, c, l)} />
+                )}
+                onOpen={open}
+              />
+            );
+            return (
+              <div key={column} className="flex flex-col gap-1">
+                <div className="px-1 pb-1 text-[13px]">
+                  <span className="font-medium text-tx3">{columnLabel(column)}</span>{" "}
+                  <span className="text-tx4">{cards.length}</span>
+                </div>
+                <div className="flex min-h-[72px] flex-1 flex-col gap-3 rounded-[10px] border border-line bg-side p-2">
+                  {lanes.length === 0
+                    ? cell("")
+                    : lanesShown(lanes, cards, dragging).map((lane) =>
+                        cell(lane, laneLabel(lane, board.laneField)),
+                      )}
+                </div>
               </div>
-            ))}
-          </div>
-          {(lanes.length > 0 ? lanes : [""]).map((lane) => (
-            <div key={lane} className="mt-3 flex flex-col gap-1.5">
-              {lanes.length > 0 && (
-                <span className="text-xs text-tx4">{laneLabel(lane, board.laneField)}</span>
-              )}
-              <div
-                className="grid gap-2"
-                style={{ gridTemplateColumns: `repeat(${columns.length}, ${columnTrack})` }}
-              >
-                {columns.map((column) => (
-                  <Cell
-                    key={column}
-                    cards={board.cards.filter((x) => x.column === column && x.lane === lane)}
-                    // A cell for no status (or no lane value) takes no drops: see moveOf.
-                    droppable={column !== "" && (lanes.length === 0 || lane !== "")}
-                    onDrop={(card) => drop(card, column, lane)}
-                    allCards={board.cards}
-                    menu={(card) => (
-                      <MoveMenu board={board} card={card} onMove={(c, l) => drop(card, c, l)} />
-                    )}
-                    onOpen={setSheet}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       <p className="text-[12.5px] text-tx4">
@@ -204,20 +256,28 @@ export function Board({ project }: { project: string }) {
   );
 }
 
+/** One lane of a column (or the whole column, on a board without lanes): its
+ * cards, and where a card is dropped. */
 function Cell({
+  label,
   cards,
   allCards,
   droppable,
+  dragging,
   onDrop,
+  onDrag,
   menu,
   onOpen,
 }: {
+  label?: string;
   cards: Card[];
   allCards: Card[];
   droppable: boolean;
+  dragging: boolean;
   onDrop: (card: Card) => void;
+  onDrag: (dragging: boolean) => void;
   menu: (card: Card) => React.ReactNode;
-  onOpen: (path: string) => void;
+  onOpen: (path: string, card: HTMLElement) => void;
 }) {
   const [over, setOver] = useState(false);
   const teams = useTeams();
@@ -237,11 +297,14 @@ function Cell({
       onDrop={(e: DragEvent) => {
         e.preventDefault();
         setOver(false);
+        onDrag(false);
         const card = allCards.find((c) => c.path === e.dataTransfer.getData("text/plain"));
         if (card) onDrop(card);
       }}
-      className={`flex min-h-[72px] flex-col gap-2 rounded-[10px] border bg-side p-2 ${over ? "border-acc" : "border-line"}`}
+      // While a card is dragged, every cell that takes it shows its outline.
+      className={`-m-1 flex flex-col gap-2 rounded-lg border p-1 ${cellLook(dragging && droppable, over)}`}
     >
+      {label && <span className="px-1 text-xs text-tx4">{label}</span>}
       {cards.map((card) => {
         const assignee = card.assignee ? agentOf(teams.data ?? [], `${card.assignee}@`) : undefined;
         return (
@@ -249,13 +312,21 @@ function Cell({
           // biome-ignore lint/a11y/useKeyWithClickEvents: the title button is the keyboard path to the sheet
           <div
             key={card.path}
+            // Clicking another card while the sheet is open shows that card in it.
+            data-card
+            // The whole card drags and opens (the CEO, 2026-10-21); only the
+            // cursor tells them apart: a grab on its top row, a pointer below.
             draggable
-            // A click anywhere on the card opens its sheet (the title button's click lands here too).
-            onClick={() => onOpen(card.path)}
-            onDragStart={(e) => e.dataTransfer.setData("text/plain", card.path)}
-            className="group flex cursor-grab flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 py-2.5 hover:border-line3"
+            onClick={(e) => onOpen(card.path, e.currentTarget)}
+            onDragStart={(e) => {
+              e.dataTransfer.setData("text/plain", card.path);
+              // After the drag has begun: changing the layout inside dragstart cancels it in Chrome.
+              setTimeout(() => onDrag(true));
+            }}
+            onDragEnd={() => onDrag(false)}
+            className="group flex cursor-pointer flex-col gap-1.5 rounded-lg border border-line bg-panel px-3 pb-2.5 hover:border-line3"
           >
-            <div className="flex items-center gap-2">
+            <div className="-mx-3 flex cursor-grab items-center gap-2 px-3 pt-2.5">
               <span className="font-mono text-[11.5px] font-medium text-tx4">{card.id}</span>
               {card.priority && (
                 <span
@@ -265,7 +336,7 @@ function Cell({
                 </span>
               )}
               <span className="flex-1" />
-              {/* The menu moves the card; its clicks don't open the sheet. */}
+              {/* The menu moves the card; its clicks (in its portal too) don't open the sheet. */}
               {/* biome-ignore lint/a11y/noStaticElementInteractions: only stops the click from reaching the card */}
               {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard events never open the sheet */}
               <span onClick={(e) => e.stopPropagation()}>{menu(card)}</span>
@@ -358,6 +429,10 @@ function SideSheet({
   const tick = useTick(project, (e) =>
     toast({ title: path ?? "", body: e.message, color: "var(--err)" }),
   );
+  // Another card shown in the open sheet starts at its top.
+  const top = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on each new card
+  useEffect(() => top.current?.parentElement?.scrollTo(0, 0), [path]);
   const open = (p: string) => {
     onClose();
     navigate({
@@ -370,7 +445,8 @@ function SideSheet({
     <Drawer
       open={path !== undefined}
       onClose={onClose}
-      width={460}
+      width={sheetWidth}
+      keepOpenOn="[data-card]"
       title={
         <span className="flex items-center gap-3">
           <span className="font-mono text-[12.5px] font-normal text-tx3">
@@ -382,7 +458,7 @@ function SideSheet({
         </span>
       }
     >
-      <div className="px-[22px] pt-5 pb-8">
+      <div ref={top} className="px-[22px] pt-5 pb-8">
         {entry.data && (
           <WikiArticle
             project={project}

@@ -6,6 +6,16 @@ import { FieldChip } from "./ui";
 // chips, then its Markdown. Links between entries open in the reader;
 // checkboxes tick (the only write).
 
+/** The chips to show, and the `title` field, which is the page's heading
+ * rather than a chip: a card's body doesn't repeat it. */
+export function chipsOf(frontmatter: Record<string, string>): {
+  title?: string;
+  fields: [string, string][];
+} {
+  const { title, ...rest } = frontmatter;
+  return { title: title || undefined, fields: Object.entries(rest).filter(([, v]) => v !== "") };
+}
+
 export function WikiArticle({
   project,
   entry,
@@ -20,7 +30,7 @@ export function WikiArticle({
   onTick: (line: number, done: boolean) => void;
 }) {
   const client = useClient();
-  const fields = Object.entries(entry.frontmatter).filter(([, v]) => v !== "");
+  const { title, fields } = chipsOf(entry.frontmatter);
   return (
     <article className="flex flex-col gap-3.5">
       {fields.length > 0 && (
@@ -31,6 +41,7 @@ export function WikiArticle({
         </div>
       )}
       <div className={`wiki ${size === "sheet" ? "sheet" : ""}`}>
+        {title && <h1>{title}</h1>}
         <Markdown
           entry={entry}
           onOpen={onOpen}

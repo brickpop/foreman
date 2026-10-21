@@ -301,10 +301,16 @@ func frontmatter(e *index.Entry) map[string]string {
 	return out
 }
 
-// title is an entry's own title, else a readable name from its filename.
+// title is an entry's `title` field, else its body's first `# heading`, else
+// a readable name from its filename: cards written either way get a title.
 func title(e *index.Entry) string {
 	if t := e.Field("title"); t != "" {
 		return t
+	}
+	for _, h := range e.Headings {
+		if h.Level == 1 && h.Text != "" {
+			return h.Text
+		}
 	}
 	return titleFromFilename(e.Path)
 }

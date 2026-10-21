@@ -38,7 +38,7 @@ Full width of its column, gap 14. Opens `index.md` by default.
 
 No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as wikiview has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them.
 
-1. **Frontmatter chips**: one `key: value` chip per field; empty values hidden, and so is the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17).
+1. **Frontmatter chips**: one `key: value` chip per field; empty values hidden, and so is the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17). A `title` field is no chip: it is the page's H1, above the body (the CEO, 2026-10-21: a card's body doesn't repeat it). An entry with both a `title` and a body H1 shows both.
 2. **Body** rendered from Markdown:
 
 | Element | Rendering |

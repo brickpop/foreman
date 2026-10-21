@@ -21,8 +21,8 @@ var ErrMerging = errors.New("git: a merge is under way")
 // a colon.
 const backupTime = "2006-01-02T15-04-05Z"
 
-// BackupRef names a backup of kind (closed, discarded) made at at, under
-// path (rev-3/lead/atlas/x): refs/foreman/closed/2026-10-22T09-30-00Z/rev-3/lead/atlas/x.
+// BackupRef names a backup of kind (dismissed, discarded) made at at, under
+// path (rev-3/lead/atlas/x): refs/foreman/dismissed/2026-10-22T09-30-00Z/rev-3/lead/atlas/x.
 func BackupRef(kind string, at time.Time, path string) string {
 	return "refs/foreman/" + kind + "/" + at.UTC().Format(backupTime) + "/" + path
 }

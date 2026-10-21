@@ -961,16 +961,18 @@ func TestReviewsAndTheirComments(t *testing.T) {
 		t.Fatalf("saved %+v %v", r, err)
 	}
 	r.ChangesRequestedAt = time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
+	r.WithdrawnAt, r.WithdrawnReason, r.SupersededBy = time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC), "all of it is in lead/atlas/big", "rev-9"
 	if _, err := revs.Save(ctx, r); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := revs.Get(ctx, "rev-1"); err != nil || !got.ChangesRequestedAt.Equal(r.ChangesRequestedAt) || got.Branch != r.Branch {
+	if got, err := revs.Get(ctx, "rev-1"); err != nil || !got.ChangesRequestedAt.Equal(r.ChangesRequestedAt) || got.Branch != r.Branch ||
+		!got.WithdrawnAt.Equal(r.WithdrawnAt) || got.WithdrawnReason != r.WithdrawnReason || got.SupersededBy != "rev-9" {
 		t.Errorf("got %+v %v", got, err)
 	}
 	if _, err := revs.Save(ctx, Review{ProjectID: "other", Branch: "lead/x/y"}); err != nil {
 		t.Fatal(err)
 	}
-	if list, _ := revs.List(ctx); len(list) != 2 || list[0].ID != "rev-1" {
+	if list, _ := revs.List(ctx); len(list) != 2 || list[0].ID != "rev-1" || !list[1].WithdrawnAt.IsZero() || list[1].SupersededBy != "" {
 		t.Errorf("list %+v", list)
 	}
 

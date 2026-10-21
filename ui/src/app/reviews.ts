@@ -1,7 +1,7 @@
 import type {
-  Close,
-  Closed,
   Deployment,
+  Dismiss,
+  Dismissed,
   NewComment,
   RepoDiff,
   Review,
@@ -10,9 +10,10 @@ import type {
 } from "../api/client";
 import {
   ReviewChangesRequested,
-  ReviewClosed,
+  ReviewDismissed,
   ReviewMerged,
   ReviewNeedsYou,
+  ReviewWithdrawn,
 } from "../api/types/workflow";
 import type { DiffLine } from "./diff";
 
@@ -23,12 +24,13 @@ const statusLabels: Record<string, string> = {
   [ReviewNeedsYou]: "Needs your review",
   [ReviewChangesRequested]: "Changes requested",
   [ReviewMerged]: "Merged",
-  [ReviewClosed]: "Closed",
+  [ReviewDismissed]: "Dismissed",
+  [ReviewWithdrawn]: "Withdrawn",
 };
 
-/** One way to Close a review: what becomes of its team and branches, and
+/** One way to Dismiss a review: what becomes of its team and branches, and
  * whether the lead hears of it (only while its team keeps working). */
-export type CloseChoice = {
+export type DismissChoice = {
   value: "keep" | "stop" | "drop";
   label: string;
   stopTeam: boolean;
@@ -37,7 +39,7 @@ export type CloseChoice = {
 };
 
 /** The review's team, by name, and whether its deployment still runs. */
-export function closingTeam(v: Review, active: Deployment[], teams: Team[]) {
+export function reviewTeam(v: Review, active: Deployment[], teams: Team[]) {
   const teamId = v.deploymentId.split("@")[0];
   return {
     name: teams.find((t) => t.id === teamId)?.config.name || teamId,
@@ -45,14 +47,14 @@ export function closingTeam(v: Review, active: Deployment[], teams: Team[]) {
   };
 }
 
-/** The ways to Close, the first the default. Branches go only with their
+/** The ways to Dismiss, the first the default. Branches go only with their
  * team, as its agents work in them (the CEO, 2026-10-21). */
-export function closeChoices(
+export function dismissChoices(
   team: { name: string; live: boolean },
   project: string,
-): CloseChoice[] {
+): DismissChoice[] {
   const aside = "(kept aside, recoverable by hand)";
-  const choice = (value: CloseChoice["value"], label: string, stop: boolean, drop: boolean) => ({
+  const choice = (value: DismissChoice["value"], label: string, stop: boolean, drop: boolean) => ({
     value,
     label,
     stopTeam: stop,
@@ -76,8 +78,8 @@ export function closeChoices(
       ];
 }
 
-/** The Close to send: the note only when the lead will hear it. */
-export function closeRequest(choice: CloseChoice, note: string): Close {
+/** The Dismiss to send: the note only when the lead will hear it. */
+export function dismissRequest(choice: DismissChoice, note: string): Dismiss {
   return {
     note: choice.tells ? note.trim() : "",
     dropBranches: choice.dropBranches,
@@ -87,21 +89,21 @@ export function closeRequest(choice: CloseChoice, note: string): Close {
 
 /** Why a note typed won't reach the lead with this choice, if it won't
  * (typed, then a choice that stops the team): the CEO is warned. */
-export function lostNote(choice: CloseChoice, note: string, lead: string): string | undefined {
+export function lostNote(choice: DismissChoice, note: string, lead: string): string | undefined {
   if (choice.tells || !note.trim()) return undefined;
   return choice.stopTeam
     ? `${lead} won't get your note: the team stops.`
     : `${lead} won't get your note: the team isn't running.`;
 }
 
-/** The Close button: it sends only a note someone hears. */
-export function closeLabel(choice: CloseChoice, note: string): string {
-  return choice.tells && note.trim() ? "Close and send" : "Close now";
+/** The Dismiss button: it sends only a note someone hears. */
+export function dismissLabel(choice: DismissChoice, note: string): string {
+  return choice.tells && note.trim() ? "Dismiss and send" : "Dismiss now";
 }
 
-/** The branches a close kept, and why, one line each. */
-export function keptLines(closed: Closed): string {
-  return closed.kept.map((k) => `${k.branch} in ${k.repo}: ${k.why}.`).join("\n");
+/** The branches a dismissal kept, and why, one line each. */
+export function keptLines(dismissed: Dismissed): string {
+  return dismissed.kept.map((k) => `${k.branch} in ${k.repo}: ${k.why}.`).join("\n");
 }
 
 /** A review's status as the screens say it. */
@@ -109,7 +111,7 @@ export function statusLabel(status: string): string {
   return statusLabels[status] ?? status;
 }
 
-/** Whether the CEO can still act on it: comment, merge, request changes, close. */
+/** Whether the CEO can still act on it: comment, merge, request changes, dismiss. */
 export function isOpen(v: Review): boolean {
   return v.status === ReviewNeedsYou || v.status === ReviewChangesRequested;
 }
@@ -168,7 +170,7 @@ export function diffKey(repo: string, path: string, line: DiffLine): string | un
  * it moved to; an old-side one, a removed line, only against main, where
  * main's numbering is the one it was written on), general ones, the outdated
  * ones, whose line changed since, and those whose line the diff shown doesn't
- * have (its repo merged or closed, its file out of the since view).
+ * have (its repo merged, dismissed or withdrawn, its file out of the since view).
  */
 export function placeComments(comments: ReviewComment[], since: boolean, shown: Set<string>) {
   const at = new Map<string, ReviewComment[]>();

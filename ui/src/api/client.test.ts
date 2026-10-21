@@ -247,14 +247,14 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("closes a review, answering with the branches kept", async () => {
+  it("dismisses a review, answering with the branches kept", async () => {
     const kept = [{ repo: "api", branch: "lead/atlas/x", why: "changes in the way" }];
     const calls = stubFetch(200, { kept });
     const c = httpClient("http://x");
-    const close = { note: "", dropBranches: true, stopTeam: true };
-    expect(await c.reviews.close("rev-1", close)).toEqual({ kept });
+    const dismiss = { note: "", dropBranches: true, stopTeam: true };
+    expect(await c.reviews.dismiss("rev-1", dismiss)).toEqual({ kept });
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
-      ["POST", "http://x/api/reviews/rev-1/close", close],
+      ["POST", "http://x/api/reviews/rev-1/dismiss", dismiss],
     ]);
   });
 

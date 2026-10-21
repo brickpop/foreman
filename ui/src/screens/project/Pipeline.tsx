@@ -70,7 +70,7 @@ export function InFlight({ project }: { project: Project }) {
     .slice(0, 20);
   const openMrs = mrs.filter((m) => m.state === "open");
   // In flight on their own: every work item no merge request carries, integrated
-  // ones included (they wait for the lead's request_merge). A closed review's
+  // ones included (they wait for the lead's request_merge). A dismissed review's
   // items stay with it, out of the way, until a new hand-off frees them.
   const carried = (w: (typeof items)[number]) => mrs.some((m) => m.id === w.mergeRequestId);
   const loose = items.filter((w) => !carried(w));

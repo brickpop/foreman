@@ -3,7 +3,9 @@
 package fake
 
 import (
+	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/brickpop/foreman/internal/harness"
 )
@@ -63,4 +65,15 @@ func (Adapter) Describe(event string, _ []byte) string {
 		"UserPromptSubmit": "Working on a message",
 		"Stop":             "Finished its turn",
 	}[event]
+}
+
+// WriteProgram writes a shell script for the fake harness to run, in place of
+// the fakeharness binary. It holds syscall.ForkLock while the file is open for
+// writing: a process started meanwhile from another goroutine would inherit
+// that descriptor until its exec, and running the script then fails with
+// "text file busy" (seen as flaky tests).
+func WriteProgram(path, script string) error {
+	syscall.ForkLock.RLock()
+	defer syscall.ForkLock.RUnlock()
+	return os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o755)
 }

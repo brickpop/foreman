@@ -94,8 +94,8 @@ type TeamMessage struct {
 }
 
 // TeamAction is one git tool an agent called (switch, commit, merge,
-// abort_merge, discard, set_submodule, request_merge) and what it did
-// (wiki/product/architecture/protocol.md#team-actions).
+// abort_merge, discard, set_submodule, request_merge, withdraw_merge) and
+// what it did (wiki/product/architecture/protocol.md#team-actions).
 type TeamAction struct {
 	ID           int64        `json:"id"`
 	DeploymentID string       `json:"deploymentId"`
@@ -143,7 +143,7 @@ type MergeRequest struct {
 	Repo           string    `json:"repo"` // one of the project's code repos
 	Branch         string    `json:"branch"`
 	Entry          string    `json:"entry"` // the wiki card explaining the work
-	State          string    `json:"state"` // open, merged or rejected
+	State          string    `json:"state"` // open, merged, rejected or withdrawn
 	ChecksStatus   string    `json:"checksStatus"`
 	Conflicting    bool      `json:"conflicting"`
 	ForgePRURL     string    `json:"forgePrUrl"`
@@ -164,6 +164,9 @@ type Review struct {
 	Branch             string    `json:"branch"`
 	CreatedAt          time.Time `json:"createdAt"`
 	ChangesRequestedAt time.Time `json:"changesRequestedAt"` // zero unless it waits on the lead
+	WithdrawnAt        time.Time `json:"withdrawnAt"`        // zero unless the lead or Foreman withdrew it
+	WithdrawnReason    string    `json:"withdrawnReason"`
+	SupersededBy       string    `json:"supersededBy"` // the review that holds all of it, when one does
 }
 
 // ReviewComment is the CEO's comment on a review: on a line of a repo's

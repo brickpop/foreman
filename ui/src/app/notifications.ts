@@ -1,6 +1,7 @@
 import type { Deployment, Instance, Request, Team } from "../api/client";
 import type { Event } from "../api/types/events";
 import type { Notifications } from "../api/types/home";
+import type { Withdrawn } from "../api/types/workflow";
 import { agentOf } from "./model";
 
 // What the CEO hears about (wiki/product/features/notifications.md): one
@@ -44,6 +45,22 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
       toggle: "needsMe",
       title: `${who} needs you${where}`,
       color: "var(--acc)",
+    };
+  }
+  if (e.type === "review.withdrawn") {
+    // A toast only: nothing waits on the CEO. Their drafts on it are gone
+    // (the CEO, 2026-10-22: warn that they're lost).
+    const w = e.data as Withdrawn;
+    const lost = w.lostDrafts === 1 ? "draft comment" : `${w.lostDrafts} draft comments`;
+    return {
+      title: `${w.by === "foreman" ? "Foreman" : name(w.lead)} withdrew ${w.review.branch}`,
+      body:
+        `${w.review.withdrawnReason}.` +
+        (w.lostDrafts > 0 ? ` Your ${lost} on it ${w.lostDrafts === 1 ? "is" : "are"} lost.` : ""),
+      instance: w.lead,
+      deployment: w.deploymentId,
+      review: w.review.id,
+      color: w.lostDrafts > 0 ? "var(--err)" : "var(--tx4)",
     };
   }
   if (e.type === "instance.status") {

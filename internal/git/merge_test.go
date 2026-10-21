@@ -302,20 +302,20 @@ func TestCompareTwoCommits(t *testing.T) {
 func TestDropBranch(t *testing.T) {
 	g, dir := mergeFixture(t)
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
-	if err := g.DropBranch(ctx, dir, "lead/atlas/x", "refs/foreman/closed/rev-1/lead/atlas/x", "main"); err != nil {
+	if err := g.DropBranch(ctx, dir, "lead/atlas/x", "refs/foreman/dismissed/rev-1/lead/atlas/x", "main"); err != nil {
 		t.Fatal(err)
 	}
 	if g.HasBranch(ctx, dir, "lead/atlas/x") {
 		t.Error("the branch is still there")
 	}
-	if kept := mustRun(t, dir, "rev-parse", "refs/foreman/closed/rev-1/lead/atlas/x"); kept != head {
+	if kept := mustRun(t, dir, "rev-parse", "refs/foreman/dismissed/rev-1/lead/atlas/x"); kept != head {
 		t.Errorf("backup at %s, want %s", kept, head)
 	}
 	// Not a branch: no listing shows it.
-	if branches := mustRun(t, dir, "branch", "--list"); strings.Contains(branches, "closed") {
+	if branches := mustRun(t, dir, "branch", "--list"); strings.Contains(branches, "dismissed") {
 		t.Errorf("branches %q", branches)
 	}
-	for _, bad := range [][2]string{{"-x", "refs/foreman/closed/x"}, {"main", "refs/heads/other"}, {"main", ""}} {
+	for _, bad := range [][2]string{{"-x", "refs/foreman/dismissed/x"}, {"main", "refs/heads/other"}, {"main", ""}} {
 		if err := g.DropBranch(ctx, dir, bad[0], bad[1], "main"); !errors.Is(err, ErrBadBranch) {
 			t.Errorf("%q: %v", bad, err)
 		}
@@ -337,7 +337,7 @@ func TestDropBranchCheckedOutInAWorktree(t *testing.T) {
 	}
 	write(t, filepath.Join(wt, "notes.md"), "half a thought\n")
 
-	backup := BackupRef("closed", time.Now(), "rev-1/lead/atlas/x")
+	backup := BackupRef("dismissed", time.Now(), "rev-1/lead/atlas/x")
 	if err := g.DropBranch(ctx, dir, "lead/atlas/x", backup, "main"); err != nil {
 		t.Fatal(err)
 	}

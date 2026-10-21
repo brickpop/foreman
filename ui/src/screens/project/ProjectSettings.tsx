@@ -195,7 +195,7 @@ function Configuration({ project }: { project: Project }) {
               [
                 "review",
                 "text-ok",
-                "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you review it: merge it, request changes, or close it.",
+                "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you review it: merge it, request changes, or dismiss it.",
               ],
               [
                 "finding",

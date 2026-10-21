@@ -14,12 +14,12 @@ Three actors, and every interaction enters through exactly one channel:
 
 | Actor | Channel | Struct | Received by |
 |---|---|---|---|
-| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `request_merge`) |
+| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `request_merge`, `withdraw_merge`) |
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
 | CEO | Answering a request (Dashboard, project Overview) | `Answer` | Web server → **Workflow** `Resolve` |
-| CEO | On a [review](../models/review.md): comments, Request changes, Merge (the repos ticked), Close; later Create PR on the forge | `ReviewAction` | Web server → **Workflow** |
+| CEO | On a [review](../models/review.md): comments, Request changes, Merge (the repos ticked), Dismiss; later Create PR on the forge | `ReviewAction` | Web server → **Workflow** |
 | Foreman | Process exit, silence, rate limit, git or build error | internal | **Instance manager** / **Workflow** → blocked [request](#requests) |
 | Foreman | Forge poll, project-repo watch | internal | **Workflow** → [merge request](#work-items-and-merge-requests) transitions |
 
@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge" | "withdraw_merge"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -115,6 +115,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
 | `escalate` | anyone | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
 | `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
+| `withdraw_merge` | the lead only | no | Workflow |
 
 ### `ask`
 
@@ -283,18 +284,31 @@ type RequestMergeResult struct { Review string; MergeRequests []string; Refreshe
 - Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (merging it would change nothing, in any repo), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
 - Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on the Dashboard or on the project's Overview.
 
+### `withdraw_merge`
+
+```go
+type WithdrawMergeArgs struct { Branch, Reason, SupersededBy string } // branch, superseded_by: lead/<own team>/<topic>, each with a review open
+```
+
+- Effect: Workflow ends the caller's open [review](../models/review.md) of `Branch` as **withdrawn** ([Reviews → Withdrawn](../features/reviews.md#withdrawn)): every merge request still open in it becomes `withdrawn` (its note, the reason), the review keeps the reason and `superseded_by` (the review of `SupersededBy`), the CEO's draft comments on it are deleted, and its review request resolves (`withdrawn`). The work items its merge requests carried are freed: their commits are still on the lead branch, so they go to the lead's open merge requests whose branch holds them, in the same repo, or else wait for the next `request_merge` of a branch that does. The branch stays. Publishes `review.withdrawn`. The tool's text says `Withdrew review rev-1 of lead/atlas/small (api, web): it left the CEO's queue. The branch stays.`, with ` The CEO sees it superseded by rev-2 (lead/atlas/big).` when given, then where its hand-offs went.
+- Kept as a [team action](#team-actions), refusals included.
+- Errors: `not_lead` (never seen in practice), `branch_not_allowed` (either branch not the caller's own lead branch), `no_reason`, `too_long` (the reason, over the message limit), `superseded_by_itself`, `not_open` (no review open on `Branch`), `superseding_not_open` (`SupersededBy` has none: request it first), `not_superseded` (`SupersededBy` doesn't contain `Branch` in a repo the review has open: merge it in first, or leave it out).
+- **Foreman withdraws too** (the CEO, 2026-10-22): when the CEO merges a repo of a review (Merge, or a merge Foreman notices outside it), every other open review of the same lead (deployment) with a merge request on that repo, whose every open merge request `main` now holds (merging it would change nothing), is withdrawn the same way, with the reason `<branch>, merged, holds all of it` and superseded by the merged review; its work items go to the merged review's merge request in their repo. So the CEO can merge either one: merging the bigger withdraws the smaller, merging the smaller leaves the bigger open (it holds more). Nothing happens at `request_merge` time.
+
 ### Deliveries Foreman originates
 
 | When | To | Delivered text |
 |---|---|---|
 | A merge request is merged (Merge to main, or on the forge) | its lead | `From Foreman: lead/atlas/integration was merged into main in ledger-api, as one commit. lead/atlas/integration now starts from main.`; when the branch couldn't move to the new `main` ([Merge to main](../features/pipeline-and-merges.md#merge-to-main)), the second sentence is `lead/atlas/integration has commits since, or changes in the way, so it still holds what was merged: merge main into it with merge("main") before you go on.` |
+| The CEO merges a review that holds all of another open review of the same lead | that lead | `From Foreman: the CEO merged lead/atlas/big, which holds all of lead/atlas/small, so Foreman withdrew the review of lead/atlas/small (rev-1, api, web). Don't request it again.` ([`withdraw_merge`](#withdraw_merge)); sent before the "main moved" notices, which then skip it |
 | Another merge request on the same repo is merged | the lead of every other open one | `From Foreman: main moved (lead/atlas/integration was merged). Merge it into lead/atlas/settlement-v2 with merge("main"), resolve any conflicts and commit(), then call request_merge again.` ([When main moves](../features/pipeline-and-merges.md#when-main-moves)) |
 | Merge to main finds a conflict, or the forge reports one | that merge request's lead | `From Foreman: lead/atlas/settlement-v2 conflicts with main in ledger-api, so the CEO couldn't merge it. Merge main in with merge("main"), resolve the conflicts and commit(), then call request_merge again.` |
 | The CEO chooses Create PR | the merge request's lead | `From Foreman: the CEO opened PR #128 on the forge for lead/atlas/settlement-v2: <url>` |
 | Review comments on the forge (after Create PR) | the merge request's lead | `From Foreman: a review comment on PR #128 by <user>: <its start>… Read it with read_message("msg-N").` (stored as a message, kind `notice`) |
 | Request changes on its review | the review's lead | `From the CEO: changes requested on lead/atlas/settlement-v2 (backlog/LED-44.md).`, the note, one line per comment, then `Fix them, commit(), then call request_merge again on the same branch.` ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)) |
-| Close on its review, its team kept working | the review's lead | `From Foreman: the CEO closed the review of lead/atlas/settlement-v2 without merging (ledger-api). Stop work on it, and don't request it again.`, then `The CEO's note: <note>` when there is one ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)). A team stopped with the close, or not running, is told nothing |
-| Its PR closed on the forge (not built) | the merge request's lead | As Close on its review, its team kept working |
+| An agent's session starts fresh (a deploy, a wake; not a restart that continues its conversation) with earlier work in its worktrees | that agent | `From Foreman: your worktrees hold earlier work. Branches with work main hasn't got: wt/tove/LED-44 (api). Changes not committed in web (on wt/tove/LED-44). Resume what is still wanted; new work goes on a new topic, made from main with switch(<topic>). Changes you don't want: discard().`; for the lead also `Your reviews still open: lead/atlas/x (waiting for the CEO)` or `(changes requested: fix them, then request_merge again)`. Each part only when it applies; nothing when there is nothing |
+| Dismiss on its review, its team kept working | the review's lead | `From Foreman: the CEO dismissed the review of lead/atlas/settlement-v2 without merging (ledger-api). Stop work on it, and don't request it again.`, then `The CEO's note: <note>` when there is one ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)). A team stopped with the close, or not running, is told nothing |
+| Its PR closed on the forge (not built) | the merge request's lead | As Dismiss on its review, its team kept working |
 | "Owning team fixes now" on a finding | the named team's lead | `From the CEO: <team> fixes "<finding>" now.` |
 | A soul or team edit | each running instance | `From Foreman: your definition changed. Read it with read_message("msg-N").` (the changed sections, stored as a message of kind `notice`; [Session prompt → Updates](./session-prompt.md#updates)) |
 
@@ -335,14 +349,14 @@ Lifecycle:
 
 ## Team actions
 
-What the git tools did, for the CEO to follow (the CEO's decision, 2026-10-16): each call of `switch`, `commit`, `merge`, `abort_merge`, `set_submodule` or `request_merge` is kept in `team_actions`, refusals included (a hand-off and a contribution are messages already). Workflow records it after the call and publishes `team.action`.
+What the git tools did, for the CEO to follow (the CEO's decision, 2026-10-16): each call of `switch`, `commit`, `merge`, `abort_merge`, `discard`, `set_submodule`, `request_merge` or `withdraw_merge` is kept in `team_actions`, refusals included (a hand-off and a contribution are messages already). Workflow records it after the call and publishes `team.action`.
 
 ```go
 type TeamAction struct {
     ID           int64
     DeploymentID string
     Instance     string        // who called it
-    Tool         string        // switch, commit, merge, abort_merge, discard, set_submodule, request_merge
+    Tool         string        // switch, commit, merge, abort_merge, discard, set_submodule, request_merge, withdraw_merge
     Branch       string        // switch: to; merge: from; set_submodule: the branch committed on
     Repos        []ActionRepo  // what happened in each repo
     Error        string        // the refusal the agent got; "" when it went through
@@ -427,6 +441,7 @@ Work item:
 | 2 → 3 integrated | the item's branch head is an ancestor of one of the lead's `lead/<team>/*` heads | Git, checked right after the lead's `merge` or `commit` (which finishes a conflicted merge), the only ways a lead branch takes in work, and on `request_merge`; in every repo that has the branch |
 | 3 → requested | `request_merge` on a branch containing it | Workflow |
 | requested → merged / → 0 | its merge request merged / rejected | Workflow |
+| requested → 3 integrated, or another merge request | its merge request withdrawn: to the superseding merged one in its repo, else to an open one of the lead's whose branch holds it, else free | Workflow |
 
 Merge request:
 
@@ -436,11 +451,12 @@ Merge request:
                                          │ ▲
                request_merge again       │ │  (refreshed: checks rerun; pushed to its PR if any; same request)
                                          │ └──┘
-                                         └── Close (its review) · its PR closed on the forge ▶ rejected
+                                         ├── Dismiss (its review) · its PR closed on the forge ▶ rejected
+                                         └── withdraw_merge · Foreman, when a merged review holds all of its review ▶ withdrawn
 ```
 
 - Create PR on the forge doesn't change the state: the merge request stays `open`, now with a PR to watch.
-- `merged` and `rejected` are final. Entering either delivers to the lead, and resolves its review's request once the review has nothing left open. Entering `merged` sends the "main moved" notice to the leads of every other open merge request on the same repo.
+- `merged`, `rejected` and `withdrawn` are final. Entering `withdrawn` publishes `review.withdrawn`; Foreman's own withdrawal delivers to the lead. Entering `merged` or `rejected` delivers to the lead, and resolves its review's request once the review has nothing left open. Entering `merged` sends the "main moved" notice to the leads of every other open merge request on the same repo.
 - Several merge requests can be open at once: one per (repo, lead branch).
 
 ## Events
@@ -456,6 +472,7 @@ Every state change is published on the in-process event bus; the web server stre
 | `team.action` | an [action](#team-actions), once recorded | Workflow | Activity panel |
 | `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, project Overview, sidebar badges, notifications |
 | `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Worktrees |
+| `review.withdrawn` | the review, its deployment and lead, `by` (`lead` or `foreman`), how many of the CEO's draft comments went with it | Workflow | Reviews, the toast warning of lost drafts |
 | `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
 | `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Overview, Board, Settings |
 
@@ -464,7 +481,7 @@ Every state change is published on the in-process event bus; the web server stre
 - **Identity comes from the token.** `Instance` and `Deployment` in every `ToolCall` and `HookEvent` are set by the agent link from the caller's token; nothing in a payload can claim another identity.
 - **Messages never cross deployments.** Team-tool names resolve within the caller's deployment only.
 - **Only `Output` and `Artifact` cross sandboxes** in a reply; a handoff names a branch, never a path.
-- **Only the lead requests merges**, only from its own `lead/<team>/*` branches, and **only the CEO's action merges or reaches a forge**.
+- **Only the lead requests merges** (and withdraws them), only from its own `lead/<team>/*` branches, and **only the CEO's action merges or reaches a forge**.
 - **Only Foreman writes git.** Agents read it; every commit, merge and branch, in the code repos and the project repo alike, is a team tool run on the host ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)).
 - **Nothing is typed into a session except deliveries**, and only when the recipient is idle (the CEO's own keystrokes excepted).
 - **Every request has exactly one way back**: a tool result, a delivery, a forge event or an instance action (see [Requests](#requests)).

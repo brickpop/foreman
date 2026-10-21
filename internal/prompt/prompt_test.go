@@ -26,7 +26,7 @@ var atlas = home.TeamConfig{
 }
 
 // every team tool, as the finished epic will offer them
-var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate", "request_merge"}
+var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate", "request_merge", "withdraw_merge"}
 
 func input(agent string, tools []string) Input {
 	return Input{
@@ -152,7 +152,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	}
 }
 
-// Today's step: messaging, the git tools and request_merge (the lead's); no escalate yet.
+// Today's step: messaging, the git tools, request_merge and withdraw_merge (the lead's); no escalate yet.
 func TestTodaysTools(t *testing.T) {
 	for _, agent := range []string{"mara", "ilya"} {
 		got := Compose(input(agent, Offered(agent == "mara")))
@@ -179,12 +179,32 @@ func TestTodaysTools(t *testing.T) {
 	}
 	lead := Compose(input("mara", Offered(true)))
 	if !strings.Contains(lead, "request_merge(branch, entry)") || !strings.Contains(lead, "Ask for a merge to main with request_merge(branch, entry)") ||
+		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") ||
 		!strings.Contains(lead, "requests merges") || strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
 		t.Errorf("lead:\n%s", lead)
 	}
 	member := Compose(input("ilya", Offered(false)))
-	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") {
+	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") || strings.Contains(member, "withdraw_merge") {
 		t.Errorf("member:\n%s", member)
+	}
+}
+
+// Worktrees outlive a session: every agent with git tools is told to check
+// where it is and start new work from main; the lead, to name the topic it
+// hands out. Without switch there is nothing to say.
+func TestWorktreesPersist(t *testing.T) {
+	persist := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
+		"New work goes on a new topic: switch(<topic>) makes it from main. Earlier work you resume, or commit to its topic before switching. What you don't want: discard()."
+	handOut := "Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to."
+	lead, member := Compose(input("mara", Offered(true))), Compose(input("ilya", Offered(false)))
+	if !strings.Contains(lead, persist+" "+handOut) {
+		t.Errorf("lead:\n%s", lead)
+	}
+	if !strings.Contains(member, persist+"\n") || strings.Contains(member, handOut) {
+		t.Errorf("member:\n%s", member)
+	}
+	if got := Compose(input("ilya", nil)); strings.Contains(got, "persist between runs") {
+		t.Errorf("without git tools:\n%s", got)
 	}
 }
 

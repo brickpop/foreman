@@ -29,9 +29,9 @@ Every adapter implements the same small set, so kinds are interchangeable. Forem
 | open PR (title, body, head, base = `main`) → URL, number | **Create PR**: the title and body come from the merge request's wiki entry |
 | read PR state | polling, below |
 | read check status | after opening and while polling; shown as "checks pass" on review request panels ([Needs you](../features/project-pipeline.md#1-needs-you)), next to Foreman's own run of the project `checks` |
-| comment, close PR | CEO **Close** on a review whose merge request has a PR: the reason is posted on the PR and the PR is closed (the reason is also delivered to the lead) |
+| comment, close PR | CEO **Dismiss** on a review whose merge request has a PR: the reason is posted on the PR and the PR is closed (the reason is also delivered to the lead) |
 
-For `none` there is no PR and nothing to push: the CEO uses Merge to main, and Close only reaches the lead's session.
+For `none` there is no PR and nothing to push: the CEO uses Merge to main, and Dismiss only reaches the lead's session.
 
 ### PR state
 

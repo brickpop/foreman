@@ -130,6 +130,9 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "request.resolved":
       // A review's request opening or closing is its status changing.
       return [keys.requests, reviewsKey];
+    case "review.withdrawn":
+      // Its request resolves (when it had one), and its hand-offs move.
+      return [keys.requests, reviewsKey, ["pipeline"]];
     case "team.message":
       return [keys.messages, keys.activity];
     case "team.action":

@@ -57,7 +57,7 @@ func testChief(t *testing.T) (*chiefOfStaff, *home.Home, *specs) {
 		t.Fatal(err)
 	}
 	program := filepath.Join(t.TempDir(), "harness.sh")
-	if err := os.WriteFile(program, []byte("#!/bin/sh\necho \"opened: $*\"\ncat\n"), 0o755); err != nil {
+	if err := fake.WriteProgram(program, "echo \"opened: $*\"\ncat"); err != nil {
 		t.Fatal(err)
 	}
 	logins := profiles.Store{Root: t.TempDir()}

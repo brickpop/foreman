@@ -68,7 +68,7 @@ PUT    /api/reviews/:id/comments/:comment     {body}: edits a draft; 204; 409 SE
 DELETE /api/reviews/:id/comments/:comment     deletes a draft; 204; 409 SENT
 POST   /api/reviews/:id/changes               {note}: Request changes: the drafts and the note to the lead in one message; 204; 400 INVALID (neither)
 POST   /api/reviews/:id/merge                 {heads: {<repo>: <commit>}}: merges each repo named, at the commit the CEO read, its full hash (Pipeline and merges → Merge to main); 204; 409 NOT_MERGED says, per repo, why one didn't (a conflict: the lead is told to merge main in; the CEO's checkout in the way; the branch moved since that commit), the others merged; 409 NOT_OPEN
-POST   /api/reviews/:id/close                 {note, dropBranches, stopTeam}: stops the team first when asked (an error closes nothing), closes it unmerged in every repo open, drops its branches (kept under refs/foreman/closed/) when asked, and tells a lead whose team keeps working to stop, with the note if any → {kept: [{repo, branch, why}]}, the branches it couldn't drop (a git error); 400 INVALID to drop the branches of a team left running; 409 NOT_OPEN
+POST   /api/reviews/:id/dismiss               {note, dropBranches, stopTeam}: stops the team first when asked (an error dismisses nothing), ends it unmerged in every repo open, drops its branches (kept under refs/foreman/dismissed/) when asked, and tells a lead whose team keeps working to stop, with the note if any → {kept: [{repo, branch, why}]}, the branches it couldn't drop (a git error); 400 INVALID to drop the branches of a team left running; 409 NOT_OPEN
 POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 
@@ -141,6 +141,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | Type | When | Payload |
 |---|---|---|
 | `request.created` / `request.resolved` | Workflow creates or resolves a request | the request |
+| `review.withdrawn` | the lead, or Foreman, withdrew a review ([Reviews → Withdrawn](../features/reviews.md#withdrawn)) | review, deploymentId, lead, by (`lead` or `foreman`), lostDrafts |
 | `instance.status` | an instance changes status or task | id, status, task |
 | `instance.draft` | messages wait on the CEO's draft in an agent's terminal, each countdown step, and when they stop waiting | id, waiting (0: the notice goes), leftMs, counting, paused |
 | `instance.doing` | an agent's harness reports a step of its work (a hook): its new activity line ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | id, doing (line, at) |

@@ -24,7 +24,8 @@ const (
 	ReviewNeedsYou         = "needs-review"
 	ReviewChangesRequested = "changes-requested" // waiting on the lead
 	ReviewMerged           = "merged"            // nothing open, something merged
-	ReviewClosed           = "closed"            // nothing open, nothing merged
+	ReviewDismissed        = "dismissed"         // nothing open, nothing merged
+	ReviewWithdrawn        = "withdrawn"         // the lead, or Foreman, took it back
 )
 
 var (
@@ -56,23 +57,33 @@ type Comment struct {
 	Outdated            bool `json:"outdated"`
 }
 
-// Close is the CEO's Close of a review: what becomes of its branches and team.
-type Close struct {
+// Dismiss is the CEO's Dismiss of a review: what becomes of its branches and team.
+type Dismiss struct {
 	Note         string `json:"note"` // to the lead, when its team keeps working
 	DropBranches bool   `json:"dropBranches"`
 	StopTeam     bool   `json:"stopTeam"`
 }
 
-// Closed is what a close did not do as asked: the branches it couldn't drop.
-type Closed struct {
+// Dismissed is what a dismissal did not do as asked: the branches it couldn't drop.
+type Dismissed struct {
 	Kept []KeptBranch `json:"kept"`
 }
 
-// KeptBranch is a branch a close kept, and why, for the CEO.
+// KeptBranch is a branch a dismissal kept, and why, for the CEO.
 type KeptBranch struct {
 	Repo   string `json:"repo"`
 	Branch string `json:"branch"`
 	Why    string `json:"why"`
+}
+
+// Withdrawn is a review the lead withdrew, or Foreman did (By "foreman")
+// when the CEO merged another holding all of it: the review.withdrawn event.
+type Withdrawn struct {
+	Review       store.Review `json:"review"`
+	DeploymentID string       `json:"deploymentId"`
+	Lead         string       `json:"lead"`       // the instance whose review it was
+	By           string       `json:"by"`         // lead or foreman
+	LostDrafts   int          `json:"lostDrafts"` // the CEO's draft comments on it, gone with it
 }
 
 // RepoDiff is one repo's change in a review.
@@ -84,7 +95,7 @@ type RepoDiff struct {
 	Diff  string `json:"diff"`
 }
 
-// status is a review's state from its merge requests.
+// status is a review's state from its merge requests, and its withdrawal.
 func status(r store.Review, mrs []store.MergeRequest) string {
 	merged := false
 	for _, mr := range mrs {
@@ -98,10 +109,13 @@ func status(r store.Review, mrs []store.MergeRequest) string {
 			merged = true
 		}
 	}
-	if merged {
+	switch {
+	case !r.WithdrawnAt.IsZero():
+		return ReviewWithdrawn
+	case merged:
 		return ReviewMerged
 	}
-	return ReviewClosed
+	return ReviewDismissed
 }
 
 // ListReviews lists every review, newest first, without their comments.
@@ -151,7 +165,7 @@ func (w *Workflow) view(ctx context.Context, r store.Review) (Review, error) {
 	v := Review{Review: r, Status: status(r, mrs), MergeRequests: mrs, UpdatedAt: r.CreatedAt}
 	for _, mr := range mrs {
 		v.Entry, v.DeploymentID, v.Lead = mr.Entry, mr.DeploymentID, mr.AuthorInstance
-		for _, t := range []time.Time{mr.CreatedAt, mr.MergedAt, mr.RejectedAt, r.ChangesRequestedAt} {
+		for _, t := range []time.Time{mr.CreatedAt, mr.MergedAt, mr.RejectedAt, r.ChangesRequestedAt, r.WithdrawnAt} {
 			if t.After(v.UpdatedAt) {
 				v.UpdatedAt = t
 			}
@@ -269,7 +283,7 @@ func (w *Workflow) ReviewDiff(ctx context.Context, id string, since bool) ([]Rep
 			return nil, err
 		}
 		d := RepoDiff{Repo: mr.Repo, Main: main}
-		// A merged branch has nothing left to show against main; a closed one
+		// A merged branch has nothing left to show against main; a dismissed one
 		// may be gone. Only the open ones have a change to read.
 		if mr.State != store.MergeOpen {
 			out = append(out, d)
@@ -502,35 +516,35 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 	return errors.Join(failed...)
 }
 
-// CloseReview ends the review unmerged, in every repo still open in it: the
+// DismissReview ends the review unmerged, in every repo still open in it: the
 // work isn't wanted (the CEO, 2026-10-21). Its work items leave In flight.
-// With StopTeam its deployment stops first (nothing closes when it can't),
+// With StopTeam its deployment stops first (nothing is dismissed when it can't),
 // and nobody is told; while it keeps running, the lead is told to stop work
 // on it, with the CEO's note. With DropBranches its branches go: the lead
 // branch and the members' branches it carried, each kept under
-// refs/foreman/closed/ (a branch checked out moves to main instead, what its
+// refs/foreman/dismissed/ (a branch checked out moves to main instead, what its
 // worktree held not committed kept too), only while no agent works in them:
 // ErrInvalid when the team runs on. A branch that can't go (a git error)
-// stays, listed in Closed with why.
-func (w *Workflow) CloseReview(ctx context.Context, id string, c Close) (Closed, error) {
+// stays, listed in Dismissed with why.
+func (w *Workflow) DismissReview(ctx context.Context, id string, c Dismiss) (Dismissed, error) {
 	v, err := w.openReview(ctx, id)
 	if err != nil {
-		return Closed{}, err
+		return Dismissed{}, err
 	}
 	running, err := w.Teams.Active(ctx, v.DeploymentID)
 	if err != nil {
-		return Closed{}, err
+		return Dismissed{}, err
 	}
 	if c.DropBranches && running && !c.StopTeam {
-		return Closed{}, fmt.Errorf("%w: stop the team to drop its branches: its agents work in them", ErrInvalid)
+		return Dismissed{}, fmt.Errorf("%w: stop the team to drop its branches: its agents work in them", ErrInvalid)
 	}
 	if running && c.StopTeam {
 		if err := w.Teams.Stop(ctx, v.DeploymentID); err != nil {
-			return Closed{}, fmt.Errorf("stopping the team: %w", err)
+			return Dismissed{}, fmt.Errorf("stopping the team: %w", err)
 		}
 	}
 	note := strings.TrimSpace(c.Note)
-	closed := Closed{Kept: []KeptBranch{}} // [] on the wire, never null
+	dismissed := Dismissed{Kept: []KeptBranch{}} // [] on the wire, never null
 	var lead store.MergeRequest
 	var repos []string
 	for _, mr := range v.MergeRequests {
@@ -544,19 +558,19 @@ func (w *Workflow) CloseReview(ctx context.Context, id string, c Close) (Closed,
 		}
 		for _, branch := range w.branchesOf(ctx, mr) {
 			if err := w.dropBranch(ctx, mr, branch, id); err != nil {
-				closed.Kept = append(closed.Kept, KeptBranch{Repo: mr.Repo, Branch: branch, Why: err.Error()})
+				dismissed.Kept = append(dismissed.Kept, KeptBranch{Repo: mr.Repo, Branch: branch, Why: err.Error()})
 			}
 		}
 	}
-	w.resolveReview(ctx, id, "closed")
+	w.resolveReview(ctx, id, "dismissed")
 	if running && !c.StopTeam {
-		text := fmt.Sprintf("From Foreman: the CEO closed the review of %s without merging (%s). Stop work on it, and don't request it again.", v.Branch, strings.Join(repos, ", "))
+		text := fmt.Sprintf("From Foreman: the CEO dismissed the review of %s without merging (%s). Stop work on it, and don't request it again.", v.Branch, strings.Join(repos, ", "))
 		if note != "" {
 			text += " The CEO's note: " + note
 		}
 		w.tell(ctx, lead, "foreman", text)
 	}
-	return closed, nil
+	return dismissed, nil
 }
 
 // branchesOf are a merge request's branches in its repo: the lead branch,
@@ -576,13 +590,13 @@ func (w *Workflow) branchesOf(ctx context.Context, mr store.MergeRequest) []stri
 	return branches
 }
 
-// dropBranch discards one of a closed review's branches in a merge
-// request's repo, keeping its head under refs/foreman/closed/<time>/<review>/.
+// dropBranch discards one of a dismissed review's branches in a merge
+// request's repo, keeping its head under refs/foreman/dismissed/<time>/<review>/.
 func (w *Workflow) dropBranch(ctx context.Context, mr store.MergeRequest, branch, review string) error {
 	main, dir, err := w.repoOf(mr)
 	if err != nil {
 		return err
 	}
 	defer w.pruneBackups(ctx, dir)
-	return w.Git.DropBranch(ctx, dir, branch, git.BackupRef("closed", w.Now(), review+"/"+branch), main)
+	return w.Git.DropBranch(ctx, dir, branch, git.BackupRef("dismissed", w.Now(), review+"/"+branch), main)
 }

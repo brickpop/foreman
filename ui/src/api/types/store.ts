@@ -103,8 +103,8 @@ export interface TeamMessage {
 }
 /**
  * TeamAction is one git tool an agent called (switch, commit, merge,
- * abort_merge, discard, set_submodule, request_merge) and what it did
- * (wiki/product/architecture/protocol.md#team-actions).
+ * abort_merge, discard, set_submodule, request_merge, withdraw_merge) and
+ * what it did (wiki/product/architecture/protocol.md#team-actions).
  */
 export interface TeamAction {
   id: number /* int64 */;
@@ -158,7 +158,7 @@ export interface MergeRequest {
   repo: string; // one of the project's code repos
   branch: string;
   entry: string; // the wiki card explaining the work
-  state: string; // open, merged or rejected
+  state: string; // open, merged, rejected or withdrawn
   checksStatus: string;
   conflicting: boolean;
   forgePrUrl: string;
@@ -180,6 +180,9 @@ export interface Review {
   branch: string;
   createdAt: string /* RFC 3339 */;
   changesRequestedAt: string /* RFC 3339 */; // zero unless it waits on the lead
+  withdrawnAt: string /* RFC 3339 */; // zero unless the lead or Foreman withdrew it
+  withdrawnReason: string;
+  supersededBy: string; // the review that holds all of it, when one does
 }
 /**
  * ReviewComment is the CEO's comment on a review: on a line of a repo's

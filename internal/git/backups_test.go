@@ -10,7 +10,7 @@ import (
 
 func TestBackupRefCarriesItsTime(t *testing.T) {
 	at := time.Date(2026, 10, 22, 9, 30, 5, 0, time.FixedZone("CEST", 2*3600))
-	if got := BackupRef("closed", at, "rev-3/lead/atlas/x"); got != "refs/foreman/closed/2026-10-22T07-30-05Z/rev-3/lead/atlas/x" {
+	if got := BackupRef("dismissed", at, "rev-3/lead/atlas/x"); got != "refs/foreman/dismissed/2026-10-22T07-30-05Z/rev-3/lead/atlas/x" {
 		t.Errorf("%q", got)
 	}
 	if !ValidBranch(ctx, BackupRef("discarded", at, "tove/api")[len("refs/"):]) {
@@ -22,9 +22,9 @@ func TestBackupRefCarriesItsTime(t *testing.T) {
 func TestPruneBackups(t *testing.T) {
 	g, dir := mergeFixture(t)
 	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
-	old := BackupRef("closed", now.AddDate(0, 0, -31), "rev-1/lead/atlas/x")
+	old := BackupRef("dismissed", now.AddDate(0, 0, -31), "rev-1/lead/atlas/x")
 	recent := BackupRef("discarded", now.AddDate(0, 0, -29), "tove/api")
-	undated := "refs/foreman/closed/rev-0/lead/atlas/x"
+	undated := "refs/foreman/dismissed/rev-0/lead/atlas/x"
 	for _, ref := range []string{old, recent, undated} {
 		mustRun(t, dir, "update-ref", ref, "lead/atlas/x")
 	}

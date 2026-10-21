@@ -50,6 +50,45 @@ describe("noticeFor", () => {
     });
   });
 
+  it("tells a withdrawal, warning of the drafts lost with it", () => {
+    const withdrawn = (by: string, lostDrafts: number) =>
+      noticeFor(
+        {
+          type: "review.withdrawn",
+          data: {
+            review: {
+              id: "rev-3",
+              branch: "lead/atlas/small",
+              withdrawnReason: "all of it is in big",
+            },
+            deploymentId: "atlas@ledger",
+            lead: "mara@ledger",
+            by,
+            lostDrafts,
+          },
+        },
+        [team],
+        instances,
+      );
+    expect(withdrawn("lead", 0)).toEqual({
+      title: "Mara withdrew lead/atlas/small",
+      body: "all of it is in big.",
+      instance: "mara@ledger",
+      deployment: "atlas@ledger",
+      review: "rev-3",
+      color: "var(--tx4)",
+    });
+    expect(withdrawn("foreman", 1)).toMatchObject({
+      title: "Foreman withdrew lead/atlas/small",
+      body: "all of it is in big. Your draft comment on it is lost.",
+      color: "var(--err)",
+    });
+    expect(withdrawn("lead", 3)?.body).toBe(
+      "all of it is in big. Your 3 draft comments on it are lost.",
+    );
+    expect(withdrawn("lead", 3)?.toggle).toBeUndefined();
+  });
+
   it("names Foreman when it raised the request itself", () => {
     const n = noticeFor(request({ kind: "blocked", instanceId: "" }), [team], instances);
     expect(n?.title).toBe("Foreman needs you on ledger");

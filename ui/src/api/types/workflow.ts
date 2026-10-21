@@ -19,7 +19,11 @@ export const ReviewMerged = "merged"; // nothing open, something merged
 /**
  * A review's status, derived from its merge requests.
  */
-export const ReviewClosed = "closed"; // nothing open, nothing merged
+export const ReviewDismissed = "dismissed"; // nothing open, nothing merged
+/**
+ * A review's status, derived from its merge requests.
+ */
+export const ReviewWithdrawn = "withdrawn"; // the lead, or Foreman, took it back
 /**
  * Review is one review as the CEO reads it.
  */
@@ -42,26 +46,37 @@ export interface Comment extends store.ReviewComment {
   outdated: boolean;
 }
 /**
- * Close is the CEO's Close of a review: what becomes of its branches and team.
+ * Dismiss is the CEO's Dismiss of a review: what becomes of its branches and team.
  */
-export interface Close {
+export interface Dismiss {
   note: string; // to the lead, when its team keeps working
   dropBranches: boolean;
   stopTeam: boolean;
 }
 /**
- * Closed is what a close did not do as asked: the branches it couldn't drop.
+ * Dismissed is what a dismissal did not do as asked: the branches it couldn't drop.
  */
-export interface Closed {
+export interface Dismissed {
   kept: KeptBranch[];
 }
 /**
- * KeptBranch is a branch a close kept, and why, for the CEO.
+ * KeptBranch is a branch a dismissal kept, and why, for the CEO.
  */
 export interface KeptBranch {
   repo: string;
   branch: string;
   why: string;
+}
+/**
+ * Withdrawn is a review the lead withdrew, or Foreman did (By "foreman")
+ * when the CEO merged another holding all of it: the review.withdrawn event.
+ */
+export interface Withdrawn {
+  review: store.Review;
+  deploymentId: string;
+  lead: string; // the instance whose review it was
+  by: string; // lead or foreman
+  lostDrafts: number /* int */; // the CEO's draft comments on it, gone with it
 }
 /**
  * RepoDiff is one repo's change in a review.

@@ -249,11 +249,19 @@ func run(args []string, stdout io.Writer) error {
 	}
 	login := profileLogins{store: profileStore, adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog),
 		project: h.Project}
+	// Workflow needs the manager (to stop a closed review's team), and the
+	// manager tells Workflow of each fresh session: set below.
+	var flow *workflow.Workflow
 	manager = instances.New(instances.Deps{
 		Home: h.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: h,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters, Profile: login.Of,
 		OpenLog: openLog, Publish: publish, Agent: agent,
 		Blocked: func() error { return checklist.Blocked() }, Requests: state.Requests(),
+		Started: func(ctx context.Context, inst store.Instance, lead bool) {
+			if flow != nil {
+				flow.Resumed(ctx, inst, lead)
+			}
+		},
 	})
 	// An agent quiet mid-turn for the stuck_after_minutes setting gets a card.
 	go func() {
@@ -287,7 +295,6 @@ func run(args []string, stdout io.Writer) error {
 	manager.ProjectsChanged(ctx)
 	// Messaging and Workflow need each other: a hand-off is a message, and its
 	// delivery moves the hand-off's work item.
-	var flow *workflow.Workflow
 	messenger = messaging.New(messaging.Deps{
 		Messages: state.Messages(), Instances: state.Instances(), Deployments: state.Deployments(),
 		Config: h, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,

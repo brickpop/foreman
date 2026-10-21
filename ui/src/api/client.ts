@@ -37,7 +37,13 @@ import type {
 } from "./types/store";
 import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Node } from "./types/wiki";
-import type { Close, Closed, RepoDiff, Review, Comment as ReviewComment } from "./types/workflow";
+import type {
+  Dismiss,
+  Dismissed,
+  RepoDiff,
+  Review,
+  Comment as ReviewComment,
+} from "./types/workflow";
 
 // Everything the UI asks of the server goes through this interface, grouped
 // in areas that match the backend's blocks. Screens never call fetch or
@@ -52,10 +58,10 @@ export type {
   Board,
   Branches,
   Card,
-  Close,
-  Closed,
   Commit,
   Deployment,
+  Dismiss,
+  Dismissed,
   Doing,
   Draft,
   Entry,
@@ -265,8 +271,8 @@ export interface ReviewsArea {
    * the rest stay open. A repo whose branch moved since isn't merged. */
   merge(review: string, heads: Record<string, string>): Promise<void>;
   /** Ends it unmerged, the reason going to the lead. */
-  /** Closes it as the CEO chose; answers with the branches it couldn't drop. */
-  close(review: string, c: Close): Promise<Closed>;
+  /** Dismisses it as the CEO chose; answers with the branches it couldn't drop. */
+  dismiss(review: string, c: Dismiss): Promise<Dismissed>;
 }
 
 export interface WikiArea {
@@ -506,8 +512,10 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       requestChanges: (review, note) =>
         send("POST", `/api/reviews/${id(review)}/changes`, { note }),
       merge: (review, heads) => send("POST", `/api/reviews/${id(review)}/merge`, { heads }),
-      close: async (review, c) =>
-        (await request("POST", `/api/reviews/${id(review)}/close`, c)).json() as Promise<Closed>,
+      dismiss: async (review, c) =>
+        (
+          await request("POST", `/api/reviews/${id(review)}/dismiss`, c)
+        ).json() as Promise<Dismissed>,
     },
     requests: {
       list: () => getJSON("/api/requests"),

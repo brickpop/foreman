@@ -29,10 +29,10 @@ type Input struct {
 
 // built are the team tools that exist so far (the Messaging and hand-offs
 // epic brings them in steps), in the order the prompt lists them.
-var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "request_merge"}
+var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "request_merge", "withdraw_merge"}
 
 // Offered is the team tools an agent gets: what is built, as its role allows
-// (handoff for members, request_merge for the lead). The team-tool router
+// (handoff for members, request_merge and withdraw_merge for the lead). The team-tool router
 // serves exactly these.
 func Offered(lead bool) []string {
 	var tools []string
@@ -45,9 +45,9 @@ func Offered(lead bool) []string {
 }
 
 // forRole: the lead hands nothing off (it works only on lead branches), and
-// only the lead requests merges.
+// only the lead requests merges, and withdraws them.
 func forRole(tool string, lead bool) bool {
-	return !(tool == "handoff" && lead) && !(tool == "request_merge" && !lead)
+	return !(tool == "handoff" && lead) && !((tool == "request_merge" || tool == "withdraw_merge") && !lead)
 }
 
 // Compose returns the session prompt, as Markdown.
@@ -71,6 +71,9 @@ func Compose(in Input) string {
 	line("Goal: %s", goal(in.Goal, lead))
 	line("Your sandbox: %s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Sandbox)
 	line("Branches: %s", branches(in, lead, has))
+	if has("switch") {
+		line("%s", persisting(lead && len(in.Team.Roster()) > 1, has))
+	}
 	line("Knowledge base: %s/project/wiki (%s)", in.Sandbox, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	if lead && len(in.Team.Roster()) > 1 {
@@ -182,6 +185,21 @@ func branches(in Input, lead bool, has func(string) bool) string {
 	}
 }
 
+// persisting says that worktrees outlive a session: a deployment resumes
+// (wiki/product/architecture/sandboxes-and-git.md#branches), so an agent may
+// start on earlier work, and a lead hands out work on fresh topics.
+func persisting(leadOfTeam bool, has func(string) bool) string {
+	s := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
+		"New work goes on a new topic: switch(<topic>) makes it from main. Earlier work you resume, or commit to its topic before switching."
+	if has("discard") {
+		s += " What you don't want: discard()."
+	}
+	if leadOfTeam {
+		s += " Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to."
+	}
+	return s
+}
+
 func wikiAccess(lead bool, has func(string) bool) string {
 	switch {
 	case lead && has("commit"):
@@ -248,6 +266,14 @@ func tools(in Input, lead bool, has func(string) bool) string {
 			"request_merge(branch, entry)        Ask the CEO to merge one of your lead/"+in.Team.Team+"/* branches into main;",
 			"                                    entry: the wiki card that explains the work. Only you can.",
 			"                                    Call it again on the same branch to refresh it.",
+		)
+	}
+	if has("withdraw_merge") {
+		rows = append(rows,
+			"withdraw_merge(branch, reason,      Take back your open request to merge a branch, before the CEO",
+			"  superseded_by)                    decides it: superseded_by, another of your branches under review",
+			"                                    that holds all of it. When the CEO merges a branch that holds",
+			"                                    all of another under review, Foreman withdraws that one itself.",
 		)
 	}
 	notes := ""

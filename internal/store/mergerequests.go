@@ -9,9 +9,10 @@ import (
 
 // Merge request states (wiki/product/models/merge-request.md).
 const (
-	MergeOpen     = "open"
-	MergeMerged   = "merged"
-	MergeRejected = "rejected"
+	MergeOpen      = "open"
+	MergeMerged    = "merged"
+	MergeRejected  = "rejected"
+	MergeWithdrawn = "withdrawn"
 )
 
 // MergeRequests is the merge_requests table.

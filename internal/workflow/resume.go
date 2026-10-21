@@ -1,0 +1,95 @@
+package workflow
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/brickpop/foreman/internal/store"
+)
+
+// A deployment resumes: its worktrees keep what earlier sessions left
+// (wiki/product/architecture/sandboxes-and-git.md#branches). An agent starting
+// fresh is told what that is, once, so it resumes it or moves on.
+
+// Resumed tells an agent whose session starts fresh what its worktrees hold
+// from before: its branches with work main lacks, the changes it hasn't
+// committed, and for the lead the reviews still open. Nothing when there is
+// nothing.
+func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) {
+	team, projectID, _ := strings.Cut(inst.DeploymentID, "@")
+	project, err := w.Config.Project(projectID)
+	if err != nil {
+		return
+	}
+	prefix := "wt/" + inst.AgentID + "/"
+	if lead {
+		prefix = "lead/" + team + "/"
+	}
+	unmerged := map[string][]string{} // branch → its repos
+	var uncommitted []string
+	for _, r := range project.Repos {
+		dir := filepath.Join(inst.SandboxPath, r.Name)
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
+			continue
+		}
+		main := project.Main(r.Name)
+		branches, err := w.Git.Branches(ctx, dir, prefix)
+		if err != nil {
+			slog.Info("what a worktree holds", "instance", inst.ID, "repo", r.Name, "err", err)
+			continue
+		}
+		for _, b := range branches {
+			if merged, err := w.Git.Merged(ctx, dir, main, b); err == nil && !merged {
+				unmerged[b] = append(unmerged[b], r.Name)
+			}
+		}
+		if clean, err := w.Git.Clean(ctx, dir); err == nil && !clean {
+			on, _ := w.Git.Branch(ctx, dir)
+			uncommitted = append(uncommitted, fmt.Sprintf("%s (on %s)", r.Name, on))
+		}
+	}
+	var open []string
+	if lead {
+		reviews, _ := w.ListReviews(ctx)
+		for _, v := range reviews {
+			switch {
+			case v.DeploymentID != inst.DeploymentID:
+			case v.Status == ReviewNeedsYou:
+				open = append(open, v.Branch+" (waiting for the CEO)")
+			case v.Status == ReviewChangesRequested:
+				open = append(open, v.Branch+" (changes requested: fix them, then request_merge again)")
+			}
+		}
+	}
+	if len(unmerged) == 0 && len(uncommitted) == 0 && len(open) == 0 {
+		return
+	}
+	text := "From Foreman: your worktrees hold earlier work."
+	if len(unmerged) > 0 {
+		var each []string
+		for _, b := range slices.Sorted(maps.Keys(unmerged)) {
+			each = append(each, fmt.Sprintf("%s (%s)", b, strings.Join(unmerged[b], ", ")))
+		}
+		text += " Branches with work main hasn't got: " + strings.Join(each, ", ") + "."
+	}
+	if len(uncommitted) > 0 {
+		text += " Changes not committed in " + strings.Join(uncommitted, ", ") + "."
+	}
+	if len(open) > 0 {
+		text += " Your reviews still open: " + strings.Join(open, ", ") + "."
+	}
+	text += " Resume what is still wanted; new work goes on a new topic, made from main with switch(<topic>)."
+	if len(uncommitted) > 0 {
+		text += " Changes you don't want: discard()."
+	}
+	if _, err := w.Messages.Send(ctx, store.TeamMessage{DeploymentID: inst.DeploymentID, FromInstance: "foreman",
+		ToInstance: inst.ID, Kind: "notice", Body: text}); err != nil {
+		slog.Warn("telling an agent what it left", "instance", inst.ID, "err", err)
+	}
+}

@@ -106,7 +106,9 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 		t.Fatal(err)
 	}
 	program := filepath.Join(t.TempDir(), "harness.sh")
-	write(t, program, "#!/bin/sh\n"+script+"\n", 0o755)
+	if err := fake.WriteProgram(program, script); err != nil {
+		t.Fatal(err)
+	}
 	f := &fixture{t: t, root: root, db: db, hm: hm}
 	logs := sessionlog.Dir{Root: hm.Path("logs")}
 	f.profiles = profiles.Store{Root: t.TempDir()}
@@ -499,10 +501,25 @@ func TestARaisedLimitStartsTheQueued(t *testing.T) {
 // (Claude Code's continues instead: its adapter's tests).
 func TestACrashRestartsOnceThenStops(t *testing.T) {
 	f := newFixture(t, `echo "[$1]" >> "$FOREMAN_PROMPT_FILE.openers"; sleep 0.2; exit 3`, 12)
+	// Workflow hears of a session starting fresh, not of a restart that
+	// continues its conversation.
+	var mu sync.Mutex
+	var started []string
+	f.deps.Started = func(_ context.Context, inst store.Instance, lead bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		started = append(started, fmt.Sprintf("%s lead=%v", inst.ID, lead))
+	}
+	f.m = New(f.deps)
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
 		t.Fatal(err)
 	}
 	inst := f.waitStatus("mara@ledger", Stopped)
+	mu.Lock()
+	if got := strings.Join(started, "; "); got != "mara@ledger lead=true" {
+		t.Errorf("started %q", got)
+	}
+	mu.Unlock()
 	if inst.Restarts != 1 {
 		t.Errorf("restarts %d, want 1", inst.Restarts)
 	}

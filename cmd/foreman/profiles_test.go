@@ -34,7 +34,7 @@ func (loginFile) Connected(dir string) bool {
 func testProfiles(t *testing.T, projects ...home.Project) profileLogins {
 	t.Helper()
 	program := filepath.Join(t.TempDir(), "login.sh")
-	if err := os.WriteFile(program, []byte("#!/bin/sh\ncat\n"), 0o755); err != nil {
+	if err := fake.WriteProgram(program, "cat"); err != nil {
 		t.Fatal(err)
 	}
 	logs := sessionlog.Dir{Root: t.TempDir()}

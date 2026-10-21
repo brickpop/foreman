@@ -74,7 +74,7 @@ Every arrow, in words:
 |---|---|---|
 | Web server | Instance manager | Open a terminal view, type into it, deploy, stop |
 | Web server | Messaging | The CEO's Line; the Activity panel; the countdown on the CEO's draft |
-| Web server | Workflow | Answer a request; a review's comments and decisions (Request changes, Merge, Close; later Create PR); Sync a reserved repo |
+| Web server | Workflow | Answer a request; a review's comments and decisions (Request changes, Merge, Dismiss; later Create PR); Sync a reserved repo |
 | Web server | Home & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
 | Workflow | Messaging | Deliver answers, notices ("PR #128 opened", "main moved") to agents |
@@ -455,7 +455,7 @@ Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pen
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
 Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
 Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Dashboard
-CEO, on a review: Merge ──▶ Workflow ──▶ Git.MergeToMain  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Request changes, Close ──▶ delivered to the lead
+CEO, on a review: Merge ──▶ Workflow ──▶ Git.MergeToMain  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Request changes, Dismiss ──▶ delivered to the lead
 (after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
 ```
 

@@ -61,7 +61,7 @@ func (t tool) handed(ctx context.Context, branch string) {
 		slog.Warn("a hand-off's work item", "deployment", t.c.Deployment.ID, "branch", branch, "err", err)
 		return
 	}
-	// Carried by a merge request that was closed: handed again, it is new
+	// Carried by a merge request that was dismissed: handed again, it is new
 	// work, for the next request_merge to carry.
 	if t.w.free(ctx, item) {
 		item.MergeRequestID = ""

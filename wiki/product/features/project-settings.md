@@ -61,7 +61,7 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 - **"What comes to you"**: grid `84px 1fr`, the kind label (colored, Mono uppercase, no border) and a line:
   - Approval: "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer."
   - Question: "An agent needs information only you have. It keeps working on other things meanwhile."
-  - Review: "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you review it: merge it, request changes, or close it."
+  - Review: "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you review it: merge it, request changes, or dismiss it."
   - Finding: "A challenge team rates something high severity. You decide who fixes it, and when."
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
 - **"Merges"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:

@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Deployment, MergeRequest, Review, ReviewComment, Team } from "../api/client";
 import {
-  closeChoices,
-  closeLabel,
-  closeRequest,
-  closingTeam,
   commentAt,
   diffKey,
+  dismissChoices,
+  dismissLabel,
+  dismissRequest,
   drafts,
   hasSince,
   keptLines,
@@ -17,6 +16,8 @@ import {
   openRepos,
   placeComments,
   reviewGroups,
+  reviewTeam,
+  statusLabel,
 } from "./reviews";
 
 const mr = (repo: string, more: Partial<MergeRequest> = {}) =>
@@ -122,28 +123,29 @@ describe("reviewGroups", () => {
       at("r1", "merged"),
       at("r2", "needs-review"),
       at("r3", "changes-requested"),
-      at("r4", "closed"),
+      at("r4", "dismissed"),
       at("r5", "needs-review"),
-      at("r6", "merged"),
+      at("r6", "withdrawn"),
     ];
-    const g = reviewGroups(all, 2);
+    const g = reviewGroups(all, 3);
     expect(g.needsYou.map((v) => v.id)).toEqual(["r2", "r5"]);
     expect(g.waiting.map((v) => v.id)).toEqual(["r3"]);
-    expect(g.done.map((v) => v.id)).toEqual(["r1", "r4"]);
+    expect(g.done.map((v) => v.id)).toEqual(["r1", "r4", "r6"]);
+    expect(statusLabel("withdrawn")).toBe("Withdrawn");
   });
 });
 
-describe("Close", () => {
+describe("Dismiss", () => {
   const v = { deploymentId: "atlas@ledger" } as Review;
   const teams = [{ id: "atlas", config: { name: "Atlas" } }] as Team[];
   const atlas = [{ id: "atlas@ledger" }] as Deployment[];
-  const running = closeChoices({ name: "Atlas", live: true }, "ledger");
-  const stopped = closeChoices({ name: "Atlas", live: false }, "ledger");
+  const running = dismissChoices({ name: "Atlas", live: true }, "ledger");
+  const stopped = dismissChoices({ name: "Atlas", live: false }, "ledger");
   const shape = (c: (typeof running)[number]) => [c.value, c.stopTeam, c.dropBranches, c.tells];
 
   it("knows the review's team by name, and whether it still runs", () => {
-    expect(closingTeam(v, atlas, teams)).toEqual({ name: "Atlas", live: true });
-    expect(closingTeam(v, [{ id: "atlas@other" } as Deployment], [])).toEqual({
+    expect(reviewTeam(v, atlas, teams)).toEqual({ name: "Atlas", live: true });
+    expect(reviewTeam(v, [{ id: "atlas@other" } as Deployment], [])).toEqual({
       name: "atlas",
       live: false,
     });
@@ -165,16 +167,16 @@ describe("Close", () => {
 
   it("sends the note, and says so, only when someone hears it", () => {
     const [keep, stop] = running;
-    expect(closeRequest(keep, "  not now ")).toEqual({
+    expect(dismissRequest(keep, "  not now ")).toEqual({
       note: "not now",
       dropBranches: false,
       stopTeam: false,
     });
-    expect(closeLabel(keep, "not now")).toBe("Close and send");
-    expect(closeLabel(keep, "  ")).toBe("Close now");
+    expect(dismissLabel(keep, "not now")).toBe("Dismiss and send");
+    expect(dismissLabel(keep, "  ")).toBe("Dismiss now");
     // A note typed, then a choice that stops the team: it goes nowhere.
-    expect(closeRequest(stop, "not now").note).toBe("");
-    expect(closeLabel(stop, "not now")).toBe("Close now");
+    expect(dismissRequest(stop, "not now").note).toBe("");
+    expect(dismissLabel(stop, "not now")).toBe("Dismiss now");
   });
 
   it("warns when a note typed won't reach the lead", () => {

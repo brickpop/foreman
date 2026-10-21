@@ -73,7 +73,7 @@ type Messages interface {
 	Send(ctx context.Context, msg store.TeamMessage) (store.TeamMessage, error)
 }
 
-// Teams are the deployments a closed review's team runs in (the instance
+// Teams are the deployments a dismissed review's team runs in (the instance
 // manager): the CEO may stop it with the close.
 type Teams interface {
 	// Active reports whether the deployment still runs.
@@ -153,6 +153,10 @@ var definitions = []agentlink.Tool{
 	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into main, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Commit first. Call it again on the same branch to refresh it (after merging main in, say).",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"}`, "branch", "entry")},
+	{Name: "withdraw_merge", Description: "Withdraw your open request to merge a lead branch, in every repo, before the CEO decides it: the work is superseded by another of your branches, or no longer wanted. The branch stays. The CEO's draft comments on it are lost.",
+		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>, with a review open"},`+
+			`"reason":{"type":"string","description":"Why, for the CEO"},`+
+			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
 }
 
 // Tools implements teamtools.Block.
@@ -173,6 +177,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		Ref      string   `json:"ref"`
 		URL      string   `json:"url"`
 		Repos    []string `json:"repos"`
+		Reason   string   `json:"reason"`
+		By       string   `json:"superseded_by"`
 		Commits  []struct {
 			Repo    string `json:"repo"`
 			Message string `json:"message"`
@@ -211,10 +217,13 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "request_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Entry))
+	case "withdraw_merge":
+		act.Branch = strings.TrimSpace(a.Branch)
+		res = t.withdrawMerge(ctx, act.Branch, strings.TrimSpace(a.Reason), strings.TrimSpace(a.By))
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
-	// The git tools and request_merge are kept as actions, refusals included (a hand-off and a
+	// The git tools, request_merge and withdraw_merge are kept as actions, refusals included (a hand-off and a
 	// contribution are messages already).
 	if res.Error {
 		act.Error = res.Text

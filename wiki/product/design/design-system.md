@@ -150,7 +150,7 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 | **Secondary** (outline) | Transparent, 1px `--line2`, `--tx2` (or `--tx`), 500 13px, radius 7, padding `6–8px 12–14px` | Cancel, Hire, Deploy a team, Refine with Chief of Staff, the stepper |
 | **Raised** | `--raised`, 1px `--line2`, `--tx` | Open sessions, Sessions |
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
-| **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Close a review. Always behind a confirmation |
+| **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
 | **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Listen on, Theme; and the on/off toggles Split and Messages, which look the same |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |

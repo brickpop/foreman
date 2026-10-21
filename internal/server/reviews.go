@@ -25,9 +25,9 @@ type Reviews interface {
 	// MergeReview: workflow.ErrConflict, ErrLocalChanges or ErrBranchMoved
 	// for each repo that couldn't be merged (the others are).
 	MergeReview(ctx context.Context, id string, heads map[string]string) error
-	// CloseReview: workflow.ErrInvalid when dropping the branches of a team
+	// DismissReview: workflow.ErrInvalid when dropping the branches of a team
 	// left running.
-	CloseReview(ctx context.Context, id string, c workflow.Close) (workflow.Closed, error)
+	DismissReview(ctx context.Context, id string, c workflow.Dismiss) (workflow.Dismissed, error)
 }
 
 func reviewRoutes(mux *http.ServeMux, rv Reviews) {
@@ -82,13 +82,13 @@ func reviewRoutes(mux *http.ServeMux, rv Reviews) {
 		}
 		writeReview(w, nil, rv.MergeReview(r.Context(), r.PathValue("id"), req.Heads))
 	})
-	mux.HandleFunc("POST /api/reviews/{id}/close", func(w http.ResponseWriter, r *http.Request) {
-		var req workflow.Close
+	mux.HandleFunc("POST /api/reviews/{id}/dismiss", func(w http.ResponseWriter, r *http.Request) {
+		var req workflow.Dismiss
 		if !decode(w, r, &req, "expected {note, dropBranches, stopTeam}") {
 			return
 		}
-		closed, err := rv.CloseReview(r.Context(), r.PathValue("id"), req)
-		writeReview(w, closed, err)
+		dismissed, err := rv.DismissReview(r.Context(), r.PathValue("id"), req)
+		writeReview(w, dismissed, err)
 	})
 }
 
@@ -115,7 +115,7 @@ func writeReview(w http.ResponseWriter, v any, err error) {
 	case errors.Is(err, workflow.ErrSent):
 		writeError(w, http.StatusConflict, "SENT", "That comment was sent to the lead already: it stays as they got it")
 	case errors.Is(err, workflow.ErrNotOpen):
-		writeError(w, http.StatusConflict, "NOT_OPEN", "Nothing open to decide there: it was merged or closed already")
+		writeError(w, http.StatusConflict, "NOT_OPEN", "Nothing open to decide there: it was merged, dismissed or withdrawn already")
 	case errors.Is(err, workflow.ErrConflict), errors.Is(err, workflow.ErrLocalChanges), errors.Is(err, workflow.ErrBranchMoved):
 		writeError(w, http.StatusConflict, "NOT_MERGED", notMerged(err))
 	default:

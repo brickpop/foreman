@@ -30,7 +30,7 @@ On deploy ([Agent runtime](./agent-runtime.md#instance-lifecycle)), `Git.Prepare
 **A deployment resumes; new work starts from `main`** (the CEO, 2026-10-22). Stop then Deploy brings the same team back to the same worktrees and branches, with the new goal; branch names are never salted per deployment, as topics already keep pieces of work apart, and `switch(<new topic>)` starts each new one from `main`. So that leftovers never get in the way:
 
 - **Idle desks follow `main`.** A home branch holding nothing `main` lacks (merging it would change nothing), with nothing uncommitted where it is checked out, moves to `main` (`Git.Freshen`): whenever an agent's worktrees are prepared (deploy, wake, restart) and after every merge into `main` ([Pipeline and merges → Merge to main](../features/pipeline-and-merges.md#merge-to-main)). A desk with work stays as it is: the agent resumes it, or commits it to its topic and switches.
-- **Work not wanted goes cleanly.** An agent drops what it didn't commit with `discard()`; the CEO drops a closed review's branches with Close ([Pipeline and merges → Review and merge](../features/pipeline-and-merges.md#review-and-merge)). Either way a copy is kept ([Backups](#backups)).
+- **Work not wanted goes cleanly.** An agent drops what it didn't commit with `discard()`; the CEO drops a dismissed review's branches with Dismiss ([Pipeline and merges → Review and merge](../features/pipeline-and-merges.md#review-and-merge)). Either way a copy is kept ([Backups](#backups)).
 
 Stopping a deployment keeps the worktrees on disk; they are removed (`git worktree remove`) only on an explicit CEO action ([not built](../../backlog/remove-worktrees.md)). **Branches are cleaned up:** once a deployment ends, Foreman deletes each of its agents' `wt/*` branches that is merged into `main` (`Git.Prune`, [not built](../../backlog/after-merge-cleanup.md)); unmerged ones stay. A branch still checked out in a kept worktree can't be deleted, so it goes when that worktree is removed.
 
@@ -40,8 +40,8 @@ What Foreman throws away, it keeps first, as a ref under `refs/foreman/<kind>/<t
 
 | Kind | What | Made by |
 |---|---|---|
-| `closed/<time>/<review>/<branch>` | a dropped branch's head | Close, dropping its branches |
-| `closed/<time>/<review>/<branch>@uncommitted` | what the worktree holding it hadn't committed (a merge not finished included), as a commit on its head | the same |
+| `dismissed/<time>/<review>/<branch>` | a dropped branch's head | Dismiss, dropping its branches (`closed/` before 2026-10-22, until pruned) |
+| `dismissed/<time>/<review>/<branch>@uncommitted` | what the worktree holding it hadn't committed (a merge not finished included), as a commit on its head | the same |
 | `discarded/<time>/<agent>/<repo>` | what the agent hadn't committed, as a commit on its branch's head | `discard()` |
 
 A copy of what wasn't committed is made through an index of its own (`GIT_INDEX_FILE`), so it records every file as it was (conflict markers included) and leaves the worktree's own index alone; files ignored by `.gitignore` aren't in it. A copy is never written over another: two made in the same second fail instead. To restore one: `git restore --source=<ref> -- .` in the worktree, or `git branch <name> <ref>`.

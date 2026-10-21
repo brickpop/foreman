@@ -14,13 +14,12 @@ import {
   useTeams,
 } from "../app/queries";
 import {
-  type CloseChoice,
-  closeChoices,
-  closeLabel,
-  closeRequest,
-  closingTeam,
   commentAt,
+  type DismissChoice,
   diffKey,
+  dismissChoices,
+  dismissLabel,
+  dismissRequest,
   drafts,
   hasSince,
   isOpen,
@@ -31,6 +30,7 @@ import {
   mergeLabel,
   openRepos,
   placeComments,
+  reviewTeam,
   statusLabel,
 } from "../app/reviews";
 import { Avatar } from "../components/Avatar";
@@ -40,7 +40,7 @@ import { Button, Empty, Loading, SectionLabel, Segmented } from "../components/u
 // One review of a lead's branch (wiki/product/features/reviews.md): its files
 // by repo, each file's diff with the CEO's comments on its lines, the general
 // and outdated comments, and the decision: merge the repos ticked, request
-// changes (sending the draft comments), or close it.
+// changes (sending the draft comments), or dismiss it.
 
 /** The comments a screen part changes, and how. */
 type Comments = {
@@ -162,6 +162,25 @@ export function Review() {
             · {statusLabel(v.status)} · {when(v.updatedAt)}
           </span>
         </p>
+        {v.withdrawnReason && (
+          <p className="text-[14px] text-tx3">
+            Withdrawn: {v.withdrawnReason}.
+            {v.supersededBy && (
+              <>
+                {" "}
+                Superseded by{" "}
+                <Link
+                  to="/reviews/$review"
+                  params={{ review: v.supersededBy }}
+                  className="font-mono text-tx2 hover:text-tx"
+                >
+                  {v.supersededBy}
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        )}
         {hasSince(v) && (
           <Segmented
             label="Which change"
@@ -245,8 +264,8 @@ export function Review() {
           mainOf={(repo) => mainOf(project, repo)}
           forge={forgeOf(project)}
           diffs={diff.data}
-          closeAs={closeChoices(
-            closingTeam(v, deployments.data ?? [], teams.data ?? []),
+          dismissAs={dismissChoices(
+            reviewTeam(v, deployments.data ?? [], teams.data ?? []),
             v.projectId,
           )}
           failed={failed}
@@ -509,15 +528,15 @@ function Composer({
 
 /** The decision, at the page's foot: the repos to merge (all ticked at
  * first) at the heads the diffs show, Request changes with the draft, or
- * Close: the work isn't wanted, and the CEO picks what becomes of its team
- * and branches (closeAs, the first the default). */
+ * Dismiss: the work isn't wanted, and the CEO picks what becomes of its team
+ * and branches (dismissAs, the first the default). */
 function DecisionBar({
   review: v,
   lead,
   mainOf,
   forge,
   diffs,
-  closeAs,
+  dismissAs,
   failed,
 }: {
   review: ReviewData;
@@ -525,17 +544,17 @@ function DecisionBar({
   mainOf: (repo: string) => string;
   forge: string;
   diffs: RepoDiff[] | undefined;
-  closeAs: CloseChoice[];
+  dismissAs: DismissChoice[];
   failed: (e: Error) => void;
 }) {
   const toast = useToast();
   const queries = useQueryClient();
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
-  const [form, setForm] = useState<"" | "changes" | "close">("");
+  const [form, setForm] = useState<"" | "changes" | "dismiss">("");
   const [text, setText] = useState("");
-  const [chosen, choose] = useState<CloseChoice["value"]>("keep");
+  const [chosen, choose] = useState<DismissChoice["value"]>("keep");
   // The team may stop meanwhile, taking its choices along: back to the default.
-  const closing = closeAs.find((c) => c.value === chosen) ?? closeAs[0];
+  const dismissing = dismissAs.find((c) => c.value === chosen) ?? dismissAs[0];
   const done = () => {
     setForm("");
     setText("");
@@ -549,11 +568,11 @@ function DecisionBar({
     (c, note: string) => c.reviews.requestChanges(v.id, note),
     failed,
   );
-  const close = useReviewChange(
-    (c, choice: CloseChoice) => c.reviews.close(v.id, closeRequest(choice, text)),
+  const dismiss = useReviewChange(
+    (c, choice: DismissChoice) => c.reviews.dismiss(v.id, dismissRequest(choice, text)),
     failed,
   );
-  const busy = merge.isPending || changes.isPending || close.isPending;
+  const busy = merge.isPending || changes.isPending || dismiss.isPending;
   const repos = openRepos(v, mainOf);
   const ticked = repos.filter((r) => !unticked.has(r.repo));
   const heads = mergeHeads(
@@ -593,9 +612,9 @@ function DecisionBar({
         <Button
           variant="danger"
           disabled={busy}
-          onClick={() => setForm(form === "close" ? "" : "close")}
+          onClick={() => setForm(form === "dismiss" ? "" : "dismiss")}
         >
-          Close
+          Dismiss
         </Button>
         <Button disabled={busy} onClick={() => setForm(form === "changes" ? "" : "changes")}>
           Request changes{draft > 0 && ` (${draft})`}
@@ -625,35 +644,35 @@ function DecisionBar({
             e.preventDefault();
             if (form === "changes") changes.mutate(text.trim(), { onSuccess: done });
             else
-              close.mutate(closing, {
-                onSuccess: (closed) => {
+              dismiss.mutate(dismissing, {
+                onSuccess: (dismissed) => {
                   done();
-                  if (closing.stopTeam) {
+                  if (dismissing.stopTeam) {
                     queries.invalidateQueries({ queryKey: keys.instances });
                     queries.invalidateQueries({ queryKey: keys.deployments });
                   }
-                  if (closing.dropBranches) queries.invalidateQueries({ queryKey: keys.repos });
-                  if (closed.kept.length > 0)
+                  if (dismissing.dropBranches) queries.invalidateQueries({ queryKey: keys.repos });
+                  if (dismissed.kept.length > 0)
                     toast({
-                      title: "Closed, but some branches stay",
-                      body: keptLines(closed),
+                      title: "Dismissed, but some branches stay",
+                      body: keptLines(dismissed),
                       color: "var(--err)",
                     });
                 },
               });
           }}
         >
-          {form === "close" && (
+          {form === "dismiss" && (
             <fieldset className="flex flex-col gap-1 text-[13.5px] text-tx2">
               <legend className="mb-1 text-[12.5px] font-medium text-tx4">
                 What becomes of it
               </legend>
-              {closeAs.map((c) => (
+              {dismissAs.map((c) => (
                 <label key={c.value} className="flex items-center gap-2">
                   <input
                     type="radio"
-                    name="close"
-                    checked={closing.value === c.value}
+                    name="dismiss"
+                    checked={dismissing.value === c.value}
                     onChange={() => choose(c.value)}
                   />
                   {c.label}
@@ -662,7 +681,7 @@ function DecisionBar({
             </fieldset>
           )}
           {/* A note typed stays in view when the choice won't send it, with why. */}
-          {(form === "changes" || closing.tells || text.trim() !== "") && (
+          {(form === "changes" || dismissing.tells || text.trim() !== "") && (
             <textarea
               rows={3}
               value={text}
@@ -676,19 +695,19 @@ function DecisionBar({
               className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
             />
           )}
-          {form === "close" && lostNote(closing, text, lead) && (
+          {form === "dismiss" && lostNote(dismissing, text, lead) && (
             <p role="alert" className="text-[13px] text-err">
-              {lostNote(closing, text, lead)}
+              {lostNote(dismissing, text, lead)}
             </p>
           )}
           <span className="flex justify-end gap-2">
             <Button onClick={done}>Cancel</Button>
             <Button
               type="submit"
-              variant={form === "close" ? "danger" : "primary"}
+              variant={form === "dismiss" ? "danger" : "primary"}
               disabled={busy || (form === "changes" && draft === 0 && !text.trim())}
             >
-              {form === "changes" ? `Send to ${lead}` : closeLabel(closing, text)}
+              {form === "changes" ? `Send to ${lead}` : dismissLabel(dismissing, text)}
             </Button>
           </span>
         </form>

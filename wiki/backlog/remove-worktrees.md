@@ -13,6 +13,6 @@ epic: git
 ## What it does
 
 - On a stopped deployment (Team page), **Remove worktrees**: each of its agents' worktrees goes (`git worktree remove`), its changes not committed first saved as a commit under `refs/foreman/` like `discard()` does, so nothing is lost.
-- Its branches stay; the next deploy makes fresh worktrees on the home branches ([Resume, clean desks, discard and backups](./resume-and-clean-desks.md)).
+- Its branches stay; the next deploy makes fresh worktrees on the home branches ([Resume, clean desks, discard and backups](./archive/resume-and-clean-desks.md)).
 
 **Done when:** the action is on the Team page, refused while the deployment runs, and tested: worktrees gone, changes recoverable, branches kept, a redeploy recreates the worktrees.

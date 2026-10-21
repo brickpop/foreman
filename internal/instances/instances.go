@@ -93,6 +93,10 @@ type Deps struct {
 	Recheck time.Duration
 	// Requests is where a stuck agent's card goes (CheckStuck); nil: none.
 	Requests store.Requests
+	// Started is told of each session that starts fresh (not continuing its
+	// conversation), once its process runs: Workflow tells the agent what its
+	// worktrees hold from before. nil: nobody.
+	Started func(ctx context.Context, inst store.Instance, lead bool)
 }
 
 // AgentLink is foreman-agent as the instances get it: mounted into each
@@ -802,11 +806,16 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err != nil {
 		return nil, err
 	}
-	return m.Runner.Start(ctx, runner.Spec{
+	proc, err := m.Runner.Start(ctx, runner.Spec{
 		Name: m.processName(id), Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: l.Env,
 		Mounts: append(mounts, l.Mounts...),
 		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, HomeLabel: m.Home},
 	})
+	// A session continuing its conversation knows already.
+	if err == nil && !session.Continue && m.Started != nil {
+		m.Started(ctx, inst, lead)
+	}
+	return proc, err
 }
 
 // HomeLabel names the Foreman home a process belongs to. Every Foreman on a

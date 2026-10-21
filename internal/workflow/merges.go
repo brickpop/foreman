@@ -23,7 +23,7 @@ import (
 
 var (
 	// ErrNotOpen means the review has no open merge request left (they were
-	// merged or closed already), or none in the repos named.
+	// merged, dismissed or withdrawn already), or none in the repos named.
 	ErrNotOpen = errors.New("workflow: nothing open to decide")
 	// ErrConflict means the branch doesn't merge cleanly into main: the
 	// merge request is marked so and the lead told to merge main in.
@@ -93,7 +93,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 			return teamtools.Refusal("internal", "%v", err)
 		}
 		t.w.announce(mr)
-		t.carry(ctx, r.dir, mr)
+		t.w.carry(ctx, r.dir, mr)
 		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, MergeRequest: mr.ID})
 		what := r.name + " (" + mr.ID + ")"
 		if refreshed {
@@ -118,22 +118,22 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 	return agentlink.Result{Text: fmt.Sprintf("Review %s, %s: waiting for the CEO.", reviewID, strings.Join(made, ", "))}
 }
 
-// carry gives the merge request the integrated work items its branch
-// contains that have none yet, or only a closed one (the lead asked again
-// on a branch the CEO closed but kept).
-func (t tool) carry(ctx context.Context, dir string, mr store.MergeRequest) {
-	items, err := t.w.WorkItems.ForDeployment(ctx, t.c.Deployment.ID)
+// carry gives the merge request the integrated work items of its deployment
+// its branch contains that have none yet, or only a dismissed one (the lead
+// asked again on a branch the CEO dismissed but kept).
+func (w *Workflow) carry(ctx context.Context, dir string, mr store.MergeRequest) {
+	items, err := w.WorkItems.ForDeployment(ctx, mr.DeploymentID)
 	if err != nil {
-		slog.Warn("work items", "deployment", t.c.Deployment.ID, "err", err)
+		slog.Warn("work items", "deployment", mr.DeploymentID, "err", err)
 		return
 	}
 	for _, item := range items {
-		if item.Stage != store.StageIntegrated || !t.w.free(ctx, item) || !t.w.Git.HasBranch(ctx, dir, item.Branch) {
+		if item.Stage != store.StageIntegrated || !w.free(ctx, item) || !w.Git.HasBranch(ctx, dir, item.Branch) {
 			continue
 		}
-		if in, err := t.w.Git.Contains(ctx, dir, mr.Branch, item.Branch); err == nil && in {
+		if in, err := w.Git.Contains(ctx, dir, mr.Branch, item.Branch); err == nil && in {
 			item.MergeRequestID = mr.ID
-			t.w.save(ctx, item)
+			w.save(ctx, item)
 		}
 	}
 }
@@ -165,13 +165,13 @@ func (w *Workflow) mergeToMain(ctx context.Context, mr store.MergeRequest, head 
 }
 
 // free says whether a work item is carried by no merge request, or only by
-// a closed one.
+// a dismissed or withdrawn one.
 func (w *Workflow) free(ctx context.Context, item store.WorkItem) bool {
 	if item.MergeRequestID == "" {
 		return true
 	}
 	mr, err := w.MergeRequests.Get(ctx, item.MergeRequestID)
-	return err == nil && mr.State == store.MergeRejected
+	return err == nil && (mr.State == store.MergeRejected || mr.State == store.MergeWithdrawn)
 }
 
 // reject ends one merge request unmerged. Its work items stay carried by
@@ -192,6 +192,10 @@ func (w *Workflow) Reconcile(ctx context.Context) {
 		return
 	}
 	for _, mr := range open {
+		// An earlier one's merge may have withdrawn it since the list was read.
+		if now, err := w.MergeRequests.Get(ctx, mr.ID); err != nil || now.State != store.MergeOpen {
+			continue
+		}
 		main, dir, err := w.repoOf(mr)
 		if err != nil {
 			continue
@@ -205,7 +209,8 @@ func (w *Workflow) Reconcile(ctx context.Context) {
 	}
 }
 
-// merged ends a merge request as merged, tells its lead, and tells the
+// merged ends a merge request as merged, tells its lead, withdraws the
+// lead's other reviews main now holds all of (supersede), and tells the
 // leads of the other open ones on the same repo that main moved. Its review
 // request is resolved once nothing in the review is left open. The branch,
 // still at head (the commit merged), moves to the new main: a squash left
@@ -223,6 +228,7 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main, dir,
 	}
 	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: %s was merged into %s in %s, as one commit. %s", mr.Branch, main, mr.Repo, next))
 	w.freshenDesks(ctx, dir, main)
+	w.supersede(ctx, mr)
 	open, err := w.MergeRequests.Open(ctx)
 	if err != nil {
 		return

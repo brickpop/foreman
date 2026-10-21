@@ -1,11 +1,12 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { isNotBuilt, type Request, type Team } from "../api/client";
+import { isNotBuilt, type Project, type Request, type Team } from "../api/client";
 import {
   agentOf,
   checksSentence,
   dashboardSubtitle,
   dashboardTitle,
   forgeOf,
+  mainOf,
   ordered,
   projectRows,
 } from "../app/model";
@@ -96,8 +97,8 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
   const answer = useAnswer();
   const projects = useProjects();
   const agent = agentOf(teams, r.instanceId);
-  const main = projects.data?.find((p) => p.id === r.projectId)?.config.main ?? "main";
-  const reviewText = useReviewText(r, main, agent?.soul.name);
+  const project = projects.data?.find((p) => p.id === r.projectId);
+  const reviewText = useReviewText(r, project, agent?.soul.name);
   // A review is decided right here (dashboard.md#request-list): its merge request
   // carries the change to look at.
   const mr = useMergeRequest(r.kind === "review" ? r.mergeRequestId : "");
@@ -106,12 +107,11 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
   const openSession = () =>
     navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
   if (r.kind === "review" && mr.data) {
-    const project = projects.data?.find((p) => p.id === r.projectId);
     return (
       <ReviewPanel
         request={r}
         mr={mr.data}
-        main={main}
+        main={mainOf(project, mr.data.repo)}
         forge={forgeOf(project)}
         who={agent && { name: agent.soul.name, look: agent.soul.look }}
         context={context}
@@ -143,11 +143,15 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
 }
 
 /** A review's sentence: `<Lead> wants <entry title> merged into <main> in <repo>. Checks pass.` */
-function useReviewText(r: Request, main: string, lead?: string): string | undefined {
+function useReviewText(
+  r: Request,
+  project: Project | undefined,
+  lead?: string,
+): string | undefined {
   const pipeline = usePipeline(r.kind === "review" ? r.projectId : "");
   const mr = pipeline.data?.mergeRequests.find((m) => m.id === r.mergeRequestId);
   const title = useEntryTitle(r.projectId, mr?.entry ?? "");
   if (r.kind !== "review" || !mr) return undefined;
   const what = title.data ?? mr.entry;
-  return `${lead ?? "The lead"} wants ${what} merged into ${main} in ${mr.repo}.${checksSentence(mr.checksStatus)}`;
+  return `${lead ?? "The lead"} wants ${what} merged into ${mainOf(project, mr.repo)} in ${mr.repo}.${checksSentence(mr.checksStatus)}`;
 }

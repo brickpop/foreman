@@ -20,6 +20,14 @@ export interface FolderEntry {
   path: string;
   repo: boolean; // a git repo's top folder (its own .git folder): one that can be added
 }
+/**
+ * Branches are a repo's branches before it is added, to pick its main branch
+ * when it has no main.
+ */
+export interface Branches {
+  branches: string[]; // by name
+  current: string; // its checkout's; "" when detached
+}
 
 //////////
 // source: config.go
@@ -29,7 +37,6 @@ export interface FolderEntry {
  */
 export interface ProjectConfig {
   description: string;
-  main: string;
   checks: string;
   mergeToMain: string;
   alwaysAskCeo: string[];
@@ -156,6 +163,7 @@ export interface Project {
 export interface Repo {
   name: string; // unique in the project
   path: string; // absolute
+  main: string; // the branch agents start from and merges go to
   problem: string; // why agents can't use it (missing, …); "" when they can
 }
 /**

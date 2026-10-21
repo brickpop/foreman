@@ -36,11 +36,11 @@ func TestProjectExampleParsesWithDefaults(t *testing.T) {
 	if len(p) > 0 {
 		t.Fatalf("problems: %v", p)
 	}
-	if c.Main != "main" || c.MergeToMain != "ceo" || c.Forge.Kind != "forgejo" || len(c.AlwaysAskCEO) != 1 {
+	if c.MergeToMain != "ceo" || c.Forge.Kind != "forgejo" || len(c.AlwaysAskCEO) != 1 {
 		t.Errorf("parsed %+v", c)
 	}
 	minimal, p := ParseProject(nil)
-	if len(p) > 0 || minimal.Forge.Kind != "none" || minimal.Main != "main" {
+	if len(p) > 0 || minimal.Forge.Kind != "none" {
 		t.Errorf("minimal: %+v %v", minimal, p)
 	}
 }
@@ -54,6 +54,7 @@ func TestProjectProblems(t *testing.T) {
 		"its repos, the record's": {`repos = ["api"]`, "repos: not a field Foreman knows"},
 		"merge by agents":         {"merge_to_main = \"lead\"", "merge_to_main"},
 		"unknown field":           {"wiki = \"docs\"", "wiki: not a field Foreman knows"},
+		"main, now per repo":      {"main = \"main\"", "main: each code repo has its own main branch now"},
 		"syntax error":            {`checks = `, "line 1"},
 		"multi-line describe":     {"description = \"\"\"a\nb\"\"\"", "one line"},
 	} {
@@ -228,5 +229,14 @@ func TestRosterPutsTheLeadFirstThenTheFileOrder(t *testing.T) {
 	}
 	if got := c.Roster(); !reflect.DeepEqual(got, []string{"mara", "tove", "ivo", "ada"}) {
 		t.Errorf("roster %v", got)
+	}
+}
+
+// A project.toml from before each repo had its own main says only what
+// replaced the line, not also that it is unknown.
+func TestAnOldMainLineSaysWhatReplacedIt(t *testing.T) {
+	_, p := ParseProject([]byte("main = \"main\"\nmerge_to_main = \"ceo\"\n"))
+	if len(p) != 1 || !strings.Contains(p[0], "Project settings → Code repos") {
+		t.Errorf("problems %v", p)
 	}
 }

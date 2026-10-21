@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
-import { forgeOf, linkLine } from "../../app/model";
+import { forgeOf, linkLine, mainOf } from "../../app/model";
 import { columnLabel, laneLabel, moveOf } from "./Board";
 import { sourceLabel } from "./Pipeline";
 
@@ -83,5 +83,22 @@ describe("forgeOf", () => {
     expect(forgeOf(project("github"))).toBe("github");
     expect(forgeOf(project("none"))).toBe("none");
     expect(forgeOf(undefined)).toBe("none");
+  });
+});
+
+describe("mainOf", () => {
+  const project = {
+    repos: [
+      { name: "api", path: "/h/api", main: "main", problem: "" },
+      { name: "poc", path: "/h/poc", main: "master", problem: "" },
+    ],
+  } as unknown as Project;
+  it("is the repo's own main branch", () => {
+    expect(mainOf(project, "poc")).toBe("master");
+    expect(mainOf(project, "api")).toBe("main");
+  });
+  it("is main for a repo it doesn't have, or before the project loads", () => {
+    expect(mainOf(project, "gone")).toBe("main");
+    expect(mainOf(undefined, "poc")).toBe("main");
   });
 });

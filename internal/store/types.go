@@ -36,6 +36,9 @@ type Instance struct {
 	HarnessSessionID string    `json:"-"` // for the harness's own resume
 	StartedAt        time.Time `json:"startedAt"`
 	Restarts         int       `json:"restarts"`
+	// StopReason is why Foreman stopped it on its own (a start that failed, a
+	// crash loop); "" otherwise, cleared on each start.
+	StopReason string `json:"stopReason"`
 	// Doing is what its harness last reported doing in this run, nil until
 	// it says: kept by the instance manager in memory, never stored.
 	Doing *Doing `json:"doing"`

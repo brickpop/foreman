@@ -5,6 +5,7 @@ import { type Project, useClient } from "../../api/client";
 import { agentOf, forgeLabel, harnessLabel, onOtherProfile, when } from "../../app/model";
 import {
   keys,
+  useBranches,
   useDeployments,
   useHomeFolder,
   useInstances,
@@ -312,6 +313,37 @@ function ProfileChoice({ project }: { project: Project }) {
 /** The project's code repos, wherever they are on disk, each with what keeps
  * agents from using it; added, created, located, renamed and removed here.
  * Renaming and removing wait until no team is deployed on the project. */
+/** A repo's main branch, which its agents start from and its merges go to:
+ * any of its branches. One it no longer has (renamed, or from before each repo
+ * had its own) is flagged, since agents can't start without it. */
+function RepoMain({
+  repo,
+  onPick,
+}: {
+  repo: Project["repos"][number];
+  onPick: (main: string) => void;
+}) {
+  const branches = useBranches(repo.path);
+  const list = branches.data?.branches ?? [];
+  return (
+    <span className="flex flex-wrap items-center gap-2 text-[13px] text-tx3">
+      Main branch
+      <Select
+        label={`Main branch of ${repo.name}`}
+        value={repo.main}
+        mono
+        options={list.map((b) => ({ value: b, label: b }))}
+        onChange={(b) => b !== repo.main && onPick(b)}
+      />
+      {branches.data && !list.includes(repo.main) && (
+        <span className="text-err">
+          {repo.name} has no branch {repo.main}: pick its main branch, or agents can't start.
+        </span>
+      )}
+    </span>
+  );
+}
+
 function CodeRepos({ project }: { project: Project }) {
   const client = useClient();
   const queries = useQueryClient();
@@ -396,6 +428,14 @@ function CodeRepos({ project }: { project: Project }) {
                 </span>
               )}
               {r.problem && <span className="text-[13px] text-err">{r.problem}</span>}
+              {!r.problem && (
+                <RepoMain
+                  repo={r}
+                  onPick={(main) =>
+                    change.mutate(() => client.home.setRepoMain(project.id, r.name, main))
+                  }
+                />
+              )}
             </li>
           ))}
         </ul>

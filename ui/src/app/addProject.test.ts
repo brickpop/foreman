@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createdBody, inside, repoName } from "./addProject";
+import { createdBody, inside, mainToSend, repoName } from "./addProject";
 
 describe("repoName", () => {
   it("is the folder's own name", () => {
@@ -42,5 +42,24 @@ describe("createdBody", () => {
   it("tells a clone from a new repo", () => {
     expect(createdBody(true, true, path)).toBe(`Cloned its project repo into ${path}.`);
     expect(createdBody(true, false, path)).toContain("with project.toml and a starter wiki");
+  });
+});
+
+describe("mainToSend", () => {
+  const poc = { branches: ["feature", "master"], current: "feature" };
+  it("sends nothing for a repo with a main: the server takes it", () => {
+    expect(mainToSend({ branches: ["main", "master"], current: "master" })).toBeUndefined();
+    expect(mainToSend({ branches: ["main"], current: "main" }, "main")).toBeUndefined();
+  });
+  it("sends nothing until the branches have loaded", () => {
+    expect(mainToSend(undefined, "master")).toBeUndefined();
+  });
+  it("defaults to the checkout's branch, else the first", () => {
+    expect(mainToSend(poc)).toBe("feature");
+    expect(mainToSend({ branches: ["dev", "master"], current: "" })).toBe("dev");
+  });
+  it("takes the CEO's pick, but only one the repo has", () => {
+    expect(mainToSend(poc, "master")).toBe("master");
+    expect(mainToSend(poc, "gone")).toBe("feature");
   });
 });

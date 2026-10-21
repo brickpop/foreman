@@ -152,7 +152,7 @@ func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 	}
 	h.reload()
 	p, _ = h.Project("ledger")
-	if p.Version != "" || p.Config.Main != "main" || !hasProblem(p.Problems, "project.toml: not found in "+p.Path) {
+	if p.Version != "" || !hasProblem(p.Problems, "project.toml: not found in "+p.Path) {
 		t.Errorf("without project.toml: %+v", p)
 	}
 }
@@ -338,7 +338,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 	expect(Change{Kind: "projects"})
 	writeFile(t, filepath.Join(relay.Path, "project.toml"), "checks = \"go test\"")
 	expect(Change{Kind: "project", ID: "relay"})
-	if _, err := h.AddRepo(ctx, "relay", "api", codeRepo(t, "dev/api")); err != nil {
+	if _, err := h.AddRepo(ctx, "relay", "api", codeRepo(t, "dev/api"), ""); err != nil {
 		t.Fatal(err)
 	}
 	expect(Change{Kind: "projects"})

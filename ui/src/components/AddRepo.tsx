@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { type Project, useClient } from "../api/client";
-import { inside, repoName } from "../app/addProject";
-import { keys } from "../app/queries";
+import { inside, mainToSend, repoName } from "../app/addProject";
+import { keys, useBranches } from "../app/queries";
 import { RepoPicker } from "./RepoPicker";
+import { Select } from "./Select";
 import { Button, Segmented } from "./ui";
 
 // Adds a code repo to a project (wiki/product/features/add-project.md#picking-repos):
@@ -23,18 +24,26 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
   const [picked, setPicked] = useState<string>();
   // undefined follows the picked folder's name until the CEO edits it.
   const [name, setName] = useState<string>();
+  // An existing repo without a main: the branch the CEO picks as its main.
+  const [chosen, setChosen] = useState<string>();
+  const branches = useBranches(mode === "existing" ? picked : undefined);
+  const main = mainToSend(branches.data, chosen);
   const value = name ?? (mode === "existing" && picked ? repoName(picked) : "");
   const path =
     mode === "existing" ? picked : picked && value.trim() && inside(picked, value.trim());
+  const reset = () => {
+    setPicked(undefined);
+    setName(undefined);
+    setChosen(undefined);
+  };
   const add = useMutation({
     mutationFn: () =>
       mode === "existing"
-        ? client.home.addRepo(project, value.trim(), path ?? "")
+        ? client.home.addRepo(project, value.trim(), path ?? "", main)
         : client.home.newRepo(project, value.trim(), path ?? ""),
     onSuccess: (p) => {
       queries.invalidateQueries({ queryKey: keys.projects });
-      setPicked(undefined);
-      setName(undefined);
+      reset();
       onAdded(p);
     },
   });
@@ -45,8 +54,7 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
         value={mode}
         onChange={(m) => {
           setMode(m);
-          setPicked(undefined);
-          setName(undefined);
+          reset();
           add.reset();
         }}
         options={[
@@ -59,7 +67,7 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
           <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-tx2" title={picked}>
             {mode === "new" ? `in ${picked}` : picked}
           </span>
-          <Button variant="small" onClick={() => setPicked(undefined)}>
+          <Button variant="small" onClick={reset}>
             Change
           </Button>
         </div>
@@ -80,11 +88,29 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
             : `Creates ${path || "<folder>/<name>"} with a README in a first commit, on main.`}
         </span>
       </label>
-      {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}
+      {main !== undefined && branches.data && (
+        <div className="flex flex-col gap-1.5">
+          <span className={label}>Main branch</span>
+          <Select
+            label="Main branch"
+            value={main}
+            mono
+            onChange={setChosen}
+            options={branches.data.branches.map((b) => ({ value: b, label: b }))}
+          />
+          <span className={hint}>
+            This repo has no main branch. Pick its default: agents start their branches from it, and
+            merges go to it. You can change it later in Project settings.
+          </span>
+        </div>
+      )}
+      {(add.error ?? branches.error) && (
+        <p className="m-0 text-[13px] text-err">{(add.error ?? branches.error)?.message}</p>
+      )}
       <div className="flex justify-end">
         <Button
           variant="primary"
-          disabled={!path || !value.trim() || add.isPending}
+          disabled={!path || !value.trim() || add.isPending || branches.isLoading}
           onClick={() => add.mutate()}
         >
           {mode === "existing" ? "Add repo" : "Create repo"}

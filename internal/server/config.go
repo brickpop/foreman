@@ -33,9 +33,10 @@ type Config interface {
 	// and its history, its project repo only if deleteRepo.
 	NewProject(ctx context.Context, name, clone string) (p home.Project, created bool, err error)
 	RemoveProject(ctx context.Context, id string, deleteRepo bool) error
-	// AddRepo adds an existing repo, by its folder; NewRepo creates an empty
-	// one at a new folder and adds it.
-	AddRepo(ctx context.Context, project, name, path string) (home.Project, error)
+	// AddRepo adds an existing repo, by its folder, with main as its main
+	// branch ("": main, which it must have); NewRepo creates an empty one at
+	// a new folder, on main, and adds it.
+	AddRepo(ctx context.Context, project, name, path, main string) (home.Project, error)
 	NewRepo(ctx context.Context, project, name, path string) (home.Project, error)
 	// LocateRepo points a missing repo at its new folder; RemoveRepo takes a
 	// repo out of the project (refused while a team is deployed on it).
@@ -44,9 +45,13 @@ type Config interface {
 	// RenameRepo renames a repo, its agents' worktrees with it (refused while
 	// a team is deployed on the project).
 	RenameRepo(ctx context.Context, project, name, newName string) (home.Project, error)
+	// SetRepoMain sets a repo's main branch, one it has.
+	SetRepoMain(ctx context.Context, project, name, main string) (home.Project, error)
 	// Browse lists a folder for picking repos, inside the folder they are
 	// added from ("" is that folder).
 	Browse(path string) (home.Folder, error)
+	// RepoBranches lists a folder's branches, to pick a repo's main branch.
+	RepoBranches(ctx context.Context, path string) (home.Branches, error)
 	// SetProfile names the profile the project's agents run on.
 	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
@@ -111,17 +116,35 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		var req struct {
 			Name string `json:"name"`
 			Path string `json:"path"`
+			Main string `json:"main"`
 			New  bool   `json:"new"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, new?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, main?, new?}")
 			return
 		}
-		add := c.AddRepo
+		var p home.Project
+		var err error
 		if req.New {
-			add = c.NewRepo
+			p, err = c.NewRepo(r.Context(), r.PathValue("id"), req.Name, req.Path)
+		} else {
+			p, err = c.AddRepo(r.Context(), r.PathValue("id"), req.Name, req.Path, req.Main)
 		}
-		p, err := add(r.Context(), r.PathValue("id"), req.Name, req.Path)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("GET /api/folders/branches", func(w http.ResponseWriter, r *http.Request) {
+		b, err := c.RepoBranches(r.Context(), r.URL.Query().Get("path"))
+		writeProject(w, b, err)
+	})
+	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}/main", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Main string `json:"main"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {main}")
+			return
+		}
+		p, err := c.SetRepoMain(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Main)
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {

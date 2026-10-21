@@ -1,6 +1,7 @@
 package home
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,4 +64,29 @@ func (h *Home) Browse(path string) (Folder, error) {
 	}
 	sort.Slice(f.Entries, func(i, j int) bool { return strings.ToLower(f.Entries[i].Name) < strings.ToLower(f.Entries[j].Name) })
 	return f, nil
+}
+
+// Branches are a repo's branches before it is added, to pick its main branch
+// when it has no main.
+type Branches struct {
+	Branches []string `json:"branches"` // by name
+	Current  string   `json:"current"`  // its checkout's; "" when detached
+}
+
+// RepoBranches lists the branches of a folder to add as a repo, inside the
+// folder repos are added from.
+func (h *Home) RepoBranches(ctx context.Context, path string) (Branches, error) {
+	real, err := h.repoFolder(path)
+	if err != nil {
+		return Branches{}, fmt.Errorf("%w: %s", ErrInvalid, err.Error())
+	}
+	if !inside(real, h.start) {
+		return Branches{}, fmt.Errorf("%w: %s", ErrInvalid, h.outsideStart(path))
+	}
+	list, err := h.git.Branches(ctx, real, "")
+	if err != nil {
+		return Branches{}, err
+	}
+	current, _ := h.git.Branch(ctx, real)
+	return Branches{Branches: list, Current: current}, nil
 }

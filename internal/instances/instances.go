@@ -684,13 +684,13 @@ func (m *Manager) start(id string, l *live) {
 		// A stop already freed the slot and set the status; a run may have
 		// replaced this one since.
 		if m.release(id, l) {
-			m.setStatus(ctx, id, Stopped)
+			m.stopped(ctx, id, "couldn't start: "+err.Error())
 		}
 		m.startQueued()
 		return
 	}
 	inst, _ := m.Instances.Get(ctx, id)
-	inst.Status, inst.StartedAt = Running, time.Now()
+	inst.Status, inst.StartedAt, inst.StopReason = Running, time.Now(), ""
 	_ = m.Instances.Put(ctx, inst)
 	m.publish("instance.status", StatusChange{ID: id, Status: Running})
 	m.heardFrom(ctx, id)
@@ -736,7 +736,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {
 		repoDir, worktree := repo.Path, filepath.Join(inst.SandboxPath, repo.Name)
-		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, project.Config.Main); err != nil {
+		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, repo.Main); err != nil {
 			return nil, err
 		}
 		// An agent starts without a submodule that can't be fetched (offline,
@@ -853,7 +853,7 @@ func (m *Manager) watch(id string, l *live) {
 		m.enqueue(id)
 	default:
 		slog.Warn("instance exited again; stopped", "instance", id, "code", code)
-		m.setStatus(ctx, id, Stopped)
+		m.stopped(ctx, id, fmt.Sprintf("it exited twice in a row (code %d)", code))
 	}
 	m.startQueued()
 }
@@ -882,11 +882,26 @@ func (m *Manager) setStatus(ctx context.Context, id, status string) {
 	if err != nil || inst.Status == status {
 		return
 	}
-	inst.Status = status
+	// A reason is only Foreman's own stop's (stopped).
+	inst.Status, inst.StopReason = status, ""
 	if err := m.Instances.Put(ctx, inst); err != nil {
 		slog.Warn("saving an instance", "instance", id, "err", err)
 	}
 	m.publish("instance.status", StatusChange{ID: id, Status: status})
+}
+
+// stopped stops an instance on Foreman's own decision, saying why: its pane
+// shows it until the next start.
+func (m *Manager) stopped(ctx context.Context, id, reason string) {
+	inst, err := m.Instances.Get(ctx, id)
+	if err != nil {
+		return
+	}
+	inst.Status, inst.StopReason = Stopped, reason
+	if err := m.Instances.Put(ctx, inst); err != nil {
+		slog.Warn("saving an instance", "instance", id, "err", err)
+	}
+	m.publish("instance.status", StatusChange{ID: id, Status: Stopped})
 }
 
 func (m *Manager) publish(typ string, data any) {
@@ -959,7 +974,7 @@ func (m *Manager) DeploymentsIn(ctx context.Context, status string) ([]store.Dep
 // compose is an instance's session prompt: launch writes it, Prompt shows it.
 func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
-		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Goal: dep.Goal,
+		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Repos: project.Repos, Goal: dep.Goal,
 		Tools: m.tools(inst.AgentID == team.Config.Lead),
 	})
 }

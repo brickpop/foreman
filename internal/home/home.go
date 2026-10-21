@@ -121,6 +121,11 @@ type Git interface {
 	MoveWorktree(ctx context.Context, repo, from, to string) error
 	// PruneWorktrees makes repo forget its worktrees whose folder is gone.
 	PruneWorktrees(ctx context.Context, repo string) error
+	// Branches lists dir's branches that start with prefix, by name.
+	Branches(ctx context.Context, dir, prefix string) ([]string, error)
+	// Branch is the branch dir's checkout is on; "" when it is detached.
+	Branch(ctx context.Context, dir string) (string, error)
+	HasBranch(ctx context.Context, dir, branch string) bool
 }
 
 // Deps is what Load needs besides the home's files.

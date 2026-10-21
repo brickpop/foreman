@@ -19,7 +19,8 @@ type Input struct {
 	Project string          // the project's id
 	Sandbox string          // the agent's sandbox, at the same path on the host and in its container
 	Config  home.ProjectConfig
-	Goal    string // the deployment's goal
+	Repos   []home.Repo // the project's code repos, each with its main branch
+	Goal    string      // the deployment's goal
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
 	// describes those and no others. Without ask, it describes working alone,
 	// the CEO relaying; without commit, git is read-only and the CEO reviews.
@@ -143,20 +144,38 @@ func Compose(in Input) string {
 	return b.String()
 }
 
+// mains names the branch the agent's branches are made from: one name when
+// every repo has the same main, else each repo's ("master in api, main in web").
+func mains(repos []home.Repo) string {
+	var each []string
+	same := true
+	for _, r := range repos {
+		each = append(each, r.Main+" in "+r.Name)
+		same = same && r.Main == repos[0].Main
+	}
+	switch {
+	case len(repos) == 0:
+		return "main"
+	case same:
+		return repos[0].Main
+	}
+	return strings.Join(each, ", ")
+}
+
 func branches(in Input, lead bool, has func(string) bool) string {
 	switching := has("switch")
 	switch {
 	case !switching && lead:
-		return fmt.Sprintf("you work on lead/%s/integration, made for you from %s.", in.Team.Team, in.Config.Main)
+		return fmt.Sprintf("you work on lead/%s/integration, made for you from %s.", in.Team.Team, mains(in.Repos))
 	case !switching:
-		return fmt.Sprintf("you work on wt/%s/main, made for you from %s.", in.Agent, in.Config.Main)
+		return fmt.Sprintf("you work on wt/%s/main, made for you from %s.", in.Agent, mains(in.Repos))
 	case lead && has("request_merge"):
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
-			"Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with merge(\"main\"), "+
+			"Ask for a merge to main with request_merge(branch, entry), one per branch. When told a repo's main moved, merge it in with merge(<its main>), "+
 			"resolve any conflicts and commit(), then call request_merge again.", in.Team.Team, in.Team.Team)
 	case lead:
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
-			"Merge the hand-offs you accept into it with merge(branch). When main moves, merge it in with merge(\"main\"). "+
+			"Merge the hand-offs you accept into it with merge(branch). When told a repo's main moved, merge it in with merge(<its main>). "+
 			"Tell the CEO which lead branch is ready for review.", in.Team.Team, in.Team.Team)
 	default:
 		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch). No push to main.", in.Agent)
@@ -193,7 +212,7 @@ var toolRows = map[string][]string{
 	"ask":          {"ask(teammate, request)              Get info or work. Keep going meanwhile."},
 	"reply":        {"reply(request_id, output)           Answer a request. Only `output` is returned."},
 	"read_message": {"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."},
-	"switch":       {"switch(branch)                      Go to one of your branches (made from main if new)."},
+	"switch":       {"switch(branch)                      Go to one of your branches (made from each repo's main if new)."},
 	"commit": {
 		"commit(commits)                     Commit the repos you name, each with its own message:",
 		"                                    [{repo, message}], repo being its folder in your sandbox.",
@@ -333,7 +352,8 @@ func instruction(s home.Soul, merges bool) string {
 func Template(team home.TeamConfig, agent string) string {
 	return Compose(Input{
 		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", Goal: "{goal}",
-		Config: home.ProjectConfig{Main: "{main}", Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
+		Repos:  []home.Repo{{Name: "{repo}", Main: "{main}"}},
+		Config: home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:  Offered(agent == team.Lead),
 	})
 }

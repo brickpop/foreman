@@ -37,7 +37,7 @@ func TestNewProject(t *testing.T) {
 	if p.ID != "DevProject" || p.Path != h.Path("projects", "DevProject") || p.Profile != "default" || len(p.Repos) != 0 || len(p.Problems) != 0 {
 		t.Errorf("project %+v", p)
 	}
-	if want, _ := starterFile("DevProject", "project.toml"); p.Source != want || p.Config.Main != "main" {
+	if want, _ := starterFile("DevProject", "project.toml"); p.Source != want {
 		t.Errorf("project.toml %q %+v", p.Source, p.Config)
 	}
 	if log := gitOut(t, p.Path, "log", "--format=%s"); log != "Project repo" {
@@ -196,17 +196,17 @@ func TestAddRepo(t *testing.T) {
 		}
 	}
 	app, sdk := codeRepo(t, "dev/aragon/app"), codeRepo(t, "dev/aragon/sdk")
-	if _, err := h.AddRepo(ctx, "aragon", "app", app); err != nil {
+	if _, err := h.AddRepo(ctx, "aragon", "app", app, ""); err != nil {
 		t.Fatal(err)
 	}
-	p, err := h.AddRepo(ctx, "aragon", "sdk", sdk+"/")
+	p, err := h.AddRepo(ctx, "aragon", "sdk", sdk+"/", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(p.Repos, []Repo{{Name: "app", Path: app, root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
+	if !slices.Equal(p.Repos, []Repo{{Name: "app", Path: app, Main: "main", root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, Main: "main", root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
 		t.Errorf("aragon %+v", p)
 	}
-	if p, err := h.AddRepo(ctx, "app-only", "app", app); err != nil || len(p.Repos) != 1 {
+	if p, err := h.AddRepo(ctx, "app-only", "app", app, ""); err != nil || len(p.Repos) != 1 {
 		t.Errorf("one repo in two projects: %+v %v", p, err)
 	}
 
@@ -243,7 +243,7 @@ func TestAddRepo(t *testing.T) {
 		{"outside the CEO's home folder", "out", outside, ErrInvalid, "outside your home folder"},
 		{"inside Foreman's home", "in", inHome, ErrInvalid, "inside Foreman's home"},
 	} {
-		_, err := h.AddRepo(ctx, "aragon", tc.repo, tc.path)
+		_, err := h.AddRepo(ctx, "aragon", tc.repo, tc.path, "")
 		if !errors.Is(err, tc.want) || !strings.Contains(err.Error(), tc.says) {
 			t.Errorf("%s: %v, want %v saying %q", tc.name, err, tc.want, tc.says)
 		}
@@ -251,7 +251,7 @@ func TestAddRepo(t *testing.T) {
 	if p, _ := h.Project("aragon"); len(p.Repos) != 2 {
 		t.Errorf("a refusal added a repo: %+v", p.Repos)
 	}
-	if _, err := h.AddRepo(ctx, "nope", "app", app); !errors.Is(err, ErrNotFound) {
+	if _, err := h.AddRepo(ctx, "nope", "app", app, ""); !errors.Is(err, ErrNotFound) {
 		t.Errorf("no such project: %v", err)
 	}
 }
@@ -265,7 +265,7 @@ func TestMissingReposAreLocatedOrRemoved(t *testing.T) {
 		t.Fatal(err)
 	}
 	api := codeRepo(t, "dev/api")
-	if _, err := h.AddRepo(ctx, "ledger", "api", api); err != nil {
+	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
 		t.Fatal(err)
 	}
 	moved := filepath.Join(os.Getenv("HOME"), "src", "api")
@@ -334,8 +334,6 @@ func TestNewRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(p.Path, "project.toml"), "main = \"trunk\"\n")
-	h.reload()
 	path := filepath.Join(os.Getenv("HOME"), "dev", "ledger-api")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -344,7 +342,7 @@ func TestNewRepo(t *testing.T) {
 	if err != nil || len(p.Repos) != 1 || p.Repos[0].Path != path || !p.Repos[0].Ready() {
 		t.Fatalf("%+v %v", p, err)
 	}
-	if branch := gitOut(t, path, "branch", "--show-current"); branch != "trunk" {
+	if branch := gitOut(t, path, "branch", "--show-current"); branch != "main" || p.Repos[0].Main != "main" {
 		t.Errorf("branch %q", branch)
 	}
 	if log := gitOut(t, path, "log", "--format=%s", "--name-only"); log != "First commit\n\nREADME.md" {
@@ -562,7 +560,7 @@ func TestRenameRepo(t *testing.T) {
 	api := codeRepo(t, "dev/api")
 	web := codeRepo(t, "dev/web")
 	for name, path := range map[string]string{"api": api, "web": web} {
-		if _, err := h.AddRepo(ctx, "ledger", name, path); err != nil {
+		if _, err := h.AddRepo(ctx, "ledger", name, path, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -615,7 +613,7 @@ func TestRemoveProject(t *testing.T) {
 		}
 	}
 	api := codeRepo(t, "dev/api")
-	if _, err := h.AddRepo(ctx, "ledger", "api", api); err != nil {
+	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
 		t.Fatal(err)
 	}
 	sandboxWorktree(t, h, "ledger", "mara", "api", api)
@@ -669,8 +667,8 @@ func TestGone(t *testing.T) {
 		t.Error("a project without repos is gone")
 	}
 	api, web := codeRepo(t, "dev/api"), codeRepo(t, "dev/web")
-	h.AddRepo(ctx, "ledger", "api", api)
-	p, _ = h.AddRepo(ctx, "ledger", "web", web)
+	h.AddRepo(ctx, "ledger", "api", api, "")
+	p, _ = h.AddRepo(ctx, "ledger", "web", web, "")
 	_ = os.RemoveAll(api)
 	if p.Gone() != "" {
 		t.Error("gone with one repo left")
@@ -682,5 +680,56 @@ func TestGone(t *testing.T) {
 	_ = os.RemoveAll(p.Path)
 	if !strings.Contains(p.Gone(), "its project repo") {
 		t.Errorf("project repo deleted: %q", p.Gone())
+	}
+}
+
+// A repo's main branch is main when it has one; otherwise the CEO picks one
+// of its branches (RepoBranches lists them), and can change it later.
+func TestARepoHasItsOwnMainBranch(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "aragon", ""); err != nil {
+		t.Fatal(err)
+	}
+	app := codeRepo(t, "dev/app")
+	poc := codeRepo(t, "dev/poc")
+	gitOut(t, poc, "branch", "-m", "main", "master")
+	gitOut(t, poc, "switch", "--quiet", "-c", "feature")
+
+	b, err := h.RepoBranches(ctx, poc)
+	if err != nil || !slices.Equal(b.Branches, []string{"feature", "master"}) || b.Current != "feature" {
+		t.Errorf("%+v: %v", b, err)
+	}
+	if _, err := h.RepoBranches(ctx, filepath.Join(t.TempDir(), "x")); !errors.Is(err, ErrInvalid) {
+		t.Errorf("branches of no repo: %v", err)
+	}
+	for name, tc := range map[string]struct{ main, says string }{
+		"no main, none picked": {"", "has no branch main: pick its main branch"},
+		"a branch it hasn't":   {"trunk", `has no branch "trunk"`},
+	} {
+		if _, err := h.AddRepo(ctx, "aragon", "poc", poc, tc.main); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.says) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, err := h.AddRepo(ctx, "aragon", "app", app, ""); err != nil {
+		t.Fatal(err)
+	}
+	p, err := h.AddRepo(ctx, "aragon", "poc", poc, "master")
+	if err != nil || p.Repos[0].Main != "main" || p.Repos[1].Main != "master" {
+		t.Fatalf("%+v %v", p.Repos, err)
+	}
+
+	if _, err := h.SetRepoMain(ctx, "aragon", "poc", "trunk"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a main it hasn't: %v", err)
+	}
+	if _, err := h.SetRepoMain(ctx, "aragon", "nope", "main"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such repo: %v", err)
+	}
+	if p, err = h.SetRepoMain(ctx, "aragon", "poc", "feature"); err != nil || p.Repos[1].Main != "feature" || p.Repos[0].Main != "main" {
+		t.Errorf("changed: %+v %v", p.Repos, err)
+	}
+	// Kept in the record: a reload still has it.
+	h.reload()
+	if p, _ := h.Project("aragon"); p.Repos[1].Main != "feature" {
+		t.Errorf("after a reload: %+v", p.Repos)
 	}
 }

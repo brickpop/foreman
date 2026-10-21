@@ -38,6 +38,11 @@ export interface Instance {
   startedAt: string /* RFC 3339 */;
   restarts: number /* int */;
   /**
+   * StopReason is why Foreman stopped it on its own (a start that failed, a
+   * crash loop); "" otherwise, cleared on each start.
+   */
+  stopReason: string;
+  /**
    * Doing is what its harness last reported doing in this run, nil until
    * it says: kept by the instance manager in memory, never stored.
    */

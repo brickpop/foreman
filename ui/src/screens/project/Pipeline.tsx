@@ -7,7 +7,7 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { agentOf, forgeOf, ordered, when } from "../../app/model";
+import { agentOf, forgeOf, mainOf, ordered, when } from "../../app/model";
 import {
   useAnswer,
   useEntryTitle,
@@ -108,7 +108,7 @@ export function InFlight({ project }: { project: Project }) {
                 key={m.id}
                 mr={m}
                 project={project.id}
-                main={project.config.main}
+                main={mainOf(project, m.repo)}
                 teams={teams.data ?? []}
                 items={items.filter((w) => w.mergeRequestId === m.id)}
                 live={live.has(m.deploymentId)}
@@ -159,11 +159,11 @@ function ProjectRequest({
       <ReviewPanel
         request={r}
         mr={mr}
-        main={project.config.main}
+        main={mainOf(project, mr.repo)}
         forge={forgeOf(project)}
         who={who}
         context={context}
-        reviewText={`${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into ${project.config.main} in ${mr.repo}.`}
+        reviewText={`${agent?.soul.name ?? "The lead"} wants ${title.data ?? mr.entry} merged into ${mainOf(project, mr.repo)} in ${mr.repo}.`}
         author={agent?.soul.name ?? "the lead"}
         variant="project"
         source={sourceLabel(r)}

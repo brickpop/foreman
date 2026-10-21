@@ -61,7 +61,7 @@ func TestTheStartFolderBoundsAddingRepos(t *testing.T) {
 		t.Fatal(err)
 	}
 	outside := codeRepo(t, filepath.Join(home, "src", "api"))
-	if p, err = h.AddRepo(ctx, "ledger", "api", outside); err != nil {
+	if p, err = h.AddRepo(ctx, "ledger", "api", outside, ""); err != nil {
 		t.Fatal(err)
 	}
 	inside := codeRepo(t, filepath.Join(home, "dev", "web"))
@@ -69,11 +69,11 @@ func TestTheStartFolderBoundsAddingRepos(t *testing.T) {
 	if filepath.Base(h.Start()) != "dev" {
 		t.Fatalf("start %s", h.Start())
 	}
-	if _, err := h.AddRepo(ctx, "ledger", "web", inside); err != nil {
+	if _, err := h.AddRepo(ctx, "ledger", "web", inside, ""); err != nil {
 		t.Errorf("inside the start folder: %v", err)
 	}
 	other := codeRepo(t, filepath.Join(home, "src", "docs"))
-	if _, err := h.AddRepo(ctx, "ledger", "docs", other); err == nil || !strings.Contains(err.Error(), "where repos are added from") {
+	if _, err := h.AddRepo(ctx, "ledger", "docs", other, ""); err == nil || !strings.Contains(err.Error(), "where repos are added from") {
 		t.Errorf("outside the start folder: %v", err)
 	}
 	if _, err := h.LocateRepo(ctx, "ledger", "api", outside); err == nil || !strings.Contains(err.Error(), "where repos are added from") {
@@ -88,7 +88,7 @@ func TestTheStartFolderBoundsAddingRepos(t *testing.T) {
 	if real, _ := filepath.EvalSymlinks(home); h.Start() != real {
 		t.Errorf("started outside the home folder: start %s", h.Start())
 	}
-	if _, err := h.AddRepo(ctx, "ledger", "docs", other); err != nil {
+	if _, err := h.AddRepo(ctx, "ledger", "docs", other, ""); err != nil {
 		t.Errorf("then anywhere in the home folder: %v", err)
 	}
 }

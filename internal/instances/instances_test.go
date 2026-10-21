@@ -102,7 +102,7 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	if _, _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api); err != nil {
+	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api, ""); err != nil {
 		t.Fatal(err)
 	}
 	program := filepath.Join(t.TempDir(), "harness.sh")
@@ -496,6 +496,9 @@ func TestACrashRestartsOnceThenStops(t *testing.T) {
 	inst := f.waitStatus("mara@ledger", Stopped)
 	if inst.Restarts != 1 {
 		t.Errorf("restarts %d, want 1", inst.Restarts)
+	}
+	if inst.StopReason != "it exited twice in a row (code 3)" {
+		t.Errorf("stop reason %q", inst.StopReason)
 	}
 	openers, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "mara"), ".harness", "fake", "PROMPT.md.openers"))
 	if string(openers) != "[Your goal on ledger: g]\n[Your goal on ledger: g]\n" {
@@ -915,8 +918,8 @@ func TestStartAgainAfterTwoCrashes(t *testing.T) {
 	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if s := f.waitStatus("mara@ledger", Running); s.Restarts != 0 {
-		t.Errorf("restarts %d after Start again", s.Restarts)
+	if s := f.waitStatus("mara@ledger", Running); s.Restarts != 0 || s.StopReason != "" {
+		t.Errorf("after Start again: restarts %d, stop reason %q", s.Restarts, s.StopReason)
 	}
 	f.waitStatus("mara@ledger", Stopped) // crashes twice again
 	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
@@ -1354,7 +1357,7 @@ func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 	if _, _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api")); err != nil {
+	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api"), ""); err != nil {
 		t.Fatal(err)
 	}
 	write(t, f.hm.Path("config", "teams", "orion.toml"),
@@ -1529,5 +1532,29 @@ func TestRestoreResolvesOldStuckCards(t *testing.T) {
 	}
 	if len(list) != 1 || list[0].ID != other.ID {
 		t.Errorf("open after Restore: %+v (stuck was %s)", list, stuck.ID)
+	}
+}
+
+// A start that fails stops the instance with the reason, for its pane; a
+// start that works clears it.
+func TestAFailedStartSaysWhy(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	api := filepath.Join(f.root, "dev", "ledger-api")
+	gitRun(t, "-C", api, "branch", "-m", "main", "master")
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	inst := f.waitStatus("mara@ledger", Stopped)
+	if !strings.HasPrefix(inst.StopReason, "couldn't start: ") || !strings.Contains(inst.StopReason, `has no branch "main"`) {
+		t.Errorf("stop reason %q", inst.StopReason)
+	}
+	if _, err := f.hm.SetRepoMain(ctx, "ledger", "ledger-api", "master"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if s := f.waitStatus("mara@ledger", Running); s.StopReason != "" {
+		t.Errorf("after a start: %q", s.StopReason)
 	}
 }

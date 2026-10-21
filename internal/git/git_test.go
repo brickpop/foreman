@@ -219,7 +219,7 @@ func TestPrepareRefusals(t *testing.T) {
 	}
 
 	master := codeRepo(t, "master")
-	if err := g.Prepare(ctx, master, filepath.Join(t.TempDir(), "x"), "wt/mara/main", "main"); err == nil || !strings.Contains(err.Error(), "set `main` in project.toml") {
+	if err := g.Prepare(ctx, master, filepath.Join(t.TempDir(), "x"), "wt/mara/main", "main"); err == nil || !strings.Contains(err.Error(), "pick it in Project settings → Code repos") {
 		t.Errorf("a repo without main: %v", err)
 	}
 	if err := g.Prepare(ctx, master, filepath.Join(t.TempDir(), "x"), "wt/mara/main", "master"); err != nil {

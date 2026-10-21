@@ -6,6 +6,7 @@ import type { Account as ForgeAccount } from "./types/forge";
 import type { Commit, TreeEntry } from "./types/git";
 import type { Endpoint, EndpointChange, Status as HarnessStatus } from "./types/harness";
 import type {
+  Branches,
   Folder,
   FolderEntry,
   Look,
@@ -48,6 +49,7 @@ export type {
   ActivityItem,
   ActivityPage,
   Board,
+  Branches,
   Card,
   Commit,
   Deployment,
@@ -103,15 +105,20 @@ export interface HomeArea {
   newProject(name: string, clone?: string): Promise<{ project: Project; created: boolean }>;
   /** Removes a project and its history; its project repo too when deleteRepo. */
   removeProject(project: string, deleteRepo: boolean): Promise<void>;
-  /** Adds an existing repo by its folder; newRepo creates an empty one at a new folder. */
-  addRepo(project: string, name: string, path: string): Promise<Project>;
+  /** Adds an existing repo by its folder, on main (none: main, which it
+   * must have); newRepo creates an empty one at a new folder, on main. */
+  addRepo(project: string, name: string, path: string, main?: string): Promise<Project>;
   newRepo(project: string, name: string, path: string): Promise<Project>;
+  /** Sets a repo's main branch, one it has. */
+  setRepoMain(project: string, name: string, main: string): Promise<Project>;
   /** Points a missing repo at its new folder (the same repo). */
   locateRepo(project: string, name: string, path: string): Promise<Project>;
   renameRepo(project: string, name: string, newName: string): Promise<Project>;
   removeRepo(project: string, name: string): Promise<Project>;
   /** A folder for picking repos; none: the folder Foreman was started in. */
   folders(path?: string): Promise<Folder>;
+  /** A repo folder's branches, to pick its main branch. */
+  branches(path: string): Promise<Branches>;
   /** Sets the profile a project's agents run on, from their next start. */
   setProfile(project: string, profile: string): Promise<Project>;
   /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
@@ -342,13 +349,17 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       },
       removeProject: (project, deleteRepo) =>
         send("DELETE", `/api/projects/${id(project)}${deleteRepo ? "?deleteRepo=true" : ""}`),
-      addRepo: async (project, name, path) =>
+      addRepo: async (project, name, path, main) =>
         (
-          await request("POST", `/api/projects/${id(project)}/repos`, { name, path })
+          await request("POST", `/api/projects/${id(project)}/repos`, { name, path, main })
         ).json() as Promise<Project>,
       newRepo: async (project, name, path) =>
         (
           await request("POST", `/api/projects/${id(project)}/repos`, { name, path, new: true })
+        ).json() as Promise<Project>,
+      setRepoMain: async (project, name, main) =>
+        (
+          await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}/main`, { main })
         ).json() as Promise<Project>,
       locateRepo: async (project, name, path) =>
         (
@@ -365,6 +376,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
           await request("DELETE", `/api/projects/${id(project)}/repos/${id(name)}`)
         ).json() as Promise<Project>,
       folders: (path) => getJSON(`/api/folders${path ? `?${new URLSearchParams({ path })}` : ""}`),
+      branches: (path) => getJSON(`/api/folders/branches?${new URLSearchParams({ path })}`),
       setProfile: async (project, profile) =>
         (
           await request("PUT", `/api/projects/${id(project)}/profile`, { profile })

@@ -78,8 +78,19 @@ func (f fakeConfig) Browse(path string) (home.Folder, error) {
 	}
 	return home.Folder{Path: path, Entries: []home.FolderEntry{{Name: "app", Path: path + "/app", Repo: true}}}, nil
 }
-func (f fakeConfig) AddRepo(_ context.Context, project, name, path string) (home.Project, error) {
-	return f.changed("AddRepo", project, name, path)
+func (f fakeConfig) AddRepo(_ context.Context, project, name, path, main string) (home.Project, error) {
+	return f.changed("AddRepo", project, name, path+" main="+main)
+}
+func (f fakeConfig) SetRepoMain(_ context.Context, project, name, main string) (home.Project, error) {
+	return f.changed("SetRepoMain", project, main, name)
+}
+
+// RepoBranches lists a repo on master below /home/ceo/dev, as Browse does.
+func (f fakeConfig) RepoBranches(_ context.Context, path string) (home.Branches, error) {
+	if !strings.HasPrefix(path, "/home/ceo/dev/") {
+		return home.Branches{}, fmt.Errorf("%w: %s is outside /home/ceo/dev", home.ErrInvalid, path)
+	}
+	return home.Branches{Branches: []string{"feature", "master"}, Current: "feature"}, nil
 }
 func (f fakeConfig) NewRepo(_ context.Context, project, name, path string) (home.Project, error) {
 	return f.changed("NewRepo", project, name, path)
@@ -363,7 +374,9 @@ func TestProjectRoutes(t *testing.T) {
 		call               []string
 	}{
 		{http.MethodPost, "/api/projects", `{"name":"aragon"}`, []string{"NewProject", "aragon", ""}},
-		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web"}},
+		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web main="}},
+		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","main":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web main=master"}},
+		{http.MethodPut, "/api/projects/ledger/repos/web/main", `{"main":"master"}`, []string{"SetRepoMain", "master", "web"}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","new":true}`, []string{"NewRepo", "web", "/home/ceo/dev/web"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
@@ -413,6 +426,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"busy"}`, http.StatusConflict, `"DEPLOYED"`},
 		{http.MethodDelete, "/api/projects/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
 		{http.MethodGet, "/api/folders?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
+		{http.MethodGet, "/api/folders/branches?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
+		{http.MethodPut, "/api/projects/ledger/repos/web/main", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
 	} {
 		if w := send(tc.method, tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s %s %s: %d %s", tc.method, tc.path, tc.body, w.Code, w.Body)
@@ -443,5 +458,10 @@ func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
 		if f.Path != want || len(f.Entries) != 1 || !f.Entries[0].Repo {
 			t.Errorf("%s: %+v", path, f)
 		}
+	}
+	var b home.Branches
+	decodeBody(t, get(t, h, "/api/folders/branches?path=/home/ceo/dev/poc"), &b)
+	if len(b.Branches) != 2 || b.Current != "feature" {
+		t.Errorf("branches: %+v", b)
 	}
 }

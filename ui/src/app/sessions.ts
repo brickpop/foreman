@@ -177,6 +177,13 @@ export function linePlaceholder(name: string, status: string, lead: boolean): st
   return lead ? `Tell ${name} what you need. They’ll delegate.` : `Direct instruction to ${name}…`;
 }
 
+/** A stopped agent's pane: why Foreman stopped it, when it did (a start that
+ * failed, a crash loop), and that its messages wait. */
+export function stoppedLine(name: string, reason: string): string {
+  const why = reason ? `${name} stopped: ${reason}.` : `${name} stopped.`;
+  return `${why} Messages for them wait until you start them again; they pick up their conversation.`;
+}
+
 /** A countdown as m:ss, rounded up (it reaches 0:00 only at the end). */
 export function countdown(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));

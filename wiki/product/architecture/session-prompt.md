@@ -40,7 +40,7 @@ They are separate sessions that Foreman runs: your harness's own agent or messag
 ask(teammate, request)              Get info or work. Keep going meanwhile.
 reply(request_id, output)           Answer a request. Only `output` is returned.
 read_message(id)                    Read a message to you in full (a delivery quotes only its start).
-switch(branch)                      Go to one of your branches (made from main if new).
+switch(branch)                      Go to one of your branches (made from each repo's main if new).
 commit(commits)                     Commit the repos you name, each with its own message:
                                     [{repo, message}], repo being its folder in your sandbox.
 merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.
@@ -98,7 +98,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 
 | Placeholder | Lead | Member |
 |---|---|---|
-| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch). Ask for a merge to main with request_merge(branch, entry), one per branch. When told main moved, merge it in with merge("main"), resolve any conflicts and commit(), then call request_merge again.` | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch). No push to main.` |
+| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch). Ask for a merge to main with request_merge(branch, entry), one per branch. When told a repo's main moved, merge it in with merge(<its main>), resolve any conflicts and commit(), then call request_merge again.` | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch). No push to main.` |
 | `{wiki access}` | `read and write: edit, then commit its repo, project` | `read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file` |
 | `{teammates and the wiki}` | `Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.` Left out for a lead alone. | (none) |
 | tools | all but `handoff`, including `request_merge` | all but `request_merge` |

@@ -347,18 +347,19 @@ func (t tool) switchTo(ctx context.Context, branch string) agentlink.Result {
 	}
 	var created []string
 	for _, r := range repos {
-		made, err := t.w.Git.Switch(ctx, r.dir, branch, t.project.Config.Main)
+		main := t.project.Main(r.name)
+		made, err := t.w.Git.Switch(ctx, r.dir, branch, main)
 		if err != nil {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		}
 		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, Created: made})
 		if made {
-			created = append(created, r.name)
+			created = append(created, fmt.Sprintf("%s (from %s)", r.name, main))
 		}
 	}
 	text := fmt.Sprintf("Switched %s to %s.", names(repos), branch)
 	if len(created) > 0 {
-		text += fmt.Sprintf(" New in %s, made from %s.", strings.Join(created, ", "), t.project.Config.Main)
+		text += fmt.Sprintf(" New in %s.", strings.Join(created, ", "))
 	}
 	return agentlink.Result{Text: text + t.synced(ctx, repos)}
 }
@@ -518,7 +519,7 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 			continue
 		}
 		found = true
-		n, err := t.w.Git.Ahead(ctx, r.dir, branch, t.project.Config.Main)
+		n, err := t.w.Git.Ahead(ctx, r.dir, branch, t.project.Main(r.name))
 		if err != nil {
 			return gitError(err)
 		}
@@ -528,7 +529,7 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case !ahead:
-		return teamtools.Refusal("nothing_new", "%s has no commits beyond %s", branch, t.project.Config.Main)
+		return teamtools.Refusal("nothing_new", "%s has no commits beyond its repo's main branch", branch)
 	}
 	msg, err := t.w.Messages.Send(ctx, store.TeamMessage{DeploymentID: t.c.Deployment.ID, FromInstance: t.c.Instance.ID,
 		ToInstance: to, Kind: "handoff", Body: summary, ArtifactRef: branch})

@@ -14,7 +14,8 @@ Kept in `state.db` (tables `projects` and `project_repos`, [Persistence](../arch
 
 - **name**: the project id, a slug, unique in any case (`Ledger` and `ledger` are one project). Used in instance ids (`agent@project`) and URLs.
 - **profile**: the [profile](../architecture/session-runner.md#credentials) its agents run on (a harness and its login); empty means `default`. Set from [Project settings](../features/project-settings.md) (`PUT /api/projects/{id}/profile`); it reaches each agent at its next start.
-- **code repos**: each a **name** (unique in the project in any case, never `project`), an absolute **path** anywhere in the CEO's home folder, and its **root commit** (the lowest hash among the commits with no parent), kept so that **Locate** accepts only a folder holding that commit.
+- **code repos**: each a **name** (unique in the project in any case, never `project`), an absolute **path** anywhere in the CEO's home folder, its **root commit** (the lowest hash among the commits with no parent), kept so that **Locate** accepts only a folder holding that commit, and its **main branch** (below).
+- **main branch**, one per code repo (the CEO, 2026-10-21): the protected branch its agents start their branches from and its merges go to. No agent writes it; it changes only by the CEO's decision: Merge to main, a PR merged on the forge, or the CEO's own git. It is `main` when the repo has a branch of that name; otherwise the add dialog asks which branch is its default (listing its branches, the checkout's preselected, `GET /api/folders/branches`). A new empty repo is made on `main`. [Project settings](../features/project-settings.md) changes it to any branch the repo has (`PUT /api/projects/{id}/repos/{repo}/main`); worktrees made before stay on their branches. One a repo no longer has (renamed) is flagged there, and its agents can't start: their start fails with the reason in their pane ([Instance](./instance.md)). Repos added before 2026-10-21 got `main`. The project repo is always on `main` (Foreman makes it).
 
 A repo is added by the path of a git repo's top folder: its `.git` a folder (it is mounted read-only at its own path), with at least one commit, its real path inside the [start folder](../features/add-project.md#picking-repos) (the folder Foreman was started in, or `$HOME` when that is outside it) and outside Foreman's home, and not already in the project. Or a **new** empty repo is made at a path that doesn't exist yet, in the start folder too (a README in a first commit, on `main`). Foreman never moves or deletes a code repo, nor touches its files: it writes only in its `.git` (the agents' branches and worktrees, which live under the home) ([Sandboxes and git policy](../architecture/sandboxes-and-git.md)).
 
@@ -30,7 +31,6 @@ The project repo uses the project's `forge`, like the code repos, at the URL `fo
 
 ```toml
 description = "Settlement and reconciliation service."
-main = "main"                          # protected branch name
 checks = "npm test"                    # run in a sandbox before handoff and on a merge request
 merge_to_main = "ceo"                  # v1: always ceo
 always_ask_ceo = [                     # gates: these always raise an approval request
@@ -51,7 +51,6 @@ project_repo = "https://localhost:3000/ledger/ledger-project"  # the project rep
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
 | `description` | String | | | one line | Shown in the project header |
-| `main` | String | | `main` | branch name | Protected branch. No agent writes it; it changes only by the CEO's decision: Merge to main, a PR merged on the forge, or the CEO's own git |
 | `checks` | String | | | shell command | Run in a sandbox before handoff and on a merge request ([Pipeline and merges](../features/pipeline-and-merges.md)) |
 | `merge_to_main` | String | | `ceo` | enum: `ceo` | v1: always `ceo`, who chooses Merge to main (Foreman merges on that click) or Create PR and merges on the forge; Foreman never merges on its own |
 | `forge.kind` | String | | `none` | enum: `github`, `forgejo`, `gitea`, `none` | `none` = no forge: merge requests offer Merge to main and Reject, not Create PR ([Forge adapters](../architecture/forge-adapters.md)). A missing `forge` table means `none`; New project writes it explicitly |
@@ -60,7 +59,7 @@ project_repo = "https://localhost:3000/ledger/ledger-project"  # the project rep
 | `always_ask_ceo` | Array of String | | `[]` | | Gates. Hitting one makes the agent raise an approval [request](../features/requests.md). Listed in each [session prompt](../architecture/session-prompt.md) |
 | `recursive_submodules` | Boolean | | `false` | | Also check out the submodules of submodules in the agents' worktrees ([Sandboxes and git policy → Submodules](../architecture/sandboxes-and-git.md#submodules)). Off by default (the CEO, 2026-10-19) |
 
-The wiki has no field: it is always `wiki/` in the project repo. A `project` or `repos` field is reported as one Foreman doesn't know: the name and the repos are the [record](#the-project-record)'s.
+The wiki has no field: it is always `wiki/` in the project repo. A `project` or `repos` field is reported as one Foreman doesn't know: the name and the repos are the [record](#the-project-record)'s. A `main` field (every `project.toml` before 2026-10-21 has `main = "main"`) is a problem saying each code repo has its own main branch now (Project settings → Code repos) and to remove the line: like any problem, it blocks new deployments until it is gone.
 
 ## Invariants
 

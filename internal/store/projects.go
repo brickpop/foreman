@@ -27,6 +27,8 @@ type Projects interface {
 	// MoveRepo points a repo at a new path (Locate). ErrExists if another
 	// repo of the project has that path.
 	MoveRepo(ctx context.Context, project, name, path string) error
+	// SetRepoMain sets a repo's main branch.
+	SetRepoMain(ctx context.Context, project, name, main string) error
 	// RemoveRepo takes a repo out of the project.
 	RemoveRepo(ctx context.Context, project, name string) error
 	// RenameRepo renames a repo, and moves the project's open merge requests
@@ -49,11 +51,13 @@ type ProjectRecord struct {
 }
 
 // RepoRecord is one of a project's repos: a name unique in the project, its
-// folder, and its first commit, which only that repo holds.
+// folder, its first commit, which only that repo holds, and its main branch:
+// the one agents start from and merges go to.
 type RepoRecord struct {
 	Name       string
 	Path       string
 	RootCommit string
+	Main       string
 }
 
 // Projects returns the projects table.
@@ -86,7 +90,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = p.db.QueryContext(ctx, "SELECT project_id, name, path, root_commit FROM project_repos ORDER BY project_id, name")
+	rows, err = p.db.QueryContext(ctx, "SELECT project_id, name, path, root_commit, main FROM project_repos ORDER BY project_id, name")
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +98,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var project string
 		var r RepoRecord
-		if err := rows.Scan(&project, &r.Name, &r.Path, &r.RootCommit); err != nil {
+		if err := rows.Scan(&project, &r.Name, &r.Path, &r.RootCommit, &r.Main); err != nil {
 			return nil, err
 		}
 		if i, ok := byID[strings.ToLower(project)]; ok {
@@ -115,8 +119,8 @@ func (p projects) SetProfile(ctx context.Context, id, profile string) error {
 
 func (p projects) AddRepo(ctx context.Context, project string, r RepoRecord) error {
 	// No row inserted: no such project.
-	res, err := p.db.ExecContext(ctx, "INSERT INTO project_repos (project_id, name, path, root_commit) SELECT id, ?, ?, ? FROM projects WHERE id = ?",
-		r.Name, r.Path, r.RootCommit, project)
+	res, err := p.db.ExecContext(ctx, "INSERT INTO project_repos (project_id, name, path, root_commit, main) SELECT id, ?, ?, ?, ? FROM projects WHERE id = ?",
+		r.Name, r.Path, r.RootCommit, r.Main, project)
 	if err != nil {
 		return unique(err)
 	}
@@ -129,6 +133,10 @@ func (p projects) MoveRepo(ctx context.Context, project, name, path string) erro
 		return unique(err)
 	}
 	return touched(res, nil)
+}
+
+func (p projects) SetRepoMain(ctx context.Context, project, name, main string) error {
+	return touched(p.db.ExecContext(ctx, "UPDATE project_repos SET main = ? WHERE project_id = ? AND name = ?", main, project, name))
 }
 
 func (p projects) RemoveRepo(ctx context.Context, project, name string) error {

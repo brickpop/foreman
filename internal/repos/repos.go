@@ -55,13 +55,10 @@ func (b Browser) dir(project, repo string) (string, string, error) {
 		return "", "", err
 	}
 	dir, ok := p.RepoDir(repo)
-	switch {
-	case !ok:
+	if !ok {
 		return "", "", ErrNoRepo
-	case repo == projectRepo:
-		return dir, "main", nil
 	}
-	return dir, p.Config.Main, nil
+	return dir, p.Main(repo), nil
 }
 
 // Repos lists the project's code repos agents can use (a missing one is a

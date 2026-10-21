@@ -26,7 +26,6 @@ import (
 // ProjectConfig is project.toml.
 type ProjectConfig struct {
 	Description  string   `toml:"description,omitempty" json:"description"`
-	Main         string   `toml:"main,omitempty" json:"main"`
 	Checks       string   `toml:"checks,omitempty" json:"checks"`
 	MergeToMain  string   `toml:"merge_to_main,omitempty" json:"mergeToMain"`
 	AlwaysAskCEO []string `toml:"always_ask_ceo,omitempty" json:"alwaysAskCeo"`
@@ -162,12 +161,14 @@ func decode(data []byte, v any) (toml.MetaData, problems) {
 
 // ParseProject parses a project.toml: the project's rules, which travel with
 // its project repo (its name and repos are this machine's, in the database).
-// Defaults are applied (main = "main", merge_to_main = "ceo", forge none).
+// Defaults are applied (merge_to_main = "ceo", forge none).
 func ParseProject(data []byte) (ProjectConfig, []string) {
 	var c ProjectConfig
-	_, p := decode(data, &c)
-	if c.Main == "" {
-		c.Main = "main"
+	md, p := decode(data, &c)
+	if md.IsDefined("main") {
+		// Every project.toml before 2026-10-21 has it: say what replaced it.
+		p = slices.DeleteFunc(p, func(s string) bool { return strings.HasPrefix(s, "main: ") })
+		p.add("main: each code repo has its own main branch now (Project settings → Code repos); remove this line")
 	}
 	if c.MergeToMain == "" {
 		c.MergeToMain = "ceo"

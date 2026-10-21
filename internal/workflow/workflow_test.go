@@ -34,13 +34,13 @@ var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 }}
 
 // config is the home: projects in root/<id>, each with its repos api and web
-// and its project repo beside them.
+// and its project repo beside them. web's main branch is trunk, so every
+// test also checks that each repo's own main is used.
 type config struct{ root string }
 
 func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
-	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Config: home.ProjectConfig{Main: "main"},
-		Repos: []home.Repo{{Name: "api", Path: filepath.Join(dir, "api")}, {Name: "web", Path: filepath.Join(dir, "web")}}}, nil
+	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Main: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Main: "trunk"}}}, nil
 }
 
 // entries is a wiki: path to title.
@@ -91,7 +91,7 @@ func newFixture(t *testing.T) *fixture {
 		if err := os.MkdirAll(filepath.Join(dir, "wiki"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := g.Init(ctx, dir, "main"); err != nil {
+		if err := g.Init(ctx, dir, mainOf(r)); err != nil {
 			t.Fatal(err)
 		}
 		writeFile(t, filepath.Join(dir, "README"), r+"\n")
@@ -101,7 +101,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	for agent, branch := range map[string]string{"mara": "lead/atlas/integration", "tove": "wt/tove/main"} {
 		for _, r := range []string{"api", "web"} {
-			if err := g.Prepare(ctx, filepath.Join(root, "ledger", r), filepath.Join(root, "ledger", ".sandboxes", agent, r), branch, "main"); err != nil {
+			if err := g.Prepare(ctx, filepath.Join(root, "ledger", r), filepath.Join(root, "ledger", ".sandboxes", agent, r), branch, mainOf(r)); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -121,6 +121,14 @@ func newFixture(t *testing.T) *fixture {
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
 	return f
+}
+
+// mainOf is a fixture repo's main branch.
+func mainOf(repo string) string {
+	if repo == "web" {
+		return "trunk"
+	}
+	return "main"
 }
 
 func writeFile(t *testing.T, path, content string) {
@@ -187,7 +195,7 @@ func (f *fixture) refused(agent, tool string, args any, code string) string {
 func TestSwitchInEveryRepo(t *testing.T) {
 	f := newFixture(t)
 	text := f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
-	if text != "Switched api, web to wt/tove/LED-44. New in api, web, made from main." {
+	if text != "Switched api, web to wt/tove/LED-44. New in api (from main), web (from trunk)." {
 		t.Errorf("%q", text)
 	}
 	for _, r := range []string{"api", "web"} {
@@ -198,7 +206,7 @@ func TestSwitchInEveryRepo(t *testing.T) {
 	if text := f.ok("tove", "switch", map[string]string{"branch": "wt/tove/main"}); strings.Contains(text, "New") {
 		t.Errorf("back home: %q", text)
 	}
-	if text := f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/settlement"}); !strings.Contains(text, "New in api, web") {
+	if text := f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/settlement"}); !strings.Contains(text, "New in api (from main), web (from trunk)") {
 		t.Errorf("lead: %q", text)
 	}
 }
@@ -316,7 +324,7 @@ func TestMergeATeammatesBranch(t *testing.T) {
 		t.Error("tove's work didn't arrive")
 	}
 	writeFile(t, filepath.Join(f.wt("mara", "web"), "wip"), "x\n")
-	f.refused("mara", "merge", map[string]string{"branch": "main"}, "uncommitted_changes")
+	f.refused("mara", "merge", map[string]string{"branch": "trunk"}, "uncommitted_changes")
 }
 
 func TestMergeWithConflictsThenCommit(t *testing.T) {
@@ -782,7 +790,7 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 		t.Errorf("the other one moved: %+v", mr)
 	}
 	// Its lead is told it's merged, and the other open one's that main moved.
-	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/atlas/integration was merged into main in api.") || !strings.Contains(news[1].Body, "main moved (lead/atlas/integration was merged). Merge it into lead/atlas/second") {
+	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/atlas/integration was merged into main in api.") || !strings.Contains(news[1].Body, "main moved in api (lead/atlas/integration was merged). Merge it into lead/atlas/second") {
 		t.Errorf("notices %+v", news)
 	}
 	f.w.Reconcile(ctx)
@@ -872,4 +880,33 @@ func TestReviewRequests(t *testing.T) {
 	if open, _ := f.w.OpenRequests(ctx); len(open) != 1 || open[0].MergeRequestID != "mr-3" {
 		t.Errorf("backfilled %+v", open)
 	}
+}
+
+// Each repo's merge request goes to that repo's own main: web's is trunk.
+func TestEachRepoMergesIntoItsOwnMain(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>\n")
+	f.ok("mara", "commit", commits("web", "a page"))
+	req := map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
+	if text := f.ok("mara", "request_merge", req); text != "Merge request mr-1 (web): waiting for the CEO." {
+		t.Fatalf("%q", text)
+	}
+	r, err := f.db.Requests().ForMergeRequest(ctx, "mr-1")
+	if err != nil || r.Summary != "Merge lead/atlas/integration into trunk in web: Export invoices." {
+		t.Errorf("review %+v %v", r, err)
+	}
+	web := filepath.Join(f.root, "ledger", "web")
+	if err := f.w.MergeToMain(ctx, "mr-1"); err != nil {
+		t.Fatal(err)
+	}
+	if subject := f.git(web, "log", "-1", "--format=%s", "trunk"); subject != "Merge Export invoices" {
+		t.Errorf("trunk's head %q", subject)
+	}
+	if n := f.lastNotice(); !strings.Contains(n.Body, "lead/atlas/integration was merged into trunk in web.") {
+		t.Errorf("notice %+v", n)
+	}
+	// A teammate's hand-off is new against web's trunk, not a main it hasn't.
+	writeFile(t, filepath.Join(f.wt("tove", "web"), "style.css"), "p {}\n")
+	f.ok("tove", "commit", commits("web", "style"))
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/main", "summary": "style"})
 }

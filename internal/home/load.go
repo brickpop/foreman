@@ -34,6 +34,7 @@ type Project struct {
 type Repo struct {
 	Name    string `json:"name"`    // unique in the project
 	Path    string `json:"path"`    // absolute
+	Main    string `json:"main"`    // the branch agents start from and merges go to
 	Problem string `json:"problem"` // why agents can't use it (missing, …); "" when they can
 	root    string // its first commit, which Locate looks for
 }
@@ -72,6 +73,17 @@ func (p Project) RepoDir(name string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// Main is the main branch of the repo named name: the code repo's own, or
+// main for the project repo (Foreman makes it on main) and any other name.
+func (p Project) Main(name string) string {
+	for _, r := range p.Repos {
+		if r.Name == name && name != projectRepo {
+			return r.Main
+		}
+	}
+	return "main"
 }
 
 // Team is a team file.
@@ -290,7 +302,7 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 		p.Config, p.Problems = ParseProject(data)
 	}
 	for _, rec := range r.Repos {
-		repo := Repo{Name: rec.Name, Path: rec.Path, Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
+		repo := Repo{Name: rec.Name, Path: rec.Path, Main: rec.Main, Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
 		if !repo.Ready() {
 			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.Name, repo.Problem))
 		}

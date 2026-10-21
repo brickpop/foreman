@@ -272,6 +272,7 @@ func TestInstanceRoundTripsEveryField(t *testing.T) {
 		ID: "mara@ledger", DeploymentID: "atlas@ledger", AgentID: "mara", Status: "running",
 		Task: "LED-44", PID: 4242, PtyID: "c0ffee", SandboxPath: "/ws/ledger/.sandboxes/mara",
 		Harness: "claude-code", Profile: "work", HarnessSessionID: "s-1", StartedAt: at, Restarts: 2,
+		StopReason: "app has no branch main",
 	}
 	bare := Instance{ID: "tove@ledger", DeploymentID: "atlas@ledger", AgentID: "tove", Status: "starting",
 		SandboxPath: "/ws/ledger/.sandboxes/tove", Harness: "claude-code"}
@@ -692,8 +693,9 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 	if err := p.Create(ctx, "Ledger"); !errors.Is(err, ErrExists) {
 		t.Errorf("a name in another case: %v", err)
 	}
-	app := RepoRecord{Name: "app", Path: "/home/ceo/dev/aragon/app", RootCommit: "c0ffee"}
-	for _, r := range []RepoRecord{app, {Name: "sdk", Path: "/home/ceo/dev/aragon/sdk", RootCommit: "beef"}} {
+	app := RepoRecord{Name: "app", Path: "/home/ceo/dev/aragon/app", RootCommit: "c0ffee", Main: "master"}
+	sdk := RepoRecord{Name: "sdk", Path: "/home/ceo/dev/aragon/sdk", RootCommit: "beef", Main: "main"}
+	for _, r := range []RepoRecord{app, sdk} {
 		if err := p.AddRepo(ctx, "aragon", r); err != nil {
 			t.Fatal(err)
 		}
@@ -722,11 +724,22 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 	}
 	aragon := list[0]
 	if aragon.ID != "aragon" || aragon.Profile != "work" || aragon.CreatedAt.IsZero() ||
-		!slices.Equal(aragon.Repos, []RepoRecord{app, {Name: "sdk", Path: "/home/ceo/dev/aragon/sdk", RootCommit: "beef"}}) {
+		!slices.Equal(aragon.Repos, []RepoRecord{app, sdk}) {
 		t.Errorf("aragon: %+v", aragon)
 	}
 	if list[1].Profile != "" || len(list[1].Repos) != 1 {
 		t.Errorf("ledger: %+v", list[1])
+	}
+
+	// A main of its own per repo, changed in one project only.
+	if err := p.SetRepoMain(ctx, "aragon", "app", "trunk"); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := p.List(ctx); list[0].Repos[0].Main != "trunk" || list[0].Repos[1].Main != "main" || list[1].Repos[0].Main != "master" {
+		t.Errorf("after SetRepoMain: %+v", list)
+	}
+	if err := p.SetRepoMain(ctx, "aragon", "app", "master"); err != nil {
+		t.Fatal(err)
 	}
 
 	// Locate and remove, each touching only that project's repo.
@@ -740,16 +753,17 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, err := range map[string]error{
-		"locate a repo that isn't there": p.MoveRepo(ctx, "aragon", "sdk", "/x"),
-		"remove it again":                p.RemoveRepo(ctx, "aragon", "sdk"),
-		"a profile for no project":       p.SetProfile(ctx, "nope", "work"),
+		"locate a repo that isn't there":     p.MoveRepo(ctx, "aragon", "sdk", "/x"),
+		"remove it again":                    p.RemoveRepo(ctx, "aragon", "sdk"),
+		"a profile for no project":           p.SetProfile(ctx, "nope", "work"),
+		"a main for a repo that isn't there": p.SetRepoMain(ctx, "aragon", "sdk", "main"),
 	} {
 		if !errors.Is(err, ErrNotFound) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	list, _ = p.List(ctx)
-	if !slices.Equal(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee"}}) || list[1].Repos[0] != app {
+	if !slices.Equal(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee", Main: "master"}}) || list[1].Repos[0] != app {
 		t.Errorf("after locate and remove: %+v", list)
 	}
 }
@@ -878,5 +892,37 @@ func TestStopReason(t *testing.T) {
 	r, _ := deps.Deploy(ctx, "atlas", "ledger", "")
 	if r.StopReason != "" {
 		t.Errorf("redeployed with reason %q", r.StopReason)
+	}
+}
+
+// A repo added before migration 004 was on the project's main branch, which
+// defaulted to main: it reads as main.
+func TestARepoFromBeforeItsOwnMainIsOnMain(t *testing.T) {
+	db := rawDB(t)
+	all, err := fs.Sub(migrationFiles, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upTo3 := fstest.MapFS{}
+	for _, name := range []string{"001_schema.sql", "002_stop_reason.sql", "003_drop_last_output.sql"} {
+		data, err := fs.ReadFile(all, "migrations/"+name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upTo3["migrations/"+name] = &fstest.MapFile{Data: data}
+	}
+	if err := migrate(ctx, db, upTo3); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO projects (id, created_at) VALUES ('ledger', '2026-10-20T00:00:00Z');
+		INSERT INTO project_repos (project_id, name, path, root_commit) VALUES ('ledger', 'app', '/h/app', 'c0ffee')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db, all); err != nil {
+		t.Fatal(err)
+	}
+	list, err := projects{db}.List(ctx)
+	if err != nil || len(list) != 1 || len(list[0].Repos) != 1 || list[0].Repos[0].Main != "main" {
+		t.Errorf("%+v %v", list, err)
 	}
 }

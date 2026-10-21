@@ -27,7 +27,7 @@ type config struct{}
 
 func (config) Team(string) (home.Team, error) { return atlas, nil }
 func (config) Project(id string) (home.Project, error) {
-	return home.Project{ID: id, Config: home.ProjectConfig{Main: "main"}}, nil
+	return home.Project{ID: id, Config: home.ProjectConfig{}}, nil
 }
 
 // spy is a block that records the calls that reach it.

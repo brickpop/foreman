@@ -49,7 +49,6 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 		return res
 	}
 	t.integrate(ctx) // hand-offs merged since the last check go with it
-	main := t.project.Config.Main
 	var made []string
 	found := false
 	for _, r := range t.worktrees() {
@@ -57,7 +56,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 			continue
 		}
 		found = true
-		if n, err := t.w.Git.Ahead(ctx, r.dir, branch, main); err != nil {
+		if n, err := t.w.Git.Ahead(ctx, r.dir, branch, t.project.Main(r.name)); err != nil {
 			return gitError(err)
 		} else if n == 0 {
 			continue
@@ -89,7 +88,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry string) agentlink.
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case len(made) == 0:
-		return teamtools.Refusal("nothing_to_merge", "%s has no commits beyond %s in any repo", branch, main)
+		return teamtools.Refusal("nothing_to_merge", "%s has no commits beyond its repo's main branch in any repo", branch)
 	}
 	return agentlink.Result{Text: fmt.Sprintf("Merge request %s: waiting for the CEO.", strings.Join(made, ", "))}
 }
@@ -221,12 +220,12 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main strin
 	}
 	for _, other := range open {
 		if other.ProjectID == mr.ProjectID && other.Repo == mr.Repo {
-			w.tell(ctx, other, "foreman", fmt.Sprintf("From Foreman: %s moved (%s was merged). Merge it into %s with merge(%q), resolve any conflicts and commit(), then call request_merge again.", main, mr.Branch, other.Branch, main))
+			w.tell(ctx, other, "foreman", fmt.Sprintf("From Foreman: %s moved in %s (%s was merged). Merge it into %s with merge(%q), resolve any conflicts and commit(), then call request_merge again.", main, mr.Repo, mr.Branch, other.Branch, main))
 		}
 	}
 }
 
-// target is a merge request with its project's protected branch and the
+// target is a merge request with its repo's main branch and the
 // repo's own checkout (the CEO's).
 func (w *Workflow) target(ctx context.Context, id string) (store.MergeRequest, string, string, error) {
 	mr, err := w.MergeRequests.Get(ctx, id)
@@ -241,7 +240,7 @@ func (w *Workflow) target(ctx context.Context, id string) (store.MergeRequest, s
 	if !ok {
 		return mr, "", "", fmt.Errorf("%w: %s has no repo %s agents can use", home.ErrNotFound, project.ID, mr.Repo)
 	}
-	return mr, project.Config.Main, dir, nil
+	return mr, project.Main(mr.Repo), dir, nil
 }
 
 // tell delivers a notice to the merge request's lead, from Foreman or the CEO.
@@ -275,7 +274,7 @@ func (w *Workflow) review(ctx context.Context, mr store.MergeRequest) {
 	}
 	main, title := "main", mr.Entry
 	if project, err := w.Config.Project(mr.ProjectID); err == nil {
-		main = project.Config.Main
+		main = project.Main(mr.Repo)
 	}
 	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil {
 		title = e.Title

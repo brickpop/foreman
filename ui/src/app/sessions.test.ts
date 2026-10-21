@@ -18,6 +18,7 @@ import {
   panesFrom,
   rosterOrder,
   searchFor,
+  stoppedLine,
   toggleSplit,
   withDoing,
 } from "./sessions";
@@ -250,5 +251,18 @@ describe("the Sessions URL", () => {
       panes: "tic,toe",
       view: undefined,
     });
+  });
+});
+
+describe("stoppedLine", () => {
+  it("says why Foreman stopped the agent", () => {
+    expect(stoppedLine("Leady", `couldn't start: poc has no branch "main"`)).toBe(
+      `Leady stopped: couldn't start: poc has no branch "main". Messages for them wait until you start them again; they pick up their conversation.`,
+    );
+  });
+  it("says only that it stopped when there's no reason (from before reasons were kept)", () => {
+    expect(stoppedLine("Leady", "")).toBe(
+      "Leady stopped. Messages for them wait until you start them again; they pick up their conversation.",
+    );
   });
 });

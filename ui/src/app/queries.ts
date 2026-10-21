@@ -56,6 +56,16 @@ export function useHomeFolder() {
   return useQuery({ queryKey: keys.home, queryFn: () => c.home.folder() });
 }
 
+/** A repo folder's branches, while one is picked to add (or to change its main). */
+export function useBranches(path: string | undefined) {
+  const c = useClient();
+  return useQuery({
+    queryKey: ["branches", path],
+    queryFn: () => c.home.branches(path ?? ""),
+    enabled: !!path,
+  });
+}
+
 export function useProjects() {
   const c = useClient();
   return useQuery({ queryKey: keys.projects, queryFn: () => c.home.projects() });

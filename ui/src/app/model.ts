@@ -226,6 +226,12 @@ export function linkLine(mr: MergeRequest, forge: string, main = "main"): string
   return `${pr}${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
 }
 
+/** The main branch of a project's repo, which its merges go to; main until
+ * the project has loaded. */
+export function mainOf(project: Project | undefined, repo: string): string {
+  return project?.repos.find((r) => r.name === repo)?.main ?? "main";
+}
+
 /** The forge a merge request can become a PR on ("none": no Create PR): its
  * project's, since merge requests are on the project's code repos. */
 export function forgeOf(project?: Project): string {

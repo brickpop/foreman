@@ -31,7 +31,8 @@ var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge"
 func input(agent string, tools []string) Input {
 	return Input{
 		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/.foreman/sandboxes/ledger/" + agent, Goal: "Ship invoices.\n", Tools: tools,
-		Config: home.ProjectConfig{Main: "main", Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
+		Repos:  []home.Repo{{Name: "api", Main: "main"}},
+		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
 	}
 }
 
@@ -133,7 +134,8 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	in := input("ilya", nil)
 	in.Team.Playbook = nil
-	in.Config = home.ProjectConfig{Main: "trunk"}
+	in.Config = home.ProjectConfig{}
+	in.Repos = []home.Repo{{Name: "api", Main: "trunk"}}
 	got := Compose(in)
 	for _, absent := range []string{"## Playbook", "## Always escalate", "run:"} {
 		if strings.Contains(got, absent) {
@@ -141,7 +143,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 		}
 	}
 	if !strings.Contains(got, "made for you from trunk.") {
-		t.Error("the project's main branch name isn't used")
+		t.Error("the repo's main branch name isn't used")
 	}
 	solo := input("mara", every)
 	solo.Team.Agents = map[string]home.Soul{"mara": atlas.Agents["mara"]}
@@ -227,6 +229,24 @@ func TestNoGoalSaysWhoGivesIt(t *testing.T) {
 		in.Goal = "  "
 		if got := Compose(in); !strings.Contains(got, want) {
 			t.Errorf("%s:\n%s", agent, got)
+		}
+	}
+}
+
+// Repos on different main branches are each named; the same one is named once.
+func TestTheMainBranchOfEachRepo(t *testing.T) {
+	for _, tc := range []struct {
+		repos []home.Repo
+		want  string
+	}{
+		{[]home.Repo{{Name: "api", Main: "main"}, {Name: "web", Main: "main"}}, "made for you from main."},
+		{[]home.Repo{{Name: "poc", Main: "master"}, {Name: "web", Main: "main"}}, "made for you from master in poc, main in web."},
+		{nil, "made for you from main."},
+	} {
+		in := input("tove", nil)
+		in.Repos = tc.repos
+		if got := Compose(in); !strings.Contains(got, tc.want) {
+			t.Errorf("%v: no %q in\n%s", tc.repos, tc.want, got)
 		}
 	}
 }

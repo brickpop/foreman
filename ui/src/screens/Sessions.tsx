@@ -31,6 +31,7 @@ import {
   rosterOrder,
   type SessionsSearch,
   searchFor,
+  stoppedLine,
   toggleSplit,
 } from "../app/sessions";
 import { ActivityPanel } from "../components/ActivityPanel";
@@ -412,7 +413,12 @@ function Pane({
       {instance.status === "queued" ? (
         <Queued name={name} />
       ) : asleep ? (
-        <Asleep instance={instance.id} name={name} stopped={instance.status === "stopped"} />
+        <Asleep
+          instance={instance.id}
+          name={name}
+          stopped={instance.status === "stopped"}
+          reason={instance.stopReason}
+        />
       ) : (
         <div className="flex min-h-0 flex-1">
           <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
@@ -528,7 +534,17 @@ function Pane({
 
 /** An asleep or stopped agent's pane: no session runs until it is started,
  * and then it picks up its conversation. */
-function Asleep({ instance, name, stopped }: { instance: string; name: string; stopped: boolean }) {
+function Asleep({
+  instance,
+  name,
+  stopped,
+  reason,
+}: {
+  instance: string;
+  name: string;
+  stopped: boolean;
+  reason: string;
+}) {
   const client = useClient();
   const queries = useQueryClient();
   const toast = useToast();
@@ -541,7 +557,7 @@ function Asleep({ instance, name, stopped }: { instance: string; name: string; s
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
       <p className="m-0 max-w-[380px] text-[13.5px] text-tx3">
         {stopped
-          ? `${name} stopped: it crashed twice, or couldn't start. Messages for them wait until you start them again; they pick up their conversation.`
+          ? stoppedLine(name, reason)
           : `${name} is asleep: no session runs until there's work for them.`}
       </p>
       <Button disabled={wake.isPending} onClick={() => wake.mutate()}>

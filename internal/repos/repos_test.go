@@ -22,8 +22,8 @@ func (c config) Project(id string) (home.Project, error) {
 	if id != "ledger" {
 		return home.Project{}, home.ErrNotFound
 	}
-	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "project"), Config: home.ProjectConfig{Main: "trunk"},
-		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api")}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
+	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "project"), Config: home.ProjectConfig{},
+		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api"), Main: "trunk"}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
 }
 
 func gitIn(t *testing.T, dir string, args ...string) {
@@ -133,7 +133,7 @@ func TestBrowserRefusals(t *testing.T) {
 	}
 }
 
-// A repo cloned with another default branch (master) still lists: its
+// A repo whose main branch is gone (deleted since it was picked) still lists: its
 // branches just have nothing to be ahead of.
 func TestAMainTheRepoHasNot(t *testing.T) {
 	b := fixture(t)
@@ -155,6 +155,6 @@ type mainIs struct {
 
 func (m mainIs) Project(id string) (home.Project, error) {
 	p, err := m.config.Project(id)
-	p.Config.Main = m.main
+	p.Repos[0].Main = m.main
 	return p, err
 }

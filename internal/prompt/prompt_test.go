@@ -1,6 +1,7 @@
 package prompt
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -179,7 +180,7 @@ func TestTodaysTools(t *testing.T) {
 	}
 	lead := Compose(input("mara", Offered(true)))
 	if !strings.Contains(lead, "request_merge(branch, entry)") || !strings.Contains(lead, "Ask for a merge to main with request_merge(branch, entry)") ||
-		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") ||
+		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") || !strings.Contains(lead, "reviews()                           Where your reviews stand") ||
 		!strings.Contains(lead, "requests merges") || strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
 		t.Errorf("lead:\n%s", lead)
 	}
@@ -208,15 +209,27 @@ func TestWorktreesPersist(t *testing.T) {
 	}
 }
 
-// The role decides: handoff for members, request_merge for the lead.
+// The role decides: handoff for members, request_merge and withdraw_merge for
+// the lead; a tool not built yet goes to nobody.
 func TestOfferedFollowsTheRole(t *testing.T) {
-	saved := built
-	t.Cleanup(func() { built = saved })
-	built = every
-	lead, member := strings.Join(Offered(true), ","), strings.Join(Offered(false), ",")
-	if strings.Contains(lead, "handoff") || !strings.Contains(lead, "request_merge") ||
-		!strings.Contains(member, "handoff") || strings.Contains(member, "request_merge") {
-		t.Errorf("lead %s; member %s", lead, member)
+	lead, member := Offered(true), Offered(false)
+	for _, name := range []string{"handoff", "escalate"} {
+		if slices.Contains(lead, name) {
+			t.Errorf("the lead gets %s: %v", name, lead)
+		}
+	}
+	for _, name := range []string{"request_merge", "withdraw_merge", "reviews", "escalate"} {
+		if slices.Contains(member, name) {
+			t.Errorf("a member gets %s: %v", name, member)
+		}
+	}
+	for _, name := range []string{"ask", "commit", "discard", "request_merge", "withdraw_merge", "reviews"} {
+		if !slices.Contains(lead, name) {
+			t.Errorf("the lead lacks %s: %v", name, lead)
+		}
+	}
+	if !slices.Contains(member, "handoff") || !slices.Contains(member, "ask") {
+		t.Errorf("member %v", member)
 	}
 }
 

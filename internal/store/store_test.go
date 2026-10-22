@@ -961,12 +961,13 @@ func TestReviewsAndTheirComments(t *testing.T) {
 		t.Fatalf("saved %+v %v", r, err)
 	}
 	r.ChangesRequestedAt = time.Date(2026, 10, 21, 9, 0, 0, 0, time.UTC)
+	r.ChangesNote = "round it"
 	r.WithdrawnAt, r.WithdrawnReason, r.SupersededBy = time.Date(2026, 10, 22, 9, 0, 0, 0, time.UTC), "all of it is in lead/atlas/big", "rev-9"
 	if _, err := revs.Save(ctx, r); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := revs.Get(ctx, "rev-1"); err != nil || !got.ChangesRequestedAt.Equal(r.ChangesRequestedAt) || got.Branch != r.Branch ||
-		!got.WithdrawnAt.Equal(r.WithdrawnAt) || got.WithdrawnReason != r.WithdrawnReason || got.SupersededBy != "rev-9" {
+		!got.WithdrawnAt.Equal(r.WithdrawnAt) || got.WithdrawnReason != r.WithdrawnReason || got.SupersededBy != "rev-9" || got.ChangesNote != "round it" {
 		t.Errorf("got %+v %v", got, err)
 	}
 	if _, err := revs.Save(ctx, Review{ProjectID: "other", Branch: "lead/x/y"}); err != nil {

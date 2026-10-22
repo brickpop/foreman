@@ -17,9 +17,15 @@ epic: terminal-multiplexer
 - **The session selector at the top** (the deployment tabs, and the agent tabs under them) may not be needed any more.
 - **The branch the agent is on**, shown with its session.
 
+## Proposed shape
+
+- `/sessions`: the list, by project, then team, then agent: status, branch, what it is doing, the needs-you dot.
+- `/sessions/<agent@project>`: one terminal, under a header (agent, team, branch, status, back to the list), with a teammates menu to jump within the team, and an Activity toggle for its team.
+- **Split goes**, and the agent tabs with it: two browser windows side by side do it, tiled by the OS, and the teammates menu replaces the tabs. The URL loses its panes. Two tabs on one session already work (the most recently focused one sets the terminal's size).
+
 ## Open questions
 
-- **The selector:** the list replaces the deployment tabs. The agent tabs are still the quick way to jump to a teammate, and to pick the second pane of Split: keep them on a session's page, go back to the list for that, or keep Split at all, now that two browser tabs do the same?
+- **Split and the agent tabs going**, as proposed?
 - **The branch:** per repo (an agent's worktrees can be on different branches, though `switch` keeps them together), live as it switches (a `team.action` already says so), and where: the pane header, the list row, or both?
 - **Activity**, today beside a terminal in the Sessions view: on the session's page, the project's Activity tab, or both?
 

@@ -27,27 +27,90 @@ type Input struct {
 	Tools []string
 }
 
-// built are the team tools that exist so far (the Messaging and hand-offs
-// epic brings them in steps), in the order the prompt lists them.
-var built = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "request_merge", "withdraw_merge"}
+// Who may be offered a team tool.
+type role int
 
-// Offered is the team tools an agent gets: what is built, as its role allows
-// (handoff for members, request_merge and withdraw_merge for the lead). The team-tool router
-// serves exactly these.
+const (
+	anyone role = iota
+	leadOnly
+	membersOnly
+)
+
+// teamTool is a team tool as the prompt knows it: who gets it, whether it
+// exists yet (the Messaging and hand-offs epic brings them in steps), and its
+// lines in the Tools section ({team}: the team's id;
+// wiki/product/architecture/session-prompt.md#template).
+type teamTool struct {
+	name  string
+	role  role
+	built bool
+	rows  []string
+}
+
+// teamTools are every team tool, in the order the prompt lists them.
+var teamTools = []teamTool{
+	{"ask", anyone, true, []string{"ask(teammate, request)              Get info or work. Keep going meanwhile."}},
+	{"reply", anyone, true, []string{"reply(request_id, output)           Answer a request. Only `output` is returned."}},
+	{"read_message", anyone, true, []string{"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."}},
+	{"switch", anyone, true, []string{"switch(branch)                      Go to one of your branches (made from each repo's main if new)."}},
+	{"commit", anyone, true, []string{
+		"commit(commits)                     Commit the repos you name, each with its own message:",
+		"                                    [{repo, message}], repo being its folder in your sandbox.",
+	}},
+	{"merge", anyone, true, []string{
+		"merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.",
+		"                                    On conflicts: resolve the markers, then commit those repos.",
+	}},
+	{"abort_merge", anyone, true, []string{"abort_merge()                       Back out of an unfinished merge."}},
+	{"discard", anyone, true, []string{"discard(repos)                      Throw away what you didn't commit (all repos if none named)."}},
+	{"set_submodule", anyone, true, []string{
+		"set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a branch, tag or commit;",
+		"                                    url adds a new one. Switch and merge keep submodules in step.",
+	}},
+	// The lead hands nothing off: it works only on lead branches.
+	{"handoff", membersOnly, true, []string{"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."}},
+	{"contribute", anyone, true, []string{"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."}},
+	{"escalate", anyone, false, []string{
+		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
+		"                                    For an approval, wait for the answer before that step.",
+	}},
+	{"request_merge", leadOnly, true, []string{
+		"request_merge(branch, entry)        Ask the CEO to merge one of your lead/{team}/* branches into main;",
+		"                                    entry: the wiki card that explains the work. Only you can.",
+		"                                    Call it again on the same branch to refresh it.",
+	}},
+	{"withdraw_merge", leadOnly, true, []string{
+		"withdraw_merge(branch, reason,      Take back your open request to merge a branch, before the CEO",
+		"  superseded_by)                    decides it: superseded_by, another of your branches under review",
+		"                                    that holds all of it. When the CEO merges a branch that holds",
+		"                                    all of another under review, Foreman withdraws that one itself.",
+	}},
+	{"reviews", leadOnly, true, []string{
+		"reviews()                           Where your reviews stand, with the CEO's comments on changes",
+		"                                    requested. Read it again whenever you're unsure.",
+	}},
+}
+
+// Offered is the team tools an agent gets: those built, as its role allows.
+// The team-tool router serves exactly these.
 func Offered(lead bool) []string {
 	var tools []string
-	for _, t := range built {
-		if forRole(t, lead) {
-			tools = append(tools, t)
+	for _, t := range teamTools {
+		if t.built && t.forRole(lead) {
+			tools = append(tools, t.name)
 		}
 	}
 	return tools
 }
 
-// forRole: the lead hands nothing off (it works only on lead branches), and
-// only the lead requests merges, and withdraws them.
-func forRole(tool string, lead bool) bool {
-	return !(tool == "handoff" && lead) && !((tool == "request_merge" || tool == "withdraw_merge") && !lead)
+func (t teamTool) forRole(lead bool) bool {
+	return t.role == anyone || (t.role == leadOnly) == lead
+}
+
+// forRole: whether a role may have the tool named.
+func forRole(name string, lead bool) bool {
+	i := slices.IndexFunc(teamTools, func(t teamTool) bool { return t.name == name })
+	return i >= 0 && teamTools[i].forRole(lead)
 }
 
 // Compose returns the session prompt, as Markdown.
@@ -224,57 +287,15 @@ func ceoSection(in Input, lead, asking bool) string {
 	return fmt.Sprintf("The CEO normally talks to %s. If the CEO instructs you directly, do it, and tell %s if it's relevant to the team.", leadName, leadName)
 }
 
-// toolRows are the Tools section's lines, by tool
-// (wiki/product/architecture/session-prompt.md#template).
-var toolRows = map[string][]string{
-	"ask":          {"ask(teammate, request)              Get info or work. Keep going meanwhile."},
-	"reply":        {"reply(request_id, output)           Answer a request. Only `output` is returned."},
-	"read_message": {"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."},
-	"switch":       {"switch(branch)                      Go to one of your branches (made from each repo's main if new)."},
-	"commit": {
-		"commit(commits)                     Commit the repos you name, each with its own message:",
-		"                                    [{repo, message}], repo being its folder in your sandbox.",
-	},
-	"merge": {
-		"merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.",
-		"                                    On conflicts: resolve the markers, then commit those repos.",
-	},
-	"abort_merge": {"abort_merge()                       Back out of an unfinished merge."},
-	"discard":     {"discard(repos)                      Throw away what you didn't commit (all repos if none named)."},
-	"set_submodule": {
-		"set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a branch, tag or commit;",
-		"                                    url adds a new one. Switch and merge keep submodules in step.",
-	},
-	"handoff":    {"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."},
-	"contribute": {"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."},
-	"escalate": {
-		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
-		"                                    For an approval, wait for the answer before that step.",
-	},
-}
-
 // tools is the Tools section: a row per tool offered, then how they work.
 func tools(in Input, lead bool, has func(string) bool) string {
 	var rows []string
-	for _, t := range []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate"} {
-		if has(t) {
-			rows = append(rows, toolRows[t]...)
+	for _, t := range teamTools {
+		if has(t.name) {
+			for _, row := range t.rows {
+				rows = append(rows, strings.ReplaceAll(row, "{team}", in.Team.Team))
+			}
 		}
-	}
-	if has("request_merge") {
-		rows = append(rows,
-			"request_merge(branch, entry)        Ask the CEO to merge one of your lead/"+in.Team.Team+"/* branches into main;",
-			"                                    entry: the wiki card that explains the work. Only you can.",
-			"                                    Call it again on the same branch to refresh it.",
-		)
-	}
-	if has("withdraw_merge") {
-		rows = append(rows,
-			"withdraw_merge(branch, reason,      Take back your open request to merge a branch, before the CEO",
-			"  superseded_by)                    decides it: superseded_by, another of your branches under review",
-			"                                    that holds all of it. When the CEO merges a branch that holds",
-			"                                    all of another under review, Foreman withdraws that one itself.",
-		)
 	}
 	notes := ""
 	if has("commit") {

@@ -19,6 +19,7 @@ Table `reviews`.
 | `branch` | String | yes | | | The lead branch `lead/<team>/<topic>` |
 | `created_at` | Timestamp | yes | now | | |
 | `changes_requested_at` | Timestamp | | | | Set by Request changes; cleared by the lead's next `request_merge` |
+| `changes_note` | String | | `''` | | The CEO's note with the last Request changes, for the lead's `reviews()` |
 | `withdrawn_at` | Timestamp | | | | Set when the lead (`withdraw_merge`) or Foreman withdrew it ([Reviews → Withdrawn](../features/reviews.md#withdrawn)) |
 | `withdrawn_reason` | String | | `''` | ≤ the team tools' message limit | The lead's reason, or Foreman's `<branch>, merged, holds all of it` |
 | `superseded_by` | String → Review | | `''` | | The review that holds all of it, when one does |

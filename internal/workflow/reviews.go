@@ -443,13 +443,34 @@ func (w *Workflow) RequestChanges(ctx context.Context, id, note string) error {
 		}
 	}
 	r := v.Review
-	r.ChangesRequestedAt = now
+	r.ChangesRequestedAt, r.ChangesNote = now, note
 	if _, err := w.Reviews.Save(ctx, r); err != nil {
 		return err
 	}
 	w.resolveReview(ctx, id, "changes requested")
 	w.tell(ctx, lead, "ceo", changesMessage(v, note, drafts))
 	return nil
+}
+
+// commentText is a comment as the lead reads it: where it is on the branch
+// now, the line's text, then the comment; a general one is its text.
+func commentText(c Comment) string {
+	var b strings.Builder
+	switch {
+	case c.Repo == "":
+		return c.Body
+	case c.Side == "old":
+		fmt.Fprintf(&b, "%s %s, removed line %d", c.Repo, c.Path, c.Line)
+	default:
+		fmt.Fprintf(&b, "%s %s:%d", c.Repo, c.Path, c.Now)
+	}
+	if c.Outdated {
+		b.WriteString(" (changed since)")
+	}
+	if c.Snippet != "" {
+		fmt.Fprintf(&b, " `%s`", strings.TrimSpace(c.Snippet))
+	}
+	return b.String() + ": " + c.Body
 }
 
 // changesMessage is what the lead reads: each comment where it is on the
@@ -461,23 +482,7 @@ func changesMessage(v Review, note string, comments []Comment) string {
 		b.WriteString("\n\n" + note)
 	}
 	for _, c := range comments {
-		b.WriteString("\n\n- ")
-		switch {
-		case c.Repo == "":
-			b.WriteString(c.Body)
-			continue
-		case c.Side == "old":
-			fmt.Fprintf(&b, "%s %s, removed line %d", c.Repo, c.Path, c.Line)
-		default:
-			fmt.Fprintf(&b, "%s %s:%d", c.Repo, c.Path, c.Now)
-		}
-		if c.Outdated {
-			b.WriteString(" (changed since)")
-		}
-		if c.Snippet != "" {
-			fmt.Fprintf(&b, " `%s`", strings.TrimSpace(c.Snippet))
-		}
-		b.WriteString(": " + c.Body)
+		b.WriteString("\n\n- " + commentText(c))
 	}
 	b.WriteString("\n\nFix them, commit(), then call request_merge again on the same branch.")
 	return b.String()

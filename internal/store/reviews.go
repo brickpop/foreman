@@ -51,8 +51,8 @@ type reviews struct{ db *sql.DB }
 func (s reviews) Save(ctx context.Context, r Review) (Review, error) {
 	if r.ID == "" {
 		r.CreatedAt = time.Now().UTC()
-		res, err := s.db.ExecContext(ctx, "INSERT INTO reviews (project_id, branch, created_at, changes_requested_at, withdrawn_at, withdrawn_reason, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			r.ProjectID, r.Branch, timeText(r.CreatedAt), timeText(r.ChangesRequestedAt), timeText(r.WithdrawnAt), r.WithdrawnReason, r.SupersededBy)
+		res, err := s.db.ExecContext(ctx, "INSERT INTO reviews (project_id, branch, created_at, changes_requested_at, changes_note, withdrawn_at, withdrawn_reason, superseded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+			r.ProjectID, r.Branch, timeText(r.CreatedAt), timeText(r.ChangesRequestedAt), r.ChangesNote, timeText(r.WithdrawnAt), r.WithdrawnReason, r.SupersededBy)
 		if err != nil {
 			return r, err
 		}
@@ -64,8 +64,8 @@ func (s reviews) Save(ctx context.Context, r Review) (Review, error) {
 	if err != nil {
 		return r, err
 	}
-	res, err := s.db.ExecContext(ctx, "UPDATE reviews SET project_id = ?, branch = ?, created_at = ?, changes_requested_at = ?, withdrawn_at = ?, withdrawn_reason = ?, superseded_by = ? WHERE seq = ?",
-		r.ProjectID, r.Branch, timeText(r.CreatedAt), timeText(r.ChangesRequestedAt), timeText(r.WithdrawnAt), r.WithdrawnReason, r.SupersededBy, seq)
+	res, err := s.db.ExecContext(ctx, "UPDATE reviews SET project_id = ?, branch = ?, created_at = ?, changes_requested_at = ?, changes_note = ?, withdrawn_at = ?, withdrawn_reason = ?, superseded_by = ? WHERE seq = ?",
+		r.ProjectID, r.Branch, timeText(r.CreatedAt), timeText(r.ChangesRequestedAt), r.ChangesNote, timeText(r.WithdrawnAt), r.WithdrawnReason, r.SupersededBy, seq)
 	return r, touched(res, err)
 }
 
@@ -87,7 +87,7 @@ func (s reviews) Get(ctx context.Context, id string) (Review, error) {
 func (s reviews) List(ctx context.Context) ([]Review, error) { return s.query(ctx, "") }
 
 func (s reviews) query(ctx context.Context, where string, args ...any) ([]Review, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT seq, project_id, branch, created_at, changes_requested_at, withdrawn_at, withdrawn_reason, superseded_by FROM reviews "+where+" ORDER BY seq", args...)
+	rows, err := s.db.QueryContext(ctx, "SELECT seq, project_id, branch, created_at, changes_requested_at, changes_note, withdrawn_at, withdrawn_reason, superseded_by FROM reviews "+where+" ORDER BY seq", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (s reviews) query(ctx context.Context, where string, args ...any) ([]Review
 		var r Review
 		var seq int64
 		var created, requested, withdrawn sql.NullString
-		if err := rows.Scan(&seq, &r.ProjectID, &r.Branch, &created, &requested, &withdrawn, &r.WithdrawnReason, &r.SupersededBy); err != nil {
+		if err := rows.Scan(&seq, &r.ProjectID, &r.Branch, &created, &requested, &r.ChangesNote, &withdrawn, &r.WithdrawnReason, &r.SupersededBy); err != nil {
 			return nil, err
 		}
 		r.ID = "rev-" + strconv.FormatInt(seq, 10)

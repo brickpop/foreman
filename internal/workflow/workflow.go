@@ -157,6 +157,8 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>, with a review open"},`+
 			`"reason":{"type":"string","description":"Why, for the CEO"},`+
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
+	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 }
 
 // Tools implements teamtools.Block.
@@ -217,6 +219,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "request_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Entry))
+	case "reviews":
+		return t.reviews(ctx) // read-only: not an action
 	case "withdraw_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.withdrawMerge(ctx, act.Branch, strings.TrimSpace(a.Reason), strings.TrimSpace(a.By))

@@ -180,6 +180,7 @@ export interface Review {
   branch: string;
   createdAt: string /* RFC 3339 */;
   changesRequestedAt: string /* RFC 3339 */; // zero unless it waits on the lead
+  changesNote: string; // the CEO's note with the last Request changes
   withdrawnAt: string /* RFC 3339 */; // zero unless the lead or Foreman withdrew it
   withdrawnReason: string;
   supersededBy: string; // the review that holds all of it, when one does

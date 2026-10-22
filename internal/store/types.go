@@ -164,6 +164,7 @@ type Review struct {
 	Branch             string    `json:"branch"`
 	CreatedAt          time.Time `json:"createdAt"`
 	ChangesRequestedAt time.Time `json:"changesRequestedAt"` // zero unless it waits on the lead
+	ChangesNote        string    `json:"changesNote"`        // the CEO's note with the last Request changes
 	WithdrawnAt        time.Time `json:"withdrawnAt"`        // zero unless the lead or Foreman withdrew it
 	WithdrawnReason    string    `json:"withdrawnReason"`
 	SupersededBy       string    `json:"supersededBy"` // the review that holds all of it, when one does

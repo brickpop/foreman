@@ -14,7 +14,7 @@ Three actors, and every interaction enters through exactly one channel:
 
 | Actor | Channel | Struct | Received by |
 |---|---|---|---|
-| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `request_merge`, `withdraw_merge`) |
+| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `request_merge`, `withdraw_merge`, `reviews`) |
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge" | "withdraw_merge"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge" | "withdraw_merge" | "reviews"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -116,6 +116,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `escalate` | anyone | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
 | `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
 | `withdraw_merge` | the lead only | no | Workflow |
+| `reviews` | the lead only | no | Workflow |
 
 ### `ask`
 
@@ -294,6 +295,12 @@ type WithdrawMergeArgs struct { Branch, Reason, SupersededBy string } // branch,
 - Kept as a [team action](#team-actions), refusals included.
 - Errors: `not_lead` (never seen in practice), `branch_not_allowed` (either branch not the caller's own lead branch), `no_reason`, `too_long` (the reason, over the message limit), `superseded_by_itself`, `not_open` (no review open on `Branch`), `superseding_not_open` (`SupersededBy` has none: request it first), `not_superseded` (`SupersededBy` doesn't contain `Branch` in a repo the review has open: merge it in first, or leave it out).
 - **Foreman withdraws too** (the CEO, 2026-10-22): when the CEO merges a repo of a review (Merge, or a merge Foreman notices outside it), every other open review of the same lead (deployment) with a merge request on that repo, whose every open merge request `main` now holds (merging it would change nothing), is withdrawn the same way, with the reason `<branch>, merged, holds all of it` and superseded by the merged review; its work items go to the merged review's merge request in their repo. So the CEO can merge either one: merging the bigger withdraws the smaller, merging the smaller leaves the bigger open (it holds more). Nothing happens at `request_merge` time.
+
+### `reviews`
+
+- Effect: the caller's [reviews](../models/review.md) on its project (its deployment's: not another team's), open or decided in the last 7 days, newest first, as text: per review `rev-2 lead/atlas/big: <entry title> (<entry>)`; then each repo's state, `api changes requested · web conflicts with trunk` (`waiting for the CEO`, `changes requested`, `conflicts with <main>`, `merged`, `dismissed (the CEO's note: …)`, `withdrawn`); `Withdrawn: <reason>, superseded by rev-N.` when it was; and while changes are requested, `The CEO's note: …` and the comments sent with the last Request changes, each as the lead's message shows it (on its line now, ` (changed since)` once outdated), line comments first. Built from what the review page reads (`workflow.Review`), so the two agree. `You have no review open, and none decided in the last 7 days.` when there is none.
+- Read-only: not a [team action](#team-actions).
+- Errors: `not_lead` (never seen in practice).
 
 ### Deliveries Foreman originates
 

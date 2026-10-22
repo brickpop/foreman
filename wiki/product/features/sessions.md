@@ -16,6 +16,8 @@ Padding `10px 16px`, bottom border.
 - **Right**: a **`<project> · Board`** link (outline button) back to the active deployment's project, on its [Board](./board.md) tab: the tasks and their status (the CEO, 2026-10-17); then one segmented control, **`Single | Split | Activity`**, in a 1px `--line` frame ([Design system](../design/design-system.md#buttons)): one terminal, two side by side, or one beside the [Activity](#activity) panel. Split and Activity exclude each other.
 - **Empty** (no deployments): centered on `--bg`, `No team is deployed yet, so there are no sessions.` and a primary **`Deploy a team`** button, which opens [Deploy a team](./deploy-team.md) with nothing chosen (the team, the project and the goal).
 
+Not built: a list of sessions by project, each session on its own page, with its branch ([its card](../../backlog/sessions-by-project.md)).
+
 ## The URL
 
 The URL is the view, so a reload, a shared link or Back shows the same thing (found 2026-10-16: a reload could open another agent, picked before the team file had arrived, and nothing was kept): `/sessions?deployment=<team@project>&agent=<agent>&panes=<left>,<right>&view=activity`. `agent` is the active pane's agent; `panes` is there only when split; `view=activity` only while Activity is open. Agents are named by their id (the deployment names the project); a full instance id (`tac@DevProject`) is read too, as notifications link it. Every change replaces the URL (no history entry per click). What the URL names is checked against the deployment's agents: an unknown agent opens the lead, a split that can't be made is one pane, and an agent asked for outside the split takes the left pane. Switching deployment tabs comes back to each one's last view, while the app runs.

@@ -26,6 +26,8 @@ The toggles gate browser notifications only; toasts always show. A tab raises a 
 
 A Foreman-raised request (no instance, e.g. a failed build) is titled `Foreman needs you on <project>`. The done notice's body is a fixed line until instance events carry the hand-off summary.
 
+Not built: notifications from the OS rather than the browser, chosen in Settings ([its card](../../backlog/os-notifications.md)).
+
 ## Behaviour
 
 - Each notification is tagged per instance (`agent@project`), so a newer one replaces an older one from the same instance. The same tag also collapses duplicates when several Foreman tabs are open (every tab receives the event; the browser shows one notification per tag). To check in every browser in scope.

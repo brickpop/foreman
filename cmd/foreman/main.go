@@ -262,8 +262,10 @@ func run(args []string, stdout io.Writer) error {
 				flow.Resumed(ctx, inst, lead)
 			}
 		},
+		Drafting: func(id string) bool { return messenger != nil && messenger.Drafting(id) },
 	})
-	// An agent quiet mid-turn for the stuck_after_minutes setting gets a card.
+	// An agent quiet mid-turn for the stuck_after_minutes setting gets a card;
+	// one idle for sleep_after_minutes goes to sleep.
 	go func() {
 		tick := time.NewTicker(time.Minute)
 		defer tick.Stop()
@@ -273,6 +275,7 @@ func run(args []string, stdout io.Writer) error {
 				return
 			case now := <-tick.C:
 				manager.CheckStuck(ctx, now)
+				manager.CheckSleep(ctx, now)
 			}
 		}
 	}()

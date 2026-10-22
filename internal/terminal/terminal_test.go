@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"strings"
@@ -60,7 +61,8 @@ func (f *fakeProcess) Resize(s runner.Size) error {
 	f.sizes = append(f.sizes, s)
 	return nil
 }
-func (f *fakeProcess) Stop(time.Duration) error { return nil }
+func (f *fakeProcess) Stop(time.Duration) error                    { return nil }
+func (f *fakeProcess) Processes(context.Context) ([]string, error) { return nil, nil }
 func (f *fakeProcess) Wait() (int, error) {
 	<-f.exited
 	f.mu.Lock()
@@ -275,3 +277,45 @@ type failingLog struct{}
 func (failingLog) Write(p []byte) (int, error) { return len(p), nil }
 func (failingLog) Tail(int64) ([]byte, error)  { return nil, errors.New("disk gone") }
 func (failingLog) Close() error                { return nil }
+
+// Sealed, a terminal refuses input until unsealed; input after since keeps it
+// open, so whoever seals sees input that came in time.
+func TestSealRefusesInputUntilUnsealed(t *testing.T) {
+	term, p, _ := start(t)
+	if !term.LastInput().IsZero() {
+		t.Error("input before any")
+	}
+	before := time.Now()
+	if err := term.Input([]byte("a")); err != nil {
+		t.Fatal(err)
+	}
+	typed := term.LastInput()
+	if typed.Before(before) {
+		t.Errorf("last input %v, before %v", typed, before)
+	}
+	if term.Seal(before) {
+		t.Fatal("sealed despite input after since")
+	}
+	if err := term.Input([]byte("b")); err != nil {
+		t.Fatalf("an unsealed terminal refused input: %v", err)
+	}
+	if !term.Seal(term.LastInput()) {
+		t.Fatal("not sealed with no input since")
+	}
+	sealedAt := term.LastInput()
+	if err := term.Input([]byte("c")); !errors.Is(err, ErrSealed) {
+		t.Errorf("input while sealed: %v", err)
+	}
+	if !term.LastInput().Equal(sealedAt) {
+		t.Error("refused input counted as input")
+	}
+	term.Unseal()
+	if err := term.Input([]byte("d")); err != nil {
+		t.Fatal(err)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.input.String() != "abd" {
+		t.Errorf("process got %q", p.input.String())
+	}
+}

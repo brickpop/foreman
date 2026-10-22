@@ -56,7 +56,7 @@ order: 3
 
 **Specs it changes:** Workspace (rewritten as the home), Project config, Workspace settings, Persistence, Sandboxes and git policy (mounts), Session runner (mounts, credentials' folder), Session prompt (`{path}`), Add a project, Project settings, Settings, First run, App shell, API, Glossary, Security, Chief of Staff (its mounts).
 
-**Side effects to carry:** the [container writes](../container-writes-outside-sandbox.md) card loses its cause in the prompt (`({path})` named the project folder, of which only the sandbox was mounted): only the sandbox's paths remain to show. `--user-data` (tests) became `--home`; `just dev` has its own home, `.dev/<harness>`, with the CEO's profiles and images linked in.
+**Side effects to carry:** the [container writes](../archive/container-writes-outside-sandbox.md) card loses its cause in the prompt (`({path})` named the project folder, of which only the sandbox was mounted): only the sandbox's paths remain to show. `--user-data` (tests) became `--home`; `just dev` has its own home, `.dev/<harness>`, with the CEO's profiles and images linked in.
 
 **Blocked by:** nothing; runs beside [Git](./git.md).
 

@@ -13,20 +13,23 @@ help:
 setup:
     cd ui && bun install
 
-# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, in .dev/real. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake. Each starts with team dev-team (Tic leads, Tac and Toe) and project DevProject (one code repo, some-app). A workspace given second is used instead (it must be on the engine its harness needs)
+# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, its home in .dev/real. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, its home in .dev/fake. Each starts with team dev-team (Tic leads, Tac and Toe) and project DevProject (one code repo, some-app, in .dev/<harness>-repos). A home given second is used instead (it must be on the engine its harness needs)
 [group('dev')]
-dev harness="real" workspace="":
+dev harness="real" home="":
     #!/usr/bin/env bash
     set -euo pipefail
-    case "{{harness}}" in fake|real) ;; *) echo "just dev: the harness is fake or real, not '{{harness}}' (just dev [real|fake] [workspace])" >&2; exit 1;; esac
-    # One workspace per harness, so each is always on the engine it needs.
-    ws="{{workspace}}"; [ -n "$ws" ] || ws=".dev/{{harness}}"
-    mkdir -p "$ws/.foreman"
-    # A new workspace: the fake harness runs as host processes (no Podman machine
+    case "{{harness}}" in fake|real) ;; *) echo "just dev: the harness is fake or real, not '{{harness}}' (just dev [real|fake] [home])" >&2; exit 1;; esac
+    # One home per harness, so each is always on the engine it needs. Its own
+    # home, so it runs beside your own Foreman (one per home).
+    home="{{home}}"; [ -n "$home" ] || home=".dev/{{harness}}"
+    mkdir -p "$home/config"
+    home="$(cd "$home" && pwd)"
+    # A new home: the fake harness runs as host processes (no Podman machine
     # to start); Claude Code runs in Podman.
     engine=direct; [ "{{harness}}" = real ] && engine=podman
-    [ -f "$ws/.foreman/settings.toml" ] || echo "engine = \"$engine\"" > "$ws/.foreman/settings.toml"
-    teams="$ws/.foreman/teams"
+    settings="$home/config/settings.toml"
+    [ -f "$settings" ] || echo "engine = \"$engine\"" > "$settings"
+    teams="$home/config/teams"
     if [ ! -d "$teams" ]; then
         mkdir -p "$teams"
         printf '%s\n' 'team = "dev-team"' 'name = "DevTeam"' 'lead = "tic"' '' \
@@ -34,12 +37,10 @@ dev harness="real" workspace="":
             '[agents.tac]' 'name = "Tac"' 'role = "engineer"' '' \
             '[agents.toe]' 'name = "Toe"' 'role = "reviewer"' > "$teams/dev-team.toml"
     fi
-    dev_project="$ws/DevProject"
-    if [ ! -d "$dev_project" ]; then
-        mkdir -p "$dev_project/project" "$dev_project/some-app"
-        echo 'project = "DevProject"' > "$dev_project/project/project.toml"
-        git -C "$dev_project/project" init --quiet --initial-branch=main
-        app="$dev_project/some-app"
+    # The code repo lives outside the home, as a CEO's repos do.
+    app="$(dirname "$home")/$(basename "$home")-repos/some-app"
+    if [ ! -d "$app" ]; then
+        mkdir -p "$app"
         echo "# Some app repo" > "$app/README.md"
         git -C "$app" init --quiet --initial-branch=main
         git -C "$app" add README.md
@@ -47,14 +48,13 @@ dev harness="real" workspace="":
     fi
     # The fake harness is a host program, which a container can't run; Claude Code
     # gets its login through a mount, which the Direct engine ignores.
-    settings="$ws/.foreman/settings.toml"
     direct=no; grep -Eq '^engine *= *"direct"' "$settings" && direct=yes
     if [ "{{harness}}" = fake ] && [ $direct = no ]; then
-        echo "just dev fake: $ws runs on Podman, where the fake harness can't run. Use \`just dev\` for Claude Code, or set engine = \"direct\" in $settings." >&2
+        echo "just dev fake: $home runs on Podman, where the fake harness can't run. Use \`just dev\` for Claude Code, or set engine = \"direct\" in $settings." >&2
         exit 1
     fi
     if [ "{{harness}}" = real ] && [ $direct = yes ]; then
-        echo "just dev: $ws runs on the Direct engine, where Claude Code can't get its login. Set engine = \"podman\" in $settings (or in Settings, then restart), or use \`just dev fake\` for the fake harness." >&2
+        echo "just dev: $home runs on the Direct engine, where Claude Code can't get its login. Set engine = \"podman\" in $settings (or in Settings, then restart), or use \`just dev fake\` for the fake harness." >&2
         exit 1
     fi
     fake=""
@@ -66,8 +66,35 @@ dev harness="real" workspace="":
     # Build once in the foreground, so a broken UI toolchain stops here with its own error.
     (cd ui && bun run build)
     (cd ui && bun run watch) &
-    trap 'kill $! 2>/dev/null' EXIT
-    go run ./cmd/foreman "$ws" --yes --ui-dir ui/dist/app $fake
+    watch=$!
+    # Claude Code's logins and the image builds are yours, linked in.
+    if [ "{{harness}}" = real ]; then
+        for d in profiles images; do
+            mkdir -p "$HOME/.foreman/$d"
+            ln -sfn "$HOME/.foreman/$d" "$home/$d"
+        done
+    fi
+    # Projects are records, made through the API: once the server answers,
+    # DevProject is created with some-app, unless it exists.
+    (
+        for _ in $(seq 300); do
+            sleep 0.2
+            base="$(sed -nE 's#^(https?://[^/]+).*#\1#p' "$home/server.lock" 2>/dev/null)" || true
+            token="$(cat "$home/access-token" 2>/dev/null)" || true
+            [ -n "$base" ] && [ -n "$token" ] || continue
+            api() { curl -sf -H "Authorization: Bearer $token" -H "Content-Type: application/json" "$@"; }
+            api -o /dev/null "$base/api/home" || continue
+            api -o /dev/null "$base/api/projects/DevProject" && exit 0
+            api -o /dev/null -X POST "$base/api/projects" -d '{"name":"DevProject"}' &&
+                api -o /dev/null -X POST "$base/api/projects/DevProject/repos" -d "{\"name\":\"some-app\",\"path\":\"$app\"}" &&
+                exit 0
+            echo "just dev: couldn't create DevProject through the API" >&2
+            exit 1
+        done
+    ) &
+    seed=$!
+    trap 'kill $watch $seed 2>/dev/null' EXIT
+    go run ./cmd/foreman --home "$home" --ui-dir ui/dist/app $fake
 
 # Regenerate the UI's TypeScript types from the Go structs (tygo.yaml); commit the result
 [group('build')]

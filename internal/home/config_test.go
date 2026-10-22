@@ -155,9 +155,10 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 	if len(p) > 0 || !reflect.DeepEqual(s, DefaultSettings()) {
 		t.Errorf("empty settings: %+v %v", s, p)
 	}
-	// A field set keeps the others at their defaults, booleans included.
+	// A field set keeps the others at their defaults, booleans included;
+	// sleeping is off unless set.
 	s, p = ParseSettings([]byte("port = 9000\n[notifications]\nfinishes = false"))
-	if len(p) > 0 || s.Port != 9000 || s.MaxSessions != 12 || s.Notifications.Finishes || !s.Notifications.NeedsMe {
+	if len(p) > 0 || s.Port != 9000 || s.MaxSessions != 12 || s.Notifications.Finishes || !s.Notifications.NeedsMe || s.SleepAfterMinutes != 0 {
 		t.Errorf("partial settings: %+v %v", s, p)
 	}
 	for name, tc := range map[string]struct{ toml, want string }{
@@ -167,6 +168,7 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 		"engine":     {`engine = "docker"`, "engine"},
 		"harnesses":  {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: not a field Foreman knows"},
 		"stuck":      {`stuck_after_minutes = 0`, "stuck_after_minutes"},
+		"sleep":      {`sleep_after_minutes = -5`, "sleep_after_minutes"},
 		"log cap":    {`log_cap_mb = -1`, "log_cap_mb"},
 		"forge kind": {"[forges.bitbucket]\nurl = \"https://x\"", "forges.bitbucket"},
 		"repo forge": {"[global_forge]\nkind = \"github\"", "global_forge.url: required"},

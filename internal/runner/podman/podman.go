@@ -279,3 +279,26 @@ func (p *process) Wait() (int, error) {
 	<-p.done
 	return p.exitCode, p.waitErr
 }
+
+// Processes are the container's processes but its first (the harness),
+// zombies left out.
+func (p *process) Processes(ctx context.Context) ([]string, error) {
+	rows, err := p.c.top(ctx, p.id)
+	if err != nil {
+		return nil, err
+	}
+	return others(rows), nil
+}
+
+// others reads top's rows (pid, state, command line, which Podman may split
+// at its spaces): the command lines of all but PID 1 and the zombies.
+func others(rows [][]string) []string {
+	var list []string
+	for _, r := range rows {
+		if len(r) < 3 || r[0] == "1" || strings.HasPrefix(r[1], "Z") {
+			continue
+		}
+		list = append(list, strings.Join(r[2:], " "))
+	}
+	return list
+}

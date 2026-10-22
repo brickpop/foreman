@@ -7,9 +7,13 @@ package direct
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -126,4 +130,53 @@ func (pr *process) Stop(grace time.Duration) error {
 func (pr *process) Wait() (int, error) {
 	<-pr.done
 	return pr.exitCode, pr.waitErr
+}
+
+// Processes are the descendants of the process, found with ps (Linux and
+// macOS both have it), zombies left out.
+func (pr *process) Processes(ctx context.Context) ([]string, error) {
+	out, err := exec.CommandContext(ctx, "ps", "-A", "-o", "pid=,ppid=,stat=,args=").Output()
+	if err != nil {
+		return nil, fmt.Errorf("direct: ps: %w", err)
+	}
+	return descendants(string(out), pr.cmd.Process.Pid), nil
+}
+
+// descendants reads ps's "pid ppid stat args" lines: the command lines of
+// root's live descendants.
+func descendants(ps string, root int) []string {
+	type proc struct {
+		ppid   int
+		zombie bool
+		args   string
+	}
+	procs := map[int]proc{}
+	for _, line := range strings.Split(ps, "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 {
+			continue
+		}
+		pid, err1 := strconv.Atoi(f[0])
+		ppid, err2 := strconv.Atoi(f[1])
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		procs[pid] = proc{ppid: ppid, zombie: strings.HasPrefix(f[2], "Z"), args: strings.Join(f[3:], " ")}
+	}
+	var list []string
+	for _, p := range procs {
+		if p.zombie {
+			continue
+		}
+		// Bounded by the count: ps reads each process at its own moment, so a
+		// recycled pid could make a loop.
+		for up, seen := p.ppid, 0; up > 1 && seen < len(procs); up, seen = procs[up].ppid, seen+1 {
+			if up == root {
+				list = append(list, p.args)
+				break
+			}
+		}
+	}
+	slices.Sort(list)
+	return list
 }

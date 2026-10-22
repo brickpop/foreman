@@ -2,6 +2,7 @@ package podman
 
 import (
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/runner"
@@ -74,5 +75,20 @@ func TestMachineBounds(t *testing.T) {
 		if got := machineBounds(uint64(c.hostGiB)<<10, c.cpus); got != c.want {
 			t.Errorf("%d GiB, %d CPUs: %+v, want %+v", c.hostGiB, c.cpus, got, c.want)
 		}
+	}
+}
+
+// top's rows, its command line whole or split at its spaces: PID 1 and the
+// zombies are left out.
+func TestOthers(t *testing.T) {
+	got := others([][]string{
+		{"1", "S", "claude --continue"},
+		{"7", "S", "/opt/foreman/foreman-agent", "mcp"},
+		{"9", "Z", "[sh]"},
+		{"12", "R", "npm run dev"},
+		{"13"},
+	})
+	if want := []string{"/opt/foreman/foreman-agent mcp", "npm run dev"}; !slices.Equal(got, want) {
+		t.Errorf("others = %q, want %q", got, want)
 	}
 }

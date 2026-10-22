@@ -137,6 +137,7 @@ type Process interface {
     Stop(grace time.Duration) error
     Wait() (exitCode int, err error)
     Labels() map[string]string
+    Processes(ctx) ([]string, error)   // what else runs in it, zombies left out: an idle agent sleeps only with nothing but its helpers
 }
 type Spec struct { Image; Command; Dir; Env; Mounts; Size; Labels }
 ```
@@ -176,6 +177,9 @@ type Terminal interface {
     Resize(Size) error
     Done() <-chan struct{}             // closed when the process exits
     ExitCode() (int, bool)
+    LastInput() time.Time              // when input last came
+    Seal(since time.Time) bool         // refuse input before a sleep's stop, unless some came after since
+    Unseal()
 }
 type View interface {
     Snapshot() []byte                  // recreates the current screen on a fresh terminal

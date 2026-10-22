@@ -78,9 +78,12 @@ func TestTypedTracksTheDraft(t *testing.T) {
 		{"\x7f\x7f\x7f\x7f", 0},
 	} {
 		m.Typed("x", []byte(tc.keys))
-		if got := length(); got != tc.want {
-			t.Errorf("after %q: %d, want %d", tc.keys, got, tc.want)
+		if got := length(); got != tc.want || m.Drafting("x") != (tc.want > 0) {
+			t.Errorf("after %q: %d (drafting %v), want %d", tc.keys, got, m.Drafting("x"), tc.want)
 		}
+	}
+	if m.Drafting("nobody") {
+		t.Error("a draft in a prompt nobody typed into")
 	}
 }
 

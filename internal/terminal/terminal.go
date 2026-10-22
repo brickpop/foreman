@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/brickpop/foreman/internal/runner"
 )
@@ -22,8 +23,12 @@ type Log interface {
 	Close() error
 }
 
-// ErrExited means the process has ended and takes no more input.
-var ErrExited = errors.New("terminal: process has exited")
+var (
+	// ErrExited means the process has ended and takes no more input.
+	ErrExited = errors.New("terminal: process has exited")
+	// ErrSealed means the process is being stopped and takes no more input.
+	ErrSealed = errors.New("terminal: closed to input")
+)
 
 const (
 	// SnapshotMax is how much recent output a newly attached viewer receives.
@@ -40,10 +45,12 @@ type Terminal struct {
 	name    string // for the server log only
 	done    chan struct{}
 
-	mu       sync.Mutex
-	viewers  map[*View]struct{}
-	exited   bool
-	exitCode int
+	mu        sync.Mutex
+	viewers   map[*View]struct{}
+	exited    bool
+	exitCode  int
+	lastInput time.Time
+	sealed    bool
 }
 
 // New takes over process and log: it reads the output until the process
@@ -118,11 +125,47 @@ func (t *Terminal) Attach() (*View, error) {
 
 // Input sends bytes to the process, as typed.
 func (t *Terminal) Input(p []byte) error {
-	if t.hasExited() {
+	t.mu.Lock()
+	exited, sealed := t.exited, t.sealed
+	if !exited && !sealed {
+		t.lastInput = time.Now()
+	}
+	t.mu.Unlock()
+	switch {
+	case exited:
 		return ErrExited
+	case sealed:
+		return ErrSealed
 	}
 	_, err := t.process.Write(p)
 	return err
+}
+
+// LastInput is when input last came; zero before any.
+func (t *Terminal) LastInput() time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.lastInput
+}
+
+// Seal closes the terminal to input before its process is stopped, unless
+// input came after since: then it reports false and stays open. Checked and
+// closed in one step, so any input is either seen here or refused.
+func (t *Terminal) Seal(since time.Time) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.lastInput.After(since) {
+		return false
+	}
+	t.sealed = true
+	return true
+}
+
+// Unseal opens the terminal to input again: its process wasn't stopped.
+func (t *Terminal) Unseal() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.sealed = false
 }
 
 // Resize sets the terminal size. Viewers share one terminal, so the last one

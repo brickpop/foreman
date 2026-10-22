@@ -332,3 +332,20 @@ func TestOpenThenConnect(t *testing.T) {
 		t.Errorf("List after Connect: %v", err)
 	}
 }
+
+// Processes lists what runs besides PID 1, live ones only: here PID 1 (cat)
+// never reaps the finished `true`, which stays a zombie.
+func TestProcessesAreTheOthersAlive(t *testing.T) {
+	r := engine(t)
+	p := start(t, r, runner.Spec{Command: sh(`sleep 300 & true & echo ready; exec cat`)})
+	out := collect(p)
+	out.waitFor(t, "ready")
+	time.Sleep(300 * time.Millisecond) // the `true` has ended
+	list, err := p.Processes(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0] != "sleep 300" {
+		t.Errorf("processes %q", list)
+	}
+}

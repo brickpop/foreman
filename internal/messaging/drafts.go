@@ -99,6 +99,15 @@ func escapeLength(p []byte) int {
 	return 2
 }
 
+// Drafting reports whether the CEO has typed into the instance's prompt
+// without sending it: it keeps the instance awake.
+func (m *Messenger) Drafting(id string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	d := m.drafts[id]
+	return d != nil && d.length > 0
+}
+
 // PauseCountdown stops or restarts an instance's countdown.
 func (m *Messenger) PauseCountdown(id string, paused bool) {
 	m.mu.Lock()

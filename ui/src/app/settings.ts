@@ -20,8 +20,15 @@ export function settingsSearch(s: Record<string, unknown>): { tab?: SettingsTab 
 export const stuckChoices = [5, 10, 15, 20, 30, 45, 60, 90, 120];
 export const logCapChoices = [10, 25, 50, 100, 250, 500, 1000];
 
+/** The sleep-after choices, in minutes; 0 is never. */
+export const sleepChoices = [0, 10, 20, 30, 60, 120];
+
+export function sleepLabel(minutes: number): string {
+  return minutes === 0 ? "Never" : `After ${minutes} min idle`;
+}
+
 /** A select's choices with the current value among them: settings.toml can
- * hold any value above 0, written by hand. */
+ * hold any valid value, written by hand. */
 export function withCurrent(choices: number[], value: number): number[] {
   return choices.includes(value) ? choices : [...choices, value].sort((a, b) => a - b);
 }

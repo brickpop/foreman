@@ -97,6 +97,9 @@ type Deps struct {
 	// conversation), once its process runs: Workflow tells the agent what its
 	// worktrees hold from before. nil: nobody.
 	Started func(ctx context.Context, inst store.Instance, lead bool)
+	// Drafting reports whether the CEO has typed into an instance's prompt
+	// without sending it: it keeps the instance awake (CheckSleep). nil: never.
+	Drafting func(id string) bool
 }
 
 // AgentLink is foreman-agent as the instances get it: mounted into each
@@ -126,18 +129,21 @@ type Manager struct {
 	heard map[string]time.Time
 	// stuck are the open cards of agents found stuck, by instance.
 	stuck map[string]store.Request
+	// idleSince is when each idle instance went idle (CheckSleep).
+	idleSince map[string]time.Time
 }
 
 type live struct {
 	term     *terminal.Terminal // nil while starting
 	proc     runner.Process
 	stopping bool // a stop was asked: its end is not a crash
+	sleeping bool // the stop is CheckSleep's: its end is a sleep
 }
 
 // New returns a manager.
 func New(d Deps) *Manager {
 	return &Manager{Deps: d, live: map[string]*live{}, doing: map[string]store.Doing{}, gone: map[string]bool{},
-		heard: map[string]time.Time{}, stuck: map[string]store.Request{}}
+		heard: map[string]time.Time{}, stuck: map[string]store.Request{}, idleSince: map[string]time.Time{}}
 }
 
 var (
@@ -452,6 +458,12 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 	if adapter == nil || (inst.Status != Running && inst.Status != Idle && inst.Status != Awaiting) {
 		return
 	}
+	m.mu.Lock()
+	ending := m.live[id] != nil && m.live[id].stopping
+	m.mu.Unlock()
+	if ending {
+		return // a harness ending says nothing about what the instance does next
+	}
 	m.heardFrom(ctx, id)
 	if status, ok := map[harness.Activity]string{harness.Busy: Running, harness.Idle: Idle, harness.Waiting: Awaiting}[adapter.Interpret(event, payload)]; ok {
 		m.setStatus(ctx, id, status)
@@ -589,8 +601,14 @@ func (m *Manager) adopt(ctx context.Context, id string, p runner.Process) error 
 	m.live[id] = l
 	m.mu.Unlock()
 	// Its process lived on: what its hooks last said still holds (idle stays
-	// idle, so a message queued for it is delivered).
-	if inst, err := m.Instances.Get(ctx, id); err != nil || (inst.Status != Idle && inst.Status != Awaiting) {
+	// idle, so a message queued for it is delivered; its idle clock starts over).
+	inst, err := m.Instances.Get(ctx, id)
+	switch {
+	case err == nil && inst.Status == Idle:
+		m.mu.Lock()
+		m.idleSince[id] = time.Now()
+		m.mu.Unlock()
+	case err != nil || inst.Status != Awaiting:
 		m.setStatus(ctx, id, Running)
 	}
 	m.heardFrom(ctx, id)
@@ -665,9 +683,11 @@ func (m *Manager) markQueued(id string) {
 // terminal. A failure stops the instance (with its reason in the log).
 func (m *Manager) start(id string, l *live) {
 	ctx := context.Background()
-	// A new run: what the last one did is no longer what it is doing.
+	// A new run: what the last one did is no longer what it is doing, nor
+	// how long it was idle.
 	m.mu.Lock()
 	delete(m.doing, id)
+	delete(m.idleSince, id)
 	m.mu.Unlock()
 	m.setStatus(ctx, id, Starting)
 	proc, err := m.launch(ctx, id)
@@ -844,10 +864,16 @@ func (m *Manager) watch(id string, l *live) {
 	delete(m.heard, id)
 	m.mu.Unlock()
 	m.mu.Lock()
-	stopping := l.stopping
+	stopping, sleeping := l.stopping, l.sleeping
 	m.mu.Unlock()
-	m.release(id, l)
+	released := m.release(id, l)
 	if stopping {
+		// Put to sleep, unless a stop or a restart took it meanwhile.
+		if sleeping && released {
+			if inst, err := m.Instances.Get(ctx, id); err == nil && inst.Status == Idle {
+				m.setStatus(ctx, id, Asleep)
+			}
+		}
 		m.startQueued()
 		return
 	}
@@ -898,6 +924,13 @@ func (m *Manager) setStatus(ctx context.Context, id, status string) {
 	if err != nil || inst.Status == status {
 		return
 	}
+	m.mu.Lock()
+	if status == Idle {
+		m.idleSince[id] = time.Now()
+	} else {
+		delete(m.idleSince, id)
+	}
+	m.mu.Unlock()
 	// A reason is only Foreman's own stop's (stopped).
 	inst.Status, inst.StopReason = status, ""
 	if err := m.Instances.Put(ctx, inst); err != nil {
@@ -1202,6 +1235,80 @@ func (m *Manager) CheckStuck(ctx context.Context, now time.Time) {
 		m.mu.Unlock()
 		m.publish("request.created", r)
 	}
+}
+
+// CheckSleep puts to sleep each agent idle for the sleep_after_minutes setting
+// (0: never), with no input since, no unsent draft of the CEO's, and nothing
+// left running in its session but foreman-agent: a dev server or a build it
+// started keeps it awake. Its container stops, freeing its slot; a message or
+// the CEO's Start wakes it with its conversation
+// (wiki/product/architecture/agent-runtime.md#idle-agents-sleep).
+func (m *Manager) CheckSleep(ctx context.Context, now time.Time) {
+	limit := time.Duration(m.Config.Settings().Settings.SleepAfterMinutes) * time.Minute
+	if limit <= 0 {
+		return
+	}
+	var sleeps sync.WaitGroup
+	m.mu.Lock()
+	for id, l := range m.live {
+		since, idle := m.idleSince[id]
+		if !idle || l.term == nil || l.stopping {
+			continue
+		}
+		if last := l.term.LastInput(); last.After(since) {
+			since = last
+		}
+		if now.Sub(since) >= limit {
+			sleeps.Go(func() { m.sleep(ctx, id, l, since) })
+		}
+	}
+	m.mu.Unlock()
+	sleeps.Wait()
+}
+
+// sleep stops an idle instance's process, quiet since since (its watch then
+// puts it to sleep), unless the CEO has a draft in it, something else runs in it, or it
+// stirred meanwhile. Its terminal refuses input from the check on, so a
+// delivery either came before (and it stays awake) or waits for it to wake.
+func (m *Manager) sleep(ctx context.Context, id string, l *live, since time.Time) {
+	if m.Drafting != nil && m.Drafting(id) {
+		return
+	}
+	procs, err := l.proc.Processes(ctx)
+	if err != nil {
+		slog.Warn("listing an idle instance's processes", "instance", id, "err", err)
+		return
+	}
+	for _, p := range procs {
+		if !m.helper(p) {
+			return
+		}
+	}
+	m.mu.Lock()
+	idleSince, idle := m.idleSince[id]
+	sealed := idle && !idleSince.After(since) && m.live[id] == l && !l.stopping && l.term.Seal(since)
+	if sealed {
+		l.stopping, l.sleeping = true, true
+	}
+	m.mu.Unlock()
+	if !sealed {
+		return
+	}
+	if err := l.proc.Stop(stopGrace); err != nil {
+		slog.Warn("putting an instance to sleep", "instance", id, "err", err)
+		m.mu.Lock()
+		l.stopping, l.sleeping = false, false
+		m.mu.Unlock()
+		l.term.Unseal()
+		return
+	}
+}
+
+// helper reports whether a process (its command line) is one an idle harness
+// keeps: foreman-agent, Claude Code's and Pi's MCP server for the team tools.
+func (m *Manager) helper(command string) bool {
+	program, _, _ := strings.Cut(command, " ")
+	return m.Agent.Path != "" && filepath.Base(program) == filepath.Base(m.Agent.Path)
 }
 
 // agentName is the instance's agent as its team names it, else its id.

@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: in-progress
 priority: high
 tags: [feature]
 epic: workflow
@@ -24,15 +24,15 @@ epic: workflow
 - **The ping waits like any message:** for idle, and for the CEO's unsent draft (the countdown). Any activity before `idle()` cancels the sleep.
 
 **Edge cases:**
-- **The ping stays in the conversation:** it costs a turn (tokens), and the agent's context keeps it after waking.
-- **An agent that never calls `idle()`:** does Foreman ask again after another 20 minutes, or only once per idle stretch? To decide.
 - **A CEO shell in the container** (`podman exec`) is a process too, so it keeps the agent awake.
-- **The Direct engine** has no container to inspect, so agents there never sleep.
 - **A lead waiting on a teammate's reply** sleeps too, and the reply wakes it.
 - **A pane the CEO is watching** turns into the asleep view; the Line or Start wakes it.
 
-- [ ] the setting (off, or minutes), in Settings and `settings.toml`
-- [ ] the process check in `foreman-agent`, with each adapter's helper list
-- [ ] decide: the silent process check alone, or the ping and `idle()` (through Messaging's delivery, draft countdown included)
-- [ ] `Sleep(id)` in the instance manager; activity cancels a pending sleep
-- [ ] tests: no ping with a stray process, with the setting off, or with messages waiting; `idle()` sleeps and a message wakes; activity after the ping keeps it awake
+**Decided (the CEO, 2026-10-23): the silent process check alone.** No ping, no `idle()` tool. Built as [Agent runtime → Idle agents sleep](../product/architecture/agent-runtime.md#idle-agents-sleep). Beyond the design above: input since the agent went idle restarts its clock, the terminal refuses input in the same step as the last check (so a delivery is never cut off by the stop), and the processes come from Podman's `top` (no code in `foreman-agent`) or `ps` on the Direct engine, so Direct agents sleep too. No adapter names extra helpers yet: only `foreman-agent` is one.
+
+- [x] the setting (off, or minutes), in Settings and `settings.toml`
+- [x] the process check, in the engines (`Processes`)
+- [x] decide: the silent process check alone
+- [x] the sleep in the instance manager; activity cancels a pending sleep
+- [x] tests: a stray process, the setting off, input, a draft, running and awaiting keep it awake; a helper and a zombie don't; a failed stop leaves it awake; a wake starts it again
+- [ ] on the CEO's Podman: `just test-podman` runs `TestProcessesAreTheOthersAlive` (the API's `top` with `pid`, `state`, `args` is unverified here)

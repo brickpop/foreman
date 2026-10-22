@@ -1584,3 +1584,179 @@ func TestAFailedStartSaysWhy(t *testing.T) {
 		t.Errorf("after a start: %q", s.StopReason)
 	}
 }
+
+// sleepy is a fixture whose lead runs script, then `exec cat` (so the shell
+// itself is gone), deployed and idle, with hooks read as activities. In
+// script, $HELPER is a foreman-agent: sleep under that name.
+func sleepy(t *testing.T, script string) *fixture {
+	t.Helper()
+	helper := filepath.Join(t.TempDir(), "foreman-agent")
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(sleep, helper); err != nil {
+		t.Fatal(err)
+	}
+	f := newFixture(t, strings.ReplaceAll(script, "$HELPER", helper)+"\necho ready\nexec cat", 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
+	f.deps.Agent.Path = "/opt/foreman/foreman-agent"
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	f.output("mara@ledger", "ready")
+	f.m.Hook("mara@ledger", "idle", nil)
+	return f
+}
+
+// sleepAfter sets the sleep_after_minutes setting.
+func (f *fixture) sleepAfter(minutes int) {
+	f.t.Helper()
+	settings := f.hm.Settings()
+	s := settings.Settings
+	s.SleepAfterMinutes = minutes
+	if _, err := f.hm.SaveSettings(ctx, s, settings.Version); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+// idleSince is when the instance went idle, as CheckSleep counts it.
+func (f *fixture) idleSince(id string) time.Time {
+	f.m.mu.Lock()
+	defer f.m.mu.Unlock()
+	return f.m.idleSince[id]
+}
+
+// An agent idle for the setting goes to sleep, freeing its slot, and a wake
+// starts it again; off (the default), or short of the setting, it stays.
+func TestAnIdleAgentSleeps(t *testing.T) {
+	f := sleepy(t, `true`)
+	idle := f.idleSince("mara@ledger")
+	if idle.IsZero() {
+		t.Fatal("no idle clock")
+	}
+	f.m.CheckSleep(ctx, idle.Add(3*time.Hour))
+	if s := f.status("mara@ledger"); s.Status != Idle || !f.m.Live("mara@ledger") {
+		t.Fatalf("slept with the setting off: %s", s.Status)
+	}
+	f.sleepAfter(20)
+	f.m.CheckSleep(ctx, idle.Add(19*time.Minute))
+	if s := f.status("mara@ledger"); s.Status != Idle {
+		t.Fatalf("slept before 20 min: %s", s.Status)
+	}
+	f.m.CheckSleep(ctx, idle.Add(20*time.Minute))
+	inst := f.waitStatus("mara@ledger", Asleep)
+	if f.m.Live("mara@ledger") || inst.Restarts != 0 || inst.StopReason != "" {
+		t.Errorf("asleep: %+v, live %v", inst, f.m.Live("mara@ledger"))
+	}
+	f.m.Hook("mara@ledger", "busy", nil) // a late hook from the ended run
+	if s := f.status("mara@ledger"); s.Status != Asleep {
+		t.Errorf("a late hook made it %s", s.Status)
+	}
+	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if !f.idleSince("mara@ledger").IsZero() {
+		t.Error("the new run kept the old idle clock")
+	}
+}
+
+// Only foreman-agent may be left running: anything else keeps the agent
+// awake, and a finished process never reaped (a zombie) doesn't.
+func TestWhatRunsDecidesTheSleep(t *testing.T) {
+	for _, tc := range []struct {
+		name, script string
+		sleeps       bool
+	}{
+		{"a helper", `"$HELPER" 300 &`, true},
+		{"a zombie", `true &`, true},
+		{"a dev server", `"$HELPER" 300 & sleep 300 &`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := sleepy(t, tc.script)
+			f.sleepAfter(20)
+			time.Sleep(200 * time.Millisecond) // the background `true` has ended
+			f.m.CheckSleep(ctx, f.idleSince("mara@ledger").Add(time.Hour))
+			if tc.sleeps {
+				f.waitStatus("mara@ledger", Asleep)
+				return
+			}
+			if s := f.status("mara@ledger"); s.Status != Idle || !f.m.Live("mara@ledger") {
+				t.Errorf("slept with a process running: %s", s.Status)
+			}
+		})
+	}
+}
+
+// Only idle counts, from the last change: running, awaiting, input since it
+// went idle, or the CEO's unsent draft keep it awake.
+func TestOnlyAQuietIdleAgentSleeps(t *testing.T) {
+	f := sleepy(t, `true`)
+	drafting := false
+	f.deps.Drafting = func(id string) bool { return drafting && id == "mara@ledger" }
+	f.m.Drafting = f.deps.Drafting
+	f.sleepAfter(20)
+	awake := func(why string) {
+		t.Helper()
+		if s := f.status("mara@ledger"); s.Status == Asleep || !f.m.Live("mara@ledger") {
+			t.Fatalf("slept %s: %s", why, s.Status)
+		}
+	}
+	for _, event := range []string{"busy", "waiting"} {
+		f.m.Hook("mara@ledger", event, nil)
+		f.m.CheckSleep(ctx, time.Now().Add(3*time.Hour))
+		awake("while " + event)
+	}
+
+	f.m.Hook("mara@ledger", "idle", nil)
+	idle := f.idleSince("mara@ledger")
+	time.Sleep(50 * time.Millisecond)
+	term, err := f.m.Terminal("mara@ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := term.Input([]byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	f.m.CheckSleep(ctx, idle.Add(20*time.Minute)) // 20 min since idle, not since the input
+	awake("with input since it went idle")
+
+	drafting = true
+	f.m.CheckSleep(ctx, time.Now().Add(3*time.Hour))
+	awake("on the CEO's draft")
+	drafting = false
+	f.m.CheckSleep(ctx, time.Now().Add(3*time.Hour))
+	f.waitStatus("mara@ledger", Asleep)
+}
+
+// A sleep whose stop fails leaves the agent as it was, taking input again.
+func TestASleepThatCantStopLeavesTheAgentAwake(t *testing.T) {
+	f := sleepy(t, `true`)
+	f.stopAll()
+	u := &unstoppable{Runner: f.deps.Runner}
+	t.Cleanup(func() {
+		for _, p := range u.procs {
+			_ = p.Stop(time.Second)
+		}
+	})
+	f.deps.Runner = u
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	f.output("mara@ledger", "ready")
+	f.m.Hook("mara@ledger", "idle", nil)
+	f.sleepAfter(20)
+	f.m.CheckSleep(ctx, time.Now().Add(time.Hour))
+	if s := f.status("mara@ledger"); s.Status != Idle || !f.m.Live("mara@ledger") {
+		t.Fatalf("after a failed stop: %s", s.Status)
+	}
+	if err := f.m.Type("mara@ledger", []byte("still here\r")); err != nil {
+		t.Errorf("input after a failed stop: %v", err)
+	}
+	f.output("mara@ledger", "still here")
+}

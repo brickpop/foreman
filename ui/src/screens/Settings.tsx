@@ -27,6 +27,8 @@ import {
   logCapChoices,
   settingsSearch,
   settingsTabs,
+  sleepChoices,
+  sleepLabel,
   stuckChoices,
   withCurrent,
 } from "../app/settings";
@@ -231,6 +233,20 @@ function RunningSection({ settings }: { settings: SettingsData }) {
             label: `${m} min`,
           }))}
           onChange={(m) => save((s) => ({ ...s, stuckAfterMinutes: m }))}
+        />
+      </Row>
+      <Row
+        title="Put idle agents to sleep"
+        explanation="An agent idle this long, with nothing left running in its session (a dev server, a build) and no text of yours waiting in its prompt, is stopped to free its slot. A message or your Start wakes it with its conversation."
+      >
+        <Select
+          label="Put idle agents to sleep"
+          value={settings.sleepAfterMinutes}
+          options={withCurrent(sleepChoices, settings.sleepAfterMinutes).map((m) => ({
+            value: m,
+            label: sleepLabel(m),
+          }))}
+          onChange={(m) => save((s) => ({ ...s, sleepAfterMinutes: m }))}
         />
       </Row>
       <Row

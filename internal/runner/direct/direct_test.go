@@ -6,6 +6,7 @@ import (
 	"io"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -193,5 +194,40 @@ func TestEmptyCommandAndMissingProgramFail(t *testing.T) {
 func TestListIsEmpty(t *testing.T) {
 	if got, err := (Runner{}).List(context.Background()); err != nil || len(got) != 0 {
 		t.Errorf("List = %v, %v", got, err)
+	}
+}
+
+// Processes finds what the process started, grandchildren included, and
+// leaves out the finished ones it never reaped (cat reaps nothing).
+func TestProcessesAreTheDescendantsAlive(t *testing.T) {
+	s := start(t, sh(`sleep 300 & (sleep 301; true) & true & echo ready; exec cat`))
+	readUntil(t, s, "ready")
+	time.Sleep(300 * time.Millisecond) // the `true` has ended
+	list, err := s.Processes(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(list, "sleep 300") || !slices.Contains(list, "sleep 301") || len(list) != 3 {
+		t.Errorf("processes %q: want both sleeps and the subshell", list)
+	}
+}
+
+func TestDescendants(t *testing.T) {
+	ps := `    1     0 Ss   init
+  100     1 S    harness --continue
+  101   100 S    /opt/foreman-agent mcp
+  102   100 Z    [sh] <defunct>
+  103   101 S    node server.js
+  200     1 S    someone else
+  300   301 S    a loop
+  301   300 S    the loop's other end
+  junk
+`
+	want := []string{"/opt/foreman-agent mcp", "node server.js"}
+	if got := descendants(ps, 100); !slices.Equal(got, want) {
+		t.Errorf("descendants = %q, want %q", got, want)
+	}
+	if got := descendants(ps, 999); len(got) != 0 {
+		t.Errorf("an unknown root has %q", got)
 	}
 }

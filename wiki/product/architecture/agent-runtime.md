@@ -36,7 +36,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 - **The other members are `asleep`:** an instance with no container, no sandbox yet, and no session slot.
 - **Waking** an asleep instance queues it and starts it like any other (`POST /api/instances/:id/wake`). In epic 1 the CEO wakes one with **Start** in its pane ([Sessions](../features/sessions.md#panes)); from epic 2 a delivery to it (an `ask`, a handoff, a reply) wakes it first ([Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md)). Waking any other status does nothing.
 - After a Foreman restart, an asleep instance stays asleep. The restore itself waits until Podman first answers ([First run](../features/first-run.md#foreman-always-starts)): Foreman serves before that.
-- **Later:** an agent that is done and waits for nothing goes back to `asleep`, its harness exited so that waking it resumes its conversation (native resume). It needs idle detection (epic 2) and resume per harness; see the [Idle sleep](../../backlog/idle-sleep.md) card (a setting, off by default; Foreman asks the agent, which calls `idle()`).
+- **An idle agent goes back to sleep** when the CEO turns it on: [Idle agents sleep](#idle-agents-sleep).
 
 ### Status transitions
 
@@ -48,6 +48,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 | `starting` | sandbox ready and harness spawned | `running` (lead with a goal) or `idle` |
 | `running` | harness idle signal ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)) | `idle`, or `done` if it handed off and has nothing assigned |
 | `idle` / `done` | CEO input, team message or reply delivered | `running` |
+| `idle` | idle for `sleep_after_minutes`, quiet and with nothing else running ([Idle agents sleep](#idle-agents-sleep)) | `asleep` |
 | any live | `escalate(approval)` or blocking `escalate(question)` | `awaiting` |
 | `awaiting` | request resolved | `running` |
 | any live | process exit, crash, rate limit, no output for N min (default 20, see below), sandbox or git error (a merge conflict from `merge` is not one: it goes back to the agent, who resolves it and commits) | `stopped` + blocked request; a crash first gets one automatic restart (see below) |
@@ -57,7 +58,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 ## Concurrency
 
 - Global setting `max running sessions` (default 12, 1–64; [Global settings](../models/global-settings.md)). Instances beyond the limit are `queued` and start, in creation order, as slots free up. Only an instance that actually waits shows `queued` (one that gets a slot at once goes straight to `starting`; the CEO, 2026-10-18: a passing `queued` warned them about slots for nothing). Raising the limit starts those that now fit at once (any change to `settings.toml`, from the UI or an editor); lowering it stops nothing.
-- A slot is held by every instance whose container is running, including one waiting on an approval or a reply. An `asleep` instance holds none. Releasing slots while waiting (stopping the container and resuming the harness session later) needs native resume, so it is revisited once the [Prove epic](../../backlog/epics/prove.md) shows which harnesses support it.
+- A slot is held by every instance whose container is running, including one waiting on an approval or a reply. An `asleep` instance holds none. An idle one gives its slot back by going to sleep, when the CEO turns that on ([Idle agents sleep](#idle-agents-sleep)); one waiting on an approval keeps it, since stopping it would lose its open dialog.
 - The Chief of Staff's session does not count towards the limit: it isn't an agent of a deployment, and the CEO must always be able to reach it ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)).
 
 ## Recovery
@@ -89,6 +90,18 @@ An agent is **stuck** when it is mid-turn (`running`) and **no hook event at all
 - **Idle and awaiting agents are never stuck:** they are waiting, not working.
 - **What happens:** the Instance manager checks once a minute and raises one **blocked** [request](../features/requests.md) per stuck agent, "<Name> may be stuck: no activity for <N> min.", with **Restart** (and the card opens the session). The agent keeps running; nothing is restarted for the CEO. The card resolves itself on the agent's next hook event (whatever it says), when its run ends (a restart, a stop, a crash), or when Foreman restarts (its watch starts over, and raises it again if the agent is still quiet).
 - **When activity was last heard** is kept in the manager's memory, never stored: a Foreman restart starts every agent's watch over.
+
+## Idle agents sleep
+
+An **idle** agent holds a container, a session slot and memory while it waits for nothing. With `sleep_after_minutes` set (a [global setting](../models/global-settings.md), `0` by default: never; read at each check), Foreman puts it to sleep once it has been idle that long (the CEO, 2026-10-16 and 2026-10-23). Asleep, it holds none of them, and a message or the CEO's Start wakes it with its conversation ([Lazy starts](#lazy-starts)), as after a clean exit.
+
+- **Silently.** Foreman asks the agent nothing: a question typed into its session would cost a turn and stay in its conversation (the CEO judged it noise). Instead it checks what runs.
+- **Only when nothing else runs.** The [engine](./session-runner.md) lists the session's processes besides the harness itself: in a container, all but its PID 1 (Podman's `top`, read from `/proc`, nothing installed in the image); on the Direct engine, the harness's descendants (`ps`). Zombies (finished, never reaped: the harness, as PID 1, reaps only its own children) don't count. Anything but `foreman-agent` (the team tools' MCP server, which Claude Code and Pi keep running) keeps the agent awake: a dev server, a watcher or a build it started and forgot, and a shell the CEO opened in its container.
+- **Quiet means:** `idle` the whole time (`running` and `awaiting` never sleep: an open dialog would be lost), no input since (from the CEO or a delivery: the clock starts over at the last keystroke), and no draft of the CEO's left unsent in its prompt.
+- **How:** the Instance manager checks once a minute, with the stuck check. Its terminal is closed to input in the same step as the last check, so a delivery either came first (and the agent stays awake) or is refused and waits for the wake, which the sleep then starts at once. Foreman then stops the container, never types `/exit` (a Claude Code command, which could land on a dialog): SIGTERM, a kill after 10 s. A stop that fails leaves the agent awake, taking input again. Nothing is lost: harnesses write their transcript as they go, and an idle agent has no turn in progress.
+- **A pane the CEO is watching** turns into the asleep view; Start wakes it.
+- **When it went idle** is kept in the manager's memory: after a Foreman restart, the clock of an agent still idle starts over.
+- **Not covered:** a harness waiting on a timer of its own (a scheduled wake-up, no process) is idle and sleeps, losing the timer. A process that detached itself from the harness on the Direct engine (a double fork) is no longer its descendant and doesn't keep it awake; in a container it still does.
 
 
 ## Memory

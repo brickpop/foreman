@@ -195,3 +195,12 @@ func (c *client) attach(ctx context.Context, id string) (net.Conn, *bufio.Reader
 	}
 	return conn, br, nil
 }
+
+// top lists the container's processes as rows of pid, state and command line,
+// read by Podman from /proc: nothing has to be installed in the image.
+func (c *client) top(ctx context.Context, id string) ([][]string, error) {
+	q := url.Values{"ps_args": {"pid", "state", "args"}, "stream": {"false"}}
+	var out struct{ Processes [][]string }
+	err := c.call(ctx, "GET", "/containers/"+id+"/top", q, nil, &out)
+	return out.Processes, err
+}

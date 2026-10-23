@@ -70,7 +70,7 @@ A project starts with none, and deploying refuses until it has one. Each route a
 
 ## Removing a project
 
-`DELETE /api/projects/{id}` (`?deleteRepo=true` for the option), `204` on success, from **Remove this project** in [Project settings](./project-settings.md). Refused while a team is deployed on the project (`409 DEPLOYED`). In order:
+`DELETE /api/projects/{id}` (`?deleteRepo=true` for the option), `204` on success, from **Remove this project** in [Project settings](./project-settings.md). Only an [archived](../models/project-config.md#the-project-record) project can be removed (`400 INVALID`, `archive <id> before removing it`; the CEO, 2026-10-23: archiving, which keeps everything, comes first), and never while a team is deployed on it (`409 DEPLOYED`). In order:
 
 1. Its agents' sandboxes (`~/.foreman/sandboxes/<id>/`) go, uncommitted work included, and each code repo prunes its worktrees' records (`git worktree prune`). The repos and their branches stay.
 2. Its session logs (`~/.foreman/logs/*@<id>/`) go.

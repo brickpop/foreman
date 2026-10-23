@@ -164,6 +164,7 @@ function Sidebar({
           {model.projects.map((p) => (
             <ProjectRow key={p.id} project={p} />
           ))}
+          <Archived projects={model.archived} />
           <button
             type="button"
             onClick={onNewProject}
@@ -171,7 +172,6 @@ function Sidebar({
           >
             + New project
           </button>
-          <Archived projects={model.archived} />
         </section>
         <section className="flex flex-col gap-0.5">
           <Label>Teams</Label>
@@ -247,7 +247,7 @@ function Archived({ projects }: { projects: SidebarModel["archived"] }) {
         className="flex items-center gap-1.5 px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
       >
         <Chevron open={shown} />
-        Archived · {projects.length}
+        Archived
       </button>
       {shown && projects.map((p) => <ProjectRow key={p.id} project={p} />)}
     </>

@@ -37,7 +37,7 @@ import {
 import { ActivityPanel } from "../components/ActivityPanel";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
-import { CheckIcon, CopyIcon, PromptIcon, StopIcon } from "../components/icons";
+import { CheckIcon, CopyIcon, PromptIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
@@ -107,7 +107,7 @@ export function Sessions() {
           onChange={(d) =>
             navigate({ to: "/sessions", search: lastView.get(d) ?? { deployment: d } })
           }
-          onClose={{ label: "Stop", close: setStopping, icon: <StopIcon /> }}
+          onClose={{ label: "Stop", close: setStopping }}
           onReorder={(dragged, target) => {
             tabOrder = moved(
               tabs.map((t) => t.id),

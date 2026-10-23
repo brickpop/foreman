@@ -577,14 +577,18 @@ func (h *Home) RenameRepo(ctx context.Context, project, name, newName string) (P
 // RemoveProject removes a project: its sandboxes (its code repos forget
 // those worktrees; their branches stay), its session logs, its record and
 // its whole history in the database, and its project repo only when asked
-// (one never pushed has no other copy). Refused while a team is deployed on
-// it.
+// (one never pushed has no other copy). Only an archived project can be
+// removed (the CEO, 2026-10-23: archiving first, which keeps everything, is
+// the step back), and never while a team is deployed on it.
 func (h *Home) RemoveProject(ctx context.Context, id string, deleteRepo bool) error {
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[id]
 	if !ok {
 		return ErrNotFound
+	}
+	if !p.Archived {
+		return fmt.Errorf("%w: archive %s before removing it", ErrInvalid, id)
 	}
 	if h.deployed != nil && h.deployed(ctx, id) {
 		return fmt.Errorf("%w: stop the team on %s before removing it", ErrDeployed, id)

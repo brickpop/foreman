@@ -485,15 +485,28 @@ function CodeRepos({ project }: { project: Project }) {
 }
 
 /** Archives the project (out of the sidebar's projects and the Dashboard, not
- * deployable; everything kept), or unarchives it. */
+ * deployable; everything kept), stopping the teams on it after a confirmation;
+ * or unarchives it. */
 function ArchiveProject({ project }: { project: Project }) {
   const client = useClient();
   const queries = useQueryClient();
   const toast = useToast();
-  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
+  const teams = useTeams().data ?? [];
+  const running = (useDeployments().data ?? []).filter((d) => d.projectId === project.id);
+  const names = running.map((d) => teams.find((t) => t.id === d.teamId)?.config.name || d.teamId);
+  const [confirming, setConfirming] = useState(false);
   const archive = useMutation({
-    mutationFn: () => client.home.setArchived(project.id, !project.archived),
-    onSuccess: () => queries.invalidateQueries({ queryKey: keys.projects }),
+    mutationFn: async () => {
+      if (!project.archived) {
+        for (const d of running) await client.agents.stop(d.id);
+      }
+      return client.home.setArchived(project.id, !project.archived);
+    },
+    onSettled: () => {
+      queries.invalidateQueries({ queryKey: keys.projects });
+      queries.invalidateQueries({ queryKey: keys.deployments });
+      queries.invalidateQueries({ queryKey: keys.instances });
+    },
     onError: (e: Error) =>
       toast({
         title: project.archived ? "Project not unarchived" : "Project not archived",
@@ -506,30 +519,38 @@ function ArchiveProject({ project }: { project: Project }) {
       <span className="text-[13.5px] text-tx2">
         {project.archived
           ? "It is out of the sidebar's projects and the Dashboard, and takes no deployment, until you unarchive it."
-          : deployed
-            ? "Stop the teams on it first."
-            : "It leaves the sidebar's projects and the Dashboard, and takes no deployment until you unarchive it. Everything is kept."}
+          : `It leaves the sidebar's projects and the Dashboard, and takes no deployment until you unarchive it. Everything is kept.${running.length > 0 ? ` ${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} first.` : ""}`}
       </span>
       <span>
         <Button
           variant="small"
-          disabled={(deployed && !project.archived) || archive.isPending}
-          onClick={() => archive.mutate()}
+          disabled={archive.isPending}
+          onClick={() =>
+            running.length > 0 && !project.archived ? setConfirming(true) : archive.mutate()
+          }
         >
           {project.archived ? "Unarchive project" : "Archive project"}
         </Button>
       </span>
+      <Confirm
+        open={confirming}
+        title={`Stop ${names.join(", ")} and archive ${project.id}?`}
+        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${project.id}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${project.id} is archived.`}
+        action="Stop and archive"
+        onConfirm={() => archive.mutate()}
+        onClose={() => setConfirming(false)}
+      />
     </Block>
   );
 }
 
-/** Removes the project and its history; its project repo folder only when asked. */
+/** Removes an archived project and its history; its project repo folder only
+ * when asked. One not archived is archived first. */
 function RemoveProject({ project }: { project: Project }) {
   const client = useClient();
   const queries = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
-  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
   const [open, setOpen] = useState(false);
   const [deleteRepo, setDeleteRepo] = useState(false);
   const remove = useMutation({
@@ -545,14 +566,14 @@ function RemoveProject({ project }: { project: Project }) {
   return (
     <Block title="Remove this project">
       <span className="text-[13.5px] text-tx2">
-        {deployed
-          ? "Stop the teams on it first."
-          : "Its record, its agents' sandboxes and its history go. Your code repos keep their branches."}
+        {project.archived
+          ? "Its record, its agents' sandboxes and its history go. Your code repos keep their branches."
+          : "Archive it first: archiving keeps everything, removing deletes its history."}
       </span>
       <span>
         <Button
           variant="small"
-          disabled={deployed || remove.isPending}
+          disabled={!project.archived || remove.isPending}
           onClick={() => {
             setDeleteRepo(false);
             setOpen(true);

@@ -91,6 +91,9 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 	writeFile(t, filepath.Join(p.Path, "wiki", "notes.md"), "kept\n")
 	gitOut(t, p.Path, "add", "-A")
 	gitOut(t, p.Path, "commit", "--quiet", "-m", "Notes")
+	if _, err := h.SetArchived(ctx, "ledger", true); err != nil {
+		t.Fatal(err)
+	}
 	if err := h.RemoveProject(ctx, "ledger", false); err != nil {
 		t.Fatal(err)
 	}
@@ -662,6 +665,15 @@ func TestRemoveProject(t *testing.T) {
 	sandboxWorktree(t, h, "ledger", "mara", "api", api)
 	writeFile(t, h.Path("logs", "mara@ledger", "1.log"), "x")
 	writeFile(t, h.Path("logs", "kai@relay", "1.log"), "x")
+	// Only once archived; and never while deployed (a deploy racing the archive).
+	if err := h.RemoveProject(ctx, "ledger", false); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "archive ledger before removing it") {
+		t.Errorf("not archived: %v", err)
+	}
+	for _, id := range []string{"ledger", "relay"} {
+		if _, err := h.SetArchived(ctx, id, true); err != nil {
+			t.Fatal(err)
+		}
+	}
 	deployed := true
 	h.deployed = func(_ context.Context, project string) bool { return deployed && project == "ledger" }
 	if err := h.RemoveProject(ctx, "ledger", false); !errors.Is(err, ErrDeployed) {

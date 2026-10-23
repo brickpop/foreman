@@ -13,9 +13,10 @@ epic: projects-anywhere
 **Decided** (the CEO, 2026-10-23):
 
 - **Archive**, not just hide: an archived project leaves the sidebar's projects and the Dashboard, and Deploy refuses it until it is unarchived. Its record, repos, worktrees, history and pages stay.
-- **Refused while a team is deployed on it**, as removing is. Unarchiving is never refused.
+- **With teams deployed, archiving stops them first**, after a confirmation (the CEO, 2026-10-23, replacing an outright refusal); the server still refuses while one runs. Unarchiving is never refused.
+- **Only an archived project can be removed** (the CEO, 2026-10-23): Remove says "Archive it first" until then.
 - **The flag is on the project's record** ([Project config → archived](../../product/models/project-config.md#the-project-record)). The record is in this machine's database, so it is per machine, like the profile.
-- **A collapsed "Archived · N" group** ends the sidebar's Projects; Project settings archives and unarchives.
+- **A collapsed "Archived" group (no count: the CEO, 2026-10-23)** sits after the project rows, before "+ New project"; Project settings archives and unarchives.
 - **Only the sidebar and the Dashboard** leave it out. The setup checklist, the deploy dialog's project list and the gone-project check treat it as any project; the deploy dialog shows Deploy's refusal.
 
 - [x] decisions above

@@ -25,6 +25,7 @@ PUT    /api/projects/:id/repos/:repo/name     {name} → rename it; agents' work
 PUT    /api/projects/:id/repos/:repo/main     {main} → its main branch, one it has: agents start from it, merges go to it (400 INVALID)
 DELETE /api/projects/:id/repos/:repo          remove it from the project; its folder and branches stay (409 DEPLOYED while a team is deployed on the project)
 PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
+PUT    /api/projects/:id/archived             {archived} → archives the project (409 DEPLOYED while a team is deployed on it) or unarchives it
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)

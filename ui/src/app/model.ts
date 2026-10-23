@@ -159,28 +159,30 @@ export type ProjectRow = {
   state: "needs you" | "on track" | "idle";
 };
 
-/** One row per project: its teams and working agents, and its state. */
+/** One row per project not archived: its teams and working agents, and its state. */
 export function projectRows(
   projects: Project[],
   teams: Team[],
   instances: Instance[],
   requests: Request[],
 ): ProjectRow[] {
-  return projects.map((p) => {
-    const mine = instances.filter((i) => i.id.endsWith(`@${p.id}`));
-    const teamIds = [...new Set(mine.map((i) => i.deploymentId.split("@")[0]))];
-    const names = teamIds.map((t) => teams.find((x) => x.id === t)?.config.name || t);
-    const working = mine.filter((i) => i.status === "running").length;
-    const open = requests.some((r) => r.status === "open" && r.projectId === p.id);
-    return {
-      id: p.id,
-      line:
-        names.length === 0
-          ? "No team deployed"
-          : `${names.join(", ")} · ${working} agent${working === 1 ? "" : "s"} working`,
-      state: open ? "needs you" : working > 0 ? "on track" : "idle",
-    };
-  });
+  return projects
+    .filter((p) => !p.archived)
+    .map((p) => {
+      const mine = instances.filter((i) => i.id.endsWith(`@${p.id}`));
+      const teamIds = [...new Set(mine.map((i) => i.deploymentId.split("@")[0]))];
+      const names = teamIds.map((t) => teams.find((x) => x.id === t)?.config.name || t);
+      const working = mine.filter((i) => i.status === "running").length;
+      const open = requests.some((r) => r.status === "open" && r.projectId === p.id);
+      return {
+        id: p.id,
+        line:
+          names.length === 0
+            ? "No team deployed"
+            : `${names.join(", ")} · ${working} agent${working === 1 ? "" : "s"} working`,
+        state: open ? "needs you" : working > 0 ? "on track" : "idle",
+      };
+    });
 }
 
 const harnessLabels: Record<string, string> = {

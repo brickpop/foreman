@@ -21,6 +21,8 @@ type Projects interface {
 	Create(ctx context.Context, id string) error
 	// SetProfile names the profile its agents run on ("" for the default).
 	SetProfile(ctx context.Context, id, profile string) error
+	// SetArchived archives a project, or unarchives it.
+	SetArchived(ctx context.Context, id string, archived bool) error
 	// AddRepo adds a repo to the project. ErrExists if the project has that
 	// name or that path already.
 	AddRepo(ctx context.Context, project string, r RepoRecord) error
@@ -46,6 +48,7 @@ type Projects interface {
 type ProjectRecord struct {
 	ID        string
 	Profile   string
+	Archived  bool
 	CreatedAt time.Time
 	Repos     []RepoRecord
 }
@@ -66,7 +69,7 @@ func (db *DB) Projects() Projects { return projects{db.sql} }
 type projects struct{ db *sql.DB }
 
 func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
-	rows, err := p.db.QueryContext(ctx, "SELECT id, profile, created_at FROM projects ORDER BY id")
+	rows, err := p.db.QueryContext(ctx, "SELECT id, profile, archived, created_at FROM projects ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +78,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var r ProjectRecord
 		var created sql.NullString
-		if err := rows.Scan(&r.ID, &r.Profile, &created); err != nil {
+		if err := rows.Scan(&r.ID, &r.Profile, &r.Archived, &created); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -115,6 +118,10 @@ func (p projects) Create(ctx context.Context, id string) error {
 
 func (p projects) SetProfile(ctx context.Context, id, profile string) error {
 	return touched(p.db.ExecContext(ctx, "UPDATE projects SET profile = ? WHERE id = ?", profile, id))
+}
+
+func (p projects) SetArchived(ctx context.Context, id string, archived bool) error {
+	return touched(p.db.ExecContext(ctx, "UPDATE projects SET archived = ? WHERE id = ?", archived, id))
 }
 
 func (p projects) AddRepo(ctx context.Context, project string, r RepoRecord) error {

@@ -145,12 +145,13 @@ export interface Notifications {
 
 /**
  * Project is a project of this machine: its record (its name, its repos, its
- * profile) and its project repo's project.toml.
+ * profile, whether it is archived) and its project repo's project.toml.
  */
 export interface Project {
   id: string;
   path: string; // its project repo, <home>/projects/<id>
   profile: string; // the profile its agents run on: its own, else the default
+  archived: boolean; // put away: out of the sidebar's projects and the Dashboard, not deployable
   config: ProjectConfig;
   repos: Repo[]; // the code repos agents get worktrees of, by name
   version: string; // of project.toml

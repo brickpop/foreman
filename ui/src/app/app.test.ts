@@ -28,6 +28,24 @@ describe("sidebarModel", () => {
     ]);
   });
 
+  it("puts the archived projects in their own group, still marked when they need the CEO", () => {
+    const m = sidebarModel(
+      [
+        project("ledger"),
+        { ...project("relay"), archived: true },
+        { ...project("harbor"), archived: true },
+      ],
+      [],
+      [],
+      [request("harbor")],
+    );
+    expect(m.projects).toEqual([{ id: "ledger", needsYou: false }]);
+    expect(m.archived).toEqual([
+      { id: "relay", needsYou: false },
+      { id: "harbor", needsYou: true },
+    ]);
+  });
+
   it("says where each team is deployed", () => {
     const m = sidebarModel(
       [],
@@ -234,9 +252,14 @@ describe("the Dashboard's model", () => {
     expect(card.on).toEqual(["ledger", "relay"]);
   });
 
-  it("gives each project its line and state", () => {
+  it("gives each project not archived its line and state", () => {
     const rows = projectRows(
-      [project("ledger"), project("relay"), project("harbor")],
+      [
+        project("ledger"),
+        project("relay"),
+        project("harbor"),
+        { ...project("old"), archived: true },
+      ],
       [team("atlas", "Atlas"), team("orion", "Orion")],
       [
         inst("mara@ledger", "running", "atlas@ledger"),

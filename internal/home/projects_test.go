@@ -393,6 +393,43 @@ func TestSetProfile(t *testing.T) {
 	}
 }
 
+// Archiving keeps everything but is refused while a team is deployed;
+// unarchiving never is. Each is announced, and survives a restart.
+func TestSetArchived(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	deployed := true
+	h.deployed = func(_ context.Context, project string) bool { return deployed && project == "ledger" }
+	if _, err := h.SetArchived(ctx, "ledger", true); !errors.Is(err, ErrDeployed) || !strings.Contains(err.Error(), "stop the team on ledger before archiving it") {
+		t.Errorf("while deployed: %v", err)
+	}
+	if p, _ := h.Project("ledger"); p.Archived {
+		t.Error("archived although refused")
+	}
+	deployed = false
+	var changes []Change
+	h.notify = func(c Change) { changes = append(changes, c) }
+	if p, err := h.SetArchived(ctx, "ledger", true); err != nil || !p.Archived {
+		t.Errorf("%+v %v", p, err)
+	}
+	if len(changes) != 1 || changes[0].Kind != "projects" {
+		t.Errorf("changes %+v", changes)
+	}
+	reload(t, h)
+	if p, _ := h.Project("ledger"); !p.Archived || !exists(p.Path) {
+		t.Errorf("after a restart: %+v", p)
+	}
+	deployed = true // can't be, once archived; unarchiving is never refused
+	if p, err := h.SetArchived(ctx, "ledger", false); err != nil || p.Archived {
+		t.Errorf("unarchived: %+v %v", p, err)
+	}
+	if _, err := h.SetArchived(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such project: %v", err)
+	}
+}
+
 // A project repo without the scaffold (made elsewhere, or its files deleted)
 // gets only what it lacks, committed on its own.
 func TestScaffoldFillsWhatIsMissing(t *testing.T) {

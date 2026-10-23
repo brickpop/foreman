@@ -698,6 +698,45 @@ func TestRequests(t *testing.T) {
 
 // --- projects -------------------------------------------------------------------
 
+// A project is archived and unarchived on its own; one never added can't be.
+func TestArchiveAProject(t *testing.T) {
+	p := open(t).Projects()
+	for _, id := range []string{"ledger", "aragon"} {
+		if err := p.Create(ctx, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	archived := func() []bool {
+		list, err := p.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []bool
+		for _, r := range list {
+			got = append(got, r.Archived)
+		}
+		return got
+	}
+	if got := archived(); !slices.Equal(got, []bool{false, false}) {
+		t.Errorf("new projects: %v", got)
+	}
+	if err := p.SetArchived(ctx, "Ledger", true); err != nil {
+		t.Fatal(err)
+	}
+	if got := archived(); !slices.Equal(got, []bool{false, true}) {
+		t.Errorf("ledger archived: %v", got)
+	}
+	if err := p.SetArchived(ctx, "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	if got := archived(); !slices.Equal(got, []bool{false, false}) {
+		t.Errorf("ledger unarchived: %v", got)
+	}
+	if err := p.SetArchived(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such project: %v", err)
+	}
+}
+
 func TestProjectsAndTheirRepos(t *testing.T) {
 	p := open(t).Projects()
 	if list, err := p.List(ctx); err != nil || len(list) != 0 {

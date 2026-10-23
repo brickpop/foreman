@@ -250,6 +250,7 @@ function Configuration({ project }: { project: Project }) {
           <pre className="m-0 overflow-x-auto rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2 select-text">
             {project.source}
           </pre>
+          <ArchiveProject project={project} />
           <RemoveProject project={project} />
         </Block>
       </div>
@@ -479,6 +480,45 @@ function CodeRepos({ project }: { project: Project }) {
         }
         onClose={() => setRemoving(undefined)}
       />
+    </Block>
+  );
+}
+
+/** Archives the project (out of the sidebar's projects and the Dashboard, not
+ * deployable; everything kept), or unarchives it. */
+function ArchiveProject({ project }: { project: Project }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
+  const archive = useMutation({
+    mutationFn: () => client.home.setArchived(project.id, !project.archived),
+    onSuccess: () => queries.invalidateQueries({ queryKey: keys.projects }),
+    onError: (e: Error) =>
+      toast({
+        title: project.archived ? "Project not unarchived" : "Project not archived",
+        body: e.message,
+        color: "var(--err)",
+      }),
+  });
+  return (
+    <Block title={project.archived ? "Archived" : "Archive this project"}>
+      <span className="text-[13.5px] text-tx2">
+        {project.archived
+          ? "It is out of the sidebar's projects and the Dashboard, and takes no deployment, until you unarchive it."
+          : deployed
+            ? "Stop the teams on it first."
+            : "It leaves the sidebar's projects and the Dashboard, and takes no deployment until you unarchive it. Everything is kept."}
+      </span>
+      <span>
+        <Button
+          variant="small"
+          disabled={(deployed && !project.archived) || archive.isPending}
+          onClick={() => archive.mutate()}
+        >
+          {project.archived ? "Unarchive project" : "Archive project"}
+        </Button>
+      </span>
     </Block>
   );
 }

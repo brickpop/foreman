@@ -190,14 +190,16 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("sets a project's profile and scaffolds its project repo", async () => {
+  it("sets a project's profile, scaffolds its project repo and archives it", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
     await client.home.setProfile("my project", "work");
     await client.home.scaffold("my project");
+    await client.home.setArchived("my project", true);
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["PUT", "http://x/api/projects/my%20project/profile", { profile: "work" }],
       ["POST", "http://x/api/projects/my%20project/scaffold", undefined],
+      ["PUT", "http://x/api/projects/my%20project/archived", { archived: true }],
     ]);
   });
 

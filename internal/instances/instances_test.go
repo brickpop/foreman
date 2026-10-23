@@ -909,6 +909,26 @@ func TestDeployRefusesAProjectWithoutRepos(t *testing.T) {
 	}
 }
 
+// An archived project takes no deployment until it is unarchived.
+func TestDeployRefusesAnArchivedProject(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if _, err := f.hm.SetArchived(ctx, "ledger", true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "ledger is archived") {
+		t.Errorf("%v", err)
+	}
+	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
+		t.Errorf("deployed anyway: %+v", deps)
+	}
+	if _, err := f.hm.SetArchived(ctx, "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Errorf("unarchived: %v", err)
+	}
+}
+
 // A clean exit (the CEO's /exit) is done for now: asleep, holding no slot,
 // until the CEO's Start (or work) wakes it, picking up its conversation.
 func TestACleanExitSleepsAndStartResumes(t *testing.T) {

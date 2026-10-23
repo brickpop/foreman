@@ -133,6 +133,8 @@ export interface HomeArea {
   branches(path: string): Promise<Branches>;
   /** Sets the profile a project's agents run on, from their next start. */
   setProfile(project: string, profile: string): Promise<Project>;
+  /** Archives a project (refused while a team is deployed on it), or unarchives it. */
+  setArchived(project: string, archived: boolean): Promise<Project>;
   /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
   missing(project: string): Promise<Missing[]>;
   scaffold(project: string): Promise<Missing[]>;
@@ -418,6 +420,10 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       setProfile: async (project, profile) =>
         (
           await request("PUT", `/api/projects/${id(project)}/profile`, { profile })
+        ).json() as Promise<Project>,
+      setArchived: async (project, archived) =>
+        (
+          await request("PUT", `/api/projects/${id(project)}/archived`, { archived })
         ).json() as Promise<Project>,
       missing: (project) => getJSON(`/api/projects/${id(project)}/scaffold`),
       scaffold: async (project) =>

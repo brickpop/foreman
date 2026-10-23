@@ -46,7 +46,7 @@ One card per active deployment, by project then team (cards at least 320px wide)
 
 ## Projects
 
-One card per project (cards at least 240px wide), then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the project's Overview ([Wiki reader](./wiki-reader.md)).
+One card per project not [archived](../models/project-config.md#the-project-record) (cards at least 240px wide), then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the project's Overview ([Wiki reader](./wiki-reader.md)).
 
 - The name (600 15px), and on the right its state: a dot and `needs you` (`--acc`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
 - Its description (13.5px `--tx3`, two lines, kept at two so cards line up), or `No description yet.`

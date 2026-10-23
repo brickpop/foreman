@@ -285,6 +285,23 @@ func (h *Home) SetProfile(ctx context.Context, project, profile string) (Project
 	return h.rescan(project)
 }
 
+// SetArchived archives a project, or unarchives it. Archiving is refused
+// while a team is deployed on it, as removing it is.
+func (h *Home) SetArchived(ctx context.Context, project string, archived bool) (Project, error) {
+	h.mu.Lock()
+	defer h.unlock()
+	if _, ok := h.snap.projects[project]; !ok {
+		return Project{}, ErrNotFound
+	}
+	if archived && h.deployed != nil && h.deployed(ctx, project) {
+		return Project{}, fmt.Errorf("%w: stop the team on %s before archiving it", ErrDeployed, project)
+	}
+	if err := h.records.SetArchived(ctx, project, archived); err != nil {
+		return Project{}, h.recordError(err)
+	}
+	return h.rescan(project)
+}
+
 // usableRepo checks a folder to add as a repo of p (Home.usableFolder)
 // and returns its root commit: a repo without a commit has no branch for
 // agents to start from. main must be a branch it has; "" is main, when it has

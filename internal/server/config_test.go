@@ -104,6 +104,9 @@ func (f fakeConfig) RemoveRepo(_ context.Context, project, name string) (home.Pr
 func (f fakeConfig) SetProfile(_ context.Context, project, profile string) (home.Project, error) {
 	return f.changed("SetProfile", project, profile, "")
 }
+func (f fakeConfig) SetArchived(_ context.Context, project string, archived bool) (home.Project, error) {
+	return f.changed("SetArchived", project, fmt.Sprint(archived), "")
+}
 
 // A project repo from before the scaffold: its wiki.toml is missing.
 func (f fakeConfig) Missing(project string) ([]home.Missing, error) {
@@ -381,6 +384,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
+		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":true}`, []string{"SetArchived", "true", ""}},
+		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":false}`, []string{"SetArchived", "false", ""}},
 		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"site"}`, []string{"RenameRepo", "site", "web"}},
 	} {
@@ -428,6 +433,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodGet, "/api/folders?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodGet, "/api/folders/branches?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodPut, "/api/projects/ledger/repos/web/main", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
+		{http.MethodPut, "/api/projects/ledger/archived", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
+		{http.MethodPut, "/api/projects/nope/archived", `{"archived":true}`, http.StatusNotFound, `"NOT_FOUND"`},
 	} {
 		if w := send(tc.method, tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s %s %s: %d %s", tc.method, tc.path, tc.body, w.Code, w.Body)

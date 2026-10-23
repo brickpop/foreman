@@ -54,6 +54,8 @@ type Config interface {
 	RepoBranches(ctx context.Context, path string) (home.Branches, error)
 	// SetProfile names the profile the project's agents run on.
 	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
+	// SetArchived archives the project, or unarchives it.
+	SetArchived(ctx context.Context, project string, archived bool) (home.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
 	// Scaffold creates them, never overwriting one.
 	Missing(project string) ([]home.Missing, error)
@@ -171,6 +173,17 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			return
 		}
 		p, err := c.SetProfile(r.Context(), r.PathValue("id"), req.Profile)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("PUT /api/projects/{id}/archived", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Archived *bool `json:"archived"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil || req.Archived == nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {archived}")
+			return
+		}
+		p, err := c.SetArchived(r.Context(), r.PathValue("id"), *req.Archived)
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("GET /api/projects/{id}/scaffold", func(w http.ResponseWriter, r *http.Request) {

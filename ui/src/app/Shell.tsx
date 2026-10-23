@@ -1,6 +1,7 @@
-import { Link, Outlet, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { Instance, Project, Request, Team } from "../api/client";
+import { Chevron } from "../components/icons";
 import { NewProject } from "../components/NewProject";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
@@ -72,6 +73,8 @@ export type SidebarModel = {
    * count in the nav. */
   reviews: number;
   projects: { id: string; needsYou: boolean }[];
+  /** The archived projects, in a collapsed group of their own. */
+  archived: { id: string; needsYou: boolean }[];
   teams: { id: string; name: string; deployedOn: string }[];
 };
 
@@ -84,12 +87,11 @@ export function sidebarModel(
 ): SidebarModel {
   const open = requests.filter((r) => r.status === "open");
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean));
+  const row = (p: Project) => ({ id: p.id, needsYou: open.some((r) => r.projectId === p.id) });
   return {
     reviews: open.filter((r) => r.kind === "review").length,
-    projects: projects.map((p) => ({
-      id: p.id,
-      needsYou: open.some((r) => r.projectId === p.id),
-    })),
+    projects: projects.filter((p) => !p.archived).map(row),
+    archived: projects.filter((p) => p.archived).map(row),
     teams: teams.map((t) => {
       const on = [...deployments]
         .filter((d) => d.startsWith(`${t.id}@`))
@@ -160,19 +162,7 @@ function Sidebar({
         <section className="flex flex-col gap-0.5">
           <Label>Projects</Label>
           {model.projects.map((p) => (
-            <Link
-              key={p.id}
-              to="/projects/$project"
-              params={{ project: p.id }}
-              search={{ tab: "overview" }}
-              className={rowItem}
-              activeProps={navActive}
-              // Active on every tab of the project, not only the one the link opens.
-              activeOptions={{ includeSearch: false }}
-            >
-              {p.id}
-              {p.needsYou && <Dot title="Needs you" />}
-            </Link>
+            <ProjectRow key={p.id} project={p} />
           ))}
           <button
             type="button"
@@ -181,6 +171,7 @@ function Sidebar({
           >
             + New project
           </button>
+          <Archived projects={model.archived} />
         </section>
         <section className="flex flex-col gap-0.5">
           <Label>Teams</Label>
@@ -215,6 +206,51 @@ function Sidebar({
         </Link>
       </footer>
     </aside>
+  );
+}
+
+/** A project in the sidebar, active on every tab of the project. */
+function ProjectRow({ project }: { project: SidebarModel["projects"][number] }) {
+  return (
+    <Link
+      to="/projects/$project"
+      params={{ project: project.id }}
+      search={{ tab: "overview" }}
+      className={rowItem}
+      activeProps={navActive}
+      // Active on every tab of the project, not only the one the link opens.
+      activeOptions={{ includeSearch: false }}
+    >
+      {project.id}
+      {project.needsYou && <Dot title="Needs you" />}
+    </Link>
+  );
+}
+
+/** The archived projects, collapsed; open while one of them is. */
+function Archived({ projects }: { projects: SidebarModel["archived"] }) {
+  const [open, setOpen] = useState(false);
+  const current = useParams({ strict: false }).project;
+  if (projects.length === 0) {
+    return null;
+  }
+  const shown = open || projects.some((p) => p.id === current);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation(); // keeps the narrow screens' overlay open
+          setOpen(!shown);
+        }}
+        aria-expanded={shown}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
+      >
+        <Chevron open={shown} />
+        Archived · {projects.length}
+      </button>
+      {shown && projects.map((p) => <ProjectRow key={p.id} project={p} />)}
+    </>
   );
 }
 

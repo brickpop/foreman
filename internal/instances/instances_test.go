@@ -792,10 +792,10 @@ func TestTheHarnessGetsTheAgentLink(t *testing.T) {
 // the run a redeploy started in its place (seen as a flaky redeploy).
 func TestARunReleasesOnlyItsOwnSlot(t *testing.T) {
 	m := New(Deps{})
-	old, current := &live{}, &live{}
-	m.live["mara@ledger"] = current
+	old, current := &run{}, &run{}
+	m.runs["mara@ledger"] = current
 	m.release("mara@ledger", old)
-	if m.live["mara@ledger"] != current {
+	if m.runs["mara@ledger"] != current {
 		t.Fatal("the old run freed the new run's slot")
 	}
 	m.release("mara@ledger", current)
@@ -1585,10 +1585,11 @@ func TestAFailedStartSaysWhy(t *testing.T) {
 	}
 }
 
-// sleepy is a fixture whose lead runs script, then `exec cat` (so the shell
-// itself is gone), deployed and idle, with hooks read as activities. In
-// script, $HELPER is a foreman-agent: sleep under that name.
-func sleepy(t *testing.T, script string) *fixture {
+// crowded is a fixture with one session slot: its lead runs script, then
+// `exec cat` (so the shell itself is gone), and is idle; tove, woken, waits
+// for the slot. Hooks are read as activities. In script, $HELPER is a
+// foreman-agent: sleep under that name.
+func crowded(t *testing.T, script string) *fixture {
 	t.Helper()
 	helper := filepath.Join(t.TempDir(), "foreman-agent")
 	sleep, err := exec.LookPath("sleep")
@@ -1598,7 +1599,7 @@ func sleepy(t *testing.T, script string) *fixture {
 	if err := os.Symlink(sleep, helper); err != nil {
 		t.Fatal(err)
 	}
-	f := newFixture(t, strings.ReplaceAll(script, "$HELPER", helper)+"\necho ready\nexec cat", 12)
+	f := newFixture(t, strings.ReplaceAll(script, "$HELPER", helper)+"\necho ready\nexec cat", 1)
 	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
 	f.deps.Agent.Path = "/opt/foreman/foreman-agent"
 	f.m = New(f.deps)
@@ -1608,56 +1609,60 @@ func sleepy(t *testing.T, script string) *fixture {
 	f.waitStatus("mara@ledger", Running)
 	f.output("mara@ledger", "ready")
 	f.m.Hook("mara@ledger", "idle", nil)
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Queued)
 	return f
 }
 
-// sleepAfter sets the sleep_after_minutes setting.
-func (f *fixture) sleepAfter(minutes int) {
-	f.t.Helper()
-	settings := f.hm.Settings()
-	s := settings.Settings
-	s.SleepAfterMinutes = minutes
-	if _, err := f.hm.SaveSettings(ctx, s, settings.Version); err != nil {
-		f.t.Fatal(err)
-	}
-}
-
-// idleSince is when the instance went idle, as CheckSleep counts it.
+// idleSince is when the instance went idle, as MakeRoom counts it.
 func (f *fixture) idleSince(id string) time.Time {
 	f.m.mu.Lock()
 	defer f.m.mu.Unlock()
-	return f.m.idleSince[id]
+	if r := f.m.runs[id]; r != nil {
+		return r.idleSince
+	}
+	return time.Time{}
 }
 
-// An agent idle for the setting goes to sleep, freeing its slot, and a wake
-// starts it again; off (the default), or short of the setting, it stays.
-func TestAnIdleAgentSleeps(t *testing.T) {
-	f := sleepy(t, `true`)
+// An agent idle for a minute gives its slot to one that waits: it sleeps,
+// the other starts, and a wake starts it again (queued in turn). Just idle,
+// it keeps the slot; with nobody waiting, it is never touched.
+func TestAnIdleAgentMakesRoom(t *testing.T) {
+	f := crowded(t, `true`)
 	idle := f.idleSince("mara@ledger")
 	if idle.IsZero() {
 		t.Fatal("no idle clock")
 	}
-	f.m.CheckSleep(ctx, idle.Add(3*time.Hour))
+	f.m.MakeRoom(ctx, idle.Add(59*time.Second))
 	if s := f.status("mara@ledger"); s.Status != Idle || !f.m.Live("mara@ledger") {
-		t.Fatalf("slept with the setting off: %s", s.Status)
+		t.Fatalf("slept before a minute: %s", s.Status)
 	}
-	f.sleepAfter(20)
-	f.m.CheckSleep(ctx, idle.Add(19*time.Minute))
-	if s := f.status("mara@ledger"); s.Status != Idle {
-		t.Fatalf("slept before 20 min: %s", s.Status)
-	}
-	f.m.CheckSleep(ctx, idle.Add(20*time.Minute))
+	f.m.MakeRoom(ctx, idle.Add(time.Minute))
 	inst := f.waitStatus("mara@ledger", Asleep)
-	if f.m.Live("mara@ledger") || inst.Restarts != 0 || inst.StopReason != "" {
-		t.Errorf("asleep: %+v, live %v", inst, f.m.Live("mara@ledger"))
+	if inst.Restarts != 0 || inst.StopReason != "" {
+		t.Errorf("asleep: %+v", inst)
 	}
+	f.waitStatus("tove@ledger", Running)
 	f.m.Hook("mara@ledger", "busy", nil) // a late hook from the ended run
 	if s := f.status("mara@ledger"); s.Status != Asleep {
 		t.Errorf("a late hook made it %s", s.Status)
 	}
+
+	// Tove idle, nobody waiting: nothing happens.
+	f.m.Hook("tove@ledger", "idle", nil)
+	f.m.MakeRoom(ctx, time.Now().Add(3*time.Hour))
+	if s := f.status("tove@ledger"); s.Status != Idle {
+		t.Fatalf("slept with nobody waiting: %s", s.Status)
+	}
+	// Mara woken waits, and tove makes room in turn, with its own fresh clock.
 	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {
 		t.Fatal(err)
 	}
+	f.waitStatus("mara@ledger", Queued)
+	f.m.MakeRoom(ctx, f.idleSince("tove@ledger").Add(time.Minute))
+	f.waitStatus("tove@ledger", Asleep)
 	f.waitStatus("mara@ledger", Running)
 	if !f.idleSince("mara@ledger").IsZero() {
 		t.Error("the new run kept the old idle clock")
@@ -1666,7 +1671,7 @@ func TestAnIdleAgentSleeps(t *testing.T) {
 
 // Only foreman-agent may be left running: anything else keeps the agent
 // awake, and a finished process never reaped (a zombie) doesn't.
-func TestWhatRunsDecidesTheSleep(t *testing.T) {
+func TestWhatRunsDecidesWhoMakesRoom(t *testing.T) {
 	for _, tc := range []struct {
 		name, script string
 		sleeps       bool
@@ -1676,29 +1681,30 @@ func TestWhatRunsDecidesTheSleep(t *testing.T) {
 		{"a dev server", `"$HELPER" 300 & sleep 300 &`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			f := sleepy(t, tc.script)
-			f.sleepAfter(20)
+			f := crowded(t, tc.script)
 			time.Sleep(200 * time.Millisecond) // the background `true` has ended
-			f.m.CheckSleep(ctx, f.idleSince("mara@ledger").Add(time.Hour))
+			f.m.MakeRoom(ctx, time.Now().Add(time.Hour))
 			if tc.sleeps {
 				f.waitStatus("mara@ledger", Asleep)
+				f.waitStatus("tove@ledger", Running)
 				return
 			}
 			if s := f.status("mara@ledger"); s.Status != Idle || !f.m.Live("mara@ledger") {
 				t.Errorf("slept with a process running: %s", s.Status)
 			}
+			if s := f.status("tove@ledger"); s.Status != Queued {
+				t.Errorf("tove is %s", s.Status)
+			}
 		})
 	}
 }
 
-// Only idle counts, from the last change: running, awaiting, input since it
-// went idle, or the CEO's unsent draft keep it awake.
-func TestOnlyAQuietIdleAgentSleeps(t *testing.T) {
-	f := sleepy(t, `true`)
+// Only a quiet idle agent makes room: running, awaiting, input since it went
+// idle, or the CEO's unsent draft keep it awake.
+func TestOnlyAQuietIdleAgentMakesRoom(t *testing.T) {
+	f := crowded(t, `true`)
 	drafting := false
-	f.deps.Drafting = func(id string) bool { return drafting && id == "mara@ledger" }
-	f.m.Drafting = f.deps.Drafting
-	f.sleepAfter(20)
+	f.m.Drafting = func(id string) bool { return drafting && id == "mara@ledger" }
 	awake := func(why string) {
 		t.Helper()
 		if s := f.status("mara@ledger"); s.Status == Asleep || !f.m.Live("mara@ledger") {
@@ -1707,34 +1713,31 @@ func TestOnlyAQuietIdleAgentSleeps(t *testing.T) {
 	}
 	for _, event := range []string{"busy", "waiting"} {
 		f.m.Hook("mara@ledger", event, nil)
-		f.m.CheckSleep(ctx, time.Now().Add(3*time.Hour))
+		f.m.MakeRoom(ctx, time.Now().Add(3*time.Hour))
 		awake("while " + event)
 	}
 
 	f.m.Hook("mara@ledger", "idle", nil)
 	idle := f.idleSince("mara@ledger")
 	time.Sleep(50 * time.Millisecond)
-	term, err := f.m.Terminal("mara@ledger")
-	if err != nil {
+	if err := f.m.Type("mara@ledger", []byte("x")); err != nil {
 		t.Fatal(err)
 	}
-	if err := term.Input([]byte("x")); err != nil {
-		t.Fatal(err)
-	}
-	f.m.CheckSleep(ctx, idle.Add(20*time.Minute)) // 20 min since idle, not since the input
+	f.m.MakeRoom(ctx, idle.Add(time.Minute)) // a minute since idle, not since the input
 	awake("with input since it went idle")
 
 	drafting = true
-	f.m.CheckSleep(ctx, time.Now().Add(3*time.Hour))
+	f.m.MakeRoom(ctx, time.Now().Add(3*time.Hour))
 	awake("on the CEO's draft")
 	drafting = false
-	f.m.CheckSleep(ctx, time.Now().Add(3*time.Hour))
+	f.m.MakeRoom(ctx, time.Now().Add(3*time.Hour))
 	f.waitStatus("mara@ledger", Asleep)
+	f.waitStatus("tove@ledger", Running)
 }
 
 // A sleep whose stop fails leaves the agent as it was, taking input again.
 func TestASleepThatCantStopLeavesTheAgentAwake(t *testing.T) {
-	f := sleepy(t, `true`)
+	f := crowded(t, `true`)
 	f.stopAll()
 	u := &unstoppable{Runner: f.deps.Runner}
 	t.Cleanup(func() {
@@ -1750,8 +1753,11 @@ func TestASleepThatCantStopLeavesTheAgentAwake(t *testing.T) {
 	f.waitStatus("mara@ledger", Running)
 	f.output("mara@ledger", "ready")
 	f.m.Hook("mara@ledger", "idle", nil)
-	f.sleepAfter(20)
-	f.m.CheckSleep(ctx, time.Now().Add(time.Hour))
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Queued)
+	f.m.MakeRoom(ctx, time.Now().Add(time.Hour))
 	if s := f.status("mara@ledger"); s.Status != Idle || !f.m.Live("mara@ledger") {
 		t.Fatalf("after a failed stop: %s", s.Status)
 	}

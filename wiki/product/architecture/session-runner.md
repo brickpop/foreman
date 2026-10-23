@@ -21,7 +21,7 @@ Conceptually (exact Go signatures are an implementation detail; the authority is
 | process: `Resize(cols, rows)` | Propagates a terminal resize |
 | process: `Stop(grace)` | Graceful stop (SIGTERM, then kill after `grace`) |
 | process: `Wait() → exit code` | Blocks until the process exits (used to raise blocked requests) |
-| process: `Processes() → []command line` | What else runs in the session, zombies left out: in a container every process but PID 1 (the API's `top`); on the Direct engine the process's descendants (`ps`). An idle agent sleeps only when nothing but `foreman-agent` is left ([Idle agents sleep](./agent-runtime.md#idle-agents-sleep)) |
+| process: `Processes() → []command line` | What else runs in the session, zombies left out: in a container every process but PID 1 (the API's `top`); on the Direct engine the process's descendants (`ps`). An idle agent sleeps only when nothing but `foreman-agent` is left ([Idle agents make room](./agent-runtime.md#idle-agents-make-room)) |
 | `List() → []process` | Running processes this engine started (by label), for [recovery](./agent-runtime.md#recovery) after a Foreman restart |
 
 The [Terminal](./building-blocks.md#2-terminal-terminal) holding a process tees every byte it reads into the instance's session log ([Persistence](./persistence.md)) before fanning it out to viewers ([API](./api.md#pty-websocket)).

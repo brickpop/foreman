@@ -8,7 +8,7 @@ epic: install-first-run
 
 # Pi as a second harness
 
-**Why:** the CEO, 2026-10-18: a second [harness](../product/architecture/harness-adapters.md) besides Claude Code, for agents on models the CEO serves locally or on other providers. Brought forward ahead of [Idle sleep](./idle-sleep.md) the same day.
+**Why:** the CEO, 2026-10-18: a second [harness](../product/architecture/harness-adapters.md) besides Claude Code, for agents on models the CEO serves locally or on other providers. Brought forward ahead of [Idle sleep](./archive/idle-sleep.md) the same day.
 
 **Decided (the CEO, 2026-10-18):**
 - **A Pi profile is a model server and one model**, Pi's `models.json` in the profile folder, set in a form: URL, optional API key, Detect (`<url>/models`) to pick the model, context window and longest reply prefilled with 256k and 128k. `samplingParams`, `thinkingLevelMap` and the like are optional and added by hand; a save keeps them. One model per profile: another model is another profile, until [presets](./agent-model-settings.md).

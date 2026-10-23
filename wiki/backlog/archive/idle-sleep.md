@@ -1,16 +1,16 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: workflow
 ---
 
-# Put idle agents to sleep (a setting, off by default)
+# Idle agents make room for those waiting for a slot
 
 **Seen 2026-10-18:** with 7 agents and 6 slots, Lumen stayed `queued` behind five idle agents and its messages never arrived (the CEO read it as a delivery bug). The Activity panel now says why a message waits, but nothing frees the slot. Next after the Chief of Staff (the CEO, 2026-10-18).
 
-**Why:** an agent that is done and waits for nothing still holds a container, a session slot (12 by default) and memory. Asleep, it holds none, and a message or the CEO's Start wakes it with its conversation ([Agent runtime → Lazy starts](../product/architecture/agent-runtime.md#lazy-starts)). A clean exit (`/exit`) already does this (built 2026-10-16). What's left is Foreman doing it on its own.
+**Why:** an agent that is done and waits for nothing still holds a container, a session slot (12 by default) and memory. Asleep, it holds none, and a message or the CEO's Start wakes it with its conversation ([Agent runtime → Lazy starts](../../product/architecture/agent-runtime.md#lazy-starts)). A clean exit (`/exit`) already does this (built 2026-10-16). What's left is Foreman doing it on its own.
 
 **Decided (the CEO, 2026-10-16):**
 - **A global setting, off by default.** When on, it applies after **20 minutes** of idle (the length is part of the setting).
@@ -28,11 +28,13 @@ epic: workflow
 - **A lead waiting on a teammate's reply** sleeps too, and the reply wakes it.
 - **A pane the CEO is watching** turns into the asleep view; the Line or Start wakes it.
 
-**Decided (the CEO, 2026-10-23): the silent process check alone.** No ping, no `idle()` tool. Built as [Agent runtime → Idle agents sleep](../product/architecture/agent-runtime.md#idle-agents-sleep). Beyond the design above: input since the agent went idle restarts its clock, the terminal refuses input in the same step as the last check (so a delivery is never cut off by the stop), and the processes come from Podman's `top` (no code in `foreman-agent`) or `ps` on the Direct engine, so Direct agents sleep too. No adapter names extra helpers yet: only `foreman-agent` is one.
+**Decided (the CEO, 2026-10-23): the silent process check alone.** No ping, no `idle()` tool. Beyond the design above: input since the agent went idle restarts its clock, the terminal refuses input in the same step as the last check (so a delivery is never cut off by the stop), and the processes come from Podman's `top` (no code in `foreman-agent`) or `ps` on the Direct engine, so Direct agents sleep too. No adapter names extra helpers yet: only `foreman-agent` is one.
 
-- [x] the setting (off, or minutes), in Settings and `settings.toml`
+**Decided (the CEO, 2026-10-23, later): on demand, no setting.** The timer setting (`sleep_after_minutes`) was built, then replaced: a sleep after N minutes freed slots only by luck, and touched agents when slots were free. Now an idle agent sleeps only when an instance waits for its slot, the longest quiet first, after at least a minute idle. Built as [Agent runtime → Idle agents make room](../../product/architecture/agent-runtime.md#idle-agents-make-room).
+
+- [x] on demand: when an instance waits for a slot (the setting went)
 - [x] the process check, in the engines (`Processes`)
 - [x] decide: the silent process check alone
 - [x] the sleep in the instance manager; activity cancels a pending sleep
-- [x] tests: a stray process, the setting off, input, a draft, running and awaiting keep it awake; a helper and a zombie don't; a failed stop leaves it awake; a wake starts it again
-- [ ] on the CEO's Podman: `just test-podman` runs `TestProcessesAreTheOthersAlive` (the API's `top` with `pid`, `state`, `args` is unverified here)
+- [x] tests: nobody waiting, under a minute, a stray process, input, a draft, running and awaiting keep it awake; a helper and a zombie don't; a failed stop leaves it awake; the waiting one starts, and a wake starts it again
+- [x] on the CEO's Podman: `just test-podman` passes `TestProcessesAreTheOthersAlive` (2026-10-23)

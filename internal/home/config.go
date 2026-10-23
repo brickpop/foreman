@@ -91,7 +91,6 @@ type Settings struct {
 	MaxSessions       int                     `toml:"max_sessions" json:"maxSessions"`
 	Engine            string                  `toml:"engine" json:"engine"`
 	StuckAfterMinutes int                     `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
-	SleepAfterMinutes int                     `toml:"sleep_after_minutes" json:"sleepAfterMinutes"`
 	LogCapMB          int                     `toml:"log_cap_mb" json:"logCapMb"`
 	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
 	GlobalForge       GlobalForge             `toml:"global_forge" json:"globalForge"`
@@ -311,9 +310,6 @@ func (s Settings) validate() problems {
 	}
 	if s.StuckAfterMinutes <= 0 {
 		p.add("stuck_after_minutes: must be more than 0")
-	}
-	if s.SleepAfterMinutes < 0 {
-		p.add("sleep_after_minutes: must be 0 (never) or more")
 	}
 	if s.LogCapMB <= 0 {
 		p.add("log_cap_mb: must be more than 0")

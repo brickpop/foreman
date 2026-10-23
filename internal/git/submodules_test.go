@@ -408,13 +408,14 @@ func TestFetchesGoWithoutTheCEOsCredentials(t *testing.T) {
 	gitOut(t, libDir, "config", "http.receivepack", "false")
 	exec := strings.TrimSpace(gitOut(t, ".", "--exec-path"))
 	var withAuth atomic.Int32
-	private := true
+	var private atomic.Bool // read by the server's goroutines
+	private.Store(true)
 	backend := &cgi.Handler{Path: filepath.Join(exec, "git-http-backend"), Env: []string{"GIT_PROJECT_ROOT=" + filepath.Dir(libDir), "GIT_HTTP_EXPORT_ALL=1"}}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "" {
 			withAuth.Add(1)
 		}
-		if private {
+		if private.Load() {
 			w.Header().Set("WWW-Authenticate", `Basic realm="git"`)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -446,7 +447,7 @@ func TestFetchesGoWithoutTheCEOsCredentials(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(wts["tove"], "lib/dep")); !os.IsNotExist(err) {
 		t.Error("a failed add left lib/dep behind")
 	}
-	private = false
+	private.Store(false)
 	if _, err := g.SetSubmodule(ctx, wts["tove"], "lib/dep", "v1", url, "Add lib/dep", tove); err != nil {
 		t.Fatalf("a public repo: %v", err)
 	}

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/events"
@@ -86,7 +87,7 @@ type rig struct {
 	ready, connects int
 	deliveryBlocked error // what Blocked said when Connected last ran
 	readyErr        error
-	published       int
+	published       atomic.Int32 // counted from the image build's goroutine too
 }
 
 func newRig(t *testing.T, e *engine) *rig {
@@ -111,7 +112,7 @@ func newRig(t *testing.T, e *engine) *rig {
 		},
 		Publish: func(e events.Event) {
 			if e.Type == "setup.changed" {
-				r.published++
+				r.published.Add(1)
 			}
 		},
 	})
@@ -142,11 +143,11 @@ func TestPodmanAppearsAfterStartup(t *testing.T) {
 	}
 
 	r.engine.set(func(e *engine) { e.installed, e.running = true, true })
-	before := r.published
+	before := r.published.Load()
 	r.check(ctx, false)
 	r.built(t)
-	if r.ready != 1 || r.Blocked() != nil || r.published == before {
-		t.Fatalf("with Podman: ready %d, blocked %v, published %d", r.ready, r.Blocked(), r.published-before)
+	if r.ready != 1 || r.Blocked() != nil || r.published.Load() == before {
+		t.Fatalf("with Podman: ready %d, blocked %v, published %d", r.ready, r.Blocked(), r.published.Load()-before)
 	}
 	if got := stateOf(r.Steps(ctx), "running"); got != "done" {
 		t.Errorf("restored: %s", got)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { settingsSearch, sleepLabel, withCurrent } from "./settings";
+import { settingsSearch, withCurrent } from "./settings";
 
 describe("settingsSearch", () => {
   it("keeps a topic tab, Agents left out of the URL", () => {
@@ -21,13 +21,5 @@ describe("withCurrent", () => {
     expect(withCurrent([10, 50, 100], 50)).toEqual([10, 50, 100]);
     expect(withCurrent([10, 50, 100], 37)).toEqual([10, 37, 50, 100]);
     expect(withCurrent([10, 50, 100], 5000)).toEqual([10, 50, 100, 5000]);
-  });
-});
-
-describe("sleepLabel", () => {
-  it("names 0 never, any other value its minutes", () => {
-    expect(sleepLabel(0)).toBe("Never");
-    expect(sleepLabel(20)).toBe("After 20 min idle");
-    expect(sleepLabel(7)).toBe("After 7 min idle");
   });
 });

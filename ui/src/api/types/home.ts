@@ -113,7 +113,6 @@ export interface Settings {
   maxSessions: number /* int */;
   engine: string;
   stuckAfterMinutes: number /* int */;
-  sleepAfterMinutes: number /* int */;
   logCapMb: number /* int */;
   forges: { [key: string]: ForgeAccount};
   globalForge: GlobalForge;

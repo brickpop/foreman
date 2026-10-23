@@ -590,7 +590,12 @@ func TestRenameRepo(t *testing.T) {
 	if exists(old) || gitOut(t, moved, "branch", "--show-current") != "wt/mara/main" {
 		t.Errorf("the worktree didn't move")
 	}
-	if list := gitOut(t, api, "worktree", "list", "--porcelain"); !strings.Contains(list, "worktree "+moved) {
+	// Resolved: git names it by its real path (macOS: /var is /private/var).
+	real, err := filepath.EvalSymlinks(moved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list := gitOut(t, api, "worktree", "list", "--porcelain"); !strings.Contains(list, "worktree "+real) {
 		t.Errorf("the repo doesn't know the moved worktree:\n%s", list)
 	}
 	// A missing repo can't move its worktrees.

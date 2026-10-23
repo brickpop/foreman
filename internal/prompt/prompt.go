@@ -137,6 +137,9 @@ func Compose(in Input) string {
 	if has("switch") {
 		line("%s", persisting(lead && len(in.Team.Roster()) > 1, has))
 	}
+	if has("commit") {
+		line("%s", provingTests)
+	}
 	line("Knowledge base: %s/project/wiki (%s)", in.Sandbox, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	if lead && len(in.Team.Roster()) > 1 {
@@ -144,9 +147,13 @@ func Compose(in Input) string {
 		// files, and a member takes its read-only mount for a fault.
 		if has("contribute") {
 			line("Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.")
+			line("%s", leadReviews)
 		} else {
 			line("Your teammates can't write it: ask them for content, never to write wiki files.")
 		}
+	}
+	if !lead && has("contribute") {
+		line("%s", memberReviews)
 	}
 	line("Read %s/project/AGENTS.md first: how this project's wiki and tasks work.", in.Sandbox)
 	line("")
@@ -238,15 +245,55 @@ func branches(in Input, lead bool, has func(string) bool) string {
 	case lead && has("request_merge"):
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
 			"Ask for a merge to main with request_merge(branch, entry), one per branch. When told a repo's main moved, merge it in with merge(<its main>), "+
-			"resolve any conflicts and commit(), then call request_merge again.", in.Team.Team, in.Team.Team)
+			"resolve any conflicts and commit(), then call request_merge again.%s %s", in.Team.Team, in.Team.Team, oneTopic(has), fewRequests)
 	case lead:
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
 			"Merge the hand-offs you accept into it with merge(branch). When told a repo's main moved, merge it in with merge(<its main>). "+
-			"Tell the CEO which lead branch is ready for review.", in.Team.Team, in.Team.Team)
+			"Tell the CEO which lead branch is ready for review.%s", in.Team.Team, in.Team.Team, oneTopic(has))
 	default:
-		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch). No push to main.", in.Agent)
+		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch). No push to main.%s", in.Agent, oneCard(has))
 	}
 }
+
+// The rules below came from a lead's account of what went wrong
+// (2026-10-23): reviews passed on as summaries, the CEO asked to decide from
+// documents, seven merge requests at once, proof tests that pass while the
+// bug exists reaching main, and an audit branch merged into fix branches that
+// then had to be rebuilt twice.
+
+// oneTopic keeps a lead branch to its topic (with a leading space, to follow
+// a sentence).
+func oneTopic(has func(string) bool) string {
+	if !has("merge") {
+		return ""
+	}
+	return " A lead branch holds one topic: merge in only that topic's hand-offs, never another topic's branch."
+}
+
+// oneCard keeps a member's branch to its card (with a leading space).
+func oneCard(has func(string) bool) string {
+	if !has("merge") {
+		return ""
+	}
+	return " A card's branch starts from main and holds only that card: never merge in another card's branch (an audit's, a proof's). " +
+		"To reuse a test from one, copy it in (git show <branch>:<file>)."
+}
+
+// fewRequests keeps the CEO's reviews to what fits in a sitting.
+const fewRequests = "Keep at most two merge requests open, on topics that don't overlap, each one topic the CEO can review in one sitting. " +
+	"See them through to their merge before you propose the next. Withdraw a request before you replace it."
+
+// provingTests keeps main's tests passing only when the code is right.
+const provingTests = "Tests bound for main assert correct behaviour only. A test that passes while a bug exists (a proof, a repro) stays on its own branch, " +
+	"and lands with the fix, as the fix's regression test."
+
+// leadReviews and memberReviews keep anything up for review or a decision
+// whole, in one place everyone can read.
+const (
+	leadReviews = "Anything up for review or a decision (a design, a gate review) is filed in the wiki: by its author through contribute(), or by you the moment it arrives. " +
+		"To pass one on, link its entry: never retype it, and never present a summary as the full text."
+	memberReviews = "What you put up for review or a decision (a design, a gate review) goes in through contribute(): then point to the entry it files, never retype it."
+)
 
 // persisting says that worktrees outlive a session: a deployment resumes
 // (wiki/product/architecture/sandboxes-and-git.md#branches), so an agent may
@@ -276,12 +323,19 @@ func wikiAccess(lead bool, has func(string) bool) string {
 	}
 }
 
+// ceoBrief: the CEO decides from the lead's words, and builds only what it
+// agreed to.
+const ceoBrief = "Agree the scope with the CEO before building anything it didn't ask for.\n" +
+	"When the CEO must decide, bring a brief that stands alone: the question in plain words, who it affects, " +
+	"the options with their consequences, and your recommendation. Documents are optional depth, never required reading."
+
 func ceoSection(in Input, lead, asking bool) string {
 	if lead {
+		s := "The CEO talks to you."
 		if asking {
-			return "The CEO talks to you. Break requests down and delegate with ask()."
+			s += " Break requests down and delegate with ask()."
 		}
-		return "The CEO talks to you."
+		return s + "\n" + ceoBrief
 	}
 	leadName := in.Team.Agents[in.Team.Lead].Name
 	return fmt.Sprintf("The CEO normally talks to %s. If the CEO instructs you directly, do it, and tell %s if it's relevant to the team.", leadName, leadName)

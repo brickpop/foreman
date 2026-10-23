@@ -283,3 +283,47 @@ func TestTheMainBranchOfEachRepo(t *testing.T) {
 		}
 	}
 }
+
+// A lead's account of what went wrong (2026-10-23) became rules, each
+// following the tool it is about: reviews filed in the wiki and linked, briefs
+// the CEO decides from, few merge requests, one card or topic per branch,
+// and no proof tests in main.
+func TestTheLeadsLessons(t *testing.T) {
+	lead, member := Compose(input("mara", Offered(true))), Compose(input("ilya", Offered(false)))
+	brief := "When the CEO must decide, bring a brief that stands alone: the question in plain words, who it affects, the options with their consequences, and your recommendation."
+	for _, want := range []string{
+		"by its author through contribute(), or by you the moment it arrives. To pass one on, link its entry: never retype it, and never present a summary as the full text.",
+		"## The CEO\nThe CEO talks to you. Break requests down and delegate with ask().\nAgree the scope with the CEO before building anything it didn't ask for.\n" + brief,
+		"then call request_merge again. A lead branch holds one topic: merge in only that topic's hand-offs, never another topic's branch. Keep at most two merge requests open,",
+		"Withdraw a request before you replace it.\n",
+		"Tests bound for main assert correct behaviour only. A test that passes while a bug exists (a proof, a repro) stays on its own branch, and lands with the fix, as the fix's regression test.\n",
+	} {
+		if !strings.Contains(lead, want) {
+			t.Errorf("lead: missing %q in:\n%s", want, lead)
+		}
+	}
+	for _, want := range []string{
+		"goes in through contribute(): then point to the entry it files, never retype it.\n",
+		"No push to main. A card's branch starts from main and holds only that card: never merge in another card's branch (an audit's, a proof's). To reuse a test from one, copy it in (git show <branch>:<file>).\n",
+		"Tests bound for main assert correct behaviour only.",
+	} {
+		if !strings.Contains(member, want) {
+			t.Errorf("member: missing %q in:\n%s", want, member)
+		}
+	}
+	for _, absent := range []string{brief, "merge requests open", "A lead branch holds", "or by you the moment"} {
+		if strings.Contains(member, absent) {
+			t.Errorf("member is told %q:\n%s", absent, member)
+		}
+	}
+	// Without the tools a rule is about, it isn't said; the brief needs none.
+	bare := Compose(input("mara", nil))
+	for _, absent := range []string{"merge requests open", "A lead branch holds", "Tests bound for main", "contribute()"} {
+		if strings.Contains(bare, absent) {
+			t.Errorf("a lead without tools is told %q:\n%s", absent, bare)
+		}
+	}
+	if !strings.Contains(bare, "## The CEO\nThe CEO talks to you.\nAgree the scope") {
+		t.Errorf("a lead without tools:\n%s", bare)
+	}
+}

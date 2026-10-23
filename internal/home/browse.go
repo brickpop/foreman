@@ -87,6 +87,9 @@ func (h *Home) RepoBranches(ctx context.Context, path string) (Branches, error) 
 	if err != nil {
 		return Branches{}, err
 	}
+	if list == nil {
+		list = []string{} // a repo without a commit has none: [], never null to the UI
+	}
 	current, _ := h.git.Branch(ctx, real)
 	return Branches{Branches: list, Current: current}, nil
 }

@@ -2,6 +2,7 @@ package home
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
@@ -740,6 +741,17 @@ func TestARepoHasItsOwnMainBranch(t *testing.T) {
 	b, err := h.RepoBranches(ctx, poc)
 	if err != nil || !slices.Equal(b.Branches, []string{"feature", "master"}) || b.Current != "feature" {
 		t.Errorf("%+v: %v", b, err)
+	}
+	// A repo without a commit has no branch yet: an empty list, not null (AddRepo then says why).
+	empty := filepath.Join(os.Getenv("HOME"), "dev", "empty")
+	if err := os.MkdirAll(empty, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, empty, "init", "--quiet")
+	if b, err := h.RepoBranches(ctx, empty); err != nil || b.Branches == nil || len(b.Branches) != 0 {
+		t.Errorf("a repo without a commit: %#v %v", b, err)
+	} else if out, _ := json.Marshal(b); !strings.Contains(string(out), `"branches":[]`) {
+		t.Errorf("sent as %s", out)
 	}
 	if _, err := h.RepoBranches(ctx, filepath.Join(t.TempDir(), "x")); !errors.Is(err, ErrInvalid) {
 		t.Errorf("branches of no repo: %v", err)

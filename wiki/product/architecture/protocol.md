@@ -117,6 +117,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
 | `withdraw_merge` | the lead only | no | Workflow |
 | `reviews` | the lead only | no | Workflow |
+| `team` | the lead only | no | Workflow (+ the Instance manager, Git) |
 
 ### `ask`
 
@@ -299,6 +300,13 @@ type WithdrawMergeArgs struct { Branch, Reason, SupersededBy string } // branch,
 ### `reviews`
 
 - Effect: the caller's [reviews](../models/review.md) on its project (its deployment's: not another team's), open or decided in the last 7 days, newest first, as text: per review `rev-2 lead/atlas/big: <entry title> (<entry>)`; then each repo's state, `api changes requested · web conflicts with trunk` (`waiting for the CEO`, `changes requested`, `conflicts with <main>`, `merged`, `dismissed (the CEO's note: …)`, `withdrawn`); `Withdrawn: <reason>, superseded by rev-N.` when it was; and while changes are requested, `The CEO's note: …` and the comments sent with the last Request changes, each as the lead's message shows it (on its line now, ` (changed since)` once outdated), line comments first. Built from what the review page reads (`workflow.Review`), so the two agree. `You have no review open, and none decided in the last 7 days.` when there is none.
+- Read-only: not a [team action](#team-actions).
+- Errors: `not_lead` (never seen in practice).
+
+### `team`
+
+- Effect: where each of the lead's teammates stands (the CEO, 2026-10-23), in roster order, one line each: `Tove, Engineer: running, last report 3m ago.`, then its worktrees, `api on wt/tove/led-44, uncommitted changes · web on wt/tove/led-44, merge under way`. The status is the [instance](../models/instance.md#statuses)'s, with `(<stop reason>)` when Foreman stopped it; the time is when its harness last reported (the activity line's, the one the Dashboard shows), not for an asleep or stopped one, and none until it reports after a Foreman restart (kept in memory). A teammate added to the team since the deploy shows `not in this deployment (joined the team since it was deployed).`; a lead alone gets `You have no teammates.`
+- Only what Foreman itself knows crosses: never the activity line's text nor anything from the teammate's terminal ([Security](./security.md)). Worktrees are read on the host, so it wakes nobody.
 - Read-only: not a [team action](#team-actions).
 - Errors: `not_lead` (never seen in practice).
 

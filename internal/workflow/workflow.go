@@ -78,6 +78,9 @@ type Messages interface {
 type Teams interface {
 	// Active reports whether the deployment still runs.
 	Active(ctx context.Context, deployment string) (bool, error)
+	// List returns the instances of every active deployment, each with when its
+	// harness last reported (team()).
+	List(ctx context.Context) ([]store.Instance, error)
 	Stop(ctx context.Context, deployment string) error
 }
 
@@ -159,6 +162,8 @@ var definitions = []agentlink.Tool{
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
 	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
+	{Name: "team", Description: "Where each teammate stands: its status, when its harness last reported, and each repo's branch with whether it holds uncommitted changes or a merge under way. Read-only; wakes nobody.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 }
 
 // Tools implements teamtools.Block.
@@ -221,6 +226,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Entry))
 	case "reviews":
 		return t.reviews(ctx) // read-only: not an action
+	case "team":
+		return t.team(ctx) // read-only: not an action
 	case "withdraw_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.withdrawMerge(ctx, act.Branch, strings.TrimSpace(a.Reason), strings.TrimSpace(a.By))
@@ -268,12 +275,15 @@ type tool struct {
 // repo is one of the caller's worktrees, or the live project repo.
 type repo struct{ name, dir string }
 
-// worktrees are the caller's worktrees, one per code repo of the project
-// that it has (a repo added since its deploy has none yet).
-func (t tool) worktrees() []repo {
+// worktrees are the caller's worktrees.
+func (t tool) worktrees() []repo { return worktreesIn(t.project, t.c.Instance.SandboxPath) }
+
+// worktreesIn are an agent's worktrees under its sandbox, one per code repo of
+// the project that it has (a repo added since its deploy has none yet).
+func worktreesIn(project home.Project, sandbox string) []repo {
 	var repos []repo
-	for _, r := range t.project.Repos {
-		dir := filepath.Join(t.c.Instance.SandboxPath, r.Name)
+	for _, r := range project.Repos {
+		dir := filepath.Join(sandbox, r.Name)
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 			repos = append(repos, repo{r.Name, dir})
 		}

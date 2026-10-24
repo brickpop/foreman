@@ -89,6 +89,10 @@ var teamTools = []teamTool{
 		"reviews()                           Where your reviews stand, with the CEO's comments on changes",
 		"                                    requested. Read it again whenever you're unsure.",
 	}},
+	{"team", leadOnly, true, []string{
+		"team()                              Where each teammate stands: status, last report, branches.",
+		"                                    Check it before you ask a teammate how it's going.",
+	}},
 }
 
 // Offered is the team tools an agent gets: those built, as its role allows.

@@ -76,16 +76,19 @@ func (m *messages) Send(_ context.Context, msg store.TeamMessage) (store.TeamMes
 }
 
 // teams fakes the instance manager: the deployments running, those stopped,
-// and stopping failing with fail.
+// stopping failing with fail, and the instances List returns.
 type teams struct {
-	running map[string]bool
-	stopped []string
-	fail    error
+	running   map[string]bool
+	instances []store.Instance
+	stopped   []string
+	fail      error
 }
 
 func (t *teams) Active(_ context.Context, deployment string) (bool, error) {
 	return t.running[deployment], nil
 }
+
+func (t *teams) List(context.Context) ([]store.Instance, error) { return t.instances, nil }
 
 func (t *teams) Stop(_ context.Context, deployment string) error {
 	if t.fail != nil {

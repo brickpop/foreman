@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -33,25 +31,21 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	}
 	unmerged := map[string][]string{} // branch → its repos
 	var uncommitted []string
-	for _, r := range project.Repos {
-		dir := filepath.Join(inst.SandboxPath, r.Name)
-		if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-			continue
-		}
-		main := project.Main(r.Name)
-		branches, err := w.Git.Branches(ctx, dir, prefix)
+	for _, r := range worktreesIn(project, inst.SandboxPath) {
+		main := project.Main(r.name)
+		branches, err := w.Git.Branches(ctx, r.dir, prefix)
 		if err != nil {
-			slog.Info("what a worktree holds", "instance", inst.ID, "repo", r.Name, "err", err)
+			slog.Info("what a worktree holds", "instance", inst.ID, "repo", r.name, "err", err)
 			continue
 		}
 		for _, b := range branches {
-			if merged, err := w.Git.Merged(ctx, dir, main, b); err == nil && !merged {
-				unmerged[b] = append(unmerged[b], r.Name)
+			if merged, err := w.Git.Merged(ctx, r.dir, main, b); err == nil && !merged {
+				unmerged[b] = append(unmerged[b], r.name)
 			}
 		}
-		if clean, err := w.Git.Clean(ctx, dir); err == nil && !clean {
-			on, _ := w.Git.Branch(ctx, dir)
-			uncommitted = append(uncommitted, fmt.Sprintf("%s (on %s)", r.Name, on))
+		if clean, err := w.Git.Clean(ctx, r.dir); err == nil && !clean {
+			on, _ := w.Git.Branch(ctx, r.dir)
+			uncommitted = append(uncommitted, fmt.Sprintf("%s (on %s)", r.name, on))
 		}
 	}
 	var open []string

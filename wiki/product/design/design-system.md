@@ -17,11 +17,11 @@ Dark is `:root`; light overrides it under `html[data-theme="light"]`.
 | Token | Dark | Light | Used for |
 |---|---|---|---|
 | `--bg` | `#0E0F11` | `#F5F3EE` | Page background, default avatar dot border, swatch inner ring |
-| `--side` | `#0B0C0E` | `#EDEAE3` | Sidebar, agent-tab strip, board cells, direct-line banner |
+| `--side` | `#0B0C0E` | `#EDEAE3` | Sidebar, agent-tab strip, board cells |
 | `--panel` | `#131518` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
 | `--raised` | `#1B1E22` | `#EEEBE4` | Selected nav/segment, raised buttons, chips, stage chips |
 | `--hover` | `#17191C` | `#E6E2DA` | Row and item hover |
-| `--term` | `#08090A` | `#FBFAF7` | Terminal panes, `<pre>`, inputs, textareas, CoS result panel |
+| `--term` | `#08090A` | `#FBFAF7` | Terminals, `<pre>`, inputs, textareas, CoS result panel |
 | `--line` | `#1F2227` | `#E0DCD3` | Default borders and dividers |
 | `--line2` | `#2C3036` | `#CFCAC0` | Button and input borders, dashed empty states, scrollbar thumb |
 | `--line3` | `#3A3F46` | `#B5AFA3` | Hover border, selected segment border, toast border, unchecked box |
@@ -78,7 +78,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | Radius | Used on |
 |---|---|
 | 4px | Kind chip, "lead" tag, checkbox |
-| 5px | Frontmatter chip, stage chip, pane-header buttons |
+| 5px | Frontmatter chip, stage chip |
 | 6px | Nav items, small buttons, swatches, skill chips, settings inputs |
 | 7px | Standard buttons |
 | 8px | Board card, code block, textareas |
@@ -152,12 +152,12 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--err` border, `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
-| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board and deployment tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, deployment tabs, Listen on, Theme; and the on/off toggles Split and Messages, which look the same |
+| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, Listen on, Theme |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |
 | **Select** (`components/Select.tsx`, the one dropdown; the CEO, 2026-10-18) | A trigger like an input (`--panel`, 1px `--line2`, radius 7, 13px, the chosen label and a `▾`; `--acc` border while open), opening a menu like the Board's (`--panel`, `--line2`, radius 8, `--shadow`, at least the trigger's width, at most 360px tall, scrolling): one row per choice, `✓` beside the chosen one, a detail on the right in `--tx4`. Arrow keys and typing a letter move through it | The repo picker, a project's profile, a new profile's harness, the Podman machine's memory and CPUs. No native `<select>` |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |
 | **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Connect, Edit, Rebuild |
-| **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | Terminal pane header only: Line, Copy, × |
+| **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | The draft box's Pause / Resume, a review comment's Edit and Delete |
 
 **Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on the Dashboard and 13px on the project's Overview (Needs you).
 

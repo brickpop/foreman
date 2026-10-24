@@ -50,17 +50,17 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
   7. **Kickoff:** only Mara, the lead, starts now: her harness starts with the goal as its opening message (`Your goal on ledger: …`), so she starts working at once. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
-**10. Watch.** Dashboard: "4 sessions working across 1 deployment". **Sessions** → tab "Atlas · ledger" → Mara's pane (the lead's tab is first).
+**10. Watch.** Dashboard: "4 sessions working across 1 deployment". **Sessions** → "Atlas" under ledger in the sidebar → Mara's terminal (the lead's tab is first).
 - *Under the hood:* Web server → Terminal `Attach` → a View: the snapshot of Mara's screen, then live output (WebSocket, raw bytes).
 
-**11. Talk to the lead.** The CEO types into Mara's pane: "Use the existing request-id header; keep the API backwards compatible."
+**11. Talk to the lead.** The CEO types into Mara's terminal: "Use the existing request-id header; keep the API backwards compatible."
 - *Under the hood:* keystrokes go raw, Web server → Terminal `Input` → the container's terminal. No Foreman logic in between.
 
 **12. The lead plans in the wiki.** Mara reads `project/wiki/` and the code, creates the card `project/wiki/backlog/LED-44.md` (a task: status `todo`, assignee `tove`) and commits it with `commit()`. (The lead writes the knowledge base; everyone else contributes through `contribute`.)
 - *Under the hood:* the agent edits files in the live project repo, mounted read-write for her (its `.git` read-only), and calls `commit()`, which Foreman runs on the host; Foreman's file watcher notices; the Wiki block re-reads; the Event bus updates the Board and the "changed" dot in the reader.
 
 **13. The lead delegates.** Mara calls the team tool `ask(tove, "Take LED-44 …")`.
-- *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `msg-41` queued for `tove@ledger`; `ask` returns `msg-41` at once, Mara keeps working. A **marker** "Mara asked Tove (msg-41)" appears beside both panes and in the Messages drawer (UI only).
+- *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `msg-41` queued for `tove@ledger`; `ask` returns `msg-41` at once, Mara keeps working. "Mara asked Tove" shows in the team's Activity panel (UI only).
 
 **14. The engine wakes the teammate.** Tove is idle, so Messaging delivers: the text appears in Tove's terminal as if typed, and she starts.
 - *Under the hood:* Instance manager knows Tove is `idle` (her last hook event); Messaging → `Instances.Deliver` → Harness adapter `Deliver` (types the text, then Enter) → Terminal `Input`. Tove's next hook says `busy`. Had she been busy, the message would wait for her next `idle`.
@@ -82,7 +82,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 
 ## Part 3: intervene
 
-**20. A direct instruction.** In Sessions, the CEO presses **Split** and clicks Ilya's tab: his pane opens on the right with his current screen, banner "Direct line to Ilya. He'll tell Mara if it matters." The CEO types "Use the decimal library already in the repo."
+**20. A direct instruction.** In Sessions, the CEO clicks Ilya's tab (or opens it in a second browser tab, to keep Mara's beside it): his current screen, his role and branch beside his name. The CEO types "Use the decimal library already in the repo."
 - *Under the hood:* a second Terminal `Attach` (snapshot + live); keystrokes raw to Ilya's terminal. Ilya's prompt tells him to inform the lead if relevant, which he does with `ask`/`reply` like any message.
 
 **21. An approval.** Ilya wants a new dependency, a project gate: he calls `escalate(approval, "Add decimal.js?", ["Approve", "Deny"])`. Dashboard shows the request, the browser notifies. The CEO clicks **Approve**; Ilya continues.

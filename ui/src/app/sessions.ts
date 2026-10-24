@@ -4,11 +4,10 @@ import { roster } from "./model";
 // The Sessions screen's logic (wiki/product/features/sessions.md), apart from
 // its components so it can be tested.
 
-export type DeploymentTab = {
+export type ActiveDeployment = {
   id: string;
   team: string; // its name
   project: string;
-  label: string;
   needsYou: boolean;
   status: string;
 };
@@ -26,48 +25,32 @@ const liveliness = [
   "stopped",
 ];
 
-/** A deployment's status, for its tab's dot: its liveliest agent's. */
+/** A deployment's status, for its dot: its liveliest agent's. */
 export function deploymentStatus(instances: Instance[]): string {
   const ranks = instances.map((i) => liveliness.indexOf(i.status)).filter((r) => r >= 0);
   return ranks.length > 0 ? liveliness[Math.min(...ranks)] : "asleep";
 }
 
-/** One tab per active deployment: `<Team> · <project>`, its needs-you dot and its status. */
-export function deploymentTabs(
+/** The active deployments, by project, then team name: each with its
+ * needs-you dot and its status. */
+export function activeDeployments(
   instances: Instance[],
   teams: Team[],
   requests: Request[],
-): DeploymentTab[] {
+): ActiveDeployment[] {
   const ids = [...new Set(instances.map((i) => i.deploymentId).filter(Boolean))];
-  return ids.map((id) => {
-    const [team, project] = id.split("@");
-    const name = teams.find((t) => t.id === team)?.config.name || team;
-    return {
-      id,
-      team: name,
-      project,
-      label: `${name} · ${project}`,
-      needsYou: requests.some((r) => r.status === "open" && r.deploymentId === id),
-      status: deploymentStatus(instances.filter((i) => i.deploymentId === id)),
-    };
-  });
-}
-
-/** Tabs in the order the CEO dragged them to; new ones keep their place at the end. */
-export function inOrder<T extends { id: string }>(tabs: T[], order: string[]): T[] {
-  const rank = (t: T) => {
-    const r = order.indexOf(t.id);
-    return r < 0 ? order.length : r;
-  };
-  return [...tabs].sort((a, b) => rank(a) - rank(b));
-}
-
-/** The order after dropping dragged on target: dragged takes target's place. */
-export function moved(ids: string[], dragged: string, target: string): string[] {
-  if (dragged === target || !ids.includes(dragged) || !ids.includes(target)) return ids;
-  const rest = ids.filter((id) => id !== dragged);
-  const at = rest.indexOf(target) + (ids.indexOf(dragged) < ids.indexOf(target) ? 1 : 0);
-  return [...rest.slice(0, at), dragged, ...rest.slice(at)];
+  return ids
+    .map((id) => {
+      const [team, project] = id.split("@");
+      return {
+        id,
+        team: teams.find((t) => t.id === team)?.config.name || team,
+        project,
+        needsYou: requests.some((r) => r.status === "open" && r.deploymentId === id),
+        status: deploymentStatus(instances.filter((i) => i.deploymentId === id)),
+      };
+    })
+    .sort((a, b) => a.project.localeCompare(b.project) || a.team.localeCompare(b.team));
 }
 
 /** The agent of a deployment that did something last: where its work is. */
@@ -90,7 +73,7 @@ export function withDoing(
   return instances?.map((i) => (i.id === change.id ? { ...i, doing: change.doing } : i));
 }
 
-/** A deployment's instances in tab order: the lead first, then the roster's order. */
+/** A deployment's instances in tab order: the lead first, then the team file's order. */
 export function rosterOrder(deployment: string, instances: Instance[], teams: Team[]): Instance[] {
   const team = teams.find((t) => t.id === deployment.split("@")[0]);
   const mine = instances.filter((i) => i.deploymentId === deployment);
@@ -103,81 +86,43 @@ export function rosterOrder(deployment: string, instances: Instance[], teams: Te
   return [...mine].sort((a, b) => rank(a) - rank(b));
 }
 
-/** The panes of one deployment: one or two instance ids, and the active one. */
-export type Panes = { open: string[]; active: number };
-
-/** Clicking an agent tab: activate its pane, or show it in the active pane. */
-export function clickTab(p: Panes, id: string): Panes {
-  const at = p.open.indexOf(id);
-  if (at >= 0) return { ...p, active: at };
-  const open = [...p.open];
-  open[p.active] = id;
-  return { ...p, open };
-}
-
-/** Split: the first member not in pane 1 becomes pane 2, and active. Single
- * keeps the active pane's agent. */
-export function toggleSplit(p: Panes, roster: Instance[]): Panes {
-  if (p.open.length === 2) return { open: [p.open[p.active]], active: 0 };
-  const other = roster.find((i) => i.id !== p.open[0]);
-  if (!other) return p;
-  return { open: [p.open[0], other.id], active: 1 };
-}
-
-/** Closing a pane (when split): the other stays, and pane 1 is active. */
-export function closePane(p: Panes, index: number): Panes {
-  return { open: p.open.filter((_, i) => i !== index), active: 0 };
-}
-
 /** What the Sessions URL says (wiki/product/features/sessions.md#the-url): the
- * deployment, its active agent, both agents when split (left, right), and
- * whether Activity is open. Agents are named by their id; a full instance id
- * (agent@project) is read too. */
+ * deployment, its agent shown, and whether Activity is open. The agent is
+ * named by its id; a full instance id (agent@project) is read too. */
 export type SessionsSearch = {
   deployment?: string;
   agent?: string;
-  panes?: string;
   view?: "activity";
 };
 
-const agentOfId = (id: string) => id.split("@")[0];
+export type SessionsView = { deployment: string; agent: string; view?: "activity" };
 
-/** The panes the URL describes, checked against the roster: an agent that
- * isn't in it falls back to the lead, a split that can't be made to one pane. */
-export function panesFrom(search: SessionsSearch, roster: Instance[]): Panes {
-  const find = (agent?: string) => roster.find((i) => agent && i.agentId === agentOfId(agent))?.id;
-  const active = find(search.agent) ?? roster[0]?.id;
-  if (!active) return { open: [], active: 0 };
-  const [left, right] = (search.panes ?? "").split(",").map((a) => find(a));
-  if (left && right && left !== right) {
-    const open = [left, right];
-    const at = open.indexOf(active);
-    // An agent asked for outside the split takes the left pane.
-    return at >= 0
-      ? { open, active: at }
-      : { open: [active, right === active ? left : right], active: 0 };
-  }
-  return { open: [active], active: 0 };
+/** The view the URL describes, checked against what is deployed: an unknown
+ * deployment is the first one, an unknown agent the lead. A URL naming only
+ * the deployment (the sidebar's link) comes back to its `last` view.
+ * Undefined when nothing is deployed. */
+export function sessionsView(
+  search: SessionsSearch,
+  deployments: string[],
+  rosterOf: (deployment: string) => Instance[],
+  last: (deployment: string) => SessionsView | undefined,
+): SessionsView | undefined {
+  const deployment = deployments.find((d) => d === search.deployment) ?? deployments[0];
+  if (!deployment) return undefined;
+  const remembered = search.agent || search.view ? undefined : last(deployment);
+  const asked = (search.agent ?? remembered?.agent ?? "").split("@")[0];
+  const roster = rosterOf(deployment);
+  const agent = roster.find((i) => i.agentId === asked)?.agentId ?? roster[0]?.agentId ?? "";
+  return { deployment, agent, view: search.view ?? remembered?.view };
 }
 
-/** The URL for these panes: what panesFrom reads back. */
-export function searchFor(deployment: string, p: Panes, activity: boolean): SessionsSearch {
-  const ids = p.open.map(agentOfId);
-  return {
-    deployment,
-    agent: ids[p.active],
-    panes: ids.length === 2 ? ids.join(",") : undefined,
-    view: activity ? "activity" : undefined,
-  };
-}
-
-/** The line input's placeholder (wiki/product/features/sessions.md#panes). */
+/** The line input's placeholder (wiki/product/features/sessions.md#the-terminal). */
 export function linePlaceholder(name: string, status: string, lead: boolean): string {
   if (status === "awaiting") return `Reply to ${name}…`;
   return lead ? `Tell ${name} what you need. They’ll delegate.` : `Direct instruction to ${name}…`;
 }
 
-/** A stopped agent's pane: why Foreman stopped it, when it did (a start that
+/** A stopped agent's screen: why Foreman stopped it, when it did (a start that
  * failed, a crash loop), and that its messages wait. */
 export function stoppedLine(name: string, reason: string): string {
   const why = reason ? `${name} stopped: ${reason}.` : `${name} stopped.`;

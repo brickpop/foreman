@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Repo, RepoBranch, Team } from "../api/client";
 import {
+  branchOf,
   branchOwner,
   bytes,
   crumbs,
@@ -77,6 +78,19 @@ describe("worktrees", () => {
       ["mara", ["api:lead/atlas/integration"]],
       ["tove", ["api:wt/tove/LED-44", "web:wt/tove/LED-44"]],
     ]);
+  });
+
+  it("gives the branch an agent is on, once however many repos it spans", () => {
+    expect(branchOf(repos, "tove")).toBe("wt/tove/LED-44");
+    expect(branchOf(repos, "mara")).toBe("lead/atlas/integration");
+    expect(branchOf(repos, "ines")).toBe(""); // a branch but no worktree
+    expect(branchOf([], "tove")).toBe("");
+    // Repos on different branches (never through switch): each one, in the repos' order.
+    const split = [
+      repos[0],
+      { ...repos[1], branches: [branch("wt/tove/other", { agent: "tove" })] },
+    ];
+    expect(branchOf(split, "tove")).toBe("wt/tove/LED-44, wt/tove/other");
   });
 
   it("finds where a branch is read, repos with commits on it first", () => {

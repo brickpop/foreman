@@ -15,14 +15,14 @@ Body padding `24px 48px 64px`, the full width.
 - **One timeline** of the project's active deployments, newest first, in one panel: the rows of [Sessions → Activity](./sessions.md#activity) (a thread per row, which opens into a chat; a git action per row on a faint tint), each starting with its team's name (`Atlas ·`, 11.5px `--tx4`, so the agents' labels stay the loudest). No "who calls whom" map: Sessions keeps it.
 - **Team chips** (segmented: `All teams`, then one per active deployment) when more than one team is deployed. A team's chip shows that deployment alone.
 - **50 items at a time**, then a **`Show more`** button while there are more. A thread whose ask is on a later page joins it once that page loads.
-- A thread's **`Open <asker>'s pane`** opens [Sessions](./sessions.md) on that deployment with that agent's pane.
+- A thread's **`Open <asker>'s session`** opens [Sessions](./sessions.md) on that deployment with that agent shown.
 - Times are local: `14:05` today, `Oct 15 14:05` earlier this year, `Oct 15 2025 14:05` before.
 - **Live:** new messages and actions (`team.message`, `team.action`) refetch the pages loaded.
 - **Empty:** `No team is deployed on <project>. Deploy one from its Settings tab.`; a deployment with nothing yet: `Nothing yet.`
 
 ## Older sessions
 
-Below the timeline, only when the project has stopped deployments: **`Older sessions · N`** (a section label with a chevron), collapsed. Opened, one line per stopped deployment: chevron, the team's name (600), `stopped <time> · <goal>` (`--tx4`), then, when Foreman stopped it on its own, `by Foreman: <reason>` (`--err`, [Deployment](../models/deployment.md)). Each opens its own timeline, paged the same way, without team names (the line above says it) and without `Open … pane` (a stopped deployment has no sessions).
+Below the timeline, only when the project has stopped deployments: **`Older sessions · N`** (a section label with a chevron), collapsed. Opened, one line per stopped deployment: chevron, the team's name (600), `stopped <time> · <goal>` (`--tx4`), then, when Foreman stopped it on its own, `by Foreman: <reason>` (`--err`, [Deployment](../models/deployment.md)). Each opens its own timeline, paged the same way, without team names (the line above says it) and without `Open … session` (a stopped deployment has no sessions).
 
 A redeployed pair reactivates its old row ([Deployment](../models/deployment.md)), so its earlier runs' traffic is in the timeline, not in Older sessions.
 

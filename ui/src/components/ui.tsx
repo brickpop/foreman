@@ -1,5 +1,5 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import type { ButtonHTMLAttributes, DragEvent, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { dotStyle } from "./Avatar";
 
 // The design system's small building blocks (wiki/product/design/design-system.md):
@@ -42,36 +42,18 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
 export const outlineLink =
   "rounded-[7px] border border-line2 px-3 py-[5px] text-[13px] font-medium text-tx2 hover:border-line3";
 
-/** One choice of a segmented control (board switcher, Split, theme…). */
+/** One choice of a segmented control (board switcher, theme…). */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
   label,
-  onClose,
-  onReorder,
 }: {
   options: { value: T; label: ReactNode; disabled?: boolean }[];
   value: T;
   onChange: (value: T) => void;
   label: string;
-  /** Gives each option a × (Sessions' deployment tabs: Stop). */
-  /** A button after each option (× unless icon says otherwise). */
-  onClose?: { label: string; close: (value: T) => void; icon?: ReactNode };
-  /** Lets the options be dragged onto one another to reorder them. */
-  onReorder?: (dragged: T, target: T) => void;
 }) {
-  // Native drag and drop: an option dropped on another takes its place.
-  const drag = (value: T) =>
-    onReorder && {
-      draggable: true,
-      onDragStart: (e: DragEvent) => e.dataTransfer.setData("text/plain", value),
-      onDragOver: (e: DragEvent) => e.preventDefault(),
-      onDrop: (e: DragEvent) => {
-        e.preventDefault();
-        onReorder(e.dataTransfer.getData("text/plain") as T, value);
-      },
-    };
   return (
     <ToggleGroup.Root
       type="single"
@@ -80,46 +62,16 @@ export function Segmented<T extends string>({
       aria-label={label}
       className="inline-flex gap-1"
     >
-      {options.map((o) => {
-        const on = o.value === value;
-        if (!onClose)
-          return (
-            <ToggleGroup.Item
-              key={o.value}
-              value={o.value}
-              disabled={o.disabled}
-              className={segment(on)}
-              {...drag(o.value)}
-            >
-              {o.label}
-            </ToggleGroup.Item>
-          );
-        // The × sits beside the option, not in it: a button can't hold a button.
-        return (
-          <span
-            key={o.value}
-            className={`${segment(on)} inline-flex items-center gap-2 pr-1.5`}
-            {...drag(o.value)}
-          >
-            <ToggleGroup.Item
-              value={o.value}
-              disabled={o.disabled}
-              className="focus-visible:outline-2 focus-visible:outline-acc"
-            >
-              {o.label}
-            </ToggleGroup.Item>
-            <button
-              type="button"
-              aria-label={`${onClose.label} ${o.value}`}
-              title={onClose.label}
-              onClick={() => onClose.close(o.value)}
-              className="rounded px-1 text-tx4 hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"
-            >
-              {onClose.icon ?? "×"}
-            </button>
-          </span>
-        );
-      })}
+      {options.map((o) => (
+        <ToggleGroup.Item
+          key={o.value}
+          value={o.value}
+          disabled={o.disabled}
+          className={segment(o.value === value)}
+        >
+          {o.label}
+        </ToggleGroup.Item>
+      ))}
     </ToggleGroup.Root>
   );
 }

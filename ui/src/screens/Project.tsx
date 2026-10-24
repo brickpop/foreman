@@ -2,7 +2,7 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import { inbox } from "../app/model";
 import { useInstances, useProjects, useRequests, useTeams } from "../app/queries";
-import { deploymentTabs, mostRecentAgent } from "../app/sessions";
+import { activeDeployments, mostRecentAgent } from "../app/sessions";
 import { DeployDialog } from "../components/DeployDialog";
 import { Button, CountBadge, Loading, outlineLink } from "../components/ui";
 import { Activity } from "./project/Activity";
@@ -100,8 +100,8 @@ function ToTheWork({ project, onDeploy }: { project: string; onDeploy: () => voi
   const instances = useInstances();
   const teams = useTeams();
   if (!instances.data) return null;
-  // The same tabs Sessions shows, so a link here always has sessions there.
-  const here = deploymentTabs(instances.data, teams.data ?? [], []).filter(
+  // The same deployments Sessions lists, so a link here always has sessions there.
+  const here = activeDeployments(instances.data, teams.data ?? [], []).filter(
     (d) => d.project === project,
   );
   if (here.length === 0)

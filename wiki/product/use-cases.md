@@ -23,7 +23,7 @@ Acceptance:
 In Sessions, open the Atlas · ledger tab and type to Mara: "Add idempotency keys to POST /settle". Mara asks Tove, and Tove builds in `wt/tove/LED-44`. Tove hands off to Mara, who integrates. The board card moves.
 
 Acceptance:
-- [ ] Text typed in Mara's pane reaches Mara's harness stdin.
+- [ ] Text typed in Mara's terminal reaches Mara's harness stdin.
 - [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the Activity panel (who calls whom, and the exchange).
 - [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
@@ -36,7 +36,7 @@ Acceptance:
 Open Tove's tab and type a direct instruction. Tove acts, and tells Mara if it matters to the team.
 
 Acceptance:
-- [ ] Tove's pane shows the "Direct line" banner.
+- [ ] Tove's tab shows her role and her branch.
 - [ ] Every keystroke reaches Tove's TUI raw, through the same bytes whether typed in the terminal or the line-input box.
 - [ ] Foreman posts nothing into Mara's session; Tove's session prompt tells it to inform Mara when the instruction is relevant to the team.
 

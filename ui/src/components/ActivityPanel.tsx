@@ -9,8 +9,8 @@ import { Dot } from "./ui";
 
 // The Activity panel (wiki/product/features/sessions.md#activity): a
 // small map of who calls whom, then the exchanges, newest first: one row per
-// thread, which opens into a chat. One per deployment; the panes stay
-// terminals only.
+// thread, which opens into a chat. One per deployment; the terminal stays
+// the agent's only.
 
 // The map: name boxes on an ellipse, compact.
 const width = 328;
@@ -326,7 +326,7 @@ export function ThreadRow({
               onClick={() => onOpen(m.fromInstance)}
               className="self-start text-[12px] text-accTx"
             >
-              Open {name(m.fromInstance)}’s pane
+              Open {name(m.fromInstance)}’s session
             </button>
           )}
         </div>

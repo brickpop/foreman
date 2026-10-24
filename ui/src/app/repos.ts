@@ -50,6 +50,14 @@ export function worktrees(repos: Repo[]): Worktree[] {
   return [...by.values()].sort((a, b) => a.agent.localeCompare(b.agent));
 }
 
+/** The branch an agent has checked out: one, since `switch` moves all its
+ * repos together; each different one, should they ever differ. "" with no
+ * worktree yet. */
+export function branchOf(repos: Repo[], agent: string): string {
+  const w = worktrees(repos).find((w) => w.agent === agent);
+  return [...new Set(w?.branches.map((b) => b.branch.name))].join(", ");
+}
+
 /** The repos that have a branch, those with commits beyond their main first:
  * where a work item's branch can be read. */
 export function reposWith(repos: Repo[], branch: string): string[] {

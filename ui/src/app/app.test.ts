@@ -46,6 +46,25 @@ describe("sidebarModel", () => {
     ]);
   });
 
+  it("lists the deployments under Sessions, grouped by project", () => {
+    const m = sidebarModel(
+      [],
+      [team("atlas", "Atlas"), team("vesper", "Vesper")],
+      [
+        { deploymentId: "vesper@ledger", agentId: "a", status: "running" } as Instance,
+        { deploymentId: "atlas@relay", agentId: "b", status: "idle" } as Instance,
+        { deploymentId: "atlas@ledger", agentId: "c", status: "awaiting" } as Instance,
+      ],
+      [{ ...request("ledger"), deploymentId: "atlas@ledger" }],
+    );
+    expect(m.sessions.map((g) => [g.project, g.deployments.map((d) => d.team)])).toEqual([
+      ["ledger", ["Atlas", "Vesper"]],
+      ["relay", ["Atlas"]],
+    ]);
+    expect(m.sessions[0].deployments[0]).toMatchObject({ needsYou: true, status: "awaiting" });
+    expect(sidebarModel([], [], [], []).sessions).toEqual([]);
+  });
+
   it("says where each team is deployed", () => {
     const m = sidebarModel(
       [],

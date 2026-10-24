@@ -1,25 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Instance, Request, Team } from "../api/client";
 import {
+  activeDeployments,
   applyMention,
-  clickTab,
-  closePane,
   countdown,
   deploymentStatus,
-  deploymentTabs,
-  inOrder,
   isLineShortcut,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
   mostRecentAgent,
-  moved,
-  panesFrom,
   rosterOrder,
-  searchFor,
+  type SessionsView,
+  sessionsView,
   stoppedLine,
-  toggleSplit,
   withDoing,
 } from "./sessions";
 
@@ -43,29 +38,22 @@ const all = [
 ];
 
 describe("Sessions", () => {
-  it("has a tab per deployment, with its needs-you dot", () => {
+  it("lists the active deployments by project, then team name, with their needs-you dot", () => {
     const open = { status: "open", deploymentId: "orion@relay" } as Request;
-    expect(deploymentTabs(all, [atlas], [open])).toEqual([
-      {
-        id: "atlas@ledger",
-        team: "Atlas",
-        project: "ledger",
-        label: "Atlas · ledger",
-        needsYou: false,
-        status: "asleep",
-      },
-      {
-        id: "orion@relay",
-        team: "orion",
-        project: "relay",
-        label: "orion · relay",
-        needsYou: true,
-        status: "asleep",
-      },
+    const vesper = { id: "vesper", config: { name: "Vesper" } } as unknown as Team;
+    const list = [...all, inst("kit@ledger", "vesper@ledger"), inst("ana@harbor", "zed@harbor")];
+    expect(activeDeployments(list, [atlas, vesper], [open])).toEqual([
+      { id: "zed@harbor", team: "zed", project: "harbor", needsYou: false, status: "asleep" },
+      { id: "atlas@ledger", team: "Atlas", project: "ledger", needsYou: false, status: "asleep" },
+      { id: "vesper@ledger", team: "Vesper", project: "ledger", needsYou: false, status: "asleep" },
+      { id: "orion@relay", team: "orion", project: "relay", needsYou: true, status: "asleep" },
     ]);
+    // A resolved request, or one of another deployment, is no dot.
+    const resolved = { status: "resolved", deploymentId: "atlas@ledger" } as Request;
+    expect(activeDeployments(all, [atlas], [resolved])[0].needsYou).toBe(false);
   });
 
-  it("shows a team's liveliest agent on its tab", () => {
+  it("shows a team's liveliest agent as its status", () => {
     const with_ = (...statuses: string[]) => statuses.map((status) => ({ status }) as Instance);
     expect(deploymentStatus(with_("asleep", "running", "idle"))).toBe("running");
     expect(deploymentStatus(with_("running", "awaiting"))).toBe("awaiting"); // waiting on the CEO first
@@ -73,16 +61,6 @@ describe("Sessions", () => {
     expect(deploymentStatus(with_("asleep", "stopped"))).toBe("asleep");
     expect(deploymentStatus(with_("weird"))).toBe("asleep");
     expect(deploymentStatus([])).toBe("asleep");
-  });
-
-  it("keeps the tabs in the order they were dragged to", () => {
-    const tabs = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "new" }];
-    expect(inOrder(tabs, ["c", "a", "b", "gone"]).map((t) => t.id)).toEqual(["c", "a", "b", "new"]);
-    expect(inOrder(tabs, []).map((t) => t.id)).toEqual(["a", "b", "c", "new"]);
-    expect(moved(["a", "b", "c"], "a", "c")).toEqual(["b", "c", "a"]); // rightwards: after the target
-    expect(moved(["a", "b", "c"], "c", "a")).toEqual(["c", "a", "b"]); // leftwards: before it
-    expect(moved(["a", "b", "c"], "b", "b")).toEqual(["a", "b", "c"]);
-    expect(moved(["a", "b", "c"], "x", "a")).toEqual(["a", "b", "c"]);
   });
 
   it("finds the agent that did something last", () => {
@@ -115,25 +93,6 @@ describe("Sessions", () => {
       "tove",
       "ilya",
     ]);
-  });
-
-  it("opens on the lead, splits with the first other member, and goes back", () => {
-    const roster = rosterOrder("atlas@ledger", all, [atlas]);
-    let p = panesFrom({}, roster);
-    expect(p).toEqual({ open: ["mara@ledger"], active: 0 });
-    p = toggleSplit(p, roster);
-    expect(p).toEqual({ open: ["mara@ledger", "tove@ledger"], active: 1 });
-    // A tab already in a pane activates it; another replaces the active pane.
-    expect(clickTab(p, "mara@ledger")).toEqual({ open: ["mara@ledger", "tove@ledger"], active: 0 });
-    expect(clickTab(p, "ilya@ledger")).toEqual({ open: ["mara@ledger", "ilya@ledger"], active: 1 });
-    // Single keeps the active pane's agent; closing a pane leaves pane 1 active.
-    expect(toggleSplit(p, roster)).toEqual({ open: ["tove@ledger"], active: 0 });
-    expect(closePane(p, 0)).toEqual({ open: ["tove@ledger"], active: 0 });
-    // A team of one can't split.
-    expect(toggleSplit({ open: ["x"], active: 0 }, [inst("x", "d")])).toEqual({
-      open: ["x"],
-      active: 0,
-    });
   });
 
   it("words the line input for each case", () => {
@@ -201,56 +160,62 @@ describe("mentions in the line input", () => {
 });
 
 describe("the Sessions URL", () => {
-  const inst = (agent: string) => ({ id: `${agent}@ledger`, agentId: agent }) as Instance;
-  const roster = [inst("tic"), inst("tac"), inst("toe")];
-  it("opens the lead when it names no agent, or one that isn't there", () => {
-    expect(panesFrom({}, roster)).toEqual({ open: ["tic@ledger"], active: 0 });
-    expect(panesFrom({ agent: "gone" }, roster)).toEqual({ open: ["tic@ledger"], active: 0 });
-    expect(panesFrom({}, [])).toEqual({ open: [], active: 0 });
-  });
-  it("reads the active agent, by id or full instance id", () => {
-    expect(panesFrom({ agent: "tac" }, roster)).toEqual({ open: ["tac@ledger"], active: 0 });
-    expect(panesFrom({ agent: "toe@ledger" }, roster)).toEqual({ open: ["toe@ledger"], active: 0 });
-  });
-  it("reads a split, left and right, with its active side", () => {
-    expect(panesFrom({ agent: "toe", panes: "tic,toe" }, roster)).toEqual({
-      open: ["tic@ledger", "toe@ledger"],
-      active: 1,
-    });
-    // An agent outside the split (a notification's link) takes the left pane.
-    expect(panesFrom({ agent: "tac", panes: "tic,toe" }, roster)).toEqual({
-      open: ["tac@ledger", "toe@ledger"],
-      active: 0,
-    });
-    // A split that can't be made is one pane.
-    expect(panesFrom({ agent: "tic", panes: "tic,gone" }, roster)).toEqual({
-      open: ["tic@ledger"],
-      active: 0,
-    });
-    expect(panesFrom({ agent: "tic", panes: "tic,tic" }, roster)).toEqual({
-      open: ["tic@ledger"],
-      active: 0,
-    });
-  });
-  it("writes what it reads back", () => {
-    for (const p of [
-      { open: ["tic@ledger"], active: 0 },
-      { open: ["tic@ledger", "toe@ledger"], active: 1 },
-    ]) {
-      for (const activity of [false, true]) {
-        const s = searchFor("atlas@ledger", p, activity);
-        expect(panesFrom(s, roster)).toEqual(p);
-        expect(s.view).toBe(activity ? "activity" : undefined);
-      }
-    }
-    expect(
-      searchFor("atlas@ledger", { open: ["tic@ledger", "toe@ledger"], active: 1 }, false),
-    ).toEqual({
-      deployment: "atlas@ledger",
-      agent: "toe",
-      panes: "tic,toe",
+  const inst = (agent: string, project = "ledger") =>
+    ({ id: `${agent}@${project}`, agentId: agent }) as Instance;
+  const rosters: Record<string, Instance[]> = {
+    "atlas@ledger": [inst("tic"), inst("tac"), inst("toe")],
+    "orion@relay": [inst("lumen", "relay")],
+  };
+  const deployments = Object.keys(rosters);
+  const rosterOf = (d: string) => rosters[d] ?? [];
+  const view = (search: object, last: Record<string, SessionsView> = {}) =>
+    sessionsView(search, deployments, rosterOf, (d) => last[d]);
+
+  it("opens the first deployment's lead when it names nothing, or what isn't deployed", () => {
+    const first = { deployment: "atlas@ledger", agent: "tic", view: undefined };
+    expect(view({})).toEqual(first);
+    expect(view({ deployment: "gone@ledger", agent: "tac" })).toEqual({ ...first, agent: "tac" });
+    expect(view({ deployment: "orion@relay" })).toEqual({
+      deployment: "orion@relay",
+      agent: "lumen",
       view: undefined,
     });
+  });
+
+  it("reads the agent by id or full instance id, and an unknown one is the lead", () => {
+    expect(view({ deployment: "atlas@ledger", agent: "toe" })?.agent).toBe("toe");
+    expect(view({ deployment: "atlas@ledger", agent: "toe@ledger" })?.agent).toBe("toe");
+    expect(view({ deployment: "atlas@ledger", agent: "gone" })?.agent).toBe("tic");
+    // Another deployment's agent isn't this one's.
+    expect(view({ deployment: "atlas@ledger", agent: "lumen" })?.agent).toBe("tic");
+  });
+
+  it("keeps Activity open as the URL says", () => {
+    expect(view({ deployment: "atlas@ledger", agent: "tac", view: "activity" })?.view).toBe(
+      "activity",
+    );
+  });
+
+  it("comes back to a deployment's last view when the URL names only the deployment", () => {
+    const last: Record<string, SessionsView> = {
+      "atlas@ledger": { deployment: "atlas@ledger", agent: "toe", view: "activity" },
+    };
+    expect(view({ deployment: "atlas@ledger" }, last)).toEqual(last["atlas@ledger"]);
+    // A link naming the agent (a notification) means that agent, as it says.
+    expect(view({ deployment: "atlas@ledger", agent: "tac" }, last)).toEqual({
+      deployment: "atlas@ledger",
+      agent: "tac",
+      view: undefined,
+    });
+    // A last agent gone since (a team change) is the lead.
+    const gone = { "atlas@ledger": { deployment: "atlas@ledger", agent: "left" } };
+    expect(view({ deployment: "atlas@ledger" }, gone)?.agent).toBe("tic");
+  });
+
+  it("is nothing when nothing is deployed", () => {
+    expect(sessionsView({ deployment: "atlas@ledger" }, [], rosterOf, () => undefined)).toBe(
+      undefined,
+    );
   });
 });
 

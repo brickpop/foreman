@@ -165,7 +165,7 @@ The notifier also derives browser notifications and toasts from these events on 
 - On connect, the server sends a **snapshot** of the current terminal state (screen, scrollback, cursor, modes; [Terminal state](./terminal-state.md)), then live output. An instance without a session is a `404`, before the upgrade.
 - **Binary frames** carry raw terminal bytes, both ways (keystrokes in, output out).
 - **Text frames** carry JSON control messages: `{"type":"resize","cols":120,"rows":40}` from the client; `{"type":"exit","code":…}` from the server (a `status` message is planned with instance statuses). Unknown control messages are ignored on both sides.
-- Several clients may attach to one instance (two tabs, split panes); all receive output, any may type. The PTY size follows the most recent resize.
+- Several clients may attach to one instance (two browser tabs); all receive output, any may type. The PTY size follows the most recent resize.
 - A viewer that falls more than 1024 output chunks behind is dropped, so a slow tab never stalls the agent. The server closes it with code `1013` (try again later); the client reconnects at once, clears its screen and receives a fresh snapshot. Other disconnects are retried with a backoff from 250 ms up to 5 s. After the `exit` message the server closes normally (`1000`) and the client doesn't reconnect.
 - The upgrade request passes the same Origin and token checks as the HTTP API: browsers do not apply the same-origin policy to WebSockets.
 

@@ -26,7 +26,6 @@ const sessions = createRoute({
   validateSearch: (s: Record<string, unknown>): SessionsSearch => ({
     deployment: typeof s.deployment === "string" ? s.deployment : undefined,
     agent: typeof s.agent === "string" ? s.agent : undefined,
-    panes: typeof s.panes === "string" ? s.panes : undefined,
     view: s.view === "activity" ? "activity" : undefined,
   }),
   component: Sessions,

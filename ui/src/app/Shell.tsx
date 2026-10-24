@@ -16,6 +16,7 @@ import {
   useSettings,
   useTeams,
 } from "./queries";
+import { type ActiveDeployment, activeDeployments } from "./sessions";
 
 // The frame every screen lives in (wiki/product/features/app-shell.md): the
 // sidebar, the main area, and the overlays.
@@ -72,6 +73,8 @@ export type SidebarModel = {
   /** The reviews waiting on the CEO: their review requests open; the only
    * count in the nav. */
   reviews: number;
+  /** The active deployments under Sessions, grouped by project. */
+  sessions: { project: string; deployments: ActiveDeployment[] }[];
   projects: { id: string; needsYou: boolean }[];
   /** The archived projects, in a collapsed group of their own. */
   archived: { id: string; needsYou: boolean }[];
@@ -88,8 +91,15 @@ export function sidebarModel(
   const open = requests.filter((r) => r.status === "open");
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean));
   const row = (p: Project) => ({ id: p.id, needsYou: open.some((r) => r.projectId === p.id) });
+  const sessions: SidebarModel["sessions"] = [];
+  for (const d of activeDeployments(instances, teams, requests)) {
+    const group = sessions.at(-1);
+    if (group?.project === d.project) group.deployments.push(d);
+    else sessions.push({ project: d.project, deployments: [d] });
+  }
   return {
     reviews: open.filter((r) => r.kind === "review").length,
+    sessions,
     projects: projects.filter((p) => !p.archived).map(row),
     archived: projects.filter((p) => p.archived).map(row),
     teams: teams.map((t) => {
@@ -152,9 +162,34 @@ function Sidebar({
           <Link to="/" className={navItem} activeProps={navActive} activeOptions={{ exact: true }}>
             Dashboard
           </Link>
-          <Link to="/sessions" className={navItem} activeProps={navActive}>
+          {/* Highlighted only with nothing deployed: otherwise the deployment shown is. */}
+          <Link
+            to="/sessions"
+            className={navItem}
+            activeProps={model.sessions.length === 0 ? navActive : undefined}
+          >
             Sessions
           </Link>
+          {model.sessions.map((g) => (
+            <div key={g.project} className="flex flex-col gap-0.5 pl-3">
+              <div className="truncate px-2.5 pt-1 text-xs text-tx4">{g.project}</div>
+              {g.deployments.map((d) => (
+                <Link
+                  key={d.id}
+                  to="/sessions"
+                  search={{ deployment: d.id }}
+                  className={rowItem}
+                  activeProps={navActive}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Dot status={d.status} title={d.status} />
+                    <span className="truncate">{d.team}</span>
+                  </span>
+                  {d.needsYou && <Dot title="Needs you" />}
+                </Link>
+              ))}
+            </div>
+          ))}
           <Link to="/reviews" className={navItem} activeProps={navActive}>
             Reviews <CountBadge count={model.reviews} />
           </Link>

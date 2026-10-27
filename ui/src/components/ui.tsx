@@ -10,7 +10,8 @@ const buttonVariants = {
   secondary: "border border-line2 bg-transparent font-medium text-tx2 hover:border-line3",
   raised: "border border-line2 bg-raised font-medium text-tx hover:border-line3",
   muted: "border border-line2 bg-transparent font-medium text-tx3 hover:border-line3",
-  danger: "border border-err bg-transparent font-medium text-err hover:bg-err/10",
+  danger:
+    "border border-line2 bg-transparent font-medium text-err hover:border-err hover:bg-err/10",
   ghost: "border border-transparent bg-transparent font-medium text-tx3 hover:text-tx2",
   small: "border border-line2 bg-transparent font-medium text-tx2 hover:border-line3",
   tiny: "border border-line2 bg-transparent text-tx3 hover:border-line3",

@@ -107,6 +107,7 @@ export function Sessions() {
         <h1 className="m-0 truncate text-[15px] font-semibold">
           {d?.team} <span className="font-normal text-tx3">· {d?.project}</span>
         </h1>
+        {instance && <AgentBranch key={instance.id} shown={instance} />}
         {d?.needsYou && <Dot title="Needs you" />}
         <span className="flex-1" />
         {/* Back to what the team works on: the project's tasks and their status. */}
@@ -171,8 +172,26 @@ export function Sessions() {
   );
 }
 
-/** The deployment's agents, the lead first; the one shown carries its branch.
- * The shown agent's controls (children) end the row. */
+/** The branch of the agent shown, in the header beside its project. */
+function AgentBranch({ shown }: { shown: Instance }) {
+  const repos = useRepos(shown.id.split("@")[1]);
+  const branch = branchOf(repos.data ?? [], shown.agentId);
+  // A worktree is made when its agent starts: one not seen yet is looked for
+  // again as the agent's status moves (git actions refresh the rest).
+  const hasSession = !["asleep", "stopped", "queued"].includes(shown.status);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a status change only
+  useEffect(() => {
+    if (!branch && hasSession && repos.isSuccess) repos.refetch();
+  }, [shown.status]);
+  return branch ? (
+    <span className="truncate font-mono text-[11.5px] text-tx4" title={branch}>
+      {branch}
+    </span>
+  ) : null;
+}
+
+/** The deployment's agents, the lead first. The shown agent's controls
+ * (children) end the row. */
 function AgentTabs({
   roster,
   team,
@@ -186,15 +205,6 @@ function AgentTabs({
   onClick: (id: string) => void;
   children: ReactNode;
 }) {
-  const repos = useRepos(shown.id.split("@")[1]);
-  const branch = branchOf(repos.data ?? [], shown.agentId);
-  // A worktree is made when its agent starts: one not seen yet is looked for
-  // again as the agent's status moves (git actions refresh the rest).
-  const hasSession = !["asleep", "stopped", "queued"].includes(shown.status);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on a status change only
-  useEffect(() => {
-    if (!branch && hasSession && repos.isSuccess) repos.refetch();
-  }, [shown.status]);
   const tab = (i: Instance) => {
     const soul = team?.config.agents[i.agentId];
     const on = i.id === shown.id;
@@ -208,9 +218,6 @@ function AgentTabs({
         <Avatar look={soul?.look} size={24} status={i.status} dotBorder="var(--side)" />
         {soul?.name ?? i.agentId}
         {i.agentId === team?.config.lead && <LeadTag />}
-        {on && branch && (
-          <span className="font-mono text-[11.5px] font-normal text-tx4">{branch}</span>
-        )}
       </button>
     );
   };

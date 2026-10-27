@@ -122,7 +122,13 @@ func New(d Deps) *Workflow {
 
 var _ teamtools.Block = (*Workflow)(nil)
 
+// object is a tool's input schema. With nothing required it leaves required
+// out: JSON Schema wants an array there, and strict providers (Moonshot)
+// refuse the null a nil slice marshals to.
 func object(props string, required ...string) json.RawMessage {
+	if len(required) == 0 {
+		return json.RawMessage(`{"type":"object","properties":{` + props + `}}`)
+	}
 	req, _ := json.Marshal(required)
 	return json.RawMessage(`{"type":"object","properties":{` + props + `},"required":` + string(req) + `}`)
 }

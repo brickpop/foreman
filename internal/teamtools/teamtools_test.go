@@ -3,6 +3,7 @@ package teamtools_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -72,6 +73,8 @@ func TestEveryOfferedToolIsServed(t *testing.T) {
 			names = append(names, tool.Name)
 			if !json.Valid(tool.InputSchema) || tool.Description == "" {
 				t.Errorf("%s: a bad definition", tool.Name)
+			} else if err := strictSchema(tool.InputSchema); err != nil {
+				t.Errorf("%s: %v", tool.Name, err)
 			}
 		}
 		if want := prompt.Offered(id == "mara@ledger"); !slices.Equal(names, want) {
@@ -81,6 +84,35 @@ func TestEveryOfferedToolIsServed(t *testing.T) {
 	if tools := r.List("nobody@ledger"); tools != nil {
 		t.Errorf("an unknown instance got %v", tools)
 	}
+}
+
+// strictSchema holds a schema to what strict providers (Moonshot) check, at
+// every level: an object's required, when there, is an array of properties it
+// declares.
+func strictSchema(raw json.RawMessage) error {
+	var s map[string]json.RawMessage
+	if json.Unmarshal(raw, &s) != nil {
+		return nil // not a schema: absent, or a value such as an enum's
+	}
+	var props map[string]json.RawMessage
+	_ = json.Unmarshal(s["properties"], &props)
+	if req, ok := s["required"]; ok {
+		var names []string
+		if err := json.Unmarshal(req, &names); err != nil || names == nil {
+			return fmt.Errorf("required must be an array, got %s", req)
+		}
+		for _, n := range names {
+			if _, ok := props[n]; !ok {
+				return fmt.Errorf("required %q isn't a property", n)
+			}
+		}
+	}
+	for _, sub := range props {
+		if err := strictSchema(sub); err != nil {
+			return err
+		}
+	}
+	return strictSchema(s["items"])
 }
 
 func TestTheRouterChecksBeforeAnyBlock(t *testing.T) {

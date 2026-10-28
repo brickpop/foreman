@@ -25,6 +25,8 @@ type Input struct {
 	// describes those and no others. Without ask, it describes working alone,
 	// the CEO relaying; without commit, git is read-only and the CEO reviews.
 	Tools []string
+	// Instructions are the CEO's standing instructions (Settings), last.
+	Instructions string
 }
 
 // Who may be offered a team tool.
@@ -217,6 +219,15 @@ func Compose(in Input) string {
 		default:
 			line("Before you tell the CEO you're done, run: %s", in.Config.Checks)
 		}
+	}
+	// Last, and below Foreman's: a personal note can't override the team
+	// tools or the git policy.
+	if text := strings.TrimSpace(in.Instructions); text != "" {
+		line("")
+		line("## The CEO's standing instructions")
+		line("The CEO's own rules for every agent. Where one conflicts with what Foreman says above, Foreman's rules win.")
+		line("")
+		line("%s", text)
 	}
 	return b.String()
 }
@@ -454,13 +465,15 @@ func instruction(s home.Soul, merges bool) string {
 }
 
 // Template is an agent's prompt before any deployment: the deployment's and
-// the project's parts stay as {placeholders}, so the whole shape shows.
-func Template(team home.TeamConfig, agent string) string {
+// the project's parts stay as {placeholders}, so the whole shape shows. The
+// CEO's instructions are already known, so they show as they are.
+func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
 		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", Goal: "{goal}",
-		Repos:  []home.Repo{{Name: "{repo}", Main: "{main}"}},
-		Config: home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
-		Tools:  Offered(agent == team.Lead),
+		Repos:        []home.Repo{{Name: "{repo}", Main: "{main}"}},
+		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
+		Tools:        Offered(agent == team.Lead),
+		Instructions: instructions,
 	})
 }
 

@@ -4,17 +4,14 @@ import type { Project, Request, Team } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import {
   agentOf,
-  dashboardSubtitle,
   greeting,
   inbox,
   type ProjectRow,
   projectRows,
-  roleLabel,
-  type SessionGroup,
   sessionGroups,
   type TeamCard,
   teamCards,
-  when,
+  workingSummary,
 } from "../app/model";
 import {
   useAnswer,
@@ -28,10 +25,20 @@ import {
 import { setupPending } from "../app/setup";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
+import { DeploymentCard } from "../components/DeploymentCard";
 import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
-import { Button, Dot, Empty, LeadTag, Loading, PageTitle, SectionLabel } from "../components/ui";
+import {
+  Button,
+  card,
+  cover,
+  Dot,
+  Empty,
+  Loading,
+  PageTitle,
+  SectionLabel,
+} from "../components/ui";
 
 // The start page (wiki/product/features/dashboard.md): what is at work, the
 // projects and the teams, each a click from where it's handled. Reviews live
@@ -47,7 +54,12 @@ export function Dashboard() {
   const [newProject, setNewProject] = useState(false);
   const openChiefOfStaff = useOpenChiefOfStaff();
   const asks = inbox(requests.data ?? []);
-  const groups = sessionGroups(instances.data ?? [], deployments.data ?? [], teams.data ?? []);
+  const groups = sessionGroups(
+    instances.data ?? [],
+    deployments.data ?? [],
+    teams.data ?? [],
+    requests.data ?? [],
+  );
   const rows = projectRows(
     projects.data ?? [],
     teams.data ?? [],
@@ -59,7 +71,7 @@ export function Dashboard() {
   return (
     <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-12 pt-12 pb-16 max-[760px]:px-4">
       <div className="flex flex-wrap items-end gap-4">
-        <PageTitle title={greeting()} subtitle={dashboardSubtitle(instances.data ?? [])} />
+        <PageTitle title={greeting()} subtitle={workingSummary(instances.data ?? [])} />
         <span className="flex-1" />
         <div className="flex gap-2">
           <Button onClick={() => setNewProject(true)}>New project</Button>
@@ -105,7 +117,7 @@ export function Dashboard() {
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
             {groups.map((g) => (
-              <Deployed key={g.deployment} group={g} />
+              <DeploymentCard key={g.deployment} group={g} />
             ))}
           </div>
         )}
@@ -165,78 +177,6 @@ function Section({
       </div>
       {children}
     </section>
-  );
-}
-
-const card = "relative flex flex-col gap-3 rounded-xl border border-line bg-panel px-4 py-3.5";
-// A card's title link covers the whole card; its other controls sit above it.
-const cover = "after:absolute after:inset-0 after:rounded-xl after:content-['']";
-
-/** One deployment at work: its team, goal and awake agents, each opening its
- * session; the asleep ones only counted. */
-function Deployed({ group: g }: { group: SessionGroup }) {
-  const navigate = useNavigate();
-  const working = g.agents.filter((a) => a.instance.status === "running").length;
-  return (
-    <article className={`${card} !gap-2.5 !px-0 !pb-2 hover:border-line3`}>
-      <header className="flex flex-col gap-0.5 px-4">
-        <span className="flex items-baseline gap-2">
-          <Link
-            to="/sessions"
-            search={{ deployment: g.deployment }}
-            className={`font-semibold ${cover}`}
-          >
-            {g.team?.config.name || g.deployment.split("@")[0]}
-          </Link>
-          <span className="text-[13px] text-tx4">on {g.project}</span>
-          <span className="flex-1" />
-          <span className={`text-[12.5px] ${working > 0 ? "text-ok" : "text-tx4"}`}>
-            {working > 0 ? `${working} working` : g.agents.length > 0 ? "idle" : "asleep"}
-          </span>
-        </span>
-        {g.goal && <p className="line-clamp-2 text-[13.5px] text-tx3">{g.goal}</p>}
-      </header>
-      <div className="flex flex-col">
-        {g.agents.map(({ instance: i, agent, lead }) => (
-          <button
-            key={i.id}
-            type="button"
-            onClick={() =>
-              navigate({ to: "/sessions", search: { deployment: g.deployment, agent: i.id } })
-            }
-            className="relative z-10 grid grid-cols-[auto_1fr] items-center gap-x-2.5 px-4 py-1.5 text-left hover:bg-hover"
-          >
-            <Avatar look={agent?.soul.look} size={28} status={i.status} dotBorder="var(--panel)" />
-            <span className="flex min-w-0 flex-col">
-              <span className="flex items-center gap-1.5 text-[13.5px]">
-                <span className="font-medium">{agent?.soul.name ?? i.agentId}</span>
-                {lead && <LeadTag />}
-                <span className="truncate text-tx4">{agent ? roleLabel(agent.soul.role) : ""}</span>
-              </span>
-              <span className="truncate font-mono text-[11.5px] text-tx4">
-                {i.doing ? `${i.doing.line} · ${when(i.doing.at)}` : i.status}
-              </span>
-            </span>
-          </button>
-        ))}
-        {g.asleep.length > 0 && (
-          <span className="flex items-center gap-2.5 px-4 py-1.5 text-[12.5px] text-tx4">
-            <span className="flex">
-              {g.asleep.slice(0, 5).map(({ instance: i, agent }, n) => (
-                <span
-                  key={i.id}
-                  className={n > 0 ? "-ml-1.5" : ""}
-                  title={agent?.soul.name ?? i.agentId}
-                >
-                  <Avatar look={agent?.soul.look} size={20} />
-                </span>
-              ))}
-            </span>
-            {g.asleep.length} asleep · woken when needed
-          </span>
-        )}
-      </div>
-    </article>
   );
 }
 

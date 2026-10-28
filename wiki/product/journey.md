@@ -50,7 +50,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
   7. **Kickoff:** only Mara, the lead, starts now: her harness starts with the goal as its opening message (`Your goal on ledger: …`), so she starts working at once. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
-**10. Watch.** Dashboard: "4 sessions working across 1 deployment". **Sessions** → "Atlas" under ledger in the sidebar → Mara's terminal (the lead's tab is first).
+**10. Watch.** Dashboard: "4 sessions working across 1 deployment". **Sessions** → the Atlas card under ledger → Mara's terminal (the lead's tab is first).
 - *Under the hood:* Web server → Terminal `Attach` → a View: the snapshot of Mara's screen, then live output (WebSocket, raw bytes).
 
 **11. Talk to the lead.** The CEO types into Mara's terminal: "Use the existing request-id header; keep the API backwards compatible."

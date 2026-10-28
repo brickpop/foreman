@@ -9,13 +9,18 @@ import { useToast } from "../../components/Toasts";
 export const inGlobalRepo = "Global repo";
 export const onThisMachine = "This machine";
 
-/** Saves a change to the settings read last; a failure says why and the screen refetches. */
+/** Saves a change to the settings read last; a failure says why and the screen
+ * refetches. Resolves to whether it was saved. */
 export function useSave() {
   const save = useSaveSettings();
   const toast = useToast();
-  return (change: (s: SettingsData) => SettingsData) =>
-    save(change).catch((e: Error) =>
-      toast({ title: "Settings not saved", body: e.message, color: "var(--err)" }),
+  return (change: (s: SettingsData) => SettingsData): Promise<boolean> =>
+    save(change).then(
+      () => true,
+      (e: Error) => {
+        toast({ title: "Settings not saved", body: e.message, color: "var(--err)" });
+        return false;
+      },
     );
 }
 

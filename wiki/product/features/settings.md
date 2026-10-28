@@ -10,14 +10,22 @@ The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10
 
 | Tab | Sections |
 |---|---|
-| **Agents** | [Profiles](#profiles), [Running agents](#running-agents) |
+| **Agents** | [Profiles](#profiles), [Instructions for every agent](#instructions-for-every-agent), [Running agents](#running-agents) |
 | **Git & forges** | [Forge accounts](#forge-accounts), [Global repo](#global-repo) |
 | **Notifications & look** | [Notifications](#notifications), [Appearance](#appearance) |
 | **System** | [Home](#home), [Network](#network), [Maintenance](#maintenance) |
 
 **Each section says where it is kept**, after its label (` · Global repo`, `--tx4`, not bold): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **Global repo + this machine** (hosts in the global repo, tokens on this machine; [secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
 
-Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`).
+Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent), which save on **Save**.
+
+## Instructions for every agent
+
+On **Agents**, kept in the global repo (`instructions` in [Global settings](../models/global-settings.md)). The CEO's own standing rules for coding agents, the way they'd write them in their `~/.claude/CLAUDE.md` or Pi's `AGENTS.md`, which Foreman's agents never read (they run with a private config dir; the CEO, 2026-10-26). Intro: "Your standing rules, as you'd write them in your own CLAUDE.md or AGENTS.md. Foreman adds them at the end of every agent's session prompt, from its next start. Where they conflict with Foreman's own rules (team tools, git, the wiki), Foreman's win."
+
+A full-width text field (8 rows, Mono 13px on `--term`, resizable; placeholder `e.g. Write commit messages in English. Prefer small functions.`). Once edited, **`Save`** (primary) and **`Discard`** appear under it: a long text saves as one commit, never mid-sentence (the CEO, 2026-10-28; the other settings save on change). A failed save keeps the text and says why in a toast. A change on disk shows while the field isn't being edited.
+
+Decided (the CEO, 2026-10-28): **one global text**, not per profile (the same rules usually apply whatever the harness; per profile can come later); **written in Foreman**, not copied from the CEO's own files (those carry rules for the CEO's own sessions: Mac paths, tools the container lacks); only the CEO's personal layer (a team's is the soul's job description, a project's its repo's `AGENTS.md`); **team agents only**, not the [Chief of Staff](./chief-of-staff.md), whose prompt is fixed; applied **at an agent's next start**, like a profile change. Where it goes in the prompt: [Session prompt](../architecture/session-prompt.md#the-ceos-instructions).
 
 ## Running agents
 

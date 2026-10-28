@@ -211,7 +211,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such agent")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"prompt": prompt.Template(t.Config, r.PathValue("agent"))})
+		writeJSON(w, http.StatusOK, map[string]string{"prompt": prompt.Template(t.Config, r.PathValue("agent"), c.Settings().Settings.Instructions)})
 	})
 	mux.HandleFunc("PUT /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {

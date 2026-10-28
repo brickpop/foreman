@@ -244,7 +244,7 @@ func TestRoleLabels(t *testing.T) {
 
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
-	got := Template(atlas, "tove")
+	got := Template(atlas, "tove", "")
 	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", "Goal: {goal}", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -326,5 +326,26 @@ func TestTheLeadsLessons(t *testing.T) {
 	}
 	if !strings.Contains(bare, "## The CEO\nThe CEO talks to you.\nAgree the scope") {
 		t.Errorf("a lead without tools:\n%s", bare)
+	}
+}
+
+// The CEO's instructions come last, after Foreman's own rules, which win;
+// none (or only blank lines) adds no section.
+func TestTheCEOsInstructionsComeLast(t *testing.T) {
+	in := input("tove", every)
+	in.Instructions = "\n  Write commit messages in English.\n# Never use `sudo`\n\n"
+	got := Compose(in)
+	want := "\n## The CEO's standing instructions\nThe CEO's own rules for every agent. Where one conflicts with what Foreman says above, Foreman's rules win.\n\nWrite commit messages in English.\n# Never use `sudo`\n"
+	if !strings.HasSuffix(got, want) {
+		t.Errorf("not last, or not as written:\n%s", got)
+	}
+	for _, blank := range []string{"", " \n\t\n"} {
+		in.Instructions = blank
+		if got := Compose(in); strings.Contains(got, "standing instructions") {
+			t.Errorf("%q adds a section:\n%s", blank, got)
+		}
+	}
+	if got := Template(atlas, "tove", "Be brief."); !strings.HasSuffix(got, "\nBe brief.\n") {
+		t.Errorf("the template leaves them out:\n%s", got)
 	}
 }

@@ -95,6 +95,10 @@ type Settings struct {
 	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
 	GlobalForge       GlobalForge             `toml:"global_forge" json:"globalForge"`
 	Notifications     Notifications           `toml:"notifications" json:"notifications"`
+	// Instructions are the CEO's standing instructions for every agent, added
+	// to each session prompt (wiki/product/architecture/session-prompt.md).
+	// Written as a multi-line string (encodeSettings).
+	Instructions string `toml:"instructions,omitempty" json:"instructions"`
 }
 
 // ForgeAccount is a forge account's host or owner; its token is a secret.
@@ -413,4 +417,44 @@ func (c TeamConfig) Roster() []string {
 		add(id)
 	}
 	return ids
+}
+
+// encodeSettings renders settings.toml, the instructions as a multi-line
+// string, so their Markdown reads as written: the TOML library writes every
+// string on one line, with \n escapes.
+func encodeSettings(s Settings) ([]byte, error) {
+	text := s.Instructions
+	s.Instructions = ""
+	out, err := encode(s)
+	if err != nil || text == "" {
+		return out, err
+	}
+	key := []byte("instructions = " + multiline(text) + "\n")
+	// A top-level key goes before the first table, or it would be the table's.
+	if i := bytes.Index(out, []byte("\n[")); i >= 0 {
+		return slices.Concat(out[:i+1], key, out[i+1:]), nil
+	}
+	return append(out, key...), nil
+}
+
+// multiline is s as a TOML multi-line basic string: backslashes and the
+// control characters TOML refuses escaped, and quotes too wherever they could
+// close it.
+func multiline(s string) string {
+	var b strings.Builder
+	b.WriteString("\"\"\"\n")
+	for i, r := range s {
+		switch {
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '"' && (strings.HasPrefix(s[i:], `"""`) || i == len(s)-1):
+			b.WriteString(`\"`)
+		case r < 0x20 && r != '\n' && r != '\t' || r == 0x7f:
+			fmt.Fprintf(&b, `\u%04X`, r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteString(`"""`)
+	return b.String()
 }

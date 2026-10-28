@@ -664,6 +664,25 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	}
 }
 
+// The CEO's instructions (Settings) reach the harness at the next start.
+func TestTheCEOsInstructionsReachTheHarness(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	s := f.hm.Settings()
+	s.Settings.Instructions = "Answer in Catalan."
+	if _, err := f.hm.SaveSettings(ctx, s.Settings, s.Version); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "Ship invoices"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.m.Wake(ctx, "tove@ledger")
+	f.waitStatus("tove@ledger", Running)
+	given, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
+	if !strings.HasSuffix(string(given), "\nAnswer in Catalan.\n") {
+		t.Errorf("given:\n%s", given)
+	}
+}
+
 // eventIsActivity reads a hook event's name as the activity itself.
 type eventIsActivity struct{ fake.Adapter }
 

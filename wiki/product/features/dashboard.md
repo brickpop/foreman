@@ -36,9 +36,9 @@ Today only review requests are built, so the section doesn't show yet.
 
 ## At work
 
-One card per active deployment, by project then team (cards at least 320px wide), with `All sessions →` on the label's right (to [Sessions](./sessions.md)). The whole card opens its deployment in Sessions (border `--line3` on hover), its agent rows each opening their own session (the CEO, 2026-10-21).
+One card per active deployment, by project then team (cards at least 320px wide), with `All sessions →` on the label's right (to [Sessions](./sessions.md)). The whole card opens its deployment in Sessions (border `--line3` on hover), its agent rows each opening their own session (the CEO, 2026-10-21). The same card (`DeploymentCard`) makes [Sessions' list](./sessions.md#the-list).
 
-- **Header**: the team's name (600, the card's link), `on <project>` (13px `--tx4`), and on the right `<n> working` (`--ok`), `idle`, or `asleep` when every agent is (`--tx4`). Under it the deployment's goal (13.5px `--tx3`, two lines at most).
+- **Header**: the team's name (600, the card's link), `on <project>` (13px `--tx4`), the amber needs-you dot when a request of the deployment is open, and on the right `<n> working` (`--ok`), `idle`, or `asleep` when every agent is (`--tx4`). Under it the deployment's goal (13.5px `--tx3`, two lines at most).
 - **A row per awake agent**, the lead first, then the team file's order: Avatar 28 with its status dot, the name (500), the `lead` tag, the role (`--tx4`); under it, in Mono 11.5px `--tx4`, what its harness last said it was doing and when (`Editing api/cal.go · 14:05`), or its status. A row opens that agent's session.
 - **The asleep agents** (not started yet, woken when needed) only counted, rows being noise (the CEO, 2026-10-21): their avatars (20, overlapping, at most five) and `<n> asleep · woken when needed` (12.5px `--tx4`). A deployment whose agents all sleep keeps its card.
 - **Loading**: the [loading placeholder](../design/design-system.md#surfaces) until the sessions are in, never the empty box; likewise a card-sized one at the head of Projects and of Teams.

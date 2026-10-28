@@ -117,6 +117,12 @@ export interface Settings {
   forges: { [key: string]: ForgeAccount};
   globalForge: GlobalForge;
   notifications: Notifications;
+  /**
+   * Instructions are the CEO's standing instructions for every agent, added
+   * to each session prompt (wiki/product/architecture/session-prompt.md).
+   * Written as a multi-line string (encodeSettings).
+   */
+  instructions: string;
 }
 /**
  * ForgeAccount is a forge account's host or owner; its token is a secret.

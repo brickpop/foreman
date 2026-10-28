@@ -6,7 +6,7 @@ tags: [architecture, agents, teams, sessions]
 
 # Session prompt
 
-The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from four sources: the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [deployment](../models/deployment.md) (goal) the [project config](../models/project-config.md) (gates, checks) and the instance's sandbox. It is passed to the harness as described by its [adapter](./harness-adapters.md).
+The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from these sources, and last the [CEO's instructions](#the-ceos-instructions): the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [deployment](../models/deployment.md) (goal) the [project config](../models/project-config.md) (gates, checks) and the instance's sandbox. It is passed to the harness as described by its [adapter](./harness-adapters.md).
 
 The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)). For an agent whose team isn't deployed anywhere, it shows the full template with the deployment-dependent variables (`{project}`, `{sandbox}`, `{goal}`, `{repos}`, `{checks}`, `{gates}`…) left as highlighted placeholders, so the whole shape is visible before deploying.
 
@@ -88,6 +88,11 @@ close a loop, since every ask() waits for a reply. Ask only when you need someth
 - {gate}
 ...
 Before any handoff, run: {checks}         (the lead: "Before you request a merge, run: {checks}")
+
+## The CEO's standing instructions          (only when set in Settings)
+The CEO's own rules for every agent. Where one conflicts with what Foreman says above, Foreman's rules win.
+
+{instructions}
 ```
 
 Without a goal, the line says who gives it: the lead reads `Goal: none set yet: the CEO gives it in this session. Wait for it.`, a member `Goal: none set yet: the CEO gives it to your lead, who tells you what to work on.`
@@ -95,6 +100,10 @@ Without a goal, the line says who gives it: the lead reads `Goal: none set yet: 
 **Phasing:** the prompt describes exactly the team tools Foreman offers the agent (`prompt.Offered`, which the team-tool router serves too, so the two can't drift), and none when the agent started without `foreman-agent`. The [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) epic brings them in steps: today `ask`, `reply`, `read_message`, `switch`, `commit`, `merge`, `abort_merge`, `set_submodule` (since 2026-10-19), `handoff` (members), `contribute` and, since the Git epic (2026-10-17), `request_merge` (the lead), since 2026-10-22 `withdraw_merge` and `reviews` (the lead), and since 2026-10-23 `team` (the lead); `escalate` is still to come. Each piece of the prompt follows its tool: without `ask`, teammates can't be reached and the CEO relays; without `commit`, a Git section says git is read-only and the CEO reviews the uncommitted work; without `switch`, the agent's branch was made for it; without `request_merge`, the lead's default job doesn't end with merges, and its branches line says to merge accepted hand-offs with `merge` and to tell the CEO which lead branch is ready for review; without `escalate`, the messages note says nothing about approvals. The checks line says "Before any handoff" for a member with `handoff`, "Before you request a merge" for the lead with `request_merge`, else "Before you tell the CEO you're done". The outcome rule (two lines under the tools) comes with `reply`, since an agent otherwise tends to paste a transcript; so does the rule that a reply ends its ask (two more lines), since a lead otherwise answers replies and sends "closing the loop" asks, each of which demands another reply (seen 2026-10-19).
 
 **Working rules** (the CEO, 2026-10-23, from a lead's account of what went wrong): reviews and designs are filed in the wiki and passed on by linking the entry (`{reviews in the wiki}`), since a reviewer's review reached only the lead, who passed on a summary as if it were the full text; the CEO decides from a self-contained brief and agrees the scope before the lead builds what wasn't asked for (`{ceo section}`), since the lead sent the CEO to read documents to decide; at most two merge requests open, one topic each (`{branches}`), after seven at once; a branch holds one card or topic (`{branches}`), since an audit branch merged into fix branches had them rebuilt twice (there is no cherry-pick: a test is copied in with `git show`); and tests reaching main assert correct behaviour only (`{proving tests}`), since proof tests that pass while the bug exists reached a merge request. Each rule follows the tool it is about, and none goes in `{instruction}`, which a soul's own text replaces.
+
+## The CEO's instructions
+
+`{instructions}` is the text the CEO writes in [Settings → Instructions for every agent](../features/settings.md#instructions-for-every-agent) (`instructions` in [Global settings](../models/global-settings.md)), trimmed and as written; with none, the section is left out. Every team agent gets it, lead and members alike, whatever the harness; the [Chief of Staff](../features/chief-of-staff.md) doesn't (the CEO, 2026-10-28). It comes **last**, after Foreman's own rules, and the prompt says Foreman's win on a conflict: a personal note can't override the team tools or the git policy. It is read when the prompt is composed, so a change reaches an agent **at its next start** (no context update), and shows at once on the [Agent page](../features/agent-page.md), whose prompt (and template) includes it.
 
 ## Delivery
 

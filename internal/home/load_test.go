@@ -444,3 +444,54 @@ func TestTheSubscriberCanReadTheHome(t *testing.T) {
 		t.Fatal("the home stayed locked")
 	}
 }
+
+// The CEO's instructions survive a save and a reload exactly, Markdown with
+// quotes, backslashes and a TOML-looking line included, and are written as a
+// multi-line string, readable in the file.
+func TestSettingsKeepTheInstructions(t *testing.T) {
+	h := loaded(t, nil)
+	s := DefaultSettings()
+	s.Instructions = "# Rules\n- Say \"done\" only when tests pass.\n- Paths like C:\\tmp and `'''` stay.\n\"\"\"\nport = 1\n"
+	if _, err := h.SaveSettings(ctx, s, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.Settings().Settings; got.Instructions != s.Instructions || got.Port != 8888 {
+		t.Errorf("read back %q, port %d", got.Instructions, got.Port)
+	}
+	data, err := os.ReadFile(h.config(settingsFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "instructions = \"\"\"\n# Rules\n") {
+		t.Errorf("not multi-line:\n%s", data)
+	}
+	parsed, problems := ParseSettings(data)
+	if len(problems) > 0 || parsed.Instructions != s.Instructions {
+		t.Errorf("parsed %q, %v", parsed.Instructions, problems)
+	}
+	s.Instructions = ""
+	if data, _ := encode(s); strings.Contains(string(data), "instructions") {
+		t.Errorf("empty instructions written:\n%s", data)
+	}
+}
+
+// Whatever the CEO types reads back exactly: runs of quotes (one closing the
+// string early), a quote last, backslashes, CRLF, tabs, control characters.
+func TestInstructionsRoundTrip(t *testing.T) {
+	for _, text := range []string{
+		`a "quote" last"`, `""`, `"""`, `""""`, `x""""""y`, `ends with \`, `\n is not a newline`,
+		"line\r\nwindows", "tab\there", "bell\x07 del\x7f", "\n\nleading blank lines", "trailing\n\n",
+		"unicode: català, 日本語, 🙂",
+	} {
+		s := DefaultSettings()
+		s.Instructions = text
+		data, err := encodeSettings(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, problems := ParseSettings(data)
+		if len(problems) > 0 || got.Instructions != text || got.GlobalForge.Kind != "none" {
+			t.Errorf("%q came back %q, %v:\n%s", text, got.Instructions, problems, data)
+		}
+	}
+}

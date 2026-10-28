@@ -2,7 +2,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Instance, type Team, useClient } from "../api/client";
-import { agentOf, harnessLabel, roleLabel, slotsTaken } from "../app/model";
+import {
+  agentOf,
+  harnessLabel,
+  roleLabel,
+  type SessionGroup,
+  sessionGroups,
+  slotsTaken,
+  workingSummary,
+} from "../app/model";
 import {
   keys,
   useDeployments,
@@ -18,6 +26,7 @@ import { branchOf } from "../app/repos";
 import {
   activeDeployments,
   applyMention,
+  byProject,
   countdown,
   isLineShortcut,
   linePlaceholder,
@@ -25,6 +34,7 @@ import {
   mentionAt,
   mentionMatches,
   rosterOrder,
+  type SessionsSearch,
   type SessionsView,
   sessionsView,
   stoppedLine,
@@ -32,19 +42,32 @@ import {
 import { ActivityPanel } from "../components/ActivityPanel";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
+import { DeploymentCard } from "../components/DeploymentCard";
 import { CheckIcon, CopyIcon, PromptIcon, StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
-import { Button, Dot, LeadTag, Loading, outlineLink } from "../components/ui";
+import {
+  Button,
+  Dot,
+  Empty,
+  LeadTag,
+  Loading,
+  outlineLink,
+  PageTitle,
+  SectionLabel,
+} from "../components/ui";
 
-// The terminal multiplexer (wiki/product/features/sessions.md): one deployment
-// per page, picked in the sidebar; its agent tabs, the chosen agent's
-// terminal, and the Activity panel.
+// The terminal multiplexer (wiki/product/features/sessions.md): the list of
+// active deployments, and a page per deployment with its agent tabs, the
+// chosen agent's terminal, and the Activity panel.
 
-// Each deployment's last view, so its sidebar link comes back to it (while
+// Each deployment's last view, so the list's link comes back to it (while
 // the app runs).
 const lastView = new Map<string, SessionsView>();
+
+// What a view says, to compare the URL with what is shown.
+const viewKey = (v: SessionsSearch) => `${v.deployment ?? ""} ${v.agent ?? ""} ${v.view ?? ""}`;
 
 export function Sessions() {
   const search = useSearch({ from: "/sessions" });
@@ -71,23 +94,29 @@ export function Sessions() {
       )
     : undefined;
   const show = (next: SessionsView) => navigate({ to: "/sessions", search: next, replace: true });
-  // The URL always names what is shown: the sidebar marks it, and a reload or
-  // a shared link shows the same.
-  const shown = view && `${view.deployment} ${view.agent} ${view.view ?? ""}`;
-  const asked = `${search.deployment} ${search.agent} ${search.view ?? ""}`;
+  // The URL always names what is shown, the list included (a deployment since
+  // stopped): a reload or a shared link shows the same.
+  const shown = viewKey(view ?? {});
+  const asked = viewKey(search);
   // biome-ignore lint/correctness/useExhaustiveDependencies: `shown` stands for the view
   useEffect(() => {
-    if (!view) return;
-    lastView.set(view.deployment, view);
-    if (shown !== asked) show(view);
-  }, [shown, asked]);
+    if (!ready) return;
+    if (view) lastView.set(view.deployment, view);
+    if (shown !== asked) navigate({ to: "/sessions", search: view ?? {}, replace: true });
+  }, [ready, shown, asked]);
 
   if (!ready) return <Loading rows={5} className="m-12" />;
   if (!view)
     return (
-      <Centered>
-        <NoSessions />
-      </Centered>
+      <SessionsList
+        groups={sessionGroups(
+          instances.data,
+          deployments.data ?? [],
+          teams.data,
+          requests.data ?? [],
+        )}
+        summary={workingSummary(instances.data)}
+      />
     );
 
   const d = active.find((a) => a.id === view.deployment);
@@ -534,23 +563,37 @@ function Queued({ name }: { name: string }) {
   );
 }
 
-/** Nothing deployed: deploy from here, choosing the team and the project. */
-function NoSessions() {
+/** Every active deployment, by project, each card opening its page. With
+ * nothing deployed, deploy from here, choosing the team and the project. */
+function SessionsList({ groups, summary }: { groups: SessionGroup[]; summary: string }) {
   const [deploy, setDeploy] = useState(false);
   return (
-    <div className="flex flex-col items-center gap-4">
-      <span>No team is deployed yet, so there are no sessions.</span>
-      <Button variant="primary" onClick={() => setDeploy(true)}>
-        Deploy a team
-      </Button>
+    <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-12 pt-12 pb-16 max-[760px]:px-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <PageTitle title="Sessions" subtitle={summary} />
+        <span className="flex-1" />
+        <Button variant="primary" onClick={() => setDeploy(true)}>
+          Deploy a team
+        </Button>
+      </div>
+      {groups.length === 0 ? (
+        <Empty>No team is deployed yet, so there are no sessions.</Empty>
+      ) : (
+        byProject(groups).map((p) => (
+          <section key={p.project} className="flex flex-col gap-3">
+            <SectionLabel>{p.project}</SectionLabel>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
+              {p.items.map((g) => (
+                <DeploymentCard key={g.deployment} group={g} />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
       {/* Mounted only while open: each opening starts fresh. */}
       {deploy && <DeployDialog open onClose={() => setDeploy(false)} />}
     </div>
   );
-}
-
-function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="grid h-full place-items-center bg-bg p-12 text-tx3">{children}</div>;
 }
 
 /** A small square button holding an icon, labelled for screen readers and on hover. */

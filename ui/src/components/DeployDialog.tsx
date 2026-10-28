@@ -58,9 +58,13 @@ export function DeployDialog({
   const teamName = teams.data?.find((t) => t.id === team)?.config.name ?? team;
   const deploy = useMutation({
     mutationFn: () => client.agents.deploy(team ?? "", project ?? "", goal.trim()),
-    onSuccess: (d) => {
-      queries.invalidateQueries({ queryKey: keys.instances });
-      queries.invalidateQueries({ queryKey: keys.deployments });
+    onSuccess: async (d) => {
+      // Its agents loaded first: until then the Sessions page doesn't know the
+      // deployment, and would show the list instead.
+      await Promise.all([
+        queries.invalidateQueries({ queryKey: keys.instances }),
+        queries.invalidateQueries({ queryKey: keys.deployments }),
+      ]);
       const t = teams.data?.find((x) => x.id === d.teamId);
       const lead = `${t?.config.lead}@${d.projectId}`;
       const members = Object.keys(t?.config.agents ?? {}).length;

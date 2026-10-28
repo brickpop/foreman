@@ -3,6 +3,7 @@ import type { Instance, Request, Team } from "../api/client";
 import {
   activeDeployments,
   applyMention,
+  byProject,
   countdown,
   deploymentStatus,
   isLineShortcut,
@@ -171,10 +172,11 @@ describe("the Sessions URL", () => {
   const view = (search: object, last: Record<string, SessionsView> = {}) =>
     sessionsView(search, deployments, rosterOf, (d) => last[d]);
 
-  it("opens the first deployment's lead when it names nothing, or what isn't deployed", () => {
-    const first = { deployment: "atlas@ledger", agent: "tic", view: undefined };
-    expect(view({})).toEqual(first);
-    expect(view({ deployment: "gone@ledger", agent: "tac" })).toEqual({ ...first, agent: "tac" });
+  it("is the list when it names no deployment, or one not deployed (stopped since)", () => {
+    expect(view({})).toBe(undefined);
+    expect(view({ agent: "tic", view: "activity" })).toBe(undefined);
+    expect(view({ deployment: "gone@ledger", agent: "tac" })).toBe(undefined);
+    // Not the first deployment by default: the one named, its lead.
     expect(view({ deployment: "orion@relay" })).toEqual({
       deployment: "orion@relay",
       agent: "lumen",
@@ -229,5 +231,22 @@ describe("stoppedLine", () => {
     expect(stoppedLine("Leady", "")).toBe(
       "Leady stopped. Messages for them wait until you start them again; they pick up their conversation.",
     );
+  });
+});
+
+describe("byProject", () => {
+  it("groups items under their project, keeping their order", () => {
+    const items = [
+      { project: "harbor", id: 1 },
+      { project: "ledger", id: 2 },
+      { project: "ledger", id: 3 },
+      { project: "relay", id: 4 },
+    ];
+    expect(byProject(items).map((g) => [g.project, g.items.map((i) => i.id)])).toEqual([
+      ["harbor", [1]],
+      ["ledger", [2, 3]],
+      ["relay", [4]],
+    ]);
+    expect(byProject([])).toEqual([]);
   });
 });

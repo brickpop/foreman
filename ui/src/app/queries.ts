@@ -115,8 +115,9 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       const object = (e.data as { object?: string }).object;
       // A team change also changes its members' prompts.
       if (object === "team") return [keys.teams, ["prompt"], keys.setup];
-      // The settings choose the engine, which the checklist checks.
-      if (object === "settings") return [keys.settings, keys.setup];
+      // The settings choose the engine, which the checklist checks, and hold
+      // the CEO's instructions, part of every prompt.
+      if (object === "settings") return [keys.settings, keys.setup, ["prompt"]];
       return [keys.projects, keys.setup];
     }
     case "projects.changed":

@@ -53,6 +53,19 @@ export function activeDeployments(
     .sort((a, b) => a.project.localeCompare(b.project) || a.team.localeCompare(b.team));
 }
 
+/** Items sorted by project, grouped under it in the same order. */
+export function byProject<T extends { project: string }>(
+  items: T[],
+): { project: string; items: T[] }[] {
+  const groups: { project: string; items: T[] }[] = [];
+  for (const item of items) {
+    const group = groups.at(-1);
+    if (group?.project === item.project) group.items.push(item);
+    else groups.push({ project: item.project, items: [item] });
+  }
+  return groups;
+}
+
 /** The agent of a deployment that did something last: where its work is. */
 export function mostRecentAgent(instances: Instance[], deployment: string): string | undefined {
   const mine = instances.filter((i) => i.deploymentId === deployment && i.doing);
@@ -98,16 +111,16 @@ export type SessionsSearch = {
 export type SessionsView = { deployment: string; agent: string; view?: "activity" };
 
 /** The view the URL describes, checked against what is deployed: an unknown
- * deployment is the first one, an unknown agent the lead. A URL naming only
- * the deployment (the sidebar's link) comes back to its `last` view.
- * Undefined when nothing is deployed. */
+ * agent is the lead. A URL naming only the deployment (the list's link) comes
+ * back to its `last` view. Undefined when the URL names no deployment that is
+ * deployed: the list of deployments shows instead. */
 export function sessionsView(
   search: SessionsSearch,
   deployments: string[],
   rosterOf: (deployment: string) => Instance[],
   last: (deployment: string) => SessionsView | undefined,
 ): SessionsView | undefined {
-  const deployment = deployments.find((d) => d === search.deployment) ?? deployments[0];
+  const deployment = deployments.find((d) => d === search.deployment);
   if (!deployment) return undefined;
   const remembered = search.agent || search.view ? undefined : last(deployment);
   const asked = (search.agent ?? remembered?.agent ?? "").split("@")[0];

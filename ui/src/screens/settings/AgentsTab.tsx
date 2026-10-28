@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type Settings as SettingsData, useClient } from "../../api/client";
 import { harnessLabel, profileName } from "../../app/model";
 import { keys, useHarnesses, useMaintenance, useProfiles } from "../../app/queries";
@@ -11,11 +11,12 @@ import { useToast } from "../../components/Toasts";
 import { Button, Segmented } from "../../components/ui";
 import { inGlobalRepo, onThisMachine, Row, Section, useSave } from "./parts";
 
-/** Settings → Agents: the profiles agents run on, and how they run. */
+/** Settings → Agents: the profiles agents run on, what every agent is told, and how they run. */
 export function AgentsTab({ settings }: { settings?: SettingsData }) {
   return (
     <>
       <ProfilesSection />
+      {settings && <InstructionsSection settings={settings} />}
       {settings && <RunningSection settings={settings} />}
     </>
   );
@@ -297,5 +298,55 @@ function NewProfile({
       </Button>
       {create.error && <p className="m-0 w-full text-err">{create.error.message}</p>}
     </form>
+  );
+}
+
+/** The CEO's standing instructions: added to every agent's session prompt,
+ * at its next start. Saved on Save, one commit each, never mid-sentence. */
+function InstructionsSection({ settings }: { settings: SettingsData }) {
+  const save = useSave();
+  // undefined: not edited, the saved text shows (and follows a change on disk).
+  const [draft, setDraft] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  const changed = draft !== undefined && draft !== settings.instructions;
+  // Once saved, the draft goes when the refetched settings hold it, not
+  // before: the old text would flash back meanwhile.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the saved text only
+  useEffect(() => {
+    if (draft === settings.instructions) setDraft(undefined);
+  }, [settings.instructions]);
+  return (
+    <Section
+      label="Instructions for every agent"
+      kept={inGlobalRepo}
+      intro="Your standing rules, as you'd write them in your own CLAUDE.md or AGENTS.md. Foreman adds them at the end of every agent's session prompt, from its next start. Where they conflict with Foreman's own rules (team tools, git, the wiki), Foreman's win."
+    >
+      <textarea
+        rows={8}
+        value={draft ?? settings.instructions}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="e.g. Write commit messages in English. Prefer small functions."
+        aria-label="Instructions for every agent"
+        className="w-full resize-y rounded-[8px] border border-line2 bg-term px-3 py-2 font-mono text-[13px] text-tx placeholder:text-tx4"
+      />
+      {changed && (
+        <div className="mt-2 flex gap-2">
+          <Button
+            variant="primary"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              await save((s) => ({ ...s, instructions: draft }));
+              setSaving(false);
+            }}
+          >
+            Save
+          </Button>
+          <Button disabled={saving} onClick={() => setDraft(undefined)}>
+            Discard
+          </Button>
+        </div>
+      )}
+    </Section>
   );
 }

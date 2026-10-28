@@ -43,6 +43,12 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
 export const outlineLink =
   "rounded-[7px] border border-line2 px-3 py-[5px] text-[13px] font-medium text-tx2 hover:border-line3";
 
+/** A card on a grid of cards (Dashboard, Sessions). */
+export const card =
+  "relative flex flex-col gap-3 rounded-xl border border-line bg-panel px-4 py-3.5";
+/** A card's title link covering the whole card; its other controls sit above it. */
+export const cover = "after:absolute after:inset-0 after:rounded-xl after:content-['']";
+
 /** One choice of a segmented control (board switcher, theme…). */
 export function Segmented<T extends string>({
   options,

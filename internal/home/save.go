@@ -48,7 +48,7 @@ func (h *Home) SaveSettings(ctx context.Context, s Settings, version string) (st
 	if p := s.validate(); len(p) > 0 {
 		return "", &InvalidError{p}
 	}
-	data, err := encode(s)
+	data, err := encodeSettings(s)
 	if err != nil {
 		return "", err
 	}

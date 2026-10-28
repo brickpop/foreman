@@ -66,8 +66,8 @@ export function greeting(now = new Date()): string {
         : "Good evening";
 }
 
-/** The Dashboard's subtitle: running sessions across active deployments. */
-export function dashboardSubtitle(instances: Instance[]): string {
+/** The subtitle of the Dashboard and Sessions: running sessions across active deployments. */
+export function workingSummary(instances: Instance[]): string {
   const running = instances.filter((i) => i.status === "running").length;
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean)).size;
   return `${plural(running, "session")} working across ${plural(deployments, "deployment")}.`;
@@ -78,6 +78,8 @@ export type SessionGroup = {
   project: string;
   team?: Team;
   goal: string;
+  /** A request of its team waits on the CEO. */
+  needsYou: boolean;
   /** Its awake agents, the lead first, then the team's order. */
   agents: { instance: Instance; agent?: Agent; lead: boolean }[];
   /** Its asleep agents (not started yet, woken when needed), in the same
@@ -91,6 +93,7 @@ export function sessionGroups(
   instances: Instance[],
   deployments: Deployment[],
   teams: Team[],
+  requests: Request[],
 ): SessionGroup[] {
   const groups = new Map<string, SessionGroup>();
   for (const i of instances) {
@@ -103,6 +106,7 @@ export function sessionGroups(
         project: project ?? "",
         team: teams.find((t) => t.id === teamId),
         goal: deployments.find((d) => d.id === i.deploymentId)?.goal ?? "",
+        needsYou: requests.some((r) => r.status === "open" && r.deploymentId === i.deploymentId),
         agents: [],
         asleep: [],
       };

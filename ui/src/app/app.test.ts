@@ -46,25 +46,6 @@ describe("sidebarModel", () => {
     ]);
   });
 
-  it("lists the deployments under Sessions, grouped by project", () => {
-    const m = sidebarModel(
-      [],
-      [team("atlas", "Atlas"), team("vesper", "Vesper")],
-      [
-        { deploymentId: "vesper@ledger", agentId: "a", status: "running" } as Instance,
-        { deploymentId: "atlas@relay", agentId: "b", status: "idle" } as Instance,
-        { deploymentId: "atlas@ledger", agentId: "c", status: "awaiting" } as Instance,
-      ],
-      [{ ...request("ledger"), deploymentId: "atlas@ledger" }],
-    );
-    expect(m.sessions.map((g) => [g.project, g.deployments.map((d) => d.team)])).toEqual([
-      ["ledger", ["Atlas", "Vesper"]],
-      ["relay", ["Atlas"]],
-    ]);
-    expect(m.sessions[0].deployments[0]).toMatchObject({ needsYou: true, status: "awaiting" });
-    expect(sidebarModel([], [], [], []).sessions).toEqual([]);
-  });
-
   it("says where each team is deployed", () => {
     const m = sidebarModel(
       [],
@@ -95,6 +76,7 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "config.changed", data: { object: "settings" } })).toEqual([
       keys.settings,
       keys.setup,
+      ["prompt"],
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "project" } })).toEqual([
       keys.projects,
@@ -131,13 +113,13 @@ describe("staleKeys", () => {
 });
 
 import {
-  dashboardSubtitle,
   greeting,
   inbox,
   ordered,
   projectRows,
   sessionGroups,
   teamCards,
+  workingSummary,
 } from "./model";
 
 const req = (id: string, kind: string, createdAt: string, projectId = "ledger") =>
@@ -183,13 +165,13 @@ describe("the Dashboard's model", () => {
 
   it("titles and subtitles", () => {
     expect(
-      dashboardSubtitle([
+      workingSummary([
         inst("mara@ledger", "running", "atlas@ledger"),
         inst("tove@ledger", "idle", "atlas@ledger"),
         inst("lumen@relay", "running", "orion@relay"),
       ]),
     ).toBe("2 sessions working across 2 deployments.");
-    expect(dashboardSubtitle([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
+    expect(workingSummary([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
       "1 session working across 1 deployment.",
     );
   });
@@ -224,12 +206,18 @@ describe("the Dashboard's model", () => {
       ],
       [{ id: "atlas@ledger", goal: "Ship invoices" } as Deployment],
       [atlas],
+      [
+        { status: "open", deploymentId: "atlas@ledger" } as Request,
+        // Resolved, or another deployment's: not this one's dot.
+        { status: "resolved", deploymentId: "orion@relay" } as Request,
+        { status: "open", deploymentId: "atlas@elsewhere" } as Request,
+      ],
     );
     // A deployment whose agents are all asleep is still listed (harbor).
-    expect(groups.map((g) => [g.deployment, g.project, g.team?.id, g.goal])).toEqual([
-      ["atlas@harbor", "harbor", "atlas", ""],
-      ["atlas@ledger", "ledger", "atlas", "Ship invoices"],
-      ["orion@relay", "relay", undefined, ""],
+    expect(groups.map((g) => [g.deployment, g.project, g.team?.id, g.goal, g.needsYou])).toEqual([
+      ["atlas@harbor", "harbor", "atlas", "", false],
+      ["atlas@ledger", "ledger", "atlas", "Ship invoices", true],
+      ["orion@relay", "relay", undefined, "", false],
     ]);
     expect(groups[0].agents).toEqual([]);
     expect(groups[0].asleep.map((a) => a.instance.agentId)).toEqual(["ines"]);

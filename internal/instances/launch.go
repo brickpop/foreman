@@ -181,7 +181,8 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
 		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Repos: project.Repos, Goal: dep.Goal,
-		Tools: m.tools(inst.AgentID == team.Config.Lead),
+		Tools:        m.tools(inst.AgentID == team.Config.Lead),
+		Instructions: m.Config.Settings().Settings.Instructions,
 	})
 }
 

@@ -1,4 +1,4 @@
-import type { Doing, Instance, Request, Team } from "../api/client";
+import type { Deployment, Doing, Instance, Request, Team } from "../api/client";
 import { roster } from "./model";
 
 // The Sessions screen's logic (wiki/product/features/sessions.md), apart from
@@ -53,17 +53,44 @@ export function activeDeployments(
     .sort((a, b) => a.project.localeCompare(b.project) || a.team.localeCompare(b.team));
 }
 
-/** Items sorted by project, grouped under it in the same order. */
-export function byProject<T extends { project: string }>(
-  items: T[],
-): { project: string; items: T[] }[] {
-  const groups: { project: string; items: T[] }[] = [];
-  for (const item of items) {
-    const group = groups.at(-1);
-    if (group?.project === item.project) group.items.push(item);
-    else groups.push({ project: item.project, items: [item] });
-  }
-  return groups;
+export type SessionRow = ActiveDeployment & {
+  goal: string;
+  state: "working" | "idle" | "asleep" | "stopped";
+  /** When it last did something (RFC 3339), "" when nothing says. */
+  lastActivity: string;
+};
+
+// A time as milliseconds; a blank, a bad one and Go's zero time are 0.
+const ms = (t?: string) => Math.max(Date.parse(t ?? "") || 0, 0);
+// The latest of some times, "" when none counts.
+const latest = (times: (string | undefined)[]) =>
+  times.reduce<string>((a, t) => (t && ms(t) > ms(a) ? t : a), "");
+
+/** The Sessions list: one row per active deployment, the latest activity
+ * first (ties keep activeDeployments' order). An agent's last step is kept in
+ * memory only, so after a restart its start, then the deploy, stand in. */
+export function sessionRows(
+  active: ActiveDeployment[],
+  instances: Instance[],
+  deployments: Deployment[],
+): SessionRow[] {
+  return active
+    .map((d) => {
+      const mine = instances.filter((i) => i.deploymentId === d.id);
+      const deployment = deployments.find((x) => x.id === d.id);
+      const lastActivity =
+        latest(mine.map((i) => i.doing?.at)) ||
+        latest(mine.map((i) => i.startedAt)) ||
+        latest([deployment?.createdAt]);
+      const working = mine.some((i) => i.status === "running" || i.status === "starting");
+      const state: SessionRow["state"] = working
+        ? "working"
+        : d.status === "asleep" || d.status === "stopped"
+          ? d.status
+          : "idle";
+      return { ...d, goal: deployment?.goal ?? "", state, lastActivity };
+    })
+    .sort((a, b) => ms(b.lastActivity) - ms(a.lastActivity));
 }
 
 /** The agent of a deployment that did something last: where its work is. */

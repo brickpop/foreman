@@ -443,7 +443,9 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 	}
 	repos := t.committable()
 	seen := map[string]bool{}
-	for _, a := range asked {
+	for i := range asked {
+		a := &asked[i]
+		a.Message = withoutCoAuthors(a.Message)
 		if _, ok := repos[a.Repo]; !ok {
 			names := slices.Sorted(maps.Keys(repos))
 			return teamtools.Refusal("unknown_repo", "%q isn't one of your repos: yours are %s", a.Repo, strings.Join(names, ", "))
@@ -508,6 +510,19 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 		text += " Nothing changed in " + strings.Join(unchanged, ", ") + "."
 	}
 	return agentlink.Result{Text: text}
+}
+
+// withoutCoAuthors is an agent's commit message without its Co-Authored-By
+// lines, which a harness may add on its own: a commit carries its message
+// alone (the CEO, 2026-10-29).
+func withoutCoAuthors(message string) string {
+	var kept []string
+	for _, line := range strings.Split(message, "\n") {
+		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "co-authored-by:") {
+			kept = append(kept, line)
+		}
+	}
+	return strings.TrimRight(strings.Join(kept, "\n"), " \t\r\n")
 }
 
 func (t tool) merge(ctx context.Context, branch string) agentlink.Result {

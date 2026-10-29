@@ -302,6 +302,25 @@ func TestCommitTheReposNamedAsTheAgent(t *testing.T) {
 	}
 }
 
+// A commit carries its message alone: the Co-Authored-By lines a harness adds
+// go, in any case and wherever they are; a message of nothing else is none.
+func TestCommitDropsCoAuthoredByLines(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
+	f.refused("tove", "commit", commits("api", "Co-Authored-By: Claude <noreply@anthropic.com>"), "empty")
+	f.refused("tove", "commit", commits("api", "\n\nco-authored-by: Claude\n"), "empty")
+	f.ok("tove", "commit", commits("api", "cal v0\n\nThe calendar.\n  co-authored-by: A <a@x>\nSigned-off-by: Tove\nCO-AUTHORED-BY: B <b@x>\n\n"))
+	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "cal v0\n\nThe calendar.\nSigned-off-by: Tove" {
+		t.Errorf("message %q", msg)
+	}
+	// Only a line that starts with it: one that mentions it stays.
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v1\n")
+	f.ok("tove", "commit", commits("api", "Explain the Co-Authored-By: trailer"))
+	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "Explain the Co-Authored-By: trailer" {
+		t.Errorf("message %q", msg)
+	}
+}
+
 // Every entry is checked before anything is committed.
 func TestACommitNamingABadRepoCommitsNothing(t *testing.T) {
 	f := newFixture(t)
@@ -845,8 +864,8 @@ func TestFromHandoffToMain(t *testing.T) {
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
 		t.Fatal(err)
 	}
-	// One commit, the agents credited.
-	if msg := f.git(api, "log", "-1", "--format=%B", "main"); msg != "Export invoices\n\nCo-Authored-By: Tove <tove@foreman.invalid>" {
+	// One commit, its message the title alone.
+	if msg := f.git(api, "log", "-1", "--format=%B", "main"); msg != "Export invoices" {
 		t.Errorf("main's head %q", msg)
 	}
 	if parents := f.git(api, "log", "-1", "--format=%P", "main"); strings.Contains(parents, " ") {

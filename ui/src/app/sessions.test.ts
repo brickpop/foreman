@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Instance, Request, Team } from "../api/client";
+import type { Deployment, Instance, Request, Team } from "../api/client";
 import {
   activeDeployments,
   applyMention,
-  byProject,
   countdown,
   deploymentStatus,
   isLineShortcut,
@@ -14,6 +13,7 @@ import {
   mostRecentAgent,
   rosterOrder,
   type SessionsView,
+  sessionRows,
   sessionsView,
   stoppedLine,
   withDoing,
@@ -234,19 +234,83 @@ describe("stoppedLine", () => {
   });
 });
 
-describe("byProject", () => {
-  it("groups items under their project, keeping their order", () => {
-    const items = [
-      { project: "harbor", id: 1 },
-      { project: "ledger", id: 2 },
-      { project: "ledger", id: 3 },
-      { project: "relay", id: 4 },
+describe("sessionRows", () => {
+  const zero = "0001-01-01T00:00:00Z"; // Go's zero time, as the API sends it unset
+  const at = (
+    id: string,
+    deploymentId: string,
+    status: string,
+    times: { doing?: string; startedAt?: string } = {},
+  ) =>
+    ({
+      ...inst(id, deploymentId),
+      status,
+      startedAt: times.startedAt ?? zero,
+      doing: times.doing && { line: "Editing", at: times.doing },
+    }) as Instance;
+  const dep = (id: string, createdAt: string, goal = "") => ({ id, goal, createdAt }) as Deployment;
+  const rows = (instances: Instance[], deployments: Deployment[]) =>
+    sessionRows(activeDeployments(instances, [atlas], []), instances, deployments);
+
+  it("puts the latest activity first, whatever the project's name", () => {
+    const list = [
+      at("tove@ledger", "atlas@ledger", "idle", { doing: "2026-10-29T09:00:00Z" }),
+      at("mara@ledger", "atlas@ledger", "running", { doing: "2026-10-29T11:00:00Z" }),
+      at("lumen@relay", "orion@relay", "idle", { doing: "2026-10-29T10:00:00Z" }),
+      at("ana@harbor", "zed@harbor", "idle", { doing: "2026-10-29T12:00:00Z" }),
     ];
-    expect(byProject(items).map((g) => [g.project, g.items.map((i) => i.id)])).toEqual([
-      ["harbor", [1]],
-      ["ledger", [2, 3]],
-      ["relay", [4]],
+    const r = rows(list, [dep("atlas@ledger", zero, "Ship invoicing")]);
+    expect(r.map((x) => [x.project, x.lastActivity])).toEqual([
+      ["harbor", "2026-10-29T12:00:00Z"],
+      ["ledger", "2026-10-29T11:00:00Z"], // its latest agent, not its first
+      ["relay", "2026-10-29T10:00:00Z"],
     ]);
-    expect(byProject([])).toEqual([]);
+    expect(r[1]).toMatchObject({ team: "Atlas", goal: "Ship invoicing", state: "working" });
+    expect(r[0].goal).toBe(""); // no deployment record: no goal, still listed
+  });
+
+  it("falls back to the agents' start, then the deploy, when no step is known (after a restart)", () => {
+    const list = [
+      at("tove@ledger", "atlas@ledger", "idle", { startedAt: "2026-10-29T08:00:00Z" }),
+      at("mara@ledger", "atlas@ledger", "idle", { startedAt: "2026-10-29T08:30:00Z" }),
+      at("lumen@relay", "orion@relay", "asleep"),
+      at("ana@harbor", "zed@harbor", "asleep"),
+    ];
+    const r = rows(list, [dep("orion@relay", "2026-10-28T08:00:00Z")]);
+    expect(r.map((x) => [x.project, x.lastActivity])).toEqual([
+      ["ledger", "2026-10-29T08:30:00Z"],
+      ["relay", "2026-10-28T08:00:00Z"],
+      ["harbor", ""], // nothing says: last, its zero times ignored
+    ]);
+  });
+
+  it("prefers a step over a later start: a step is what was done", () => {
+    const list = [
+      at("tove@ledger", "atlas@ledger", "idle", { doing: "2026-10-29T09:00:00Z" }),
+      at("mara@ledger", "atlas@ledger", "idle", { startedAt: "2026-10-29T10:00:00Z" }),
+    ];
+    expect(rows(list, [])[0].lastActivity).toBe("2026-10-29T09:00:00Z");
+  });
+
+  it("keeps project then team order on equal times", () => {
+    const list = [
+      at("ana@ledger", "zed@ledger", "idle"),
+      at("tove@ledger", "atlas@ledger", "idle"),
+    ];
+    expect(rows(list, []).map((x) => x.id)).toEqual(["atlas@ledger", "zed@ledger"]);
+  });
+
+  it("says working, idle, asleep or stopped", () => {
+    const state = (...statuses: string[]) =>
+      rows(
+        statuses.map((s, n) => at(`a${n}@p`, "t@p", s)),
+        [],
+      )[0].state;
+    expect(state("idle", "starting")).toBe("working");
+    expect(state("awaiting", "running")).toBe("working"); // someone is at work
+    expect(state("awaiting", "asleep")).toBe("idle"); // waiting on the CEO: the needs-you dot says so
+    expect(state("queued", "done")).toBe("idle");
+    expect(state("asleep", "stopped")).toBe("asleep");
+    expect(state("stopped")).toBe("stopped");
   });
 });

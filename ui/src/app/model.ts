@@ -336,6 +336,16 @@ export function when(iso: string, now = new Date()): string {
   return t.getFullYear() === now.getFullYear() ? `${day} ${hm}` : `${day} ${t.getFullYear()} ${hm}`;
 }
 
+/** How long ago a stored time was: `just now`, `5m ago`, `3h ago`, `2d ago`.
+ * A time ahead of `now` (another clock) is `just now`. */
+export function ago(iso: string, now = new Date()): string {
+  const minutes = Math.floor((now.getTime() - Date.parse(iso)) / 60_000);
+  if (!(minutes >= 1)) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}h ago`;
+  return `${Math.floor(minutes / (24 * 60))}d ago`;
+}
+
 /** How many session slots are taken: every instance starting, running, idle
  * or awaiting holds one (wiki/product/architecture/agent-runtime.md). */
 export function slotsTaken(instances: Instance[]): number {

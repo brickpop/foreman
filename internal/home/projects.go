@@ -457,7 +457,6 @@ func validName(name string) bool {
 	return nameRule.MatchString(name) && !strings.Contains(name, "..")
 }
 
-
 // checkRepoName refuses a name a repo of p can't have: one Foreman couldn't
 // create as a folder, the project repo's, or one p has, in any case.
 func checkRepoName(p Project, name string) error {

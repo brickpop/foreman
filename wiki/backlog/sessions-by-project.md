@@ -50,3 +50,17 @@ The URL stays `/sessions?deployment=&agent=&view=` (`panes` dropped), so every l
 - [x] tests: the list for no or a stopped deployment, `byProject`, the needs-you flag; the sidebar groups test removed
 - [x] specs: Sessions (The list, The URL), App shell, Dashboard, journey, UI state
 - [ ] tried by the CEO in the browser (only the unit tests and the build have run it)
+
+## Changed (the CEO, 2026-10-29)
+
+The list "made no sense": what the CEO follows is the project, not which agent is on it, and two teams on one project are rare. So:
+
+- **One full-width row per deployment, the latest activity first**, no project sections. The **project** is the row's name, the **team** a chip on the right. The row also shows the status dot, the needs-you dot, the goal, `working` / `idle` / `asleep` / `stopped`, and the last activity.
+- **No agents in the row.** The Dashboard's At work card keeps them: `DeploymentCard` stays on the Dashboard only.
+- **Last activity**, shown relative (`5m ago`), is the latest agent step (`doing.at`). Steps are kept in memory, so after a restart the latest agent `startedAt` stands in, then the deployment's `createdAt`.
+
+- [x] `sessionRows` in `app/sessions.ts` (built on `activeDeployments`), `SessionsRow` in `screens/Sessions.tsx`; `byProject` removed (it had no other user)
+- [x] tests: the order by activity (ties included), the fallbacks with Go's zero time ignored, a step beating a later start, each state word
+- [x] the last activity relative (`ago` in `app/model.ts`, beside `when`), the list redrawn every 30 s; tests: each unit boundary, a time ahead of the clock
+- [x] specs: Sessions (The list), Dashboard (no longer shared)
+- [ ] tried by the CEO in the browser

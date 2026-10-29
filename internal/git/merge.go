@@ -24,9 +24,8 @@ var (
 )
 
 // Squash puts what branch changes onto target as one new commit, by the
-// CEO's git identity (Foreman's when there is none): message, then a
-// Co-Authored-By line per author of branch's commits, so the agents keep the
-// credit. Only while branch is at head (the commit the CEO read, its full
+// CEO's git identity (Foreman's when there is none), with the message alone:
+// no trailers (the CEO, 2026-10-29). Only while branch is at head (the commit the CEO read, its full
 // hash): ErrMoved otherwise. When target has all of it already, nothing is committed. When
 // dir (the repo's own checkout, the CEO's) has target checked out, its files
 // move with target; otherwise they are left alone.
@@ -55,15 +54,11 @@ func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message str
 	if was, err := treeOf(ctx, dir, old); err != nil || was == tree {
 		return err
 	}
-	authors, err := run(ctx, dir, "log", "--reverse", "--format=%an <%ae>", old+".."+at)
-	if err != nil {
-		return err
-	}
 	var who []string
 	if !hasIdentity(ctx, dir) {
 		who = fallbackIdentity
 	}
-	commit, err := run(ctx, dir, append(who, "commit-tree", tree, "-p", old, "-m", message+coAuthors(authors))...)
+	commit, err := run(ctx, dir, append(who, "commit-tree", tree, "-p", old, "-m", message)...)
 	if err != nil {
 		return err
 	}
@@ -82,23 +77,6 @@ func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message str
 	// Moved only if target is still where it was read: never over someone else's move.
 	_, err = run(ctx, dir, "update-ref", "refs/heads/"+target, commit, old)
 	return err
-}
-
-// coAuthors is the trailer naming each author once, in the order they
-// first committed.
-func coAuthors(authors string) string {
-	var b strings.Builder
-	seen := map[string]bool{}
-	for _, a := range strings.Split(authors, "\n") {
-		if a = strings.TrimSpace(a); a != "" && !seen[a] {
-			if len(seen) == 0 {
-				b.WriteString("\n")
-			}
-			seen[a] = true
-			b.WriteString("\nCo-Authored-By: " + a)
-		}
-	}
-	return b.String()
 }
 
 // Merged reports whether merging branch into into would change nothing: all

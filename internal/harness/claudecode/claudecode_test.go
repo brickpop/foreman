@@ -80,6 +80,9 @@ func TestLaunch(t *testing.T) {
 	if file(t, l, "settings.json")["tui"] != "default" {
 		t.Error("the renderer isn't pinned to the classic one (the fullscreen dialog would eat a message)")
 	}
+	if a := file(t, l, "settings.json")["attribution"]; !reflect.DeepEqual(a, map[string]any{"commit": "", "pr": ""}) {
+		t.Errorf("attribution %v: Claude Code would ask for its Co-Authored-By trailer", a)
+	}
 	account := file(t, l, ".claude.json")
 	projects := account["projects"].(map[string]any)
 	if account["hasCompletedOnboarding"] != true || account["oauthAccount"] == nil ||

@@ -70,9 +70,8 @@ func TestSquashTheCheckedOutTarget(t *testing.T) {
 	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "Settlement v2"); err != nil {
 		t.Fatal(err)
 	}
-	// Each author once, by their first commit; the fixture's own commit is by
-	// the repo's identity, Foreman here.
-	squashed(t, dir, base, "Settlement v2\n\nCo-Authored-By: Foreman <foreman@localhost>\nCo-Authored-By: Tove <tove@foreman.invalid>\nCo-Authored-By: Mara <mara@foreman.invalid>")
+	// The message alone, however many authors wrote the branch.
+	squashed(t, dir, base, "Settlement v2")
 	if who := mustRun(t, dir, "log", "-1", "--format=%an|%cn", "main"); who != "Foreman|Foreman" {
 		t.Errorf("by %q, want the CEO's identity (Foreman's with none)", who)
 	}
@@ -134,7 +133,7 @@ func TestSquashWithoutTouchingAnotherCheckout(t *testing.T) {
 	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "Settlement v2"); err != nil {
 		t.Fatal(err)
 	}
-	squashed(t, dir, base, "Settlement v2\n\nCo-Authored-By: Foreman <foreman@localhost>")
+	squashed(t, dir, base, "Settlement v2")
 	if branch := mustRun(t, dir, "branch", "--show-current"); branch != "the-ceos-work" {
 		t.Errorf("checkout moved to %s", branch)
 	}

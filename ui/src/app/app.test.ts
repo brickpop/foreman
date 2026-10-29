@@ -342,7 +342,7 @@ describe("roster", () => {
   });
 });
 
-import { when } from "./model";
+import { ago, when } from "./model";
 
 describe("when", () => {
   // Local times, whatever the machine's zone: built from local parts.
@@ -353,6 +353,24 @@ describe("when", () => {
     expect(when(at(2026, 9, 17, 9, 5), now)).toBe("09:05");
     expect(when(at(2026, 9, 15, 14, 30), now)).toBe("Oct 15 14:30");
     expect(when(at(2025, 11, 31, 23, 59), now)).toBe("Dec 31 2025 23:59");
+  });
+});
+
+describe("ago", () => {
+  const now = new Date("2026-10-29T12:00:00Z");
+  const earlier = (seconds: number) => new Date(now.getTime() - seconds * 1000).toISOString();
+  it("counts down to the largest whole unit, rounding down", () => {
+    expect(ago(earlier(0), now)).toBe("just now");
+    expect(ago(earlier(59), now)).toBe("just now");
+    expect(ago(earlier(60), now)).toBe("1m ago");
+    expect(ago(earlier(59 * 60 + 59), now)).toBe("59m ago");
+    expect(ago(earlier(3600), now)).toBe("1h ago");
+    expect(ago(earlier(24 * 3600 - 1), now)).toBe("23h ago");
+    expect(ago(earlier(24 * 3600), now)).toBe("1d ago");
+    expect(ago(earlier(400 * 24 * 3600), now)).toBe("400d ago");
+  });
+  it("calls a time ahead of now (another clock) just now", () => {
+    expect(ago(earlier(-300), now)).toBe("just now");
   });
 });
 

@@ -4,11 +4,11 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Instance, type Team, useClient } from "../api/client";
 import {
   agentOf,
+  ago,
   harnessLabel,
   roleLabel,
-  type SessionGroup,
-  sessionGroups,
   slotsTaken,
+  when,
   workingSummary,
 } from "../app/model";
 import {
@@ -26,7 +26,6 @@ import { branchOf } from "../app/repos";
 import {
   activeDeployments,
   applyMention,
-  byProject,
   countdown,
   isLineShortcut,
   linePlaceholder,
@@ -34,28 +33,30 @@ import {
   mentionAt,
   mentionMatches,
   rosterOrder,
+  type SessionRow,
   type SessionsSearch,
   type SessionsView,
+  sessionRows,
   sessionsView,
   stoppedLine,
 } from "../app/sessions";
 import { ActivityPanel } from "../components/ActivityPanel";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
-import { DeploymentCard } from "../components/DeploymentCard";
 import { CheckIcon, CopyIcon, PromptIcon, StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
 import {
   Button,
+  card,
+  cover,
   Dot,
   Empty,
   LeadTag,
   Loading,
   outlineLink,
   PageTitle,
-  SectionLabel,
 } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): the list of
@@ -109,12 +110,7 @@ export function Sessions() {
   if (!view)
     return (
       <SessionsList
-        groups={sessionGroups(
-          instances.data,
-          deployments.data ?? [],
-          teams.data,
-          requests.data ?? [],
-        )}
+        rows={sessionRows(active, instances.data, deployments.data ?? [])}
         summary={workingSummary(instances.data)}
       />
     );
@@ -563,10 +559,16 @@ function Queued({ name }: { name: string }) {
   );
 }
 
-/** Every active deployment, by project, each card opening its page. With
+/** Every active deployment, the latest activity first, each row opening its page. With
  * nothing deployed, deploy from here, choosing the team and the project. */
-function SessionsList({ groups, summary }: { groups: SessionGroup[]; summary: string }) {
+function SessionsList({ rows, summary }: { rows: SessionRow[]; summary: string }) {
   const [deploy, setDeploy] = useState(false);
+  // The relative times move on their own: redrawn every 30 s.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const tick = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(tick);
+  }, []);
   return (
     <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-12 pt-12 pb-16 max-[760px]:px-4">
       <div className="flex flex-wrap items-end gap-4">
@@ -576,23 +578,55 @@ function SessionsList({ groups, summary }: { groups: SessionGroup[]; summary: st
           Deploy a team
         </Button>
       </div>
-      {groups.length === 0 ? (
+      {rows.length === 0 ? (
         <Empty>No team is deployed yet, so there are no sessions.</Empty>
       ) : (
-        byProject(groups).map((p) => (
-          <section key={p.project} className="flex flex-col gap-3">
-            <SectionLabel>{p.project}</SectionLabel>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
-              {p.items.map((g) => (
-                <DeploymentCard key={g.deployment} group={g} />
-              ))}
-            </div>
-          </section>
-        ))
+        <div className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <SessionsRow key={r.id} row={r} now={now} />
+          ))}
+        </div>
       )}
       {/* Mounted only while open: each opening starts fresh. */}
       {deploy && <DeployDialog open onClose={() => setDeploy(false)} />}
     </div>
+  );
+}
+
+/** One active deployment, named by its project (what the CEO follows); the
+ * team only a chip. The row opens the deployment's page. */
+function SessionsRow({ row: r, now }: { row: SessionRow; now: Date }) {
+  return (
+    <article className={`${card} !flex-row items-center !gap-3 hover:border-line3`}>
+      <Dot status={r.status} title={r.status} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-2">
+          <Link
+            to="/sessions"
+            search={{ deployment: r.id }}
+            className={`truncate text-[15px] font-semibold ${cover}`}
+          >
+            {r.project}
+          </Link>
+          {r.needsYou && <Dot title="Needs you" />}
+        </span>
+        {r.goal && <span className="truncate text-[13.5px] text-tx3">{r.goal}</span>}
+      </span>
+      <span className="shrink-0 rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx3">
+        {r.team}
+      </span>
+      <span
+        className={`w-14 shrink-0 text-[12.5px] ${r.state === "working" ? "text-ok" : "text-tx4"}`}
+      >
+        {r.state}
+      </span>
+      <span
+        className="w-24 shrink-0 text-right text-[12.5px] text-tx4 tabular-nums max-[760px]:hidden"
+        title={r.lastActivity && `Last activity: ${when(r.lastActivity, now)}`}
+      >
+        {r.lastActivity && ago(r.lastActivity, now)}
+      </span>
+    </article>
   );
 }
 

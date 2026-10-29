@@ -10,7 +10,15 @@ The terminal multiplexer. Every agent [instance](../models/instance.md) is a liv
 
 ## The list
 
-`/sessions`, the sidebar's **Sessions** (the CEO, 2026-10-28: the deployments aren't listed in the sidebar, which stays short). The title `Sessions`, under it the Dashboard's line (`<n> sessions working across <n> deployments.`), and on the right a primary **`Deploy a team`**, which opens [Deploy a team](./deploy-team.md) with nothing chosen. Then one section per project with an active deployment, by project name, labelled with the project; in it one card per deployment, by team: the [Dashboard's At work card](./dashboard.md#at-work), the same component (`DeploymentCard`), with its team, needs-you dot, goal, awake agents and what each is doing, and its asleep agents counted. The card opens the deployment's page, coming back to the agent last shown there; an agent's row opens that agent. Only active deployments: a stopped one is reached from its [Team page](./team-page.md), where it is redeployed.
+`/sessions`, the sidebar's **Sessions** (the CEO, 2026-10-28: the deployments aren't listed in the sidebar, which stays short). The title `Sessions`, under it the Dashboard's line (`<n> sessions working across <n> deployments.`), and on the right a primary **`Deploy a team`**, which opens [Deploy a team](./deploy-team.md) with nothing chosen. Then one full-width row per active deployment (gap 8), **the latest activity first**. The CEO follows projects, not agents, and seldom has two teams on one project, so the project names the row and no agent shows (the CEO, 2026-10-29). Each row is a card laid out horizontally, with border `--line3` on hover:
+
+- The deployment's **status dot**, as in the page's [header](#a-page-per-deployment).
+- The **project** (600 15px), with an amber needs-you dot when it needs the CEO. Under it, the deployment's **goal** on one line (13.5px `--tx3`, truncated).
+- On the right, the **team** as a chip (`--raised`, 12.5px `--tx3`).
+- The state, 12.5px: `working` (`--ok`) when an agent is running or starting, otherwise `idle`, or `asleep` / `stopped` when every agent is.
+- The **last activity**, relative (`just now`, `5m ago`, `3h ago`, `2d ago`, redrawn every 30 s; the CEO, 2026-10-29), with the exact time as its tooltip (12.5px `--tx4`, hidden under 760px). This is the latest step any of its agents reported. Steps are kept in memory only, so after a restart the latest agent start stands in for it, and failing that the deploy time. A row with no time at all sorts last. Equal times keep project, then team, order.
+
+The row opens the deployment's page, coming back to the agent last shown there. The list shows only active deployments: a stopped one is reached from its [Team page](./team-page.md), where it is redeployed. The Dashboard's [At work cards](./dashboard.md#at-work), which list the agents, are a separate component.
 
 **Empty** (no deployments): under the title, a dashed box, `No team is deployed yet, so there are no sessions.`
 

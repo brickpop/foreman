@@ -1,7 +1,7 @@
 // Package pi is the Pi harness adapter (wiki/product/architecture/harness-adapters.md#pi).
 // A Pi profile is a model server and one model on it (Pi's models.json),
 // set in a form, not a login. Each instance gets its own Pi config dir
-// inside its sandbox: a copy of that models.json for the container, the
+// in its harness folder: a copy of that models.json for the container, the
 // session prompt, Foreman's MCP server and the hooks extension. Probed on
 // Pi 1.3.0 (2026-10-18): no dialog at startup with --no-approve, the opener
 // as the message argument (with --continue too), Ctrl+J for a new line.
@@ -38,8 +38,9 @@ type Adapter struct {
 var _ harness.EndpointAdapter = Adapter{}
 
 // ConfigDir is the instance's private Pi config dir (PI_CODING_AGENT_DIR),
-// inside its sandbox: its models, sessions and settings, and its session prompt.
-func ConfigDir(sandbox string) string { return filepath.Join(sandbox, ".harness", "pi") }
+// in its harness folder (harness.Session.Dir): its models, sessions and
+// settings, and its session prompt.
+func ConfigDir(dir string) string { return filepath.Join(dir, "pi") }
 
 // modelsFile is Pi's custom models, in the profile folder and in each
 // instance's config dir.
@@ -65,7 +66,7 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	if err != nil {
 		return harness.Launch{}, err
 	}
-	dir := ConfigDir(s.Sandbox)
+	dir := ConfigDir(s.Dir)
 	files := []harness.File{
 		{Path: filepath.Join(dir, modelsFile), Data: models, Mode: 0o600},
 		{Path: filepath.Join(dir, "APPEND_SYSTEM.md"), Data: []byte(s.Prompt), Mode: 0o600},
@@ -399,4 +400,21 @@ func loopback(host string) bool {
 func number(v any) int {
 	f, _ := v.(float64)
 	return int(f)
+}
+
+// sessionFolder is Pi's folder of a working folder's conversations
+// (sessions/<it>), as Pi 1.3.0 names it: --<path without its leading slash,
+// each / \ and : made a dash>--.
+func sessionFolder(path string) string {
+	return "--" + strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(strings.TrimPrefix(path, "/")) + "--"
+}
+
+var _ harness.Mover = Adapter{}
+
+// MoveConversations renames the working folder's conversations from from to
+// to. A conversation keeps its old working folder in its first line, which Pi
+// doesn't check when it continues one from its own folder.
+func (Adapter) MoveConversations(dir, from, to string) error {
+	sessions := filepath.Join(ConfigDir(dir), "sessions")
+	return harness.Rename(filepath.Join(sessions, sessionFolder(from)), filepath.Join(sessions, sessionFolder(to)))
 }

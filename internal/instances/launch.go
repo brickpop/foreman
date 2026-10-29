@@ -133,10 +133,17 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		mounts = append(mounts, runner.Mount{Source: filepath.Join(projectRepo, ".git"), Target: filepath.Join(inSandbox, ".git"), ReadOnly: true})
 	}
 
+	// The harness's own files, private, outside the sandbox.
+	dir := project.HarnessDir(inst.AgentID)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	mounts = append(mounts, runner.Mount{Source: dir, Target: dir})
+
 	text := m.compose(inst, dep, team, project)
 	first := inst.StartedAt.IsZero()
 	session := harness.Session{
-		Instance: id, Sandbox: inst.SandboxPath, Prompt: text, Login: on.login,
+		Instance: id, Sandbox: inst.SandboxPath, Dir: dir, Prompt: text, Login: on.login,
 		// A restart (after a crash, or a Foreman restart) picks up its conversation;
 		// a new deployment, or another harness, starts fresh.
 		Continue: !first && !switched,

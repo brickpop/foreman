@@ -77,6 +77,7 @@ describe("staleKeys", () => {
       keys.settings,
       keys.setup,
       ["prompt"],
+      ["workspace"],
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "project" } })).toEqual([
       keys.projects,

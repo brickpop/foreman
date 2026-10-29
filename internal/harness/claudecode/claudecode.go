@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/runner"
@@ -25,9 +26,10 @@ type Adapter struct {
 
 var _ harness.Adapter = Adapter{}
 
-// ConfigDir is the instance's private Claude Code config dir, inside its
-// sandbox: its settings, history and memory, and its session prompt.
-func ConfigDir(sandbox string) string { return filepath.Join(sandbox, ".harness", "claude-code") }
+// ConfigDir is the instance's private Claude Code config dir, in its harness
+// folder (harness.Session.Dir): its settings, history and memory, and its
+// session prompt.
+func ConfigDir(dir string) string { return filepath.Join(dir, "claude-code") }
 
 // Launch starts Claude Code with permission checks off (the container is the
 // boundary), its config in the instance's private dir, and the shared login.
@@ -36,7 +38,7 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	if _, err := os.Stat(login); err != nil {
 		return harness.Launch{}, harness.ErrNotConnected
 	}
-	dir := ConfigDir(s.Sandbox)
+	dir := ConfigDir(s.Dir)
 	account, err := account(dir, s.Login, s.Sandbox)
 	if err != nil {
 		return harness.Launch{}, err
@@ -290,4 +292,55 @@ func (a Adapter) Login(dir string) (harness.Launch, error) {
 		Env:     []string{"CLAUDE_CONFIG_DIR=" + dir},
 		Mounts:  []runner.Mount{{Source: dir, Target: dir}},
 	}, nil
+}
+
+// projectFolder is Claude Code's folder of a working folder's conversations
+// (projects/<it>): its path, every character but a letter or a digit made a
+// dash. Past 200 characters Claude Code cuts it and adds a hash of its own;
+// false then.
+func projectFolder(path string) (string, bool) {
+	folder := strings.Map(func(r rune) rune {
+		if r < 128 && (unicode.IsLetter(r) || unicode.IsDigit(r)) {
+			return r
+		}
+		return '-'
+	}, path)
+	return folder, len(folder) <= 200
+}
+
+var _ harness.Mover = Adapter{}
+
+// MoveConversations renames the working folder's conversations, and moves
+// its entry in .claude.json (its history, the trust given), from to to.
+func (Adapter) MoveConversations(dir, from, to string) error {
+	config := ConfigDir(dir)
+	src, ok := projectFolder(from)
+	dst, ok2 := projectFolder(to)
+	if !ok || !ok2 {
+		return fmt.Errorf("claude code can't carry the conversations of %s over to %s: a path that long gets a name Foreman can't predict", from, to)
+	}
+	src, dst = filepath.Join(config, "projects", src), filepath.Join(config, "projects", dst)
+	if err := harness.Rename(src, dst); err != nil {
+		return err
+	}
+	path := filepath.Join(config, ".claude.json")
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	record := map[string]any{}
+	if err == nil {
+		err = json.Unmarshal(data, &record)
+	}
+	if projects, _ := record["projects"].(map[string]any); err == nil && projects[from] != nil {
+		projects[to] = projects[from]
+		delete(projects, from)
+		data, _ = json.MarshalIndent(record, "", "  ")
+		err = os.WriteFile(path, data, 0o600)
+	}
+	if err != nil {
+		_ = harness.Rename(dst, src)
+		return fmt.Errorf("claude code account record: %w", err)
+	}
+	return nil
 }

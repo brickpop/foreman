@@ -1,7 +1,7 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { type Project, useClient } from "../api/client";
+import { type Project, type Suggestion, useClient } from "../api/client";
 import { createdBody } from "../app/addProject";
 import { keys } from "../app/queries";
 import { AddRepo } from "./AddRepo";
@@ -9,8 +9,9 @@ import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button, Segmented } from "./ui";
 
-// The New project dialog (wiki/product/features/add-project.md): a name and
-// its project repo (New, or Cloned with the CEO's own git), then its code repos.
+// The New project dialog (wiki/product/features/add-project.md): a name, its
+// workspace and its project repo (New, or Cloned with the CEO's own git), then
+// its code repos.
 
 const label = "text-[13px] font-medium text-tx4";
 const field =
@@ -38,9 +39,22 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
   const [name, setName] = useState("");
   const [source, setSource] = useState<"new" | "clone">("new");
   const [clone, setClone] = useState("");
+  // The workspace follows the name, in the projects folder, until the CEO
+  // edits it.
+  const [edited, setEdited] = useState<string>();
+  const suggestion = useQuery({
+    queryKey: ["workspace", name.trim()],
+    queryFn: () => client.home.suggestWorkspace(name.trim()),
+    placeholderData: (previous) => previous,
+  }).data;
+  const workspace = edited ?? (name.trim() ? (suggestion?.path ?? "") : "");
   const create = useMutation({
     mutationFn: () =>
-      client.home.newProject(name.trim(), source === "clone" ? clone.trim() : undefined),
+      client.home.newProject(
+        name.trim(),
+        workspace.trim(),
+        source === "clone" ? clone.trim() : undefined,
+      ),
     onSuccess: ({ project: p, created }) => {
       queries.invalidateQueries({ queryKey: keys.projects });
       navigate({
@@ -56,7 +70,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
       onCreated(p);
     },
   });
-  const ready = name.trim() && (source === "new" || clone.trim());
+  const ready = name.trim() && workspace.trim() && (source === "new" || clone.trim());
   return (
     <form
       className="flex flex-col gap-4"
@@ -76,6 +90,17 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
         <span className={hint}>
           Letters, digits, dots, hyphens and underscores, starting with a letter or digit.
         </span>
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className={label}>Workspace</span>
+        <input
+          value={workspace}
+          onChange={(e) => setEdited(e.target.value)}
+          placeholder={suggestion ? `${suggestion.folder}/<name>` : undefined}
+          spellCheck={false}
+          className={field}
+        />
+        <span className={hint}>{workspaceHint(workspace, suggestion)}</span>
       </label>
       <div className="flex flex-col gap-1.5">
         <span className={label}>Project repo</span>
@@ -100,7 +125,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
         )}
         <span className={hint}>
           {source === "new"
-            ? "Its wiki and project.toml, in a new git repo under Foreman's home. One left there by a removed project of this name is taken over as it is."
+            ? "Its wiki and project.toml, in a new git repo: the workspace's project/ folder. One left there by a removed project is taken over as it is."
             : "Cloned with your own git: your SSH keys and credential helper. Foreman stores nothing."}
         </span>
       </div>
@@ -113,6 +138,17 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
       </div>
     </form>
   );
+}
+
+/** What the workspace field says: what goes there, and that the projects
+ * folder is created with it when it doesn't exist yet. */
+function workspaceHint(workspace: string, s: Suggestion | undefined): string {
+  const what =
+    "Your folder for this project: its project repo and its agents' worktrees, where you can run their code. Anywhere in your home folder.";
+  if (s && !s.folderExists && workspace.startsWith(`${s.folder}/`)) {
+    return `${what} ${s.folder} doesn't exist yet: it is created with the project.`;
+  }
+  return what;
 }
 
 function Repos({ project, onClose }: { project: Project; onClose: () => void }) {

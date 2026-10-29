@@ -15,15 +15,34 @@ epic: install-first-run
 - **Nothing asks for a profile.** A new project gets the default profile without saying so ([Add a project → Effect](../product/features/add-project.md#effect), step 5). The only place to choose one is [Project settings](../product/features/project-settings.md) (`ProfileChoice`), which the CEO has to know to look for.
 - **The overall flow is unclear.** The project is created in step 1, before its repos. The Overview opens behind the dialog while step 2 is still open. **Later** and **Done** both just close the dialog.
 
-**Done when:** the dialog has a structure the CEO has agreed to, it shows repos already added and won't let them be picked again, it asks for the profile, and [Add a project](../product/features/add-project.md) (with [First run](../product/features/first-run.md) and [Project settings](../product/features/project-settings.md) if `AddRepo` changes there too) describes it.
+Was blocked by [Project workspaces](./project-workspaces.md), built 2026-10-28: step 1 already has a typed **Workspace** field (following the name, `GET /api/folders/workspace`); this card adds its **Change** (the folder browser, picking a folder, existing or to be made) in place of typing.
 
-**To decide with the CEO before building:**
-- **The structure.** Keep two steps (create, then add repos) but with a proper list of repos, or make it one form (name, project repo, repos, profile) that creates everything when the CEO clicks Create. With one form, a failed step means undoing the earlier ones. With two steps, the project exists before it has repos, as now.
-- **Where the profile goes.** In step 1 next to the project repo, or with the repos. It defaults to the default profile, and the dialog says which one that is.
-- **How repos already added show in the browser.** Greyed out and marked `added`, or hidden. The browser would need the project's repo paths (it compares real paths, so a symlink to an added repo counts as added).
-- **What the Overview does meanwhile.** Whether it should open only once the dialog closes.
+## Decided (the CEO, 2026-10-28)
 
-- [ ] agree on the structure with the CEO, ideally from a sketch
-- [ ] the dialog, `AddRepo` and `RepoPicker` changes (and Project settings, which shares `AddRepo`)
-- [ ] tests: an added repo can't be picked again (through a symlink too); the profile chosen is the one the project gets; the repos already added are listed when the dialog opens on a project that has some
+- **Two steps.** Step 1, **New project**: the name, the **workspace** (pre-filled `<projects folder>/<name>`, editable; offers to create the projects folder when it's missing), the project repo (New | Clone, always into `<workspace>/project/`), and the **profile** (a select, default preselected, with its harness and connected state, as in Project settings). **Create project**.
+- Step 2, **`<name>`: code repos**: a real list of the project's repos (name, path, main branch, **Remove**), then **+ Add a repo**, which opens the add form (`AddRepo`, shared with Project settings) under the list. Each repo is checked by the server as it's added. One button: **Done: open `<name>`**.
+- **Repos already in the project** show in the folder browser greyed and marked `added`, with no **Pick**; the server marks them by real path, so a symlink to one counts. Project settings too.
+- **The Overview opens when the dialog closes** (Done, or closing step 2), not behind it at creation. Cancel in step 1 opens nothing.
+
+```
+── New project ─────────────────────────────────────
+Project name  [ledger            ]
+Workspace     [~/workspace/foreman/ledger] [Change]
+Project repo  (New) Clone
+Profile       [default · Claude Code ▾] connected
+                         [Cancel] [Create project]
+
+── ledger: code repos (step 2 of 2) ────────────────
+api   ~/dev/api       main     [Remove]
+web   ~/dev/web       trunk    [Remove]
+[+ Add a repo]
+  (picker opens here; added repos greyed)
+                           [Done: open ledger]
+```
+
+**Done when:** the dialog is as decided above, and [Add a project](../product/features/add-project.md) (with [First run](../product/features/first-run.md) and [Project settings](../product/features/project-settings.md), which share `AddRepo`) describes it.
+
+- [x] agree on the structure with the CEO
+- [ ] the dialog; `AddRepo`'s list; the browser's `added` (the server marks the entries, given the project); the profile in step 1
+- [ ] tests: an added repo can't be picked again (through a symlink too); the profile chosen is the one the project gets; the repos already added are listed when step 2 opens; the Overview opens on Done only
 - [ ] update the specs above

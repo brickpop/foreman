@@ -64,8 +64,6 @@ type Config interface {
 	// Checked is the project with its repos checked now: one may have moved
 	// since the last reload, which the home doesn't watch.
 	Checked(id string) (home.Project, error)
-	// Sandbox is the folder of an agent's worktrees on a project.
-	Sandbox(project, agent string) string
 	Team(id string) (home.Team, error)
 	Settings() home.SettingsFile
 }

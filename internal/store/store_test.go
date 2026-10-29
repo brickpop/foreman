@@ -702,7 +702,7 @@ func TestRequests(t *testing.T) {
 func TestArchiveAProject(t *testing.T) {
 	p := open(t).Projects()
 	for _, id := range []string{"ledger", "aragon"} {
-		if err := p.Create(ctx, id); err != nil {
+		if err := p.Create(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -743,12 +743,12 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 		t.Fatalf("empty: %v %v", list, err)
 	}
 	for _, id := range []string{"ledger", "aragon"} {
-		if err := p.Create(ctx, id); err != nil {
+		if err := p.Create(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// A Mac takes Ledger and ledger for one folder.
-	if err := p.Create(ctx, "Ledger"); !errors.Is(err, ErrExists) {
+	if err := p.Create(ctx, "Ledger", ""); !errors.Is(err, ErrExists) {
 		t.Errorf("a name in another case: %v", err)
 	}
 	app := RepoRecord{Name: "app", Path: "/home/ceo/dev/aragon/app", RootCommit: "c0ffee", Main: "master"}
@@ -831,7 +831,7 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 func TestRenameRepo(t *testing.T) {
 	db := open(t)
 	p := db.Projects()
-	if err := p.Create(ctx, "ledger"); err != nil {
+	if err := p.Create(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, r := range []RepoRecord{{Name: "api", Path: "/h/api", RootCommit: "a"}, {Name: "web", Path: "/h/web", RootCommit: "b"}} {
@@ -874,7 +874,7 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 	db := open(t)
 	p := db.Projects()
 	for _, id := range []string{"ledger", "relay"} {
-		if err := p.Create(ctx, id); err != nil {
+		if err := p.Create(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 		if err := p.AddRepo(ctx, id, RepoRecord{Name: "api", Path: "/h/" + id, RootCommit: "a"}); err != nil {
@@ -928,7 +928,7 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 		t.Errorf("removed twice: %v", err)
 	}
 	// Added again: a new deployment, not the old one revived.
-	if err := p.Create(ctx, "ledger"); err != nil {
+	if err := p.Create(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	dep, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "fresh")
@@ -1098,5 +1098,40 @@ func TestOpenMergeRequestsFromBeforeGetAReviewPerBranch(t *testing.T) {
 	}
 	if list, _ := (reviews{db}).List(ctx); len(list) != 2 || list[0].Branch != "lead/atlas/integration" || list[1].Branch != "lead/atlas/v2" {
 		t.Errorf("reviews %+v", list)
+	}
+}
+
+// A project keeps the workspace it was made in, a project made before
+// workspaces has none, and a migration sets one.
+func TestProjectWorkspace(t *testing.T) {
+	p := open(t).Projects()
+	if err := p.Create(ctx, "ledger", "/home/ceo/workspace/foreman/ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Create(ctx, "aragon", ""); err != nil {
+		t.Fatal(err)
+	}
+	workspaces := func() []string {
+		list, err := p.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, r := range list {
+			out = append(out, r.Workspace)
+		}
+		return out
+	}
+	if got := workspaces(); !slices.Equal(got, []string{"", "/home/ceo/workspace/foreman/ledger"}) {
+		t.Errorf("created: %q", got)
+	}
+	if err := p.SetWorkspace(ctx, "aragon", "/home/ceo/workspace/foreman/aragon"); err != nil {
+		t.Fatal(err)
+	}
+	if got := workspaces(); got[0] != "/home/ceo/workspace/foreman/aragon" {
+		t.Errorf("migrated: %q", got)
+	}
+	if err := p.SetWorkspace(ctx, "nope", "/x"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such project: %v", err)
 	}
 }

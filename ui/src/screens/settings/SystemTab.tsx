@@ -1,16 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type ImageStatus, type Settings as SettingsData, useClient } from "../../api/client";
 import { keys, useHomeFolder, useMaintenance } from "../../app/queries";
 import { Confirm } from "../../components/Overlays";
 import { Button, Segmented } from "../../components/ui";
 import { inGlobalRepo, onThisMachine, Row, Section, useSave } from "./parts";
 
-/** Settings → System: Foreman's home, its network, and the agent images. */
+/** Settings → System: Foreman's home, where new projects go, its network,
+ * and the agent images. */
 export function SystemTab({ settings }: { settings?: SettingsData }) {
   return (
     <>
       <HomeSection />
+      {settings && <ProjectsSection settings={settings} />}
       {settings && <NetworkSection settings={settings} />}
       <MaintenanceSection />
     </>
@@ -23,9 +25,57 @@ function HomeSection() {
     <Section label="Home">
       <Row
         title="Home"
-        explanation="Foreman’s folder on this machine: the global repo (teams, settings), each project’s repo, the agents’ sandboxes and its state."
+        explanation="Foreman’s folder on this machine: the global repo (teams, settings), the agents’ harness folders (their config and conversations), and its state. Your projects live in their workspaces."
       >
         <span className="font-mono text-[13px] text-tx2">{home.data?.path}</span>
+      </Row>
+    </Section>
+  );
+}
+
+/** Where a new project's workspace is suggested: <projects folder>/<name>. A
+ * path, so it is saved explicitly, as the instructions are. */
+function ProjectsSection({ settings }: { settings: SettingsData }) {
+  const save = useSave();
+  // undefined: not edited, the saved path shows.
+  const [draft, setDraft] = useState<string>();
+  const [saving, setSaving] = useState(false);
+  const changed = draft !== undefined && draft !== settings.projectsFolder;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the saved path only
+  useEffect(() => {
+    if (draft === settings.projectsFolder) setDraft(undefined);
+  }, [settings.projectsFolder]);
+  return (
+    <Section label="Projects" kept={inGlobalRepo}>
+      <Row
+        title="Projects folder"
+        explanation="New project suggests each project's workspace here, in a folder of its name; you can pick another. ~ is your home folder, on any machine."
+      >
+        <input
+          value={draft ?? settings.projectsFolder}
+          onChange={(e) => setDraft(e.target.value)}
+          aria-label="Projects folder"
+          spellCheck={false}
+          className="w-64 rounded-[8px] border border-line2 bg-term px-3 py-1.5 font-mono text-[13px] text-tx"
+        />
+        {changed && (
+          <>
+            <Button
+              variant="primary"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                await save((s) => ({ ...s, projectsFolder: draft }));
+                setSaving(false);
+              }}
+            >
+              Save
+            </Button>
+            <Button disabled={saving} onClick={() => setDraft(undefined)}>
+              Discard
+            </Button>
+          </>
+        )}
       </Row>
     </Section>
   );

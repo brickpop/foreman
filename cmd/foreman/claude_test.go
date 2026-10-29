@@ -166,7 +166,7 @@ func startClaudeHome(t *testing.T, profile string) *claudeHome {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	c.post("/api/projects", map[string]string{"name": "proj"})
+	c.post("/api/projects", map[string]string{"name": "proj", "workspace": filepath.Join(root, "workspace")})
 	c.post("/api/projects/proj/repos", map[string]string{"name": "app", "path": app})
 	c.put("/api/projects/proj/profile", map[string]string{"profile": profile})
 	// Foreman serves before Podman answers: agents start once the checklist
@@ -332,7 +332,7 @@ func (c *claudeHome) waitMessage(match func(store.TeamMessage) bool, timeout tim
 // transcript is an agent's conversation, as Claude Code saved it.
 func (c *claudeHome) transcript(agent string) []map[string]any {
 	c.t.Helper()
-	files, _ := filepath.Glob(filepath.Join(c.home, "sandboxes", "proj", agent, ".harness", "claude-code", "projects", "*", "*.jsonl"))
+	files, _ := filepath.Glob(filepath.Join(c.home, "harness", "proj", agent, "claude-code", "projects", "*", "*.jsonl"))
 	var lines []map[string]any
 	for _, f := range files {
 		file, err := os.Open(f)

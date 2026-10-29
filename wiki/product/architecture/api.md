@@ -16,9 +16,10 @@ The PRD's surface (indicative; names may still change during implementation, thi
 
 ```
 GET    /api/home                              {path}: Foreman's home on this machine
-GET    /api/projects | /api/projects/:id      the record (name, profile, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
-POST   /api/projects                          {name, clone?} → New: the record and its project repo under the home, with a starter wiki; with clone (a git URL or a local path), its project repo cloned with the CEO's own git; or a project repo a removed project left there taken over (201 made or cloned, 200 taken over; 400 INVALID, with git's message for a failed clone; 409 EXISTS)
-DELETE /api/projects/:id                      ?deleteRepo=true → remove the project: its record, sandboxes, session logs and history; its project repo folder only with deleteRepo (204; 400 INVALID when not archived; 409 DEPLOYED)
+GET    /api/projects | /api/projects/:id      the record (name, workspace, profile, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
+POST   /api/projects                          {name, clone?, workspace} → New: the record, the workspace (made if missing) and its project repo at <workspace>/project, with a starter wiki; with clone (a git URL or a local path), its project repo cloned with the CEO's own git; or a project repo a removed project left there taken over (201 made or cloned, 200 taken over; 400 INVALID, with git's message for a failed clone; 409 EXISTS)
+DELETE /api/projects/:id                      ?deleteRepo=true&deleteWorktrees=true → remove the project: its record, session logs, harness folders and history; its workspace stays, its project repo only with deleteRepo, its agents' worktrees only with deleteWorktrees (204; 400 INVALID when not archived; 409 DEPLOYED)
+POST   /api/projects/:id/migrate              {workspace} → legacy: move a project made before workspaces into one, its agents' conversations carried over (400 INVALID, 409 EXISTS, 409 DEPLOYED)
 POST   /api/projects/:id/repos                {name, path, main?, new?} → add an existing code repo at path, on its main branch (main when it has one, else the `main` given, one of its branches), or with new, create an empty one on main at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
 PUT    /api/projects/:id/repos/:repo          {path} → Locate: the repo's new path, which must hold its root commit (400 INVALID)
 PUT    /api/projects/:id/repos/:repo/name     {name} → rename it; agents' worktrees move, open merge requests follow (400 INVALID, 409 EXISTS, 409 DEPLOYED)
@@ -31,8 +32,9 @@ GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, fol
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip= a page of history, newest first: {commits, next}, 50 commits; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
-GET    /api/folders                           ?path= a folder for picking repos, inside the start folder (none: the start folder): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
-GET    /api/folders/branches                  ?path= a repo folder's branches, to pick its main branch: {branches, current} (current: its checkout's, "" when detached; 400 INVALID outside the start folder)
+GET    /api/folders                           ?path= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
+GET    /api/folders/workspace                 ?name= where a project named name would go: {path, folder, folderExists} (the projects folder, ~ expanded; path is the folder itself while name isn't a valid one)
+GET    /api/folders/branches                  ?path= a repo folder's branches, to pick its main branch: {branches, current} (current: its checkout's, "" when detached; 400 INVALID outside $HOME or inside Foreman's home)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team

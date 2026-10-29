@@ -52,19 +52,29 @@ func (f fakeConfig) SaveTeam(context.Context, home.TeamConfig, string) (home.Tea
 // The project routes answer by name: "bad" is invalid, "taken" exists, "busy"
 // is deployed; the project they return says what was called, in Problems.
 // NewProject takes over "kept".
-func (f fakeConfig) NewProject(_ context.Context, name, clone string) (home.Project, bool, error) {
-	p, err := f.changed("NewProject", "", name, clone)
+func (f fakeConfig) NewProject(_ context.Context, name, clone, workspace string) (home.Project, bool, error) {
+	p, err := f.changed("NewProject", "", name, clone+" ws="+workspace)
 	return p, name != "kept", err
 }
 func (f fakeConfig) RenameRepo(_ context.Context, project, name, newName string) (home.Project, error) {
 	return f.changed("RenameRepo", project, newName, name)
 }
-func (f fakeConfig) RemoveProject(_ context.Context, id string, deleteRepo bool) error {
+func (f fakeConfig) RemoveProject(_ context.Context, id string, deleteRepo, deleteWorktrees bool) error {
 	_, err := f.changed("RemoveProject", "", id, "")
 	if err == nil && f.removed != nil {
-		*f.removed = append(*f.removed, fmt.Sprint(id, " deleteRepo=", deleteRepo))
+		*f.removed = append(*f.removed, fmt.Sprint(id, " deleteRepo=", deleteRepo, " deleteWorktrees=", deleteWorktrees))
 	}
 	return err
+}
+
+func (f fakeConfig) Migrate(_ context.Context, id, workspace string) (home.Project, error) {
+	return f.changed("Migrate", id, workspace, "")
+}
+
+// SuggestWorkspace puts a project in /home/ceo/workspace/foreman, which
+// doesn't exist.
+func (f fakeConfig) SuggestWorkspace(name string) (home.Suggestion, error) {
+	return home.Suggestion{Path: "/home/ceo/workspace/foreman/" + name, Folder: "/home/ceo/workspace/foreman"}, nil
 }
 
 // Browse lists /home/ceo/dev (the start folder) and below; anything else is
@@ -376,7 +386,8 @@ func TestProjectRoutes(t *testing.T) {
 		method, path, body string
 		call               []string
 	}{
-		{http.MethodPost, "/api/projects", `{"name":"aragon"}`, []string{"NewProject", "aragon", ""}},
+		{http.MethodPost, "/api/projects", `{"name":"aragon","workspace":"/home/ceo/w/aragon"}`, []string{"NewProject", "aragon", " ws=/home/ceo/w/aragon"}},
+		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"/home/ceo/w/ledger"}`, []string{"Migrate", "/home/ceo/w/ledger", ""}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web main="}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","main":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web main=master"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/main", `{"main":"master"}`, []string{"SetRepoMain", "master", "web"}},
@@ -386,7 +397,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
 		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":true}`, []string{"SetArchived", "true", ""}},
 		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":false}`, []string{"SetArchived", "false", ""}},
-		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git"}},
+		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git","workspace":"/w"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git ws=/w"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"site"}`, []string{"RenameRepo", "site", "web"}},
 	} {
 		var p home.Project
@@ -435,6 +446,9 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web/main", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodPut, "/api/projects/ledger/archived", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
 		{http.MethodPut, "/api/projects/nope/archived", `{"archived":true}`, http.StatusNotFound, `"NOT_FOUND"`},
+		{http.MethodPost, "/api/projects/nope/migrate", `{"workspace":"/w"}`, http.StatusNotFound, `"NOT_FOUND"`},
+		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"busy"}`, http.StatusConflict, `"DEPLOYED"`},
+		{http.MethodPost, "/api/projects/ledger/migrate", `{`, http.StatusBadRequest, `"BAD_REQUEST"`},
 	} {
 		if w := send(tc.method, tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s %s %s: %d %s", tc.method, tc.path, tc.body, w.Code, w.Body)
@@ -442,21 +456,22 @@ func TestProjectRoutes(t *testing.T) {
 	}
 }
 
-// Removing a project answers 204, its project repo deleted only when asked;
+// Removing a project answers 204, its project repo and its agents' worktrees
+// deleted only when asked; a new project's workspace is suggested;
 // the browser lists a folder, the start folder when none is given.
 func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
 	var removed []string
 	c := config
 	c.removed = &removed
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: c, UI: builtUI})
-	for _, path := range []string{"/api/projects/ledger", "/api/projects/relay?deleteRepo=true"} {
+	for _, path := range []string{"/api/projects/ledger", "/api/projects/relay?deleteRepo=true", "/api/projects/books?deleteWorktrees=true"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, path, nil))
 		if w.Code != http.StatusNoContent {
 			t.Errorf("DELETE %s: %d %s", path, w.Code, w.Body)
 		}
 	}
-	if strings.Join(removed, ", ") != "ledger deleteRepo=false, relay deleteRepo=true" {
+	if strings.Join(removed, ", ") != "ledger deleteRepo=false deleteWorktrees=false, relay deleteRepo=true deleteWorktrees=false, books deleteRepo=false deleteWorktrees=true" {
 		t.Errorf("removed %v", removed)
 	}
 	for path, want := range map[string]string{"/api/folders": "/home/ceo/dev", "/api/folders?path=/home/ceo/dev/aragon": "/home/ceo/dev/aragon"} {
@@ -465,6 +480,11 @@ func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
 		if f.Path != want || len(f.Entries) != 1 || !f.Entries[0].Repo {
 			t.Errorf("%s: %+v", path, f)
 		}
+	}
+	var s home.Suggestion
+	decodeBody(t, get(t, h, "/api/folders/workspace?name=books"), &s)
+	if s.Path != "/home/ceo/workspace/foreman/books" || s.FolderExists {
+		t.Errorf("suggestion %+v", s)
 	}
 	var b home.Branches
 	decodeBody(t, get(t, h, "/api/folders/branches?path=/home/ceo/dev/poc"), &b)

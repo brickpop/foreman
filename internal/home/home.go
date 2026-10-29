@@ -1,7 +1,7 @@
 // Package home is Foreman's home on this machine
 // (wiki/product/models/home.md): the global repo (teams, settings.toml), the
-// projects (records in the database, each with its project repo under
-// projects/), the access token. It loads and validates the config files,
+// projects (records in the database, each with its workspace: its project
+// repo and its agents' sandboxes), the access token. It loads and validates the config files,
 // checks each project's repos, saves version-guarded with one commit each,
 // and watches its files change on disk.
 package home
@@ -17,6 +17,7 @@ import (
 	"sync"
 
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/fsnotify/fsnotify"
 )
 
 const tokenFile = "access-token"
@@ -29,12 +30,17 @@ type Home struct {
 	git      Git
 	records  store.Projects
 	deployed func(ctx context.Context, project string) bool
-	allowed  string // repos must be inside it: the CEO's home folder, its real path
-	start    string // new repos are added from inside it: where Foreman was started (inside allowed), its real path
+	allowed  string // workspaces and repos must be inside it: the CEO's home folder, its real path
+	start    string // the folder browser opens there: where Foreman was started (inside allowed), its real path
+	// conversations carries an agent's conversations over to its sandbox's new path (Deps.Conversations).
+	conversations func(dir, from, to string) error
 
-	mu     sync.Mutex // guards snap, saves and pending
-	snap   snapshot
-	notify func(Change) // set by Watch
+	mu      sync.Mutex // guards snap, saves and pending
+	snap    snapshot
+	notify  func(Change)      // set by Watch
+	watcher *fsnotify.Watcher // set by Watch
+	// rewatch: a project was made or moved, its project repo to watch (unlock).
+	rewatch bool
 	// pending are the changes to tell the subscriber once h.mu is released
 	// (unlock): never under it, since the subscriber may read the home.
 	pending []Change
@@ -126,6 +132,8 @@ type Git interface {
 	// Branch is the branch dir's checkout is on; "" when it is detached.
 	Branch(ctx context.Context, dir string) (string, error)
 	HasBranch(ctx context.Context, dir, branch string) bool
+	// RepairWorktrees tells repo where its worktrees moved to (a migration).
+	RepairWorktrees(ctx context.Context, repo string, worktrees ...string) error
 }
 
 // Deps is what Load needs besides the home's files.
@@ -135,8 +143,12 @@ type Deps struct {
 	// Deployed says whether a team is deployed on the project: its repos
 	// can't be taken away from under its agents.
 	Deployed func(ctx context.Context, project string) bool
-	// Start is the folder Foreman was started in: repos are added from inside
-	// it (the browser starts there and never goes above it), or from the
-	// CEO's home folder when it is outside that, or empty.
+	// Start is the folder Foreman was started in: the folder browser opens
+	// there (it can go up to the CEO's home folder), or at the CEO's home
+	// folder when it is outside that, or empty.
 	Start string
+	// Conversations carries an agent's conversations over when its sandbox
+	// moves from one path to another (a migration): each harness files them by
+	// working folder, in the harness folder dir. Nil: they aren't carried.
+	Conversations func(dir, from, to string) error
 }

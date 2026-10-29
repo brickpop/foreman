@@ -27,7 +27,23 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 
 **Left column** (max 520px):
 
-- **"Where things live"**: the home's tree, explained (Mono 13px / 1.7 `<pre>`), with the home's real path and this project's name:
+- **"Workspace"** (first; the CEO, 2026-10-28): the workspace's path (Mono 13px `--tx2`, selectable) and **`Copy`**, then "Its project repo, and in agents/ each agent's worktrees: look at and run their code there. Editing while an agent works turns into its uncommitted changes." ([Project config → The workspace](../models/project-config.md#the-workspace)).
+  For a project made before workspaces, **"Move into a workspace"** instead (legacy): "This project lives in Foreman's home. Moved into a folder of yours, its project repo and its agents' worktrees are where you can find them and run their code. Uncommitted work and conversations come along. Stop the teams on it first.", a path field pre-filled `<projects folder>/<project>`, and **`Move`** (`Moving…` while it runs; `POST /api/projects/:id/migrate`). Done, the toast "<project> moved" ("Into <workspace>."); a refusal is a toast "Project not moved" with the reason.
+- **"Where things live"**: the project's files, explained (Mono 13px / 1.7 `<pre>`), with the real paths and this project's name:
+
+  ```
+  ~/workspace/foreman/ledger/
+  ├─ project/           project repo (git)
+  │  ├─ project.toml    checks, gates, forge
+  │  └─ wiki/           knowledge base + wiki.toml (boards)
+  └─ agents/            one sandbox per agent: a worktree of each repo
+  ~/.foreman/
+  ├─ config/            global repo (git): teams, settings
+  ├─ harness/ledger/  each agent's harness config and conversations
+  └─ state.db           deployments, sessions, requests (runtime)
+  ```
+
+  A project made before workspaces shows the home's tree as it was:
 
   ```
   ~/.foreman/
@@ -68,9 +84,9 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - forge `none`: "No forge. You merge requested branches into main from their review, in Reviews; Foreman does the merge."
   - otherwise: "Merge to main from a branch's review, in Reviews, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file."
   - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
-- **`project.toml`**: a row with `~/.foreman/projects/<project>/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
+- **`project.toml`**: a row with `<workspace>/project/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 - **"Archive this project"**: "It leaves the sidebar's projects and the Dashboard, and takes no deployment until you unarchive it. Everything is kept.", followed, while teams are deployed on it, by "<Atlas, Orion> stop first.". **`Archive project`** acts at once, or, with teams deployed, asks first: "Stop <teams> and archive <project>?", "<teams> stop on <project>: their sessions end; worktrees and branches are kept. Then <project> is archived.", **`Stop and archive`**. Archived, the block reads **"Archived"**, "It is out of the sidebar's projects and the Dashboard, and takes no deployment, until you unarchive it.", with **`Unarchive project`**. A refusal is a toast "Project not archived" ([Project config → archived](../models/project-config.md#the-project-record)).
-- **"Remove this project"** (last): on an archived project, "Its record, its agents' sandboxes and its history go. Your code repos keep their branches."; on any other, "Archive it first: archiving keeps everything, removing deletes its history." with the button disabled. **`Remove project`** asks first: "Remove <project>?", "Its record, its agents' sandboxes (their uncommitted work included) and its history (deployments, messages, requests, merge requests, session logs) go for good. Your code repos and their branches stay.", with a checkbox, off at each opening: "Also delete its project repo folder, <path>: its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, it's taken over by a new project of the same name." Removing opens the Dashboard with the toast "<project> removed"; a refusal is a toast "Project not removed" ([Add a project → Removing a project](./add-project.md#removing-a-project)).
+- **"Remove this project"** (last): on an archived project, "Its record and its history go. Its workspace stays. Your code repos keep their branches."; on any other, "Archive it first: archiving keeps everything, removing deletes its history." with the button disabled. **`Remove project`** asks first: "Remove <project>?", "Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its workspace, your code repos and their branches stay.", with two checkboxes, off at each opening: "Also delete its agents' worktrees, their uncommitted work included. Their branches stay in your code repos." and "Also delete its project repo folder, <path>: its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, it's taken over by a new project in the same workspace." Removing opens the Dashboard with the toast "<project> removed"; a refusal is a toast "Project not removed" ([Add a project → Removing a project](./add-project.md#removing-a-project)).
 
 
 Everything in this block is read-only but the profile, the code repos and Remove. Changes to `project.toml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

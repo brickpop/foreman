@@ -20,15 +20,21 @@ var ErrNotFound = errors.New("home: not found")
 // Project is a project of this machine: its record (its name, its repos, its
 // profile, whether it is archived) and its project repo's project.toml.
 type Project struct {
-	ID       string        `json:"id"`
-	Path     string        `json:"path"`     // its project repo, <home>/projects/<id>
-	Profile  string        `json:"profile"`  // the profile its agents run on: its own, else the default
-	Archived bool          `json:"archived"` // put away: out of the sidebar's projects and the Dashboard, not deployable
-	Config   ProjectConfig `json:"config"`
-	Repos    []Repo        `json:"repos"`    // the code repos agents get worktrees of, by name
-	Version  string        `json:"version"`  // of project.toml
-	Problems []string      `json:"problems"` // what is wrong with project.toml or a repo; Config is then the last good one
-	Source   string        `json:"source"`   // project.toml as it is on disk, shown read-only
+	ID   string `json:"id"`
+	Path string `json:"path"` // its project repo, <workspace>/project
+	// Workspace is its folder (the CEO's): the project repo and the agents'
+	// sandboxes. "" for a project made before workspaces, still in Foreman's
+	// home until migrated (legacy).
+	Workspace string        `json:"workspace"`
+	Profile   string        `json:"profile"`  // the profile its agents run on: its own, else the default
+	Archived  bool          `json:"archived"` // put away: out of the sidebar's projects and the Dashboard, not deployable
+	Config    ProjectConfig `json:"config"`
+	Repos     []Repo        `json:"repos"`    // the code repos agents get worktrees of, by name
+	Version   string        `json:"version"`  // of project.toml
+	Problems  []string      `json:"problems"` // what is wrong with project.toml or a repo; Config is then the last good one
+	Source    string        `json:"source"`   // project.toml as it is on disk, shown read-only
+	agents    string        // its agents' sandboxes, one folder each (Sandbox)
+	harness   string        // its agents' harness folders, one each (HarnessDir); "" for legacy
 }
 
 // Repo is one of a project's code repos, anywhere on disk.
@@ -129,8 +135,8 @@ const (
 	configDir    = "config" // the global repo: teams and settings
 	teamsDir     = "teams"
 	settingsFile = "settings.toml"
-	projectsDir  = "projects"  // the project repos, one folder per project
-	sandboxesDir = "sandboxes" // the agents' worktrees, <project>/<agent>/<repo>
+	projectsDir  = "projects"  // legacy: the project repos, one folder per project
+	sandboxesDir = "sandboxes" // legacy: the agents' worktrees, <project>/<agent>/<repo>
 	projectRepo  = "project"   // the project repo's name among the repos, and its folder in a sandbox
 	wikiDir      = "wiki"      // the wiki bundle, inside the project repo
 	logsDir      = "logs"      // the session logs, one folder per instance (<agent>@<project>)
@@ -145,7 +151,7 @@ const gitignore = "*.tmp\n"
 // Load makes the home the global repo if it isn't yet, then reads every
 // config file and checks every project's repos.
 func (h *Home) Load(ctx context.Context, d Deps) error {
-	h.git, h.records, h.deployed = d.Git, d.Projects, d.Deployed
+	h.git, h.records, h.deployed, h.conversations = d.Git, d.Projects, d.Deployed, d.Conversations
 	allowed, err := homeFolder()
 	if err != nil {
 		return err
@@ -174,11 +180,11 @@ func (h *Home) TeamsDir() string { return h.config(teamsDir) }
 // LogsDir is where the session logs are, one folder per instance.
 func (h *Home) LogsDir() string { return h.Path(logsDir) }
 
-// Start is the folder repos are added from: where Foreman was started, or the
+// Start is where the folder browser opens: where Foreman was started, or the
 // CEO's home folder (a real path).
 func (h *Home) Start() string { return h.start }
 
-// homeFolder is the CEO's home folder, its real path: repos must be inside it
+// homeFolder is the CEO's home folder, its real path: workspaces and repos must be inside it
 // (on macOS, what the Podman machine shares).
 func homeFolder() (string, error) {
 	dir, err := os.UserHomeDir()
@@ -290,7 +296,8 @@ func (h *Home) scan(prev snapshot) snapshot {
 
 // project is a record with its project.toml read and its repos checked.
 func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
-	p := Project{ID: r.ID, Path: h.Path(projectsDir, r.ID), Profile: r.Profile, Archived: r.Archived, Repos: []Repo{}}
+	p := Project{ID: r.ID, Workspace: r.Workspace, Profile: r.Profile, Archived: r.Archived, Repos: []Repo{}}
+	p.Path, p.agents, p.harness = h.layout(r.ID, r.Workspace)
 	if p.Profile == "" {
 		p.Profile = profiles.Default
 	}
@@ -444,10 +451,14 @@ func (h *Home) WikiDir(id string) (string, error) {
 	return filepath.Join(p.Path, wikiDir), nil
 }
 
-// Sandbox is the folder of an agent's worktrees on a project:
-// <home>/sandboxes/<project>/<agent>.
+// Sandbox is the folder of an agent's worktrees on a project
+// (Project.Sandbox); "" for no such project.
 func (h *Home) Sandbox(project, agent string) string {
-	return h.Path(sandboxesDir, project, agent)
+	p, err := h.Project(project)
+	if err != nil {
+		return ""
+	}
+	return p.Sandbox(agent)
 }
 
 // Teams returns every team, by id.

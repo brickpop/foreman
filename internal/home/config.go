@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -94,6 +95,7 @@ type Settings struct {
 	LogCapMB          int                     `toml:"log_cap_mb" json:"logCapMb"`
 	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
 	GlobalForge       GlobalForge             `toml:"global_forge" json:"globalForge"`
+	ProjectsFolder    string                  `toml:"projects_folder" json:"projectsFolder"`
 	Notifications     Notifications           `toml:"notifications" json:"notifications"`
 	// Instructions are the CEO's standing instructions for every agent, added
 	// to each session prompt (wiki/product/architecture/session-prompt.md).
@@ -124,8 +126,9 @@ func DefaultSettings() Settings {
 	return Settings{
 		Listen: "local", Port: 8888, MaxSessions: 12, Engine: "podman",
 		StuckAfterMinutes: 20, LogCapMB: 50,
-		GlobalForge:   GlobalForge{Kind: "none"},
-		Notifications: Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
+		ProjectsFolder: "~/workspace/foreman",
+		GlobalForge:    GlobalForge{Kind: "none"},
+		Notifications:  Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
 	}
 }
 
@@ -317,6 +320,9 @@ func (s Settings) validate() problems {
 	}
 	if s.LogCapMB <= 0 {
 		p.add("log_cap_mb: must be more than 0")
+	}
+	if f := s.ProjectsFolder; f != "~" && !strings.HasPrefix(f, "~/") && !filepath.IsAbs(f) {
+		p.add("projects_folder: %q must be an absolute path or start with ~/", f)
 	}
 	for _, k := range sortedKeys(s.Forges) {
 		if k == "none" || !slices.Contains(forgeKinds, k) {

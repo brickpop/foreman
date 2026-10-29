@@ -9,7 +9,7 @@
  */
 export interface Folder {
   path: string; // a real path
-  parent?: string; // "" at the top: the browser never goes above Start
+  parent?: string; // "" at the top: the browser never goes above the CEO's home folder
   entries: FolderEntry[]; // its subfolders by name, hidden ones left out
 }
 /**
@@ -116,6 +116,7 @@ export interface Settings {
   logCapMb: number /* int */;
   forges: { [key: string]: ForgeAccount};
   globalForge: GlobalForge;
+  projectsFolder: string;
   notifications: Notifications;
   /**
    * Instructions are the CEO's standing instructions for every agent, added
@@ -155,7 +156,13 @@ export interface Notifications {
  */
 export interface Project {
   id: string;
-  path: string; // its project repo, <home>/projects/<id>
+  path: string; // its project repo, <workspace>/project
+  /**
+   * Workspace is its folder (the CEO's): the project repo and the agents'
+   * sandboxes. "" for a project made before workspaces, still in Foreman's
+   * home until migrated (legacy).
+   */
+  workspace: string;
   profile: string; // the profile its agents run on: its own, else the default
   archived: boolean; // put away: out of the sidebar's projects and the Dashboard, not deployable
   config: ProjectConfig;
@@ -208,4 +215,17 @@ export interface Change {
   id?: string; // the project or team, for "project" and "team"
   version?: string; // the file's new version ("" once it is gone)
   problems?: string[]; // what is wrong with it now
+}
+
+//////////
+// source: workspace.go
+
+/**
+ * Suggestion is a new project's workspace as New project pre-fills it:
+ * <projects folder>/<name>.
+ */
+export interface Suggestion {
+  path: string; // the workspace; the projects folder when the name isn't a valid one (yet)
+  folder: string; // the projects folder, ~ expanded
+  folderExists: boolean; // false: creating the project creates it too
 }

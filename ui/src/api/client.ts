@@ -15,6 +15,7 @@ import type {
   Settings,
   SettingsFile,
   Soul,
+  Suggestion,
   Team,
 } from "./types/home";
 import type { Draft } from "./types/messaging";
@@ -92,6 +93,7 @@ export type {
   SettingsFile,
   SetupStep,
   Soul,
+  Suggestion,
   Team,
   TeamAction,
   TeamMessage,
@@ -111,12 +113,25 @@ export interface HomeArea {
   settings(): Promise<SettingsFile>;
   /** Saves settings.toml, guarded by the version read. */
   saveSettings(settings: Settings, version: string): Promise<SettingsFile>;
-  /** Creates a project and its project repo: new (a starter wiki), or cloned
-   * from clone (a URL or a local path, with the CEO's own git). created is
-   * false when it took over a project repo a removed project left there. */
-  newProject(name: string, clone?: string): Promise<{ project: Project; created: boolean }>;
-  /** Removes a project and its history; its project repo too when deleteRepo. */
-  removeProject(project: string, deleteRepo: boolean): Promise<void>;
+  /** Creates a project in workspace, and its project repo there: new (a
+   * starter wiki), or cloned from clone (a URL or a local path, with the CEO's
+   * own git). created is false when it took over a project repo a removed
+   * project left there. */
+  newProject(
+    name: string,
+    workspace: string,
+    clone?: string,
+  ): Promise<{ project: Project; created: boolean }>;
+  /** Where a project named name would go: in the projects folder. */
+  suggestWorkspace(name: string): Promise<Suggestion>;
+  /** Moves a project made before workspaces into workspace (legacy). */
+  migrate(project: string, workspace: string): Promise<Project>;
+  /** Removes a project and its history, keeping its workspace: its project
+   * repo too when deleteRepo, its agents' worktrees when deleteWorktrees. */
+  removeProject(
+    project: string,
+    opts: { deleteRepo: boolean; deleteWorktrees: boolean },
+  ): Promise<void>;
   /** Adds an existing repo by its folder, on main (none: main, which it
    * must have); newRepo creates an empty one at a new folder, on main. */
   addRepo(project: string, name: string, path: string, main?: string): Promise<Project>;
@@ -127,7 +142,8 @@ export interface HomeArea {
   locateRepo(project: string, name: string, path: string): Promise<Project>;
   renameRepo(project: string, name: string, newName: string): Promise<Project>;
   removeRepo(project: string, name: string): Promise<Project>;
-  /** A folder for picking repos; none: the folder Foreman was started in. */
+  /** A folder for picking repos, inside the CEO's home folder; none: the
+   * folder Foreman was started in. */
   folders(path?: string): Promise<Folder>;
   /** A repo folder's branches, to pick its main branch. */
   branches(path: string): Promise<Branches>;
@@ -382,13 +398,23 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/settings", { settings, version })
         ).json() as Promise<SettingsFile>,
-      newProject: async (name, clone) => {
-        const r = await request("POST", "/api/projects", { name, clone });
+      newProject: async (name, workspace, clone) => {
+        const r = await request("POST", "/api/projects", { name, clone, workspace });
         // 201: a new project repo; 200: one taken over.
         return { project: (await r.json()) as Project, created: r.status === 201 };
       },
-      removeProject: (project, deleteRepo) =>
-        send("DELETE", `/api/projects/${id(project)}${deleteRepo ? "?deleteRepo=true" : ""}`),
+      suggestWorkspace: (name) =>
+        getJSON(`/api/folders/workspace?${new URLSearchParams({ name })}`),
+      migrate: async (project, workspace) =>
+        (
+          await request("POST", `/api/projects/${id(project)}/migrate`, { workspace })
+        ).json() as Promise<Project>,
+      removeProject: (project, { deleteRepo, deleteWorktrees }) => {
+        const q = new URLSearchParams();
+        if (deleteRepo) q.set("deleteRepo", "true");
+        if (deleteWorktrees) q.set("deleteWorktrees", "true");
+        return send("DELETE", `/api/projects/${id(project)}${q.size ? `?${q}` : ""}`);
+      },
       addRepo: async (project, name, path, main) =>
         (
           await request("POST", `/api/projects/${id(project)}/repos`, { name, path, main })

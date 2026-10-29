@@ -6,6 +6,7 @@ package harness
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -15,11 +16,14 @@ import (
 // Session is what an adapter needs to launch one instance.
 type Session struct {
 	Instance string // e.g. mara@ledger
-	// Sandbox is the instance's folder on the host (<project>/.sandboxes/<agent>),
-	// its working directory, mounted at the same path. The adapter keeps the
-	// harness's private config inside it.
+	// Sandbox is the instance's folder on the host (its agent's sandbox),
+	// its working directory, mounted at the same path.
 	Sandbox string
-	Prompt  string // the composed session prompt
+	// Dir is the instance's private harness folder on the host, in Foreman's
+	// home, mounted at the same path: the adapter keeps the harness's config
+	// and conversations in its own folder there (Dir/<harness>).
+	Dir    string
+	Prompt string // the composed session prompt
 	// Login is the folder of the profile it runs on, on the host: the
 	// harness's login, shared by every instance on it (internal/profiles).
 	Login string
@@ -123,4 +127,48 @@ func GitConfig(path string) []runner.Mount {
 		return nil
 	}
 	return []runner.Mount{{Source: path, Target: containerHome + "/.gitconfig", ReadOnly: true}}
+}
+
+// Mover is an adapter whose harness files its conversations by working
+// folder (Claude Code, Pi): it carries an instance's over when its sandbox
+// moves, so the agent continues where it was. Legacy: only a project's
+// migration to its workspace moves a sandbox
+// (wiki/backlog/remove-workspace-migration.md).
+type Mover interface {
+	// MoveConversations renames, in the harness folder dir, the conversations
+	// of working folder from to those of to; none is fine.
+	MoveConversations(dir, from, to string) error
+}
+
+// MoveConversations carries an instance's conversations over in each
+// adapter's harness that files them by working folder; on a failure, those
+// carried already go back.
+func MoveConversations(adapters map[string]Adapter, dir, from, to string) error {
+	var moved []Mover
+	for _, a := range adapters {
+		m, ok := a.(Mover)
+		if !ok {
+			continue
+		}
+		if err := m.MoveConversations(dir, from, to); err != nil {
+			for _, back := range moved {
+				_ = back.MoveConversations(dir, to, from)
+			}
+			return err
+		}
+		moved = append(moved, m)
+	}
+	return nil
+}
+
+// Rename renames a harness's folder of conversations, from to to: none is
+// fine, a folder at to already is refused (it would merge two agents').
+func Rename(from, to string) error {
+	if _, err := os.Stat(from); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if _, err := os.Stat(to); err == nil {
+		return fmt.Errorf("%s is there already", to)
+	}
+	return os.Rename(from, to)
 }

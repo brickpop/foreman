@@ -26,7 +26,7 @@ func setup(t *testing.T) (Adapter, harness.Session) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	return a, harness.Session{Instance: "mara@ledger", Sandbox: t.TempDir(), Prompt: "You are Mara.", Login: profile}
+	return a, harness.Session{Instance: "mara@ledger", Sandbox: t.TempDir(), Dir: t.TempDir(), Prompt: "You are Mara.", Login: profile}
 }
 
 func file(t *testing.T, l harness.Launch, name string) []byte {
@@ -67,7 +67,7 @@ func TestLaunch(t *testing.T) {
 	if !reflect.DeepEqual(l.Command, want) {
 		t.Errorf("command %v", l.Command)
 	}
-	dir := ConfigDir(s.Sandbox)
+	dir := ConfigDir(s.Dir)
 	if !slices.Contains(l.Env, "PI_CODING_AGENT_DIR="+dir) || !slices.Contains(l.Env, "PI_SKIP_VERSION_CHECK=1") {
 		t.Errorf("env %v", l.Env)
 	}
@@ -130,7 +130,7 @@ func TestLaunchWithTheAgentLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	extension := filepath.Join(ConfigDir(s.Sandbox), "foreman-hooks.ts")
+	extension := filepath.Join(ConfigDir(s.Dir), "foreman-hooks.ts")
 	if i := slices.Index(l.Command, "--extension"); i < 0 || l.Command[i+1] != extension {
 		t.Errorf("command %v", l.Command)
 	}
@@ -170,7 +170,7 @@ func TestARestartContinuesOnlyThisDeploymentsConversation(t *testing.T) {
 	a, s := setup(t)
 	save := func(name string) {
 		t.Helper()
-		path := filepath.Join(ConfigDir(s.Sandbox), "sessions", "--work--", name)
+		path := filepath.Join(ConfigDir(s.Dir), "sessions", "--work--", name)
 		_ = os.MkdirAll(filepath.Dir(path), 0o700)
 		if err := os.WriteFile(path, []byte("{}\n"), 0o600); err != nil {
 			t.Fatal(err)
@@ -340,5 +340,24 @@ func TestGitConfigMount(t *testing.T) {
 	l, _ := a.Launch(s)
 	if !reflect.DeepEqual(l.Mounts, []runner.Mount{{Source: a.GitConfig, Target: "/home/node/.gitconfig", ReadOnly: true}}) {
 		t.Errorf("mounts %v", l.Mounts)
+	}
+}
+
+// A moved sandbox's conversations follow it, under the folder Pi 1.3.0 names
+// for the new working folder.
+func TestMoveConversations(t *testing.T) {
+	a, s := setup(t)
+	sessions := filepath.Join(ConfigDir(s.Dir), "sessions")
+	if err := a.MoveConversations(s.Dir, "/a", "/b"); err != nil {
+		t.Errorf("nothing to move: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(sessions, "--Users-ceo-.foreman-sandboxes-ledger-mara--"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.MoveConversations(s.Dir, "/Users/ceo/.foreman/sandboxes/ledger/mara", "/Users/ceo/workspace/foreman/ledger/agents/mara"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(sessions, "--Users-ceo-workspace-foreman-ledger-agents-mara--")); err != nil {
+		t.Error("the conversations didn't move")
 	}
 }

@@ -134,7 +134,7 @@ func TestLoadMakesTheGlobalRepoWithWhatIsThere(t *testing.T) {
 // problems; one that is gone is a problem, with the defaults.
 func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 	h := loaded(t, nil)
-	p, _, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +277,7 @@ func TestSaveSettings(t *testing.T) {
 func TestWatchReportsChangesOnDisk(t *testing.T) {
 	h := loaded(t, nil)
 	root := h.Root()
-	ledger, _, err := h.NewProject(ctx, "ledger", "")
+	ledger, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +312,8 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 
 	writeFile(t, filepath.Join(root, "state.db"), "churn")
 	writeFile(t, filepath.Join(root, "logs", "x.log"), "churn")
-	writeFile(t, filepath.Join(root, "sandboxes", "ledger", "mara", "api", "x"), "churn")
+	writeFile(t, filepath.Join(ledger.Sandbox("mara"), "api", "x"), "churn")
+	writeFile(t, filepath.Join(ledger.HarnessDir("mara"), "claude-code", "x"), "churn")
 	writeFile(t, filepath.Join(ledger.Path, "wiki", "spec.md"), "# Spec\n")
 	gitOut(t, ledger.Path, "add", ".")
 	gitOut(t, ledger.Path, "commit", "--quiet", "-m", "spec")
@@ -331,7 +332,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 
 	// A project made after the watch started is watched too, and a repo added
 	// is told at once.
-	relay, _, err := h.NewProject(ctx, "relay", "")
+	relay, _, err := h.NewProject(ctx, "relay", "", workspace("relay"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -494,4 +495,10 @@ func TestInstructionsRoundTrip(t *testing.T) {
 			t.Errorf("%q came back %q, %v:\n%s", text, got.Instructions, problems, data)
 		}
 	}
+}
+
+// workspace is where the tests make project name: the default projects
+// folder, in the test's home folder.
+func workspace(name string) string {
+	return filepath.Join(os.Getenv("HOME"), "workspace", "foreman", name)
 }

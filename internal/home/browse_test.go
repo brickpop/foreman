@@ -8,22 +8,27 @@ import (
 	"testing"
 )
 
-// The browser lists one folder at a time from where Foreman was started,
-// never above it: subfolders only, hidden ones and symlinks leading out left
-// out, git repos marked.
+// The browser lists one folder at a time, opening where Foreman was started
+// and going up to the CEO's home folder, never above it: subfolders only,
+// hidden ones, symlinks leading out and Foreman's home left out, git repos
+// marked.
 func TestBrowse(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
+	realHome, _ := filepath.EvalSymlinks(home)
 	dev := filepath.Join(home, "dev")
 	codeRepo(t, filepath.Join(dev, "app"))
 	writeFile(t, filepath.Join(dev, "Notes", "todo.md"), "x")
 	writeFile(t, filepath.Join(dev, ".cache", "x"), "x")
 	writeFile(t, filepath.Join(dev, "readme.txt"), "x")
-	writeFile(t, filepath.Join(home, "elsewhere", "x"), "x")
-	if err := os.Symlink(filepath.Join(home, "elsewhere"), filepath.Join(dev, "out")); err != nil {
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(dev, "out")); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(filepath.Join(dev, "app"), filepath.Join(dev, "link-to-app")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(h.Root(), filepath.Join(dev, "foreman-home")); err != nil {
 		t.Fatal(err)
 	}
 	startedIn(t, h, dev)
@@ -37,58 +42,52 @@ func TestBrowse(t *testing.T) {
 	for _, e := range top.Entries {
 		got = append(got, e.Name+map[bool]string{true: " (repo)"}[e.Repo])
 	}
-	if top.Path != real || top.Parent != "" || strings.Join(got, ", ") != "app (repo), link-to-app (repo), Notes" {
+	if top.Path != real || top.Parent != realHome || strings.Join(got, ", ") != "app (repo), link-to-app (repo), Notes" {
 		t.Errorf("top: %s, parent %q, %v", top.Path, top.Parent, got)
 	}
 	notes, err := h.Browse(filepath.Join(dev, "Notes"))
 	if err != nil || notes.Parent != real || len(notes.Entries) != 0 {
 		t.Errorf("a subfolder: %+v %v", notes, err)
 	}
-	for _, path := range []string{home, filepath.Join(dev, "out"), "dev", filepath.Join(dev, "readme.txt"), filepath.Join(dev, "nope")} {
+	// Up to the home folder, and no higher.
+	up, err := h.Browse(home)
+	if err != nil || up.Path != realHome || up.Parent != "" {
+		t.Errorf("the home folder: %+v %v", up, err)
+	}
+	for _, path := range []string{filepath.Dir(home), filepath.Join(dev, "out"), "dev", filepath.Join(dev, "readme.txt"), filepath.Join(dev, "nope")} {
 		if _, err := h.Browse(path); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v", path, err)
 		}
 	}
 }
 
-// Foreman started outside the CEO's home folder adds repos from that home
-// folder; started inside it, from where it was started.
-func TestTheStartFolderBoundsAddingRepos(t *testing.T) {
+// Repos are added from anywhere in the CEO's home folder, wherever Foreman
+// was started (the CEO, 2026-10-28), never from outside it nor from
+// Foreman's home.
+func TestTheHomeFolderBoundsAddingRepos(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	p, _, err := h.NewProject(ctx, "ledger", "")
-	if err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
 		t.Fatal(err)
 	}
-	outside := codeRepo(t, filepath.Join(home, "src", "api"))
-	if p, err = h.AddRepo(ctx, "ledger", "api", outside, ""); err != nil {
-		t.Fatal(err)
-	}
-	inside := codeRepo(t, filepath.Join(home, "dev", "web"))
 	startedIn(t, h, filepath.Join(home, "dev"))
-	if filepath.Base(h.Start()) != "dev" {
-		t.Fatalf("start %s", h.Start())
-	}
-	if _, err := h.AddRepo(ctx, "ledger", "web", inside, ""); err != nil {
-		t.Errorf("inside the start folder: %v", err)
-	}
-	other := codeRepo(t, filepath.Join(home, "src", "docs"))
-	if _, err := h.AddRepo(ctx, "ledger", "docs", other, ""); err == nil || !strings.Contains(err.Error(), "where repos are added from") {
+	elsewhere := codeRepo(t, filepath.Join(home, "src", "api"))
+	if _, err := h.AddRepo(ctx, "ledger", "api", elsewhere, ""); err != nil {
 		t.Errorf("outside the start folder: %v", err)
 	}
-	if _, err := h.LocateRepo(ctx, "ledger", "api", outside); err == nil || !strings.Contains(err.Error(), "where repos are added from") {
-		t.Errorf("located outside the start folder: %v", err)
+	if _, err := h.RepoBranches(ctx, elsewhere); err != nil {
+		t.Errorf("its branches: %v", err)
 	}
-	// A repo added before stays usable.
-	if p, _ = h.Project("ledger"); !p.Repos[0].Ready() {
-		t.Errorf("the repo added before: %+v", p.Repos[0])
+	inHome := codeRepo(t, h.Path("stray"))
+	if _, err := h.AddRepo(ctx, "ledger", "stray", inHome, ""); err == nil || !strings.Contains(err.Error(), "inside Foreman's home") {
+		t.Errorf("in Foreman's home: %v", err)
 	}
-	// Started outside the CEO's home folder: the home folder is the bound.
+	if _, err := h.NewRepo(ctx, "ledger", "fresh", h.Path("fresh")); err == nil || !strings.Contains(err.Error(), "inside Foreman's home") {
+		t.Errorf("a new repo in Foreman's home: %v", err)
+	}
+	// Started outside the CEO's home folder: the browser opens at the home folder.
 	startedIn(t, h, t.TempDir())
 	if real, _ := filepath.EvalSymlinks(home); h.Start() != real {
 		t.Errorf("started outside the home folder: start %s", h.Start())
-	}
-	if _, err := h.AddRepo(ctx, "ledger", "docs", other, ""); err != nil {
-		t.Errorf("then anywhere in the home folder: %v", err)
 	}
 }

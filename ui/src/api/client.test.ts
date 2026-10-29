@@ -203,6 +203,27 @@ describe("httpClient", () => {
     ]);
   });
 
+  it("creates a project in its workspace, migrates one, and removes one with what was asked", async () => {
+    const calls = stubFetch(200, { id: "cal" });
+    const client = httpClient("http://x");
+    await client.home.newProject("cal", "/home/ceo/workspace/foreman/cal");
+    await client.home.suggestWorkspace("my cal");
+    await client.home.migrate("my project", "/home/ceo/w/p");
+    await client.home.removeProject("a", { deleteRepo: false, deleteWorktrees: false });
+    await client.home.removeProject("b", { deleteRepo: true, deleteWorktrees: true });
+    expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
+      [
+        "POST",
+        "http://x/api/projects",
+        { name: "cal", workspace: "/home/ceo/workspace/foreman/cal" },
+      ],
+      ["GET", "http://x/api/folders/workspace?name=my+cal", undefined],
+      ["POST", "http://x/api/projects/my%20project/migrate", { workspace: "/home/ceo/w/p" }],
+      ["DELETE", "http://x/api/projects/a", undefined],
+      ["DELETE", "http://x/api/projects/b?deleteRepo=true&deleteWorktrees=true", undefined],
+    ]);
+  });
+
   it("reads the wiki, escaping each segment of a path but not its slashes", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");

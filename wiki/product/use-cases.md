@@ -14,7 +14,7 @@ Run `foreman`, open the UI, then use **+ New project** to make `ledger` and add 
 
 Acceptance:
 - [ ] `foreman` serves the UI on `localhost:8888`, and `~/.foreman/config/` exists as a git repo (the global repo). A second `foreman` only prints the first one's URL.
-- [ ] The [Add a project](./features/add-project.md) dialog creates the project repo `~/.foreman/projects/ledger/` (`git init`, `project.toml`, a starter wiki) and adds `~/dev/ledger-api` to the project's record by its path. Nothing is cloned, and nothing is written in `~/dev/ledger-api` but its `.git`.
+- [ ] The [Add a project](./features/add-project.md) dialog creates the project repo `~/workspace/foreman/ledger/project/` (`git init`, `project.toml`, a starter wiki) and adds `~/dev/ledger-api` to the project's record by its path. Nothing is cloned, and nothing is written in `~/dev/ledger-api` but its `.git`.
 - [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a team from the purpose and shows it in the preview beside its terminal, one tab per member; the CEO's **Create Atlas** writes `~/.foreman/config/teams/atlas.toml`, one commit in the global repo, and Atlas appears in the sidebar within 1 s. A draft that breaks the team file's invariants (a name already used) is never shown.
 - [ ] [Deploying](./features/deploy-team.md) Atlas to ledger with a goal creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
 
@@ -28,7 +28,7 @@ Acceptance:
 - [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
 - [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Worktrees](./features/worktrees.md) tab, under In flight.
-- [ ] Tove's `contribute(finding, …)` writes a note in `~/.foreman/projects/ledger/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
+- [ ] Tove's `contribute(finding, …)` writes a note in `~/workspace/foreman/ledger/project/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
 - [ ] When the lead updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
 
 ## 3. Direct instruction

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -65,7 +66,7 @@ func (c *chiefOfStaff) Start(ctx context.Context, opener string) (string, error)
 		return "", err
 	}
 	session := harness.Session{
-		Instance: cos.Instance, Sandbox: c.dir, Prompt: cos.Prompt(c.teams(), c.teamsDir),
+		Instance: cos.Instance, Sandbox: c.dir, Dir: filepath.Join(c.dir, ".harness"), Prompt: cos.Prompt(c.teams(), c.teamsDir),
 		Login: c.profiles.Dir(profiles.Default),
 		// Every visit continues the last conversation, and says what it is for.
 		Continue: true, Opener: opener, OpenerOnContinue: true,

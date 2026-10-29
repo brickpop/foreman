@@ -13,8 +13,8 @@ Where Foreman keeps what, and how changes on disk reach the UI. The principle (c
 | Store | Location | Owner | Mechanics |
 |---|---|---|---|
 | Project records | `state.db`, tables `projects` and `project_repos` | Foreman (UI) | A project's name, profile and code repos (name, path, root commit); names unique in any case ([Project config → The project record](../models/project-config.md#the-project-record)) |
-| Project config | `~/.foreman/projects/<name>/project.toml` (project repo) | CEO / Chief of Staff | Read-only for Foreman except New project (creates it). Parsed and validated on load and on change ([Project config](../models/project-config.md)) |
-| Wiki content | `~/.foreman/projects/<name>/wiki/` (project repo) | lead (commit through `commit()` (no review)), CEO | Read via the [wiki engine](./wiki-engine.md); Foreman writes only checkboxes, card moves and `contribute` notes, one commit per write |
+| Project config | `<workspace>/project/project.toml` (project repo) | CEO / Chief of Staff | Read-only for Foreman except New project (creates it). Parsed and validated on load and on change ([Project config](../models/project-config.md)) |
+| Wiki content | `<workspace>/project/wiki/` (project repo) | lead (commit through `commit()` (no review)), CEO | Read via the [wiki engine](./wiki-engine.md); Foreman writes only checkboxes, card moves and `contribute` notes, one commit per write |
 | Team definitions | `~/.foreman/config/teams/<team>.toml` (global repo) | Foreman (UI, Chief of Staff proposals the CEO confirms), editor | Read and written by Foreman, one commit per save ([Team definition](../models/team-definition.md)) |
 | Global settings | `~/.foreman/config/settings.toml` (global repo) | Foreman (UI) | [Global settings](../models/global-settings.md) |
 | Secrets | OS keychain or a 0600 file in the home, outside the global repo | Foreman (UI) | Write-only from the UI ([Secrets](../models/secrets.md)) |

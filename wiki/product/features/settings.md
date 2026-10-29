@@ -6,18 +6,18 @@ tags: [feature, ui, home, config, security]
 
 # Settings screen
 
-The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: with no workspace any more, the old `Workspace | Global` split said nothing, both being machine-wide). The tab is in the URL, `/settings?tab=git|look|system`; **Agents**, the first, has none, and any other value, the old `workspace` and `global` included, opens Agents. The same tab bar as a project's.
+The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: with no workspace any more, the old `Workspace | Global` split said nothing, both being machine-wide; that workspace was the folder Foreman once ran on, not a [project's workspace](../models/project-config.md#the-workspace)). The tab is in the URL, `/settings?tab=git|look|system`; **Agents**, the first, has none, and any other value, the old `workspace` and `global` included, opens Agents. The same tab bar as a project's.
 
 | Tab | Sections |
 |---|---|
 | **Agents** | [Profiles](#profiles), [Instructions for every agent](#instructions-for-every-agent), [Running agents](#running-agents) |
 | **Git & forges** | [Forge accounts](#forge-accounts), [Global repo](#global-repo) |
 | **Notifications & look** | [Notifications](#notifications), [Appearance](#appearance) |
-| **System** | [Home](#home), [Network](#network), [Maintenance](#maintenance) |
+| **System** | [Home](#home), [Projects](#projects), [Network](#network), [Maintenance](#maintenance) |
 
 **Each section says where it is kept**, after its label (` · Global repo`, `--tx4`, not bold): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **Global repo + this machine** (hosts in the global repo, tokens on this machine; [secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
 
-Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent), which save on **Save**.
+Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent) and the [projects folder](#projects), which save on **Save** (Discard drops the edit).
 
 ## Instructions for every agent
 
@@ -44,7 +44,15 @@ On **System**. A fact, not a setting.
 
 | Row | Explanation | Control |
 |---|---|---|
-| Home | Foreman’s folder on this machine: the global repo (teams, settings), each project’s repo, the agents’ sandboxes and its state. | The path (`GET /api/home`, [Home](../models/home.md)), read-only (Mono 13px `--tx2`) |
+| Home | Foreman’s folder on this machine: the global repo (teams, settings), the agents’ harness folders (their config and conversations), and its state. Your projects live in their workspaces. | The path (`GET /api/home`, [Home](../models/home.md)), read-only (Mono 13px `--tx2`) |
+
+## Projects
+
+On **System**, kept in the global repo.
+
+| Row | Explanation | Control |
+|---|---|---|
+| Projects folder | New project suggests each project's workspace here, in a folder of its name; you can pick another. ~ is your home folder, on any machine. | A path field (`projects_folder`, [Global settings](../models/global-settings.md)); **Save** and **Discard** appear once it is edited |
 
 ## Network
 

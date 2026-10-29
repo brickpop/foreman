@@ -194,6 +194,14 @@ func (g *CLI) PruneWorktrees(ctx context.Context, repo string) error {
 	return err
 }
 
+// RepairWorktrees tells repo where its worktrees are now, after they moved:
+// each one's link to the repo still holds, the repo's record of it doesn't.
+func (g *CLI) RepairWorktrees(ctx context.Context, repo string, worktrees ...string) error {
+	defer g.lock(ctx, repo)()
+	_, err := run(ctx, repo, append([]string{"worktree", "repair", "--"}, worktrees...)...)
+	return err
+}
+
 // command is git with Foreman's settings, in dir. Its messages are always in
 // English (LC_ALL=C): Foreman reads some of them, and a CEO's git in another
 // language would otherwise hide what happened (found 2026-10-17, a Catalan

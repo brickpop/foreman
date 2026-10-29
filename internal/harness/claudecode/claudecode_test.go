@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/harness"
@@ -17,8 +18,9 @@ func setup(t *testing.T) (Adapter, harness.Session) {
 	creds := t.TempDir()
 	write(t, filepath.Join(creds, ".credentials.json"), `{"claudeAiOauth":{}}`)
 	write(t, filepath.Join(creds, ".claude.json"), `{"oauthAccount":{"emailAddress":"x"},"projects":{"/elsewhere":{"hasTrustDialogAccepted":false}}}`)
-	sandbox := filepath.Join(t.TempDir(), "ledger", ".sandboxes", "mara")
-	return Adapter{}, harness.Session{Instance: "mara@ledger", Sandbox: sandbox, Prompt: "# You are Mara", Login: creds}
+	root := t.TempDir()
+	sandbox, dir := filepath.Join(root, "ledger", "agents", "mara"), filepath.Join(root, ".foreman", "harness", "ledger", "mara")
+	return Adapter{}, harness.Session{Instance: "mara@ledger", Sandbox: sandbox, Dir: dir, Prompt: "# You are Mara", Login: creds}
 }
 
 func write(t *testing.T, path, content string) {
@@ -58,7 +60,7 @@ func TestLaunch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := ConfigDir(s.Sandbox)
+	dir := ConfigDir(s.Dir)
 	if !reflect.DeepEqual(l.Command, []string{"claude", "--dangerously-skip-permissions"}) {
 		t.Errorf("command %v", l.Command)
 	}
@@ -89,7 +91,7 @@ func TestLaunch(t *testing.T) {
 // A restart keeps the instance's own record (its history), with the flags set again.
 func TestRelaunchKeepsTheInstancesOwnRecord(t *testing.T) {
 	a, s := setup(t)
-	write(t, filepath.Join(ConfigDir(s.Sandbox), ".claude.json"), `{"numStartups":7,"projects":{}}`)
+	write(t, filepath.Join(ConfigDir(s.Dir), ".claude.json"), `{"numStartups":7,"projects":{}}`)
 	l, err := a.Launch(s)
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +112,7 @@ func TestLaunchOptions(t *testing.T) {
 	if l, _ := a.Launch(s); len(l.Command) != 2 {
 		t.Errorf("continue without a conversation: %v", l.Command)
 	}
-	write(t, filepath.Join(ConfigDir(s.Sandbox), "projects", "-ws-ledger", "abc.jsonl"), "{}\n")
+	write(t, filepath.Join(ConfigDir(s.Dir), "projects", "-ws-ledger", "abc.jsonl"), "{}\n")
 	l, err := a.Launch(s)
 	if err != nil {
 		t.Fatal(err)
@@ -144,7 +146,7 @@ func TestLaunchRefusals(t *testing.T) {
 	if _, err := a.Launch(harness.Session{Sandbox: s.Sandbox, Login: t.TempDir()}); !errors.Is(err, harness.ErrNotConnected) {
 		t.Errorf("without a login: %v", err)
 	}
-	write(t, filepath.Join(ConfigDir(s.Sandbox), ".claude.json"), "{broken")
+	write(t, filepath.Join(ConfigDir(s.Dir), ".claude.json"), "{broken")
 	if _, err := a.Launch(s); err == nil {
 		t.Error("a broken account record was accepted")
 	}
@@ -183,7 +185,7 @@ func TestLaunchWithTheAgentLink(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := ConfigDir(s.Sandbox)
+	dir := ConfigDir(s.Dir)
 	want := []string{"claude", "--dangerously-skip-permissions", "--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config", s.Opener}
 	if !reflect.DeepEqual(l.Command, want) {
 		t.Errorf("command %v", l.Command)
@@ -292,7 +294,7 @@ func writeFiles(t *testing.T, l harness.Launch) {
 // opener (the lead's goal), as an argument: interactive, never -p.
 func TestARestartContinuesOnlyThisDeploymentsConversation(t *testing.T) {
 	a, s := setup(t)
-	dir := ConfigDir(s.Sandbox)
+	dir := ConfigDir(s.Dir)
 	write(t, filepath.Join(dir, "projects", "-ws-ledger", "last-deployment.jsonl"), "{}\n")
 	s.Opener = "Your goal on ledger: ship it"
 	// The deployment's first start: fresh, with the goal, whatever is there.
@@ -320,5 +322,66 @@ func TestARestartContinuesOnlyThisDeploymentsConversation(t *testing.T) {
 		if filepath.Base(f.Path) == "foreman-fresh-start" {
 			t.Error("a restart rewrote the fresh-start list")
 		}
+	}
+}
+
+// A moved sandbox's conversations follow it, with its history and trust in
+// .claude.json, so the agent continues where it was.
+func TestMoveConversations(t *testing.T) {
+	a, s := setup(t)
+	dir := ConfigDir(s.Dir)
+	from, to := "/Users/ceo/.foreman/sandboxes/ledger/mara", "/Users/ceo/workspace/foreman/ledger/agents/mara"
+	write(t, filepath.Join(dir, "projects", "-Users-ceo--foreman-sandboxes-ledger-mara", "abc.jsonl"), "{}\n")
+	write(t, filepath.Join(dir, "projects", "-elsewhere", "def.jsonl"), "{}\n")
+	write(t, filepath.Join(dir, ".claude.json"), `{"numStartups":7,"projects":{"`+from+`":{"history":["hi"]},"/elsewhere":{}}}`)
+	if err := a.MoveConversations(s.Dir, from, to); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "-Users-ceo-workspace-foreman-ledger-agents-mara", "abc.jsonl")); err != nil {
+		t.Error("the conversation didn't move")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "-elsewhere", "def.jsonl")); err != nil {
+		t.Error("another folder's moved")
+	}
+	var record struct {
+		NumStartups int                       `json:"numStartups"`
+		Projects    map[string]map[string]any `json:"projects"`
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, ".claude.json"))
+	_ = json.Unmarshal(data, &record)
+	if record.NumStartups != 7 || record.Projects[from] != nil || record.Projects[to]["history"] == nil || record.Projects["/elsewhere"] == nil {
+		t.Errorf("record %s", data)
+	}
+	// Moved back, as a failed migration does.
+	if err := a.MoveConversations(s.Dir, to, from); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "-Users-ceo--foreman-sandboxes-ledger-mara", "abc.jsonl")); err != nil {
+		t.Error("the conversation didn't come back")
+	}
+}
+
+func TestMoveConversationsRefuses(t *testing.T) {
+	a, s := setup(t)
+	if err := a.MoveConversations(s.Dir, "/a", "/b"); err != nil {
+		t.Errorf("nothing to move: %v", err)
+	}
+	dir := ConfigDir(s.Dir)
+	write(t, filepath.Join(dir, "projects", "-a", "1.jsonl"), "{}\n")
+	write(t, filepath.Join(dir, "projects", "-b", "2.jsonl"), "{}\n")
+	if err := a.MoveConversations(s.Dir, "/a", "/b"); err == nil {
+		t.Error("merged into another folder's conversations")
+	}
+	long := "/" + strings.Repeat("x", 200)
+	if err := a.MoveConversations(s.Dir, "/a", long); err == nil || !strings.Contains(err.Error(), "can't predict") {
+		t.Errorf("a path Claude Code hashes: %v", err)
+	}
+	// A broken account record: the folder goes back.
+	write(t, filepath.Join(dir, ".claude.json"), "{broken")
+	if err := a.MoveConversations(s.Dir, "/a", "/c"); err == nil {
+		t.Error("a broken record")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "projects", "-a", "1.jsonl")); err != nil {
+		t.Error("the folder stayed moved")
 	}
 }

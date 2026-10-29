@@ -122,9 +122,12 @@ func run(args []string, stdout io.Writer) error {
 		active, _ := manager.DeploymentsIn(ctx, store.DeploymentActive)
 		return slices.ContainsFunc(active, func(d store.Deployment) bool { return d.ProjectID == project })
 	}
-	// Repos are added from where Foreman was started (the folder browser's top).
+	// The folder browser opens where Foreman was started.
 	start, _ := os.Getwd()
-	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start}); err != nil {
+	// Set below: a project's migration carries its agents' conversations over.
+	var adapters map[string]harness.Adapter
+	conversations := func(dir, from, to string) error { return harness.MoveConversations(adapters, dir, from, to) }
+	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start, Conversations: conversations}); err != nil {
 		return err
 	}
 	// The engine is chosen once: a change of the setting takes effect on restart.
@@ -189,7 +192,7 @@ func run(args []string, stdout io.Writer) error {
 		hostAlias = ""
 	}
 	claude := claudecode.Adapter{GitConfig: homeGitConfig()}
-	adapters := map[string]harness.Adapter{
+	adapters = map[string]harness.Adapter{
 		"claude-code": claude,
 		"pi":          pi.Adapter{GitConfig: homeGitConfig(), HostAlias: hostAlias},
 	}

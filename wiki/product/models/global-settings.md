@@ -26,6 +26,7 @@ tags: [model, config, home]
 | `notifications.merge_requested` | Boolean | | `true` | | "A merge is requested" |
 | `instructions` | String (Markdown) | | empty | | The CEO's standing instructions, added at the end of every team agent's [session prompt](../architecture/session-prompt.md#the-ceos-instructions) at its next start; set in [Settings](../features/settings.md#instructions-for-every-agent). Foreman writes it as a multi-line string (`"""`), so it reads as typed |
 
+| `projects_folder` | String (path) | | `~/workspace/foreman` | `~`, `~/…` or an absolute path | Where New project suggests a project's [workspace](./project-config.md#the-workspace), `<projects folder>/<name>`; created with the first project made in it. Kept as a `~` path, so it carries to another machine. Set in [Settings → System](../features/settings.md#projects) |
 There is no harness command setting (decided 2026-10-15): Foreman builds the agent image, so each harness runs its own command (`claude`, …); a `[harnesses]` table is reported as a field Foreman doesn't know. Field names are a proposal; the PRD names the contents ("listen, limits, harness commands, notifications"), not the keys.
 
 ## Invariants

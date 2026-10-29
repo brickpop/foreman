@@ -14,6 +14,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** a fix in wikiview or a change to the engine's slug rule doesn't reach Foreman until copied again (the cross-check catches the slug rule).
 - **Fix:** the engine exports its heading-id rule; wikiview exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import wikiview's building blocks](./backlog/wikiview-upstream.md).
 
+## The workspace migration
+
+- **State:** Foreman moves a project made before workspaces out of `~/.foreman/projects/` and `~/.foreman/sandboxes/` into its workspace (`home.Migrate`, `POST /api/projects/{id}/migrate`, the "Move into a workspace" offer in Project settings), worktrees repaired and the agents' conversations carried over (`harness.Mover` in the Claude Code and Pi adapters); so it still knows the old layout's paths (`projectsDir`, `sandboxesDir`, `legacyHarn`, the legacy branch of `Home.layout` and `Project.HarnessDir`, the watcher's `projects/`).
+- **Why:** only the CEO's existing projects need it: Foreman has no other users yet (the CEO, 2026-10-28).
+- **Impact:** code, a route and a UI offer kept for a one-off move; the old paths stay named in the code. Its known edges, accepted for a one-off: the moves are renames, so a workspace on another file system than the home is refused by the OS (`EXDEV`, "invalid cross-device link") and nothing moves; a stopped deployment's instance rows keep their old `sandbox_path` until a redeploy writes new ones (nothing reads them meanwhile: a start uses the row a deploy just wrote); a conversation folder Claude Code named with a hash (a path over 200 characters) can't be carried over, so the move is refused; and a failed undo (a rename back that fails too) is ignored, leaving that folder where it got to.
+- **Fix:** removed once the CEO has migrated every project: [Remove the workspace migration](./backlog/remove-workspace-migration.md).
+
 ## Wiki performance: whole-wiki work on every change and read
 
 - **State:** the Wiki block ([Wiki engine](./product/architecture/wiki-engine.md#what-foreman-adds-on-top)) does whole-wiki work in several places:
@@ -55,6 +62,15 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Why:** a harness gives no acknowledgement that a line reached its prompt; each known dialog is switched off in the config Foreman writes.
 - **Fix:** the Claude Code integration tests (`just test-claude`) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
 
+
+## Project workspaces: known edges
+
+- **State** (from [Project workspaces](./backlog/project-workspaces.md), 2026-10-28):
+  - **Worktrees kept on remove:** removing a project without its worktrees leaves them in `<workspace>/agents/`, their records in each code repo, so those branches can't be deleted while checked out there, and a new project in the same workspace reuses the folders as they are.
+  - **A workspace inside an enclosing git repo** (`~/workspace` a repo itself) is refused only when that repo is a code repo of some project; otherwise git run there on the host (the Direct engine) sees the enclosing repo. In a container it isn't mounted.
+  - **The workspace is typed, not browsed** in New project and in the move offer: the folder browser lists repos to add, not a place for a new folder.
+- **Why:** the card landed the layout; the dialog and the clean-up have cards of their own.
+- **Fix:** the folder browser picks the workspace in [Restructure the New project dialog](./backlog/new-project-dialog.md); kept worktrees cleaned up from [Remove a stopped deployment's worktrees](./backlog/remove-worktrees.md).
 
 ## Projects as records: known edges
 

@@ -25,6 +25,7 @@ func (h *Home) Watch(ctx context.Context, notify func(Change)) error {
 	}
 	h.mu.Lock()
 	h.notify = notify
+	h.watcher = watcher
 	h.mu.Unlock()
 	h.watchDirs(watcher)
 	go func() {
@@ -61,8 +62,8 @@ func (h *Home) reload() {
 }
 
 // watchDirs watches every folder whose entries make up the snapshot: the
-// home (config/ and projects/ appearing), the global repo, teams/, projects/
-// and each project repo. A project's code repos are
+// home, the global repo, teams/, and each project repo, in its workspace
+// (legacy: projects/ and each folder in it). A project's code repos are
 // anywhere, so they are checked on every reload and start, never watched.
 // fsnotify watches a folder's direct entries; adding one twice is harmless.
 func (h *Home) watchDirs(watcher *fsnotify.Watcher) {
@@ -73,6 +74,7 @@ func (h *Home) watchDirs(watcher *fsnotify.Watcher) {
 			dirs = append(dirs, h.Path(projectsDir, e.Name()))
 		}
 	}
+	dirs = append(dirs, h.projectRepos()...)
 	for _, d := range dirs {
 		if _, err := os.Stat(d); err == nil {
 			_ = watcher.Add(d)
@@ -80,9 +82,26 @@ func (h *Home) watchDirs(watcher *fsnotify.Watcher) {
 	}
 }
 
+// projectRepos are the projects' project repos.
+func (h *Home) projectRepos() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	var dirs []string
+	for _, p := range h.snap.projects {
+		dirs = append(dirs, p.Path)
+	}
+	return dirs
+}
+
 // relevant says whether a file event can change the snapshot. The home also
 // holds state.db and the logs, which change all the time.
 func (h *Home) relevant(path string) bool {
+	for _, repo := range h.projectRepos() {
+		// a project repo going, its project.toml
+		if path == repo || path == filepath.Join(repo, "project.toml") {
+			return true
+		}
+	}
 	rel, err := filepath.Rel(h.root, path)
 	if err != nil {
 		return false
@@ -93,7 +112,7 @@ func (h *Home) relevant(path string) bool {
 		// config/, its settings.toml, teams/ and its files
 		return len(parts) == 1 || rel == filepath.Join(configDir, settingsFile) || parts[1] == teamsDir
 	case parts[0] == projectsDir:
-		// projects/, a project repo appearing or going, its project.toml
+		// legacy: projects/, a project repo appearing or going, its project.toml
 		return len(parts) <= 2 || (len(parts) == 3 && parts[2] == "project.toml")
 	}
 	return false

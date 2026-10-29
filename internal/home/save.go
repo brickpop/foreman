@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -103,6 +104,10 @@ func (h *Home) publish(changes []Change) {
 	if h.notify != nil {
 		h.pending = append(h.pending, changes...)
 	}
+	// A project made or moved has a project repo to watch now (unlock).
+	if slices.ContainsFunc(changes, func(c Change) bool { return c.Kind == "projects" || c.Kind == "project" }) {
+		h.rewatch = true
+	}
 }
 
 // unlock releases h.mu, then tells the subscriber what changed meanwhile.
@@ -110,9 +115,13 @@ func (h *Home) publish(changes []Change) {
 // reading max_sessions on a settings change) would wait on itself forever,
 // and every request after it.
 func (h *Home) unlock() {
-	changes, notify := h.pending, h.notify
-	h.pending = nil
+	changes, notify, rewatch := h.pending, h.notify, h.rewatch && h.watcher != nil
+	h.pending, h.rewatch = nil, false
 	h.mu.Unlock()
+	// Before telling: a change made right after it is then seen.
+	if rewatch {
+		h.watchDirs(h.watcher)
+	}
 	for _, c := range changes {
 		notify(c)
 	}

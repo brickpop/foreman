@@ -28,7 +28,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	for _, agent := range team.Config.Roster() {
 		inst := store.Instance{
 			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Asleep,
-			SandboxPath: m.Config.Sandbox(project.ID, agent), Harness: on.harness, Profile: on.profile,
+			SandboxPath: project.Sandbox(agent), Harness: on.harness, Profile: on.profile,
 		}
 		if err := m.Instances.Put(ctx, inst); err != nil { // a new instance: nothing to change yet
 			return dep, err

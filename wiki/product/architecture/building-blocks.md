@@ -105,14 +105,14 @@ Every arrow, in words:
 │  foreman-agent ──────────── tcp: host.containers.internal:<agent port>, token ──────┼──▶ Agent link
 │                                                                                     │
 │  Mounts                                                                             │
-│   ~/.foreman/sandboxes/ledger/tove/ledger-api  Tove's worktree (wt/tove/*), rw      │
+│   ~/workspace/foreman/ledger/agents/tove/ledger-api  Tove's worktree, rw            │
 │   ~/dev/ledger-api/.git                  the repo every worktree shares, ro         │
-│   ~/.foreman/sandboxes/ledger/tove/project  the live project repo (project.toml,    │
-│                                          wiki), from ~/.foreman/projects/ledger:    │
+│   ~/workspace/foreman/ledger/agents/tove/project  the live project repo             │
+│                                          (project.toml, wiki), from ../../project:  │
 │                                          rw for the lead, else ro                   │
 │                                          (its .git ro for every agent)              │
-│   $CLAUDE_CONFIG_DIR     the instance's private config: prompt, MCP + hooks config, │
-│                          history, memory (rw)                                       │
+│   ~/.foreman/harness/ledger/tove  its harness folder: $CLAUDE_CONFIG_DIR, its       │
+│                          prompt, MCP + hooks config, history, memory (rw)           │
 │   …/profiles/<name>/     the project's profile's login file (the CEO's; rw)         │
 │   ~/.gitconfig           ro, if it exists                                           │
 │  Never mounted: the rest of ~ (~/.ssh, ~/.config, …), the rest of ~/.foreman/       │
@@ -317,7 +317,7 @@ type Dashboard interface {
     LocateRepo(project, name, path) (Project, error) // a moved repo: the new path must hold its root commit
     RemoveRepo(project, name) (Project, error)       // refused while a team is deployed on the project
     SetProfile(project, profile) (Project, error)
-    Sandbox(project, agent) string                   // <home>/sandboxes/<project>/<agent>
+    Sandbox(project, agent) string                   // <workspace>/agents/<agent>
     Teams() []Team;        Team(id) (Team, error)
     SaveTeam(TeamConfig, version) (Team, error)      // version-guarded; one commit per save
     Settings() SettingsFile; SaveSettings(Settings, version) (newVersion, error)

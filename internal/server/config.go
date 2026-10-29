@@ -27,12 +27,20 @@ type Config interface {
 	SaveSettings(ctx context.Context, s home.Settings, version string) (string, error)
 	// SaveTeam writes a team file if still at version; returns the saved team.
 	SaveTeam(ctx context.Context, c home.TeamConfig, version string) (home.Team, error)
-	// NewProject creates a project with its project repo, new or cloned from
-	// clone (a URL or a local path), and no code repo yet; created is false
-	// when it took over a project repo left there. RemoveProject removes one
-	// and its history, its project repo only if deleteRepo.
-	NewProject(ctx context.Context, name, clone string) (p home.Project, created bool, err error)
-	RemoveProject(ctx context.Context, id string, deleteRepo bool) error
+	// NewProject creates a project in workspace with its project repo, new or
+	// cloned from clone (a URL or a local path), and no code repo yet; created
+	// is false when it took over a project repo left there. RemoveProject
+	// removes one and its history, keeping its workspace: its project repo
+	// only if deleteRepo, its agents' worktrees only if deleteWorktrees.
+	NewProject(ctx context.Context, name, clone, workspace string) (p home.Project, created bool, err error)
+	RemoveProject(ctx context.Context, id string, deleteRepo, deleteWorktrees bool) error
+	// SuggestWorkspace is where a project named name would go: in the
+	// projects folder.
+	SuggestWorkspace(name string) (home.Suggestion, error)
+	// Migrate moves a project made before workspaces into workspace (refused
+	// while a team is deployed on it). Legacy: it goes once the CEO has
+	// migrated (wiki/backlog/remove-workspace-migration.md).
+	Migrate(ctx context.Context, id, workspace string) (home.Project, error)
 	// AddRepo adds an existing repo, by its folder, with main as its main
 	// branch ("": main, which it must have); NewRepo creates an empty one at
 	// a new folder, on main, and adds it.
@@ -47,8 +55,8 @@ type Config interface {
 	RenameRepo(ctx context.Context, project, name, newName string) (home.Project, error)
 	// SetRepoMain sets a repo's main branch, one it has.
 	SetRepoMain(ctx context.Context, project, name, main string) (home.Project, error)
-	// Browse lists a folder for picking repos, inside the folder they are
-	// added from ("" is that folder).
+	// Browse lists a folder for picking repos and workspaces, inside the
+	// CEO's home folder ("" is the folder Foreman was started from).
 	Browse(path string) (home.Folder, error)
 	// RepoBranches lists a folder's branches, to pick a repo's main branch.
 	RepoBranches(ctx context.Context, path string) (home.Branches, error)
@@ -77,14 +85,15 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Name  string `json:"name"`
-			Clone string `json:"clone"`
+			Name      string `json:"name"`
+			Clone     string `json:"clone"`
+			Workspace string `json:"workspace"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, clone?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, clone?, workspace}")
 			return
 		}
-		p, created, err := c.NewProject(r.Context(), req.Name, req.Clone)
+		p, created, err := c.NewProject(r.Context(), req.Name, req.Clone, req.Workspace)
 		if err == nil && created {
 			// 201 tells a new project repo from one taken over (200).
 			writeJSON(w, http.StatusCreated, p)
@@ -93,11 +102,23 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("DELETE /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if err := c.RemoveProject(r.Context(), r.PathValue("id"), r.URL.Query().Get("deleteRepo") == "true"); err != nil {
+		q := r.URL.Query()
+		if err := c.RemoveProject(r.Context(), r.PathValue("id"), q.Get("deleteRepo") == "true", q.Get("deleteWorktrees") == "true"); err != nil {
 			writeProject(w, nil, err)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /api/projects/{id}/migrate", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Workspace string `json:"workspace"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {workspace}")
+			return
+		}
+		p, err := c.Migrate(r.Context(), r.PathValue("id"), req.Workspace)
+		writeProject(w, p, err)
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}/name", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
@@ -133,6 +154,10 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			p, err = c.AddRepo(r.Context(), r.PathValue("id"), req.Name, req.Path, req.Main)
 		}
 		writeProject(w, p, err)
+	})
+	mux.HandleFunc("GET /api/folders/workspace", func(w http.ResponseWriter, r *http.Request) {
+		s, err := c.SuggestWorkspace(r.URL.Query().Get("name"))
+		writeProject(w, s, err)
 	})
 	mux.HandleFunc("GET /api/folders/branches", func(w http.ResponseWriter, r *http.Request) {
 		b, err := c.RepoBranches(r.Context(), r.URL.Query().Get("path"))

@@ -13,7 +13,7 @@ import (
 // its subfolders, the git repos among them marked.
 type Folder struct {
 	Path    string        `json:"path"`             // a real path
-	Parent  string        `json:"parent,omitempty"` // "" at the top: the browser never goes above Start
+	Parent  string        `json:"parent,omitempty"` // "" at the top: the browser never goes above the CEO's home folder
 	Entries []FolderEntry `json:"entries"`          // its subfolders by name, hidden ones left out
 }
 
@@ -25,8 +25,8 @@ type FolderEntry struct {
 }
 
 // Browse lists a folder for the repo browser: path, or Start when empty. It
-// must be inside Start, and so must each subfolder listed (a symlink leading
-// out is left out).
+// must be inside the CEO's home folder, and each subfolder listed usable
+// (Home.usable): a symlink leading out, or Foreman's home, is left out.
 func (h *Home) Browse(path string) (Folder, error) {
 	if path == "" {
 		path = h.start
@@ -38,15 +38,15 @@ func (h *Home) Browse(path string) (Folder, error) {
 	if err != nil {
 		return Folder{}, fmt.Errorf("%w: %s is not a folder", ErrInvalid, path)
 	}
-	if !inside(real, h.start) {
-		return Folder{}, fmt.Errorf("%w: %s", ErrInvalid, h.outsideStart(path))
+	if !inside(real, h.allowed) {
+		return Folder{}, fmt.Errorf("%w: %s is outside your home folder (%s)", ErrInvalid, path, h.allowed)
 	}
 	entries, err := os.ReadDir(real)
 	if err != nil {
 		return Folder{}, fmt.Errorf("%w: %s can't be read: %s", ErrInvalid, path, err.Error())
 	}
 	f := Folder{Path: real, Entries: []FolderEntry{}}
-	if real != h.start {
+	if real != h.allowed {
 		f.Parent = filepath.Dir(real)
 	}
 	for _, e := range entries {
@@ -54,7 +54,8 @@ func (h *Home) Browse(path string) (Folder, error) {
 			continue
 		}
 		child, err := filepath.EvalSymlinks(filepath.Join(real, e.Name()))
-		if err != nil || !inside(child, h.start) {
+		// Out of bounds (a symlink leading out, Foreman's home): left out.
+		if err != nil || h.usable(child, child) != nil {
 			continue
 		}
 		if info, err := os.Stat(child); err != nil || !info.IsDir() {
@@ -73,15 +74,15 @@ type Branches struct {
 	Current  string   `json:"current"`  // its checkout's; "" when detached
 }
 
-// RepoBranches lists the branches of a folder to add as a repo, inside the
-// folder repos are added from.
+// RepoBranches lists the branches of a folder to add as a repo, one Foreman
+// may use (Home.usable).
 func (h *Home) RepoBranches(ctx context.Context, path string) (Branches, error) {
 	real, err := h.repoFolder(path)
 	if err != nil {
 		return Branches{}, fmt.Errorf("%w: %s", ErrInvalid, err.Error())
 	}
-	if !inside(real, h.start) {
-		return Branches{}, fmt.Errorf("%w: %s", ErrInvalid, h.outsideStart(path))
+	if err := h.usable(path, real); err != nil {
+		return Branches{}, err
 	}
 	list, err := h.git.Branches(ctx, real, "")
 	if err != nil {

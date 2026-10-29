@@ -99,7 +99,7 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	if err := hm.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := hm.NewProject(ctx, "ledger", "", filepath.Join(root, "workspace", "ledger")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api, ""); err != nil {
@@ -236,7 +236,7 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/tove/main" {
 		t.Errorf("a member's branch %q", b)
 	}
-	prompt, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
+	prompt, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
 	if !strings.Contains(string(prompt), "Goal: Ship invoices") || strings.Contains(string(prompt), "## Tools") {
 		t.Errorf("tove's prompt:\n%s", prompt)
 	}
@@ -526,7 +526,7 @@ func TestACrashRestartsOnceThenStops(t *testing.T) {
 	if inst.StopReason != "it exited twice in a row (code 3)" {
 		t.Errorf("stop reason %q", inst.StopReason)
 	}
-	openers, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "mara"), ".harness", "fake", "PROMPT.md.openers"))
+	openers, _ := os.ReadFile(f.hm.Path("harness", "ledger", "mara", "fake", "PROMPT.md.openers"))
 	if string(openers) != "[Your goal on ledger: g]\n[Your goal on ledger: g]\n" {
 		t.Errorf("openers per start: %q", openers)
 	}
@@ -655,7 +655,7 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	given, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
+	given, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
 	if shown != string(given) || !strings.Contains(shown, "Goal: Ship invoices") {
 		t.Errorf("shown:\n%s\ngiven:\n%s", shown, given)
 	}
@@ -677,7 +677,7 @@ func TestTheCEOsInstructionsReachTheHarness(t *testing.T) {
 	}
 	_ = f.m.Wake(ctx, "tove@ledger")
 	f.waitStatus("tove@ledger", Running)
-	given, _ := os.ReadFile(filepath.Join(f.hm.Sandbox("ledger", "tove"), ".harness", "fake", "PROMPT.md"))
+	given, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
 	if !strings.HasSuffix(string(given), "\nAnswer in Catalan.\n") {
 		t.Errorf("given:\n%s", given)
 	}
@@ -857,7 +857,7 @@ func (g *failingSync) SyncSubmodules(_ context.Context, dir string, recursive bo
 // fetched doesn't keep the agent from starting.
 func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	write(t, f.hm.Path("projects", "ledger", "project.toml"), "recursive_submodules = true\n", 0o644)
+	write(t, filepath.Join(f.root, "workspace", "ledger", "project", "project.toml"), "recursive_submodules = true\n", 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
@@ -1337,7 +1337,8 @@ func (s *specs) last() runner.Spec {
 // An agent gets its sandbox, each repo's .git read-only at its real path
 // (which its worktree's link names, a symlinked repo folder included), and
 // the project repo in its sandbox: writable for the lead only, its .git
-// read-only for all. Nothing else of the machine, the home least of all.
+// read-only for all, and its private harness folder. Nothing else of the
+// machine, nor of the home.
 func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	link := filepath.Join(f.root, "linked-api")
@@ -1355,16 +1356,21 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	}
 	f.waitStatus("mara@ledger", Running)
 	realAPI, _ := filepath.EvalSymlinks(filepath.Join(f.root, "dev", "ledger-api"))
-	project := f.hm.Path("projects", "ledger")
+	project := filepath.Join(f.root, "workspace", "ledger", "project")
 	mara := f.hm.Sandbox("ledger", "mara")
+	harnessDir := f.hm.Path("harness", "ledger", "mara")
 	want := []runner.Mount{
 		{Source: mara, Target: mara},
 		{Source: filepath.Join(realAPI, ".git"), Target: filepath.Join(realAPI, ".git"), ReadOnly: true},
 		{Source: project, Target: filepath.Join(mara, "project")},
 		{Source: filepath.Join(project, ".git"), Target: filepath.Join(mara, "project", ".git"), ReadOnly: true},
+		{Source: harnessDir, Target: harnessDir},
 	}
 	if got := rec.last(); !slices.Equal(got.Mounts, want) || got.Labels[HomeLabel] != f.hm.Root() {
 		t.Errorf("the lead's mounts:\n%+v\nwant\n%+v\nlabels %v", got.Mounts, want, got.Labels)
+	}
+	if info, err := os.Stat(harnessDir); err != nil || info.Mode().Perm() != 0o700 {
+		t.Errorf("the harness folder is readable by others: %v", info.Mode())
 	}
 	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
 		t.Fatal(err)
@@ -1419,7 +1425,7 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 // its branches and worktrees would collide there. Another team can.
 func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
+	if _, _, err := f.hm.NewProject(ctx, "suite", "", filepath.Join(f.root, "workspace", "suite")); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api"), ""); err != nil {

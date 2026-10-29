@@ -21,7 +21,7 @@ var _ harness.Adapter = Adapter{}
 // and the opener, if any, as its argument. It keeps no conversation, so every
 // start is fresh (and gets the opener).
 func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
-	prompt := filepath.Join(s.Sandbox, ".harness", "fake", "PROMPT.md")
+	prompt := filepath.Join(s.Dir, "fake", "PROMPT.md")
 	command := []string{a.Program}
 	if s.Opener != "" {
 		command = append(command, s.Opener)

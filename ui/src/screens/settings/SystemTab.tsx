@@ -2,18 +2,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { type ImageStatus, type Settings as SettingsData, useClient } from "../../api/client";
 import { keys, useHomeFolder, useMaintenance } from "../../app/queries";
-import { Confirm } from "../../components/Overlays";
-import { Button, Segmented } from "../../components/ui";
+import { Button } from "../../components/ui";
 import { inGlobalRepo, onThisMachine, Row, Section, useSave } from "./parts";
 
-/** Settings → System: Foreman's home, where new projects go, its network,
+/** Settings → System: Foreman's home, where new projects go,
  * and the agent images. */
 export function SystemTab({ settings }: { settings?: SettingsData }) {
   return (
     <>
       <HomeSection />
       {settings && <ProjectsSection settings={settings} />}
-      {settings && <NetworkSection settings={settings} />}
       <MaintenanceSection />
     </>
   );
@@ -77,37 +75,6 @@ function ProjectsSection({ settings }: { settings: SettingsData }) {
           </>
         )}
       </Row>
-    </Section>
-  );
-}
-
-function NetworkSection({ settings }: { settings: SettingsData }) {
-  const save = useSave();
-  const [confirm, setConfirm] = useState(false);
-  return (
-    <Section label="Network" kept={inGlobalRepo}>
-      <Row
-        title="Listen on"
-        explanation="Anyone with the URL Foreman printed at start has full control. Keep this on your own machine unless you trust the network. Takes effect on restart."
-      >
-        <Segmented
-          label="Listen on"
-          value={settings.listen}
-          onChange={(v) => (v === "lan" ? setConfirm(true) : save((s) => ({ ...s, listen: v })))}
-          options={[
-            { value: "local", label: "This machine" },
-            { value: "lan", label: "Local network" },
-          ]}
-        />
-      </Row>
-      <Confirm
-        open={confirm}
-        onClose={() => setConfirm(false)}
-        title="Listen on the local network?"
-        body="Anyone on your network who gets the URL can drive your agents, and through them your code and your machine. Only do this on a network you trust. Takes effect when Foreman restarts."
-        action="Listen on the network"
-        onConfirm={() => save((s) => ({ ...s, listen: "lan" }))}
-      />
     </Section>
   );
 }

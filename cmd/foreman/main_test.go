@@ -51,6 +51,16 @@ func TestFakeHarnessNeedsTheDirectEngine(t *testing.T) {
 	}
 }
 
+// --port wins over settings.toml's port, which serves when no flag is given.
+func TestThePortFlagWinsOverTheSetting(t *testing.T) {
+	if p := portOf("9000", 7000); p != "9000" {
+		t.Errorf("flag and setting: %q", p)
+	}
+	if p := portOf("", 7000); p != "7000" {
+		t.Errorf("setting alone: %q", p)
+	}
+}
+
 func TestTheAgentPortIsTheNextOne(t *testing.T) {
 	if p, err := nextPort("8888"); err != nil || p != "8889" {
 		t.Errorf("8888: %q %v", p, err)

@@ -160,8 +160,13 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 	if len(p) > 0 || s.Port != 9000 || s.MaxSessions != 12 || s.Notifications.Finishes || !s.Notifications.NeedsMe {
 		t.Errorf("partial settings: %+v %v", s, p)
 	}
+	// listen is gone (Foreman listens on this machine only; the CEO,
+	// 2026-10-30): one left in an older file is said, and the rest still loads.
+	s, p = ParseSettings([]byte("listen = \"local\"\nport = 9000"))
+	if s.Port != 9000 || !hasProblem(p, "listen: not a field Foreman knows") {
+		t.Errorf("listen left over: %+v %v", s, p)
+	}
 	for name, tc := range map[string]struct{ toml, want string }{
-		"listen":     {`listen = "everywhere"`, "listen"},
 		"port":       {`port = 70000`, "port"},
 		"sessions":   {`max_sessions = 0`, "max_sessions"},
 		"engine":     {`engine = "docker"`, "engine"},

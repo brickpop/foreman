@@ -8,7 +8,7 @@ tags: [architecture, runtime, sessions, team-tools, api]
 
 Foreman is **one Go binary** that serves the API and the built SPA, supervises one containerised harness process per agent [instance](../models/instance.md), and routes everything that crosses between agents or reaches the CEO. Languages, libraries and repo layout are in [Tech stack](./tech-stack.md). This entry names the components and how they connect; each has its own entry.
 
-It listens on `localhost:8888` by default ([Global settings](../models/global-settings.md) can switch it to the local network, see [Security](./security.md)).
+It listens on `127.0.0.1:8888` by default, on this machine only (the CEO, 2026-10-30: no local-network mode, see [Security](./security.md)).
 
 ## Components
 

@@ -152,7 +152,7 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--line2` border (`--err` on hover), `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
-| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, Listen on, Theme |
+| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, Theme |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |
 | **Select** (`components/Select.tsx`, the one dropdown; the CEO, 2026-10-18) | A trigger like an input (`--panel`, 1px `--line2`, radius 7, 13px, the chosen label and a `▾`; `--acc` border while open), opening a menu like the Board's (`--panel`, `--line2`, radius 8, `--shadow`, at least the trigger's width, at most 360px tall, scrolling): one row per choice, `✓` beside the chosen one, a detail on the right in `--tx4`. Arrow keys and typing a letter move through it | The repo picker, a project's profile, a new profile's harness, the Podman machine's memory and CPUs. No native `<select>` |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |

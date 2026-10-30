@@ -87,7 +87,6 @@ type Look struct {
 
 // Settings is settings.toml. Absent fields keep their defaults.
 type Settings struct {
-	Listen            string                  `toml:"listen" json:"listen"`
 	Port              int                     `toml:"port" json:"port"`
 	MaxSessions       int                     `toml:"max_sessions" json:"maxSessions"`
 	Engine            string                  `toml:"engine" json:"engine"`
@@ -124,7 +123,7 @@ type Notifications struct {
 // DefaultSettings are the settings while settings.toml doesn't exist.
 func DefaultSettings() Settings {
 	return Settings{
-		Listen: "local", Port: 8888, MaxSessions: 12, Engine: "podman",
+		Port: 8888, MaxSessions: 12, Engine: "podman",
 		StuckAfterMinutes: 20, LogCapMB: 50,
 		ProjectsFolder: "~/workspace/foreman",
 		GlobalForge:    GlobalForge{Kind: "none"},
@@ -303,9 +302,6 @@ func ParseSettings(data []byte) (Settings, []string) {
 
 func (s Settings) validate() problems {
 	var p problems
-	if s.Listen != "local" && s.Listen != "lan" {
-		p.add(`listen: must be "local" or "lan"`)
-	}
 	if s.Port < 1 || s.Port > 65535 {
 		p.add("port: %d is not a port", s.Port)
 	}

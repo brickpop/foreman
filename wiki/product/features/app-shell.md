@@ -27,7 +27,7 @@ Screens: [Dashboard](./dashboard.md), [Sessions](./sessions.md), [Reviews](./rev
    - **Teams** label, then one row per team with, right-aligned (12px `--tx4`), where it is deployed: the project id if one deployment, `N projects` if more, `—` if none. A team row is active on its Team page and on the Agent page of any of its members. Then **`+ New team`**, which opens the [Chief of Staff](./chief-of-staff.md) "Create a team" flow.
    - Section labels are plain labels: not links, not collapsible. There is no Teams index screen (the prototype has one that nothing links to): the sidebar already lists every team.
 3. **Footer** (padding `12px 10px`, top border):
-   - **Settings row**: "Settings" with the listen address on the right (e.g. `localhost:8888`, Mono 11.5px `--tx4`). Opens [Settings](./settings.md).
+   - **Settings row**: "Settings" with the address on the right, `localhost:` and the port the browser reached Foreman on, which is the one bound (e.g. `localhost:8888`, Mono 11.5px `--tx4`). Opens [Settings](./settings.md).
 
 Data: projects and teams from the [home](../models/home.md) (the projects' records and project repos, the global repo's team files), deployments from the runtime state ([Deployment](../models/deployment.md)); the badge and dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
 

@@ -53,7 +53,7 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		"tui": "default",
 		// No Co-Authored-By trailer or "Generated with" line asked of the
 		// model: a commit carries its message alone (the CEO, 2026-10-29).
-		// commit() drops any trailer that comes anyway.
+		// commit() drops either line if it comes anyway.
 		"attribution": map[string]string{"commit": "", "pr": ""},
 	}
 	args := []string{a.Command(), "--dangerously-skip-permissions"}

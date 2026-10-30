@@ -43,7 +43,7 @@ foreman [--home <dir>] [--no-open] [--port 8888] [--new-token]
 - The folder it is started in is where the folder browser opens, a convenience: run Foreman from `~/dev/aragon` to start picking repos there. Workspaces and code repos may be anywhere in the CEO's home folder, `$HOME`, never inside Foreman's home (the CEO, 2026-10-28, replacing the start-folder bound of 2026-10-20; [Add a project → Picking repos](../features/add-project.md#picking-repos)).
 - On every start Foreman prints the URL with the [access token](../architecture/security.md#access-token) and opens it in the default browser; `--no-open` only prints it. A second `foreman` while one runs prints the first one's URL (and opens it) and exits, touching nothing.
 - `--home <dir>` runs on another home (tests, `just dev`); a relative one is made absolute.
-- `--port` sets the UI port (default `8888`); the interface it binds to follows the `listen` [setting](./global-settings.md).
+- `--port` sets the UI port, over `port` in [settings](./global-settings.md) (default `8888`). Foreman binds `127.0.0.1` only: it is never reachable from another machine (the CEO, 2026-10-30).
 - `--new-token` replaces the access token before starting, which logs every browser out.
 - `--ui-dir <folder>` (development only) serves the web UI from a folder instead of the embedded build; `just dev` uses it.
 - `--fake-harness <program>` (development only) runs agents and harness logins on that program (`cmd/fakeharness`) instead of Claude Code, so a team deploys without a login. Direct engine only: on Podman, Foreman refuses to start with it (a container can't run a host binary). `just dev fake` uses it; `just dev` doesn't.
@@ -54,7 +54,7 @@ foreman [--home <dir>] [--no-open] [--port 8888] [--new-token]
 ~/.foreman/
 ├─ config/                 the global repo (git)
 │  ├─ .gitignore           *.tmp
-│  ├─ settings.toml        global settings (listen, limits, engine, forges, notifications)
+│  ├─ settings.toml        global settings (port, limits, engine, forges, notifications)
 │  └─ teams/               team definitions (souls + playbooks)
 │     └─ atlas.toml
 ├─ harness/

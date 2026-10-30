@@ -60,7 +60,7 @@ func main() {
 func run(args []string, stdout io.Writer) error {
 	flags := flag.NewFlagSet("foreman", flag.ContinueOnError)
 	noOpen := flags.Bool("no-open", false, "print the URL but don't open the browser")
-	port := flags.String("port", "8888", "port for the web UI")
+	portFlag := flags.String("port", "", "port for the web UI (default: settings.toml's port, 8888 unless set)")
 	newToken := flags.Bool("new-token", false, "replace the access token (logs every browser out)")
 	uiDir := flags.String("ui-dir", "", "development: serve the web UI from this folder instead of the embedded build")
 	fakeHarness := flags.String("fake-harness", "", "development: run agents and logins on this program (cmd/fakeharness) instead of Claude Code")
@@ -106,6 +106,7 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	port := portOf(*portFlag, h.Settings().Settings.Port)
 	token, err := h.AccessToken(*newToken)
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
@@ -142,13 +143,13 @@ func run(args []string, stdout io.Writer) error {
 	}
 
 	// Listen before printing the URL, so a busy port fails before the browser opens.
-	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", *port))
+	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
 	if err != nil {
 		return err
 	}
 	// The agent port: the next one, on the host's loopback only, where
 	// containers reach it through Podman's host alias (experiment C).
-	agentPort, err := nextPort(*port)
+	agentPort, err := nextPort(port)
 	if err != nil {
 		return err
 	}
@@ -156,7 +157,7 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("the agent port: %w", err)
 	}
-	url := fmt.Sprintf("http://127.0.0.1:%s/?token=%s", *port, token)
+	url := fmt.Sprintf("http://127.0.0.1:%s/?token=%s", port, token)
 	if err := lock.Announce(url); err != nil {
 		return err
 	}
@@ -382,7 +383,7 @@ func run(args []string, stdout io.Writer) error {
 	go checklist.Run(quit)
 	views := agents{Manager: manager, logins: login.terms, typed: messenger.Typed}
 	handler := server.New(server.Options{
-		Guard:        access.NewTokenGuard(token, access.LocalHosts(*port), *port),
+		Guard:        access.NewTokenGuard(token, access.LocalHosts(port), port),
 		Home:         h,
 		Config:       h,
 		Events:       bus,
@@ -452,6 +453,15 @@ func resolveProgram(program string) (string, error) {
 }
 
 // nextPort is the port after port: the agent port, next to the UI's.
+// portOf is the web UI's port: --port when given, else settings.toml's (its
+// own default, 8888), so a machine's port survives a restart without flags.
+func portOf(flag string, setting int) string {
+	if flag != "" {
+		return flag
+	}
+	return strconv.Itoa(setting)
+}
+
 func nextPort(port string) (string, error) {
 	n, err := strconv.Atoi(port)
 	if err != nil || n < 1 || n > 65534 {

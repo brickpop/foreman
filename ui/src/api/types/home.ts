@@ -108,7 +108,6 @@ export interface Look {
  * Settings is settings.toml. Absent fields keep their defaults.
  */
 export interface Settings {
-  listen: string;
   port: number /* int */;
   maxSessions: number /* int */;
   engine: string;

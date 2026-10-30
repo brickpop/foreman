@@ -126,7 +126,6 @@ function Sidebar({
   const teams = useTeams();
   const instances = useInstances();
   const requests = useRequests();
-  const settings = useSettings();
   usePreferences(); // the theme
   const model = sidebarModel(
     projects.data ?? [],
@@ -134,7 +133,9 @@ function Sidebar({
     instances.data ?? [],
     requests.data ?? [],
   );
-  const port = settings.data?.settings.port ?? 8888;
+  // The port the browser reached Foreman on: the one it is bound to, whatever
+  // settings.toml says (--port wins over it).
+  const port = window.location.port;
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: closes the overlay after a link was followed; the links are the keyboard path
     <aside

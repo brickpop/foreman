@@ -302,9 +302,10 @@ func TestCommitTheReposNamedAsTheAgent(t *testing.T) {
 	}
 }
 
-// A commit carries its message alone: the Co-Authored-By lines a harness adds
-// go, in any case and wherever they are; a message of nothing else is none.
-func TestCommitDropsCoAuthoredByLines(t *testing.T) {
+// A commit carries its message alone: the attribution a harness adds
+// (Co-Authored-By lines, Claude Code's "Generated with") goes, in any case and
+// wherever it is; a message of nothing else is none.
+func TestCommitDropsAttribution(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
 	f.refused("tove", "commit", commits("api", "Co-Authored-By: Claude <noreply@anthropic.com>"), "empty")
@@ -317,6 +318,19 @@ func TestCommitDropsCoAuthoredByLines(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v1\n")
 	f.ok("tove", "commit", commits("api", "Explain the Co-Authored-By: trailer"))
 	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "Explain the Co-Authored-By: trailer" {
+		t.Errorf("message %q", msg)
+	}
+	// Claude Code's whole block, its "Generated with" line with or without the
+	// robot; a message of only that is none either.
+	f.refused("tove", "commit", commits("api", "🤖 Generated with [Claude Code](https://claude.com/claude-code)"), "empty")
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v2\n")
+	f.ok("tove", "commit", commits("api", "cal v2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nGenerated with [Claude Code]\n"))
+	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "cal v2" {
+		t.Errorf("message %q", msg)
+	}
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v3\n")
+	f.ok("tove", "commit", commits("api", "Generated with care"))
+	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "Generated with care" {
 		t.Errorf("message %q", msg)
 	}
 }

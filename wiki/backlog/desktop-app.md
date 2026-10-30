@@ -14,7 +14,7 @@ epic: install-first-run
 
 - A [Wails](https://wails.io) v3 app: Foreman's server runs inside it as now, and its windows show the UI at `http://localhost:<port>`; the UI doesn't change, and a browser keeps working beside it.
 - Its notifications service is a second `Notifier`, swapped in for `terminal-notifier` on macOS.
-- `bin/foreman` stays, headless: on a server, or with `listen = "lan"`.
+- `bin/foreman` stays, headless (on this machine only: there is no local-network mode, the CEO, 2026-10-30).
 
 ## Before starting
 

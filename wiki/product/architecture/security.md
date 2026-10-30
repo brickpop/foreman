@@ -28,15 +28,14 @@ Listening on `127.0.0.1` alone is not enough: any website open in the CEO's brow
 3. The server swaps the URL token for an HttpOnly, `SameSite=Strict` cookie and redirects to the same URL without it, so the token doesn't stay in the address bar or the history.
 4. Missing or wrong token: `401` (and a page that says to use the URL printed in the terminal). Rotating the token (`foreman --new-token`, see [Starting Foreman](../models/home.md#starting-foreman)) logs every browser out.
 
-The same token protects "Listen on: Local network"; the Settings warning stays, since anyone holding the URL has full control.
+Foreman binds `127.0.0.1` only, so the URL works on this machine alone (the CEO, 2026-10-30: no local-network mode). Anyone on the machine holding the URL still has full control.
 
 ### HTTP hardening
 
 | Threat | Control |
 |---|---|
-| **LAN access.** "Listen on: Local network" gives everyone on the network interactive shells | The [access token](#access-token) is required on every request; the Settings warning stays |
 | **CSRF from any website.** A page the CEO visits can POST to `http://localhost:8888` | Reject state-changing requests whose `Origin` isn't Foreman's own; require a JSON content type; plus the access token |
-| **DNS rebinding.** A malicious domain re-resolves to 127.0.0.1 and reads the API as same-origin | **Host header allowlist** (`localhost`, `127.0.0.1`, `[::1]`, plus configured LAN names) on every request |
+| **DNS rebinding.** A malicious domain re-resolves to 127.0.0.1 and reads the API as same-origin | **Host header allowlist** (`localhost`, `127.0.0.1`, `[::1]`, with the port) on every request |
 | **WebSocket hijacking.** Browsers don't apply same-origin policy to WebSockets | Check `Origin` (and the token) on every upgrade to `/ws/pty/*` |
 | **Another local user or a container** calling the API | The [access token](#access-token) |
 

@@ -9,3 +9,4 @@ A self-hosted server and web UI that lets one person (the CEO) run several teams
 - [Product](./product/index.md): what Foreman is and how it works (vision, data models, features, architecture, design)
 - [Backlog](./backlog/index.md): the kanban board of committed work
 - [Technical debt](./technical-debt.md): accepted limitations and workarounds to revisit
+- [Original PRD](./archive/original-prd.md): the first product definition, superseded by Product, kept for its history (with its clickable prototype)

@@ -10,3 +10,6 @@
 
 # foreman-agent, built for the agent containers (`just build`, `just dev`)
 /agentbin/dist/foreman-agent*
+
+# Local scratch
+/tmp/

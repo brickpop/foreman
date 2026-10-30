@@ -8,7 +8,7 @@ tags: [architecture, api, ui, security]
 
 The HTTP surface the SPA uses: JSON over HTTP, server-sent events for push, and one WebSocket per terminal. Served by the same binary as the UI ([Overview](./overview.md)). Agents don't use this API: they use the [Team tools](./team-tools.md) tools on the separate team-tools listener.
 
-All endpoints are local-only unless the listen setting changes. Every request passes the checks in [Security](./security.md#http-hardening) (Host allowlist, Origin check, access token).
+All endpoints are local-only: Foreman binds `127.0.0.1`. Every request passes the checks in [Security](./security.md#http-hardening) (Host allowlist, Origin check, access token).
 
 ## Endpoints
 

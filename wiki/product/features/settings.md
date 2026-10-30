@@ -13,7 +13,7 @@ The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10
 | **Agents** | [Profiles](#profiles), [Instructions for every agent](#instructions-for-every-agent), [Running agents](#running-agents) |
 | **Git & forges** | [Forge accounts](#forge-accounts), [Global repo](#global-repo) |
 | **Notifications & look** | [Notifications](#notifications), [Appearance](#appearance) |
-| **System** | [Home](#home), [Projects](#projects), [Network](#network), [Maintenance](#maintenance) |
+| **System** | [Home](#home), [Projects](#projects), [Maintenance](#maintenance) |
 
 **Each section says where it is kept**, after its label (` · Global repo`, `--tx4`, not bold): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **Global repo + this machine** (hosts in the global repo, tokens on this machine; [secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
 
@@ -53,14 +53,6 @@ On **System**, kept in the global repo.
 | Row | Explanation | Control |
 |---|---|---|
 | Projects folder | New project suggests each project's workspace here, in a folder of its name; you can pick another. ~ is your home folder, on any machine. | A path field (`projects_folder`, [Global settings](../models/global-settings.md)); **Save** and **Discard** appear once it is edited |
-
-## Network
-
-On **System**, kept in the global repo.
-
-| Row | Explanation | Control |
-|---|---|---|
-| Listen on | Anyone with the URL Foreman printed at start has full control. Keep this on your own machine unless you trust the network. | Segmented `This machine` / `Local network`. Choosing Local network asks for confirmation with a warning that anyone on the network can drive the agents ([Security](../architecture/security.md)). Takes effect on restart |
 
 ## Profiles
 

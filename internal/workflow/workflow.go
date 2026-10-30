@@ -445,7 +445,7 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 	seen := map[string]bool{}
 	for i := range asked {
 		a := &asked[i]
-		a.Message = withoutCoAuthors(a.Message)
+		a.Message = withoutAttribution(a.Message)
 		if _, ok := repos[a.Repo]; !ok {
 			names := slices.Sorted(maps.Keys(repos))
 			return teamtools.Refusal("unknown_repo", "%q isn't one of your repos: yours are %s", a.Repo, strings.Join(names, ", "))
@@ -512,13 +512,15 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 	return agentlink.Result{Text: text}
 }
 
-// withoutCoAuthors is an agent's commit message without its Co-Authored-By
-// lines, which a harness may add on its own: a commit carries its message
-// alone (the CEO, 2026-10-29).
-func withoutCoAuthors(message string) string {
+// withoutAttribution is an agent's commit message without the attribution a
+// harness may add on its own: its Co-Authored-By lines, and Claude Code's
+// "🤖 Generated with [Claude Code](…)". A commit carries its message alone
+// (the CEO, 2026-10-29).
+func withoutAttribution(message string) string {
 	var kept []string
 	for _, line := range strings.Split(message, "\n") {
-		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), "co-authored-by:") {
+		l := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "🤖")))
+		if !strings.HasPrefix(l, "co-authored-by:") && !strings.HasPrefix(l, "generated with [claude code]") {
 			kept = append(kept, line)
 		}
 	}

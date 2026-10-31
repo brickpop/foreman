@@ -106,7 +106,6 @@ func run(args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	port := portOf(*portFlag, h.Settings().Settings.Port)
 	token, err := h.AccessToken(*newToken)
 	if err != nil {
 		return fmt.Errorf("access token: %w", err)
@@ -131,7 +130,9 @@ func run(args []string, stdout io.Writer) error {
 	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start, Conversations: conversations}); err != nil {
 		return err
 	}
-	// The engine is chosen once: a change of the setting takes effect on restart.
+	// Read once the settings are loaded; a change of the port or the engine
+	// takes effect on restart.
+	port := portOf(*portFlag, h.Settings().Settings.Port)
 	running := h.Settings().Settings.Engine
 	// The fake harness is a host binary: a container can't run it.
 	if *fakeHarness != "" && running != "direct" {

@@ -95,7 +95,11 @@ func TestSyncChecksOutThePinsWithoutTouchingTheReposConfig(t *testing.T) {
 }
 
 func TestSyncFetchesOnlyOverHTTPS(t *testing.T) {
-	_, _, _, _, wts := withSubmodule(t, "tove")
+	r, _, _, _, wts := withSubmodule(t, "tove")
+	// The CEO never checked it out, so nothing to fall back on.
+	if err := os.RemoveAll(filepath.Join(r, ".git/modules/lib/dep")); err != nil {
+		t.Fatal(err)
+	}
 	err := New().SyncSubmodules(ctx, wts["tove"], false)
 	if err == nil || !strings.Contains(err.Error(), "not allowed") {
 		t.Errorf("a file:// submodule fetched with the default protocols: %v", err)
@@ -399,6 +403,228 @@ func TestRecursiveIsOptional(t *testing.T) {
 		}
 	}
 	_ = wts
+}
+
+func TestAnSSHURLIsTriedOverHTTPS(t *testing.T) {
+	for url, want := range map[string]string{
+		"git@github.com:aragon/platform-doc.git": "https://github.com/aragon/platform-doc.git",
+		"github.com:/aragon/x.git":               "https://github.com/aragon/x.git",
+		"ssh://git@github.com/aragon/x.git":      "https://github.com/aragon/x.git",
+		"ssh://git@gitea.local:2222/team/x.git":  "https://gitea.local/team/x.git",
+		"https://github.com/aragon/x.git":        "https://github.com/aragon/x.git",
+		"../sibling.git":                         "../sibling.git",
+		"file:///Users/ceo/lib":                  "file:///Users/ceo/lib",
+		"/Users/ceo/lib":                         "/Users/ceo/lib",
+	} {
+		if got := httpsOf(url); got != want {
+			t.Errorf("%s: %s, want %s", url, got, want)
+		}
+	}
+}
+
+// pinnedOverSSH is a code repo whose main pins lib at v1 under lib/dep with an
+// SSH URL no https counterpart answers (a private repo, to Foreman), and a
+// worktree of it.
+func pinnedOverSSH(t *testing.T) (r, wt, v1 string) {
+	t.Helper()
+	r, _, v1, _, wts := withSubmodule(t, "tove")
+	gitOut(t, r, "config", "--file", ".gitmodules", "submodule.lib/dep.url", "git@127.0.0.1:aragon/lib.git")
+	gitOut(t, r, "add", ".gitmodules")
+	gitOut(t, r, "-c", "user.name=CEO", "-c", "user.email=ceo@x", "commit", "--quiet", "-m", "lib over ssh")
+	gitOut(t, wts["tove"], "merge", "--quiet", "--ff-only", "main")
+	return r, wts["tove"], v1
+}
+
+// A private submodule comes from the CEO's own checkout when https can't
+// reach it: what the CEO fetched, with no credentials lent.
+func TestAPrivateSubmoduleComesFromTheCEOsCheckout(t *testing.T) {
+	_, wt, v1 := pinnedOverSSH(t)
+	if err := New().SyncSubmodules(ctx, wt, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, filepath.Join(wt, "lib/dep/lib.sol")); got != "v1\n" {
+		t.Errorf("lib/dep at %q, want the pinned v1", got)
+	}
+	if head := gitOut(t, filepath.Join(wt, "lib/dep"), "rev-parse", "HEAD"); head != v1 {
+		t.Errorf("lib/dep on %s", head)
+	}
+}
+
+// The fallback reads the CEO's copy of the submodule, never the URL: an agent
+// pointing .gitmodules at another repo on the machine gets nothing from it.
+func TestTheFallbackNeverFetchesTheAgentsURL(t *testing.T) {
+	_, wt, v1 := pinnedOverSSH(t)
+	secret := codeRepo(t, "main")
+	write(t, filepath.Join(secret, "secret.txt"), "the CEO's\n")
+	if err := New().Commit(ctx, secret, "secret", "secret.txt"); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, wt, "config", "--file", ".gitmodules", "submodule.lib/dep.url", "file://"+secret)
+	if err := New().SyncSubmodules(ctx, wt, false); err != nil {
+		t.Fatal(err)
+	}
+	if head := gitOut(t, filepath.Join(wt, "lib/dep"), "rev-parse", "HEAD"); head != v1 {
+		t.Errorf("lib/dep on %s, want the pinned v1 from the CEO's copy", head)
+	}
+	if out := gitOut(t, filepath.Join(wt, "lib/dep"), "log", "--all", "--format=%s"); strings.Contains(out, "secret") {
+		t.Errorf("the agent's URL was fetched: %q", out)
+	}
+}
+
+// The fallback allows local paths for one clone, never recursively: a nested
+// .gitmodules naming a repo on the machine gets nothing from it.
+func TestTheFallbackDoesntFetchNestedLocalURLs(t *testing.T) {
+	secret, _, _ := lib(t)
+	outer, _, _ := lib(t)
+	gitOut(t, outer, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+secret, "lib/inner")
+	gitOut(t, outer, "-c", "user.name=CEO", "-c", "user.email=ceo@x", "commit", "--quiet", "-m", "inner")
+	r, _ := worktrees(t)
+	gitOut(t, r, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+outer, "lib/outer")
+	gitOut(t, r, "config", "--file", ".gitmodules", "submodule.lib/outer.url", "git@127.0.0.1:aragon/outer.git")
+	gitOut(t, r, "add", ".gitmodules", "lib/outer")
+	gitOut(t, r, "-c", "user.name=CEO", "-c", "user.email=ceo@x", "commit", "--quiet", "-m", "outer over ssh")
+	wt := filepath.Join(t.TempDir(), "tove", "api")
+	if err := New().Prepare(ctx, r, wt, "wt/tove/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	err := New().SyncSubmodules(ctx, wt, true)
+	if err == nil || !strings.Contains(err.Error(), "lib/inner") {
+		t.Errorf("the nested local URL wasn't refused: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(wt, "lib/outer/lib.sol")); err != nil {
+		t.Errorf("lib/outer didn't come from the CEO's checkout: %v", err)
+	}
+	if !emptyOrMissing(filepath.Join(wt, "lib/outer/lib/inner")) {
+		t.Error("the nested submodule came from a local path")
+	}
+}
+
+// Not in the CEO's checkout either: the error says how to make it come.
+func TestAPrivateSubmoduleTheCEOHasntCheckedOut(t *testing.T) {
+	r, wt, _ := pinnedOverSSH(t)
+	if err := os.RemoveAll(filepath.Join(r, ".git/modules/lib/dep")); err != nil {
+		t.Fatal(err)
+	}
+	err := New().SyncSubmodules(ctx, wt, false)
+	if err == nil || !strings.Contains(err.Error(), "git submodule update --init lib/dep") {
+		t.Errorf("%v", err)
+	}
+}
+
+// moved puts a worktree one folder deeper, as moving a project into its
+// workspace did, and tells its repo (git worktree repair, as Migrate does).
+func moved(t *testing.T, r, wt string) string {
+	t.Helper()
+	to := filepath.Join(t.TempDir(), "workspace", "agents", "tove", "api")
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(wt, to); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, r, "worktree", "repair", to)
+	return to
+}
+
+// A worktree moved with its submodules checked out: git keeps their links
+// relative, and `worktree repair` leaves them, so every git command in it
+// failed (found 2026-10-30, after a project moved into its workspace). The
+// next start relinks them.
+func TestPrepareRelinksTheSubmodulesOfAMovedWorktree(t *testing.T) {
+	r, _, v1, _, wts := withSubmodule(t, "tove")
+	if err := local().SyncSubmodules(ctx, wts["tove"], false); err != nil {
+		t.Fatal(err)
+	}
+	wt := moved(t, r, wts["tove"])
+	if _, err := New().DirtySubmodules(ctx, wt); err == nil {
+		t.Fatal("the moved worktree's submodule still works: the test proves nothing")
+	}
+	if err := New().Prepare(ctx, r, wt, "wt/tove/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if dirty, err := New().DirtySubmodules(ctx, wt); err != nil || len(dirty) > 0 {
+		t.Errorf("after Prepare: %v %v", dirty, err)
+	}
+	dep := filepath.Join(wt, "lib/dep")
+	real, _ := filepath.EvalSymlinks(dep)
+	if top := gitOut(t, dep, "rev-parse", "--show-toplevel"); top != real {
+		t.Errorf("the submodule's worktree is %s, want %s (its core.worktree)", top, real)
+	}
+	if head := gitOut(t, dep, "rev-parse", "HEAD"); head != v1 {
+		t.Errorf("the submodule lost its commit: %s", head)
+	}
+	// Relative still, as git writes them: a later move breaks them the same
+	// way, and the start after it mends them again.
+	if link := read(t, filepath.Join(dep, ".git")); !strings.HasPrefix(link, "gitdir: ../") {
+		t.Errorf("link %q", link)
+	}
+	if err := local().SyncSubmodules(ctx, wt, false); err != nil {
+		t.Errorf("sync after the relink: %v", err)
+	}
+}
+
+// The relink runs on the host over a .gitmodules the agent can edit: a path
+// out of the worktree, through a symlink, or a name out of the git dir
+// rewrites nothing.
+func TestTheRelinkStaysInTheWorktree(t *testing.T) {
+	r, _, _, _, wts := withSubmodule(t, "tove")
+	wt := wts["tove"]
+	if err := local().SyncSubmodules(ctx, wt, false); err != nil {
+		t.Fatal(err)
+	}
+	outside := t.TempDir()
+	planted := "gitdir: the CEO's own\n"
+	write(t, filepath.Join(outside, "x", ".git"), planted)
+	if err := os.Symlink(filepath.Join(outside, "x"), filepath.Join(wt, "link")); err != nil {
+		t.Fatal(err)
+	}
+	up, _ := filepath.Rel(wt, filepath.Join(outside, "x"))
+	// Each borrows lib/dep's name, whose git data exists: only the checks on
+	// the path stop the rewrite.
+	modules := filepath.Join(wt, ".gitmodules")
+	write(t, modules, read(t, modules)+
+		"[submodule \"lib/dep\"]\n\tpath = "+up+"\n"+
+		"[submodule \"lib/dep\"]\n\tpath = link\n"+
+		"[submodule \"../../../dep\"]\n\tpath = lib/dep\n\turl = https://x\n")
+	if err := New().Prepare(ctx, r, wt, "wt/tove/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(t, filepath.Join(outside, "x", ".git")); got != planted {
+		t.Errorf("a .git outside the worktree was rewritten: %q", got)
+	}
+	if link := read(t, filepath.Join(wt, "lib/dep/.git")); !strings.Contains(link, "/modules/lib/dep") {
+		t.Errorf("lib/dep relinked by another name: %q", link)
+	}
+}
+
+// Nested submodules (recursive_submodules) are relinked too.
+func TestPrepareRelinksNestedSubmodules(t *testing.T) {
+	inner, _, _ := lib(t)
+	outer, _, _ := lib(t)
+	gitOut(t, outer, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+inner, "lib/inner")
+	gitOut(t, outer, "-c", "user.name=CEO", "-c", "user.email=ceo@x", "commit", "--quiet", "-m", "inner")
+	r, _ := worktrees(t)
+	gitOut(t, r, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+outer, "lib/outer")
+	gitOut(t, r, "-c", "user.name=CEO", "-c", "user.email=ceo@x", "commit", "--quiet", "-m", "outer")
+	wt := filepath.Join(t.TempDir(), "tove", "api")
+	if err := New().Prepare(ctx, r, wt, "wt/tove/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := local().SyncSubmodules(ctx, wt, true); err != nil {
+		t.Fatal(err)
+	}
+	wt = moved(t, r, wt)
+	if err := New().Prepare(ctx, r, wt, "wt/tove/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(wt, "lib/outer/lib/inner")
+	real, _ := filepath.EvalSymlinks(nested)
+	if top := gitOut(t, nested, "rev-parse", "--show-toplevel"); top != real {
+		t.Errorf("the nested submodule's worktree is %s, want %s", top, real)
+	}
+	if err := local().SyncSubmodules(ctx, wt, true); err != nil {
+		t.Errorf("sync after the relink: %v", err)
+	}
 }
 
 // The CEO's credentials never reach a fetch: not the global config's helper,

@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -69,21 +68,171 @@ func (g *CLI) SyncSubmodules(ctx context.Context, dir string, recursive bool) er
 // update runs `submodule update --init` with the URLs of the branch's
 // .gitmodules, so nothing is written to the repo's .git/config, and always as
 // a checkout: a .gitmodules can ask for a merge, a rebase or none.
+//
+// One submodule at a time, so each finds its own way: an SSH URL is tried
+// over https (a public repo answers without credentials), and failing that
+// the submodule comes from the CEO's own checkout of the repo, locally: what
+// the CEO fetched, which agents can already read (the repo's .git is mounted
+// in their containers), so no credential is lent (the CEO, 2026-10-30).
 func (g *CLI) update(ctx context.Context, dir string, recursive bool, paths ...string) error {
 	urls, err := submoduleURLs(ctx, dir)
 	if err != nil || len(urls) == 0 {
 		return err
 	}
-	var args []string
-	for _, name := range slices.Sorted(maps.Keys(urls)) {
-		args = append(args, "-c", "submodule."+name+".url="+urls[name], "-c", "submodule."+name+".update=checkout")
+	byPath, err := submoduleNames(ctx, dir)
+	if err != nil {
+		return err
+	}
+	links, err := run(ctx, dir, "ls-files", "--stage", "-z")
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, entry := range strings.Split(links, "\x00") {
+		info, path, ok := strings.Cut(entry, "\t")
+		if !ok || !strings.HasPrefix(info, "160000 ") || (len(paths) > 0 && !slices.Contains(paths, path)) {
+			continue
+		}
+		name := byPath[path]
+		err := g.updateOne(ctx, dir, recursive, name, httpsOf(urls[name]), path)
+		if err == nil {
+			continue
+		}
+		if copy := ceoCopy(ctx, dir, name); copy == "" {
+			err = fmt.Errorf("%w; not in the CEO's checkout either (git submodule update --init %s there fills it)", err, path)
+		} else if local := g.updateOne(ctx, dir, false, name, copy, path, "-c", "protocol.file.allow=always"); local == nil {
+			// Never recursive with file allowed: a nested .gitmodules could
+			// name any repo on the machine. Its nested ones go the usual way.
+			if recursive {
+				if err := g.update(ctx, filepath.Join(dir, path), true); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", path, err))
+				}
+			}
+			continue
+		} else {
+			err = fmt.Errorf("%w; from the CEO's checkout: %v (a git fetch there may bring the commit)", err, local)
+		}
+		errs = append(errs, fmt.Errorf("%s: %w", path, err))
+	}
+	return errors.Join(errs...)
+}
+
+// updateOne checks the submodule at path out, from url (extra: more git
+// config, put after fetch's own so it wins).
+func (g *CLI) updateOne(ctx context.Context, dir string, recursive bool, name, url, path string, extra ...string) error {
+	args := slices.Clone(extra)
+	if name != "" {
+		args = append(args, "-c", "submodule."+name+".url="+url, "-c", "submodule."+name+".update=checkout")
 	}
 	args = append(args, "submodule", "update", "--init", "--quiet")
 	if recursive {
 		args = append(args, "--recursive")
 	}
-	_, err = g.fetch(ctx, dir, append(append(args, "--"), paths...)...)
+	_, err := g.fetch(ctx, dir, append(args, "--", path)...)
 	return err
+}
+
+// httpsOf is an SSH URL's https counterpart (git@host:path, ssh://user@host:port/path
+// → https://host/path); any other URL as it is.
+func httpsOf(url string) string {
+	var host, path string
+	if rest, ok := strings.CutPrefix(url, "ssh://"); ok {
+		host, path, _ = strings.Cut(rest, "/")
+		host, _, _ = strings.Cut(host[strings.Index(host, "@")+1:], ":")
+	} else if h, p, ok := strings.Cut(url, ":"); ok && !strings.Contains(url, "://") && h != "" && !strings.Contains(h, "/") {
+		host, path = h[strings.Index(h, "@")+1:], p
+	} else {
+		return url
+	}
+	return "https://" + host + "/" + strings.TrimPrefix(path, "/")
+}
+
+// ceoCopy is where the CEO's own checkout of the repo keeps the submodule's
+// git data, "" when it has none.
+func ceoCopy(ctx context.Context, dir, name string) string {
+	common, err := run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil || !filepath.IsLocal(name) {
+		return ""
+	}
+	copy := filepath.Join(strings.TrimSpace(common), "modules", name)
+	if info, err := os.Stat(copy); err != nil || !info.IsDir() {
+		return ""
+	}
+	return copy
+}
+
+// submoduleNames are the submodules .gitmodules names, by path.
+func submoduleNames(ctx context.Context, dir string) (map[string]string, error) {
+	out, err := run(ctx, dir, "config", "--file", ".gitmodules", "-z", "--get-regexp", `^submodule\..*\.path$`)
+	if err != nil && strings.TrimSpace(out) == "" {
+		return nil, nil // no path at all: git config exits 1
+	}
+	names := map[string]string{}
+	for _, entry := range strings.Split(out, "\x00") {
+		if key, path, ok := strings.Cut(entry, "\n"); ok {
+			names[path] = strings.TrimSuffix(strings.TrimPrefix(key, "submodule."), ".path")
+		}
+	}
+	return names, nil
+}
+
+// relinkSubmodules points each checked-out submodule of the worktree dir at
+// its git data again, and the data back at it. Git writes both links as
+// relative paths (the submodule's .git file, the data's core.worktree), so a
+// move of the worktree breaks them and `worktree repair` leaves them: every
+// git command in the worktree then fails (found 2026-10-30, after a project
+// moved into its workspace). Nested submodules too.
+//
+// It runs on the host, and .gitmodules is the agent's to edit: it only ever
+// rewrites a submodule's existing .git file, inside the worktree and through
+// no symlink, to point into the worktree's own git dir.
+func relinkSubmodules(ctx context.Context, dir string) error {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return err
+	}
+	out, err := run(ctx, root, "rev-parse", "--absolute-git-dir")
+	if err != nil {
+		return err
+	}
+	gitDir, err := filepath.EvalSymlinks(strings.TrimSpace(out))
+	if err != nil {
+		return err
+	}
+	names, err := submoduleNames(ctx, root)
+	if err != nil {
+		return err
+	}
+	for path, name := range names {
+		if !filepath.IsLocal(name) || !filepath.IsLocal(path) {
+			continue
+		}
+		data := filepath.Join(gitDir, "modules", name)
+		sub := filepath.Join(root, path)
+		if real, err := filepath.EvalSymlinks(sub); err != nil || real != sub {
+			continue // not checked out, or reached through a symlink
+		}
+		if info, err := os.Lstat(filepath.Join(sub, ".git")); err != nil || !info.Mode().IsRegular() {
+			continue // never checked out, or a repo of its own
+		}
+		if info, err := os.Stat(data); err != nil || !info.IsDir() {
+			continue
+		}
+		toData, _ := filepath.Rel(sub, data)
+		toSub, _ := filepath.Rel(data, sub)
+		if err := os.WriteFile(filepath.Join(sub, ".git"), []byte("gitdir: "+toData+"\n"), 0o644); err != nil {
+			return err
+		}
+		if _, err := run(ctx, root, "config", "--file", filepath.Join(data, "config"), "core.worktree", toSub); err != nil {
+			return err
+		}
+		if _, err := os.Stat(filepath.Join(data, "modules")); err == nil {
+			if err := relinkSubmodules(ctx, sub); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // submoduleURLs are the URLs .gitmodules gives, by submodule name.

@@ -139,7 +139,8 @@ func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) 
 		if strings.TrimSpace(existing) != strings.TrimSpace(common) {
 			return fmt.Errorf("%s is a checkout of another repo", worktree)
 		}
-		return nil
+		// Its submodules' links break the same way when it moved.
+		return relinkSubmodules(ctx, worktree)
 	}
 	// Forget worktrees whose folder was deleted, so their branches are free.
 	if _, err := run(ctx, repo, "worktree", "prune"); err != nil {

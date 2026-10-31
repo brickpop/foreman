@@ -27,3 +27,26 @@ Found while building it (git 2.47, checked by hand before writing the code):
 - [x] specs: Sandboxes and git policy, Team tools, Protocol, Session prompt, Project config, glossary, building blocks, sessions, API
 - [x] run every check in a fresh session
 - [ ] the CEO tries a Foundry repo
+
+## Found (2026-10-30): moving a project broke every worktree with submodules
+
+After the CEO moved a project into its workspace, `switch()` failed for every agent: in each `account-bunker` worktree, the four `lib/*` submodules' `.git` files pointed one `../` too high. Moving a project puts each sandbox one folder deeper, and git writes a submodule's links as relative paths: its `.git` file, and its data's `core.worktree` back to it. `git worktree repair` (what the move runs) leaves both alone. `switch()` acts on every repo, so one broken repo blocked all of them.
+
+- [x] `relinkSubmodules` (`internal/git/submodules.go`), run by `Prepare` at every agent start: it rewrites both links of each checked-out submodule, nested ones too, so the worktrees already broken mend at their next start. It runs on the host over a `.gitmodules` the agent can edit, so it only rewrites an existing `.git` file inside the worktree, through no symlink, into the worktree's own git dir.
+- [x] tests: a moved worktree (the agents' exact error, then `status`, `--show-toplevel`, `HEAD` and a sync all right), nested submodules, and a `.gitmodules` aimed out of the worktree (a `..` path, a symlink, a `..` name), checked to fail with the guards removed
+- [x] spec: [Sandboxes and git policy → Submodules](../product/architecture/sandboxes-and-git.md#submodules)
+- [ ] the CEO restarts the agents of the moved project, and `switch()` works
+- [ ] decide with the CEO: renaming a repo whose worktrees have submodules is refused by git (`git worktree move` won't move them). Is the error enough, or should Foreman move them itself (`os.Rename`, then `worktree repair` and this relink)?
+
+## Found (2026-10-30): a private submodule never came
+
+`strategy-doc` pins `platform-doc` as `git@github.com:aragon/platform-doc.git`. Foreman fetches over https only and without the CEO's credentials (agents pick the URLs), so it refused it at every start, switch and merge, and the agent had no way to get it.
+
+**Decided (the CEO, 2026-10-30):** try the https counterpart of an SSH URL, and failing that, take it from the CEO's own checkout.
+
+- [x] `update` goes one submodule at a time: the URL through `httpsOf` (`git@host:path`, `ssh://user@host:port/path` → `https://host/path`), and on failure the CEO's copy, `<repo>/.git/modules/<name>` (`ceoCopy`), with local paths allowed for that one clone only. Agents can already read that copy (the repo's `.git` is mounted in their containers), so nothing new reaches them. Neither works: the error says to run `git submodule update --init <path>`, or a fetch, in the CEO's checkout. `relinkSubmodules` now reads the paths through the same `submoduleNames`.
+- [x] The fallback is never recursive: with local paths allowed, a nested `.gitmodules` could name any repo on the machine. Nested submodules then go the usual way.
+- [x] tests: the URL forms; a private submodule filled from the CEO's checkout; one the CEO hasn't checked out (the error); an agent's `file://` URL never fetched (the CEO's copy is used); a nested local URL refused after a fallback (checked to fail without the guard); `TestSyncFetchesOnlyOverHTTPS` now removes the CEO's copy first, so the refusal it checks still applies.
+- [x] specs: [Sandboxes and git policy → Submodules](../product/architecture/sandboxes-and-git.md#submodules), [Protocol → `set_submodule`](../product/architecture/protocol.md#set_submodule)
+- [ ] the CEO restarts Sol (or switches), and `strategy-doc/platform-doc` fills: it needs `platform-doc` checked out in the CEO's own `strategy-doc` clone
+- `set_submodule(url)` still accepts only https: an agent adding a submodule still can't name an SSH URL. Left as it is (not asked).

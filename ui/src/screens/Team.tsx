@@ -2,9 +2,8 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { roleLabel, roster, type TeamTab, teamTab } from "../app/model";
+import { readable, roleLabel, roster, type TeamTab, teamTab } from "../app/model";
 import { useDeployments, useHomeFolder, useInstances, useRequests, useTeams } from "../app/queries";
-import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
 import { StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
@@ -107,13 +106,13 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                     params={{ project: d.projectId }}
                     className="relative z-10 text-[15px] font-semibold text-tx hover:underline"
                   >
-                    {d.projectId}
+                    {readable(d.projectId)}
                   </Link>
                   <Link
                     to="/projects/$project/session"
                     params={{ project: d.projectId }}
                     data-card
-                    aria-label={`Open the sessions of ${team.config.name} on ${d.projectId}`}
+                    aria-label={`Open the sessions of ${team.config.name} on ${readable(d.projectId)}`}
                     className="text-[13px] text-tx4 outline-none after:absolute after:inset-0"
                   >
                     {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
@@ -156,9 +155,8 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
             key={agent}
             to="/teams/$team/agents/$agent"
             params={{ team: team.id, agent }}
-            className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5 border-b border-line px-1.5 py-3.5 text-tx hover:bg-hover"
+            className="grid grid-cols-[1fr_auto] items-center gap-3.5 border-b border-line px-1.5 py-3.5 text-tx hover:bg-hover"
           >
-            <Avatar look={soul.look} size={38} />
             <span className="flex min-w-0 flex-col">
               <span className="font-semibold">
                 {soul.name}
@@ -172,7 +170,7 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
                 return (
                   <span key={d.id} className="flex items-center gap-1.5 text-[13px] text-tx3">
                     <Dot status={inst?.status ?? "stopped"} />
-                    {d.projectId}
+                    {readable(d.projectId)}
                   </span>
                 );
               })}

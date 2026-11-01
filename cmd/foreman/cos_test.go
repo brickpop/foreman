@@ -195,12 +195,11 @@ func TestAProposalBecomesATeamFile(t *testing.T) {
 	if !ok {
 		t.Fatal("nothing on screen")
 	}
-	look := home.Look{Color: "#8E9AAF", Skin: "#C38A62", Hair: "curly", HairColor: "#6B4A2F", Eyes: "sleepy", Beard: "full"}
-	if _, err := c.Create(context.Background(), p.ID, map[string]home.Look{"kestrel": look, "nyx": look}); err != nil {
+	if _, err := c.Create(context.Background(), p.ID); err != nil {
 		t.Fatal(err)
 	}
 	saved, err := h.Team("vesper")
-	if err != nil || saved.Config.Agents["nyx"].Look != look || len(saved.Problems) != 0 {
+	if err != nil || saved.Config.Agents["nyx"].Name == "" || len(saved.Problems) != 0 {
 		t.Errorf("saved %+v %v", saved, err)
 	}
 	// The session is told, as typed input.

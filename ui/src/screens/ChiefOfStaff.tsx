@@ -2,11 +2,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type Proposal, useClient } from "../api/client";
-import type { Look } from "../api/types/home";
 import { memberChanges, openerOf, soulFields, soulText } from "../app/chiefOfStaff";
-import { harnessLabel, randomLook, roleLabel, roster } from "../app/model";
+import { harnessLabel, roleLabel, roster } from "../app/model";
 import { cosProposalKey, keys, useCosProposal, useProfiles, useTeams } from "../app/queries";
-import { Avatar } from "../components/Avatar";
 import { TeamPlaybook } from "../components/TeamPlaybook";
 import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { Button } from "../components/ui";
@@ -147,18 +145,10 @@ function Preview({
   const isNew = !proposal.current;
   const { members, leaving } = memberChanges(proposal);
   const ids = roster(team);
-  // A face for each member proposed without one, drawn once for this proposal
-  // (the preview is mounted per proposal): the one shown is the one saved.
-  const [looks] = useState(() => {
-    const out: Record<string, Look> = {};
-    for (const id of ids) if (!team.agents[id].look?.color) out[id] = randomLook();
-    return out;
-  });
-  const lookOf = (id: string) => looks[id] ?? team.agents[id].look;
   const first = ids.find((id) => members[id]?.status !== "same") ?? ids[0];
   const [tab, setTab] = useState(first);
   const create = useMutation({
-    mutationFn: () => client.chiefOfStaff.create(proposal.id, looks),
+    mutationFn: () => client.chiefOfStaff.create(proposal.id),
     onSuccess: (saved) => {
       queries.invalidateQueries({ queryKey: keys.teams });
       if (isNew)
@@ -189,7 +179,6 @@ function Preview({
                 id === tab ? "border-acc text-tx" : "border-transparent text-tx3 hover:text-tx2"
               }`}
             >
-              <Avatar look={lookOf(id)} size={22} />
               {team.agents[id].name}
               {members[id]?.status === "new" && (
                 <span className="text-[11.5px] text-accTx">new</span>
@@ -200,15 +189,12 @@ function Preview({
         </nav>
         {soul && (
           <div className="flex flex-col gap-3.5">
-            <div className="flex items-center gap-3">
-              <Avatar look={lookOf(tab)} size={40} />
-              <div className="flex flex-col">
-                <span className="font-semibold">{soul.name}</span>
-                <span className="text-[13px] text-tx3">
-                  {roleLabel(soul.role)}
-                  {tab === team.lead ? " · lead" : ""}
-                </span>
-              </div>
+            <div className="flex flex-col">
+              <span className="font-semibold">{soul.name}</span>
+              <span className="text-[13px] text-tx3">
+                {roleLabel(soul.role)}
+                {tab === team.lead ? " · lead" : ""}
+              </span>
             </div>
             {soulFields
               .filter((f) => f.key !== "name" && f.key !== "role")

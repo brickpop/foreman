@@ -21,6 +21,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** code, a route and a UI offer kept for a one-off move; the old paths stay named in the code. Its known edges, accepted for a one-off: the moves are renames, so a workspace on another file system than the home is refused by the OS (`EXDEV`, "invalid cross-device link") and nothing moves; a stopped deployment's instance rows keep their old `sandbox_path` until a redeploy writes new ones (nothing reads them meanwhile: a start uses the row a deploy just wrote); a conversation folder Claude Code named with a hash (a path over 200 characters) can't be carried over, so the move is refused; and a failed undo (a rename back that fails too) is ignored, leaving that folder where it got to.
 - **Fix:** removed once the CEO has migrated every project: [Remove the workspace migration](./backlog/remove-workspace-migration.md).
 
+## Old team files' `look`
+
+- **State:** a team file still carrying a member's `[agents.<id>.look]` table (avatars, removed 2026-11-02) loads: `retiredLook` in `internal/home/config.go` keeps it out of the problems, and the next save drops it ([Agent soul](./product/models/agent-soul.md#schema)).
+- **Why:** the CEO's existing team files have one; refusing them would block every deployment of those teams until hand-edited.
+- **Impact:** one key path is silently ignored rather than reported. A Chief of Staff proposal is still strict (it refuses a `look`).
+- **Fix:** remove `retiredLook` (and `decode`'s `retired` parameter, its only user) once no team file in the global repo has a `.look]` table; saving each team once does it.
+
 ## Wiki performance: whole-wiki work on every change and read
 
 - **State:** the Wiki block ([Wiki engine](./product/architecture/wiki-engine.md#what-foreman-adds-on-top)) does whole-wiki work in several places:

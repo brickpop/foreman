@@ -10,7 +10,7 @@ epic: full-ui-demo
 
 Unblocked: [API types](./api-types.md) is done.
 
-**Why:** every screen sits in the shell ([App shell](../../product/features/app-shell.md)) and uses the same components ([Design system](../../product/design/design-system.md), [Avatar](../../product/design/avatar.md)).
+**Why:** every screen sits in the shell ([App shell](../../product/features/app-shell.md)) and uses the same components ([Design system](../../product/design/design-system.md), Avatar (removed 2026-11-02)).
 
 **Done when:** the sidebar (Home, Sessions, projects, teams, Chief of Staff tile, Settings), toasts, dialogs and drawers exist as components over the tokens, with the accessibility baseline (focus ring, Escape, focus trap, real disabled), and the router serves the screens' routes.
 

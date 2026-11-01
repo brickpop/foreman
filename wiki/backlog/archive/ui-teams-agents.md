@@ -8,7 +8,7 @@ epic: full-ui-demo
 
 # Team and Agent pages, and the Deploy dialog
 
-**Why:** reusable teams the CEO tunes and deploys ([Team page](../../product/features/team-page.md), [Agent page](../../product/features/agent-page.md), [Deploy a team](../../product/features/deploy-team.md), [Avatar](../../product/design/avatar.md)).
+**Why:** reusable teams the CEO tunes and deploys ([Team page](../../product/features/team-page.md), [Agent page](../../product/features/agent-page.md), [Deploy a team](../../product/features/deploy-team.md), Avatar (removed 2026-11-02)).
 
 Unblocked: the [Demo client](./demo-client.md) and the [App shell](./app-shell.md) are in place.
 

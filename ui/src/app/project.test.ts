@@ -78,8 +78,8 @@ describe("a project's page", () => {
 
 describe("deploying onto a project with a team", () => {
   it("says the team there is replaced, and what ends", () => {
-    expect(replacingLine("Atlas", "ledger", 3)).toBe(
-      "Replaces Atlas on ledger: 3 sessions end. Worktrees and branches are kept.",
+    expect(replacingLine("Atlas", "big-ledger", 3)).toBe(
+      "Replaces Atlas on Big ledger: 3 sessions end. Worktrees and branches are kept.",
     );
     expect(sessionsEnd(1)).toBe("1 session ends");
     expect(sessionsEnd(0)).toBe("0 sessions end");

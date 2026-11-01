@@ -1,12 +1,10 @@
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { isConflict, type Soul, type Team } from "../api/client";
-import type { Look } from "../api/types/home";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { palettes, randomLook, roleLabel } from "../app/model";
+import { readable, roleLabel } from "../app/model";
 import { sessionOf } from "../app/project";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
-import { Avatar } from "../components/Avatar";
 import { useToast } from "../components/Toasts";
 import { Button, Dot, Loading } from "../components/ui";
 
@@ -84,7 +82,6 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
     if (s && !draft.skills.includes(s)) set("skills", [...draft.skills, s]);
   };
   const set = <K extends keyof Soul>(key: K, value: Soul[K]) => commit({ ...draft, [key]: value });
-  const setLook = (key: keyof Look, value: string) => set("look", { ...draft.look, [key]: value });
   const running = (instances.data ?? []).filter((i) => i.id.startsWith(`${id}@`));
   const savedNote = savedAt > 0 && (
     <span className="text-[12.5px] text-ok">✓ Saved. Applies on every project.</span>
@@ -93,7 +90,6 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
   return (
     <div className="flex flex-col gap-7">
       <header className="flex items-center gap-4">
-        <Avatar look={draft.look} size={72} />
         <div className="flex flex-col gap-1">
           <h1 className="m-0 text-[26px] font-semibold tracking-[-0.02em]">{draft.name}</h1>
           <Link
@@ -149,7 +145,9 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
               className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-3 rounded-[9px] border border-line bg-panel px-3 py-2"
             >
               <Dot status={i.status} size={8} />
-              <span className="whitespace-nowrap font-semibold">{i.id.split("@")[1]}</span>
+              <span className="whitespace-nowrap font-semibold">
+                {readable(i.id.split("@")[1])}
+              </span>
               <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
               <Button variant="small" onClick={() => navigate(sessionOf(i.id))}>
                 Session
@@ -157,62 +155,6 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
             </div>
           ))
         )}
-      </Section>
-
-      <Section
-        label="Look"
-        aside={
-          <button
-            type="button"
-            onClick={() => set("look", randomLook())}
-            className="text-[12.5px] text-accTx"
-          >
-            Shuffle
-          </button>
-        }
-      >
-        {(
-          [
-            ["Background", "color", palettes.color],
-            ["Skin", "skin", palettes.skin],
-            ["Hair color", "hairColor", palettes.hairColor],
-          ] as const
-        ).map(([label, key, colors]) => (
-          <Row key={key} label={label}>
-            {colors.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={`${label} ${c}`}
-                aria-pressed={draft.look[key] === c}
-                onClick={() => setLook(key, c)}
-                className={`size-[22px] rounded-[6px] ${draft.look[key] === c ? "shadow-[0_0_0_2px_var(--bg),0_0_0_3.5px_var(--tx)]" : ""}`}
-                style={{ background: c }}
-              />
-            ))}
-          </Row>
-        ))}
-        {(
-          [
-            ["Hair", "hair", palettes.hair],
-            ["Eyes", "eyes", palettes.eyes],
-            ["Beard", "beard", palettes.beard],
-          ] as const
-        ).map(([label, key, values]) => (
-          <Row key={key} label={label}>
-            {values.map((v) => (
-              <button
-                key={v}
-                type="button"
-                aria-pressed={draft.look[key] === v}
-                onClick={() => setLook(key, v)}
-                className={option(draft.look[key] === v)}
-              >
-                {v}
-              </button>
-            ))}
-          </Row>
-        ))}
       </Section>
 
       <Section label="Personality">
@@ -311,15 +253,6 @@ function Section({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="grid grid-cols-[84px_1fr] items-center gap-2">
-      <span className="text-[13px] text-tx3">{label}</span>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-    </div>
-  );
-}
-
 function PromptView({ team, id }: { team: Team; id: string }) {
   const instances = useInstances();
   const running = (instances.data ?? []).filter((i) => i.id.startsWith(`${id}@`));
@@ -343,7 +276,7 @@ function PromptView({ team, id }: { team: Team; id: string }) {
               onClick={() => setChosen(i.id)}
               className={option(i.id === instance)}
             >
-              on {i.id.split("@")[1]}
+              on {readable(i.id.split("@")[1])}
             </button>
           ))}
         </div>

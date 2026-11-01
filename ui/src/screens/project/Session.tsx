@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { type Instance, type Team, useClient } from "../../api/client";
-import { agentOf, harnessLabel, roleLabel, slotsTaken } from "../../app/model";
+import { agentOf, harnessLabel, readable, slotsTaken } from "../../app/model";
 import { latestStopped } from "../../app/project";
 import {
   keys,
@@ -32,7 +33,6 @@ import {
   stepAgent,
   stoppedLine,
 } from "../../app/sessions";
-import { Avatar } from "../../components/Avatar";
 import { DeployDialog } from "../../components/DeployDialog";
 import { CheckIcon, CopyIcon, PromptIcon } from "../../components/icons";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
@@ -57,6 +57,7 @@ export function Session() {
   // The last agent-tab click, counted: the terminal showing that agent takes
   // the keyboard (also when the click mounted it).
   const [focusAsk, setFocusAsk] = useState({ id: "", n: 0 });
+  const [controls, setControls] = useState<HTMLElement | null>(null);
   const d = activeDeployments(instances.data ?? [], teams.data ?? [], requests.data ?? []).find(
     (x) => x.project === project,
   );
@@ -114,11 +115,20 @@ export function Session() {
           <Link to="/teams/$team" params={{ team: d.id.split("@")[0] }} className="hover:underline">
             {d.team}
           </Link>{" "}
-          <span className="font-normal text-tx3">· {project}</span>
+          <span className="font-normal text-tx3">· {readable(project)}</span>
         </h1>
         {instance && <AgentBranch key={instance.id} shown={instance} />}
         {d.needsYou && <Dot title="Needs you" />}
       </div>
+      {instance && (
+        <AgentTabs
+          roster={roster}
+          team={team}
+          shown={instance}
+          onClick={pick}
+          controlsSlot={setControls}
+        />
+      )}
       {instance && (
         <AgentSession
           key={instance.id}
@@ -126,11 +136,7 @@ export function Session() {
           teams={teams.data}
           lead={team?.config.lead}
           focusAsk={focusAsk}
-          tabs={(controls) => (
-            <AgentTabs roster={roster} team={team} shown={instance} onClick={pick}>
-              {controls}
-            </AgentTabs>
-          )}
+          controls={controls}
         />
       )}
     </div>
@@ -145,7 +151,7 @@ function NoTeam({ project }: { project: string }) {
     <div className="px-6 pt-6 pb-12">
       <Empty>
         <span className="flex flex-col items-center gap-3">
-          No team is on {project}, so there are no sessions. Deploy one.
+          No team is on {readable(project)}, so there are no sessions. Deploy one.
           <Button variant="primary" onClick={() => setDeploy(true)}>
             Deploy a team
           </Button>
@@ -182,21 +188,30 @@ function AgentBranch({ shown }: { shown: Instance }) {
   ) : null;
 }
 
-/** The deployment's agents, the lead first. The shown agent's controls
- * (children) end the row. */
+/** The deployment's agents, the lead first. It outlives the agent shown,
+ * so picking a tab keeps the row's scroll; the shown agent's controls end
+ * it, in the slot it hands over. */
 function AgentTabs({
   roster,
   team,
   shown,
   onClick,
-  children,
+  controlsSlot,
 }: {
   roster: Instance[];
   team?: Team;
   shown: Instance;
   onClick: (id: string) => void;
-  children: ReactNode;
+  controlsSlot: (el: HTMLElement | null) => void;
 }) {
+  const row = useRef<HTMLDivElement>(null);
+  // A tab picked with the keyboard may be scrolled out of sight: bring it in.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a change of the agent shown only
+  useEffect(() => {
+    row.current
+      ?.querySelector("[aria-current]")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [shown.id]);
   const tab = (i: Instance) => {
     const soul = team?.config.agents[i.agentId];
     const on = i.id === shown.id;
@@ -204,19 +219,23 @@ function AgentTabs({
       <button
         key={i.id}
         type="button"
+        aria-current={on || undefined}
         onClick={() => onClick(i.id)}
         className={`flex shrink-0 items-center gap-2 px-3 py-2.5 font-medium ${on ? "text-tx shadow-[inset_0_-2px_0_var(--acc)]" : "text-tx3 hover:text-tx2"}`}
       >
-        <Avatar look={soul?.look} size={24} status={i.status} dotBorder="var(--side)" />
+        <Dot status={i.status} size={8} title={i.status} />
         {soul?.name ?? i.agentId}
-        {i.agentId === team?.config.lead && <LeadTag />}
+        {i.agentId === team?.config.lead && <LeadTag name={soul?.name ?? i.agentId} />}
       </button>
     );
   };
   const [lead, ...members] = roster;
   return (
     <nav className="flex items-center gap-2 border-b border-line bg-side px-3">
-      <div className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:thin]">
+      <div
+        ref={row}
+        className="flex min-w-0 flex-1 items-center overflow-x-auto [scrollbar-width:thin]"
+      >
         {lead && tab(lead)}
         {members.length > 0 && (
           <>
@@ -226,26 +245,26 @@ function AgentTabs({
           </>
         )}
       </div>
-      {children}
+      <span ref={controlsSlot} className="flex shrink-0" />
     </nav>
   );
 }
 
-/** The agent shown: its tabs row (via `tabs`, given this agent's controls),
- * its terminal. */
+/** The agent shown: its controls (into the tabs row's slot), its terminal. */
 function AgentSession({
   instance,
   teams,
   lead,
   focusAsk,
-  tabs,
+  controls,
 }: {
   instance: Instance;
   teams: Team[];
   lead?: string;
   /** The last agent-tab click: the terminal showing that agent takes the keyboard. */
   focusAsk: { id: string; n: number };
-  tabs: (controls: ReactNode) => ReactNode;
+  /** Where its controls go: the end of the tabs row. */
+  controls: HTMLElement | null;
 }) {
   const terminal = useRef<TerminalHandle>(null);
   const client = useClient();
@@ -323,25 +342,27 @@ function AgentSession({
   };
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-      {tabs(
-        <span className="flex shrink-0 items-center gap-2.5 text-[12.5px] text-tx4">
-          {agent ? roleLabel(agent.soul.role) : instance.agentId} · {harnessLabel(instance.harness)}
-          {!asleep && (
-            <IconButton onClick={copy} label={copied ? "Copied" : "Copy the whole buffer"}>
-              {copied ? <CheckIcon /> : <CopyIcon />}
-            </IconButton>
-          )}
-          {!asleep && (
-            <IconButton
-              onClick={() => (lineMode ? closeLine() : setLineMode(true))}
-              pressed={lineMode}
-              label={`Line input (${lineShortcut()})`}
-            >
-              <PromptIcon />
-            </IconButton>
-          )}
-        </span>,
-      )}
+      {controls &&
+        createPortal(
+          <span className="flex items-center gap-2.5 text-[12.5px] text-tx4">
+            {harnessLabel(instance.harness)}
+            {!asleep && (
+              <IconButton onClick={copy} label={copied ? "Copied" : "Copy the whole buffer"}>
+                {copied ? <CheckIcon /> : <CopyIcon />}
+              </IconButton>
+            )}
+            {!asleep && (
+              <IconButton
+                onClick={() => (lineMode ? closeLine() : setLineMode(true))}
+                pressed={lineMode}
+                label={`Line input (${lineShortcut()})`}
+              >
+                <PromptIcon />
+              </IconButton>
+            )}
+          </span>,
+          controls,
+        )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-term">
         {instance.status === "queued" ? (
           <Queued name={name} />

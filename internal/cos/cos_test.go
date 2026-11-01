@@ -64,8 +64,8 @@ func newFixture() *fixture {
 		"atlas": {ID: "atlas", Version: "v1", Config: home.TeamConfig{
 			Team: "atlas", Name: "Atlas", Lead: "mara", Order: []string{"mara", "tove"},
 			Agents: map[string]home.Soul{
-				"mara": {Name: "Mara", Role: "team_lead", Look: home.Look{Color: "#D9825B"}},
-				"tove": {Name: "Tove", Role: "engineer", Look: home.Look{Color: "#8DB86B"}},
+				"mara": {Name: "Mara", Role: "team_lead"},
+				"tove": {Name: "Tove", Role: "engineer"},
 			},
 		}},
 	}}}
@@ -104,12 +104,11 @@ func TestANewTeamIsShownThenCreated(t *testing.T) {
 	if len(f.teams.saved) != 0 {
 		t.Fatal("a proposal wrote the team")
 	}
-	look := home.Look{Color: "#6FA8DC", Skin: "#E2AE85", Hair: "bun", HairColor: "#2B2420", Eyes: "dots", Beard: "none"}
-	saved, err := f.Create(ctx, p.ID, map[string]home.Look{"nyx": look, "ghost": look})
+	saved, err := f.Create(ctx, p.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if saved.ID != "vesper" || f.teams.saved[0].Agents["nyx"].Look != look || f.teams.saved[0].Agents["kestrel"].Look != (home.Look{}) {
+	if saved.ID != "vesper" || f.teams.saved[0].Agents["nyx"].Name == "" {
 		t.Errorf("saved %+v", f.teams.saved)
 	}
 	if _, ok := f.Proposal(); ok || f.proposals[len(f.proposals)-1] != nil {
@@ -119,7 +118,7 @@ func TestANewTeamIsShownThenCreated(t *testing.T) {
 		t.Errorf("told %q", f.told)
 	}
 	// Created once: the same proposal again is gone.
-	if _, err := f.Create(ctx, p.ID, nil); !errors.Is(err, ErrStale) {
+	if _, err := f.Create(ctx, p.ID); !errors.Is(err, ErrStale) {
 		t.Errorf("twice: %v", err)
 	}
 }
@@ -133,11 +132,11 @@ func TestOnlyTheProposalOnScreenIsCreated(t *testing.T) {
 	if second.ID == first.ID || second.Team.Purpose != "Breaks things" {
 		t.Fatalf("second %+v", second)
 	}
-	if _, err := f.Create(ctx, first.ID, nil); !errors.Is(err, ErrStale) || len(f.teams.saved) != 0 {
+	if _, err := f.Create(ctx, first.ID); !errors.Is(err, ErrStale) || len(f.teams.saved) != 0 {
 		t.Errorf("the replaced one: %v", err)
 	}
 	f.Drop()
-	if _, err := f.Create(ctx, second.ID, nil); !errors.Is(err, ErrStale) || len(f.teams.saved) != 0 {
+	if _, err := f.Create(ctx, second.ID); !errors.Is(err, ErrStale) || len(f.teams.saved) != 0 {
 		t.Errorf("after the session ended: %v", err)
 	}
 }
@@ -147,8 +146,8 @@ func TestOnlyTheProposalOnScreenIsCreated(t *testing.T) {
 func TestATeamChangedMeanwhileIsNotOverwritten(t *testing.T) {
 	f := newFixture()
 	hire := `{"team": "atlas", "name": "Atlas", "lead": "mara", "agents": {
-	  "mara": {"name": "Mara", "role": "team_lead", "look": {"color": "#D9825B"}},
-	  "tove": {"name": "Tove", "role": "engineer", "look": {"color": "#8DB86B"}},
+	  "mara": {"name": "Mara", "role": "team_lead"},
+	  "tove": {"name": "Tove", "role": "engineer"},
 	  "arden": {"name": "Arden", "role": "engineer"}}}`
 	f.propose(t, hire)
 	p, _ := f.Proposal()
@@ -161,7 +160,7 @@ func TestATeamChangedMeanwhileIsNotOverwritten(t *testing.T) {
 	edited := f.teams.files["atlas"]
 	edited.Version = "v2" // the CEO edited Tove on the Agent page
 	f.teams.files["atlas"] = edited
-	if _, err := f.Create(ctx, p.ID, nil); !errors.Is(err, ErrChanged) || len(f.teams.saved) != 0 {
+	if _, err := f.Create(ctx, p.ID); !errors.Is(err, ErrChanged) || len(f.teams.saved) != 0 {
 		t.Fatalf("over a change: %v", err)
 	}
 	if _, ok := f.Proposal(); ok || len(f.told) != 1 || !strings.Contains(f.told[0], "propose it again") {

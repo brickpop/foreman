@@ -35,7 +35,6 @@ import {
   reviewTeam,
   statusLabel,
 } from "../../app/reviews";
-import { Avatar } from "../../components/Avatar";
 import { useToast } from "../../components/Toasts";
 import { Button, Empty, Loading, SectionLabel, Segmented } from "../../components/ui";
 
@@ -150,7 +149,6 @@ export function Review() {
           </h1>
         </div>
         <p className="flex flex-wrap items-center gap-2 text-[14px] text-tx3">
-          <Avatar look={lead?.soul.look} size={20} />
           <span>
             {lead?.soul.name ?? v.lead} ·{" "}
             <Link

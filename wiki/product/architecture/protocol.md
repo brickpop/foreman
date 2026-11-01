@@ -479,7 +479,7 @@ Every state change is published on the in-process event bus; the web server stre
 
 | Event | Payload | Emitted by | Used by |
 |---|---|---|---|
-| `instance.status` | instance id, status, task | Instance manager | Session's agent tabs, Dashboard, Deployment and Team rows, avatars |
+| `instance.status` | instance id, status, task | Instance manager | Session's agent tabs, Dashboard, Deployment and Team rows |
 | `instance.doing` | instance id, its activity line and when ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | Instance manager, from the harness's hooks | Deployment rows |
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The project's Activity (not shown yet) |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity |

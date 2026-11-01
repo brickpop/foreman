@@ -1,6 +1,6 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { dotStyle } from "./Avatar";
+import { saysLead } from "../app/model";
 
 // The design system's small building blocks (wiki/product/design/design-system.md):
 // screens use these, never raw styles for the same thing.
@@ -39,9 +39,43 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
   );
 }
 
-/** A card on a grid of cards (Dashboard). */
-export const card =
-  "relative flex flex-col gap-3 rounded-xl border border-line bg-panel px-4 py-3.5";
+/** A card on a grid of cards (Dashboard, Repos): a header band holding its
+ * name and status, over its body. */
+export function GridCard({
+  head,
+  opens = true,
+  children,
+}: {
+  head: ReactNode;
+  /** Whether it opens something (its title link covering it): then it shows hover. */
+  opens?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <article
+      className={`relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel ${opens ? "hover:border-line3" : ""}`}
+    >
+      <header className="flex min-h-[44px] items-center gap-2 border-b border-line bg-head px-4 py-2">
+        {head}
+      </header>
+      <div className="flex flex-1 flex-col gap-3 px-4 py-3.5">{children}</div>
+    </article>
+  );
+}
+
+/** A status in a card's header: its dot and word on a tint of its color. */
+export function StatusPill({ color, children }: { color: string; children: ReactNode }) {
+  return (
+    <span
+      className="flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[12px] text-tx2"
+      style={{ background: `color-mix(in srgb, ${color} 16%, transparent)` }}
+    >
+      <Dot color={color} />
+      {children}
+    </span>
+  );
+}
+
 /** A card's title link covering the whole card; its other controls sit above it. */
 export const cover = "after:absolute after:inset-0 after:rounded-xl after:content-['']";
 
@@ -138,8 +172,9 @@ export function Dot({
   );
 }
 
-/** The "lead" tag. */
-export function LeadTag() {
+/** The "lead" tag beside a lead's name; none when the name says it already. */
+export function LeadTag({ name }: { name: string }) {
+  if (saysLead(name)) return null;
   return (
     <span className="rounded-[4px] border border-accLine px-[5px] text-[11.5px] text-accTx">
       lead
@@ -238,4 +273,30 @@ export function Switch({
       />
     </button>
   );
+}
+
+/** The status color of an instance (wiki/product/design/design-system.md#status-colors). */
+export function statusColor(status: string): string {
+  switch (status) {
+    case "running":
+      return "var(--ok)";
+    case "awaiting":
+      return "var(--attn)";
+    case "done":
+      return "var(--info)";
+    case "starting":
+      return "var(--team)";
+    case "stopped":
+      return "var(--err)";
+    default:
+      return "var(--tx4)"; // idle, queued, asleep
+  }
+}
+
+/** A status dot's fill: queued is a dashed outline and asleep a plain one, so they
+ * read differently from idle. */
+export function dotStyle(status: string): { background: string; border?: string } {
+  if (status === "queued") return { background: "var(--bg)", border: "1.5px dashed var(--tx4)" };
+  if (status === "asleep") return { background: "var(--bg)", border: "1.5px solid var(--tx4)" };
+  return { background: statusColor(status) };
 }

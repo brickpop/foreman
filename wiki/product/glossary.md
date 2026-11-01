@@ -18,7 +18,7 @@ tags: [architecture, home]
 - **Wiki bundle**: `wiki/` in the project repo, the project's knowledge base: a folder of Markdown files with YAML frontmatter, plus `wiki.toml`. Compatible with the agentic-wiki / wikiview format. See [Wiki engine](./architecture/wiki-engine.md).
 - **Board**: a kanban view over wiki entries, declared in `wiki.toml` under `[[tool.wikiview.board]]`. See [Board](./features/board.md).
 - **Team definition**: a reusable roster and playbook, stored in `~/.foreman/config/teams/<team>.toml`, in the global repo. See [Team definition](./models/team-definition.md).
-- **Agent (soul)**: one member of a team definition: name, role, personality, skills, job description and look (avatar); what it runs on is its project's profile. One soul can run in many deployments. See [Agent soul](./models/agent-soul.md).
+- **Agent (soul)**: one member of a team definition: name, role, personality, skills and job description; what it runs on is its project's profile. One soul can run in many deployments. See [Agent soul](./models/agent-soul.md).
 - **Deployment**: a team assigned to a project; a project has one at most. The goal is the project's, in its wiki. This is runtime state, not config. See [Deployment](./models/deployment.md).
 - **Instance / session**: one agent running in one deployment. It is a live harness process with a PTY. Identified as `agent@project` (e.g. `mara@ledger`). See [Instance](./models/instance.md).
 - **Sandbox**: an agent instance's working directory, `<workspace>/agents/<agent>/`: its worktrees of the code repos, plus the live project repo mounted as `project/`. See [Sandboxes and git policy](./architecture/sandboxes-and-git.md).

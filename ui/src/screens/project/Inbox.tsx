@@ -1,10 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { isNotBuilt, type Review, type Team } from "../../api/client";
-import { agentOf, inbox, when } from "../../app/model";
+import { agentOf, inbox, readable, when } from "../../app/model";
 import { reviewOf } from "../../app/project";
 import { useRequests, useReviews, useTeams } from "../../app/queries";
 import { reviewGroups, statusLabel } from "../../app/reviews";
-import { Avatar } from "../../components/Avatar";
 import { Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 import { useProject } from "../Project";
 import { NeedsYou } from "./Pipeline";
@@ -48,7 +47,7 @@ export function Inbox() {
       {list("Done", groups.done)}
       {none && !reviews.error && (
         <Empty>
-          Nothing waits on you on {project.id}. A lead's request_merge() opens a review.
+          Nothing waits on you on {readable(project.id)}. A lead's request_merge() opens a review.
         </Empty>
       )}
     </div>
@@ -61,9 +60,8 @@ function ReviewRow({ review: v, teams }: { review: Review; teams: Team[] }) {
   return (
     <Link
       {...reviewOf(v.projectId, v.id)}
-      className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-line px-4 py-3 text-tx last:border-b-0 hover:bg-hover"
+      className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-line px-4 py-3 text-tx last:border-b-0 hover:bg-hover"
     >
-      <Avatar look={lead?.soul.look} size={26} />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{v.title || v.entry || v.branch}</span>
         <span className="truncate text-[12.5px] text-tx3">

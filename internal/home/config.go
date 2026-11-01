@@ -72,17 +72,6 @@ type Soul struct {
 	Personality string   `toml:"personality,omitempty" json:"personality"`
 	Skills      []string `toml:"skills,omitempty" json:"skills"`
 	Instruction string   `toml:"instruction,omitempty" json:"instruction"`
-	Look        Look     `toml:"look" json:"look"`
-}
-
-// Look is the avatar (wiki/product/design/avatar.md).
-type Look struct {
-	Color     string `toml:"color" json:"color"`
-	Skin      string `toml:"skin" json:"skin"`
-	Hair      string `toml:"hair" json:"hair"`
-	HairColor string `toml:"hair_color" json:"hairColor"`
-	Eyes      string `toml:"eyes" json:"eyes"`
-	Beard     string `toml:"beard" json:"beard"`
 }
 
 // Settings is settings.toml. Absent fields keep their defaults.
@@ -135,9 +124,6 @@ var (
 	slug       = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	snakeCase  = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 	forgeKinds = []string{"github", "forgejo", "gitea", "none"}
-	hairs      = []string{"short", "long", "curly", "bun", "bald"}
-	eyes       = []string{"dots", "glasses", "shades", "sleepy"}
-	beards     = []string{"none", "stubble", "full", "mustache"}
 )
 
 // Version identifies a file's content: writes carry the version they read.
@@ -152,14 +138,18 @@ type problems []string
 func (p *problems) add(format string, a ...any) { *p = append(*p, fmt.Sprintf(format, a...)) }
 
 // decode parses data into v, reporting a syntax error or unknown keys (which a
-// save would otherwise drop silently).
-func decode(data []byte, v any) (toml.MetaData, problems) {
+// save would otherwise drop silently), but those retired says an older file
+// may still hold: those load, ignored, and the next save drops them.
+func decode(data []byte, v any, retired ...func(toml.Key) bool) (toml.MetaData, problems) {
 	md, err := toml.Decode(string(data), v)
 	if err != nil {
 		return md, problems{err.Error()}
 	}
 	var p problems
 	for _, key := range md.Undecoded() {
+		if slices.ContainsFunc(retired, func(r func(toml.Key) bool) bool { return r(key) }) {
+			continue
+		}
 		p.add("%s: not a field Foreman knows (misspelled, or left from an older version); remove it", key)
 	}
 	return md, p
@@ -212,7 +202,7 @@ func checkURL(p *problems, field, value string) {
 // and names unique across teams) are checked when the home loads.
 func ParseTeam(id string, data []byte) (TeamConfig, []string) {
 	var c TeamConfig
-	md, p := decode(data, &c)
+	md, p := decode(data, &c, retiredLook)
 	c.Order = agentOrder(md)
 	c.Playbook, c.Escalate = normalize(c.Playbook), normalize(c.Escalate)
 	if c.Agents == nil {
@@ -225,6 +215,10 @@ func ParseTeam(id string, data []byte) (TeamConfig, []string) {
 	p = append(p, c.validate(id)...)
 	return c, p
 }
+
+// retiredLook is a soul's look: its avatar, removed on 2026-11-02 (the CEO:
+// "it only makes things ugly, and complex").
+func retiredLook(k toml.Key) bool { return len(k) >= 3 && k[0] == "agents" && k[2] == "look" }
 
 func (c TeamConfig) validate(id string) problems {
 	var p problems
@@ -285,16 +279,6 @@ func (s Soul) validate(at, id string) problems {
 			p.add("%s.skills: %q twice", at, skill)
 		}
 		seen[skill] = true
-	}
-	// The look is filled in when an agent is hired; a hand-written soul may
-	// leave it out, but a value that is there must be valid.
-	for field, v := range map[string]struct {
-		value   string
-		allowed []string
-	}{"hair": {s.Look.Hair, hairs}, "eyes": {s.Look.Eyes, eyes}, "beard": {s.Look.Beard, beards}} {
-		if v.value != "" && !slices.Contains(v.allowed, v.value) {
-			p.add("%s.look.%s: %q is not one of %s", at, field, v.value, strings.Join(v.allowed, ", "))
-		}
 	}
 	return p
 }

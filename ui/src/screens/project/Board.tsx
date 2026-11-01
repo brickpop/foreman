@@ -13,7 +13,6 @@ import {
   useTeams,
   useTick,
 } from "../../app/queries";
-import { Avatar } from "../../components/Avatar";
 import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
 import { Button, Loading, NotBuilt, Segmented } from "../../components/ui";
@@ -354,12 +353,7 @@ function Cell({
             <button type="button" className="text-left text-sm leading-[1.4] text-tx">
               {card.title}
             </button>
-            {assignee && (
-              <span className="flex items-center gap-1.5 text-[12.5px] text-tx3">
-                <Avatar look={assignee.soul.look} size={20} />
-                {assignee.soul.name}
-              </span>
-            )}
+            {assignee && <span className="text-[12.5px] text-tx3">{assignee.soul.name}</span>}
           </div>
         );
       })}

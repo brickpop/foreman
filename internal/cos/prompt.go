@@ -51,8 +51,8 @@ func Prompt(teams []home.Team, teamsDir string) string {
 	line("- `agents`: each member by id (lowercase letters, digits and hyphens, unique in the team): " +
 		"`name` (unique in the team; the role itself is a fine name, as `QA`, and other teams may use the same ids and names), " +
 		"`role` (snake_case), `personality`, `skills` (a few words each), " +
-		"`instruction` (the job description; empty means the role's default). Leave `look` out for a new member: " +
-		"Foreman gives them a face. Keep an existing member's `look` as it is.")
+		"`instruction` (the job description; empty means the role's default). " +
+		"Leave out any `look` an older file has: Foreman no longer uses it.")
 	line("- `order`: the member ids in the order the team lists them, the lead first.")
 	line("- `playbook`: the steps of how the team works, in order, each `{\"<who>\": \"<what they do>\"}`.")
 	line("- `escalate`: when to involve whom, each `{\"when\": \"…\", \"to\": \"<who>\"}`.")
@@ -116,8 +116,7 @@ var teamSchema = json.RawMessage(`{
           "role": {"type": "string", "description": "snake_case: team_lead, engineer, qa, architect, reviewer, or your own"},
           "personality": {"type": "string"},
           "skills": {"type": "array", "items": {"type": "string"}},
-          "instruction": {"type": "string", "description": "the job description; empty for the role's default"},
-          "look": {"type": "object", "description": "an existing member's, kept as it is; leave it out for a new member"}
+          "instruction": {"type": "string", "description": "the job description; empty for the role's default"}
         }
       }
     }

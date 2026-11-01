@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Instance, Team } from "../../api/client";
 import { type Filter, pageEntries, shows } from "../../app/activity";
-import { when } from "../../app/model";
+import { readable, when } from "../../app/model";
 import { sessionOf } from "../../app/project";
 import {
   useActivity,
@@ -57,7 +57,7 @@ export function Activity() {
           />
         </div>
       ) : (
-        <Empty>No team is on {project}. Deploy one from its Deployment section.</Empty>
+        <Empty>No team is on {readable(project)}. Deploy one from its Deployment section.</Empty>
       )}
       {stopped.length > 0 && <OlderSessions deployments={stopped} teams={teams} />}
     </div>

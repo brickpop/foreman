@@ -10,7 +10,6 @@ import {
   matching,
   readmeOf,
   reposWith,
-  repoTitle,
   shownAt,
   worktrees,
 } from "./repos";
@@ -187,14 +186,6 @@ describe("the history graph", () => {
       ],
       width: 3,
     });
-  });
-});
-
-describe("repoTitle", () => {
-  it("reads a slug as words, only the first capital", () => {
-    expect(repoTitle("foreman-ui")).toBe("Foreman ui");
-    expect(repoTitle("api")).toBe("Api");
-    expect(repoTitle("my__data--set_")).toBe("My data set");
   });
 });
 

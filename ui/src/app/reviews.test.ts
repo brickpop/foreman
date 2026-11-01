@@ -178,7 +178,7 @@ describe("Dismiss", () => {
       ["keep", false, false, false],
       ["drop", false, true, false],
     ]);
-    expect(running[0].label).toBe("Atlas keeps working on ledger; the branches stay");
+    expect(running[0].label).toBe("Atlas keeps working on Ledger; the branches stay");
   });
 
   it("sends the note, and says so, only when someone hears it", () => {

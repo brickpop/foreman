@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import type { RepoBranch, Repo as RepoInfo } from "../../api/client";
 import { withoutTitle } from "../../app/frontmatter";
-import { when } from "../../app/model";
+import { readable, when } from "../../app/model";
 import {
   useDeploymentOn,
   useRepoFile,
@@ -21,7 +21,6 @@ import {
   graph,
   matching,
   readmeOf,
-  repoTitle,
   shownAt,
 } from "../../app/repos";
 import { Frontmatter } from "../../components/Frontmatter";
@@ -64,7 +63,7 @@ export function Repo() {
           ←
         </Link>
         <h1 className="m-0 text-[18px] font-semibold">
-          {repo?.project ? "Project repo" : repoTitle(name)}
+          {repo?.project ? "Project repo" : readable(name)}
         </h1>
         <span className="font-mono text-[12.5px] text-tx4">{name}/</span>
       </div>
@@ -72,7 +71,7 @@ export function Repo() {
       {repos.isPending && <Loading rows={6} />}
       {repos.data && !repo && (
         <Empty>
-          {project.id} has no repo {name}.
+          {readable(project.id)} has no repo {name}.
         </Empty>
       )}
       {repo && at && (

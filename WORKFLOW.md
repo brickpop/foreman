@@ -20,7 +20,7 @@ wiki/
 │   ├── models/          # config files and runtime state
 │   ├── features/        # user-facing behaviour, one screen or flow per entry
 │   ├── architecture/    # components, protocols, stack
-│   └── design/          # design system, avatar, the UI prototype
+│   └── design/          # design system, the UI prototype
 └── backlog/             # ephemeral: the kanban
     ├── index.md         # entry point: the goal and the queries that list the cards
     ├── <card>.md        # every live card (type: task), read with `wiki list` (ignore_orphans'd)

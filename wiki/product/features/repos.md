@@ -12,13 +12,13 @@ A project's **Repos** section ([Project page](./project-page.md); Repositories u
 
 `/projects/<project>/repos`, at most 920px wide: a grid of **cards** (at least 260px wide, 12px apart; the CEO, 2026-11-02, replacing a panel of rows), one per code repo of the [record](../models/project-config.md#the-project-record), then the **project repo**'s. The CEO moved them here from Settings on 2026-11-01: the repos are managed where they are read.
 
-- **A card** (the Dashboard's card: `--panel`, `--line` border, radius 12, padding `14px 16px`) opens the repo's page wherever it is clicked (hover border `--line3`), except a repo with a problem, which can't be read. On it:
+- **A card** (a [grid card](../design/design-system.md#surfaces), as the Dashboard's: the name and the `⋯` menu in its header band, the rest in its body, 6px apart) opens the repo's page wherever it is clicked (hover border `--line3`), except a repo with a problem, which can't be read. On it:
   - its **name as words** (600 15px; the CEO, 2026-11-02: not a path): hyphens and underscores read as spaces, the first letter capital, so `foreman-ui` is "Foreman ui". Only how it shows: the repo's id, its folder name, the URL and every other place a repo is named (branch lines, reviews) keep `foreman-ui`. Its id is the name's tooltip;
   - its path (Mono 12px `--tx4`);
   - its main branch (Mono) and `· N branches` (12.5px `--tx3`); or, for a repo with a problem, the problem in `--err` (a missing folder, or one that is another repo: `Locate it where it went, or remove it from the project`);
   - when the repo no longer has its main branch, in `--err`: "No branch <main>: pick its main branch, or agents can't start." (the CEO, 2026-10-21);
   - a **`⋯` menu** (above the card's link): **`Main branch…`** (**`Locate…`** instead for a repo with a problem), **`Rename…`** and **`Remove…`**.
-- **The project repo's card**: "Project repo", "project.toml and the wiki", its branch count; no menu.
+- **The project repo's card**: "Project repo", "project.toml and the wiki", its branch count; no menu. Until the repos are read, a card-sized [loading placeholder](../design/design-system.md#surfaces) holds its place in the grid (never a full-width row under it).
 - With no code repo, above the cards in `--err`: `No code repo yet: agents need at least one to work on.` Then **`Add a repo`**. The routes and their refusals are in [Add a project → Code repos](./add-project.md#code-repos); a refusal is a toast "Repos not changed" with the reason.
   - **Add a repo** opens a modal "Add a repo to <project>" with the [repo picking form](./add-project.md#picking-repos) (Existing repo or New empty repo); it closes once one is added.
   - **Main branch…** opens a modal "Main branch of <name>": "Its agents start from it, and its merges go to it.", and a select of its branches; a pick saves it (`PUT /api/projects/{id}/repos/{repo}/main`, allowed while a team is deployed) and closes it.

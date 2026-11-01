@@ -15,6 +15,21 @@ export function repoName(path: string): string {
     .slice(0, 63);
 }
 
+/** A new project's name from what the CEO typed: a slug, as the server
+ * requires (it is the workspace's folder; readable makes how it shows):
+ * lowercase letters and digits, accents dropped, anything else one hyphen,
+ * at most 63. "My Café" is my-cafe; "" when nothing is left. */
+export function projectSlug(typed: string): string {
+  return typed
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .slice(0, 63)
+    .replace(/-+$/, "");
+}
+
 /** A new folder's path, name inside folder. */
 export function inside(folder: string, name: string): string {
   return `${folder.replace(/\/+$/, "")}/${name}`;

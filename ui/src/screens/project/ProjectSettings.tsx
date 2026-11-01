@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import { forgeLabel, harnessLabel, onOtherProfile } from "../../app/model";
+import { forgeLabel, harnessLabel, onOtherProfile, readable } from "../../app/model";
 import {
   keys,
   useDeployments,
@@ -186,7 +186,7 @@ function Workspace({ project }: { project: Project }) {
     mutationFn: () => client.home.migrate(project.id, target.trim()),
     onSuccess: (p) => {
       queries.invalidateQueries({ queryKey: keys.projects });
-      toast({ title: `${p.id} moved`, body: `Into ${p.workspace}.`, color: "var(--ok)" });
+      toast({ title: `${readable(p.id)} moved`, body: `Into ${p.workspace}.`, color: "var(--ok)" });
     },
     onError: (e: Error) =>
       toast({ title: "Project not moved", body: e.message, color: "var(--err)" }),
@@ -339,8 +339,8 @@ function ArchiveProject({ project }: { project: Project }) {
       </span>
       <Confirm
         open={confirming}
-        title={`Stop ${names.join(", ")} and archive ${project.id}?`}
-        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${project.id}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${project.id} is archived.`}
+        title={`Stop ${names.join(", ")} and archive ${readable(project.id)}?`}
+        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${readable(project.id)}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${project.id} is archived.`}
         action="Stop and archive"
         onConfirm={() => archive.mutate()}
         onClose={() => setConfirming(false)}
@@ -364,7 +364,7 @@ function RemoveProject({ project }: { project: Project }) {
     onSuccess: () => {
       queries.invalidateQueries({ queryKey: keys.projects });
       navigate({ to: "/" });
-      toast({ title: `${project.id} removed`, body: "", color: "var(--tx4)" });
+      toast({ title: `${readable(project.id)} removed`, body: "", color: "var(--tx4)" });
     },
     onError: (e: Error) =>
       toast({ title: "Project not removed", body: e.message, color: "var(--err)" }),
@@ -391,7 +391,7 @@ function RemoveProject({ project }: { project: Project }) {
       </span>
       <Confirm
         open={open}
-        title={`Remove ${project.id}?`}
+        title={`Remove ${readable(project.id)}?`}
         body="Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its workspace, your code repos and their branches stay."
         action="Remove"
         onConfirm={() => remove.mutate()}

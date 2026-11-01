@@ -16,6 +16,7 @@ import {
   ReviewWithdrawn,
 } from "../api/types/workflow";
 import type { DiffLine } from "./diff";
+import { readable } from "./model";
 
 // The Reviews screens' logic (wiki/product/features/reviews.md), apart from
 // their components so it can be tested.
@@ -63,11 +64,16 @@ export function dismissChoices(
   });
   return team.live
     ? [
-        choice("keep", `${team.name} keeps working on ${project}; the branches stay`, false, false),
-        choice("stop", `Stop ${team.name} on ${project}; the branches stay`, true, false),
+        choice(
+          "keep",
+          `${team.name} keeps working on ${readable(project)}; the branches stay`,
+          false,
+          false,
+        ),
+        choice("stop", `Stop ${team.name} on ${readable(project)}; the branches stay`, true, false),
         choice(
           "drop",
-          `Stop ${team.name} on ${project} and drop the branches ${aside}`,
+          `Stop ${team.name} on ${readable(project)} and drop the branches ${aside}`,
           true,
           true,
         ),

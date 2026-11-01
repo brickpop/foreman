@@ -33,7 +33,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **7. Create a team.** Sidebar → **+ New team** opens the Chief of Staff page, its terminal full width. The CEO types "A team to build features for ledger", answers its questions, and the preview opens beside the terminal: Atlas, its playbook, a tab per member (lead, two engineers). **Adjust team** → "make Ilya a reviewer" → a new preview → **Create Atlas**.
 - *Under the hood:* the Chief of Staff is an ad-hoc session like the login container (Harness adapter, Terminal, Execution engine), not an agent of a deployment, on the `default` profile, with `config/teams/` mounted read-only. Its one tool, `propose_team`, is checked by Home & config and pushed to the page (`cos.proposal`). **Create Atlas** makes Home & config write `config/teams/atlas.toml`, one commit in the global repo; the file watcher picks it up and the sidebar shows Atlas.
 
-**8. Tune an agent.** Team → Members → Tove → the Agent page: the CEO changes her look and personality. "Saved. Applies on every project."
+**8. Tune an agent.** Team → Members → Tove → the Agent page: the CEO changes her personality. "Saved. Applies on every project."
 - *Under the hood:* Home & config writes the team file (version-guarded against concurrent edits) and commits it: one commit per save in the global repo.
 
 ## Part 2: put the team to work

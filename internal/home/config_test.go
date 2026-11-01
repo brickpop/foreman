@@ -87,14 +87,6 @@ instruction = """
 Break the goal into cards.
 """
 
-[agents.mara.look]
-color = "#D9825B"
-skin = "#E2AE85"
-hair = "bun"
-hair_color = "#2B2420"
-eyes = "dots"
-beard = "none"
-
 [agents.tove]
 name = "Tove"
 role = "security_auditor"
@@ -105,8 +97,34 @@ func TestTeamExampleParses(t *testing.T) {
 	if len(p) > 0 {
 		t.Fatalf("problems: %v", p)
 	}
-	if c.Lead != "mara" || len(c.Agents) != 2 || c.Agents["mara"].Look.Hair != "bun" || len(c.Playbook) != 2 || c.Playbook[1]["members"] == "" {
+	if c.Lead != "mara" || len(c.Agents) != 2 || len(c.Playbook) != 2 || c.Playbook[1]["members"] == "" {
 		t.Errorf("parsed %+v", c)
+	}
+}
+
+// A team file from before 2026-11-02 has each member's look (the avatar,
+// removed): it loads with no problem, and the next save drops it. Only the
+// look is retired: anything else unknown is still a problem.
+func TestAnOldLookLoadsAndGoes(t *testing.T) {
+	old := strings.Replace(teamExample, "[agents.tove]", "[agents.mara.look]\ncolor = \"#D9825B\"\nhair = \"mohawk\"\n\n[agents.tove]", 1)
+	c, p := ParseTeam("atlas", []byte(old))
+	if len(p) > 0 {
+		t.Fatalf("an old look: %v", p)
+	}
+	data, err := encodeTeam(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "look") || strings.Contains(string(data), "D9825B") {
+		t.Errorf("the save kept the look:\n%s", data)
+	}
+	for _, src := range []string{
+		strings.Replace(teamExample, "[agents.tove]", "[agents.mara.face]\ncolor = \"x\"\n\n[agents.tove]", 1),
+		"look = \"x\"\n" + teamExample,
+	} {
+		if _, p := ParseTeam("atlas", []byte(src)); !hasProblem(p, "not a field Foreman knows") {
+			t.Errorf("an unknown field passed: %v", p)
+		}
 	}
 }
 
@@ -132,7 +150,6 @@ func TestTeamProblems(t *testing.T) {
 		"file name":         {`team = "atlas"`, `team = "orion"`, "must equal the file name"},
 		"lead not a member": {`lead = "mara"`, `lead = "ghost"`, `lead: "ghost"`},
 		"role":              {`role = "team_lead"`, `role = "Team Lead"`, "agents.mara.role"},
-		"look":              {`hair = "bun"`, `hair = "mohawk"`, "agents.mara.look.hair"},
 		"skills":            {`skills = ["decomposition", "code review"]`, `skills = ["x", "x"]`, `"x" twice`},
 		"playbook step":     {`{ lead = "Turns the goal into cards" }`, `{ lead = "a", qa = "b" }`, "playbook"},
 		"agent id":          {`[agents.tove]`, `[agents.Tove_2]`, "agents.Tove_2: the agent id must be a slug"},

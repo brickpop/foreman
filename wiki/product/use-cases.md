@@ -97,7 +97,7 @@ Acceptance:
 From Atlas, choose **Hire** and complete the CoS interview. The new engineer joins and starts on every Atlas deployment.
 
 Acceptance:
-- [ ] The interview ends with the preview, the new member's tab marked; the CEO's **Save** adds the agent to `atlas.toml`, with a random face, one commit in the global repo.
+- [ ] The interview ends with the preview, the new member's tab marked; the CEO's **Save** adds the agent to `atlas.toml`, one commit in the global repo.
 - [ ] A new instance then starts on every active Atlas deployment.
 
 ## 10. Change config safely

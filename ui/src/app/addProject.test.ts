@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createdBody, inside, mainToSend, repoName } from "./addProject";
+import { createdBody, inside, mainToSend, projectSlug, repoName } from "./addProject";
 
 describe("repoName", () => {
   it("is the folder's own name", () => {
@@ -61,5 +61,22 @@ describe("mainToSend", () => {
   it("takes the CEO's pick, but only one the repo has", () => {
     expect(mainToSend(poc, "master")).toBe("master");
     expect(mainToSend(poc, "gone")).toBe("feature");
+  });
+});
+
+describe("projectSlug", () => {
+  it("makes what the CEO typed the slug the server takes", () => {
+    expect(projectSlug("My Portfolio")).toBe("my-portfolio");
+    expect(projectSlug("  Café  Crème! ")).toBe("cafe-creme");
+    expect(projectSlug("ledger_v2.1")).toBe("ledger-v2-1");
+    expect(projectSlug("--already-a-slug--")).toBe("already-a-slug");
+    expect(projectSlug("!!!")).toBe("");
+    expect(projectSlug("日本")).toBe("");
+  });
+
+  it("never ends on a hyphen when cut to 63", () => {
+    const long = projectSlug(`${"a".repeat(62)} b`);
+    expect(long).toBe("a".repeat(62));
+    expect(projectSlug("x".repeat(80))).toHaveLength(63);
   });
 });

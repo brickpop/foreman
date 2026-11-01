@@ -19,7 +19,6 @@ type fakeCoS struct {
 	stopped   int
 	proposal  *cos.Proposal
 	createErr error
-	looks     map[string]home.Look
 }
 
 func (f *fakeCoS) Start(_ context.Context, opener string) (string, error) {
@@ -36,14 +35,13 @@ func (f *fakeCoS) Proposal() (cos.Proposal, bool) {
 	return *f.proposal, true
 }
 
-func (f *fakeCoS) Create(_ context.Context, id int, looks map[string]home.Look) (home.Team, error) {
+func (f *fakeCoS) Create(_ context.Context, id int) (home.Team, error) {
 	if f.createErr != nil {
 		return home.Team{}, f.createErr
 	}
 	if f.proposal == nil || f.proposal.ID != id {
 		return home.Team{}, cos.ErrStale
 	}
-	f.looks = looks
 	return home.Team{ID: f.proposal.Team.Team, Config: f.proposal.Team}, nil
 }
 
@@ -64,9 +62,9 @@ func TestChiefOfStaff(t *testing.T) {
 	}
 
 	var team home.Team
-	decodeBody(t, send(h, "POST", "/api/cos/proposal", `{"id":3,"looks":{"nyx":{"color":"#8E9AAF"}}}`), &team)
-	if team.ID != "vesper" || f.looks["nyx"].Color != "#8E9AAF" {
-		t.Errorf("create: %+v %v", team, f.looks)
+	decodeBody(t, send(h, "POST", "/api/cos/proposal", `{"id":3}`), &team)
+	if team.ID != "vesper" {
+		t.Errorf("create: %+v", team)
 	}
 	for _, c := range []struct {
 		body string

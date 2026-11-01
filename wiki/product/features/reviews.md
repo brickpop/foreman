@@ -14,14 +14,14 @@ Where the CEO reviews a lead's branch as on a forge, and decides it (the CEO, 20
 
 Four sections, each left out when empty, one panel of rows each but the requests: **Needs your review** (`needs-review`), then the project's other open requests, **Needs you** (one [request panel](./project-pipeline.md#1-needs-you) each), then **Waiting on the lead** (`changes-requested`) and **Done** (merged, dismissed or withdrawn, the last 20). The server lists the reviews newest first (the latest opened).
 
-- **Row** (grid `auto 1fr auto`, padding `12px 16px`, the whole row a link to its page): Avatar 26 of the lead; the entry's title (500), then `<Lead> · <repos> · <branch>` (branch in Mono); on the right the status (`Needs your review`, `Changes requested`, `Merged`, `Dismissed`, `Withdrawn`) over its time.
+- **Row** (grid `1fr auto`, padding `12px 16px`, the whole row a link to its page): the entry's title (500), then `<Lead> · <repos> · <branch>` (branch in Mono); on the right the status (`Needs your review`, `Changes requested`, `Merged`, `Dismissed`, `Withdrawn`) over its time.
 - **Empty**: `Nothing waits on you on <project>. A lead's request_merge() opens a review.`
 
 ## A review's page
 
 `/projects/<project>/inbox/<id>`, inside the Inbox, with `?since=1` for the change since the last review.
 
-- **Header** (padding `20px 24px 16px`): a square `←` button (32px, outline; back to the Inbox) left of the entry's title (22px), then the lead's avatar and `<Lead> · <branch> · <status> · <time>` (the branch links to its code in Repos, in the first repo of the review; the project is the one open). A withdrawn review adds `Withdrawn: <reason>.`, then `Superseded by <review>.` (a link to it) when one holds all of it.
+- **Header** (padding `20px 24px 16px`): a square `←` button (32px, outline; back to the Inbox) left of the entry's title (22px), then `<Lead> · <branch> · <status> · <time>` (the branch links to its code in Repos, in the first repo of the review; the project is the one open). A withdrawn review adds `Withdrawn: <reason>.`, then `Superseded by <review>.` (a link to it) when one holds all of it.
 - **Which change** (a segmented control, only once the CEO requested changes on a repo still open): **Against main** (the default: what a merge takes, `main...branch`) or **Since your last review** (from the branch head at the last Request changes to its head now).
 - **Layout**: the header on top; under it two panes, each scrolling on its own (the tree, and the diffs with the comments), so going to a file moves only the diffs and the tree stays where it was (the CEO, 2026-10-21); the decision bar at the foot.
 - **File tree** (240px, on the left, a `--line` border to its right; hidden under 900px): one group per repo open in the review, `<repo> → <main>`, then its files (rows padded `6px 8px`) with `+added −removed`; a click unfolds the file and scrolls the diffs to it. `No changes.` for a repo with none.

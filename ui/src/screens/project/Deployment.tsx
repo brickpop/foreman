@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Instance, type Team, useClient } from "../../api/client";
-import { agentOf, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
+import { agentOf, readable, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
 import { latestStopped, sessionOf } from "../../app/project";
 import {
   useDeployments,
@@ -13,12 +13,11 @@ import {
 } from "../../app/queries";
 import { type Worktree, worktrees } from "../../app/repos";
 import { rosterOrder } from "../../app/sessions";
-import { Avatar } from "../../components/Avatar";
 import { DeployDialog } from "../../components/DeployDialog";
 import { ReloadIcon, StopIcon } from "../../components/icons";
 import { StopDialog } from "../../components/StopDialog";
 import { useToast } from "../../components/Toasts";
-import { Button, Empty, LeadTag, Loading, Panel } from "../../components/ui";
+import { Button, Dot, Empty, LeadTag, Loading, Panel } from "../../components/ui";
 import { useProject } from "../Project";
 import { InFlight } from "./Pipeline";
 
@@ -102,8 +101,8 @@ export function Deployment() {
         {!d && repos.isPending && <Loading />}
         {!d && left.length === 0 && repos.isSuccess ? (
           <Empty>
-            No team is on {project.id}. Deploy one and each member gets its own worktree of the
-            project's repos.
+            No team is on {readable(project.id)}. Deploy one and each member gets its own worktree
+            of the project's repos.
           </Empty>
         ) : (
           (roster.length > 0 || left.length > 0) && (
@@ -173,16 +172,14 @@ function AgentRow({
   const agent = agentOf(teams, deployment, id);
   return (
     <div className="grid grid-cols-[auto_minmax(140px,220px)_1fr_auto] items-start gap-3 border-b border-line px-4 py-3 last:border-b-0">
-      <Avatar
-        look={agent?.soul.look}
-        size={26}
-        status={instance?.status}
-        dotBorder="var(--panel)"
-      />
+      {/* An earlier team's worktree has no instance, so no status. */}
+      <span className="mt-[6px] size-2">
+        {instance && <Dot status={instance.status} size={8} title={instance.status} />}
+      </span>
       <span className="flex min-w-0 flex-col">
         <span className="flex items-center gap-1.5">
           <span className="truncate font-medium">{agent?.soul.name ?? id}</span>
-          {agent && agent.team.config.lead === agent.id && <LeadTag />}
+          {agent && agent.team.config.lead === agent.id && <LeadTag name={agent.soul.name} />}
         </span>
         <span className="truncate text-[12.5px] text-tx4">
           {agent ? `${agent.team.config.name} · ${roleLabel(agent.soul.role)}` : id}

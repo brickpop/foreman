@@ -6,7 +6,7 @@ tags: [model, agents, teams]
 
 # Agent soul
 
-One member of a [team definition](./team-definition.md): who the agent is (name, role, personality, skills, job description), and how it looks (what it runs on is its project's profile: [below](#what-it-runs-on)). A soul is stored under `agents.<id>` of its team file and is shared by every [deployment](./deployment.md) of the team: editing it changes all of them. Working memory is not part of the soul; it is per [instance](./instance.md) and stays inside that sandbox ([Agent runtime](../architecture/agent-runtime.md)). Edited on the [Agent page](../features/agent-page.md) or via the [Chief of Staff](../features/chief-of-staff.md) (hire, refine).
+One member of a [team definition](./team-definition.md): who the agent is (name, role, personality, skills, job description; what it runs on is its project's profile: [below](#what-it-runs-on)). A soul is stored under `agents.<id>` of its team file and is shared by every [deployment](./deployment.md) of the team: editing it changes all of them. Working memory is not part of the soul; it is per [instance](./instance.md) and stays inside that sandbox ([Agent runtime](../architecture/agent-runtime.md)). Edited on the [Agent page](../features/agent-page.md) or via the [Chief of Staff](../features/chief-of-staff.md) (hire, refine).
 
 ## Schema
 
@@ -18,15 +18,8 @@ One member of a [team definition](./team-definition.md): who the agent is (name,
 | `personality` | String | | | | One or a few lines |
 | `skills` | Array of String | | `[]` | no duplicates | Shown as chips |
 | `instruction` | String (multi-line) | | the role's default | | The job description |
-| `look.color` | String (hex) | yes | random from palette | one of 8 background colors | [Avatar](../design/avatar.md) background |
-| `look.skin` | String (hex) | yes | random | one of 5 | |
-| `look.hair` | String | yes | random | enum: `short`, `long`, `curly`, `bun`, `bald` | |
-| `look.hair_color` | String (hex) | yes | random | one of 5 | |
-| `look.eyes` | String | yes | random | enum: `dots`, `glasses`, `shades`, `sleepy` | |
-| `look.beard` | String | yes | random | enum: `none`, `stubble`, `full`, `mustache` | |
 
-Palettes are defined in [Avatar](../design/avatar.md). A hired agent gets a random face.
-
+No face or avatar: an agent shows as its name (the CEO removed avatars on 2026-11-02, as noise). A team file written before then may still carry an `[agents.<id>.look]` table: it loads, is ignored, and is gone on the next save.
 ## Default job descriptions
 
 Used when a role is hired without a custom `instruction` (the CoS appends `Focus: <focus>.`).

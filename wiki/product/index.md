@@ -76,5 +76,4 @@ Files Foreman reads or owns, and the runtime state it keeps.
 ## Design
 
 - [Design system](./design/design-system.md): tokens, type, components
-- [Avatar](./design/avatar.md)
 - The clickable UI prototype: [`design/prototype/`](./design/prototype/foreman-prototype.dc.html) (open in a browser; reference only, not production code)

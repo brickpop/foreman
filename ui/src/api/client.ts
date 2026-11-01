@@ -9,7 +9,6 @@ import type {
   Branches,
   Folder,
   FolderEntry,
-  Look,
   Missing,
   Project,
   Settings,
@@ -321,7 +320,7 @@ export interface ChiefOfStaffArea {
   /** Ends it: the CEO left the page. Sent even as the page unloads. */
   stop(): Promise<void>;
   /** Writes the proposal on screen, with the faces shown for members proposed without one. */
-  create(id: number, looks: Record<string, Look>): Promise<Team>;
+  create(id: number): Promise<Team>;
 }
 
 export interface EventsArea {
@@ -589,8 +588,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       stop: async () => {
         await fetch(`${origin}/api/cos`, { method: "DELETE", keepalive: true });
       },
-      create: async (id, looks) =>
-        (await request("POST", "/api/cos/proposal", { id, looks })).json(),
+      create: async (id) => (await request("POST", "/api/cos/proposal", { id })).json(),
     },
     events: {
       subscribe: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),

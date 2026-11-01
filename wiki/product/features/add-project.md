@@ -12,7 +12,7 @@ A project is a record in Foreman's database plus its [workspace](../models/proje
 
 A modal ([App shell](./app-shell.md#overlays)) opened from **`+ New project`** in the sidebar and from the checklist's **A project** row ([First run](./first-run.md#the-checklist)), fresh at each opening. Two steps:
 
-1. **New project**: the **Project name** (the rules under [Names](#names) as its hint), the **Workspace**, then the **Project repo**, a segmented New | Clone:
+1. **New project**: the **Project name** (any words, made a slug: [Names](#names)), the **Workspace**, then the **Project repo**, a segmented New | Clone:
    - **Workspace**: a path, following the name as `<projects folder>/<name>` (`GET /api/folders/workspace?name=`, from the `projects_folder` [setting](../models/global-settings.md)) until the CEO edits it. "Your folder for this project: its project repo and its agents' worktrees, where you can run their code. Anywhere in your home folder.", plus, when the projects folder doesn't exist yet and the workspace is in it, "<folder> doesn't exist yet: it is created with the project." Picking it in a folder browser comes with [Restructure the New project dialog](../../backlog/new-project-dialog.md).
    - **New**: "Its wiki and project.toml, in a new git repo: the workspace's project/ folder. One left there by a removed project is taken over as it is."
    - **Clone**: a field for a git URL or a local path ("Cloned with your own git: your SSH keys and credential helper. Foreman stores nothing."). The button reads `Cloning…` while it runs.
@@ -33,7 +33,9 @@ The same form adds a repo from the dialog and from [Repos](./repos.md#the-list) 
 
 ## Names
 
-A project's name and a repo's follow a repo's rules: letters of either case, digits, `.`, `-` and `_`, starting with a letter or digit, at most 63 characters, never hidden. Names are unique in any case: a Mac's filesystem takes `Ledger` and `ledger` for one, and elsewhere they would be two names hard to tell apart. A repo is never named `project` (in any case): that is the project repo's place in a sandbox.
+A **project's name** is a slug (the CEO, 2026-11-02): lowercase letters and digits in words joined by single hyphens (`my-portfolio`), at most 63 characters; it is the project's id and its workspace folder, and the UI shows it readable ("My portfolio", [Project config → The project record](../models/project-config.md#the-project-record)). The dialog takes any words and makes the slug as the CEO types (accents dropped, anything else between words a hyphen: `My Portfolio!` → `my-portfolio`), its hint saying `Its folder and id: <slug>. It shows as <Readable>.`. Projects made before keep their names (`Ledger.v2` still works, shown as it is).
+
+A **repo's name** follows a repo's rules: letters of either case, digits, `.`, `-` and `_`, starting with a letter or digit, at most 63 characters, never hidden. Names of both are unique in any case: a Mac's filesystem takes `Ledger` and `ledger` for one, and elsewhere they would be two names hard to tell apart. A repo is never named `project` (in any case): that is the project repo's place in a sandbox.
 
 ## Effect
 

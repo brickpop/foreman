@@ -22,15 +22,15 @@ The URL is the view, so a reload, a shared link or Back shows the same agent (fo
 
 ## Agent tabs
 
-A strip (`--side`, padding `0 12px`) whose tabs scroll horizontally only.
+A strip (`--side`, padding `0 12px`) whose tabs scroll horizontally only. Picking a tab keeps the scroll where it is; a tab picked with the keyboard and out of sight scrolls just into view.
 
-1. The **lead first**, with the "lead" tag.
+1. The **lead first**, with the ["lead" tag](../design/design-system.md#chips-and-badges) unless its name says it already.
 2. A 1×20px `--line2` divider and the label **`Direct`** (12px `--tx4`).
 3. The other members, in roster order.
 
-Each tab: Avatar 24 with its status dot (`dotBorder --side`), the name (500). The agent shown is underlined (inset 2px bottom, `--acc`) and `--tx`, the others `--tx3`. **Its branch shows in the header**, right after `<team> · <project>` (Mono 11.5px `--tx4`; the CEO, 2026-10-25, moved out of the tab 2026-10-27): one per agent, since `switch` moves all its code repos together; should its repos ever differ, each branch, comma-separated. It comes from the project's repos (`GET /api/projects/:id/repos`, each branch with the agent that has it checked out), refreshed by every git action (`team.action`); none shows before the agent's first start makes its worktrees.
+Each tab: the agent's 8px status dot (titled with the status), the name (500). The agent shown is underlined (inset 2px bottom, `--acc`) and `--tx`, the others `--tx3`. **Its branch shows in the header**, right after `<team> · <project>` (Mono 11.5px `--tx4`; the CEO, 2026-10-25, moved out of the tab 2026-10-27): one per agent, since `switch` moves all its code repos together; should its repos ever differ, each branch, comma-separated. It comes from the project's repos (`GET /api/projects/:id/repos`, each branch with the agent that has it checked out), refreshed by every git action (`team.action`); none shows before the agent's first start makes its worktrees.
 
-At the strip's right end, always visible: the agent's **role** and harness (`<Role> · <Harness label>`, 12.5px `--tx4`; the CEO, 2026-10-25: the role says more than the old direct-line banner), then icon buttons (28px square, radius 6, `--tx3`, `--hover` behind on hover, each labelled for screen readers and in a tooltip): **Copy** (two sheets: copies the whole buffer, scrollback included, as plain text; a tick for 1.4 s) and **Line** (a `>_` prompt: toggles the line input; `--accSoft` / `--accTx` while open). An agent with no session has neither.
+At the strip's right end, always visible: the shown agent's harness label (12.5px `--tx4`; its role was there too until the CEO dropped it as redundant, 2026-11-02: the lead has its tag, the members' roles are on the [Team page](./team-page.md)), then icon buttons (28px square, radius 6, `--tx3`, `--hover` behind on hover, each labelled for screen readers and in a tooltip): **Copy** (two sheets: copies the whole buffer, scrollback included, as plain text; a tick for 1.4 s) and **Line** (a `>_` prompt: toggles the line input; `--accSoft` / `--accTx` while open). An agent with no session has neither.
 
 Clicking a tab shows that agent, and the keyboard goes to it (the CEO, 2026-10-18): its terminal, or its Line when Line is open, so the CEO types at once; an agent with no session (asleep, queued, stopped) has nothing to take it. **`⌘⇧←` / `⌘⇧→`** (`Ctrl+Shift+←` / `→` off a Mac) do the same for the previous / next tab, round the ends, from anywhere on the page (the CEO, 2026-10-30: without the mouse); like Line's shortcut, the window hears them before the terminal, so the agent never gets them, and in the Line input they no longer select to the line's start / end (off a Mac, by word).
 

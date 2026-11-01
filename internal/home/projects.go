@@ -35,15 +35,15 @@ var (
 // the CEO's, made if missing, Home.checkWorkspace): its record, and its
 // project repo at <workspace>/project, new (project.toml and a starter wiki,
 // in one first commit) or cloned from clone (a URL or a local path, as the
-// CEO's git can reach it). The name follows a repo's rules and must be new,
-// in any case. A project repo already at <workspace>/project (a removed
+// CEO's git can reach it). The name is a slug (validProjectName) and must be
+// new, in any case. A project repo already at <workspace>/project (a removed
 // project's, kept) is taken over as it is. Nothing this call made is left
 // behind if a step fails. created is false for a takeover.
 func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p Project, created bool, err error) {
 	h.mu.Lock()
 	defer h.unlock()
-	if !validName(name) {
-		return Project{}, false, fmt.Errorf("%w: a project name is %s", ErrInvalid, nameRules)
+	if !validProjectName(name) {
+		return Project{}, false, fmt.Errorf("%w: a project name is lowercase letters, digits and single hyphens (my-portfolio), at most 63", ErrInvalid)
 	}
 	if existing, ok := h.projectNamed(name); ok {
 		return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
@@ -451,10 +451,18 @@ var nameRule = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
 // nameRules says what validName accepts, for refusals.
 const nameRules = "letters, digits, dots, hyphens and underscores, starting with a letter or digit"
 
-// validName is the rule for names that become folders: a project's (its
-// project repo, its sandboxes) and a repo's (its worktree in a sandbox).
+// validName is the rule for a repo's name, which becomes a folder: its
+// worktree in a sandbox. Looser than a project's: a repo is often an existing
+// folder, named as it is.
 func validName(name string) bool {
 	return nameRule.MatchString(name) && !strings.Contains(name, "..")
+}
+
+// validProjectName is the rule for a new project's name: a slug, since it is
+// its workspace's folder and how it reads is made from it (the UI's readable;
+// the CEO, 2026-11-02). A project named before keeps its name.
+func validProjectName(name string) bool {
+	return len(name) <= 63 && slug.MatchString(name)
 }
 
 // checkRepoName refuses a name a repo of p can't have: one Foreman couldn't

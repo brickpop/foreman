@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { Deployment } from "../api/client";
 import { useClient } from "../api/client";
-import { sessionsEnd } from "../app/model";
+import { readable, sessionsEnd } from "../app/model";
 import { keys, useInstances } from "../app/queries";
 import { StopIcon } from "./icons";
 import { Modal } from "./Overlays";
@@ -35,7 +35,7 @@ export function StopDialog({
       queries.invalidateQueries({ queryKey: keys.deployments });
       onClose();
       toast({
-        title: `${teamName} stopped on ${d.projectId}`,
+        title: `${teamName} stopped on ${readable(d.projectId)}`,
         body: "Worktrees are kept. Other deployments keep running.",
         color: "var(--tx4)",
         onOpen: () =>
@@ -44,7 +44,7 @@ export function StopDialog({
     },
   });
   return (
-    <Modal open onClose={onClose} title={`Stop ${teamName} on ${d.projectId}?`}>
+    <Modal open onClose={onClose} title={`Stop ${teamName} on ${readable(d.projectId)}?`}>
       <div className="flex flex-col gap-4">
         <p className="m-0 text-tx2">{sessionsEnd(sessions)}. Worktrees and branches are kept.</p>
         {stop.error && <p className="m-0 text-[13px] text-err">{stop.error.message}</p>}

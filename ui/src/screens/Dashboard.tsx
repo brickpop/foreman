@@ -8,6 +8,7 @@ import {
   inbox,
   type ProjectRow,
   projectRows,
+  readable,
   type TeamCard,
   teamCards,
   workingSummary,
@@ -23,12 +24,19 @@ import {
   useTeams,
 } from "../app/queries";
 import { setupPending } from "../app/setup";
-import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
 import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
-import { Button, card, cover, Dot, Loading, PageTitle, SectionLabel } from "../components/ui";
+import {
+  Button,
+  cover,
+  GridCard,
+  Loading,
+  PageTitle,
+  SectionLabel,
+  StatusPill,
+} from "../components/ui";
 
 // The start page (wiki/product/features/dashboard.md): the projects, each
 // opening where its work is, and the teams. Reviews live in each project's
@@ -125,19 +133,20 @@ const stateColor = { "needs you": "var(--attn)", "on track": "var(--ok)", idle: 
 function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
   const repos = project?.repos ?? [];
   return (
-    <article className={`${card} hover:border-line3`}>
-      <span className="flex items-center gap-2">
-        <Link
-          to="/projects/$project"
-          params={{ project: row.id }}
-          className={`text-[15px] font-semibold ${cover}`}
-        >
-          {row.id}
-        </Link>
-        <span className="flex-1" />
-        <Dot color={stateColor[row.state]} title={row.state} />
-        <span className="text-[12.5px] text-tx3">{row.state}</span>
-      </span>
+    <GridCard
+      head={
+        <>
+          <Link
+            to="/projects/$project"
+            params={{ project: row.id }}
+            className={`min-w-0 flex-1 truncate text-[15px] font-semibold ${cover}`}
+          >
+            {readable(row.id)}
+          </Link>
+          <StatusPill color={stateColor[row.state]}>{row.state}</StatusPill>
+        </>
+      }
+    >
       <p className="line-clamp-2 min-h-[2lh] text-[13.5px] text-tx3">
         {project?.config.description || "No description yet."}
       </p>
@@ -157,42 +166,43 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
         {repos.length === 0 && <span className="text-[12.5px] text-tx4">No code repo yet</span>}
       </span>
       <span className="text-[12.5px] text-tx4">{row.line}</span>
-    </article>
+    </GridCard>
   );
 }
 
 function TeamCardView({ team: t, onDeploy }: { team: TeamCard; onDeploy?: () => void }) {
-  const shown = t.members.slice(0, 6);
   return (
-    <article className={`${card} hover:border-line3`}>
-      <Link
-        to="/teams/$team"
-        params={{ team: t.id }}
-        className={`text-[15px] font-semibold ${cover}`}
-      >
-        {t.name}
-      </Link>
+    <GridCard
+      head={
+        <>
+          <Link
+            to="/teams/$team"
+            params={{ team: t.id }}
+            className={`min-w-0 flex-1 truncate text-[15px] font-semibold ${cover}`}
+          >
+            {t.name}
+          </Link>
+          {t.on.length > 0 ? (
+            <StatusPill color="var(--ok)">deployed</StatusPill>
+          ) : (
+            <StatusPill color="var(--tx4)">not deployed</StatusPill>
+          )}
+        </>
+      }
+    >
       <p className="line-clamp-2 min-h-[2lh] text-[13.5px] text-tx3">
         {t.purpose || "No purpose written yet."}
       </p>
-      <span className="flex items-center">
-        {shown.map((soul, n) => (
-          <span key={soul.name} className={n > 0 ? "-ml-1.5" : ""} title={soul.name}>
-            <Avatar look={soul.look} size={26} />
-          </span>
-        ))}
-        {t.members.length > shown.length && (
-          <span className="ml-1.5 font-mono text-[11.5px] text-tx4">
-            +{t.members.length - shown.length}
-          </span>
-        )}
-        <span className="ml-2 text-[12.5px] text-tx4">
-          {t.members.length} {t.members.length === 1 ? "agent" : "agents"}
-        </span>
+      <span
+        className="truncate text-[12.5px] text-tx4"
+        title={t.members.map((s) => s.name).join(", ")}
+      >
+        {t.members.length} {t.members.length === 1 ? "agent" : "agents"}
+        {t.members.length > 0 && `: ${t.members.map((s) => s.name).join(", ")}`}
       </span>
       <span className="flex items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-[12.5px] text-tx4">
-          {t.on.length > 0 ? `On ${t.on.join(", ")}` : "Not deployed"}
+          {t.on.length > 0 && `On ${t.on.map(readable).join(", ")}`}
         </span>
         {onDeploy && (
           <Button variant="ghost" className="relative z-10" onClick={onDeploy}>
@@ -200,7 +210,7 @@ function TeamCardView({ team: t, onDeploy }: { team: TeamCard; onDeploy?: () => 
           </Button>
         )}
       </span>
-    </article>
+    </GridCard>
   );
 }
 
@@ -220,13 +230,13 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
   const navigate = useNavigate();
   const answer = useAnswer();
   const agent = agentOf(teams, r.deploymentId, r.instanceId);
-  const where = `on ${r.projectId}`;
+  const where = `on ${readable(r.projectId)}`;
   const context = agent ? `${agent.team.config.name} ${where}` : where;
   const openSession = () => navigate(sessionOf(r.instanceId));
   return (
     <RequestPanel
       request={r}
-      who={agent && { name: agent.soul.name, look: agent.soul.look }}
+      who={agent?.soul.name}
       context={context}
       onAnswer={(text) => answer.mutate({ request: r, answer: text })}
       answering={answer.isPending}

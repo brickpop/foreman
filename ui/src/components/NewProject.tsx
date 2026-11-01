@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, type Suggestion, useClient } from "../api/client";
-import { createdBody } from "../app/addProject";
+import { createdBody, projectSlug } from "../app/addProject";
+import { readable } from "../app/model";
 import { keys } from "../app/queries";
 import { AddRepo } from "./AddRepo";
 import { Modal } from "./Overlays";
@@ -21,7 +22,11 @@ const hint = "text-[12.5px] text-tx4";
 export function NewProject({ onClose }: { onClose: () => void }) {
   const [project, setProject] = useState<Project>();
   return (
-    <Modal open onClose={onClose} title={project ? `Repos of ${project.id}` : "New project"}>
+    <Modal
+      open
+      onClose={onClose}
+      title={project ? `Repos of ${readable(project.id)}` : "New project"}
+    >
       {project ? (
         <Repos project={project} onClose={onClose} />
       ) : (
@@ -37,36 +42,34 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
   const navigate = useNavigate();
   const toast = useToast();
   const [name, setName] = useState("");
+  // What is sent: the name as a slug, the project's id and folder.
+  const id = projectSlug(name);
   const [source, setSource] = useState<"new" | "clone">("new");
   const [clone, setClone] = useState("");
   // The workspace follows the name, in the projects folder, until the CEO
   // edits it.
   const [edited, setEdited] = useState<string>();
   const suggestion = useQuery({
-    queryKey: ["workspace", name.trim()],
-    queryFn: () => client.home.suggestWorkspace(name.trim()),
+    queryKey: ["workspace", id],
+    queryFn: () => client.home.suggestWorkspace(id),
     placeholderData: (previous) => previous,
   }).data;
-  const workspace = edited ?? (name.trim() ? (suggestion?.path ?? "") : "");
+  const workspace = edited ?? (id ? (suggestion?.path ?? "") : "");
   const create = useMutation({
     mutationFn: () =>
-      client.home.newProject(
-        name.trim(),
-        workspace.trim(),
-        source === "clone" ? clone.trim() : undefined,
-      ),
+      client.home.newProject(id, workspace.trim(), source === "clone" ? clone.trim() : undefined),
     onSuccess: ({ project: p, created }) => {
       queries.invalidateQueries({ queryKey: keys.projects });
       navigate({ to: "/projects/$project", params: { project: p.id } });
       toast({
-        title: `${p.id} created`,
+        title: `${readable(p.id)} created`,
         body: createdBody(created, source === "clone", p.path),
         color: "var(--ok)",
       });
       onCreated(p);
     },
   });
-  const ready = name.trim() && workspace.trim() && (source === "new" || clone.trim());
+  const ready = id && workspace.trim() && (source === "new" || clone.trim());
   return (
     <form
       className="flex flex-col gap-4"
@@ -84,7 +87,9 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
           className={field}
         />
         <span className={hint}>
-          Letters, digits, dots, hyphens and underscores, starting with a letter or digit.
+          {id
+            ? `Its folder and id: ${id}. It shows as ${readable(id)}.`
+            : "Any words: they become its folder, in lowercase with hyphens."}
         </span>
       </label>
       <label className="flex flex-col gap-1.5">

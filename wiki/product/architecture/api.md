@@ -41,7 +41,7 @@ PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in
 
 POST   /api/cos                              {opener}: starts the Chief of Staff's session, or types the opener into the running one → {terminal: "cos", proposal: the one on screen or null}; 409 NOT_READY (Podman), 409 NOT_CONNECTED (the default profile)
 DELETE /api/cos                              stops it (the CEO left the page); the proposal goes with it
-POST   /api/cos/proposal                     {id, looks}: writes proposal id, the one on screen, with the faces the page drew for members proposed without one; one commit → the team; 409 STALE (replaced, or none), 409 CONFLICT (the team changed since: the CoS is asked again), 400 INVALID
+POST   /api/cos/proposal                     {id}: writes proposal id, the one on screen; one commit → the team; 409 STALE (replaced, or none), 409 CONFLICT (the team changed since: the CoS is asked again), 400 INVALID
 
 GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
 POST   /api/deployments                       {team, project}; replaces the team on the project, if another (stopped as by DELETE); 201 the deployment; 409 ALREADY_DEPLOYED (this pair is active), NOT_READY; 400 CANT_DEPLOY

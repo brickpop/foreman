@@ -40,7 +40,7 @@ export function reloadLine(reload: ReturnType<typeof reloadOf>, teams: Team[]): 
 }
 
 import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
-import type { Look, Soul, TeamConfig } from "../api/types/home";
+import type { Soul, TeamConfig } from "../api/types/home";
 
 // Pure derivations the screens share: who an instance is, how requests are
 // ordered, what a project's state is. Kept apart from components to be tested.
@@ -211,31 +211,6 @@ export function resolveWho(team: TeamConfig, who: string): { text: string; known
   return names.length > 0 ? { text: names.join(", "), known: true } : { text: who, known: false };
 }
 
-/** The avatar's palettes and traits (wiki/product/design/avatar.md#palettes). */
-export const palettes = {
-  color: ["#D9825B", "#8DB86B", "#6FA8DC", "#B48BD6", "#E07A9A", "#4FB3A9", "#CDB46B", "#8E9AAF"],
-  skin: ["#F1C9A5", "#E2AE85", "#C38A62", "#8D5A3B", "#5E3B26"],
-  hairColor: ["#2B2420", "#6B4A2F", "#D8B46A", "#A8A8A8", "#A4482C"],
-  hair: ["short", "long", "curly", "bun", "bald"],
-  eyes: ["dots", "glasses", "shades", "sleepy"],
-  beard: ["none", "stubble", "full", "mustache"],
-} as const;
-
-/** A random face and background (Shuffle, and a new hire). */
-export function randomLook(
-  pick: (n: number) => number = (n) => Math.floor(Math.random() * n),
-): Look {
-  const one = <T>(list: readonly T[]) => list[pick(list.length)];
-  return {
-    color: one(palettes.color),
-    skin: one(palettes.skin),
-    hair: one(palettes.hair),
-    hairColor: one(palettes.hairColor),
-    eyes: one(palettes.eyes),
-    beard: one(palettes.beard),
-  };
-}
-
 /** A team's agent ids as the team presents them: the lead first, then the
  * file's order, then any it doesn't name, sorted (as home.TeamConfig.Roster). */
 export function roster(c: Team["config"]): string[] {
@@ -262,7 +237,7 @@ export function sessionsEnd(n: number): string {
 /** The Deploy dialog's warning when another team is on the project: it is
  * replaced, as by Stop (a project has one team at most). */
 export function replacingLine(team: string, project: string, sessions: number): string {
-  return `Replaces ${team} on ${project}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
+  return `Replaces ${team} on ${readable(project)}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
 }
 
 const forgeLabels: Record<string, string> = {
@@ -367,4 +342,18 @@ export const teamTabs: TeamTab[] = ["deployments", "members", "playbook", "file"
 export function teamTab(asked: unknown, deployed: boolean): TeamTab {
   if (teamTabs.includes(asked as TeamTab)) return asked as TeamTab;
   return deployed ? "deployments" : "members";
+}
+
+/** A project's or repo's name as people read it (the CEO, 2026-11-02):
+ * hyphens and underscores as spaces, the first letter capital; my-portfolio
+ * is "My portfolio". Only how it shows: its id, folder and URL stay the name. */
+export function readable(name: string): string {
+  const words = name.replace(/[-_]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Whether an agent's name already says it leads ("Lead", "Tech lead"),
+ * so a "lead" tag beside it would only repeat it. */
+export function saysLead(name: string): boolean {
+  return /(^|[^a-z])lead/i.test(name); // not \b: QA_lead says it too
 }

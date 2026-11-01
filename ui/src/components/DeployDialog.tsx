@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { harnessLabel, replacingLine } from "../app/model";
+import { harnessLabel, readable, replacingLine } from "../app/model";
 import { sessionOf } from "../app/project";
 import {
   keys,
@@ -96,7 +96,7 @@ export function DeployDialog({
       onClose();
       navigate(sessionOf(lead));
       toast({
-        title: `${t?.config.name ?? d.teamId} deployed to ${d.projectId}`,
+        title: `${t?.config.name ?? d.teamId} deployed to ${readable(d.projectId)}`,
         body: `${members} new sessions starting.`,
         color: "var(--ok)",
         onOpen: () => navigate(sessionOf(lead)),
@@ -143,7 +143,11 @@ export function DeployDialog({
                 className={option(p.id === project, there)}
                 onClick={() => setProject(p.id)}
               >
-                {there ? `${p.id} (already there)` : p.archived ? `${p.id} (archived)` : p.id}
+                {there
+                  ? `${readable(p.id)} (already there)`
+                  : p.archived
+                    ? `${readable(p.id)} (archived)`
+                    : readable(p.id)}
                 {on(p.id) && !there && (
                   <span className="text-tx4"> · {nameOf(on(p.id)?.teamId ?? "")}</span>
                 )}

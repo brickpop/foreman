@@ -6,7 +6,7 @@ tags: [design, ui]
 
 # Design system
 
-The visual language of the Foreman UI: tokens, type, spacing, surfaces and the small set of components every screen is built from. The visual reference is the clickable [prototype](./prototype/foreman-prototype.dc.html) (open it in a browser). It is reference only: its inline styles, simulated data and dead state are not production code. This entry is the source of truth when the two disagree. The [Avatar](./avatar.md) has its own entry.
+The visual language of the Foreman UI: tokens, type, spacing, surfaces and the small set of components every screen is built from. The visual reference is the clickable [prototype](./prototype/foreman-prototype.dc.html) (open it in a browser). It is reference only: its inline styles, simulated data and dead state are not production code. This entry is the source of truth when the two disagree: the prototype still draws agents' faces, which Foreman no longer has (the CEO, 2026-11-02; an agent shows as its name, with a status dot where its state matters).
 
 Two themes, **dark** and **light** (the CEO picks one, or `System` to follow the operating system; see [Settings](../features/settings.md#appearance)), built on the same tokens. Since 2026-11-02 (the CEO: "too dark, and the yellow…"; functional yet fatigue-free) dark is GitHub's **dark dimmed** (slate greys, not black) and light is GitHub's **light** (cool neutral greys). The **accent** is the CEO's pick of seven (blue by default), and **attention** (what needs the CEO) keeps its own amber whatever the accent, so "needs you" never reads as a selection. Every color in the UI comes from a token, so a theme is a token set. The theme and the accent are the CEO's preferences (`~/.foreman/preferences.toml`, [Settings → Appearance](../features/settings.md#appearance)).
 
@@ -16,10 +16,11 @@ One set for both themes in `ui/src/styles.css`: each token is `light-dark(<light
 
 | Token | Dark | Light | Used for |
 |---|---|---|---|
-| `--bg` | `#22272E` | `#FFFFFF` | Page background, default avatar dot border, swatch inner ring |
+| `--bg` | `#22272E` | `#FFFFFF` | Page background, swatch inner ring |
 | `--side` | `#1C2128` | `#F6F8FA` | Sidebar, agent-tab strip, board cells |
 | `--panel` | `#2D333B` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
 | `--raised` | `#373E47` | `#EAEEF2` | Selected nav/segment, raised buttons, chips, stage chips |
+| `--head` | `#373E47` | `#F6F8FA` | A grid card's header band (GitHub's box header: a step lighter than the card in dark, a step darker in light) |
 | `--hover` | `#323942` | `#F3F4F6` | Row and item hover |
 | `--term` | `#1C2128` | `#F6F8FA` | Terminals, `<pre>`, inputs, textareas, CoS result panel |
 | `--line` | `#373E47` | `#D8DEE4` | Default borders and dividers |
@@ -110,8 +111,6 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | 16px | CoS quick-reply chips |
 | 50% | Dots |
 
-Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
-
 ## Spacing and layout
 
 - Page padding: one rule everywhere, **24px sides**, 24px top (20px on the Wiki and a review's header) and 48px bottom, `24px 24px 48px` (the CEO, 2026-10-31: compact and consistent; 48px sides until then). Width caps belong to text meant to be read, not to padding: the wiki entry and a project's description 780px, the Inbox, Team deployments and Members 920px, Settings and Playbook 760px, the Dashboard 1080px ([Project page → Layout](../features/project-page.md#layout)). Under 760px the Dashboard's sides are 16px.
@@ -123,6 +122,8 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 
 - Default border: `1px solid var(--line)`. Inputs and buttons: `1px solid var(--line2)`.
 - **Panel**: `--panel` background, `--line` border, radius 12. A list inside a panel separates rows with a `--line` bottom border and clips with `overflow: hidden`.
+- **Grid card** (`GridCard`; Dashboard projects and teams, Repos; the CEO, 2026-11-02: cards were dull): a panel in two parts. A **header band** (`--head`, `--line` bottom border, padding `8px 16px`, at least 44px) holds the name (600 15px, cut with an ellipsis) and, on the right, its **status pill** or its menu; the **body** (padding `14px 16px`, gap 12) holds the rest. A card that opens something gets a `--line3` border on hover, and its name's link covers all of it.
+- **Status pill** (`StatusPill`): the status's 7px dot and word (12px `--tx2`) on a 16% tint of its color, fully rounded, padding `2px 8px`.
 - **Loading** (`Loading`): where data is still on its way, faint bars (12px, `--hover`, pulsing unless the CEO's system asks for reduced motion) in a panel, in place of the content and never its empty state, which would read as "there's none". Every list, page and file view that waits on the server shows it (the CEO, 2026-10-21).
 - **Empty state**: `1px dashed var(--line2)`, radius 12, `--tx3` text, centered copy.
 - **Not built yet**: an empty state where the server doesn't serve an area yet: "**Not built yet.** The server doesn't serve <the wiki>." ("Not built yet." in `--tx2`, 500), in place of what the area would show.
@@ -155,7 +156,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 | **Changed dot** | 6px `--attn` circle, tooltip "Changed since you last looked" |
 | **Frontmatter chip** | 12.5px, `--raised`, radius 5, padding `3px 8px`, `--tx3` key; the value in `--tx`. Format `key: value` |
 | **Stage chip** | 12.5px, `--tx2` on `--raised`, radius 5, padding `3px 8px` |
-| **"lead" tag** | 11.5px, `--accTx`, 1px `--accLine` border, radius 4, padding `0 5px` |
+| **"lead" tag** | 11.5px, `--accTx`, 1px `--accLine` border, radius 4, padding `0 5px`. Beside a lead's name, left out when the name says it already ("Lead", "Tech lead", "QA_lead": `lead` starting a word, any case; the CEO, 2026-11-02, after "Lead lead") |
 | **Skill chip** | 13px, `--raised`, `--tx2`, padding `4px 6px 4px 10px`, radius 6, trailing `×` in `--tx4` (removes). The "+ add" input has a `1px dashed --line2` border and is 80px wide |
 | **Quick-reply chip** (CoS) | `--raised`, 1px `--line2`, radius 16, padding `6px 12px`, 500 13px; hover border `--acc` |
 | **Priority text** (board) | Mono 500 11.5px: quick `--ok` (no uncertainty, doable right now), high `--err`, medium `--attnTx`, low `--tx4`; any other value `--tx4` |
@@ -171,7 +172,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 | **Danger** | Transparent, 1px `--line2` border (`--err` on hover), `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
 | **Segmented** | On: `--raised`, `--line2` border (`--line3` for board tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, Theme |
-| **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, avatar traits, prompt switcher, Deploy dialog choices |
+| **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, prompt switcher, Deploy dialog choices |
 | **Select** (`components/Select.tsx`, the one dropdown; the CEO, 2026-10-18) | A trigger like an input (`--panel`, 1px `--line2`, radius 7, 13px, the chosen label and a `▾`; `--acc` border while open), opening a menu like the Board's (`--panel`, `--line2`, radius 8, `--shadow`, at least the trigger's width, at most 360px tall, scrolling): one row per choice, `✓` beside the chosen one, a detail on the right in `--tx4`. Arrow keys and typing a letter move through it | The repo picker, a project's profile, a new profile's harness, the Podman machine's memory and CPUs. No native `<select>` |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |
 | **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Connect, Edit, Rebuild |
@@ -199,7 +200,7 @@ The prototype has no focus styles, no Escape handling, no focus trap and fake di
 - Show a visible focus ring on every interactive element for keyboard focus (`:focus-visible`): 2px `--acc` outline with a 2px offset.
 - Close the topmost overlay (side sheet, drawer, modal) on **Escape**, and return focus to the element that opened it.
 - Trap focus inside modals while they are open.
-- Give icon-only buttons (`×`, avatar-only tabs) an accessible label.
+- Give icon-only buttons (`×`) an accessible label.
 
 ## Not to replicate from the prototype
 

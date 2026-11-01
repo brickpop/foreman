@@ -135,18 +135,17 @@ func (c *CoS) Proposal() (Proposal, bool) {
 	return *c.proposal, true
 }
 
-// Create writes proposal id, the one on screen, as the CEO created it; looks
-// are the faces the page gave the members proposed without one. Once
+// Create writes proposal id, the one on screen, as the CEO created it. Once
 // written, or once the team changed meanwhile, the proposal is gone and the
 // Chief of Staff is told.
-func (c *CoS) Create(ctx context.Context, id int, looks map[string]home.Look) (home.Team, error) {
+func (c *CoS) Create(ctx context.Context, id int) (home.Team, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.proposal == nil || c.proposal.ID != id {
 		return home.Team{}, ErrStale
 	}
 	team := c.proposal.Team
-	team.Agents = cloneWithLooks(team.Agents, looks)
+	team.Agents = cloneAgents(team.Agents)
 	saved, err := c.Teams.SaveTeam(ctx, team, c.version)
 	switch {
 	case errors.Is(err, home.ErrConflict):
@@ -180,16 +179,10 @@ func (c *CoS) clear() {
 	c.Publish(events.Event{Type: "cos.proposal", Data: nil})
 }
 
-// cloneWithLooks gives each member without a face (no background color) the
-// one the page showed.
-func cloneWithLooks(agents map[string]home.Soul, looks map[string]home.Look) map[string]home.Soul {
+// cloneAgents copies the proposal's members, so the save shares nothing with it.
+func cloneAgents(agents map[string]home.Soul) map[string]home.Soul {
 	out := make(map[string]home.Soul, len(agents))
 	for id, s := range agents {
-		if s.Look.Color == "" { // no face yet (the page checks the same)
-			if l, ok := looks[id]; ok {
-				s.Look = l
-			}
-		}
 		s.Skills = slices.Clone(s.Skills)
 		out[id] = s
 	}

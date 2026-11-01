@@ -35,14 +35,6 @@ instruction = """
 Break the goal into cards on the board. ...
 """
 
-[agents.mara.look]
-color = "#D9825B"
-skin = "#E2AE85"
-hair = "bun"              # short | long | curly | bun | bald
-hair_color = "#2B2420"
-eyes = "dots"             # dots | glasses | shades | sleepy
-beard = "none"            # none | stubble | full | mustache
-
 [agents.ilya]
 # …
 ```
@@ -102,7 +94,7 @@ The UI, the Chief of Staff and the CEO's editor can all write the same file. Eve
 Two agents can propose a team file, never write it: the [Chief of Staff](../features/chief-of-staff.md#its-tool) (any team, mainly new ones) and, planned, **the lead of a deployed team** (its own team only). That way the CEO can have the team tuned in place, in the conversation that has the context (the CEO, 2026-11-02; [The lead proposes changes to its own team](../../backlog/lead-proposes-team.md)).
 
 - **Same tool, same checks:** `propose_team`, the whole team as it should be, checked like a save ([Invariants](#invariants)). Each proposer has its own proposal on screen; a newer one from the same proposer replaces it.
-- **The lead's scope:** its own team's souls (personality, skills, job description, look), playbook, escalation and purpose, and hiring. Never the team id, removing a member or another team. Members can't propose.
+- **The lead's scope:** its own team's souls (personality, skills, job description), playbook, escalation and purpose, and hiring. Never the team id, removing a member or another team. Members can't propose.
 - **Where the CEO sees it:** a lead's proposal opens a pane beside its terminal in the project's [Session](../features/sessions.md), the same pane as the Chief of Staff's, with **Approve** and **Reject**. It shows a **diff**: every changed field, removed text in red, added text in green; unchanged fields aren't highlighted. The Chief of Staff's preview shows the same diff, from the same component.
 - **The CEO's approval is the only gate**, so the diff must make every change visible: a lead steered by something it read (a repo, a wiki page) could otherwise slip in a quiet change to an escalation rule or a teammate's job.
 - Approved, the file is written (one commit, version-guarded) and the proposer is told. Rejected, the proposer is told and the proposal is dropped.
@@ -111,7 +103,7 @@ Two agents can propose a team file, never write it: the [Chief of Staff](../feat
 
 A saved team file reaches an instance at its **next start** (a wake from asleep counts): its prompt is composed at spawn ([Session prompt](../architecture/session-prompt.md)). Nothing restarts on its own. To apply a change at once, the CEO **reloads** the deployment (the CEO, 2026-11-02; built 2026-11-02): each live instance that is behind restarts on the new prompt, **continuing its conversation** (the CEO's Restart, one per agent); asleep ones get it at their wake anyway. Reload is the way to apply a team change to a running team, never Stop and deploy again.
 
-- **Behind:** each start keeps the hash of the prompt it was given ([Instance → `prompt_hash`](./instance.md)); a live instance (`running`, `idle`, `awaiting`) is behind when the prompt composed now differs. So any change that reaches the prompt counts, whoever made it (a proposal, the Agent page, the Chief of Staff, an editor), and so do `project.toml`'s gates and checks, the project's repos and the CEO's instructions; a change that doesn't (a member's look) doesn't. A run from before the hash was kept is never behind.
+- **Behind:** each start keeps the hash of the prompt it was given ([Instance → `prompt_hash`](./instance.md)); a live instance (`running`, `idle`, `awaiting`) is behind when the prompt composed now differs. So any change that reaches the prompt counts, whoever made it (a proposal, the Agent page, the Chief of Staff, an editor), and so do `project.toml`'s gates and checks, the project's repos and the CEO's instructions; a change that doesn't, doesn't. A run from before the hash was kept is never behind.
 - **Where:** a **`Reload`** button (the reload icon) in the project's [Deployment](../features/project-deployment.md) header, beside `Stop`, shown while some agent is behind. Approving a proposal will also offer it in the pane, as **Reload now?** (planned).
 - **Only when nobody is busy**: no agent of the deployment `queued`, `starting`, `running` or `awaiting` (waiting on the CEO may be mid-turn, at a permission prompt), so no turn is ever cut. A line under the header says what it does: `<n> agents run on an older prompt: Reload restarts them on the new one, continuing their conversations.`; while one is busy, the button is disabled and the line says `<n> agents run on an older prompt. <Name> is busy: the change applies at each agent's next start. Reload once they're idle.` (`is waiting on you` for `awaiting`).
 

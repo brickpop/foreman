@@ -1,7 +1,5 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
-import type { Look } from "../api/types/home";
-import { Avatar } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
 // One request to the CEO, but a review (decided on its page). The Dashboard and
@@ -12,7 +10,7 @@ import { Button, KindChip } from "./ui";
 type Props = {
   request: Request;
   /** Who raised it; undefined when Foreman did. */
-  who?: { name: string; look: Look };
+  who?: string;
   /** `<Team> on <project>`. */
   context: string;
   onAnswer: (answer: string) => void;
@@ -63,24 +61,12 @@ export function RequestPanel({
             type="button"
             onClick={onOpenSession}
             title="Open the session"
-            className="flex items-center gap-2.5 text-left"
+            className="text-left font-semibold hover:text-accTx"
           >
-            <Avatar
-              look={who?.look}
-              size={onProject ? 24 : 32}
-              ring={onProject ? undefined : "var(--attn)"}
-            />
-            <span className="font-semibold">{who?.name ?? r.instanceId}</span>
+            {who ?? r.instanceId}
           </button>
         ) : (
-          <>
-            <Avatar
-              look={who?.look}
-              size={onProject ? 24 : 32}
-              ring={onProject ? undefined : "var(--attn)"}
-            />
-            <span className="font-semibold">Foreman</span>
-          </>
+          <span className="font-semibold">Foreman</span>
         )}
         <span className="text-[13px] text-tx4">{context}</span>
         <span className="flex-1" />
@@ -128,7 +114,7 @@ export function RequestPanel({
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
             placeholder="Or type an answer…"
-            aria-label={`Answer ${who?.name ?? r.instanceId}`}
+            aria-label={`Answer ${who ?? r.instanceId}`}
             className="min-w-[180px] flex-1 rounded-[7px] border border-line2 bg-term px-3 py-[7px] text-tx placeholder:text-tx4 focus-visible:outline-2 focus-visible:outline-acc"
           />
         </form>

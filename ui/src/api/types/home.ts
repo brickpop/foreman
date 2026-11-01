@@ -91,18 +91,6 @@ export interface Soul {
   personality: string;
   skills: string[];
   instruction: string;
-  look: Look;
-}
-/**
- * Look is the avatar (wiki/product/design/avatar.md).
- */
-export interface Look {
-  color: string;
-  skin: string;
-  hair: string;
-  hairColor: string;
-  eyes: string;
-  beard: string;
 }
 /**
  * Settings is settings.toml. Absent fields keep their defaults.

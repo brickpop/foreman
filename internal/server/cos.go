@@ -22,9 +22,8 @@ type ChiefOfStaff interface {
 	Stop() error
 	// Proposal is the team on screen, if any.
 	Proposal() (cos.Proposal, bool)
-	// Create writes the proposal on screen, with the faces the page gave the
-	// members proposed without one.
-	Create(ctx context.Context, id int, looks map[string]home.Look) (home.Team, error)
+	// Create writes the proposal on screen.
+	Create(ctx context.Context, id int) (home.Team, error)
 }
 
 // cosSession is the body of POST /api/cos.
@@ -67,14 +66,13 @@ func cosRoutes(mux *http.ServeMux, c ChiefOfStaff) {
 	})
 	mux.HandleFunc("POST /api/cos/proposal", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			ID    int                  `json:"id"`
-			Looks map[string]home.Look `json:"looks"`
+			ID int `json:"id"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {id, looks}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {id}")
 			return
 		}
-		team, err := c.Create(r.Context(), req.ID, req.Looks)
+		team, err := c.Create(r.Context(), req.ID)
 		switch {
 		case errors.Is(err, cos.ErrStale):
 			writeError(w, http.StatusConflict, "STALE", "A newer proposal replaced this one")

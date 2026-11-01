@@ -28,22 +28,22 @@ func entries(t *testing.T, dir string) []string {
 
 // A new project is a record and a project repo at <workspace>/project,
 // committed, with no repos yet and the default profile; the workspace and
-// its missing parents are made. Names keep their case, and a name is taken in
-// any case. Nothing goes in Foreman's home.
+// its missing parents are made. A name is a slug, and taken in any case
+// (one from before slugs may have capitals). Nothing goes in Foreman's home.
 func TestNewProject(t *testing.T) {
 	h := loaded(t, nil)
-	ws := workspace("DevProject")
-	p, _, err := h.NewProject(ctx, "DevProject", "", ws)
+	ws := workspace("dev-project")
+	p, _, err := h.NewProject(ctx, "dev-project", "", ws)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.ID != "DevProject" || p.Workspace != ws || p.Path != filepath.Join(ws, "project") || p.Profile != "default" || len(p.Repos) != 0 || len(p.Problems) != 0 {
+	if p.ID != "dev-project" || p.Workspace != ws || p.Path != filepath.Join(ws, "project") || p.Profile != "default" || len(p.Repos) != 0 || len(p.Problems) != 0 {
 		t.Errorf("project %+v", p)
 	}
-	if p.Sandbox("mara") != filepath.Join(ws, "agents", "mara") || p.HarnessDir("mara") != h.Path("harness", "DevProject", "mara") {
+	if p.Sandbox("mara") != filepath.Join(ws, "agents", "mara") || p.HarnessDir("mara") != h.Path("harness", "dev-project", "mara") {
 		t.Errorf("sandbox %s, harness %s", p.Sandbox("mara"), p.HarnessDir("mara"))
 	}
-	if want, _ := starterFile("DevProject", "project.toml"); p.Source != want {
+	if want, _ := starterFile("dev-project", "project.toml"); p.Source != want {
 		t.Errorf("project.toml %q %+v", p.Source, p.Config)
 	}
 	if log := gitOut(t, p.Path, "log", "--format=%s"); log != "Project repo" {
@@ -52,7 +52,7 @@ func TestNewProject(t *testing.T) {
 	if status := gitOut(t, p.Path, "status", "--porcelain"); status != "" {
 		t.Errorf("left uncommitted: %q", status)
 	}
-	if list := h.Projects(); len(list) != 1 || list[0].ID != "DevProject" {
+	if list := h.Projects(); len(list) != 1 || list[0].ID != "dev-project" {
 		t.Errorf("projects %+v", list)
 	}
 	if exists(h.Path("projects")) || exists(h.Path("sandboxes")) {
@@ -60,11 +60,18 @@ func TestNewProject(t *testing.T) {
 	}
 	// A restart finds it: it is a record, not a folder.
 	reload(t, h)
-	if got, err := h.Project("DevProject"); err != nil || got.Path != p.Path {
+	if got, err := h.Project("dev-project"); err != nil || got.Path != p.Path {
 		t.Errorf("after a restart: %+v %v", got, err)
 	}
 	for name, want := range map[string]error{
-		"devproject":            ErrExists,
+		"dev-project": ErrExists,
+		// A project's name is its folder's: a slug (the CEO, 2026-11-02).
+		"Dev-Project":           ErrInvalid,
+		"my_app":                ErrInvalid,
+		"app.v2":                ErrInvalid,
+		"-lead":                 ErrInvalid,
+		"trail-":                ErrInvalid,
+		"a--b":                  ErrInvalid,
 		"../escape":             ErrInvalid,
 		"a b":                   ErrInvalid,
 		"":                      ErrInvalid,
@@ -76,7 +83,7 @@ func TestNewProject(t *testing.T) {
 			t.Errorf("%q: %v, want %v", name, err, want)
 		}
 	}
-	if got := entries(t, filepath.Dir(ws)); !slices.Equal(got, []string{"DevProject"}) {
+	if got := entries(t, filepath.Dir(ws)); !slices.Equal(got, []string{"dev-project"}) {
 		t.Errorf("the projects folder holds %v", got)
 	}
 }
@@ -169,7 +176,7 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 	}
 
 	// Under another name too: the workspace is what it is found by.
-	got, created, err := h.NewProject(ctx, "Books", "", ws)
+	got, created, err := h.NewProject(ctx, "books", "", ws)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -871,5 +878,20 @@ func TestARepoHasItsOwnMainBranch(t *testing.T) {
 	h.reload()
 	if p, _ := h.Project("aragon"); p.Repos[1].Main != "feature" {
 		t.Errorf("after a reload: %+v", p.Repos)
+	}
+}
+
+// The workspace offered follows the name only once it is one a project can
+// have: the dialog sends the slug of what the CEO typed.
+func TestSuggestWorkspace(t *testing.T) {
+	h := loaded(t, nil)
+	s, err := h.SuggestWorkspace("my-app")
+	if err != nil || s.Path != filepath.Join(s.Folder, "my-app") {
+		t.Errorf("my-app: %+v %v", s, err)
+	}
+	for _, name := range []string{"My App", "my_app", ""} {
+		if s, _ := h.SuggestWorkspace(name); s.Path != s.Folder {
+			t.Errorf("%q: %+v", name, s)
+		}
 	}
 }

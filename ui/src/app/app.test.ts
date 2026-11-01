@@ -52,15 +52,15 @@ describe("sidebarModel", () => {
       [],
       [team("atlas", "Atlas"), team("vesper", "Vesper"), team("orion", "")],
       [
-        instance("atlas@ledger"),
-        instance("atlas@ledger"),
+        instance("atlas@big-ledger"),
+        instance("atlas@big-ledger"),
         instance("vesper@ledger"),
         instance("vesper@relay"),
       ],
       [],
     );
     expect(m.teams).toEqual([
-      { id: "atlas", name: "Atlas", deployedOn: "ledger" },
+      { id: "atlas", name: "Atlas", deployedOn: "Big ledger" },
       { id: "vesper", name: "Vesper", deployedOn: "2 projects" },
       { id: "orion", name: "orion", deployedOn: "—" },
     ]);
@@ -220,7 +220,7 @@ describe("the Dashboard's model", () => {
   });
 });
 
-import { agentOf, palettes, randomLook, resolveWho, roleLabel, roster } from "./model";
+import { agentOf, resolveWho, roleLabel, roster } from "./model";
 
 describe("teams", () => {
   const atlas = {
@@ -266,20 +266,6 @@ describe("teams", () => {
       "QA / Tester",
       "Security auditor",
     ]);
-  });
-
-  it("draws a random look from the palettes", () => {
-    expect(randomLook(() => 0)).toEqual({
-      color: palettes.color[0],
-      skin: palettes.skin[0],
-      hair: "short",
-      hairColor: palettes.hairColor[0],
-      eyes: "dots",
-      beard: "none",
-    });
-    const look = randomLook();
-    expect(palettes.hair).toContain(look.hair);
-    expect(palettes.color).toContain(look.color);
   });
 });
 
@@ -478,5 +464,50 @@ describe("teamTab", () => {
   it("falls back on an unknown tab", () => {
     expect(teamTab("nope", false)).toBe("members");
     expect(teamTab(3, true)).toBe("deployments");
+  });
+});
+
+import { statusColor } from "../components/ui";
+
+describe("statusColor", () => {
+  it("maps every status to its color", () => {
+    expect(
+      ["running", "awaiting", "idle", "done", "starting", "stopped", "queued"].map(statusColor),
+    ).toEqual([
+      "var(--ok)",
+      "var(--attn)",
+      "var(--tx4)",
+      "var(--info)",
+      "var(--team)",
+      "var(--err)",
+      "var(--tx4)",
+    ]);
+  });
+});
+
+import { readable } from "./model";
+
+describe("readable", () => {
+  it("reads a slug as words, only the first capital", () => {
+    expect(readable("my-portfolio")).toBe("My portfolio");
+    expect(readable("api")).toBe("Api");
+    expect(readable("my__data--set_")).toBe("My data set");
+    // A name from before slugs: only its separators change.
+    expect(readable("Ledger.v2")).toBe("Ledger.v2");
+  });
+});
+
+import { saysLead } from "./model";
+
+describe("saysLead", () => {
+  it("hears lead as a word or a word's start, any case", () => {
+    for (const name of ["Lead", "lead", "Team Lead", "Tech-lead", "Leader", "QA_lead"]) {
+      expect(saysLead(name), name).toBe(true);
+    }
+  });
+  it("not inside a word, nor in other names", () => {
+    for (const name of ["Mara", "Pleadra", "Misleader", "", "Le ad"]) {
+      expect(saysLead(name), name).toBe(false);
+    }
   });
 });

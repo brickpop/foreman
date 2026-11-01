@@ -88,7 +88,7 @@ func (h *Home) SuggestWorkspace(name string) (Suggestion, error) {
 		return Suggestion{}, err
 	}
 	s := Suggestion{Path: folder, Folder: folder}
-	if validName(name) {
+	if validProjectName(name) {
 		s.Path = filepath.Join(folder, name)
 	}
 	info, err := os.Stat(folder)

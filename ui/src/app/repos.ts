@@ -82,14 +82,6 @@ export function folderOf(path: string): string {
   return path.split("/").slice(0, -1).join("/");
 }
 
-/** A repo's name as people read it (the CEO, 2026-11-02): hyphens and
- * underscores as spaces, the first letter capital. foreman-ui is "Foreman ui".
- * Only how it shows: its id, folder and URL stay the name. */
-export function repoTitle(name: string): string {
-  const words = name.replace(/[-_]+/g, " ").trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
 /** The file a folder opens with, as GitHub does: its README, else its
  * index.md (a wiki's), whatever their case; undefined with neither. */
 export function readmeOf(entries: { name: string; kind: string }[]): string | undefined {

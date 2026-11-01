@@ -13,6 +13,7 @@
   --side: light-dark(#f6f8fa, #1c2128);
   --panel: light-dark(#ffffff, #2d333b);
   --raised: light-dark(#eaeef2, #373e47);
+  --head: light-dark(#f6f8fa, #373e47);
   --hover: light-dark(#f3f4f6, #323942);
   --term: light-dark(#f6f8fa, #1c2128);
   --line: light-dark(#d8dee4, #373e47);
@@ -83,6 +84,7 @@
   --color-side: var(--side);
   --color-panel: var(--panel);
   --color-raised: var(--raised);
+  --color-head: var(--head);
   --color-hover: var(--hover);
   --color-term: var(--term);
   --color-line: var(--line);

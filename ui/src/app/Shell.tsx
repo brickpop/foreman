@@ -6,6 +6,7 @@ import { NewProject } from "../components/NewProject";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { useOpenChiefOfStaff } from "./chiefOfStaff";
+import { readable } from "./model";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
 import { latestFirst, reviewOf, sections, sessionOf } from "./project";
 import {
@@ -107,7 +108,8 @@ export function sidebarModel(
       return {
         id: t.id,
         name: t.config.name || t.id,
-        deployedOn: on.length === 0 ? "—" : on.length === 1 ? on[0] : `${on.length} projects`,
+        deployedOn:
+          on.length === 0 ? "—" : on.length === 1 ? readable(on[0]) : `${on.length} projects`,
       };
     }),
   };
@@ -235,7 +237,7 @@ function ProjectRow({ project }: { project: SidebarProject }) {
           }}
           className={`${rowItem} text-left font-medium !text-tx`}
         >
-          {project.id}
+          {readable(project.id)}
           <span className="flex items-center gap-2">
             {!open && project.inbox > 0 && <Dot title="Needs you" />}
             <Chevron open={open} />
@@ -243,7 +245,7 @@ function ProjectRow({ project }: { project: SidebarProject }) {
         </button>
       ) : (
         <Link to="/projects/$project" params={{ project: project.id }} className={rowItem}>
-          {project.id}
+          {readable(project.id)}
           {project.inbox > 0 && <Dot title="Needs you" />}
         </Link>
       )}

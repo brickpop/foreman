@@ -52,6 +52,12 @@ describe("the palettes", () => {
         expect(contrast(root[name][i], root.bg[i]), name).toBeGreaterThanOrEqual(4.5);
       }
       expect(contrast(root.attnInk[i], root.attn[i]), "attnInk").toBeGreaterThanOrEqual(4.5);
+      // A card's header band: its name and its status pill's word.
+      for (const name of ["tx", "tx2"]) {
+        expect(contrast(root[name][i], root.head[i]), `${name} on head`).toBeGreaterThanOrEqual(
+          4.5,
+        );
+      }
     });
 
     it(`keeps every accent readable in ${theme}`, () => {

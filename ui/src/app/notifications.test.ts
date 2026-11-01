@@ -25,7 +25,7 @@ describe("noticeFor", () => {
   it("tells who needs the CEO, where, and links the session", () => {
     expect(noticeFor(request({}), [team], instances)).toMatchObject({
       toggle: "needsMe",
-      title: "Tove needs you on ledger",
+      title: "Tove needs you on Ledger",
       body: "Which budget?",
       instance: "tove@ledger",
       deployment: "atlas@ledger",
@@ -35,9 +35,9 @@ describe("noticeFor", () => {
   it("names the agent as its own team has it, when another team shares the id", () => {
     const orion = { id: "orion", config: { lead: "tove", agents: { tove: { name: "QA" } } } };
     const both = [orion as unknown as Team, team];
-    expect(noticeFor(request({}), both, instances)?.title).toBe("Tove needs you on ledger");
+    expect(noticeFor(request({}), both, instances)?.title).toBe("Tove needs you on Ledger");
     expect(noticeFor(request({ deploymentId: "orion@ledger" }), both, instances)?.title).toBe(
-      "QA needs you on ledger",
+      "QA needs you on Ledger",
     );
   });
 
@@ -54,7 +54,7 @@ describe("noticeFor", () => {
     );
     expect(n).toMatchObject({
       toggle: "mergeRequested",
-      title: "Mara requested a merge on ledger",
+      title: "Mara requested a merge on Ledger",
       review: "rev-3",
     });
   });
@@ -100,7 +100,7 @@ describe("noticeFor", () => {
 
   it("names Foreman when it raised the request itself", () => {
     const n = noticeFor(request({ kind: "blocked", instanceId: "" }), [team], instances);
-    expect(n?.title).toBe("Foreman needs you on ledger");
+    expect(n?.title).toBe("Foreman needs you on Ledger");
   });
 
   it("tells when an instance is done, and only then", () => {
@@ -111,7 +111,7 @@ describe("noticeFor", () => {
     );
     expect(done).toMatchObject({
       toggle: "finishes",
-      title: "Tove is done on ledger",
+      title: "Tove is done on Ledger",
       deployment: "atlas@ledger",
     });
     for (const status of ["running", "idle", "awaiting", "stopped"]) {
@@ -158,7 +158,7 @@ describe("noticeFor", () => {
         instances,
       );
     expect(stopped("ledger is gone: all its code repos are missing")).toMatchObject({
-      title: "Foreman stopped Atlas on ledger",
+      title: "Foreman stopped Atlas on Ledger",
       body: "ledger is gone: all its code repos are missing",
       deployment: "atlas@ledger",
       instance: "",

@@ -7,7 +7,7 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { agentOf, inbox, mainOf, when } from "../../app/model";
+import { agentOf, inbox, mainOf, readable, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   useAnswer,
@@ -19,7 +19,6 @@ import {
   useTeams,
 } from "../../app/queries";
 import { reposWith } from "../../app/repos";
-import { Avatar } from "../../components/Avatar";
 import { RequestPanel } from "../../components/RequestPanel";
 import { Button, Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 
@@ -146,8 +145,10 @@ function ProjectRequest({
   const answer = useAnswer();
   const agent = agentOf(teams, r.deploymentId, r.instanceId);
   const openSession = () => navigate(sessionOf(r.instanceId));
-  const context = agent ? `${agent.team.config.name} on ${project.id}` : `on ${project.id}`;
-  const who = agent && { name: agent.soul.name, look: agent.soul.look };
+  const context = agent
+    ? `${agent.team.config.name} on ${readable(project.id)}`
+    : `on ${readable(project.id)}`;
+  const who = agent?.soul.name;
   return (
     <RequestPanel
       request={r}
@@ -198,8 +199,7 @@ function WorkRow({
   const tone =
     w.checksStatus === "fail" ? "text-err" : w.checksStatus === "pass" ? "text-ok" : "text-tx3";
   return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
-      <Avatar look={author?.soul.look} size={26} />
+    <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-medium">{title.data ?? (w.cardRef || w.branch)}</span>
         <span className="truncate text-[12.5px] text-tx3">
@@ -243,8 +243,7 @@ function MergeRow({
   const title = useEntryTitle(project, mr.entry);
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
-      <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-3">
-        <Avatar look={lead?.soul.look} size={26} />
+      <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3">
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium">
             {title.data ?? mr.entry}
@@ -294,10 +293,12 @@ function CarriedItem({
   const author = agentOf(teams, w.deploymentId, w.authorInstance);
   const title = useEntryTitle(project, w.cardRef);
   return (
-    <span className="ml-9 flex items-center gap-2 text-[13px] text-tx2">
-      <Avatar look={author?.soul.look} size={20} />
+    <span className="ml-4 flex items-center gap-2 text-[13px] text-tx2">
       {title.data ?? (w.cardRef || w.branch)}
       <span className="font-mono text-xs text-tx4">{w.branch}</span>
+      <span className="text-xs text-tx4">
+        {author?.soul.name ?? w.authorInstance.split("@")[0]}
+      </span>
     </span>
   );
 }

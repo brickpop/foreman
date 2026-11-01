@@ -3,14 +3,14 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { type Project, type Repo, useClient } from "../../api/client";
+import { readable } from "../../app/model";
 import { keys, useDeployments, useRepos } from "../../app/queries";
-import { repoTitle } from "../../app/repos";
 import { AddRepo } from "../../components/AddRepo";
 import { Confirm, Modal } from "../../components/Overlays";
 import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, card, cover, Loading } from "../../components/ui";
+import { Button, cover, GridCard, Loading } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
@@ -64,6 +64,7 @@ export function Repos() {
             onChange={open}
           />
         ))}
+        {read.isPending && <Loading rows={2} />}
         {projectRepo && (
           <Card project={project.id} name={projectRepo.name} title="Project repo">
             <span className="text-[12.5px] text-tx4">project.toml and the wiki</span>
@@ -71,20 +72,23 @@ export function Repos() {
           </Card>
         )}
       </div>
-      {read.isPending && <Loading rows={1} />}
       {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
       <span>
         <Button variant="small" onClick={() => setAdding(true)}>
           Add a repo
         </Button>
       </span>
-      <Modal open={adding} onClose={() => setAdding(false)} title={`Add a repo to ${project.id}`}>
+      <Modal
+        open={adding}
+        onClose={() => setAdding(false)}
+        title={`Add a repo to ${readable(project.id)}`}
+      >
         {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
       </Modal>
       <Modal
         open={changing?.what === "main"}
         onClose={close}
-        title={`Main branch of ${target ? repoTitle(target.name) : ""}`}
+        title={`Main branch of ${target ? readable(target.name) : ""}`}
       >
         {target && (
           <div className="flex flex-col gap-3">
@@ -165,7 +169,7 @@ export function Repos() {
       </Modal>
       <Confirm
         open={changing?.what === "remove"}
-        title={`Remove ${changing?.repo ?? ""} from ${project.id}?`}
+        title={`Remove ${changing?.repo ?? ""} from ${readable(project.id)}?`}
         body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
         action="Remove"
         onConfirm={() =>
@@ -200,7 +204,7 @@ function RepoCard({
     <Card
       project={project}
       name={r.name}
-      title={repoTitle(r.name)}
+      title={readable(r.name)}
       opens={!r.problem}
       menu={
         <RepoMenu repo={r.name} problem={!!r.problem} deployed={deployed} onChange={onChange} />
@@ -242,26 +246,33 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <div className={`${card} min-w-0 gap-1.5 ${opens ? "hover:border-line3" : ""}`}>
-      <span className="flex items-center gap-2">
-        {opens ? (
-          <Link
-            to="/projects/$project/repos/$repo"
-            params={{ project, repo: name }}
-            title={name}
-            className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-tx ${cover}`}
-          >
-            {title}
-          </Link>
-        ) : (
-          <span title={name} className="min-w-0 flex-1 truncate text-[15px] font-semibold text-tx">
-            {title}
-          </span>
-        )}
-        {menu && <span className="relative z-10">{menu}</span>}
-      </span>
-      {children}
-    </div>
+    <GridCard
+      opens={opens}
+      head={
+        <>
+          {opens ? (
+            <Link
+              to="/projects/$project/repos/$repo"
+              params={{ project, repo: name }}
+              title={name}
+              className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-tx ${cover}`}
+            >
+              {title}
+            </Link>
+          ) : (
+            <span
+              title={name}
+              className="min-w-0 flex-1 truncate text-[15px] font-semibold text-tx"
+            >
+              {title}
+            </span>
+          )}
+          {menu && <span className="relative z-10">{menu}</span>}
+        </>
+      }
+    >
+      <div className="flex flex-col gap-1.5">{children}</div>
+    </GridCard>
   );
 }
 

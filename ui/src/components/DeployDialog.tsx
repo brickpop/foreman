@@ -2,17 +2,28 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { harnessLabel } from "../app/model";
-import { keys, useDeployments, useProfiles, useProjects, useSetup, useTeams } from "../app/queries";
+import { harnessLabel, replacingLine } from "../app/model";
+import { sessionOf } from "../app/project";
+import {
+  keys,
+  useDeployments,
+  useInstances,
+  useProfiles,
+  useProjects,
+  useSetup,
+  useTeams,
+} from "../app/queries";
 import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
 // Assigns a team to a project, with an optional goal
-// (wiki/product/features/deploy-team.md).
-// Opened with a team preset (Team page), a project preset (Project settings),
-// or neither (empty Sessions). The project's profile, not connected, is connected from here.
+// (wiki/product/features/deploy-team.md). A project has one team at most:
+// another one there is replaced, and the dialog says so first.
+// Opened with a team preset (Team page, Dashboard), a project preset (its
+// Session and Deployment sections), or neither (Dashboard). The project's
+// profile, not connected, is connected from here.
 
 const option = (on: boolean, disabled = false) =>
   `rounded-[7px] border px-3 py-1.5 text-[13px] ${
@@ -27,11 +38,15 @@ export function DeployDialog({
   open,
   onClose,
   team: presetTeam,
+  initialTeam,
   project: presetProject,
 }: {
   open: boolean;
   onClose: () => void;
+  /** The team to deploy, not to be changed. */
   team?: string;
+  /** The team chosen at first, to be changed (the last one on the project). */
+  initialTeam?: string;
   project?: string;
 }) {
   const client = useClient();
@@ -41,7 +56,8 @@ export function DeployDialog({
   const teams = useTeams();
   const projects = useProjects();
   const deployments = useDeployments();
-  const [team, setTeam] = useState(presetTeam);
+  const instances = useInstances();
+  const [team, setTeam] = useState(presetTeam ?? initialTeam);
   const [project, setProject] = useState(presetProject);
   const [goal, setGoal] = useState("");
   const [connecting, setConnecting] = useState<string>();
@@ -59,14 +75,18 @@ export function DeployDialog({
   // Agents start only once Podman runs (and the instances are restored).
   const running = useSetup().data?.find((s) => s.kind === "running");
   const engineDown = running !== undefined && running.state !== "done";
-  const already = (p: string) =>
-    (deployments.data ?? []).some((d) => d.teamId === team && d.projectId === p);
-  const teamName = teams.data?.find((t) => t.id === team)?.config.name ?? team;
+  const nameOf = (id: string) => teams.data?.find((t) => t.id === id)?.config.name || id;
+  // The team on each project now (one at most): deploying another replaces it.
+  const on = (p?: string) => (deployments.data ?? []).find((d) => d.projectId === p);
+  const already = (p: string) => on(p)?.teamId === team;
+  const teamName = team && nameOf(team);
+  const replaced = project && !already(project) ? on(project) : undefined;
+  const ending = (instances.data ?? []).filter((i) => i.deploymentId === replaced?.id).length;
   const deploy = useMutation({
     mutationFn: () => client.agents.deploy(team ?? "", project ?? "", goal.trim()),
     onSuccess: async (d) => {
-      // Its agents loaded first: until then the Sessions page doesn't know the
-      // deployment, and would show the list instead.
+      // Its agents loaded first: until then the Session section doesn't know
+      // the team, and would offer to deploy one.
       await Promise.all([
         queries.invalidateQueries({ queryKey: keys.instances }),
         queries.invalidateQueries({ queryKey: keys.deployments }),
@@ -76,12 +96,12 @@ export function DeployDialog({
       const members = Object.keys(t?.config.agents ?? {}).length;
       onClose();
       setGoal("");
-      navigate({ to: "/sessions", search: { deployment: d.id, agent: lead } });
+      navigate(sessionOf(lead));
       toast({
         title: `${t?.config.name ?? d.teamId} deployed to ${d.projectId}`,
         body: `${members} new sessions starting.`,
         color: "var(--ok)",
-        onOpen: () => navigate({ to: "/sessions", search: { deployment: d.id, agent: lead } }),
+        onOpen: () => navigate(sessionOf(lead)),
       });
     },
   });
@@ -95,8 +115,8 @@ export function DeployDialog({
     >
       <div className="flex flex-col gap-4">
         <p className="m-0 text-[13.5px] text-tx3">
-          Starts a separate set of sessions for this project. Deployments on other projects aren't
-          affected.
+          A project has one team at most. The team's work here is separate from its work on other
+          projects.
         </p>
         {!presetTeam && (
           <Group label="Team">
@@ -126,6 +146,9 @@ export function DeployDialog({
                 onClick={() => setProject(p.id)}
               >
                 {there ? `${p.id} (already there)` : p.archived ? `${p.id} (archived)` : p.id}
+                {on(p.id) && !there && (
+                  <span className="text-tx4"> · {nameOf(on(p.id)?.teamId ?? "")}</span>
+                )}
               </button>
             );
           })}
@@ -140,6 +163,11 @@ export function DeployDialog({
             className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
           />
         </label>
+        {replaced && team && (
+          <p className="m-0 rounded-lg border border-accLine bg-accSoft px-3 py-2.5 text-[13px] text-accTx">
+            {replacingLine(nameOf(replaced.teamId), replaced.projectId, ending)}
+          </p>
+        )}
         {chosen?.archived && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
             <span className="flex-1">

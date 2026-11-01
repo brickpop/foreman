@@ -164,7 +164,7 @@ function withoutRenderedCheckbox(children: ReactNode): ReactNode {
   return children.filter((c) => !(c && typeof c === "object" && "type" in c && c.type === "input"));
 }
 
-/** A repo file's Markdown (a README), on the Repositories tab: rendered, and
+/** A repo file's Markdown (a README), on the Repos section: rendered, and
  * inert. Raw HTML stays off; a web link opens in a new tab, a relative one is
  * text (nothing here serves it); an image shows its text, never loaded, since
  * agents write these files and a remote image would call out. */

@@ -16,7 +16,7 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 
 ```
 ┌──────────────────────────────── Browser ──────────────────────────────────┐
-│ Screens: Dashboard · Sessions · Project · Team · Agent · Settings · Chief of Staff│
+│ Screens: Dashboard · Project · Team · Agent · Settings · Chief of Staff   │
 │                 │ never talk to the network themselves                       │
 │ ForemanClient ──── real client: HTTP + event stream + terminal WebSockets    │
 │ (main.tsx)          (an area not built yet refuses: "Not built yet")        │
@@ -73,7 +73,7 @@ Every arrow, in words:
 | From | To | Why |
 |---|---|---|
 | Web server | Instance manager | Open a terminal view, type into it, deploy, stop |
-| Web server | Messaging | The CEO's Line; the Activity panel; the countdown on the CEO's draft |
+| Web server | Messaging | The CEO's Line; the project's Activity; the countdown on the CEO's draft |
 | Web server | Workflow | Answer a request; a review's comments and decisions (Request changes, Merge, Dismiss; later Create PR); Sync a reserved repo |
 | Web server | Home & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
@@ -257,7 +257,7 @@ Moves messages between agents, and between agents and the CEO: `ask`, `reply`, `
 ```go
 type Messaging interface {
     Send(Message) (ID, error)          // from an agent's tool call, or from the CEO
-    Log(deployment) []Message          // the Activity panel
+    Log(deployment) []Message          // the project's Activity
 }
 ```
 

@@ -207,10 +207,24 @@ func TestDeploymentLookupsAndRules(t *testing.T) {
 	if err := deps.Stop(ctx, "nobody@nowhere", ""); !errors.Is(err, ErrNotFound) {
 		t.Errorf("stop unknown: %v", err)
 	}
-	for _, pair := range [][2]string{{"atlas", "relay"}, {"atlas", "ledger"}, {"build", "ledger"}} {
+	for _, pair := range [][2]string{{"atlas", "relay"}, {"atlas", "ledger"}} {
 		if _, err := deps.Deploy(ctx, pair[0], pair[1], "goal"); err != nil {
 			t.Fatal(err)
 		}
+	}
+	// One team per project: another is refused until the first stops.
+	if _, err := deps.Deploy(ctx, "build", "ledger", "goal"); !errors.Is(err, ErrProjectTaken) {
+		t.Errorf("a second team on ledger: %v", err)
+	}
+	if err := deps.Stop(ctx, "atlas@ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deps.Deploy(ctx, "build", "ledger", "goal"); err != nil {
+		t.Fatal(err)
+	}
+	// Nor can the first come back while the second is there.
+	if _, err := deps.Deploy(ctx, "atlas", "ledger", "goal"); !errors.Is(err, ErrProjectTaken) {
+		t.Errorf("atlas back on ledger beside build: %v", err)
 	}
 	list, err := deps.List(ctx)
 	if err != nil {
@@ -222,6 +236,22 @@ func TestDeploymentLookupsAndRules(t *testing.T) {
 	}
 	if got := strings.Join(ids, ","); got != "atlas@ledger,atlas@relay,build@ledger" {
 		t.Errorf("List = %s", got)
+	}
+}
+
+// The index holds the invariant even past Deploy's check: a second active
+// deployment on a project can't be written at all.
+func TestOneActiveDeploymentPerProjectInTheSchema(t *testing.T) {
+	db := open(t)
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "goal"); err != nil {
+		t.Fatal(err)
+	}
+	insert := "INSERT INTO deployments (id, team_id, project_id, goal, created_at, status) VALUES (?, ?, 'ledger', '', '2026-10-31T00:00:00Z', ?)"
+	if _, err := db.sql.Exec(insert, "build@ledger", "build", DeploymentActive); err == nil {
+		t.Error("a second active deployment on ledger was written")
+	}
+	if _, err := db.sql.Exec(insert, "orion@ledger", "orion", DeploymentStopped); err != nil {
+		t.Errorf("a stopped one beside it: %v", err)
 	}
 }
 
@@ -545,9 +575,14 @@ func TestActions(t *testing.T) {
 func TestWorkItems(t *testing.T) {
 	db := open(t)
 	deps := db.Deployments()
-	for _, p := range []struct{ team, project string }{{"atlas", "ledger"}, {"orion", "ledger"}, {"atlas", "relay"}} {
+	for _, p := range []struct{ team, project string }{{"orion", "ledger"}, {"atlas", "ledger"}, {"atlas", "relay"}} {
 		if _, err := deps.Deploy(ctx, p.team, p.project, ""); err != nil {
 			t.Fatal(err)
+		}
+		if p.team == "orion" { // a project has one team at a time
+			if err := deps.Stop(ctx, "orion@ledger", ""); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	items := db.WorkItems()

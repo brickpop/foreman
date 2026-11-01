@@ -57,11 +57,7 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
       ),
     onSuccess: ({ project: p, created }) => {
       queries.invalidateQueries({ queryKey: keys.projects });
-      navigate({
-        to: "/projects/$project",
-        params: { project: p.id },
-        search: { tab: "overview" },
-      });
+      navigate({ to: "/projects/$project", params: { project: p.id } });
       toast({
         title: `${p.id} created`,
         body: createdBody(created, source === "clone", p.path),

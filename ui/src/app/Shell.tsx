@@ -7,6 +7,7 @@ import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { useOpenChiefOfStaff } from "./chiefOfStaff";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
+import { reviewOf, sections, sessionOf } from "./project";
 import {
   useInstances,
   useLiveEvents,
@@ -68,13 +69,17 @@ export function Shell() {
   );
 }
 
+export type SidebarProject = {
+  id: string;
+  /** What waits on the CEO there: its open requests, reviews included (its
+   * Inbox's count). */
+  inbox: number;
+};
+
 export type SidebarModel = {
-  /** The reviews waiting on the CEO: their review requests open; the only
-   * count in the nav. */
-  reviews: number;
-  projects: { id: string; needsYou: boolean }[];
+  projects: SidebarProject[];
   /** The archived projects, in a collapsed group of their own. */
-  archived: { id: string; needsYou: boolean }[];
+  archived: SidebarProject[];
   teams: { id: string; name: string; deployedOn: string }[];
 };
 
@@ -87,9 +92,11 @@ export function sidebarModel(
 ): SidebarModel {
   const open = requests.filter((r) => r.status === "open");
   const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean));
-  const row = (p: Project) => ({ id: p.id, needsYou: open.some((r) => r.projectId === p.id) });
+  const row = (p: Project) => ({
+    id: p.id,
+    inbox: open.filter((r) => r.projectId === p.id).length,
+  });
   return {
-    reviews: open.filter((r) => r.kind === "review").length,
     projects: projects.filter((p) => !p.archived).map(row),
     archived: projects.filter((p) => p.archived).map(row),
     teams: teams.map((t) => {
@@ -110,6 +117,8 @@ const navItem =
 const navActive = { className: "bg-raised !text-tx" };
 const rowItem =
   "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
+const sectionItem =
+  "flex items-center justify-between rounded-md px-2.5 py-1 text-[13px] text-tx3 hover:bg-hover hover:text-tx2";
 
 function Sidebar({
   onNewProject,
@@ -152,18 +161,6 @@ function Sidebar({
         <nav className="flex flex-col gap-0.5">
           <Link to="/" className={navItem} activeProps={navActive} activeOptions={{ exact: true }}>
             Dashboard
-          </Link>
-          {/* The list and every deployment's page. */}
-          <Link
-            to="/sessions"
-            className={navItem}
-            activeProps={navActive}
-            activeOptions={{ includeSearch: false }}
-          >
-            Sessions
-          </Link>
-          <Link to="/reviews" className={navItem} activeProps={navActive}>
-            Reviews <CountBadge count={model.reviews} />
           </Link>
         </nav>
         <section className="flex flex-col gap-0.5">
@@ -216,21 +213,37 @@ function Sidebar({
   );
 }
 
-/** A project in the sidebar, active on every tab of the project. */
-function ProjectRow({ project }: { project: SidebarModel["projects"][number] }) {
+/** A project in the sidebar; the one open lists its sections under it, the
+ * Inbox with its count (the CEO, 2026-10-31: no second row of tabs). */
+function ProjectRow({ project }: { project: SidebarProject }) {
+  const current = useParams({ strict: false }).project === project.id;
   return (
-    <Link
-      to="/projects/$project"
-      params={{ project: project.id }}
-      search={{ tab: "overview" }}
-      className={rowItem}
-      activeProps={navActive}
-      // Active on every tab of the project, not only the one the link opens.
-      activeOptions={{ includeSearch: false }}
-    >
-      {project.id}
-      {project.needsYou && <Dot title="Needs you" />}
-    </Link>
+    <>
+      <Link
+        to="/projects/$project"
+        params={{ project: project.id }}
+        className={`${rowItem} ${current ? "font-medium !text-tx" : ""}`}
+      >
+        {project.id}
+        {!current && project.inbox > 0 && <Dot title="Needs you" />}
+      </Link>
+      {current && (
+        <nav className="mb-1 ml-3.5 flex flex-col gap-px border-l border-line2 pl-1.5">
+          {sections.map((s) => (
+            <Link
+              key={s.path}
+              to={`/projects/$project/${s.path}`}
+              params={{ project: project.id }}
+              className={sectionItem}
+              activeProps={navActive}
+            >
+              {s.label}
+              {s.path === "inbox" && <CountBadge count={project.inbox} />}
+            </Link>
+          ))}
+        </nav>
+      )}
+    </>
   );
 }
 
@@ -281,9 +294,9 @@ function LiveEvents() {
     // instance (Foreman itself) the request waits on the Dashboard.
     const open = () =>
       n.review
-        ? navigate({ to: "/reviews/$review", params: { review: n.review } })
+        ? navigate(reviewOf(n.deployment.split("@")[1] ?? "", n.review))
         : n.instance
-          ? navigate({ to: "/sessions", search: { deployment: n.deployment, agent: n.instance } })
+          ? navigate(sessionOf(n.instance))
           : navigate({ to: "/" });
     toast({ title: n.title, body: n.body, color: n.color, onOpen: open });
     const toggles = settings.data?.settings.notifications;

@@ -1,34 +1,36 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import type { Project, Repo } from "../../api/client";
+import type { Repo } from "../../api/client";
 import { when } from "../../app/model";
 import { useRepoFile, useRepoLog, useRepos, useRepoTree, useTeams } from "../../app/queries";
 import { branchOwner, bytes, crumbs, folderOf, isMarkdown, shownAt } from "../../app/repos";
 import { FileMarkdown } from "../../components/Markdown";
 import { Select } from "../../components/Select";
 import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
+import { useProject } from "../Project";
 
-// The project's Repositories tab (wiki/product/features/repositories.md): its
-// repos, read-only and as committed: each repo's branches, and a branch's
-// files and history. The repo and branch shown are in the URL, so a link
-// (an agent's worktree, on Worktrees) opens them.
+// A project's Repos section (wiki/product/features/repos.md): its repos,
+// read-only and as committed: each repo's branches, and a branch's files and
+// history. The repo and branch shown are in the URL, so a link (an agent's
+// worktree, on Deployment) opens them.
 
 type At = { repo: string; branch: string };
 
-export function Repositories({ project }: { project: Project }) {
+export function Repos() {
+  const project = useProject();
   const repos = useRepos(project.id);
-  const search = useSearch({ from: "/projects/$project" });
-  const navigate = useNavigate({ from: "/projects/$project" });
+  const search = useSearch({ from: "/projects/$project/repos" });
+  const navigate = useNavigate({ from: "/projects/$project/repos" });
   const list = repos.data ?? [];
   const at = shownAt(list, search.repo, search.branch);
   const choose = (next: At) =>
     navigate({ search: (s) => ({ ...s, repo: next.repo, branch: next.branch }), replace: true });
   return (
-    <div className="flex flex-col gap-2.5 px-12 pt-6 pb-16">
+    <div className="flex flex-col gap-2.5 px-6 pt-6 pb-12">
       {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
       {repos.isPending && <Loading rows={6} />}
       {at && (
-        <div className="grid h-[calc(100vh-220px)] min-h-[360px] grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
+        <div className="grid h-[calc(100vh-80px)] min-h-[360px] grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
           <Branches repos={list} at={at} onChoose={choose} />
           {/* Keyed by branch: another branch starts at its root. */}
           <Browser key={`${at.repo} ${at.branch}`} project={project.id} at={at} />

@@ -118,8 +118,9 @@ type AgentLink struct {
 // Manager runs the instances of every active deployment.
 type Manager struct {
 	Deps
-	work     sync.WaitGroup // starts and room-making under way
-	changing sync.Mutex     // one instance change at a time (change)
+	work      sync.WaitGroup // starts and room-making under way
+	changing  sync.Mutex     // one instance change at a time (change)
+	deploying sync.Mutex     // one deploy at a time (Deploy)
 
 	mu         sync.Mutex
 	runs       map[string]*run // instances with a process or a start under way

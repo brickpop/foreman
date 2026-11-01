@@ -12,14 +12,19 @@ const (
 	DeploymentStopped = "stopped"
 )
 
-// ErrActive means the team is already deployed on the project.
-var ErrActive = errors.New("store: already deployed")
+var (
+	// ErrActive means the team is already deployed on the project.
+	ErrActive = errors.New("store: already deployed")
+	// ErrProjectTaken means another team is deployed on the project: a project
+	// has one team at most.
+	ErrProjectTaken = errors.New("store: another team is deployed on the project")
+)
 
 // Deployments is the deployments table.
 type Deployments interface {
 	// Deploy creates the deployment of team on project, or reactivates the
 	// stopped one with the new goal (one row per pair, keeping its history).
-	// ErrActive if it is already active.
+	// ErrActive if it is already active, ErrProjectTaken if another team is.
 	Deploy(ctx context.Context, team, project, goal string) (Deployment, error)
 	// Stop marks it stopped, with why when Foreman stopped it on its own (""
 	// for the CEO's Stop); stopping a stopped deployment changes nothing.
@@ -43,6 +48,14 @@ func (d deployments) Deploy(ctx context.Context, team, project, goal string) (De
 	}
 	defer func() { _ = tx.Rollback() }()
 	id := team + "@" + project
+	var other string
+	err = tx.QueryRowContext(ctx, "SELECT id FROM deployments WHERE project_id = ? AND status = 'active' AND team_id != ?", project, team).Scan(&other)
+	switch {
+	case err == nil:
+		return Deployment{}, ErrProjectTaken
+	case !errors.Is(err, sql.ErrNoRows):
+		return Deployment{}, err
+	}
 	var status string
 	err = tx.QueryRowContext(ctx, "SELECT status FROM deployments WHERE team_id = ? AND project_id = ?", team, project).Scan(&status)
 	switch {

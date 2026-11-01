@@ -1,7 +1,7 @@
 import type { Repo, RepoBranch, Team } from "../api/client";
 import { agentOf } from "./model";
 
-// The Repositories tab's model (wiki/product/features/repositories.md).
+// The Repos section's model (wiki/product/features/repos.md).
 
 /** Whose branch it is, by Foreman's names: wt/<agent>/… is that agent's,
  * lead/<team>/… that team's lead's; anything else is nobody's in particular. */
@@ -15,7 +15,7 @@ export function branchOwner(branch: string, teams: Team[]): string | undefined {
   return undefined;
 }
 
-/** The repo and branch Repositories shows: the ones asked for (the URL) when
+/** The repo and branch Repos shows: the ones asked for (the URL) when
  * the project has them, else the repo's first branch (main, when it has
  * one), else the first repo's. */
 export function shownAt(

@@ -7,7 +7,6 @@ import {
 } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import {
-  type ActivityScope,
   type Board,
   type Doing,
   type Draft,
@@ -46,7 +45,6 @@ export const keys = {
   maintenance: ["maintenance"],
   setup: ["setup"],
   messages: ["messages"],
-  actions: ["actions"],
   activity: ["activity"],
   repos: ["repos"],
 } as const;
@@ -137,7 +135,7 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
     case "team.message":
       return [keys.messages, keys.activity];
     case "team.action":
-      return [keys.actions, keys.activity, keys.repos];
+      return [keys.activity, keys.repos];
     case "wiki.changed":
       return [["wiki", String((e.data as { project?: string }).project ?? "")]];
     case "pipeline.changed":
@@ -265,15 +263,6 @@ export function useAnswer() {
     onError: (e: Error) =>
       toast({ title: "Answer not sent", body: e.message, color: "var(--err)" }),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),
-  });
-}
-
-export function useActions(deployment: string) {
-  const c = useClient();
-  return useQuery({
-    queryKey: [...keys.actions, deployment],
-    queryFn: () => c.messages.actions(deployment),
-    enabled: deployment !== "",
   });
 }
 
@@ -537,19 +526,20 @@ export function useStoppedDeployments() {
   });
 }
 
-/** Team traffic a page at a time, newest first (a project's Activity tab). */
-export function useActivity(scope: ActivityScope, enabled = true) {
+/** A deployment's team traffic a page at a time, newest first (a project's
+ * Activity section). */
+export function useActivity(deployment: string, enabled = true) {
   const c = useClient();
   return useInfiniteQuery({
-    queryKey: [...keys.activity, scope],
-    queryFn: ({ pageParam }) => c.messages.activity(scope, pageParam),
+    queryKey: [...keys.activity, deployment],
+    queryFn: ({ pageParam }) => c.messages.activity(deployment, pageParam),
     initialPageParam: "",
     getNextPageParam: (last) => last.next || undefined,
     enabled,
   });
 }
 
-/** A project's repos and their branches (the Repositories tab). Under the
+/** A project's repos and their branches (the Repos section). Under the
  * repos' key: a commit, a merge or a new repo refreshes everything shown. */
 export function useRepos(project: string) {
   const c = useClient();

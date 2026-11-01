@@ -4,6 +4,7 @@ import { isConflict, type Soul, type Team } from "../api/client";
 import type { Look } from "../api/types/home";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import { palettes, randomLook, roleLabel } from "../app/model";
+import { sessionOf } from "../app/project";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { useToast } from "../components/Toasts";
@@ -29,7 +30,7 @@ export function Agent() {
       </p>
     );
   return (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(360px,1fr))] gap-10 px-12 pt-10 pb-16">
+    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(360px,1fr))] gap-10 px-6 pt-6 pb-12">
       <Editor key={`${team.id}/${id}`} team={team} id={id} saved={soul} />
       <PromptView team={team} id={id} />
     </div>
@@ -150,12 +151,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
               <Dot status={i.status} size={8} />
               <span className="whitespace-nowrap font-semibold">{i.id.split("@")[1]}</span>
               <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
-              <Button
-                variant="small"
-                onClick={() =>
-                  navigate({ to: "/sessions", search: { deployment: i.deploymentId, agent: i.id } })
-                }
-              >
+              <Button variant="small" onClick={() => navigate(sessionOf(i.id))}>
                 Session
               </Button>
             </div>

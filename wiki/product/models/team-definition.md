@@ -55,7 +55,7 @@ beard = "none"            # none | stubble | full | mustache
 | `name` | String | yes | | | Display name |
 | `purpose` | String | | | one line | What the team is for, shown under its name on the [Team page](../features/team-page.md). Free text; there are no team kinds |
 | `lead` | String | yes | | an id in `agents` | The team lead: the CEO's default contact, the only member who can call `request_merge` |
-| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across all teams** (the slug of the display name, which is unique across all teams too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when two teams share a project. Their order in the file is the roster's order everywhere, lead first: Sessions tabs, Members, the session prompt |
+| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across all teams** (the slug of the display name, which is unique across all teams too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when teams follow one another on a project (Stop keeps their worktrees). Their order in the file is the roster's order everywhere, lead first: the Session's agent tabs, Deployment, Members, the session prompt |
 | `playbook` | Array of single-key inline tables `{ who = "text" }` | | `[]` | | Ordered steps. `who` as in [Playbook and escalation](#playbook-and-escalation) |
 | `escalate` | Array of tables `[[escalate]]` with `when`, `to` | | `[]` | `to`: a `who` ([Playbook and escalation](#playbook-and-escalation)) | Escalation table. Project gates ([Project config](./project-config.md)) apply on top |
 

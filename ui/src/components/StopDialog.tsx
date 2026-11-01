@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { Deployment } from "../api/client";
 import { useClient } from "../api/client";
-import { plural } from "../app/model";
+import { sessionsEnd } from "../app/model";
 import { keys, useInstances } from "../app/queries";
 import { StopIcon } from "./icons";
 import { Modal } from "./Overlays";
@@ -10,7 +10,7 @@ import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
 // Stopping a deployment, after a confirmation (wiki/product/features/team-page.md):
-// from the Team page and from Sessions. Mount it only while open, so each
+// from the Team page and the project's Deployment section. Mount it only while open, so each
 // opening starts without the last one's error.
 
 export function StopDialog({
@@ -39,20 +39,14 @@ export function StopDialog({
         body: "Worktrees are kept. Other deployments keep running.",
         color: "var(--tx4)",
         onOpen: () =>
-          navigate({
-            to: "/projects/$project",
-            params: { project: d.projectId },
-            search: { tab: "settings" },
-          }),
+          navigate({ to: "/projects/$project/deployment", params: { project: d.projectId } }),
       });
     },
   });
   return (
     <Modal open onClose={onClose} title={`Stop ${teamName} on ${d.projectId}?`}>
       <div className="flex flex-col gap-4">
-        <p className="m-0 text-tx2">
-          {plural(sessions, "session")} end. Worktrees and branches are kept.
-        </p>
+        <p className="m-0 text-tx2">{sessionsEnd(sessions)}. Worktrees and branches are kept.</p>
         {stop.error && <p className="m-0 text-[13px] text-err">{stop.error.message}</p>}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>

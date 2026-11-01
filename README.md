@@ -34,7 +34,7 @@ bin/foreman               # serve, from ~/.foreman (one Foreman per machine)
 
 Foreman prints a URL with an access token and opens it in your browser. Use that URL: without the token every request is refused. `bin/foreman -h` lists the flags. Run it again while it runs and it prints that URL.
 
-A project is a set of git repos anywhere in your home folder, plus a **workspace**, a folder of yours (`~/workspace/foreman/<name>/` by default, set in Settings → System) holding its project repo (`project/`: its wiki and `project.toml`) and its agents' worktrees (`agents/<agent>/`), where you can look at their work and run it. Agents never work in your checkouts: each gets its own git worktree of each repo, and work reaches `main` only when you merge it. A project made before workspaces lives in `~/.foreman/` until you move it from its Settings tab.
+A project is a set of git repos anywhere in your home folder, plus a **workspace**, a folder of yours (`~/workspace/foreman/<name>/` by default, set in Settings → System) holding its project repo (`project/`: its wiki and `project.toml`) and its agents' worktrees (`agents/<agent>/`), where you can look at their work and run it. Agents never work in your checkouts: each gets its own git worktree of each repo, and work reaches `main` only when you merge it. A project made before workspaces lives in `~/.foreman/` until you move it from its Settings section.
 
 Ctrl-C stops Foreman and its agents: they go to sleep, and wake with their conversation when work arrives on the next run (a second Ctrl-C leaves them running instead).
 

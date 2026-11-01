@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ActionRepo, TeamAction } from "../api/client";
-import { ActionRow } from "./ActivityPanel";
+import { ActionRow } from "./TeamActivity";
 
 const repo = (r: Partial<ActionRepo>): ActionRepo => ({
   repo: "api",

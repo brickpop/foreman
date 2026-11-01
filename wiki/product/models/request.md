@@ -35,7 +35,7 @@ Table `requests`.
 - Resolved requests stay in `state.db` as history.
 - Duplicates are merged: same instance, kind and summary within 10 minutes, comparing summaries normalized (case-folded, whitespace collapsed). Known limit: an agent rephrasing the same ask still creates a second request, and two different asks worded identically merge.
 - Only `open` requests count toward "needs you".
-- An instance can have **many open requests**, each its own request panel on the Dashboard and on the project's Overview. Because `escalate(approval)` blocks the caller, one agent naturally waits on one approval at a time (a harness issuing parallel tool calls can still open several, which is allowed); questions and findings don't block and can pile up. The [instance](./instance.md) is `awaiting` while any blocking approval of it is open.
+- An instance can have **many open requests**, each its own request panel on the Dashboard and in the project's Inbox. Because `escalate(approval)` blocks the caller, one agent naturally waits on one approval at a time (a harness issuing parallel tool calls can still open several, which is allowed); questions and findings don't block and can pile up. The [instance](./instance.md) is `awaiting` while any blocking approval of it is open.
 - The panel's **source label** is derived, not stored: `escalate(<kind>)` for `source: agent` on approval, question and finding; `request_merge()` for review; `waiting in its session` for `source: harness`; `raised by Foreman` for `source: foreman`.
 
 ## Phasing

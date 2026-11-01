@@ -390,7 +390,6 @@ func run(args []string, stdout io.Writer) error {
 		Events:       bus,
 		Agents:       views,
 		Messages:     messenger,
-		Actions:      state.Actions(),
 		Activity:     state.Activity(),
 		Repos:        repos.Browser{Config: h, Git: gitCLI},
 		Pipeline:     flow,

@@ -80,3 +80,12 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
   - **Every start rescans:** each start calls `Checked`, which rescans every project's repos (a few `git` calls each), not only the one starting.
 - **Why:** each is rare, cheap or temporary next to what the card had to land.
 - **Fix:** a stopped deployment's sandboxes removed with it (or on demand), and the refusal then counting active ones only; Locate refusing a folder whose `.git` isn't the one the worktrees name when worktrees exist (or recreating them); `Checked` rescanning only the project starting.
+
+## One team per project: known edges
+
+- **State** (from [The project as the workplace](./backlog/project-workplace.md), 2026-10-31):
+  - **Replacing isn't one transaction:** Deploy stops the team on the project, then writes the new deployment. A failure in between (the database, or a refusal raised only by the store) leaves the project with no team; the old one stays stopped, its worktrees kept, so deploying again recovers.
+  - **The Activity filter sees loaded pages only:** filtering by a member or a pair on the map hides what doesn't match among the pages already fetched, so a rare match further back shows only after `Load older`.
+  - **The Session section's last agent is kept in memory:** a reload, or another browser, opens the project on the agent named in the URL, else on the lead ([UI state](./product/models/ui-state.md) is planned).
+- **Why:** each is rare or cheap next to what the card had to land, and the CEO asked for no workarounds.
+- **Fix:** Deploy's stop and write in one store transaction (the processes stopped after it commits); the activity filter sent to `/api/activity` as a query parameter, so the server pages the matches; the last agent saved with the `ui_state` table.

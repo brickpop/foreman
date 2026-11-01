@@ -8,14 +8,13 @@ import {
   inbox,
   type ProjectRow,
   projectRows,
-  sessionGroups,
   type TeamCard,
   teamCards,
   workingSummary,
 } from "../app/model";
+import { sessionOf } from "../app/project";
 import {
   useAnswer,
-  useDeployments,
   useInstances,
   useProjects,
   useRequests,
@@ -25,28 +24,17 @@ import {
 import { setupPending } from "../app/setup";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
-import { DeploymentCard } from "../components/DeploymentCard";
 import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
-import {
-  Button,
-  card,
-  cover,
-  Dot,
-  Empty,
-  Loading,
-  PageTitle,
-  SectionLabel,
-} from "../components/ui";
+import { Button, card, cover, Dot, Loading, PageTitle, SectionLabel } from "../components/ui";
 
-// The start page (wiki/product/features/dashboard.md): what is at work, the
-// projects and the teams, each a click from where it's handled. Reviews live
-// in Reviews, not here.
+// The start page (wiki/product/features/dashboard.md): the projects, each
+// opening where its work is, and the teams. Reviews live in each project's
+// Inbox, not here.
 export function Dashboard() {
   const requests = useRequests();
   const instances = useInstances();
-  const deployments = useDeployments();
   const projects = useProjects();
   const teams = useTeams();
   const setup = useSetup();
@@ -54,12 +42,6 @@ export function Dashboard() {
   const [newProject, setNewProject] = useState(false);
   const openChiefOfStaff = useOpenChiefOfStaff();
   const asks = inbox(requests.data ?? []);
-  const groups = sessionGroups(
-    instances.data ?? [],
-    deployments.data ?? [],
-    teams.data ?? [],
-    requests.data ?? [],
-  );
   const rows = projectRows(
     projects.data ?? [],
     teams.data ?? [],
@@ -69,7 +51,7 @@ export function Dashboard() {
   const cards = teamCards(teams.data ?? [], instances.data ?? []);
   const canDeploy = cards.length > 0 && rows.length > 0;
   return (
-    <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-12 pt-12 pb-16 max-[760px]:px-4">
+    <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-6 pt-6 pb-12 max-[760px]:px-4">
       <div className="flex flex-wrap items-end gap-4">
         <PageTitle title={greeting()} subtitle={workingSummary(instances.data ?? [])} />
         <span className="flex-1" />
@@ -89,39 +71,6 @@ export function Dashboard() {
           ))}
         </section>
       )}
-      <Section
-        title="At work"
-        aside={
-          groups.length > 0 && (
-            <Link to="/sessions" className="text-[13px] text-tx3 hover:text-tx">
-              All sessions →
-            </Link>
-          )
-        }
-      >
-        {instances.isPending ? (
-          <Loading />
-        ) : groups.length === 0 ? (
-          <Empty>
-            <span className="flex flex-col items-center gap-3">
-              {canDeploy
-                ? "No team is at work. Deploy one on a project, with a goal, and its sessions show here."
-                : "No team is at work yet. Add a project and a team, then deploy the team on it."}
-              {canDeploy && (
-                <Button variant="primary" onClick={() => setDeploy({})}>
-                  Deploy a team
-                </Button>
-              )}
-            </span>
-          </Empty>
-        ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-3">
-            {groups.map((g) => (
-              <DeploymentCard key={g.deployment} group={g} />
-            ))}
-          </div>
-        )}
-      </Section>
       <Section title="Projects">
         <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
           {projects.isPending && <Loading className="min-h-[132px]" />}
@@ -160,21 +109,10 @@ export function Dashboard() {
   );
 }
 
-function Section({
-  title,
-  aside,
-  children,
-}: {
-  title: string;
-  aside?: ReactNode;
-  children: ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between">
-        <SectionLabel>{title}</SectionLabel>
-        {aside}
-      </div>
+      <SectionLabel>{title}</SectionLabel>
       {children}
     </section>
   );
@@ -190,7 +128,6 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
         <Link
           to="/projects/$project"
           params={{ project: row.id }}
-          search={{ tab: "overview" }}
           className={`text-[15px] font-semibold ${cover}`}
         >
           {row.id}
@@ -284,8 +221,7 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
   const agent = agentOf(teams, r.instanceId);
   const where = `on ${r.projectId}`;
   const context = agent ? `${agent.team.config.name} ${where}` : where;
-  const openSession = () =>
-    navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
+  const openSession = () => navigate(sessionOf(r.instanceId));
   return (
     <RequestPanel
       request={r}

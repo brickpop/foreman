@@ -10,4 +10,4 @@ The knowledge base of {project}, kept by its team ([AGENTS.md](../AGENTS.md) say
 - [Backlog](./backlog/index.md): the work, as tasks grouped in epics.
 - [Technical debt](./technical-debt.md): accepted workarounds, and how to fix them.
 
-Deploy a team from this project's Settings tab.
+Deploy a team from this project's Deployment section.

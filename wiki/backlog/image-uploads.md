@@ -12,7 +12,7 @@ epic: terminal-multiplexer
 
 **To decide when the card starts:**
 - **Where uploads live.** Under the project, every agent of the project could read them through a mount. Inside `project/` they are already mounted, but they would be files in the project repo: committed, or git-ignored. A folder elsewhere in the home isn't mounted in any container today, so it needs a new mount, read-only.
-- **Where the CEO drops or pastes:** the Sessions pane (terminal and [Line](../product/features/sessions.md)), the Wiki reader, anywhere.
+- **Where the CEO drops or pastes:** the Session (terminal and [Line](../product/features/sessions.md)), the Wiki reader, anywhere.
 - **What the agent receives:** the path typed into the Line or the terminal at the cursor, or a message.
 - **The path the agent sees** is the container's view, not the host's: the two differ.
 - **Limits and safety:** accepted types (images only, checked by content, not by name), a maximum size, file names chosen by Foreman (never the browser's, so no path traversal and no collisions), and whether uploads are ever cleaned up.

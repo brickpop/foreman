@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import { agentOf, forgeLabel, harnessLabel, onOtherProfile, when } from "../../app/model";
+import { forgeLabel, harnessLabel, onOtherProfile } from "../../app/model";
 import {
   keys,
   useBranches,
@@ -12,120 +12,19 @@ import {
   useProfiles,
   useTeams,
 } from "../../app/queries";
-import { rosterOrder } from "../../app/sessions";
 import { AddRepo } from "../../components/AddRepo";
-import { Avatar } from "../../components/Avatar";
 import { Confirm, Modal } from "../../components/Overlays";
 import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, Empty, Panel } from "../../components/ui";
+import { Button } from "../../components/ui";
+import { useProject } from "../Project";
 
-// The project's Settings tab (wiki/product/features/project-settings.md): the
-// teams on it (runtime state), then its configuration (read-only).
+// A project's Settings section (wiki/product/features/project-settings.md):
+// its configuration. The team on it is its Deployment section.
 
-export function ProjectSettings({ project, onDeploy }: { project: Project; onDeploy: () => void }) {
-  return (
-    <div className="flex flex-col">
-      <Teams project={project} onDeploy={onDeploy} />
-      <Configuration project={project} />
-    </div>
-  );
-}
-
-function Teams({ project, onDeploy }: { project: Project; onDeploy: () => void }) {
-  const navigate = useNavigate();
-  const deployments = useDeployments();
-  const instances = useInstances();
-  const teams = useTeams();
-  const mine = (deployments.data ?? []).filter((d) => d.projectId === project.id);
-  return (
-    <section className="flex flex-col gap-5 px-12 pt-6 pb-16">
-      <div className="flex items-start gap-4">
-        <div className="flex flex-1 flex-col gap-1">
-          <h2 className="m-0 text-base font-semibold">
-            Teams on this project{" "}
-            <span className="text-[12.5px] font-normal text-tx4">· runtime state, not config</span>
-          </h2>
-          <p className="m-0 text-[13.5px] text-tx3">
-            Talk to a lead and they'll delegate. Open anyone else for a direct instruction.
-          </p>
-        </div>
-        <Button onClick={onDeploy}>Deploy a team</Button>
-      </div>
-      {mine.length === 0 ? (
-        <Empty>
-          No team is deployed here yet. Deploy one and each member gets its own worktree of this
-          project's repos.
-        </Empty>
-      ) : (
-        mine.map((d) => {
-          const team = teams.data?.find((t) => t.id === d.teamId);
-          const roster = rosterOrder(d.id, instances.data ?? [], teams.data ?? []);
-          return (
-            <div key={d.id} className="flex flex-col gap-3">
-              <div className="flex items-center gap-4">
-                <div className="flex flex-1 flex-col">
-                  <span className="text-base font-semibold">{team?.config.name ?? d.teamId}</span>
-                  <span className={`text-[13.5px] ${d.goal ? "text-tx3" : "text-tx4"}`}>
-                    {d.goal || "No goal set"}
-                  </span>
-                </div>
-                <Button
-                  variant="raised"
-                  onClick={() => navigate({ to: "/sessions", search: { deployment: d.id } })}
-                >
-                  Open sessions
-                </Button>
-              </div>
-              <Panel>
-                {roster.map((i) => {
-                  const agent = agentOf(teams.data ?? [], i.id);
-                  const lead = i.agentId === team?.config.lead;
-                  const role = agent?.soul.role ?? "";
-                  return (
-                    <button
-                      key={i.id}
-                      type="button"
-                      onClick={() =>
-                        navigate({ to: "/sessions", search: { deployment: d.id, agent: i.id } })
-                      }
-                      className="grid w-full grid-cols-[auto_150px_1fr_auto] items-center gap-3 border-b border-line px-4 py-3 text-left last:border-b-0 hover:bg-hover"
-                    >
-                      <Avatar
-                        look={agent?.soul.look}
-                        size={32}
-                        status={i.status}
-                        dotBorder="var(--panel)"
-                      />
-                      <span className="flex flex-col">
-                        <span className="font-semibold">{agent?.soul.name ?? i.agentId}</span>
-                        <span className="text-[12.5px] text-tx4">
-                          {role.replaceAll("_", " ")}
-                          {lead && " · talk here"}
-                        </span>
-                      </span>
-                      <span className="flex min-w-0 flex-col">
-                        {i.task && (
-                          <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
-                        )}
-                        {i.doing && (
-                          <span className="truncate font-mono text-[12px] text-tx4">
-                            {i.doing.line} · {when(i.doing.at)}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-[12.5px] text-tx3">Open →</span>
-                    </button>
-                  );
-                })}
-              </Panel>
-            </div>
-          );
-        })
-      )}
-    </section>
-  );
+export function ProjectSettings() {
+  return <Configuration project={useProject()} />;
 }
 
 function Configuration({ project }: { project: Project }) {
@@ -157,7 +56,7 @@ function Configuration({ project }: { project: Project }) {
         ]
   ).join("\n");
   return (
-    <section className="grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-9 border-t border-line px-12 pt-7 pb-16">
+    <section className="grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-9 px-6 pt-6 pb-12">
       <div className="flex min-w-0 max-w-[520px] flex-col gap-6">
         <Workspace project={project} />
         <Block title="Where things live">
@@ -181,7 +80,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Enforced by Foreman",
-              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Repositories → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main.",
+              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main.",
             ],
           ].map(([title, body]) => (
             <div key={title} className="flex flex-col gap-0.5">
@@ -238,8 +137,8 @@ function Configuration({ project }: { project: Project }) {
           <span className="font-medium">{forgeLabel(forge.kind)}</span>
           <span className="text-[13.5px] text-tx2">
             {forge.kind === "none"
-              ? "No forge. You merge requested branches into main from their review, in Reviews; Foreman does the merge."
-              : `Merge to main from a branch's review, in Reviews, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
+              ? "No forge. You merge requested branches into main from their review, in the Inbox; Foreman does the merge."
+              : `Merge to main from a branch's review, in the Inbox, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
           </span>
           {forge.projectRepo && (
             <span className="flex items-center gap-3 text-[13px] text-tx3">

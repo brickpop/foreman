@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Deployment, Instance, Project, Request, Team } from "../api/client";
+import type { Instance, Project, Request, Team } from "../api/client";
 import { keys, staleKeys } from "./queries";
 import { sidebarModel } from "./Shell";
 
@@ -10,21 +10,22 @@ const request = (projectId: string, status = "open", kind = "question") =>
   ({ projectId, status, kind }) as Request;
 
 describe("sidebarModel", () => {
-  it("counts the open reviews, and marks the projects that need the CEO", () => {
+  it("counts each project's Inbox: its open requests, reviews included", () => {
     const m = sidebarModel(
-      [project("ledger"), project("relay")],
+      [project("ledger"), project("relay"), project("harbor")],
       [],
       [],
       [
         request("ledger"),
         request("ledger", "open", "review"),
         request("relay", "resolved", "review"),
+        request("elsewhere"),
       ],
     );
-    expect(m.reviews).toBe(1);
     expect(m.projects).toEqual([
-      { id: "ledger", needsYou: true },
-      { id: "relay", needsYou: false },
+      { id: "ledger", inbox: 2 },
+      { id: "relay", inbox: 0 },
+      { id: "harbor", inbox: 0 },
     ]);
   });
 
@@ -39,10 +40,10 @@ describe("sidebarModel", () => {
       [],
       [request("harbor")],
     );
-    expect(m.projects).toEqual([{ id: "ledger", needsYou: false }]);
+    expect(m.projects).toEqual([{ id: "ledger", inbox: 0 }]);
     expect(m.archived).toEqual([
-      { id: "relay", needsYou: false },
-      { id: "harbor", needsYou: true },
+      { id: "relay", inbox: 0 },
+      { id: "harbor", inbox: 1 },
     ]);
   });
 
@@ -96,11 +97,7 @@ describe("staleKeys", () => {
       ["pipeline", "reviews"],
     ]);
     expect(staleKeys({ type: "team.message", data: {} })).toEqual([keys.messages, keys.activity]);
-    expect(staleKeys({ type: "team.action", data: {} })).toEqual([
-      keys.actions,
-      keys.activity,
-      keys.repos,
-    ]);
+    expect(staleKeys({ type: "team.action", data: {} })).toEqual([keys.activity, keys.repos]);
     expect(staleKeys({ type: "deployment.created", data: {} })).toEqual([
       keys.instances,
       keys.deployments,
@@ -113,15 +110,7 @@ describe("staleKeys", () => {
   });
 });
 
-import {
-  greeting,
-  inbox,
-  ordered,
-  projectRows,
-  sessionGroups,
-  teamCards,
-  workingSummary,
-} from "./model";
+import { greeting, inbox, ordered, projectRows, teamCards, workingSummary } from "./model";
 
 const req = (id: string, kind: string, createdAt: string, projectId = "ledger") =>
   ({ id, kind, createdAt, projectId, status: "open" }) as Request;
@@ -171,67 +160,10 @@ describe("the Dashboard's model", () => {
         inst("tove@ledger", "idle", "atlas@ledger"),
         inst("lumen@relay", "running", "orion@relay"),
       ]),
-    ).toBe("2 sessions working across 2 deployments.");
+    ).toBe("2 sessions working across 2 projects.");
     expect(workingSummary([inst("mara@ledger", "running", "atlas@ledger")])).toBe(
-      "1 session working across 1 deployment.",
+      "1 session working across 1 project.",
     );
-  });
-
-  it("groups the sessions by deployment, the lead first, then the team's order", () => {
-    const atlas = {
-      id: "atlas",
-      config: {
-        name: "Atlas",
-        lead: "mara",
-        order: ["tove", "mara", "ines"],
-        agents: { mara: { name: "Mara" }, tove: { name: "Tove" }, ines: { name: "Ines" } },
-      },
-    } as unknown as Team;
-    const agentInst = (agentId: string, deploymentId: string) =>
-      ({
-        id: `${agentId}@${deploymentId.split("@")[1]}`,
-        agentId,
-        deploymentId,
-        status: "running",
-      }) as Instance;
-    const groups = sessionGroups(
-      [
-        agentInst("lumen", "orion@relay"),
-        agentInst("ines", "atlas@ledger"),
-        agentInst("mara", "atlas@ledger"),
-        agentInst("zed", "atlas@ledger"),
-        agentInst("tove", "atlas@ledger"),
-        { ...agentInst("x", "atlas@ledger"), deploymentId: "" },
-        { ...agentInst("ines", "atlas@harbor"), status: "asleep" },
-        { ...agentInst("nap", "atlas@ledger"), status: "asleep" },
-      ],
-      [{ id: "atlas@ledger", goal: "Ship invoices" } as Deployment],
-      [atlas],
-      [
-        { status: "open", deploymentId: "atlas@ledger" } as Request,
-        // Resolved, or another deployment's: not this one's dot.
-        { status: "resolved", deploymentId: "orion@relay" } as Request,
-        { status: "open", deploymentId: "atlas@elsewhere" } as Request,
-      ],
-    );
-    // A deployment whose agents are all asleep is still listed (harbor).
-    expect(groups.map((g) => [g.deployment, g.project, g.team?.id, g.goal, g.needsYou])).toEqual([
-      ["atlas@harbor", "harbor", "atlas", "", false],
-      ["atlas@ledger", "ledger", "atlas", "Ship invoices", true],
-      ["orion@relay", "relay", undefined, "", false],
-    ]);
-    expect(groups[0].agents).toEqual([]);
-    expect(groups[0].asleep.map((a) => a.instance.agentId)).toEqual(["ines"]);
-    expect(groups[1].asleep.map((a) => a.instance.agentId)).toEqual(["nap"]);
-    groups.shift();
-    // Agents the team file doesn't name (zed) come last; with no team file, as they come.
-    expect(groups[0].agents.map((a) => [a.instance.agentId, a.lead, a.agent?.soul.name])).toEqual([
-      ["mara", true, "Mara"],
-      ["tove", false, "Tove"],
-      ["ines", false, "Ines"],
-      ["zed", false, undefined],
-    ]);
-    expect(groups[1].agents.map((a) => a.instance.agentId)).toEqual(["lumen"]);
   });
 
   it("gives each team its card: members lead first, the projects it's on", () => {

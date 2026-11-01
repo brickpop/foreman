@@ -98,7 +98,18 @@ func TestReviewsListOnlyTheLeadsRecentOnes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.db.Deployments().Deploy(ctx, "orion", "ledger", ""); err != nil {
+	// Orion worked on ledger before atlas came back: its reviews are its own.
+	deps := f.db.Deployments()
+	if err := deps.Stop(ctx, "atlas@ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deps.Deploy(ctx, "orion", "ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := deps.Stop(ctx, "orion@ledger", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := deps.Deploy(ctx, "atlas", "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	review("orion@ledger", "lead/orion/x", store.MergeOpen, time.Now())

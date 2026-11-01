@@ -20,14 +20,14 @@ Acceptance:
 
 ## 2. Delegate through the lead
 
-In Sessions, open the Atlas · ledger tab and type to Mara: "Add idempotency keys to POST /settle". Mara asks Tove, and Tove builds in `wt/tove/LED-44`. Tove hands off to Mara, who integrates. The board card moves.
+In ledger's Session, open Mara's tab and type to her: "Add idempotency keys to POST /settle". Mara asks Tove, and Tove builds in `wt/tove/LED-44`. Tove hands off to Mara, who integrates. The board card moves.
 
 Acceptance:
 - [ ] Text typed in Mara's terminal reaches Mara's harness stdin.
-- [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the Activity panel (who calls whom, and the exchange).
+- [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the project's [Activity](./features/project-activity.md) (who calls whom, and the exchange).
 - [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
-- [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Worktrees](./features/worktrees.md) tab, under In flight.
+- [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Deployment](./features/project-deployment.md) section, under In flight.
 - [ ] Tove's `contribute(finding, …)` writes a note in `~/workspace/foreman/ledger/project/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
 - [ ] When the lead updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
 
@@ -42,11 +42,11 @@ Acceptance:
 
 ## 4. Approval gate
 
-Ilya wants a new dependency. An approval request appears on the Dashboard and on the project's Overview, with a notification. The CEO approves and Ilya resumes.
+Ilya wants a new dependency. An approval request appears on the Dashboard and in the project's Inbox, with a notification. The CEO approves and Ilya resumes.
 
 Acceptance:
 - [ ] Ilya's `escalate(approval, …)` creates an open approval [request](./models/request.md); Ilya's instance becomes `awaiting`.
-- [ ] The request shows on [Dashboard](./features/dashboard.md) and on ledger's Overview, under [Needs you](./features/project-pipeline.md#1-needs-you); a toast and (if permitted) a browser [notification](./features/notifications.md) fire.
+- [ ] The request shows on [Dashboard](./features/dashboard.md) and in ledger's [Inbox](./features/reviews.md#the-inbox), under [Needs you](./features/project-pipeline.md#1-needs-you); a toast and (if permitted) a browser [notification](./features/notifications.md) fire.
 - [ ] Picking "Approve" resolves the request, delivers the answer to Ilya's paused tool call, and Ilya's instance leaves `awaiting`.
 
 ## 5. Merge review
@@ -108,11 +108,11 @@ In Project Settings, choose "Change with Chief of Staff" and ask it to "Use GitH
 
 Acceptance:
 - [ ] The CoS edits `project.toml` on a branch `foreman/config-N` of the project repo, never on `main`.
-- [ ] A review request appears on the project's Overview, under Needs you, with Merge to main, Create PR (when the project repo has a forge) and Reject; once merged, `project.toml` on `main` changes and the UI reflects it within 1 s; Reject leaves `main` untouched and tells the Chief of Staff why.
+- [ ] A review request appears in the project's Inbox, with Merge to main, Create PR (when the project repo has a forge) and Reject; once merged, `project.toml` on `main` changes and the UI reflects it within 1 s; Reject leaves `main` untouched and tells the Chief of Staff why.
 
 ## 11. Read the wiki
 
-The Overview opens `index.md`. Open Files, notice the changed-dot on today's standup and read it. Tick a checkbox, which writes the file.
+The project's Wiki opens `index.md`. Open Files, notice the changed-dot on today's standup and read it. Tick a checkbox, which writes the file.
 
 Acceptance:
 - [ ] The [Wiki reader](./features/wiki-reader.md) opens `index.md` by default.

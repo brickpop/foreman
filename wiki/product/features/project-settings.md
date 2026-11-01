@@ -6,24 +6,11 @@ tags: [feature, ui, config, teams]
 
 # Project settings
 
-The project's **Settings** tab: the teams working on it (runtime state) and its configuration (read-only, but for the profile its agents run on). The project header and tabs are described in [Wiki reader](./wiki-reader.md#project-header-and-tabs). Two stacked blocks.
+The project's **Settings** section ([Project page](./project-page.md)): its configuration, read-only but for the profile its agents run on. The team on the project, which this page listed until 2026-10-31, is in [Deployment](./project-deployment.md) (the CEO: remove redundant info).
 
-## 1. Teams on this project
+## Configuration
 
-Padding `24px 40px 64px`.
-
-- Title "Teams on this project" followed by `· runtime state, not config` (400 12.5px `--tx4`). Subline: `Talk to a lead and they'll delegate. Open anyone else for a direct instruction.` Right: an outline **`Deploy a team`** button, opening [Deploy a team](./deploy-team.md) with this project preset.
-- Per [deployment](../models/deployment.md): the team name (600 16px), the goal (13.5px `--tx3`), and a raised **`Open sessions`** button ([Sessions](./sessions.md) on this deployment, lead pane).
-- A panel of member rows (grid `auto 150px 1fr auto`, padding `12px 16px`), lead first:
-  - Avatar 32 with status dot (`dotBorder --panel`).
-  - Name (600) and role (12.5px `--tx4`); the lead's role reads `<Role> · talk here`.
-  - The current task (13.5px `--tx2`, ellipsis) and the **activity line**, what its harness last reported doing, then ` · ` and the time (Mono 12px `--tx4`, ellipsis): `Bash: go test ./...`, `Editing api/invoice.go`, `Finished its turn · 10:42` ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). It follows the `instance.doing` event; a run starts without one. Not the terminal's last line (decided by the CEO, 2026-10-18): a harness's screen ends in its own footer (Claude Code: `⏵⏵ bypass permissions on`), and finding the line that matters would mean reading its layout. **Phasing:** the task note isn't set by anything yet, so a row shows the activity line only.
-  - `Open →` (12.5px `--tx3`). A click anywhere on the row opens that session.
-- **Empty**: `No team is deployed here yet. Deploy one and each member gets its own worktree of this project's repos.`
-
-## 2. Configuration
-
-Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr))`, gap 36).
+Padding `24px 24px 48px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr))`, gap 36).
 
 **Left column** (max 520px):
 
@@ -63,7 +50,7 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - **Team definition**: "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
   - **Deployment**: "A team on this project with a goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix."
   - **Session prompt**: "Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt."
-  - **Enforced by Foreman**: "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (that’s In flight, in Worktrees), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main."
+  - **Enforced by Foreman**: "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main."
 
 **Right column**:
 
@@ -81,8 +68,8 @@ Padding `28px 48px 64px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   - Finding: "A challenge team rates something high severity. You decide who fixes it, and when."
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
 - **"Merges"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:
-  - forge `none`: "No forge. You merge requested branches into main from their review, in Reviews; Foreman does the merge."
-  - otherwise: "Merge to main from a branch's review, in Reviews, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file."
+  - forge `none`: "No forge. You merge requested branches into main from their review, in the Inbox; Foreman does the merge."
+  - otherwise: "Merge to main from a branch's review, in the Inbox, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file."
   - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
 - **`project.toml`**: a row with `<workspace>/project/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 - **"Archive this project"**: "It leaves the sidebar's projects and the Dashboard, and takes no deployment until you unarchive it. Everything is kept.", followed, while teams are deployed on it, by "<Atlas, Orion> stop first.". **`Archive project`** acts at once, or, with teams deployed, asks first: "Stop <teams> and archive <project>?", "<teams> stop on <project>: their sessions end; worktrees and branches are kept. Then <project> is archived.", **`Stop and archive`**. Archived, the block reads **"Archived"**, "It is out of the sidebar's projects and the Dashboard, and takes no deployment, until you unarchive it.", with **`Unarchive project`**. A refusal is a toast "Project not archived" ([Project config → archived](../models/project-config.md#the-project-record)).

@@ -29,7 +29,7 @@ Table `instances`.
 | `restarts` | Number | yes | `0` | ≥ 0 | |
 | `stop_reason` | String | yes | empty | | Why Foreman stopped it on its own: `couldn't start: <why>` (its start failed, e.g. a repo without its main branch) or `it exited twice in a row (code <n>)`. Empty otherwise; any other status change, and each start, clears it. Shown in its stopped pane ([Sessions](../features/sessions.md)) (the CEO, 2026-10-21) |
 
-Not stored either: when it last sent a hook event, kept in memory to find a [stuck agent](../architecture/agent-runtime.md#stuck-agents). Not stored: its **activity line** (`doing`: a line and its time), what its harness last reported doing in the current run, kept in memory by the Instance manager and sent with the instances ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). **Phasing:** `task` is never set yet, so it isn't shown; the agent Sessions opens a deployment on is the one with the latest activity line.
+Not stored either: when it last sent a hook event, kept in memory to find a [stuck agent](../architecture/agent-runtime.md#stuck-agents). Not stored: its **activity line** (`doing`: a line and its time), what its harness last reported doing in the current run, kept in memory by the Instance manager and sent with the instances ([Harness adapters → Activity lines](../architecture/harness-adapters.md#activity-lines)). **Phasing:** `task` is never set yet, so it isn't shown.
 
 ## Statuses
 

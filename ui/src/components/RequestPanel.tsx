@@ -4,8 +4,8 @@ import type { Look } from "../api/types/home";
 import { Avatar } from "./Avatar";
 import { Button, KindChip } from "./ui";
 
-// One request to the CEO, but a review (decided in Reviews). The Dashboard and a
-// project's Overview (Needs you) use this same panel, so they can't drift; the
+// One request to the CEO, but a review (decided on its page). The Dashboard and
+// a project's Inbox (Needs you) use this same panel, so they can't drift; the
 // variant only changes what the specs say differs
 // (wiki/product/features/dashboard.md#needs-you, wiki/product/features/project-pipeline.md#1-needs-you).
 

@@ -23,9 +23,9 @@ Table `ui_prefs`: key/value preferences.
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| `key` | String | yes | | unique | e.g. `sessions_view`, `last_screen` |
+| `key` | String | yes | | unique | e.g. `session_agent`, `last_screen` |
 | `value` | String (JSON) | yes | | | |
 
-Known keys: `sessions_view` (each deployment's last agent and Activity in [Sessions](../features/sessions.md#the-url), so the list's link comes back to it; kept only while the app runs until this table exists), `last_screen`.
+Known keys: `session_agent` (each project's last agent shown in its [Session](../features/sessions.md#the-url), so `/projects/<project>/session` with no agent comes back to it; kept only while the app runs until this table exists), `last_screen`.
 
 Preferences live here, not in the browser, so they follow the CEO across browsers. They sit in `state.db` beside the deployments they name. The **theme** is not here (the CEO, 2026-10-18): it names nothing in the state, so it is one of the CEO's preferences, `theme` in `~/.foreman/preferences.toml` (`system` default, `dark` or `light`; `GET/PUT /api/preferences`, [Settings → Appearance](../features/settings.md#appearance)). The browser keeps a copy only to paint the first frame before the server answers (no flash on load); the file stays the source of truth. Built 2026-10-18.

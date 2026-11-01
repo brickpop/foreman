@@ -28,7 +28,6 @@ type Options struct {
 	Events       Events
 	Agents       Agents
 	Messages     Messages
-	Actions      Actions
 	Activity     Activity
 	Repos        Repos
 	Pipeline     Pipeline
@@ -53,8 +52,7 @@ func New(o Options) http.Handler {
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
-	actionRoutes(mux, o.Actions)
-	activityRoutes(mux, o.Activity, o.Agents)
+	activityRoutes(mux, o.Activity)
 	repoRoutes(mux, o.Repos)
 	pipelineRoutes(mux, o.Pipeline)
 	reviewRoutes(mux, o.Reviews)

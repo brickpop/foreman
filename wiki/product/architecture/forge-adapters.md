@@ -35,7 +35,7 @@ For `none` there is no PR and nothing to push: the CEO uses Merge to main, and D
 
 ### PR state
 
-While a [merge request](../models/merge-request.md) with a PR is open, Foreman polls the PR on the forge every 60 seconds (and when the CEO opens the project's Overview): no webhooks, so nothing has to reach Foreman from outside. It reads:
+While a [merge request](../models/merge-request.md) with a PR is open, Foreman polls the PR on the forge every 60 seconds (and when the CEO opens the project's Inbox): no webhooks, so nothing has to reach Foreman from outside. It reads:
 
 - **merged**: the merge request and its work items are marked merged, the review request resolves, the lead is told; Foreman fetches the new `main` from the forge into the repo (`Git.Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. The leads of the other open merge requests on the same repo are told to merge `main` in ([When main moves](../features/pipeline-and-merges.md#when-main-moves)).
 - **mergeability**: when the forge reports the PR as conflicting with `main`, `conflicting` is set (shown as "conflicts with main") and the lead is asked to merge `main` in; cleared when the forge reports it mergeable again.

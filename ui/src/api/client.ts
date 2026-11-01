@@ -242,17 +242,11 @@ export interface RequestsArea {
   resolve(id: string, answer: string): Promise<void>;
 }
 
-/** Whose activity: a project's active deployments, or one deployment. */
-export type ActivityScope = { project: string } | { deployment: string };
-
 export interface MessagesArea {
   list(deployment: string): Promise<TeamMessage[]>;
-  /** The git tools the deployment's agents called, oldest first. */
-  actions(deployment: string): Promise<TeamAction[]>;
-  /** A page of team traffic, messages and git actions together, newest first:
-   * a project's active deployments, or one deployment; before is the previous
-   * page's next. */
-  activity(scope: ActivityScope, before?: string): Promise<ActivityPage>;
+  /** A page of a deployment's team traffic, messages and git actions
+   * together, newest first; before is the previous page's next. */
+  activity(deployment: string, before?: string): Promise<ActivityPage>;
 }
 
 export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
@@ -332,7 +326,7 @@ export interface EventsArea {
   subscribe(handlers: EventHandlers): () => void;
 }
 
-/** A project's repos, read-only, as committed (the Repositories tab). */
+/** A project's repos, read-only, as committed (the Repos section). */
 export interface ReposArea {
   /** The code repos, then the project repo, each with its branches. */
   list(project: string): Promise<Repo[]>;
@@ -577,11 +571,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
-      actions: (deployment) => getJSON(`/api/actions?deployment=${id(deployment)}`),
-      activity: (scope, before) => {
-        const q = new URLSearchParams(
-          "project" in scope ? { project: scope.project } : { deployment: scope.deployment },
-        );
+      activity: (deployment, before) => {
+        const q = new URLSearchParams({ deployment });
         if (before) q.set("before", before);
         return getJSON(`/api/activity?${q}`);
       },

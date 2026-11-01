@@ -56,7 +56,7 @@ Not used, on purpose: web frameworks, ORMs, dependency-injection containers, a m
 | Build / dev server | Vite | Fast dev server with a proxy to the Go server; static build to embed. |
 | Package manager, scripts and runtime for the UI toolchain | Bun, and only Bun (never npm, yarn, pnpm or Node). `ui/bunfig.toml` sets `run.bun = true`, so Vite, TypeScript and Biome run on the Bun runtime even though their binaries declare `node` | The CEO's rule. Only for building the UI; nothing runs on Bun in production (the UI is embedded in the Go binary). |
 | Server state | TanStack Query | Caching, refetching and optimistic updates (the board drag). SSE events invalidate or patch the cached queries, so there is one data path. |
-| Routing | TanStack Router | Typed path and search params (project / tab / entry path, team / tab, sessions / deployment). |
+| Routing | TanStack Router | Typed path and search params (project / section, with its agent, review, wiki entry or repo and branch; team / tab). |
 | Styling | Tailwind CSS 4 with the [design tokens](../design/design-system.md) declared as CSS variables | The prototype is a token system with inline styles, which maps 1:1 onto Tailwind utilities over the same variables. Both themes switch by `data-theme` on `<html>`. |
 | Accessible primitives | Radix UI primitives (dialog, popover, tabs, toggle), styled with our tokens | They bring what the prototype lacks: focus traps, Escape to close, real disabled states, keyboard navigation. Their default look is not used. |
 | Terminal | `@xterm/xterm` with the fit, web-links and serialize addons | Real ANSI terminal, resize, clickable links; "serialize" backs the Copy button. |

@@ -15,7 +15,7 @@ export function onOtherProfile(
   );
 }
 
-import type { Deployment, Instance, MergeRequest, Project, Request, Team } from "../api/client";
+import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
 import type { Look, Soul, TeamConfig } from "../api/types/home";
 
 // Pure derivations the screens share: who an instance is, how requests are
@@ -48,7 +48,7 @@ export function ordered(requests: Request[]): Request[] {
 }
 
 /** The open requests answered where they show (Dashboard, a project's
- * Overview): every kind but reviews, which are decided in Reviews
+ * Inbox): every kind but reviews, which are decided on their own page
  * (wiki/product/features/requests.md). In list order. */
 export function inbox(requests: Request[]): Request[] {
   return ordered(requests.filter((r) => r.status === "open" && r.kind !== "review"));
@@ -66,68 +66,11 @@ export function greeting(now = new Date()): string {
         : "Good evening";
 }
 
-/** The subtitle of the Dashboard and Sessions: running sessions across active deployments. */
+/** The Dashboard's subtitle: running sessions across the projects with a team. */
 export function workingSummary(instances: Instance[]): string {
   const running = instances.filter((i) => i.status === "running").length;
-  const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean)).size;
-  return `${plural(running, "session")} working across ${plural(deployments, "deployment")}.`;
-}
-
-export type SessionGroup = {
-  deployment: string;
-  project: string;
-  team?: Team;
-  goal: string;
-  /** A request of its team waits on the CEO. */
-  needsYou: boolean;
-  /** Its awake agents, the lead first, then the team's order. */
-  agents: { instance: Instance; agent?: Agent; lead: boolean }[];
-  /** Its asleep agents (not started yet, woken when needed), in the same
-   * order: only counted, they'd be noise as rows. */
-  asleep: { instance: Instance; agent?: Agent; lead: boolean }[];
-};
-
-/** Every active deployment, one group per deployment, by project then team,
- * its asleep agents apart from the others. */
-export function sessionGroups(
-  instances: Instance[],
-  deployments: Deployment[],
-  teams: Team[],
-  requests: Request[],
-): SessionGroup[] {
-  const groups = new Map<string, SessionGroup>();
-  for (const i of instances) {
-    if (!i.deploymentId) continue;
-    let g = groups.get(i.deploymentId);
-    if (!g) {
-      const [teamId, project] = i.deploymentId.split("@");
-      g = {
-        deployment: i.deploymentId,
-        project: project ?? "",
-        team: teams.find((t) => t.id === teamId),
-        goal: deployments.find((d) => d.id === i.deploymentId)?.goal ?? "",
-        needsYou: requests.some((r) => r.status === "open" && r.deploymentId === i.deploymentId),
-        agents: [],
-        asleep: [],
-      };
-      groups.set(i.deploymentId, g);
-    }
-    (i.status === "asleep" ? g.asleep : g.agents).push({
-      instance: i,
-      agent: agentOf(teams, i.id),
-      lead: g.team?.config.lead === i.agentId,
-    });
-  }
-  return [...groups.values()]
-    .map((g) => {
-      const order = g.team ? roster(g.team.config) : [];
-      const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
-      const byRank = (a: SessionGroup["agents"][number], b: SessionGroup["agents"][number]) =>
-        rank(a.instance.agentId) - rank(b.instance.agentId) ||
-        a.instance.agentId.localeCompare(b.instance.agentId);
-      return { ...g, agents: [...g.agents].sort(byRank), asleep: [...g.asleep].sort(byRank) };
-    })
-    .sort((a, b) => a.project.localeCompare(b.project) || a.deployment.localeCompare(b.deployment));
+  const projects = new Set(instances.map((i) => i.deploymentId).filter(Boolean)).size;
+  return `${plural(running, "session")} working across ${plural(projects, "project")}.`;
 }
 
 export type TeamCard = {
@@ -163,7 +106,7 @@ export type ProjectRow = {
   state: "needs you" | "on track" | "idle";
 };
 
-/** One row per project not archived: its teams and working agents, and its state. */
+/** One row per project not archived: its team and working agents, and its state. */
 export function projectRows(
   projects: Project[],
   teams: Team[],
@@ -287,6 +230,17 @@ export function plural(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? "" : "s"}`;
 }
 
+/** What stopping a team ends: `1 session ends`, `3 sessions end`. */
+export function sessionsEnd(n: number): string {
+  return `${plural(n, "session")} ${n === 1 ? "ends" : "end"}`;
+}
+
+/** The Deploy dialog's warning when another team is on the project: it is
+ * replaced, as by Stop (a project has one team at most). */
+export function replacingLine(team: string, project: string, sessions: number): string {
+  return `Replaces ${team} on ${project}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
+}
+
 const forgeLabels: Record<string, string> = {
   github: "GitHub",
   forgejo: "Forgejo",
@@ -353,7 +307,7 @@ export function slotsTaken(instances: Instance[]): number {
     .length;
 }
 
-/** Why a message to an agent still waits, as the Activity panel says it
+/** Why a message to an agent still waits, as its project's Activity says it
  * (messages are delivered when their recipient is idle). */
 export function waitingReason(
   to: Instance | undefined,

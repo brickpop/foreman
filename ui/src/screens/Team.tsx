@@ -35,7 +35,7 @@ export function Team() {
   const mine = (deployments.data ?? []).filter((d) => d.teamId === id);
   return (
     <div className="flex flex-col">
-      <header className="flex flex-col gap-4 px-12 pt-10">
+      <header className="flex flex-col gap-4 px-6 pt-6">
         <div className="flex items-end gap-4">
           <div className="flex flex-1 flex-col gap-1">
             <h1 className="m-0 text-[30px] font-semibold tracking-[-0.02em]">{team.config.name}</h1>
@@ -85,7 +85,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
   const [stopping, setStopping] = useState<Deployment>();
   const sessions = (d: Deployment) => (instances.data ?? []).filter((i) => i.deploymentId === d.id);
   return (
-    <section className="flex w-full max-w-[920px] flex-col gap-3 px-12 pt-6 pb-16">
+    <section className="flex w-full max-w-[920px] flex-col gap-3 px-6 pt-6 pb-12">
       {deployments.length === 0 ? (
         <Empty>Not deployed anywhere. Deploy it to a project to start sessions.</Empty>
       ) : (
@@ -104,9 +104,8 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
               <div className="flex items-center gap-4 px-5 py-4">
                 <div className="flex flex-1 flex-col items-start gap-0.5">
                   <Link
-                    to="/projects/$project"
+                    to="/projects/$project/wiki"
                     params={{ project: d.projectId }}
-                    search={{ tab: "overview" }}
                     className="relative z-10 text-[15px] font-semibold text-tx hover:underline"
                   >
                     {d.projectId}
@@ -115,8 +114,8 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                     {d.goal || "No goal set"}
                   </span>
                   <Link
-                    to="/sessions"
-                    search={{ deployment: d.id }}
+                    to="/projects/$project/session"
+                    params={{ project: d.projectId }}
                     data-card
                     aria-label={`Open the sessions of ${team.config.name} on ${d.projectId}`}
                     className="text-[13px] text-tx4 outline-none after:absolute after:inset-0"
@@ -152,7 +151,7 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
   const instances = useInstances();
   const ids = roster(team.config);
   return (
-    <section className="flex w-full max-w-[920px] flex-col px-12 pt-5 pb-16">
+    <section className="flex w-full max-w-[920px] flex-col px-6 pt-5 pb-12">
       {ids.map((agent) => {
         const soul = team.config.agents[agent];
         if (!soul) return null;
@@ -191,7 +190,7 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
 
 function Playbook({ team }: { team: TeamData }) {
   return (
-    <section className="flex w-full max-w-[760px] flex-col gap-6 px-12 pt-7 pb-16">
+    <section className="flex w-full max-w-[760px] flex-col gap-6 px-6 pt-7 pb-12">
       <p className="m-0 text-tx2">
         The playbook is part of the team definition, so every deployment uses the same one. It's
         added to each member's session prompt. Each project's own gates and checks apply on top.
@@ -204,7 +203,7 @@ function Playbook({ team }: { team: TeamData }) {
 function File({ team }: { team: TeamData }) {
   const home = useHomeFolder();
   return (
-    <section className="flex w-full max-w-[860px] flex-col gap-3 px-12 pt-7 pb-16">
+    <section className="flex w-full max-w-[860px] flex-col gap-3 px-6 pt-7 pb-12">
       <span className="font-mono text-[12.5px] text-tx3">
         {home.data?.path ?? "~/.foreman"}/config/teams/{team.id}.toml
       </span>

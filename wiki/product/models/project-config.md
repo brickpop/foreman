@@ -61,7 +61,7 @@ project_repo = "https://localhost:3000/ledger/ledger-project"  # the project rep
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| `description` | String | | | one line | Shown in the project header |
+| `description` | String | | | one line | Shown at the head of the project's Wiki and on its Dashboard card |
 | `checks` | String | | | shell command | Run in a sandbox before handoff and on a merge request ([Pipeline and merges](../features/pipeline-and-merges.md)) |
 | `merge_to_main` | String | | `ceo` | enum: `ceo` | v1: always `ceo`, who chooses Merge to main (Foreman merges on that click) or Create PR and merges on the forge; Foreman never merges on its own |
 | `forge.kind` | String | | `none` | enum: `github`, `forgejo`, `gitea`, `none` | `none` = no forge: a review merges locally, with no Create PR ([Forge adapters](../architecture/forge-adapters.md)). A missing `forge` table means `none`; New project writes it explicitly |

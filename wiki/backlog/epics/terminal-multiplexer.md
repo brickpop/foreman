@@ -8,7 +8,7 @@ order: 1
 
 **Goal:** a working multiplexer of isolated agents. Projects (their wiki, board and definition) get teams (souls and skills, as team files), a deployment starts one agent per member in its own Podman container, and the CEO watches and talks to each of them in the browser. No messaging between agents yet: the CEO talks to every agent directly.
 
-**Usable when done:** start Foreman, prepare images, log in to Claude Code, add a project (creating its project repo), read its wiki and board, edit a team's souls, deploy the team with a goal (each agent in its own worktree), and work with each agent in Sessions (tabs, split, reload with an exact snapshot); stop and restart Foreman without losing the agents.
+**Usable when done:** start Foreman, prepare images, log in to Claude Code, add a project (creating its project repo), read its wiki and board, edit a team's souls, deploy the team with a goal (each agent in its own worktree), and work with each agent in the project's Session (tabs, split, reload with an exact snapshot); stop and restart Foreman without losing the agents.
 
 **Journey steps:** 1–6, 8–11, 15, 20, 28–30 of [the journey](../../product/journey.md). Step 7 (creating a team) is done by editing the team file by hand until the Chief of Staff (epic 4).
 

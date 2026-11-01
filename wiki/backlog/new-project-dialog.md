@@ -13,7 +13,7 @@ epic: install-first-run
 - **Repos already added are hard to see.** Step 2 lists them only as one line of text above the form (`Added: api, web. Add another, or finish.`), and the form, once it adds a repo, goes back to the folder browser. There is no list of the project's repos with their paths and main branches.
 - **The browser offers repos already added.** `RepoPicker` marks a git repo's folder `git` and lets the CEO **Pick** it, even when it is already in the project. Only the server refuses it afterwards ("not already in the project", [Add a project → Code repos](../product/features/add-project.md#code-repos)). The same goes for Project settings, which uses the same `AddRepo`.
 - **Nothing asks for a profile.** A new project gets the default profile without saying so ([Add a project → Effect](../product/features/add-project.md#effect), step 5). The only place to choose one is [Project settings](../product/features/project-settings.md) (`ProfileChoice`), which the CEO has to know to look for.
-- **The overall flow is unclear.** The project is created in step 1, before its repos. The Overview opens behind the dialog while step 2 is still open. **Later** and **Done** both just close the dialog.
+- **The overall flow is unclear.** The project is created in step 1, before its repos. The project (its Wiki) opens behind the dialog while step 2 is still open. **Later** and **Done** both just close the dialog.
 
 Was blocked by [Project workspaces](./project-workspaces.md), built 2026-10-28: step 1 already has a typed **Workspace** field (following the name, `GET /api/folders/workspace`); this card adds its **Change** (the folder browser, picking a folder, existing or to be made) in place of typing.
 
@@ -22,7 +22,7 @@ Was blocked by [Project workspaces](./project-workspaces.md), built 2026-10-28: 
 - **Two steps.** Step 1, **New project**: the name, the **workspace** (pre-filled `<projects folder>/<name>`, editable; offers to create the projects folder when it's missing), the project repo (New | Clone, always into `<workspace>/project/`), and the **profile** (a select, default preselected, with its harness and connected state, as in Project settings). **Create project**.
 - Step 2, **`<name>`: code repos**: a real list of the project's repos (name, path, main branch, **Remove**), then **+ Add a repo**, which opens the add form (`AddRepo`, shared with Project settings) under the list. Each repo is checked by the server as it's added. One button: **Done: open `<name>`**.
 - **Repos already in the project** show in the folder browser greyed and marked `added`, with no **Pick**; the server marks them by real path, so a symlink to one counts. Project settings too.
-- **The Overview opens when the dialog closes** (Done, or closing step 2), not behind it at creation. Cancel in step 1 opens nothing.
+- **The project (its Wiki) opens when the dialog closes** (Done, or closing step 2), not behind it at creation. Cancel in step 1 opens nothing.
 
 ```
 ── New project ─────────────────────────────────────
@@ -44,5 +44,5 @@ web   ~/dev/web       trunk    [Remove]
 
 - [x] agree on the structure with the CEO
 - [ ] the dialog; `AddRepo`'s list; the browser's `added` (the server marks the entries, given the project); the profile in step 1
-- [ ] tests: an added repo can't be picked again (through a symlink too); the profile chosen is the one the project gets; the repos already added are listed when step 2 opens; the Overview opens on Done only
+- [ ] tests: an added repo can't be picked again (through a symlink too); the profile chosen is the one the project gets; the repos already added are listed when step 2 opens; the project opens on Done only
 - [ ] update the specs above

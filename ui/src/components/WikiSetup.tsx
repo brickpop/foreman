@@ -2,7 +2,7 @@ import type { Missing } from "../api/client";
 import { useProjectRepo, useScaffold } from "../app/queries";
 import { Button, Empty } from "./ui";
 
-// What Overview and Board show while the project repo lacks scaffold files
+// What Wiki and Board show while the project repo lacks scaffold files
 // (wiki/product/features/wiki-reader.md#no-wiki-yet): a project made before
 // the scaffold had them, or one whose files were deleted. Each creates what
 // is missing, never over a file that exists.

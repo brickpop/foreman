@@ -32,15 +32,16 @@ Files Foreman reads or owns, and the runtime state it keeps.
 - [App shell](./features/app-shell.md): sidebar, toasts, drawers, dialogs
 - [Dashboard](./features/dashboard.md)
 - [First run](./features/first-run.md): Foreman starts whatever is missing; the setup checklist on the Dashboard
-- [Sessions](./features/sessions.md): the terminal multiplexer
-- Project
-  - [Wiki reader](./features/wiki-reader.md) (Overview tab)
-  - [Project activity](./features/project-activity.md)
-  - [Repositories](./features/repositories.md)
-  - [Worktrees](./features/worktrees.md)
-  - [Project pipeline](./features/project-pipeline.md)
+- [Project page](./features/project-page.md): one team at most; its sections in the sidebar
+  - [Sessions](./features/sessions.md) (Session): the terminal multiplexer
+  - Inbox: [Reviews](./features/reviews.md#the-inbox), then [Needs you](./features/project-pipeline.md#1-needs-you)
+  - [Wiki reader](./features/wiki-reader.md) (Wiki)
   - [Board](./features/board.md)
-  - [Project settings](./features/project-settings.md)
+  - [Repos](./features/repos.md)
+  - [Project deployment](./features/project-deployment.md) (Deployment)
+  - [Project pipeline](./features/project-pipeline.md)
+  - [Project activity](./features/project-activity.md) (Activity)
+  - [Project settings](./features/project-settings.md) (Settings)
   - [Add a project](./features/add-project.md)
 - Teams and agents
   - [Team page](./features/team-page.md)

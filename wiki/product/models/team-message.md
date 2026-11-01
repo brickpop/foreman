@@ -6,7 +6,7 @@ tags: [model, team-tools, runtime]
 
 # Team message
 
-One message between two instances of the same [deployment](./deployment.md), routed by Foreman's [Team tools](../architecture/team-tools.md) router and stored in `state.db`. Shown in the [Sessions](../features/sessions.md#activity) Activity panel (this deployment only), never in the terminals.
+One message between two instances of the same [deployment](./deployment.md), routed by Foreman's [Team tools](../architecture/team-tools.md) router and stored in `state.db`. Shown in the project's [Activity](../features/project-activity.md#the-timeline), never in the terminals.
 
 ## Schema
 

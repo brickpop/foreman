@@ -44,7 +44,7 @@ DELETE /api/cos                              stops it (the CEO left the page); t
 POST   /api/cos/proposal                     {id, looks}: writes proposal id, the one on screen, with the faces the page drew for members proposed without one; one commit → the team; 409 STALE (replaced, or none), 409 CONFLICT (the team changed since: the CoS is asked again), 400 INVALID
 
 GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
-POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session)
+POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session); replaces the team on the project, if another (stopped as by DELETE); 201 the deployment; 409 ALREADY_DEPLOYED (this pair is active), NOT_READY; 400 CANT_DEPLOY
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status and activity line (doing)
 GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness
@@ -60,8 +60,7 @@ PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countd
 GET    /api/requests                          the open requests (today: review requests, one per review; Request → Phasing)
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
-GET    /api/actions?deployment=               the git tools its agents called (switch, commit, merge, abort_merge, discard, set_submodule, request_merge), oldest first
-GET    /api/activity?project=|deployment=     [&before=<cursor>] a page of team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; a project means its active deployments; 400 BAD_REQUEST for neither, both or a bad cursor
+GET    /api/activity?deployment=              [&before=<cursor>] a page of a deployment's team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; 400 BAD_REQUEST without a deployment or for a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
 GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404
@@ -104,8 +103,8 @@ GET    /api/events                            SSE: requests, status, file change
 ```
 
 
-A project's Activity tab pages its traffic with `/api/activity` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
-Its Repositories tab reads its repos read-only with `/api/projects/:id/repos…` ([Repositories](../features/repositories.md)); its Worktrees tab lists the agents' worktrees from the same list, each branch naming the `agent` that has it checked out ([Worktrees](../features/worktrees.md)).
+A project's Activity section pages its team's traffic with `/api/activity?deployment=` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
+Its Repos section reads its repos read-only with `/api/projects/:id/repos…` ([Repos](../features/repos.md)); its Deployment section lists the agents' worktrees from the same list, each branch naming the `agent` that has it checked out ([Project deployment](../features/project-deployment.md)).
 The project routes answer with the project as it is now; a refusal is 400 INVALID, 409 EXISTS or 409 DEPLOYED with the reason. Removing a project deletes its history too ([Add a project → Removing a project](../features/add-project.md#removing-a-project)).
 Resource ids: project = its name (unique in any case); team = team id; instance = `agent@project` (agent ids are unique across teams, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
@@ -148,7 +147,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `instance.status` | an instance changes status or task | id, status, task |
 | `instance.draft` | messages wait on the CEO's draft in an agent's terminal, each countdown step, when the draft goes out (they still wait, for the agent's next idle), and when they are delivered | id, waiting (0: the notice goes), onDraft (false once the draft went out), leftMs, counting, paused |
 | `instance.doing` | an agent's harness reports a step of its work (a hook): its new activity line ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | id, doing (line, at) |
-| `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
+| `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (for the project's Activity, not shown yet; never written into the terminal: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |
 | `team.message` | a message is routed | the message |
 | `team.action` | an agent called a git tool | the action |

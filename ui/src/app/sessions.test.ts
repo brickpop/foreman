@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Deployment, Instance, Request, Team } from "../api/client";
+import type { Instance, Request, Team } from "../api/client";
 import {
   activeDeployments,
   agentStep,
@@ -8,17 +8,12 @@ import {
   deploymentStatus,
   draftNotice,
   isLineShortcut,
-  keepOrder,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
-  mostRecentAgent,
   rosterOrder,
-  type SessionRow,
-  type SessionsView,
-  sessionRows,
-  sessionsView,
+  sessionAgent,
   stepAgent,
   stoppedLine,
   withDoing,
@@ -67,20 +62,6 @@ describe("Sessions", () => {
     expect(deploymentStatus(with_("asleep", "stopped"))).toBe("asleep");
     expect(deploymentStatus(with_("weird"))).toBe("asleep");
     expect(deploymentStatus([])).toBe("asleep");
-  });
-
-  it("finds the agent that did something last", () => {
-    const at = (id: string, deploymentId: string, doing?: string) =>
-      ({ ...inst(id, deploymentId), doing: doing && { line: "Started", at: doing } }) as Instance;
-    const list = [
-      at("tove@ledger", "atlas@ledger", "2026-10-17T10:00:00Z"),
-      at("mara@ledger", "atlas@ledger", "2026-10-17T11:30:00Z"),
-      at("ilya@ledger", "atlas@ledger"),
-      at("lumen@relay", "orion@relay", "2026-10-17T12:00:00Z"),
-    ];
-    expect(mostRecentAgent(list, "atlas@ledger")).toBe("mara");
-    expect(mostRecentAgent([at("ilya@ledger", "atlas@ledger")], "atlas@ledger")).toBeUndefined();
-    expect(mostRecentAgent(list, "nope@x")).toBeUndefined();
   });
 
   it("replaces one agent's activity line, leaving the rest", () => {
@@ -179,64 +160,31 @@ describe("mentions in the line input", () => {
   });
 });
 
-describe("the Sessions URL", () => {
-  const inst = (agent: string, project = "ledger") =>
-    ({ id: `${agent}@${project}`, agentId: agent }) as Instance;
-  const rosters: Record<string, Instance[]> = {
-    "atlas@ledger": [inst("tic"), inst("tac"), inst("toe")],
-    "orion@relay": [inst("lumen", "relay")],
-  };
-  const deployments = Object.keys(rosters);
-  const rosterOf = (d: string) => rosters[d] ?? [];
-  const view = (search: object, last: Record<string, SessionsView> = {}) =>
-    sessionsView(search, deployments, rosterOf, (d) => last[d]);
+describe("the agent a Session shows", () => {
+  const inst = (agent: string) => ({ id: `${agent}@ledger`, agentId: agent }) as Instance;
+  const roster = [inst("tic"), inst("tac"), inst("toe")];
 
-  it("is the list when it names no deployment, or one not deployed (stopped since)", () => {
-    expect(view({})).toBe(undefined);
-    expect(view({ agent: "tic", view: "activity" })).toBe(undefined);
-    expect(view({ deployment: "gone@ledger", agent: "tac" })).toBe(undefined);
-    // Not the first deployment by default: the one named, its lead.
-    expect(view({ deployment: "orion@relay" })).toEqual({
-      deployment: "orion@relay",
-      agent: "lumen",
-      view: undefined,
-    });
+  it("is the one asked, by id or full instance id", () => {
+    expect(sessionAgent("toe", roster)).toBe("toe");
+    expect(sessionAgent("toe@ledger", roster)).toBe("toe");
   });
 
-  it("reads the agent by id or full instance id, and an unknown one is the lead", () => {
-    expect(view({ deployment: "atlas@ledger", agent: "toe" })?.agent).toBe("toe");
-    expect(view({ deployment: "atlas@ledger", agent: "toe@ledger" })?.agent).toBe("toe");
-    expect(view({ deployment: "atlas@ledger", agent: "gone" })?.agent).toBe("tic");
-    // Another deployment's agent isn't this one's.
-    expect(view({ deployment: "atlas@ledger", agent: "lumen" })?.agent).toBe("tic");
+  it("comes back to the last one shown on the project when none is asked", () => {
+    expect(sessionAgent(undefined, roster, "tac")).toBe("tac");
+    // A link naming an agent (a notification) means that agent, as it says.
+    expect(sessionAgent("toe", roster, "tac")).toBe("toe");
   });
 
-  it("keeps Activity open as the URL says", () => {
-    expect(view({ deployment: "atlas@ledger", agent: "tac", view: "activity" })?.view).toBe(
-      "activity",
-    );
+  it("is the lead, first in the roster, when neither is on the team", () => {
+    expect(sessionAgent(undefined, roster)).toBe("tic");
+    // Another team's agent (the one replaced), or one gone since a team change.
+    expect(sessionAgent("lumen", roster, "left")).toBe("tic");
+    // An unknown one asked still falls back to the last one shown.
+    expect(sessionAgent("gone", roster, "tac")).toBe("tac");
   });
 
-  it("comes back to a deployment's last view when the URL names only the deployment", () => {
-    const last: Record<string, SessionsView> = {
-      "atlas@ledger": { deployment: "atlas@ledger", agent: "toe", view: "activity" },
-    };
-    expect(view({ deployment: "atlas@ledger" }, last)).toEqual(last["atlas@ledger"]);
-    // A link naming the agent (a notification) means that agent, as it says.
-    expect(view({ deployment: "atlas@ledger", agent: "tac" }, last)).toEqual({
-      deployment: "atlas@ledger",
-      agent: "tac",
-      view: undefined,
-    });
-    // A last agent gone since (a team change) is the lead.
-    const gone = { "atlas@ledger": { deployment: "atlas@ledger", agent: "left" } };
-    expect(view({ deployment: "atlas@ledger" }, gone)?.agent).toBe("tic");
-  });
-
-  it("is nothing when nothing is deployed", () => {
-    expect(sessionsView({ deployment: "atlas@ledger" }, [], rosterOf, () => undefined)).toBe(
-      undefined,
-    );
+  it("is nothing with no team on the project", () => {
+    expect(sessionAgent("tic", [], "tac")).toBeUndefined();
   });
 });
 
@@ -250,111 +198,6 @@ describe("stoppedLine", () => {
     expect(stoppedLine("Leady", "")).toBe(
       "Leady stopped. Messages for them wait until you start them again; they pick up their conversation.",
     );
-  });
-});
-
-describe("sessionRows", () => {
-  const zero = "0001-01-01T00:00:00Z"; // Go's zero time, as the API sends it unset
-  const at = (
-    id: string,
-    deploymentId: string,
-    status: string,
-    times: { doing?: string; startedAt?: string } = {},
-  ) =>
-    ({
-      ...inst(id, deploymentId),
-      status,
-      startedAt: times.startedAt ?? zero,
-      doing: times.doing && { line: "Editing", at: times.doing },
-    }) as Instance;
-  const dep = (id: string, createdAt: string, goal = "") => ({ id, goal, createdAt }) as Deployment;
-  const rows = (instances: Instance[], deployments: Deployment[]) =>
-    sessionRows(activeDeployments(instances, [atlas], []), instances, deployments);
-
-  it("puts the latest activity first, whatever the project's name", () => {
-    const list = [
-      at("tove@ledger", "atlas@ledger", "idle", { doing: "2026-10-29T09:00:00Z" }),
-      at("mara@ledger", "atlas@ledger", "running", { doing: "2026-10-29T11:00:00Z" }),
-      at("lumen@relay", "orion@relay", "idle", { doing: "2026-10-29T10:00:00Z" }),
-      at("ana@harbor", "zed@harbor", "idle", { doing: "2026-10-29T12:00:00Z" }),
-    ];
-    const r = rows(list, [dep("atlas@ledger", zero, "Ship invoicing")]);
-    expect(r.map((x) => [x.project, x.lastActivity])).toEqual([
-      ["harbor", "2026-10-29T12:00:00Z"],
-      ["ledger", "2026-10-29T11:00:00Z"], // its latest agent, not its first
-      ["relay", "2026-10-29T10:00:00Z"],
-    ]);
-    expect(r[1]).toMatchObject({ team: "Atlas", goal: "Ship invoicing", state: "working" });
-    expect(r[0].goal).toBe(""); // no deployment record: no goal, still listed
-  });
-
-  it("falls back to the agents' start, then the deploy, when no step is known (after a restart)", () => {
-    const list = [
-      at("tove@ledger", "atlas@ledger", "idle", { startedAt: "2026-10-29T08:00:00Z" }),
-      at("mara@ledger", "atlas@ledger", "idle", { startedAt: "2026-10-29T08:30:00Z" }),
-      at("lumen@relay", "orion@relay", "asleep"),
-      at("ana@harbor", "zed@harbor", "asleep"),
-    ];
-    const r = rows(list, [dep("orion@relay", "2026-10-28T08:00:00Z")]);
-    expect(r.map((x) => [x.project, x.lastActivity])).toEqual([
-      ["ledger", "2026-10-29T08:30:00Z"],
-      ["relay", "2026-10-28T08:00:00Z"],
-      ["harbor", ""], // nothing says: last, its zero times ignored
-    ]);
-  });
-
-  it("prefers a step over a later start: a step is what was done", () => {
-    const list = [
-      at("tove@ledger", "atlas@ledger", "idle", { doing: "2026-10-29T09:00:00Z" }),
-      at("mara@ledger", "atlas@ledger", "idle", { startedAt: "2026-10-29T10:00:00Z" }),
-    ];
-    expect(rows(list, [])[0].lastActivity).toBe("2026-10-29T09:00:00Z");
-  });
-
-  it("keeps project then team order on equal times", () => {
-    const list = [
-      at("ana@ledger", "zed@ledger", "idle"),
-      at("tove@ledger", "atlas@ledger", "idle"),
-    ];
-    expect(rows(list, []).map((x) => x.id)).toEqual(["atlas@ledger", "zed@ledger"]);
-  });
-
-  it("says working, idle, asleep or stopped", () => {
-    const state = (...statuses: string[]) =>
-      rows(
-        statuses.map((s, n) => at(`a${n}@p`, "t@p", s)),
-        [],
-      )[0].state;
-    expect(state("idle", "starting")).toBe("working");
-    expect(state("awaiting", "running")).toBe("working"); // someone is at work
-    expect(state("awaiting", "asleep")).toBe("idle"); // waiting on the CEO: the needs-you dot says so
-    expect(state("queued", "done")).toBe("idle");
-    expect(state("asleep", "stopped")).toBe("asleep");
-    expect(state("stopped")).toBe("stopped");
-  });
-});
-
-describe("keepOrder", () => {
-  const row = (id: string) => ({ id }) as SessionRow;
-  const ids = (rows: SessionRow[]) => rows.map((r) => r.id);
-
-  it("takes the rows' own order on entering", () => {
-    expect(ids(keepOrder([row("a"), row("b")], undefined))).toEqual(["a", "b"]);
-  });
-  it("keeps it when the activity would reorder them", () => {
-    expect(ids(keepOrder([row("c"), row("b"), row("a")], ["a", "b", "c"]))).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
-  });
-  it("puts a new deployment on top and drops one gone", () => {
-    expect(ids(keepOrder([row("d"), row("e"), row("c"), row("a")], ["a", "b", "c"]))).toEqual([
-      "d",
-      "e",
-      "a",
-      "c",
-    ]);
   });
 });
 

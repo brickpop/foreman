@@ -1,8 +1,8 @@
-import type { Deployment, Doing, Instance, Request, Team } from "../api/client";
+import type { Doing, Instance, Request, Team } from "../api/client";
 import { roster } from "./model";
 
-// The Sessions screen's logic (wiki/product/features/sessions.md), apart from
-// its components so it can be tested.
+// A project's Session section's logic (wiki/product/features/sessions.md),
+// apart from its components so it can be tested.
 
 export type ActiveDeployment = {
   id: string;
@@ -53,66 +53,6 @@ export function activeDeployments(
     .sort((a, b) => a.project.localeCompare(b.project) || a.team.localeCompare(b.team));
 }
 
-export type SessionRow = ActiveDeployment & {
-  goal: string;
-  state: "working" | "idle" | "asleep" | "stopped";
-  /** When it last did something (RFC 3339), "" when nothing says. */
-  lastActivity: string;
-};
-
-// A time as milliseconds; a blank, a bad one and Go's zero time are 0.
-const ms = (t?: string) => Math.max(Date.parse(t ?? "") || 0, 0);
-// The latest of some times, "" when none counts.
-const latest = (times: (string | undefined)[]) =>
-  times.reduce<string>((a, t) => (t && ms(t) > ms(a) ? t : a), "");
-
-/** The Sessions list: one row per active deployment, the latest activity
- * first (ties keep activeDeployments' order). An agent's last step is kept in
- * memory only, so after a restart its start, then the deploy, stand in. */
-export function sessionRows(
-  active: ActiveDeployment[],
-  instances: Instance[],
-  deployments: Deployment[],
-): SessionRow[] {
-  return active
-    .map((d) => {
-      const mine = instances.filter((i) => i.deploymentId === d.id);
-      const deployment = deployments.find((x) => x.id === d.id);
-      const lastActivity =
-        latest(mine.map((i) => i.doing?.at)) ||
-        latest(mine.map((i) => i.startedAt)) ||
-        latest([deployment?.createdAt]);
-      const working = mine.some((i) => i.status === "running" || i.status === "starting");
-      const state: SessionRow["state"] = working
-        ? "working"
-        : d.status === "asleep" || d.status === "stopped"
-          ? d.status
-          : "idle";
-      return { ...d, goal: deployment?.goal ?? "", state, lastActivity };
-    })
-    .sort((a, b) => ms(b.lastActivity) - ms(a.lastActivity));
-}
-
-/** The rows in the order the list had (ids), so nothing moves while the CEO is
- * on it (the CEO, 2026-10-30): the latest first only on entering. A deployment
- * new since goes on top; one gone drops out. */
-export function keepOrder(rows: SessionRow[], order: string[] | undefined): SessionRow[] {
-  if (!order) return rows;
-  const rank = (r: SessionRow) => order.indexOf(r.id);
-  return [...rows].sort((a, b) => rank(a) - rank(b));
-}
-
-/** The agent of a deployment that did something last: where its work is. */
-export function mostRecentAgent(instances: Instance[], deployment: string): string | undefined {
-  const mine = instances.filter((i) => i.deploymentId === deployment && i.doing);
-  const at = (i: Instance) => Date.parse(i.doing?.at ?? "") || 0;
-  const latest = mine.reduce<Instance | undefined>(
-    (a, i) => (!a || at(i) > at(a) ? i : a),
-    undefined,
-  );
-  return latest && at(latest) > 0 ? latest.agentId : undefined;
-}
-
 /** The instances with one's activity line replaced: an instance.doing event,
  * pushed at every step of its work, so never refetched for. */
 export function withDoing(
@@ -135,34 +75,16 @@ export function rosterOrder(deployment: string, instances: Instance[], teams: Te
   return [...mine].sort((a, b) => rank(a) - rank(b));
 }
 
-/** What the Sessions URL says (wiki/product/features/sessions.md#the-url): the
- * deployment, its agent shown, and whether Activity is open. The agent is
- * named by its id; a full instance id (agent@project) is read too. */
-export type SessionsSearch = {
-  deployment?: string;
-  agent?: string;
-  view?: "activity";
-};
-
-export type SessionsView = { deployment: string; agent: string; view?: "activity" };
-
-/** The view the URL describes, checked against what is deployed: an unknown
- * agent is the lead. A URL naming only the deployment (the list's link) comes
- * back to its `last` view. Undefined when the URL names no deployment that is
- * deployed: the list of deployments shows instead. */
-export function sessionsView(
-  search: SessionsSearch,
-  deployments: string[],
-  rosterOf: (deployment: string) => Instance[],
-  last: (deployment: string) => SessionsView | undefined,
-): SessionsView | undefined {
-  const deployment = deployments.find((d) => d === search.deployment);
-  if (!deployment) return undefined;
-  const remembered = search.agent || search.view ? undefined : last(deployment);
-  const asked = (search.agent ?? remembered?.agent ?? "").split("@")[0];
-  const roster = rosterOf(deployment);
-  const agent = roster.find((i) => i.agentId === asked)?.agentId ?? roster[0]?.agentId ?? "";
-  return { deployment, agent, view: search.view ?? remembered?.view };
+/** The agent a Session shows (wiki/product/features/sessions.md#the-url):
+ * the one asked, by id or full instance id; else the last one shown on the
+ * project; else the lead, first in the roster. Undefined with no roster. */
+export function sessionAgent(
+  asked: string | undefined,
+  roster: Instance[],
+  last?: string,
+): string | undefined {
+  const known = (id?: string) => roster.find((i) => i.agentId === id?.split("@")[0])?.agentId;
+  return known(asked) ?? known(last) ?? roster[0]?.agentId;
 }
 
 /** The line input's placeholder (wiki/product/features/sessions.md#the-terminal). */

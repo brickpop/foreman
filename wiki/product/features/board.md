@@ -6,7 +6,7 @@ tags: [feature, ui, wiki]
 
 # Board
 
-The project's **Board** tab: a kanban over wiki entries, compatible with wikiview. Boards are declared in the project's `wiki/wiki.toml` under `[[tool.wikiview.board]]`; cards are entries (by default `type: task`), columns come from a status field, and optional lanes from another field. Moving a card rewrites one frontmatter line, so agents see the change through the file. Parsing and writes: [Wiki engine](../architecture/wiki-engine.md).
+The project's **Board** section ([Project page](./project-page.md)): a kanban over wiki entries, compatible with wikiview. Boards are declared in the project's `wiki/wiki.toml` under `[[tool.wikiview.board]]`; cards are entries (by default `type: task`), columns come from a status field, and optional lanes from another field. Moving a card rewrites one frontmatter line, so agents see the change through the file. Parsing and writes: [Wiki engine](../architecture/wiki-engine.md).
 
 ## Board declaration
 
@@ -28,7 +28,7 @@ Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findi
 
 ## Layout
 
-Body padding `24px 48px 64px`, like every project tab. Boards are declared in `wiki.toml`: while the project repo lacks it, the tab shows the [No wiki yet](./wiki-reader.md#no-wiki-yet) placeholder instead.
+Body padding `24px 24px 48px`, like every project section. Boards are declared in `wiki.toml`: while the project repo lacks it, the section shows the [No wiki yet](./wiki-reader.md#no-wiki-yet) placeholder instead.
 
 - **Toolbar**: the **board switcher** (segmented, one button per declared board; on = raised with `--line3` border) and, right-aligned, a Mono **`wiki.toml`** / **`Hide wiki.toml`** button that reveals the board's declaration in a `<pre>` (max 620px), quoted from the file.
 - **Grid**: each column 240–320px (the CEO, 2026-10-17), narrowing towards 240px as the screen does, then scrolling horizontally; never wider than 320px, so a wide screen leaves room on the right rather than stretching the cards.

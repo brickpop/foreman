@@ -114,7 +114,7 @@ func TestDeployErrors(t *testing.T) {
 	}
 }
 
-// DeploymentsIn: atlas and orion active on ledger, build active on relay,
+// DeploymentsIn: atlas active on ledger, orion on billing, build on relay,
 // atlas stopped on relay.
 func (f *fakeAgents) DeploymentsIn(_ context.Context, status string) ([]store.Deployment, error) {
 	if status == store.DeploymentStopped {
@@ -122,7 +122,7 @@ func (f *fakeAgents) DeploymentsIn(_ context.Context, status string) ([]store.De
 	}
 	return []store.Deployment{
 		{ID: "atlas@ledger", ProjectID: "ledger", Goal: "Ship it", Status: status},
-		{ID: "orion@ledger", ProjectID: "ledger", Status: status},
+		{ID: "orion@billing", ProjectID: "billing", Status: status},
 		{ID: "build@relay", ProjectID: "relay", Status: status},
 	}, nil
 }
@@ -146,30 +146,31 @@ func TestDeploymentsAreListed(t *testing.T) {
 // pages records what each Page was asked.
 type pages struct{ asked [][]string }
 
-func (p *pages) Page(_ context.Context, deployments []string, before string, limit int) (store.ActivityPage, error) {
+func (p *pages) Page(_ context.Context, deployment, before string, limit int) (store.ActivityPage, error) {
 	if before == "bad" {
 		return store.ActivityPage{}, store.ErrBadCursor
 	}
-	p.asked = append(p.asked, append(slices.Clone(deployments), before, strconv.Itoa(limit)))
+	p.asked = append(p.asked, []string{deployment, before, strconv.Itoa(limit)})
 	return store.ActivityPage{Items: []store.ActivityItem{}, Next: "c2"}, nil
 }
 
-// A project's activity is its active deployments', 50 at a time; one
-// deployment's (an older session) is asked by its id.
+// A deployment's activity, 50 at a time: the team on the project, or an older
+// session.
 func TestActivity(t *testing.T) {
 	p := &pages{}
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Agents: &fakeAgents{}, Activity: p, UI: builtUI})
 	var page map[string]any
-	decodeBody(t, get(t, h, "/api/activity?project=ledger"), &page)
+	decodeBody(t, get(t, h, "/api/activity?deployment=atlas@ledger"), &page)
 	if page["next"] != "c2" {
 		t.Errorf("page %v", page)
 	}
 	decodeBody(t, get(t, h, "/api/activity?deployment=atlas@relay&before=c2"), &page)
-	want := [][]string{{"atlas@ledger", "orion@ledger", "", "50"}, {"atlas@relay", "c2", "50"}}
+	want := [][]string{{"atlas@ledger", "", "50"}, {"atlas@relay", "c2", "50"}}
 	if !slices.EqualFunc(p.asked, want, slices.Equal) {
 		t.Errorf("asked %v, want %v", p.asked, want)
 	}
-	for _, path := range []string{"/api/activity", "/api/activity?project=ledger&deployment=atlas@ledger", "/api/activity?project=ledger&before=bad"} {
+	// A project no longer names it: its one team's deployment does.
+	for _, path := range []string{"/api/activity", "/api/activity?project=ledger", "/api/activity?deployment=atlas@ledger&before=bad"} {
 		if w := send(h, "GET", path, ""); w.Code != http.StatusBadRequest {
 			t.Errorf("%s: %d %s", path, w.Code, w.Body)
 		}

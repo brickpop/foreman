@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-// A project's Activity tab (wiki/product/features/project-activity.md): the
-// team traffic of some deployments, messages and git actions together,
+// A project's Activity section (wiki/product/features/project-activity.md): the
+// team traffic of a deployment, messages and git actions together,
 // newest first, a page at a time.
 
 // Activity reads team traffic across the messages and actions tables.
 type Activity interface {
-	// Page returns up to limit items of the deployments, newest first,
+	// Page returns up to limit items of the deployment, newest first,
 	// older than the cursor before ("": the newest). Its Next is the cursor
 	// of the following page, "" when there is none.
-	Page(ctx context.Context, deployments []string, before string, limit int) (ActivityPage, error)
+	Page(ctx context.Context, deployment, before string, limit int) (ActivityPage, error)
 }
 
 // ErrBadCursor means a page's cursor isn't one Page gave.
@@ -57,22 +57,16 @@ func parseCursor(s string) (position, error) {
 	return position{at, parts[1], id}, nil
 }
 
-func (s activity) Page(ctx context.Context, deployments []string, before string, limit int) (ActivityPage, error) {
+func (s activity) Page(ctx context.Context, deployment, before string, limit int) (ActivityPage, error) {
 	page := ActivityPage{Items: []ActivityItem{}}
-	if len(deployments) == 0 || limit <= 0 {
+	if limit <= 0 {
 		return page, nil
 	}
-	in := strings.TrimSuffix(strings.Repeat("?, ", len(deployments)), ", ")
-	var args []any
-	for range 2 {
-		for _, d := range deployments {
-			args = append(args, d)
-		}
-	}
+	args := []any{deployment, deployment}
 	q := `SELECT at, tbl, id FROM (
-		SELECT julianday(created_at) AS at, 'a' AS tbl, id FROM team_actions WHERE deployment_id IN (` + in + `)
+		SELECT julianday(created_at) AS at, 'a' AS tbl, id FROM team_actions WHERE deployment_id = ?
 		UNION ALL
-		SELECT julianday(created_at), 'm', id FROM team_messages WHERE deployment_id IN (` + in + `))`
+		SELECT julianday(created_at), 'm', id FROM team_messages WHERE deployment_id = ?)`
 	if before != "" {
 		p, err := parseCursor(before)
 		if err != nil {

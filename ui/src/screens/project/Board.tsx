@@ -18,6 +18,7 @@ import { useToast } from "../../components/Toasts";
 import { Button, Loading, NotBuilt, Segmented } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
+import { useProject } from "../Project";
 
 // A kanban over wiki entries (wiki/product/features/board.md). A move rewrites
 // one or two frontmatter lines, version-guarded.
@@ -109,7 +110,8 @@ const priorityColor: Record<string, string> = {
   low: "text-tx4",
 };
 
-export function Board({ project }: { project: string }) {
+export function Board() {
+  const project = useProject().id;
   const navigate = useNavigate();
   const lacking = useMissing(project).data ?? [];
   const boards = useBoards(project);
@@ -126,26 +128,25 @@ export function Board({ project }: { project: string }) {
   const board = list.find((b) => b.id === chosen) ?? list[0];
   if (boards.isPending)
     return (
-      <div className="px-12 pt-6">
+      <div className="px-6 pt-6">
         <Loading rows={5} />
       </div>
     );
   if (isNotBuilt(boards.error))
     return (
-      <div className="px-12 pt-6">
+      <div className="px-6 pt-6">
         <NotBuilt what="the wiki" />
       </div>
     );
   // Boards are declared in wiki.toml: without it there are none to show.
   if (lacking.some((m) => m.required))
     return (
-      <div className="px-12 pt-6">
+      <div className="px-6 pt-6">
         <WikiSetup project={project} missing={lacking} />
       </div>
     );
-  if (boards.error)
-    return <p className="px-12 pt-6 text-[13px] text-err">{boards.error.message}</p>;
-  if (!board) return <p className="px-12 pt-6 text-tx3">No board is declared in wiki.toml.</p>;
+  if (boards.error) return <p className="px-6 pt-6 text-[13px] text-err">{boards.error.message}</p>;
+  if (!board) return <p className="px-6 pt-6 text-tx3">No board is declared in wiki.toml.</p>;
   const { columns, lanes } = board;
 
   const open = (path: string, card: HTMLElement) => {
@@ -170,9 +171,9 @@ export function Board({ project }: { project: string }) {
             color: "var(--info)",
             onOpen: () =>
               navigate({
-                to: "/projects/$project",
+                to: "/projects/$project/wiki",
                 params: { project },
-                search: { tab: "overview", entry: card.path },
+                search: { entry: card.path },
               }),
           }),
       },
@@ -180,7 +181,7 @@ export function Board({ project }: { project: string }) {
   };
 
   return (
-    <div className="flex flex-1 flex-col gap-4 px-12 pt-6 pb-16">
+    <div className="flex flex-1 flex-col gap-4 px-6 pt-6 pb-12">
       {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
       <div className="flex items-center gap-3">
         {list.length > 1 && (
@@ -440,11 +441,7 @@ function SideSheet({
   useEffect(() => top.current?.parentElement?.scrollTo(0, 0), [path]);
   const open = (p: string) => {
     onClose();
-    navigate({
-      to: "/projects/$project",
-      params: { project },
-      search: { tab: "overview", entry: p },
-    });
+    navigate({ to: "/projects/$project/wiki", params: { project }, search: { entry: p } });
   };
   return (
     <Drawer

@@ -10,6 +10,8 @@ epic: workflow
 
 **Why:** a review request today is decided on its card (Merge to main · Create PR · Reject), with the change one click away in a dialog. The CEO wants to review as on a forge before deciding (the CEO, 2026-10-21): the files changed, the diff, and comments pinned to lines or general, sent back to the lead as a request for changes. The decision belongs on that page, not on the card.
 
+Since 2026-10-31 reviews are listed in each project's Inbox, not in a Reviews section across projects ([The project is the workplace](./project-workplace.md)); the decisions below are as made on 2026-10-21.
+
 ## Asked (the CEO, 2026-10-21)
 
 - A **Reviews** section: one entry per review, and the review card (Dashboard, Needs you) links to it instead of deciding.
@@ -44,4 +46,4 @@ epic: workflow
 - [x] specs: a [Review](../product/models/review.md) model and [Reviews](../product/features/reviews.md) feature spec; Merge request, Request, Pipeline and merges, Project pipeline, Dashboard, App shell, API, and the older mentions of Reject
 - [ ] tried by the CEO in the browser on a real branch (only the unit tests and the build have run it)
 
-**Done when:** a review opens from its card on the Reviews page, with the file tree (by repo), the diff and comments; Request changes sends the draft to the lead in one message with each comment's repo, file and line; a review asked again shows the new diff, older comments on changed lines outdated; Merge to main works only from there; tests cover the comments' anchoring, the outdated rule and the message; specs: Requests, Project pipeline, Dashboard, Pipeline and merges, a Reviews feature spec, Merge request (comments).
+**Done when:** a review opens from its row in the project's Inbox, with the file tree (by repo), the diff and comments; Request changes sends the draft to the lead in one message with each comment's repo, file and line; a review asked again shows the new diff, older comments on changed lines outdated; Merge to main works only from there; tests cover the comments' anchoring, the outdated rule and the message; specs: Requests, Project pipeline, Dashboard, Pipeline and merges, a Reviews feature spec, Merge request (comments).

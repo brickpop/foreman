@@ -8,6 +8,7 @@ import {
   type WorkItem,
 } from "../../api/client";
 import { agentOf, inbox, mainOf, when } from "../../app/model";
+import { reviewOf, sessionOf } from "../../app/project";
 import {
   useAnswer,
   useEntryTitle,
@@ -22,9 +23,9 @@ import { Avatar } from "../../components/Avatar";
 import { RequestPanel } from "../../components/RequestPanel";
 import { Button, Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../components/ui";
 
-// A project's pipeline (wiki/product/features/changes.md): what needs the CEO
-// opens its Overview (a review links to its page, wiki/product/features/reviews.md); the work moving towards main, and what recently merged,
-// open its Repositories tab.
+// A project's pipeline (wiki/product/features/project-pipeline.md): what needs
+// the CEO, in its Inbox (a review opens its page there); the work moving
+// towards main, and what recently merged, in its Deployment section.
 
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
@@ -35,15 +36,15 @@ export function sourceLabel(r: Request): string {
 
 const stageLabels = ["in worktree", "handed to lead", "lead reviewing", "integrated"];
 
-/** What waits on the CEO on this project, first on its Overview, but its
- * reviews (in Reviews); nothing when nothing does. */
+/** What waits on the CEO on this project but its reviews, in its Inbox;
+ * nothing when nothing does. */
 export function NeedsYou({ project }: { project: Project }) {
   const requests = useRequests();
   const teams = useTeams();
   const open = inbox(requests.data ?? []).filter((r) => r.projectId === project.id);
   if (open.length === 0) return null;
   return (
-    <section className="flex flex-col gap-2.5 px-12 pt-6">
+    <section className="flex flex-col gap-2.5">
       <SectionLabel>Needs you</SectionLabel>
       {open.map((r) => (
         <ProjectRequest key={r.id} request={r} project={project} teams={teams.data ?? []} />
@@ -53,8 +54,8 @@ export function NeedsYou({ project }: { project: Project }) {
 }
 
 /** The work on its way to main, and what merged in the last 7 days: on the
- * Worktrees tab, under the agents' worktrees. Each branch links to its code
- * in Repositories. */
+ * Deployment section, under the agents' worktrees. Each branch links to its
+ * code in Repos. */
 export function InFlight({ project }: { project: Project }) {
   const pipeline = usePipeline(project.id);
   const teams = useTeams();
@@ -144,8 +145,7 @@ function ProjectRequest({
   const navigate = useNavigate();
   const answer = useAnswer();
   const agent = agentOf(teams, r.instanceId);
-  const openSession = () =>
-    navigate({ to: "/sessions", search: { deployment: r.deploymentId, agent: r.instanceId } });
+  const openSession = () => navigate(sessionOf(r.instanceId));
   const context = agent ? `${agent.team.config.name} on ${project.id}` : `on ${project.id}`;
   const who = agent && { name: agent.soul.name, look: agent.soul.look };
   return (
@@ -162,14 +162,14 @@ function ProjectRequest({
   );
 }
 
-/** A branch, linked to its code in Repositories when a repo has it. */
+/** A branch, linked to its code in Repos when a repo has it. */
 function BranchLink({ project, repo, branch }: { project: string; repo?: string; branch: string }) {
   if (!repo) return <span className="font-mono">{branch}</span>;
   return (
     <Link
-      to="/projects/$project"
+      to="/projects/$project/repos"
       params={{ project }}
-      search={{ tab: "repositories", repo, branch }}
+      search={{ repo, branch }}
       title={`Read ${branch} in ${repo}`}
       className="font-mono text-accTx hover:underline"
     >
@@ -212,15 +212,7 @@ function WorkRow({
         {stageLabels[w.stage] ?? w.stage}
       </span>
       {live ? (
-        <Button
-          variant="small"
-          onClick={() =>
-            navigate({
-              to: "/sessions",
-              search: { deployment: w.deploymentId, agent: w.authorInstance },
-            })
-          }
-        >
+        <Button variant="small" onClick={() => navigate(sessionOf(w.authorInstance))}>
           Session
         </Button>
       ) : (
@@ -268,10 +260,7 @@ function MergeRow({
         <span className="rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx2">
           {mr.forgePrNumber ? "PR open" : "merge requested"}
         </span>
-        <Button
-          variant="small"
-          onClick={() => navigate({ to: "/reviews/$review", params: { review: mr.reviewId } })}
-        >
+        <Button variant="small" onClick={() => navigate(reviewOf(project, mr.reviewId))}>
           Review
         </Button>
         {mr.forgePrUrl ? (
@@ -279,15 +268,7 @@ function MergeRow({
             Open PR ↗
           </Button>
         ) : live ? (
-          <Button
-            variant="small"
-            onClick={() =>
-              navigate({
-                to: "/sessions",
-                search: { deployment: mr.deploymentId, agent: mr.authorInstance },
-              })
-            }
-          >
+          <Button variant="small" onClick={() => navigate(sessionOf(mr.authorInstance))}>
             Session
           </Button>
         ) : (

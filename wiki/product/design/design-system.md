@@ -65,7 +65,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | Brand | 15px / 600 / -0.01em |
 | Nav item | 14px / 500 |
 | Sidebar project / team row | 13.5px |
-| Request text | Dashboard 16px, project Overview (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
+| Request text | Dashboard 16px, project Inbox (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
 | Kind chip | Mono 600 10.5px, `letter-spacing: .05em`, uppercase |
 | Meta mono (paths, branches) | Mono 400 11.5–12.5px, `--tx4` or `--tx3` |
 | Terminal | Mono 400 13px / line-height 1.6 |
@@ -93,11 +93,9 @@ Avatar radius is `round(size × 0.24)` ([Avatar](./avatar.md)).
 
 ## Spacing and layout
 
-- Page padding: Dashboard, Settings `48px 48px 64px`; Project and Team header `40px 48px 0`; Agent `40px 48px 64px`.
-- Project tab bodies: every tab `24px 48px 64px`, the full width, so each lines up with the project header ([Wiki reader](../features/wiki-reader.md#project-header-and-tabs)); the Settings tab's configuration part starts `28px` below its divider.
-- Team tab bodies: Deployments `24px 48px 64px`; Members `20px 48px 64px`; Playbook and File `28px 48px 64px`.
-- Max widths: Dashboard and Team tabs 920px; Settings 760px; Project settings 960px; Playbook 760px; File 860px; wiki article: the full width of its column (narrower only by the Files tree); `wiki.toml` panel 620px.
-- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between the Worktrees tab's sections; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
+- Page padding: one rule everywhere, **24px sides**, 24px top (20px on the Wiki and a review's header) and 48px bottom, `24px 24px 48px` (the CEO, 2026-10-31: compact and consistent; 48px sides until then). Width caps belong to text meant to be read, not to padding: the wiki entry and a project's description 780px, the Inbox, Team deployments and Members 920px, Settings and Playbook 760px, the Dashboard 1080px ([Project page → Layout](../features/project-page.md#layout)). Under 760px the Dashboard's sides are 16px.
+- Max widths: Dashboard 1080px; Team Deployments and Members, the Inbox 920px; Settings 760px; Project settings' left column 520px; Playbook 760px; File 860px; the wiki article and a project's description 780px; `wiki.toml` panel 620px.
+- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between the Deployment section's parts; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
 - Row padding: list rows `14px 4px` or `16px 6px`; table-like rows `12px 16px`; settings rows `14px 0` or `12px 0` with a bottom border.
 
 ## Surfaces
@@ -131,8 +129,7 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 | Element | Style |
 |---|---|
 | **Request kind chip** | Mono 600 10.5px, `.05em`, uppercase; color and 1px border in the kind color; radius 4; padding `1px 6px`; no wrap. Kinds: Approval `--accTx`, Question `--info`, Review `--ok`, Blocked `--err`, Finding `--team` ([Requests](../features/requests.md)). In explanatory lists the same label appears without a border. |
-| **Count badge** (sidebar) | `--acc` background, `--accInk` text, Mono 600 11px, padding `1px 7px`, radius 10 |
-| **Count badge** (tab) | Mono 600 10.5px, padding `1px 6px`, radius 9 |
+| **Count badge** (the sidebar's Inbox) | `--acc` background, `--accInk` text, Mono 600 10.5px, padding `1px 6px`, radius 9 |
 | **Needs-you dot** | 7px `--acc` circle |
 | **Changed dot** | 6px `--acc` circle, tooltip "Changed since you last looked" |
 | **Frontmatter chip** | 12.5px, `--raised`, radius 5, padding `3px 8px`, `--tx3` key; the value in `--tx`. Format `key: value` |
@@ -148,7 +145,7 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 |---|---|---|
 | **Primary** | `--acc` background, no border (or 1px `--acc`), `--accInk`, 600 13px, radius 7, padding `7–8px 13–14px` | The main action of a view: Deploy, Add project, New team, Deploy to a project, Send to X, the first request option |
 | **Secondary** (outline) | Transparent, 1px `--line2`, `--tx2` (or `--tx`), 500 13px, radius 7, padding `6–8px 12–14px` | Cancel, Hire, Deploy a team, Refine with Chief of Staff, the stepper |
-| **Raised** | `--raised`, 1px `--line2`, `--tx` | Open sessions, Sessions |
+| **Raised** | `--raised`, 1px `--line2`, `--tx` | The Files toggle while open (Wiki), a review comment's `Add to the draft` / `Save` |
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--line2` border (`--err` on hover), `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
@@ -159,7 +156,7 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 | **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Connect, Edit, Rebuild |
 | **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | The draft box's Pause / Resume, a review comment's Edit and Delete |
 
-**Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on the Dashboard and 13px on the project's Overview (Needs you).
+**Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on the Dashboard and 13px in the project's Inbox (Needs you).
 
 ## Form controls
 

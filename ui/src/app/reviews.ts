@@ -217,15 +217,7 @@ export function commentAt(
   return undefined;
 }
 
-/** The projects the Reviews page can be narrowed to, by name: those with a
- * review, and the one asked for (a session's link), even with none yet. */
-export function reviewProjects(reviews: Review[], asked?: string): string[] {
-  const names = new Set(reviews.map((v) => v.projectId));
-  if (asked) names.add(asked);
-  return [...names].sort();
-}
-
-/** The Reviews page's sections: what needs the CEO, what waits on a lead,
+/** The Inbox's reviews: what needs the CEO, what waits on a lead,
  * and the last ones done (newest first, as the server lists them). */
 export function reviewGroups(reviews: Review[], done = 20) {
   return {

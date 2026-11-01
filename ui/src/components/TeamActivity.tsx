@@ -1,16 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
-import { entries, type Filter, links, shows, type Thread } from "../app/activity";
+import { type Filter, links, type Thread } from "../app/activity";
 import { agentOf, waitingReason, when } from "../app/model";
-import { useActions, useDraft, useInstances, useMessages, useSettings } from "../app/queries";
+import { useDraft, useInstances, useSettings } from "../app/queries";
 import { CodeText } from "./CodeText";
 import { Dot } from "./ui";
 
-// The Activity panel (wiki/product/features/sessions.md#activity): a
-// small map of who calls whom, then the exchanges, newest first: one row per
-// thread, which opens into a chat. One per deployment; the terminal stays
-// the agent's only.
+// A team's activity, the parts of a project's Activity section
+// (wiki/product/features/project-activity.md): the map of who calls whom,
+// which filters, and the rows: one per thread, which opens into a chat, and
+// one per git action.
 
 // The map: name boxes on an ellipse, compact.
 const width = 328;
@@ -28,92 +28,6 @@ export function namesOf(teams: Team[]): Names {
     if (id === "ceo") return "You";
     return agentOf(teams, id)?.soul.name ?? id.split("@")[0];
   };
-}
-
-export function ActivityPanel({
-  deployment,
-  roster,
-  teams,
-  onClose,
-  onOpen,
-}: {
-  deployment: string;
-  roster: Instance[];
-  teams: Team[];
-  onClose: () => void;
-  onOpen: (instance: string) => void;
-}) {
-  const messages = useMessages(deployment).data ?? [];
-  const [filter, setFilter] = useState<Filter>(null);
-  const [teamId, project] = deployment.split("@");
-  const teamName = teams.find((t) => t.id === teamId)?.config.name ?? teamId;
-  const name = namesOf(teams);
-  const actions = useActions(deployment).data ?? [];
-  const shown = entries(messages, actions).filter((e) => shows(e, filter));
-  return (
-    <aside className="flex w-[360px] shrink-0 flex-col border-l border-line bg-panel">
-      <header className="flex items-start justify-between border-b border-line px-4 py-3">
-        <span className="flex flex-col">
-          <span className="font-semibold">Activity</span>
-          <span className="text-[12.5px] text-tx4">
-            {teamName} on {project} only
-          </span>
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close activity"
-          className="text-[18px] text-tx3 hover:text-tx"
-        >
-          ×
-        </button>
-      </header>
-      <CallMap
-        roster={roster}
-        messages={messages}
-        filter={filter}
-        onFilter={setFilter}
-        name={name}
-      />
-      {filter && (
-        <div className="flex items-center gap-2 border-b border-line px-4 py-2 text-[12.5px] text-tx3">
-          <span className="flex flex-1 items-center gap-1.5">
-            {"agent" in filter ? (
-              <>
-                Only <NameTag id={filter.agent} name={name} />
-              </>
-            ) : (
-              <>
-                Only <NameTag id={filter.a} name={name} /> and <NameTag id={filter.b} name={name} />
-              </>
-            )}
-          </span>
-          <button type="button" onClick={() => setFilter(null)} className="text-accTx">
-            Show all
-          </button>
-        </div>
-      )}
-      <div className="min-h-0 flex-1 overflow-auto">
-        {shown.length === 0 && (
-          <p className="m-0 px-4 py-6 text-center text-[13px] text-tx4">
-            {messages.length + actions.length === 0 ? "Nothing yet." : "Nothing here."}
-          </p>
-        )}
-        {shown.map((e) =>
-          "thread" in e ? (
-            <ThreadRow
-              key={`m${e.thread.message.id}`}
-              thread={e.thread}
-              name={name}
-              onOpen={onOpen}
-            />
-          ) : (
-            <ActionRow key={`a${e.action.id}`} action={e.action} name={name} />
-          ),
-        )}
-      </div>
-    </aside>
-  );
 }
 
 /** An agent's name as a label, in the primary colour; the CEO and Foreman
@@ -162,7 +76,7 @@ function Exchange({ message: m, name }: { message: TeamMessage; name: Names }) {
 
 /** Who calls whom: a box per agent, a line per pair that talked, with its
  * count (amber while a message between them waits). A click filters. */
-function CallMap({
+export function CallMap({
   roster,
   messages,
   filter,
@@ -193,7 +107,7 @@ function CallMap({
     filter !== null && "a" in filter && [filter.a, filter.b].sort().join() === [a, b].join();
   const status = (id: string) => roster.find((i) => i.id === id)?.status;
   return (
-    <div className="flex justify-center border-b border-line py-1.5">
+    <div className="flex justify-center py-1.5">
       <div className="relative" style={{ width, height }}>
         <svg width={width} height={height} className="absolute inset-0" aria-hidden="true">
           {pairs.map((l) => {
@@ -268,17 +182,15 @@ function CallMap({
 }
 
 /** A thread as one row: who asked whom, and how it stands. A click opens it
- * as a chat: the first message, then the replies. With team, the row names
- * its team (a project's Activity tab); without onOpen, it opens nowhere else. */
+ * as a chat: the first message, then the replies. Without onOpen, it opens
+ * nowhere else (an older session has no sessions). */
 export function ThreadRow({
   thread,
   name,
-  team,
   onOpen,
 }: {
   thread: Thread;
   name: Names;
-  team?: string;
   onOpen?: (instance: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -300,7 +212,6 @@ export function ThreadRow({
         className="flex w-full flex-col gap-1 px-4 py-2.5 text-left hover:bg-hover"
       >
         <span className="flex items-center gap-1.5">
-          {team && <TeamTag team={team} />}
           <Exchange message={m} name={name} />
           <span className="flex-1" />
           {state && (
@@ -444,9 +355,8 @@ function ActionText({ action: a }: { action: TeamAction }) {
             <>
               {" "}
               <Link
-                to="/projects/$project"
+                to="/projects/$project/inbox"
                 params={{ project: a.instance.split("@")[1] ?? "" }}
-                search={{ tab: "overview" }}
                 className="font-medium text-accTx hover:underline"
               >
                 Review it
@@ -461,20 +371,11 @@ function ActionText({ action: a }: { action: TeamAction }) {
 }
 
 /** One git tool call: who did what, then what happened in each repo (or why
- * it was refused). With team, the row names its team. */
-export function ActionRow({
-  action: a,
-  name,
-  team,
-}: {
-  action: TeamAction;
-  name: Names;
-  team?: string;
-}) {
+ * it was refused). */
+export function ActionRow({ action: a, name }: { action: TeamAction; name: Names }) {
   return (
     <div className="flex flex-col gap-1 border-b border-line bg-side/40 px-4 py-2">
       <span className="flex min-w-0 items-center gap-1.5">
-        {team && <TeamTag team={team} />}
         <NameTag id={a.instance} name={name} />
         <span className="min-w-0 truncate">
           <ActionText action={a} />
@@ -506,8 +407,32 @@ export function ActionRow({
   );
 }
 
-/** Which team a row is from, on a project's Activity tab: plain text, so the
- * agents' labels stay the loudest. */
-function TeamTag({ team }: { team: string }) {
-  return <span className="shrink-0 text-[11.5px] font-medium text-tx4">{team} ·</span>;
+/** What the map filters the rows to, and the way back to all of them. */
+export function FilterStrip({
+  filter,
+  name,
+  onClear,
+}: {
+  filter: NonNullable<Filter>;
+  name: Names;
+  onClear: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-[12.5px] text-tx3">
+      <span className="flex flex-1 items-center gap-1.5">
+        {"agent" in filter ? (
+          <>
+            Only <NameTag id={filter.agent} name={name} />
+          </>
+        ) : (
+          <>
+            Only <NameTag id={filter.a} name={name} /> and <NameTag id={filter.b} name={name} />
+          </>
+        )}
+      </span>
+      <button type="button" onClick={onClear} className="text-accTx">
+        Show all
+      </button>
+    </div>
+  );
 }

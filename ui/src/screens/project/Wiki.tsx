@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { isNotBuilt, type Node } from "../../api/client";
 import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
@@ -7,10 +7,14 @@ import { useToast } from "../../components/Toasts";
 import { Button, Dot, NotBuilt } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
+import { useProject } from "../Project";
 
-// The project's Overview: a reader for its wiki (wiki/product/features/wiki-reader.md).
+// A project's Wiki section: a reader for its wiki (wiki/product/features/wiki-reader.md),
+// the project's description at its head.
 
-export function Overview({ project, entry }: { project: string; entry?: string }) {
+export function Wiki() {
+  const { id: project, config } = useProject();
+  const { entry } = useSearch({ from: "/projects/$project/wiki" });
   const repo = useProjectRepo(project);
   const navigate = useNavigate();
   const toast = useToast();
@@ -23,12 +27,7 @@ export function Overview({ project, entry }: { project: string; entry?: string }
     toast({ title: path, body: e.message, color: "var(--err)" }),
   );
   const open = (p: string, replace = false) =>
-    navigate({
-      to: "/projects/$project",
-      params: { project },
-      search: { tab: "overview", entry: p },
-      replace,
-    });
+    navigate({ to: "/projects/$project/wiki", params: { project }, search: { entry: p }, replace });
   // Opening an entry, from anywhere, shows its top. The page scrolls in <main>.
   // biome-ignore lint/correctness/useExhaustiveDependencies: on every entry shown
   useEffect(() => {
@@ -43,20 +42,23 @@ export function Overview({ project, entry }: { project: string; entry?: string }
   }, [missing]);
   if (notBuilt)
     return (
-      <div className="px-12 pt-6">
+      <div className="px-6 pt-6">
         <NotBuilt what="the wiki" />
       </div>
     );
   // Without its files there is no wiki to read: the tree is irrelevant.
   if (lacking.some((m) => m.required))
     return (
-      <div className="px-12 pt-6">
+      <div className="px-6 pt-6">
         <WikiSetup project={project} missing={lacking} />
       </div>
     );
-  if (tree.error) return <p className="px-12 pt-6 text-[13px] text-err">{tree.error.message}</p>;
+  if (tree.error) return <p className="px-6 pt-6 text-[13px] text-err">{tree.error.message}</p>;
   return (
-    <div className="flex flex-col gap-5 px-12 pt-6 pb-16">
+    <div className="flex flex-col gap-5 px-6 pt-5 pb-12">
+      {config.description && (
+        <p className="m-0 max-w-[780px] text-[15px] text-tx3">{config.description}</p>
+      )}
       {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
       <div className="flex items-center gap-3">
         <Button
@@ -81,7 +83,8 @@ export function Overview({ project, entry }: { project: string; entry?: string }
             <Tree nodes={tree.data ?? []} current={path} depth={0} onOpen={open} />
           </nav>
         )}
-        <div className="min-w-0">
+        {/* A comfortable measure for reading, whatever the window's width. */}
+        <div className="min-w-0 max-w-[780px]">
           {current.data && (
             <WikiArticle
               project={project}

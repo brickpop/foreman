@@ -31,5 +31,5 @@ Not built: notifications from the OS rather than the browser, chosen in Settings
 ## Behaviour
 
 - Each notification is tagged per instance (`agent@project`), so a newer one replaces an older one from the same instance. The same tag also collapses duplicates when several Foreman tabs are open (every tab receives the event; the browser shows one notification per tag). To check in every browser in scope.
-- Clicking a notification (or its toast) focuses the Foreman tab and opens that instance's session; a review's opens the review's page in [Reviews](./reviews.md) instead (the CEO, 2026-10-21).
+- Clicking a notification (or its toast) focuses the Foreman tab and opens that agent in its project's [Session](./sessions.md); a review's opens the review's page in its project's [Inbox](./reviews.md#the-inbox) instead (the CEO, 2026-10-21).
 - Notifications are raised by any open Foreman tab; with several tabs open, only one shows each notification.

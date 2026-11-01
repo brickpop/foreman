@@ -69,21 +69,3 @@ func TestTheCEOsLineAndTheCountdown(t *testing.T) {
 		t.Errorf("bad body: %d", w.Code)
 	}
 }
-
-type fakeActions struct{}
-
-func (fakeActions) List(_ context.Context, deployment string) ([]store.TeamAction, error) {
-	return []store.TeamAction{{ID: 1, DeploymentID: deployment, Tool: "commit", Repos: []store.ActionRepo{{Repo: "api", Message: "cal v0"}}}}, nil
-}
-
-func TestActionsOfADeployment(t *testing.T) {
-	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Actions: fakeActions{}, UI: builtUI})
-	var list []map[string]any
-	decodeBody(t, get(t, h, "/api/actions?deployment=atlas%40ledger"), &list)
-	if len(list) != 1 || list[0]["tool"] != "commit" || list[0]["deploymentId"] != "atlas@ledger" {
-		t.Errorf("got %v", list)
-	}
-	if w := get(t, h, "/api/actions"); w.Code != http.StatusBadRequest {
-		t.Errorf("without a deployment: %d", w.Code)
-	}
-}

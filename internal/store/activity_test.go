@@ -8,15 +8,21 @@ import (
 	"testing"
 )
 
-// activityFixture: atlas and orion on ledger, atlas on relay, with messages
-// and actions at the given times (stored text, as Add writes it).
+// activityFixture: orion on ledger (stopped), then atlas on ledger and on
+// relay, with messages and actions at the given times (stored text, as Add
+// writes it).
 func activityFixture(t *testing.T, rows ...[3]string) *DB {
 	t.Helper()
 	db := open(t)
-	for _, d := range []string{"atlas@ledger", "orion@ledger", "atlas@relay"} {
+	for _, d := range []string{"orion@ledger", "atlas@ledger", "atlas@relay"} {
 		team, project, _ := strings.Cut(d, "@")
 		if _, err := db.Deployments().Deploy(ctx, team, project, ""); err != nil {
 			t.Fatal(err)
+		}
+		if d == "orion@ledger" { // a project has one team at a time
+			if err := db.Deployments().Stop(ctx, d, ""); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	for i, r := range rows { // {deployment, "m" or "a", created_at}
@@ -48,28 +54,29 @@ func labels(p ActivityPage) []string {
 	return out
 }
 
-// Newest first across both tables and the deployments asked for, by real
+// Newest first across both tables, of the deployment asked for only, by real
 // time: RFC 3339 with trimmed nanoseconds doesn't sort as text (".5Z" after
 // ".25Z", "05Z" after "05.5Z").
 func TestActivityIsNewestFirstAcrossTables(t *testing.T) {
 	db := activityFixture(t,
 		[3]string{"atlas@ledger", "m", "2026-10-17T10:00:05Z"},        // #0
-		[3]string{"orion@ledger", "a", "2026-10-17T10:00:05.5Z"},      // #1
+		[3]string{"atlas@ledger", "a", "2026-10-17T10:00:05.5Z"},      // #1
 		[3]string{"atlas@ledger", "a", "2026-10-17T10:00:05.25Z"},     // #2
 		[3]string{"atlas@relay", "m", "2026-10-17T10:00:09Z"},         // #3: another project
-		[3]string{"orion@ledger", "m", "2026-10-17T09:59:59.999999Z"}, // #4
+		[3]string{"orion@ledger", "m", "2026-10-17T10:00:08Z"},        // #4: another team, before
+		[3]string{"atlas@ledger", "m", "2026-10-17T09:59:59.999999Z"}, // #5
 	)
-	p, err := db.Activity().Page(ctx, []string{"atlas@ledger", "orion@ledger"}, "", 50)
+	p, err := db.Activity().Page(ctx, "atlas@ledger", "", 50)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := labels(p), []string{"a#1", "a#2", "m#0", "m#4"}; !slices.Equal(got, want) {
+	if got, want := labels(p), []string{"a#1", "a#2", "m#0", "m#5"}; !slices.Equal(got, want) {
 		t.Errorf("order %v, want %v", got, want)
 	}
 	if p.Next != "" {
 		t.Errorf("a next page after everything: %q", p.Next)
 	}
-	if p.Items[0].Action.DeploymentID != "orion@ledger" || p.Items[2].Message.Ref != "msg-0" {
+	if p.Items[0].Action.DeploymentID != "atlas@ledger" || p.Items[2].Message.Ref != "msg-0" {
 		t.Errorf("rows not read whole: %+v %+v", p.Items[0].Action, p.Items[2].Message)
 	}
 }
@@ -89,7 +96,7 @@ func TestActivityPages(t *testing.T) {
 		if pages > 5 {
 			t.Fatal("never ended")
 		}
-		p, err := db.Activity().Page(ctx, []string{"atlas@ledger"}, before, 3)
+		p, err := db.Activity().Page(ctx, "atlas@ledger", before, 3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,11 +122,11 @@ func TestActivityPages(t *testing.T) {
 func TestActivityRefusals(t *testing.T) {
 	db := activityFixture(t, [3]string{"atlas@ledger", "m", "2026-10-17T10:00:00Z"})
 	for _, c := range []string{"x", "1:z:2", "a:m:2", "1:m:b", "1:m"} {
-		if _, err := db.Activity().Page(ctx, []string{"atlas@ledger"}, c, 50); !errors.Is(err, ErrBadCursor) {
+		if _, err := db.Activity().Page(ctx, "atlas@ledger", c, 50); !errors.Is(err, ErrBadCursor) {
 			t.Errorf("cursor %q: %v", c, err)
 		}
 	}
-	if p, err := db.Activity().Page(ctx, nil, "", 50); err != nil || len(p.Items) != 0 {
-		t.Errorf("no deployments: %+v %v", p, err)
+	if p, err := db.Activity().Page(ctx, "nobody@nowhere", "", 50); err != nil || len(p.Items) != 0 {
+		t.Errorf("an unknown deployment: %+v %v", p, err)
 	}
 }

@@ -11,13 +11,20 @@ import (
 )
 
 // Deploy deploys team on project with goal and starts its lead; the other
-// members sleep until woken.
+// members sleep until woken. A project has one team at most: another team
+// deployed on it is stopped first, as by Stop.
 func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (store.Deployment, error) {
 	if err := m.blocked(); err != nil {
 		return store.Deployment{}, err
 	}
 	team, project, on, err := m.deployable(ctx, teamID, projectID)
 	if err != nil {
+		return store.Deployment{}, err
+	}
+	// One deploy at a time: two onto one project can't both replace its team.
+	m.deploying.Lock()
+	defer m.deploying.Unlock()
+	if err := m.replace(ctx, teamID, projectID); err != nil {
 		return store.Deployment{}, err
 	}
 	dep, err := m.Deployments.Deploy(ctx, teamID, projectID, goal)
@@ -39,6 +46,22 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	}
 	m.startQueued()
 	return dep, nil
+}
+
+// replace stops every other team's active deployment on project.
+func (m *Manager) replace(ctx context.Context, teamID, projectID string) error {
+	deps, err := m.Deployments.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, d := range deps {
+		if d.ProjectID == projectID && d.TeamID != teamID && d.Status == store.DeploymentActive {
+			if err := m.stop(ctx, d.ID, ""); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // Wake starts an asleep instance (the CEO's Start, or work arriving for it),

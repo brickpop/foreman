@@ -1,9 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useRef, useState } from "react";
-import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../api/client";
-import { type DiffLine, diffFiles, type FileDiff } from "../app/diff";
-import { agentOf, forgeOf, linkLine, mainOf, when } from "../app/model";
+import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
+import { type DiffLine, diffFiles, type FileDiff } from "../../app/diff";
+import { agentOf, forgeOf, linkLine, mainOf, when } from "../../app/model";
+import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
   useDeployments,
@@ -12,7 +13,7 @@ import {
   useReviewChange,
   useReviewDiff,
   useTeams,
-} from "../app/queries";
+} from "../../app/queries";
 import {
   commentAt,
   type DismissChoice,
@@ -32,10 +33,10 @@ import {
   placeComments,
   reviewTeam,
   statusLabel,
-} from "../app/reviews";
-import { Avatar } from "../components/Avatar";
-import { useToast } from "../components/Toasts";
-import { Button, Empty, Loading, SectionLabel, Segmented } from "../components/ui";
+} from "../../app/reviews";
+import { Avatar } from "../../components/Avatar";
+import { useToast } from "../../components/Toasts";
+import { Button, Empty, Loading, SectionLabel, Segmented } from "../../components/ui";
 
 // One review of a lead's branch (wiki/product/features/reviews.md): its files
 // by repo, each file's diff with the CEO's comments on its lines, the general
@@ -57,9 +58,9 @@ type Comments = {
 const fileId = (repo: string, path: string) => `file:${repo}/${path}`;
 
 export function Review() {
-  const { review: id } = useParams({ from: "/reviews/$review" });
-  const search = useSearch({ from: "/reviews/$review" });
-  const navigate = useNavigate({ from: "/reviews/$review" });
+  const { review: id } = useParams({ from: "/projects/$project/inbox/$review" });
+  const search = useSearch({ from: "/projects/$project/inbox/$review" });
+  const navigate = useNavigate({ from: "/projects/$project/inbox/$review" });
   const review = useReview(id);
   const v = review.data;
   const since = search.since === true && v !== undefined && hasSince(v);
@@ -123,38 +124,30 @@ export function Review() {
   // moves the diffs, never the tree.
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 flex-col gap-2 border-b border-line px-12 pt-10 pb-5">
+      <header className="flex shrink-0 flex-col gap-2 border-b border-line px-6 pt-5 pb-4">
         <div className="flex items-center gap-3">
           <Link
-            to="/reviews"
-            aria-label="Back to Reviews"
-            title="Reviews"
+            to="/projects/$project/inbox"
+            params={{ project: v.projectId }}
+            aria-label="Back to the Inbox"
+            title="Inbox"
             className="grid size-8 shrink-0 place-items-center rounded-md border border-line2 text-tx3 hover:border-line3 hover:text-tx"
           >
             ←
           </Link>
-          <h1 className="min-w-0 text-[26px] font-semibold tracking-[-0.02em]">
+          <h1 className="min-w-0 text-[22px] font-semibold tracking-[-0.02em]">
             {v.title || v.entry || v.branch}
           </h1>
         </div>
         <p className="flex flex-wrap items-center gap-2 text-[14px] text-tx3">
           <Avatar look={lead?.soul.look} size={20} />
           <span>
-            {lead?.soul.name ?? v.lead} on{" "}
+            {lead?.soul.name ?? v.lead} ·{" "}
             <Link
-              to="/projects/$project"
+              to="/projects/$project/repos"
               params={{ project: v.projectId }}
-              search={{ tab: "worktrees" }}
-              className="text-tx2 hover:text-tx"
-            >
-              {v.projectId}
-            </Link>{" "}
-            ·{" "}
-            <Link
-              to="/projects/$project"
-              params={{ project: v.projectId }}
-              search={{ tab: "repositories", repo: v.mergeRequests[0]?.repo, branch: v.branch }}
-              title="Read the branch in Repositories"
+              search={{ repo: v.mergeRequests[0]?.repo, branch: v.branch }}
+              title="Read the branch in Repos"
               className="font-mono text-tx2 hover:text-tx"
             >
               {v.branch}
@@ -170,8 +163,7 @@ export function Review() {
                 {" "}
                 Superseded by{" "}
                 <Link
-                  to="/reviews/$review"
-                  params={{ review: v.supersededBy }}
+                  {...reviewOf(v.projectId, v.supersededBy)}
                   className="font-mono text-tx2 hover:text-tx"
                 >
                   {v.supersededBy}
@@ -276,7 +268,7 @@ export function Review() {
 }
 
 function Page({ children }: { children?: ReactNode }) {
-  return <div className="flex min-h-full flex-col gap-6 px-12 pt-10">{children}</div>;
+  return <div className="flex min-h-full flex-col gap-6 px-6 pt-5">{children}</div>;
 }
 
 const lineLook: Record<DiffLine["kind"], string> = {
@@ -547,6 +539,9 @@ function DecisionBar({
   dismissAs: DismissChoice[];
   failed: (e: Error) => void;
 }) {
+  const navigate = useNavigate();
+  // A decision made, the Inbox's next one is the next thing to do.
+  const back = () => navigate({ to: "/projects/$project/inbox", params: { project: v.projectId } });
   const toast = useToast();
   const queries = useQueryClient();
   const [unticked, setUnticked] = useState<Set<string>>(new Set());
@@ -587,7 +582,7 @@ function DecisionBar({
     setUnticked(next);
   };
   return (
-    <footer className="flex shrink-0 flex-col gap-3 border-t border-line bg-side px-12 py-4">
+    <footer className="flex shrink-0 flex-col gap-3 border-t border-line bg-side px-6 py-3">
       {v.status === "changes-requested" && (
         <p className="text-[13.5px] text-tx3">
           Changes requested: waiting on {lead} to fix them and ask again.
@@ -625,12 +620,16 @@ function DecisionBar({
           onClick={() =>
             heads &&
             merge.mutate(heads, {
-              onSuccess: () =>
+              onSuccess: () => {
                 toast({
                   title: "Merged",
                   body: ticked.map((r) => `${r.repo} → ${r.main}`).join(", "),
                   color: "var(--ok)",
-                }),
+                  // To watch the lead pick it up.
+                  onOpen: () => navigate(sessionOf(v.lead)),
+                });
+                back();
+              },
             })
           }
         >
@@ -642,7 +641,13 @@ function DecisionBar({
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (form === "changes") changes.mutate(text.trim(), { onSuccess: done });
+            if (form === "changes")
+              changes.mutate(text.trim(), {
+                onSuccess: () => {
+                  done();
+                  back();
+                },
+              });
             else
               dismiss.mutate(dismissing, {
                 onSuccess: (dismissed) => {
@@ -658,6 +663,7 @@ function DecisionBar({
                       body: keptLines(dismissed),
                       color: "var(--err)",
                     });
+                  back();
                 },
               });
           }}

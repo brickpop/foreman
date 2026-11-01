@@ -18,7 +18,7 @@ Three actors, and every interaction enters through exactly one channel:
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
-| CEO | Answering a request (Dashboard, project Overview) | `Answer` | Web server → **Workflow** `Resolve` |
+| CEO | Answering a request (Dashboard, project Inbox) | `Answer` | Web server → **Workflow** `Resolve` |
 | CEO | On a [review](../models/review.md): comments, Request changes, Merge (the repos ticked), Dismiss; later Create PR on the forge | `ReviewAction` | Web server → **Workflow** |
 | Foreman | Process exit, silence, rate limit, git or build error | internal | **Instance manager** / **Workflow** → blocked [request](#requests) |
 | Foreman | Forge poll, project-repo watch | internal | **Workflow** → [merge request](#work-items-and-merge-requests) transitions |
@@ -92,7 +92,7 @@ Whenever the harness reports it is waiting for the user, Workflow raises a reque
 Anything Foreman writes into a session's terminal is **typed input**: harnesses are full-screen programs that read the terminal as their keyboard. So there are two different things, never mixed:
 
 - A **delivery** is text the agent must read: a teammate's ask, a reply, a handoff to the lead, the CEO's answer, a "main moved" notice. Messaging hands it to `Instances.Deliver`, which waits until the recipient is `idle` and then calls the harness adapter's `Deliver` (type the text, then submit). It starts a turn. **A delivery is always one line of plain words, with no symbols** (the CEO's decisions, 2026-10-15): a multi-line paste reaches Claude Code wrapped as pasted content, which it treats as possibly not the user's ([experiment D](../../backlog/archive/prove-d-claude-delivery-hooks.md)). A message's notice names it and quotes its start; the agent reads the whole message with `read_message`. Foreman's own notices are short sentences that fit the line.
-- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (msg-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) shown **beside** the terminal, in the Activity panel ([Sessions](../features/sessions.md#activity)). It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
+- A **marker** is a note for the CEO's eyes only: "Mara asked Rhea (msg-41)", "Merge requested: lead/atlas/integration". It is a UI event (`instance.marker`) meant for the project's [Activity](../features/project-activity.md#the-timeline) (not shown yet), apart from the terminal. It is **never** written into the PTY, where it would corrupt the program's screen or be read as an instruction.
 
 Every delivery is also shown as a marker. Delivered text is untrusted data: it is framed with its sender and capped ([Team tools → Delivery](./team-tools.md#delivery)).
 
@@ -249,7 +249,7 @@ type ContributeResult struct { Path string }                            // "proj
 
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter. A body is at most 32,000 characters: it becomes a file, not a line in the lead's conversation, so a whole design record fits (the CEO, 2026-10-19; messages keep 8,000). Limits count characters, not bytes. A taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in project/wiki/inbox/<file>.` The lead decides what becomes of it.
-- Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the Activity panel shows the title.
+- Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the project's Activity shows the title.
 - Errors: `bad_kind`, `too_long`.
 
 ### `escalate`
@@ -284,7 +284,7 @@ type RequestMergeResult struct { Review string; MergeRequests []string; Refreshe
 - Delivered to the lead when done: `From Foreman: merge requested for lead/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/atlas/settlement-v2`, then the outcome.
 - Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (merging it would change nothing, in any repo), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
-- Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the Activity panel; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on the Dashboard or on the project's Overview.
+- Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the project's Activity; the result names the merge requests (`Merge request mr-1 (api): waiting for the CEO.`, `refreshed` for one that was open), and the CEO decides on the review's page, in the project's Inbox.
 
 ### `withdraw_merge`
 
@@ -329,7 +329,7 @@ type WithdrawMergeArgs struct { Branch, Reason, SupersededBy string } // branch,
 
 ## Messages
 
-Messaging's unit: one `ask`, `reply`, `handoff` or `contribute` notice between two instances of one deployment, or a delivery Foreman originates. Stored as a [team message](../models/team-message.md) (agent-to-agent kinds) for the Activity panel.
+Messaging's unit: one `ask`, `reply`, `handoff` or `contribute` notice between two instances of one deployment, or a delivery Foreman originates. Stored as a [team message](../models/team-message.md) (agent-to-agent kinds) for the project's Activity.
 
 ```go
 type Message struct {
@@ -380,7 +380,7 @@ type TeamAction struct {
 type ActionRepo struct { Repo, Branch, Message, Commit string; Created bool; Conflicts []string } // Message: commit's, for this repo; set_submodule's, which says what it did
 ```
 
-Shown in the [Activity](../features/sessions.md#activity) panel, between the threads.
+Shown in the project's [Activity](../features/project-activity.md#the-timeline), between the threads.
 
 ## Requests
 
@@ -480,16 +480,16 @@ Every state change is published on the in-process event bus; the web server stre
 
 | Event | Payload | Emitted by | Used by |
 |---|---|---|---|
-| `instance.status` | instance id, status, task | Instance manager | Sessions tabs, Dashboard, Project and Team rows, avatars |
-| `instance.doing` | instance id, its activity line and when ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | Instance manager, from the harness's hooks | Project settings rows; the agent Sessions opens on |
-| `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The marker strip on Sessions panes, the Messages drawer |
-| `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity panel |
-| `team.action` | an [action](#team-actions), once recorded | Workflow | Activity panel |
-| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, project Overview, sidebar badges, notifications |
-| `pipeline.changed` | the work item or merge request | Workflow | project Overview (Needs you) and Worktrees |
-| `review.withdrawn` | the review, its deployment and lead, `by` (`lead` or `foreman`), how many of the CEO's draft comments went with it | Workflow | Reviews, the toast warning of lost drafts |
-| `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Team page, Sessions |
-| `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Overview, Board, Settings |
+| `instance.status` | instance id, status, task | Instance manager | Session's agent tabs, Dashboard, Deployment and Team rows, avatars |
+| `instance.doing` | instance id, its activity line and when ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | Instance manager, from the harness's hooks | Deployment rows |
+| `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The project's Activity (not shown yet) |
+| `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity |
+| `team.action` | an [action](#team-actions), once recorded | Workflow | Activity |
+| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, Inbox, sidebar badges, notifications |
+| `pipeline.changed` | the work item or merge request | Workflow | Inbox and Deployment (In flight, Merged) |
+| `review.withdrawn` | the review, its deployment and lead, `by` (`lead` or `foreman`), how many of the CEO's draft comments went with it | Workflow | Inbox, the toast warning of lost drafts |
+| `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Dashboard, Team page, Session, Deployment |
+| `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Wiki, Board, Settings |
 
 ## Invariants
 

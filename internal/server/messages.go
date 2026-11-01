@@ -21,62 +21,26 @@ type Messages interface {
 	PauseCountdown(instance string, paused bool)
 }
 
-// Actions is the git tools agents called (implemented by the state store).
-type Actions interface {
-	List(ctx context.Context, deployment string) ([]store.TeamAction, error)
-}
-
-func actionRoutes(mux *http.ServeMux, a Actions) {
-	mux.HandleFunc("GET /api/actions", func(w http.ResponseWriter, r *http.Request) {
-		deployment := r.URL.Query().Get("deployment")
-		if deployment == "" {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?deployment=<team@project>")
-			return
-		}
-		list, err := a.List(r.Context(), deployment)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, list)
-	})
-}
-
 // Activity pages team traffic, messages and git actions together (implemented
 // by the state store).
 type Activity interface {
-	Page(ctx context.Context, deployments []string, before string, limit int) (store.ActivityPage, error)
+	Page(ctx context.Context, deployment, before string, limit int) (store.ActivityPage, error)
 }
 
 // activityPage is how many items a page of activity holds (the CEO, 2026-10-17).
 const activityPage = 50
 
-// activityRoutes serve a project's Activity tab: its active deployments'
-// traffic merged, or one deployment's (an older session).
-func activityRoutes(mux *http.ServeMux, act Activity, a Agents) {
+// activityRoutes serve a project's Activity section: one deployment's
+// traffic, the team on the project or an older session.
+func activityRoutes(mux *http.ServeMux, act Activity) {
 	mux.HandleFunc("GET /api/activity", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		project, deployment := q.Get("project"), q.Get("deployment")
-		var deployments []string
-		switch {
-		case (project == "") == (deployment == ""):
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?project=<id> or ?deployment=<team@project>")
+		deployment := q.Get("deployment")
+		if deployment == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?deployment=<team@project>")
 			return
-		case deployment != "":
-			deployments = []string{deployment}
-		default:
-			active, err := a.DeploymentsIn(r.Context(), store.DeploymentActive)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
-				return
-			}
-			for _, d := range active {
-				if d.ProjectID == project {
-					deployments = append(deployments, d.ID)
-				}
-			}
 		}
-		page, err := act.Page(r.Context(), deployments, q.Get("before"), activityPage)
+		page, err := act.Page(r.Context(), deployment, q.Get("before"), activityPage)
 		switch {
 		case errors.Is(err, store.ErrBadCursor):
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "a bad ?before= cursor")

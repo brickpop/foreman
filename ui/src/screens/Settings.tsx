@@ -17,7 +17,7 @@ export function Settings() {
   const file = useSettings();
   const s = file.data?.settings;
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-9 px-12 pt-12 pb-16">
+    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-9 px-6 pt-6 pb-12">
       <div className="flex flex-col gap-4">
         <PageTitle title="Settings" />
         <nav className="flex flex-wrap border-b border-line">

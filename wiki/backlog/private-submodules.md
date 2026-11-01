@@ -29,7 +29,7 @@ Foreman is doing what it was designed to do ([Sandboxes and git policy → Submo
 - **An allowlist in Project settings.** The CEO names the remote repos Foreman may fetch with their credentials. More explicit, but one more thing to maintain.
 - **Both of the first two:** local first, then the CEO's credentials for URLs on `main`.
 
-**Also, in any case:** a submodule that couldn't be filled at a start is told to the agent (in its first message, like the `your worktrees hold earlier work` notice) and shown to the CEO (a finding, or a line on the Sessions page), with what to do.
+**Also, in any case:** a submodule that couldn't be filled at a start is told to the agent (in its first message, like the `your worktrees hold earlier work` notice) and shown to the CEO (a finding, or a line in the project's Session), with what to do.
 
 **Edge cases:** an scp-like URL (`git@host:org/repo.git`) and an `ssh://` one; a URL relative to the repo's remote (`../platform-doc.git`); nested submodules with `recursive_submodules`; a submodule whose URL on the agent's branch differs from the one on `main` (same name, new URL: not approved); the CEO's checkout never having run `submodule update`; a pin present locally under another submodule name.
 

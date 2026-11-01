@@ -8,7 +8,7 @@ tags: [feature, pipeline, git, forge]
 
 How work moves from a member's worktree to `main`. Only the team **lead** asks for changes to reach `main`, with a **merge request**; only the **CEO** decides, on the branch's [review](./reviews.md): Merge (Foreman merges locally), Request changes, or Dismiss; Create PR on the forge comes later. Nothing reaches a forge unless the CEO asks. Branch rules: [Sandboxes and git policy](../architecture/sandboxes-and-git.md). Forge calls: [Forge adapters](../architecture/forge-adapters.md).
 
-The pipeline has two kinds of entries, both shown in the [project pipeline](./project-pipeline.md) (In flight and Merged on [Worktrees](./worktrees.md)). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests ([Merge request → Phasing](../models/merge-request.md#phasing)); since 2026-10-21 decided on their branch's page in [Reviews](./reviews.md).
+The pipeline has two kinds of entries, both shown in the [project pipeline](./project-pipeline.md) (In flight and Merged in the project's [Deployment](./project-deployment.md) section). Built so far (2026-10-17): work items ([Work item → Phasing](../models/work-item.md#phasing)) and merge requests ([Merge request → Phasing](../models/merge-request.md#phasing)); since 2026-10-21 decided on their branch's page in [Reviews](./reviews.md).
 
 - **Work items** ([model](../models/work-item.md)): one agent's branch on its way into the lead branch. Informational only: a handoff never creates a request and needs nothing from the CEO.
 - **Merge requests** ([model](../models/merge-request.md)): the lead's request to merge a lead branch into `main`, carrying every work item integrated since the last one. A merge request is the only pipeline entry that raises a [request](./requests.md): the **review**.
@@ -24,7 +24,7 @@ Approvals, questions, findings and blocked requests are independent of the pipel
 | 2 | lead reviewing | The handoff is delivered into the lead's session. Requesting changes (an `ask` to the author) moves nothing; the author's next hand-off of the branch brings it back to stage 1 ([Protocol → Work items and merge requests](../architecture/protocol.md#work-items-and-merge-requests)) |
 | 3 | integrated | Merged into one of the lead's `lead/<team>/*` branches in the lead's worktree; checks run |
 
-Each work item carries a short **note**. Worktrees → In flight colors it by a **tone** (`ok`, `err`, `ask`, neutral) derived from the work item's state, never stored, e.g. "checks pass" (`ok`) or "2 review comments" (`ask`).
+Each work item carries a short **note**. Deployment → In flight colors it by a **tone** (`ok`, `err`, `ask`, neutral) derived from the work item's state, never stored, e.g. "checks pass" (`ok`) or "2 review comments" (`ask`).
 
 ## Review and merge
 

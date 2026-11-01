@@ -17,7 +17,7 @@ The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10
 
 **Each section says where it is kept**, after its label (` · Global repo`, `--tx4`, not bold): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **Global repo + this machine** (hosts in the global repo, tokens on this machine; [secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
 
-Padding `48px 48px 64px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent) and the [projects folder](#projects), which save on **Save** (Discard drops the edit).
+Padding `24px 24px 48px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent) and the [projects folder](#projects), which save on **Save** (Discard drops the edit).
 
 ## Instructions for every agent
 

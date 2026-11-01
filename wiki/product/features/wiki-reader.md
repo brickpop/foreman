@@ -6,18 +6,15 @@ tags: [feature, ui, wiki]
 
 # Wiki reader
 
-The project's **Overview** tab: a reader for the project's wiki bundle (`wiki/` in its project repo, `<workspace>/project/wiki/`), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only. Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
+The project's **Wiki** section ([Project page](./project-page.md); Overview until 2026-10-31): a reader for the project's wiki bundle (`wiki/` in its project repo, `<workspace>/project/wiki/`), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only (what waits on the CEO is in the [Inbox](./reviews.md#the-inbox)). Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
 
-## Project header and tabs
+## The description
 
-Shared by every project tab:
-
-- Header: the project name (H1), under it the project repo's path as its subtitle (Mono 12.5px `--tx4`, e.g. `~/workspace/foreman/ledger/project`; the CEO, 2026-10-17), then its description (15px `--tx3`), from [Project config](../models/project-config.md). Top right, the way **to the work**, so the CEO never has to look for it: one **`<Team> · Sessions`** link per team with sessions on the project (outline, as the [Sessions](./sessions.md) toolbar's `<project> · Board` link back; the CEO, 2026-10-17), opening that team's sessions on the agent with the latest [activity line](../architecture/harness-adapters.md#activity-lines) (where the work is; the lead when none has one). "With sessions" is what Sessions shows a tab for, so a link here always leads somewhere. With none, a primary **`Deploy a team`**, opening [Deploy a team](./deploy-team.md) for this project.
-- Tabs (padding `9px 14px`, 500): `Overview · Board · Repositories · Worktrees · Activity · Settings` (the CEO, 2026-10-17; Worktrees since 2026-10-21). Active: `--tx` with a 2px `--acc` bottom border over the 1px `--line` rule; inactive `--tx3`. **Overview** carries a count badge of the project's open requests, and opens with **Needs you** when something waits ([Project pipeline](./project-pipeline.md)). **Repositories** holds the work in flight, what merged, and the repos ([Repositories](./repositories.md)). Switching tabs closes the side sheet. Every tab's body has the same sides as the header (48px) and uses the full width, so the tabs line up. **Activity** is the teams' traffic on the project ([Project activity](./project-activity.md)).
+The section opens with the project's description (15px `--tx3`, at most 780px), from [Project config](../models/project-config.md), when it has one. The old project header (name, path, `<Team> · Sessions` links, tabs) is gone since 2026-10-31: the name and sections are in the [sidebar](./app-shell.md#sidebar), the work in [Session](./sessions.md), the path in [Settings](./project-settings.md) (`<path>/project.toml · read-only`).
 
 ## Layout
 
-A grid (gap 32) using the full width. Tree closed: the article alone, `minmax(0, 1fr)`. Tree open: `minmax(150px, 200px) minmax(0, 1fr)`, so the article shrinks by the tree. Body padding `24px 48px 64px`.
+A grid (gap 32) using the full width. Tree closed: the article alone, `minmax(0, 1fr)`. Tree open: `minmax(150px, 200px) minmax(0, 1fr)`, so the article shrinks by the tree. Body padding `20px 24px 48px`; the article at most 780px wide.
 
 ## Toolbar
 
@@ -62,13 +59,13 @@ No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side,
 
 ## Behaviour
 
-- **Opening an entry** (tree, link, board "Open in wiki"): shows it, switches to Overview, closes the side sheet, marks the entry seen, scrolls to the top. An unknown path falls back to `index.md`.
+- **Opening an entry** (tree, link, board "Open in wiki"): shows it in the Wiki section (`?entry=<path>`), closes the side sheet, marks the entry seen, scrolls to the top. An unknown path falls back to `index.md`.
 - **Ticking a checkbox** writes that one character to the file atomically, guarded by the entry's version; on conflict the box reverts and an error toast explains it ([API](../architecture/api.md), `PUT /api/wiki/:project/checkbox/:path`).
 - **File changes** (agents or the CEO's editor) appear within about 1 s ([Persistence](../architecture/persistence.md)): the open entry re-renders, and changed entries get their dot.
 - Prose is read-only. The only writes are a checkbox tick here and a card move on the [Board](./board.md).
 
 ## No wiki yet
 
-A project repo can lack the files the reader and the [Board](./board.md) need: one whose files were deleted, or a cloned one that never had them ([Add a project → Effect](./add-project.md#effect)). Then **Overview and Board** show, instead of the reader or the board (the tree is irrelevant without a wiki; the CEO, 2026-10-17), a dashed placeholder: `This project's wiki isn't set up yet.`, `Foreman reads it once its project repo has:` and each missing file (Mono, `<project>/project/<file>`), then a primary **`Create them`** (`Create it` for one). It writes each missing file of the [scaffold](./add-project.md#effect), never over one that exists, and commits them in the project repo as the CEO (`Project repo: add …`); the wiki appears as the watcher picks it up. `GET` / `POST /api/projects/:id/scaffold` ([API](../architecture/api.md)). Any other failure to read the wiki shows its message, never a blank page.
+A project repo can lack the files the reader and the [Board](./board.md) need: one whose files were deleted, or a cloned one that never had them ([Add a project → Effect](./add-project.md#effect)). Then the **Wiki and Board** sections show, instead of the reader or the board (the tree is irrelevant without a wiki; the CEO, 2026-10-17), a dashed placeholder: `This project's wiki isn't set up yet.`, `Foreman reads it once its project repo has:` and each missing file (Mono, `<project>/project/<file>`), then a primary **`Create them`** (`Create it` for one). It writes each missing file of the [scaffold](./add-project.md#effect), never over one that exists, and commits them in the project repo as the CEO (`Project repo: add …`); the wiki appears as the watcher picks it up. `GET` / `POST /api/projects/:id/scaffold` ([API](../architecture/api.md)). Any other failure to read the wiki shows its message, never a blank page.
 
 Only the files the wiki can't be read without (`wiki/wiki.toml`, `wiki/index.md`) bring up the placeholder. The rest of the scaffold (`AGENTS.md`, `.gitignore`, `product/index.md`, `backlog/index.md`, `technical-debt.md`) leaves the wiki and the board in place, with a one-line **notice** above them (the CEO, 2026-10-17): each missing file (Mono) and what goes wrong without it (`AGENTS.md is missing: the agents don't know how this project's wiki and tasks work.`), and a **`Create it`** / **`Create them`** button doing the same as the placeholder's. Each missing file's reason comes from the server, with whether it is required.

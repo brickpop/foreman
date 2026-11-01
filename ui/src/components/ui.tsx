@@ -39,11 +39,7 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
   );
 }
 
-/** A link that looks like an outline button: the ways between Sessions and a project. */
-export const outlineLink =
-  "rounded-[7px] border border-line2 px-3 py-[5px] text-[13px] font-medium text-tx2 hover:border-line3";
-
-/** A card on a grid of cards (Dashboard, Sessions). */
+/** A card on a grid of cards (Dashboard). */
 export const card =
   "relative flex flex-col gap-3 rounded-xl border border-line bg-panel px-4 py-3.5";
 /** A card's title link covering the whole card; its other controls sit above it. */
@@ -110,13 +106,11 @@ export function KindChip({ kind }: { kind: string }) {
   );
 }
 
-/** The amber count badge (sidebar, tabs). */
-export function CountBadge({ count, small }: { count: number; small?: boolean }) {
+/** The amber count badge (the sidebar's Inbox). */
+export function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span
-      className={`bg-acc font-mono font-semibold text-accInk ${small ? "rounded-[9px] px-1.5 py-px text-[10.5px]" : "rounded-[10px] px-[7px] py-px text-[11px]"}`}
-    >
+    <span className="rounded-[9px] bg-acc px-1.5 py-px font-mono text-[10.5px] font-semibold text-accInk">
       {count}
     </span>
   );

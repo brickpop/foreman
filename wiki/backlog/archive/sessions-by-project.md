@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: medium
 tags: [feature, ui]
 epic: terminal-multiplexer
@@ -8,7 +8,7 @@ epic: terminal-multiplexer
 
 # Sessions: a list of deployments, and a page per deployment
 
-**Why:** [Sessions](../product/features/sessions.md) shows one deployment at a time, picked with tabs at the top, and its agents with a second row of tabs. The CEO wants to see every session at a glance, and to open two sessions in two browser tabs side by side (the CEO, 2026-10-22).
+**Why:** [Sessions](../../product/features/sessions.md) shows one deployment at a time, picked with tabs at the top, and its agents with a second row of tabs. The CEO wants to see every session at a glance, and to open two sessions in two browser tabs side by side (the CEO, 2026-10-22).
 
 ## What the CEO asked
 
@@ -28,7 +28,7 @@ epic: terminal-multiplexer
 - **Split goes**: two agents side by side are two browser tabs. The URL names the deployment and the agent, no panes.
 - **The branch shows on the selected agent's tab** only, so the other tabs stay short.
 
-**Done when:** each deployment has its own page, with the URL as the view; the branch shows; [Sessions](../product/features/sessions.md) describes the new layout.
+**Done when:** each deployment has its own page, with the URL as the view; the branch shows; [Sessions](../../product/features/sessions.md) describes the new layout.
 
 ## Built (2026-10-25)
 
@@ -84,3 +84,7 @@ The list "made no sense": what the CEO follows is the project, not which agent i
 - [x] `DeploymentMenu` (Radix dropdown), the `/reviews` route's `project`, `reviewProjects`, `agentStep` / `stepAgent`; tests for the helpers and the keys (each platform, the keys left to the agent, the ends)
 - [x] specs: Sessions (Header, Agent tabs), Reviews
 - [ ] tried by the CEO in the browser
+
+## Superseded (the CEO, 2026-10-31)
+
+The Sessions list and its `/sessions` URL went with [The project is the workplace](../project-workplace.md): a session is now the Session section of its project. The unticked "tried by the CEO" steps above carry over to that card.

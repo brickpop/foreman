@@ -20,7 +20,7 @@ const atlas = {
   },
 } as unknown as Team;
 
-describe("the Repositories tab's model", () => {
+describe("the Repos section's model", () => {
   it("names whose branch it is", () => {
     expect(branchOwner("wt/tove/LED-44", [atlas])).toBe("Tove");
     expect(branchOwner("lead/atlas/integration", [atlas])).toBe("Mara");

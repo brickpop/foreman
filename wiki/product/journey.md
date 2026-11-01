@@ -27,7 +27,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **5. Add the project.** Sidebar → **+ New project** asks for a name, `ledger`, and a project repo: **New**. Then its repos: the CEO picks `~/dev/ledger-api` in the folder browser → **Add repo**, then **Done** ([Add a project](./features/add-project.md)).
 - *Under the hood:* Home & config stores the project record (`POST /api/projects`) and creates the project repo `~/workspace/foreman/ledger/project/`: `git init`, `project.toml` (`forge`), `AGENTS.md` and a starter `wiki/` with `index.md` and `wiki.toml` (one Backlog board), as its first commit. Adding `ledger-api` (`POST /api/projects/ledger/repos`) checks it is a git repo with a commit, inside the CEO's home folder, and keeps its path and root commit on the record. The sidebar updates through the Event bus (`projects.changed`).
 
-**6. Read the project.** Project → **Overview** shows the wiki's `index.md`; **Board** shows the Backlog board (empty); **Settings** shows `project.toml` read-only.
+**6. Read the project.** Sidebar → **ledger** opens its **Wiki** (no team yet), which shows the wiki's `index.md`; **Board** shows the Backlog board (empty); **Settings** shows `project.toml` read-only.
 - *Under the hood:* Wiki block (the agentic-wiki engine reads the bundle `~/workspace/foreman/ledger/project/wiki/`; markdown rendered on the server; links resolved by the engine).
 
 **7. Create a team.** Sidebar → **+ New team** opens the Chief of Staff page, its terminal full width. The CEO types "A team to build features for ledger", answers its questions, and the preview opens beside the terminal: Atlas, its playbook, a tab per member (lead, two engineers). **Adjust team** → "make Ilya a reviewer" → a new preview → **Create Atlas**.
@@ -50,7 +50,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
   7. **Kickoff:** only Mara, the lead, starts now: her harness starts with the goal as its opening message (`Your goal on ledger: …`), so she starts working at once. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
-**10. Watch.** Dashboard: "4 sessions working across 1 deployment". **Sessions** → the Atlas card under ledger → Mara's terminal (the lead's tab is first).
+**10. Watch.** Dashboard: "4 sessions working across 1 projects". The ledger card → its **Session** → Mara's terminal (the lead's tab is first).
 - *Under the hood:* Web server → Terminal `Attach` → a View: the snapshot of Mara's screen, then live output (WebSocket, raw bytes).
 
 **11. Talk to the lead.** The CEO types into Mara's terminal: "Use the existing request-id header; keep the API backwards compatible."
@@ -60,7 +60,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 - *Under the hood:* the agent edits files in the live project repo, mounted read-write for her (its `.git` read-only), and calls `commit()`, which Foreman runs on the host; Foreman's file watcher notices; the Wiki block re-reads; the Event bus updates the Board and the "changed" dot in the reader.
 
 **13. The lead delegates.** Mara calls the team tool `ask(tove, "Take LED-44 …")`.
-- *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `msg-41` queued for `tove@ledger`; `ask` returns `msg-41` at once, Mara keeps working. "Mara asked Tove" shows in the team's Activity panel (UI only).
+- *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `msg-41` queued for `tove@ledger`; `ask` returns `msg-41` at once, Mara keeps working. "Mara asked Tove" shows in the project's Activity (UI only).
 
 **14. The engine wakes the teammate.** Tove is idle, so Messaging delivers: the text appears in Tove's terminal as if typed, and she starts.
 - *Under the hood:* Instance manager knows Tove is `idle` (her last hook event); Messaging → `Instances.Deliver` → Harness adapter `Deliver` (types the text, then Enter) → Terminal `Input`. Tove's next hook says `busy`. Had she been busy, the message would wait for her next `idle`.
@@ -69,7 +69,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 - *Under the hood:* the work is plain tools inside her container (git there is read-only: `status`, `diff`, `log`), which the CEO can watch live in her pane. `switch` and `commit` go through the Agent link to Workflow, and Git makes the branch and the commit on the host in her worktree, authored as Tove. `contribute` goes through the Agent link to Workflow, which writes `project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md` (author from her token) and has Messaging deliver "⇄ Tove contributed: Flaky settle test (…)" to Mara at her next idle, with a marker.
 
 **16. Hand-off.** Tove calls `handoff(mara, "wt/tove/LED-44", "Idempotency keys, tests pass")`.
-- *Under the hood:* Workflow commits anything Tove left uncommitted, checks the branch against the policy and creates a work item (stage *handed to lead*). Nothing is fetched: Tove's and Mara's worktrees share the repo, so Mara sees the branch at once (agents never push anywhere, and nothing goes to the forge yet). Messaging delivers "Tove handed off wt/tove/LED-44: …" to Mara at her next idle; marker shown; the project's Repositories tab shows the item under In flight.
+- *Under the hood:* Workflow commits anything Tove left uncommitted, checks the branch against the policy and creates a work item (stage *handed to lead*). Nothing is fetched: Tove's and Mara's worktrees share the repo, so Mara sees the branch at once (agents never push anywhere, and nothing goes to the forge yet). Messaging delivers "Tove handed off wt/tove/LED-44: …" to Mara at her next idle; marker shown; the project's Deployment section shows the item under In flight.
 
 **17. Integration.** Mara reviews the branch (`git diff` in her worktree) and merges it into `lead/atlas/integration` with `merge("wt/tove/LED-44")`.
 - *Under the hood:* `merge` → Workflow → Git merges the branch on the host, in Mara's worktree (a conflict would leave markers for her to resolve, then `commit`). Workflow notices the integration through Git (the branch is contained in a `lead/atlas/*` branch) when Mara next goes idle: the work item moves to *integrated*. (If she wanted changes instead: an `ask` back to Tove, which moves nothing; his next hand-off of the branch brings the work item back to her: [Protocol → Work items and merge requests](./architecture/protocol.md#work-items-and-merge-requests).)
@@ -77,12 +77,12 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **18. The merge request.** Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`: the card explains what was done.
 - *Under the hood:* Workflow checks the branch and the entry, runs the project checks (in a throwaway container from the project image), creates the merge request for `ledger-api` (titled from the card, carrying the integrated work items) and a **review request**. Nothing is pushed. Dashboard shows it, the browser notifies, Mara receives "Merge requested".
 
-**19. The CEO merges.** The review waits in Reviews, its count on the sidebar. The CEO opens it, reads the change file by file, and leaves two comments: **Request changes** sends them to Mara, who fixes them and asks again. The second time, the CEO picks **Merge to main**, and Foreman merges locally. (Or **Dismiss** with a reason, which goes back to Mara; later, **Create PR on GitHub** to review and merge there.)
+**19. The CEO merges.** The review waits in ledger's Inbox, its count on the sidebar. The CEO opens it, reads the change file by file, and leaves two comments: **Request changes** sends them to Mara, who fixes them and asks again. The second time, the CEO picks **Merge to main**, and Foreman merges locally. (Or **Dismiss** with a reason, which goes back to Mara; later, **Create PR on GitHub** to review and merge there.)
 - *Under the hood:* Create PR: Git pushes the branch to GitHub from the host, with the CEO's GitHub token, and the Forge adapter opens PR #128. Forge adapter polling then sees `merged`; Workflow resolves the request, marks the merge request and its work items merged, delivers "merged into main" to Mara, and tells the leads of other open merge requests on `ledger-api` to merge `main` in (`merge("main")`). Git fetches the new `main` into `ledger-api` (`Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. (With Merge to main, Git merges on the host instead, and nothing reaches GitHub.)
 
 ## Part 3: intervene
 
-**20. A direct instruction.** In Sessions, the CEO clicks Ilya's tab (or opens it in a second browser tab, to keep Mara's beside it): his current screen, his role and branch beside his name. The CEO types "Use the decimal library already in the repo."
+**20. A direct instruction.** In ledger's Session, the CEO clicks Ilya's tab (or opens it in a second browser tab, to keep Mara's beside it): his current screen, his role and branch beside his name. The CEO types "Use the decimal library already in the repo."
 - *Under the hood:* a second Terminal `Attach` (snapshot + live); keystrokes raw to Ilya's terminal. Ilya's prompt tells him to inform the lead if relevant, which he does with `ask`/`reply` like any message.
 
 **21. An approval.** Ilya wants a new dependency, a project gate: he calls `escalate(approval, "Add decimal.js?", ["Approve", "Deny"])`. Dashboard shows the request, the browser notifies. The CEO clicks **Approve**; Ilya continues.
@@ -103,10 +103,10 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **26. Edit a soul while running.** The CEO edits Tove's job description. Running instances get a short context-update delivery at their next idle; the full prompt applies at their next start.
 - *Under the hood:* Home & config (team file) → Instance manager → Messaging delivery; the Harness adapter regenerates `CLAUDE.md` for the next start.
 
-**27. Change project config safely.** *Later: how a Chief of Staff change to `project.toml` is approved is open ([Project config with the Chief of Staff](../backlog/cos-project-config.md)); below is the earlier proposal.* Project → Settings → **Change with Chief of Staff** → "Use GitHub as the forge". A review appears on the project's Overview, under Needs you.
+**27. Change project config safely.** *Later: how a Chief of Staff change to `project.toml` is approved is open ([Project config with the Chief of Staff](../backlog/cos-project-config.md)); below is the earlier proposal.* Project → Settings → **Change with Chief of Staff** → "Use GitHub as the forge". A review appears in the project's Inbox.
 - *Under the hood:* the Chief of Staff edits `project.toml` on a branch `foreman/config-1` of the project repo `~/workspace/foreman/ledger/project/` (never in the live checkout) → `request_merge` → a review request (Merge to main, Create PR on the project repo's forge, or Reject).
 
-**28. Wiki and board.** In Overview, the CEO ticks a checkbox in a standup note; on the Board, drags LED-51 to "In progress".
+**28. Wiki and board.** In Wiki, the CEO ticks a checkbox in a standup note; on the Board, drags LED-51 to "In progress".
 - *Under the hood:* the Wiki block's version-guarded single-line writes (`SetCheckbox`, `SetField`); agents see the change at once in the live project repo they all mount.
 
 ## Part 4: stop and resume

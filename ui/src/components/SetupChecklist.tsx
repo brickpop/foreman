@@ -147,9 +147,8 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
     case "repo":
       return (
         <Link
-          to="/projects/$project"
+          to="/projects/$project/settings"
           params={{ project: s.subject }}
-          search={{ tab: "settings" }}
           className="text-[13px] text-accTx hover:underline"
         >
           Add a repo

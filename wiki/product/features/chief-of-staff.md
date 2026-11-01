@@ -12,7 +12,7 @@ Foreman's built-in agent for **teams**: it creates a team from what the CEO desc
 
 Decided by the CEO, 2026-10-18 (journey gap G2):
 
-- **An ad-hoc session, not an agent of a deployment**, like the login container of [Connect](./settings.md#profiles): one container with a terminal, started when the CEO opens the [page](#the-page) and stopped when they leave it. It isn't listed in [Sessions](./sessions.md), has no project, team or worktree, and doesn't count towards the instance limit. One at a time: a second tab shows the same session.
+- **An ad-hoc session, not an agent of a deployment**, like the login container of [Connect](./settings.md#profiles): one container with a terminal, started when the CEO opens the [page](#the-page) and stopped when they leave it. It isn't in any project's [Session](./sessions.md), has no project, team or worktree, and doesn't count towards the instance limit. One at a time: a second tab shows the same session.
 - **What it runs:** the `default` profile's harness and login, whatever that is ([Session runner → Credentials](../architecture/session-runner.md#credentials)), started interactively like any agent's, from the agent image.
 - **Its conversation carries over:** its private harness config directory is in `~/.foreman/cos/`, so the next visit continues where the last one ended (Claude Code: `--continue`). The opening line is given on every visit, a continued one too (Claude Code: `--continue "<line>"`; to check on a real login).
 - **Its id is `cos`**, on the agent port and for its terminal (`/ws/pty/cos`); an agent's is `agent@project`, so they never clash. Its process is named, and labelled with the home (`foreman.home`), like the agents'.

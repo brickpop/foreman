@@ -326,15 +326,81 @@ func TestDeployRefusals(t *testing.T) {
 		t.Errorf("nora runs on %q", nora.Harness)
 	}
 	// A change of profile reaches an agent deployed before it at its next
-	// start: tove, asleep since atlas's deploy on the default.
-	if tove := f.status("tove@ledger"); tove.Harness != "claude-code" {
-		t.Fatalf("tove deployed on %q", tove.Harness)
+	// start: ivo, asleep since orion's deploy on other.
+	if ivo := f.status("ivo@ledger"); ivo.Harness != "codex" {
+		t.Fatalf("ivo deployed on %q", ivo.Harness)
 	}
-	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+	f.useProfile("ledger", "default")
+	if err := f.m.Wake(ctx, "ivo@ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if tove := f.waitStatus("tove@ledger", Running); tove.Harness != "codex" {
-		t.Errorf("tove started on %q", tove.Harness)
+	if ivo := f.waitStatus("ivo@ledger", Running); ivo.Harness != "claude-code" {
+		t.Errorf("ivo started on %q", ivo.Harness)
+	}
+}
+
+// A project has one team at most: deploying another replaces it, stopped as
+// by Stop (its worktrees kept, its stop announced); the same team again is
+// refused, and the team stays free to work on other projects.
+func TestDeployReplacesTheTeamOnTheProject(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	write(t, f.hm.Path("config", "teams", "orion.toml"),
+		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "h"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("nora@ledger", Running)
+	if d, _ := f.db.Deployments().Get(ctx, "atlas@ledger"); d.Status != store.DeploymentStopped || d.StopReason != "" {
+		t.Errorf("atlas after orion's deploy: %+v", d)
+	}
+	for _, id := range []string{"mara@ledger", "tove@ledger"} {
+		if s := f.status(id); s.Status != Stopped {
+			t.Errorf("%s after orion's deploy: %s", id, s.Status)
+		}
+	}
+	if _, err := os.Stat(f.hm.Sandbox("ledger", "mara")); err != nil {
+		t.Errorf("the replaced lead's worktrees: %v", err)
+	}
+	f.mu.Lock()
+	var stopped, created int
+	for _, e := range f.events {
+		if dep, ok := e.Data.(store.Deployment); ok {
+			switch {
+			case e.Type == "deployment.stopped" && dep.ID == "atlas@ledger":
+				stopped++
+			case e.Type == "deployment.created" && dep.ID == "orion@ledger" && stopped == 1:
+				created++ // after the stop
+			}
+		}
+	}
+	f.mu.Unlock()
+	if stopped != 1 || created != 1 {
+		t.Errorf("events: %d atlas stops, %d orion deploys after it", stopped, created)
+	}
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", "again"); !errors.Is(err, store.ErrActive) {
+		t.Errorf("orion twice on ledger: %v", err)
+	}
+	// A refused deploy replaces nothing.
+	if _, err := f.m.Deploy(ctx, "nope", "ledger", "g"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("an unknown team: %v", err)
+	}
+	if d, _ := f.db.Deployments().Get(ctx, "orion@ledger"); d.Status != store.DeploymentActive {
+		t.Errorf("orion after a refused deploy: %+v", d)
+	}
+	// Atlas comes back, replacing orion in turn, on its old row.
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", "back"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if d, _ := f.db.Deployments().Get(ctx, "orion@ledger"); d.Status != store.DeploymentStopped {
+		t.Errorf("orion after atlas's return: %+v", d)
 	}
 }
 

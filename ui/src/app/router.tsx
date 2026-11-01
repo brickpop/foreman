@@ -2,76 +2,85 @@ import { createRootRoute, createRoute, createRouter } from "@tanstack/react-rout
 import { Agent } from "../screens/Agent";
 import { ChiefOfStaff } from "../screens/ChiefOfStaff";
 import { Dashboard } from "../screens/Dashboard";
-import { Project, type ProjectTab } from "../screens/Project";
-import { Review } from "../screens/Review";
-import { Reviews } from "../screens/Reviews";
-import { Sessions } from "../screens/Sessions";
+import { Project, ProjectHome } from "../screens/Project";
+import { Activity } from "../screens/project/Activity";
+import { Board } from "../screens/project/Board";
+import { Deployment } from "../screens/project/Deployment";
+import { Inbox } from "../screens/project/Inbox";
+import { ProjectSettings } from "../screens/project/ProjectSettings";
+import { Repos } from "../screens/project/Repos";
+import { Review } from "../screens/project/Review";
+import { Session } from "../screens/project/Session";
+import { Wiki } from "../screens/project/Wiki";
 import { Settings } from "../screens/Settings";
 import { Team, type TeamTab } from "../screens/Team";
 import { cosSearch } from "./chiefOfStaff";
 import { Shell } from "./Shell";
-import type { SessionsSearch } from "./sessions";
 import { settingsSearch } from "./settings";
 
-// One route per screen (wiki/product/features/app-shell.md), with typed path
-// and search params: project / tab / entry, team / tab, review / since.
+// One route per screen (wiki/product/features/app-shell.md), and one per
+// section of a project (wiki/product/features/project-page.md), with typed
+// path and search params.
 
 const root = createRootRoute({ component: Shell });
 
 const dashboard = createRoute({ getParentRoute: () => root, path: "/", component: Dashboard });
 
-const sessions = createRoute({
+const text = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
+
+const projectRoute = createRoute({
   getParentRoute: () => root,
-  path: "sessions",
-  validateSearch: (s: Record<string, unknown>): SessionsSearch => ({
-    deployment: typeof s.deployment === "string" ? s.deployment : undefined,
-    agent: typeof s.agent === "string" ? s.agent : undefined,
-    view: s.view === "activity" ? "activity" : undefined,
-  }),
-  component: Sessions,
+  path: "projects/$project",
+  component: Project,
 });
 
-const reviews = createRoute({
-  getParentRoute: () => root,
-  path: "reviews",
-  // project: the one project shown (a session's Reviews links it); none: every project's.
-  validateSearch: (s: Record<string, unknown>): { project?: string } =>
-    typeof s.project === "string" && s.project !== "" ? { project: s.project } : {},
-  component: Reviews,
+const section = <P extends string>(path: P) => ({
+  getParentRoute: () => projectRoute,
+  path,
 });
+
+const projectHome = createRoute({ ...section("/"), component: ProjectHome });
+
+const session = createRoute({
+  ...section("session"),
+  // agent: the one shown, by id (a full instance id is read too); none, the
+  // last one shown on the project, else its lead.
+  validateSearch: (s: Record<string, unknown>): { agent?: string } => ({ agent: text(s.agent) }),
+  component: Session,
+});
+
+const inbox = createRoute({ ...section("inbox"), component: Inbox });
 
 const review = createRoute({
-  getParentRoute: () => root,
-  path: "reviews/$review",
+  ...section("inbox/$review"),
   // since: the change since the CEO last requested changes, instead of against main.
   validateSearch: (s: Record<string, unknown>): { since?: true } =>
     s.since === true || s.since === "1" ? { since: true } : {},
   component: Review,
 });
 
-const projectTabs: ProjectTab[] = [
-  "overview",
-  "board",
-  "repositories",
-  "worktrees",
-  "activity",
-  "settings",
-];
-const text = (v: unknown) => (typeof v === "string" && v !== "" ? v : undefined);
-export const projectRoute = createRoute({
-  getParentRoute: () => root,
-  path: "projects/$project",
-  // entry: the wiki entry open on Overview; repo and branch: what Repositories shows.
-  validateSearch: (
-    s: Record<string, unknown>,
-  ): { tab: ProjectTab; entry?: string; repo?: string; branch?: string } => ({
-    tab: projectTabs.includes(s.tab as ProjectTab) ? (s.tab as ProjectTab) : "overview",
-    entry: text(s.entry),
+const wiki = createRoute({
+  ...section("wiki"),
+  // entry: the wiki entry open.
+  validateSearch: (s: Record<string, unknown>): { entry?: string } => ({ entry: text(s.entry) }),
+  component: Wiki,
+});
+
+const board = createRoute({ ...section("board"), component: Board });
+
+const reposRoute = createRoute({
+  ...section("repos"),
+  // repo and branch: what is read.
+  validateSearch: (s: Record<string, unknown>): { repo?: string; branch?: string } => ({
     repo: text(s.repo),
     branch: text(s.branch),
   }),
-  component: Project,
+  component: Repos,
 });
+
+const deployment = createRoute({ ...section("deployment"), component: Deployment });
+const activity = createRoute({ ...section("activity"), component: Activity });
+const projectSettings = createRoute({ ...section("settings"), component: ProjectSettings });
 
 const teamTabs: TeamTab[] = ["deployments", "members", "playbook", "file"];
 export const teamRoute = createRoute({
@@ -106,10 +115,18 @@ const settings = createRoute({
 export const router = createRouter({
   routeTree: root.addChildren([
     dashboard,
-    sessions,
-    reviews,
-    review,
-    projectRoute,
+    projectRoute.addChildren([
+      projectHome,
+      session,
+      inbox,
+      review,
+      wiki,
+      board,
+      reposRoute,
+      deployment,
+      activity,
+      projectSettings,
+    ]),
     teamRoute,
     agentRoute,
     chiefOfStaff,

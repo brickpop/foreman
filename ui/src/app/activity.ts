@@ -1,7 +1,7 @@
 import type { ActivityPage, TeamAction, TeamMessage } from "../api/client";
 
-// The Activity panel's model (wiki/product/features/sessions.md#activity):
-// who calls whom, and the exchanges as threads, newest first.
+// A project's Activity model (wiki/product/features/project-activity.md): who
+// calls whom, and the exchanges as threads, newest first.
 
 /** One exchange: a message, and the replies to it when it is an ask. */
 export type Thread = { message: TeamMessage; replies: TeamMessage[] };
@@ -68,7 +68,7 @@ export function matches(t: Thread, f: Filter): boolean {
   );
 }
 
-/** One line of the panel: a thread, or an action (a git tool an agent called). */
+/** One row of a timeline: a thread, or an action (a git tool an agent called). */
 export type Entry = { thread: Thread } | { action: TeamAction };
 
 /** Threads and actions together, newest activity first. */
@@ -90,7 +90,7 @@ export function shows(e: Entry, f: Filter): boolean {
   return !f || ("agent" in f && f.agent === e.action.instance);
 }
 
-/** Pages of activity as the panel's entries: every message and action loaded
+/** Pages of activity as a timeline's entries: every message and action loaded
  * so far, threaded again as pages arrive (a reply's ask may come a page later). */
 export function pageEntries(pages: ActivityPage[]): Entry[] {
   const messages: TeamMessage[] = [];

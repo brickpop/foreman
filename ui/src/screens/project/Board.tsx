@@ -438,7 +438,9 @@ function SideSheet({
   // Another card shown in the open sheet starts at its top.
   const top = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs on each new card
-  useEffect(() => top.current?.parentElement?.scrollTo(0, 0), [path]);
+  useEffect(() => {
+    top.current?.parentElement?.scrollTo(0, 0);
+  }, [path]);
   const open = (p: string) => {
     onClose();
     navigate({ to: "/projects/$project/wiki", params: { project }, search: { entry: p } });

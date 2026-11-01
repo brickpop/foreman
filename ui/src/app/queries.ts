@@ -155,39 +155,38 @@ export function useLiveEvents(listen: (e: Event) => void = () => {}) {
   const queries = useQueryClient();
   const listener = useRef(listen);
   listener.current = listen;
-  useEffect(
-    () =>
-      c.events.subscribe({
-        event: (e) => {
-          // A draft's countdown is pushed, not fetched: the event is the state.
-          if (e.type === "instance.draft") {
-            const d = e.data as Draft;
-            queries.setQueryData<Drafts>(draftsKey, (all = {}) => {
-              const { [d.id]: _, ...rest } = all;
-              return d.waiting > 0 ? { ...rest, [d.id]: d } : rest;
-            });
-          }
-          // So is the Chief of Staff's proposal: null once it is gone.
-          if (e.type === "cos.proposal") {
-            queries.setQueryData(cosProposalKey, (e.data as Proposal | null) ?? null);
-          }
-          // So is an agent's activity line, at every step of its work.
-          if (e.type === "instance.doing") {
-            const change = e.data as { id: string; doing: Doing };
-            queries.setQueryData<Instance[]>(keys.instances, (list) => withDoing(list, change));
-          }
-          invalidate(queries, staleKeys(e));
-          listener.current(e);
-        },
-        // Events sent while away aren't replayed: refetch everything shown.
-        reconnected: () => {
-          // Drafts are pushed each countdown step: start over from the next one.
-          queries.setQueryData(draftsKey, {});
-          queries.invalidateQueries();
-        },
-      }),
-    [c, queries],
-  );
+  // The unsubscribe is the cleanup.
+  useEffect(() => {
+    return c.events.subscribe({
+      event: (e) => {
+        // A draft's countdown is pushed, not fetched: the event is the state.
+        if (e.type === "instance.draft") {
+          const d = e.data as Draft;
+          queries.setQueryData<Drafts>(draftsKey, (all = {}) => {
+            const { [d.id]: _, ...rest } = all;
+            return d.waiting > 0 ? { ...rest, [d.id]: d } : rest;
+          });
+        }
+        // So is the Chief of Staff's proposal: null once it is gone.
+        if (e.type === "cos.proposal") {
+          queries.setQueryData(cosProposalKey, (e.data as Proposal | null) ?? null);
+        }
+        // So is an agent's activity line, at every step of its work.
+        if (e.type === "instance.doing") {
+          const change = e.data as { id: string; doing: Doing };
+          queries.setQueryData<Instance[]>(keys.instances, (list) => withDoing(list, change));
+        }
+        invalidate(queries, staleKeys(e));
+        listener.current(e);
+      },
+      // Events sent while away aren't replayed: refetch everything shown.
+      reconnected: () => {
+        // Drafts are pushed each countdown step: start over from the next one.
+        queries.setQueryData(draftsKey, {});
+        queries.invalidateQueries();
+      },
+    });
+  }, [c, queries]);
 }
 
 /** Messages waiting on the CEO's draft, by instance, with their countdown.

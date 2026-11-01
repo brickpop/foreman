@@ -41,9 +41,9 @@ export function Repo() {
   const list = repos.data ?? [];
   const repo = list.find((r) => r.name === name);
   const at = shownAt(list, name, search.branch);
-  // Each replaces the URL: choosing isn't a step to go back to.
-  const go = (next: typeof search) =>
-    navigate({ search: (s) => ({ ...s, ...next }), replace: true });
+  // Each is a step Back returns from (the CEO, 2026-11-02): another branch, a
+  // file, the history.
+  const go = (next: typeof search) => navigate({ search: (s) => ({ ...s, ...next }) });
   return (
     <div className="flex h-full min-h-[420px] flex-col gap-3 px-6 pt-6 pb-6">
       <div className="flex items-center gap-3">
@@ -139,7 +139,7 @@ function BranchPicker({
     >
       <Popover.Trigger
         aria-label="Branch"
-        className="flex max-w-[320px] shrink-0 items-center gap-2 rounded-[7px] border border-line2 bg-panel px-2.5 py-1.5 text-[13px] text-tx hover:border-line3 data-[state=open]:border-acc"
+        className="flex h-12 max-w-[320px] shrink-0 items-center gap-2 rounded-lg border border-line2 bg-panel px-3 text-[13px] text-tx hover:border-line3 data-[state=open]:border-acc"
       >
         <span className="truncate font-mono">{at.branch}</span>
         <span className="text-[10px] text-tx4">▾</span>
@@ -227,8 +227,8 @@ function BranchItem({
   );
 }
 
-/** The branch's latest commit, and how many it has: a click shows them all
- * (the history takes the page), another goes back to the files. */
+/** The branch's latest commit, and how many it has: a click anywhere on it
+ * shows them all (the history takes the page), another goes back to the files. */
 function LastCommit({
   project,
   at,
@@ -244,9 +244,22 @@ function LastCommit({
   const log = useRepoLog(project, at.repo, at.branch);
   const first = log.data?.pages[0];
   const c = first?.commits[0];
+  const box =
+    "flex h-12 min-w-0 flex-1 items-center gap-3 rounded-lg border border-line bg-panel px-3.5 text-left text-[13px]";
+  if (!first)
+    return (
+      <div className={box}>
+        {log.isError && <span className="truncate text-err">{log.error.message}</span>}
+      </div>
+    );
+  // All of it is the button (the CEO, 2026-11-02): the history, or back to the files.
   return (
-    <div className="flex h-[38px] min-w-0 flex-1 items-center gap-3 rounded-lg border border-line bg-panel px-3 text-[13px]">
-      {log.isError && <span className="truncate text-err">{log.error.message}</span>}
+    <button
+      type="button"
+      aria-pressed={history}
+      onClick={() => onHistory(!history)}
+      className={`${box} hover:border-line3 ${history ? "border-accLine" : ""}`}
+    >
       {c ? (
         <>
           <span className="shrink-0 text-tx3">{c.author}</span>
@@ -257,19 +270,12 @@ function LastCommit({
           <span className="shrink-0 text-[12px] text-tx4 max-[900px]:hidden">{when(c.date)}</span>
         </>
       ) : (
-        <span className="flex-1 text-tx4">{log.isPending ? "" : "No commits yet."}</span>
+        <span className="flex-1 text-tx4">No commits yet.</span>
       )}
-      {first && (
-        <Button
-          variant="tiny"
-          aria-pressed={history}
-          onClick={() => onHistory(!history)}
-          className="shrink-0"
-        >
-          {history ? "← Files" : `${first.total} ${first.total === 1 ? "commit" : "commits"}`}
-        </Button>
-      )}
-    </div>
+      <span className="shrink-0 rounded-md bg-raised px-2 py-1 text-[12.5px] text-tx2">
+        {history ? "← Files" : `${first.total} ${first.total === 1 ? "commit" : "commits"}`}
+      </span>
+    </button>
   );
 }
 
@@ -288,7 +294,9 @@ function Tree({
 }) {
   const [open, setOpen] = useState(() => new Set(above(path)));
   // A link to a file far down opens its folders; the CEO's folding stays.
-  useEffect(() => setOpen((now) => new Set([...now, ...above(path)])), [path]);
+  useEffect(() => {
+    setOpen((now) => new Set([...now, ...above(path)]));
+  }, [path]);
   const toggle = (folder: string) =>
     setOpen((now) => {
       const next = new Set(now);

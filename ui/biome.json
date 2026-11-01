@@ -3,5 +3,6 @@
   "files": { "includes": ["**", "!**/api/types"] },
   "formatter": { "indentStyle": "space", "lineWidth": 100 },
   "css": { "parser": { "tailwindDirectives": true } },
-  "linter": { "enabled": true, "rules": { "recommended": true } }
+  "linter": { "enabled": true, "rules": { "recommended": true } },
+  "plugins": ["./lint/effect-block-body.grit"]
 }

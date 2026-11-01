@@ -64,7 +64,7 @@ Not used, on purpose: web frameworks, ORMs, dependency-injection containers, a m
 | Board drag and drop | Native HTML5 drag and drop, plus a status menu on each board card as the keyboard and touch alternative | No dependency for a one-axis drop. |
 | Fonts | Geist and Geist Mono for the UI, JetBrains Mono, Fira Code and Source Code Pro for the terminals, **self-hosted** from their `@fontsource-variable` npm packages | The prototype loads Google Fonts, which breaks "offline" and "no telemetry". |
 | Avatars | A React SVG component ported from the [Avatar](../design/avatar.md) spec | No image assets. |
-| Lint and format | Biome | One tool, fast, replaces ESLint and Prettier. |
+| Lint and format | Biome, its recommended rules plus Foreman's own as GritQL plugins in `ui/lint/` | One tool, fast, replaces ESLint and Prettier. A plugin catches a mistake the recommended rules miss: `effect-block-body.grit` wants every `useEffect` callback in braces, since an expression body returns its value to React as the cleanup (Chrome's scroll methods return a Promise now, and an effect that only scrolled crashed the Board on 2026-11-02). |
 
 ## Agent images
 

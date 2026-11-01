@@ -31,7 +31,9 @@ function LoginConnect({ profile, onClose }: { profile: string; onClose: () => vo
   const queries = useQueryClient();
   const login = useMutation({ mutationFn: () => client.profiles.connect(profile) });
   // biome-ignore lint/correctness/useExhaustiveDependencies: one login per opening
-  useEffect(() => login.mutate(), []);
+  useEffect(() => {
+    login.mutate();
+  }, []);
   // Followed while open, so the dialog says when the login landed.
   const status = useQuery({
     queryKey: keys.profiles,

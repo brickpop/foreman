@@ -12,11 +12,12 @@ import { Dot } from "./ui";
 // which filters, and the rows: one per thread, which opens into a chat, and
 // one per git action.
 
-// The map: name boxes on an ellipse, compact.
+// The map: name boxes on an ellipse, tall enough that lines between the
+// boxes stay apart (the CEO, 2026-11-02).
 const width = 328;
-const height = 150;
+const height = 260;
 const rx = 118;
-const ry = 50;
+const ry = 100;
 
 export type Names = (id: string) => string;
 

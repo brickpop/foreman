@@ -1,0 +1,15 @@
+language js
+
+// An effect's callback has a block body. Written as an arrow with an
+// expression body, it hands React whatever that expression returns as its
+// cleanup, and React calls it: Chrome's scroll methods now return a Promise,
+// so an effect that only scrolled crashed the Board (2026-11-02).
+`$hook($callback, $deps)` where {
+  $hook <: or { `useEffect`, `useLayoutEffect` },
+  $callback <: `() => $body`,
+  $body <: not JsFunctionBody(),
+  register_diagnostic(
+    span = $callback,
+    message = "An effect's callback needs a block body: an expression body returns its value to React as the cleanup."
+  )
+}

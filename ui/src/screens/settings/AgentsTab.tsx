@@ -80,7 +80,7 @@ function RunningSection({ settings }: { settings: SettingsData }) {
               </span>
             )}
             {engine.data && settings.engine !== engine.data.running && (
-              <span className="mt-1.5 block font-medium text-accTx">
+              <span className="mt-1.5 block font-medium text-attnTx">
                 Restart Foreman to switch: agents run{" "}
                 {engine.data.running === "direct" ? "directly" : "in containers"} until then.
               </span>

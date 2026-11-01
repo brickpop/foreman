@@ -8,6 +8,7 @@ import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { useClient } from "../api/client";
 import type { PtyConnection } from "../api/pty";
 import { usePreferences } from "../app/queries";
+import { resolvedColor } from "../app/theme";
 import { loadTerminalFont } from "./terminalFonts";
 
 // Our terminal component. Screens use this, never xterm.js directly, so the
@@ -22,8 +23,13 @@ export type TerminalHandle = {
   focus(): void;
 };
 
-const token = (name: string) =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+/** The terminal's colors from the tokens, as the page shows them now. */
+const colors = () => ({
+  background: resolvedColor("var(--term)"),
+  foreground: resolvedColor("var(--tx2)"),
+  cursor: resolvedColor("var(--acc)"),
+  selectionBackground: resolvedColor("color-mix(in srgb, var(--acc) 35%, transparent)"),
+});
 
 export function Terminal({
   instance,
@@ -75,12 +81,7 @@ export function Terminal({
       // When the harness turns on mouse reporting, a drag goes to it, not to
       // the selection: Option-drag (Shift-drag off the Mac) still selects.
       macOptionClickForcesSelection: true,
-      theme: {
-        background: token("--term"),
-        foreground: token("--tx2"),
-        cursor: token("--acc"),
-        selectionBackground: "rgba(232, 163, 61, 0.35)",
-      },
+      theme: colors(),
     });
     xterm.current = term;
     const fitting = new FitAddon();
@@ -160,6 +161,23 @@ export function Terminal({
       current = false;
     };
   }, [font, fontSize, instance]);
+
+  // The colors follow the theme and the accent as they change: watched on the
+  // page itself, which a preferences effect (Shell's, after this one) or the
+  // operating system (System) changes.
+  useEffect(() => {
+    const paint = () => {
+      if (xterm.current) xterm.current.options.theme = colors();
+    };
+    const page = new MutationObserver(paint);
+    page.observe(document.documentElement, { attributeFilter: ["data-theme", "data-accent"] });
+    const os = matchMedia("(prefers-color-scheme: dark)");
+    os.addEventListener("change", paint);
+    return () => {
+      page.disconnect();
+      os.removeEventListener("change", paint);
+    };
+  }, []);
 
   return <div ref={host} className="h-full w-full opacity-0 transition-opacity duration-150" />;
 }

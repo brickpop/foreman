@@ -40,7 +40,7 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 
 A 1-2-3 flow:
 
-1. **Talk.** The page is the CoS's terminal, full width and height, under a header: the amber "C" tile, "Chief of Staff", the session line `<harness> · default` (Mono 11.5px `--tx4`). The CEO says what they want, in their own words.
+1. **Talk.** The page is the CoS's terminal, full width and height, under a header: the accent "C" tile, "Chief of Staff", the session line `<harness> · default` (Mono 11.5px `--tx4`). The CEO says what they want, in their own words.
 2. **Preview.** When the CoS calls `propose_team`, the preview opens on the right, taking most of the width (the terminal stays on the left, narrower, still usable):
    - the team: its name, purpose, playbook and escalation rules;
    - **one tab per member** (avatar and name; the lead first), each showing the role, personality, skills and the full job description. On a hire or refine, the new or changed member is marked and selected, and a changed field shows what it was.

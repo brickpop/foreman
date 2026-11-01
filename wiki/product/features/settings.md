@@ -80,7 +80,7 @@ On **Git & forges**, kept in the global repo. "Where your team definitions and s
 
 On **Notifications & look**, kept in the global repo.
 
-- **Browser notifications**: the permission state (raised only while the tab is hidden: when the CEO is looking, the toast says it already), `on` (`--ok`), `blocked` (`--err`), `turn on` (`--accTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
+- **Browser notifications**: the permission state (raised only while the tab is hidden: when the CEO is looking, the toast says it already), `on` (`--ok`), `blocked` (`--err`), `turn on` (`--attnTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
 - Toggles (default on): `An agent needs me`, `An agent finishes`, `A merge is requested` ([Notifications](./notifications.md)).
 
 ## Maintenance
@@ -107,5 +107,7 @@ A failed build also raises a **blocked** [request](./requests.md), so it reaches
 ## Appearance
 
 On **Notifications & look**, kept on this machine. `Theme`: segmented `System` / `Dark` / `Light`, default `System` (follows the operating system's `prefers-color-scheme`, live). One of the CEO's preferences, in `~/.foreman/preferences.toml`, outside the global repo (`GET/PUT /api/preferences`). It shows at once, is put back if the save is refused, and another open tab picks it up when it comes back into focus. The browser keeps a copy only to paint the first frame ([UI state](../models/ui-state.md), [Design system](../design/design-system.md)).
+
+`Accent` (the CEO, 2026-11-02): a swatch per [accent](../design/design-system.md#accents), each a 16px dot in its own color in a 26px ring, the chosen one ringed in it: **blue** (the default), green, purple, teal, orange, pink, amber; named in their tooltips and for screen readers. It colors primary buttons, selection, links and focus; what needs the CEO keeps its own amber (`--attn`). A preference like the theme (`accent` in the same file), shown at once, put back if refused, and copied in the browser for the first frame. A value in the file that isn't one of them reads as blue.
 
 `Terminal font`: a font and a size, for every agent terminal, also a preference (`terminal_font`, `terminal_font_size` in the same file; the CEO, 2026-10-19). Fonts: **JetBrains Mono** (the default; the setting is the terminals' only, the rest of the UI keeps Geist Mono, the CEO, 2026-10-21), **Fira Code**, **Source Code Pro**, all shipped with Foreman (it works offline), and **System monospace** (SF Mono or Menlo on the Mac, nothing to download). A shipped font is fetched only once picked. Sizes 10 to 24 px, default 13. Open terminals switch at once, once the font has loaded (the terminal measures its cells on the font it has). A value in the file that can't be kept (an unknown font, a size out of range) reads as its default; the other values stay. Geist Mono and IBM Plex Mono are no terminal fonts (the CEO, 2026-10-20: fewer fonts, a lighter app), so a file naming them reads as JetBrains Mono.

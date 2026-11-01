@@ -9,6 +9,10 @@
 export interface Preferences {
   theme: string; // system, dark or light
   /**
+   * Accent is one of Accents: the UI's accent color (its styles.css).
+   */
+  accent: string;
+  /**
    * TerminalFont is one of TerminalFonts; the UI ships each but system.
    */
   terminalFont: string;

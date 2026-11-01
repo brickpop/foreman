@@ -113,8 +113,6 @@ export function sidebarModel(
   };
 }
 
-const navItem =
-  "flex items-center justify-between rounded-md px-2.5 py-2 font-medium text-tx2 hover:bg-hover";
 const navActive = { className: "bg-raised !text-tx" };
 const rowItem =
   "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
@@ -153,18 +151,18 @@ function Sidebar({
       onClick={onClose}
       className={`flex min-h-0 flex-col border-r border-line bg-side max-[760px]:fixed max-[760px]:inset-y-0 max-[760px]:left-0 max-[760px]:z-40 max-[760px]:w-[220px] max-[760px]:shadow-overlay ${open ? "" : "max-[760px]:hidden"}`}
     >
-      <div className="flex items-center gap-[9px] px-[18px] pt-5 pb-4">
-        <div className="grid size-[22px] place-items-center rounded-[5px] bg-acc font-mono text-xs font-bold text-accInk">
+      {/* The way to the Dashboard (the CEO, 2026-11-02: no menu entry for it). */}
+      <Link
+        to="/"
+        title="Dashboard"
+        className="mx-2.5 mt-3 mb-2 flex items-center gap-[9px] rounded-md px-2 py-2 text-tx hover:bg-hover"
+      >
+        <span className="grid size-[22px] place-items-center rounded-[5px] bg-acc font-mono text-xs font-bold text-accInk">
           F
-        </div>
-        <div className="text-[15px] font-semibold tracking-[-0.01em]">Foreman</div>
-      </div>
+        </span>
+        <span className="text-[15px] font-semibold tracking-[-0.01em]">Foreman</span>
+      </Link>
       <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-2.5 pb-3">
-        <nav className="flex flex-col gap-0.5">
-          <Link to="/" className={navItem} activeProps={navActive} activeOptions={{ exact: true }}>
-            Dashboard
-          </Link>
-        </nav>
         <section className="flex flex-col gap-0.5">
           <Label>Projects</Label>
           {model.projects.map((p) => (

@@ -43,7 +43,7 @@ describe("Avatar", () => {
       ["running", "awaiting", "idle", "done", "starting", "stopped", "queued"].map(statusColor),
     ).toEqual([
       "var(--ok)",
-      "var(--acc)",
+      "var(--attn)",
       "var(--tx4)",
       "var(--info)",
       "var(--team)",

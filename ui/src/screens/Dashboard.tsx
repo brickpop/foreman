@@ -120,7 +120,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-const stateColor = { "needs you": "var(--acc)", "on track": "var(--ok)", idle: "var(--tx4)" };
+const stateColor = { "needs you": "var(--attn)", "on track": "var(--ok)", idle: "var(--tx4)" };
 
 function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
   const repos = project?.repos ?? [];

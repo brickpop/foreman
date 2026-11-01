@@ -83,7 +83,7 @@ PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems
 GET    /api/harnesses                         the supported harnesses: their command, newline keystroke, and how a profile connects (login: a terminal; endpoint: a form)
-GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same for every project: {theme, terminalFont, terminalFontSize} (theme: system, dark or light; terminalFont: jetbrains-mono, fira-code, source-code-pro or system; terminalFontSize: 10 to 24; 400 INVALID). A PUT changes the fields it names; the rest stay
+GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same for every project: {theme, accent, terminalFont, terminalFontSize} (theme: system, dark or light; accent: blue, green, purple, teal, orange, pink or amber; terminalFont: jetbrains-mono, fira-code, source-code-pro or system; terminalFontSize: 10 to 24; 400 INVALID). A PUT changes the fields it names; the rest stay
 GET    /api/profiles                          the CEO's profiles (each a harness and its credentials, shared by every project): name, harness, connected; default first
 POST   /api/profiles                          {name, harness} → 201 the profile, with no login yet (400 INVALID: a bad name or an unsupported harness; 409 EXISTS)
 DELETE /api/profiles/:name                    deletes it and its login, ending its login terminal (204; 400 INVALID for default; 404)

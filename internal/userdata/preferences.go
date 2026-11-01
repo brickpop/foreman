@@ -18,6 +18,10 @@ var ErrInvalid = errors.New("userdata: invalid preferences")
 
 var themes = []string{"system", "dark", "light"}
 
+// Accents are the UI's accent colors, the default first (the UI's accents
+// lists the same ids).
+var Accents = []string{"blue", "green", "purple", "teal", "orange", "pink", "amber"}
+
 // TerminalFonts are the terminal's fonts (the UI's terminalFonts lists the
 // same ids); system is the operating system's monospace.
 var TerminalFonts = []string{"jetbrains-mono", "fira-code", "source-code-pro", "system"}
@@ -30,7 +34,7 @@ const (
 
 // DefaultPreferences are the preferences before any is set.
 func DefaultPreferences() Preferences {
-	return Preferences{Theme: "system", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}
+	return Preferences{Theme: "system", Accent: Accents[0], TerminalFont: "jetbrains-mono", TerminalFontSize: 13}
 }
 
 // PreferencesIn is preferences.toml in the CEO's folder.
@@ -52,6 +56,9 @@ func (f PreferencesFile) Get() Preferences {
 	if !slices.Contains(themes, p.Theme) {
 		p.Theme = def.Theme
 	}
+	if !slices.Contains(Accents, p.Accent) {
+		p.Accent = def.Accent
+	}
 	if !slices.Contains(TerminalFonts, p.TerminalFont) {
 		p.TerminalFont = def.TerminalFont
 	}
@@ -66,6 +73,8 @@ func (f PreferencesFile) Set(p Preferences) error {
 	switch {
 	case !slices.Contains(themes, p.Theme):
 		return fmt.Errorf("%w: theme %q is not one of %s", ErrInvalid, p.Theme, strings.Join(themes, ", "))
+	case !slices.Contains(Accents, p.Accent):
+		return fmt.Errorf("%w: accent %q is not one of %s", ErrInvalid, p.Accent, strings.Join(Accents, ", "))
 	case !slices.Contains(TerminalFonts, p.TerminalFont):
 		return fmt.Errorf("%w: terminal font %q is not one of %s", ErrInvalid, p.TerminalFont, strings.Join(TerminalFonts, ", "))
 	case p.TerminalFontSize < MinFontSize || p.TerminalFontSize > MaxFontSize:

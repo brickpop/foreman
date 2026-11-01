@@ -152,7 +152,7 @@ export function DeployDialog({
           })}
         </Group>
         {replaced && team && (
-          <p className="m-0 rounded-lg border border-accLine bg-accSoft px-3 py-2.5 text-[13px] text-accTx">
+          <p className="m-0 rounded-lg border border-attnLine bg-attnSoft px-3 py-2.5 text-[13px] text-attnTx">
             {replacingLine(nameOf(replaced.teamId), replaced.projectId, ending)}
           </p>
         )}

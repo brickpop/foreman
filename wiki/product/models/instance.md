@@ -41,7 +41,7 @@ Not stored either: when it last sent a hook event, kept in memory to find a [stu
 | `starting` | Container, worktrees and harness being set up | violet (`--team`) |
 | `running` | Working | green (`--ok`) |
 | `idle` | Waiting at its prompt with nothing assigned (and not right after a handoff) | grey (`--tx4`) |
-| `awaiting` | Waits on the CEO: an open `escalate(approval)`, or the harness reported it is waiting for the user ([Request](./request.md#invariants), [Protocol](../architecture/protocol.md#waiting-for-the-ceo)) | amber (`--acc`) |
+| `awaiting` | Waits on the CEO: an open `escalate(approval)`, or the harness reported it is waiting for the user ([Request](./request.md#invariants), [Protocol](../architecture/protocol.md#waiting-for-the-ceo)) | attention (`--attn`) |
 | `done` | Just handed off, nothing assigned yet. Lasts until the next input or card assignment, then becomes `idle` (or `running`) | blue (`--info`) |
 | `stopped` | Exited, crashed, rate-limited, or its deployment was stopped | red (`--err`) |
 

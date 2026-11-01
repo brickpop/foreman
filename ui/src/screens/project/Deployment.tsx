@@ -208,7 +208,7 @@ function AgentRow({
             <span className="shrink-0 text-[12px] text-tx4">
               {b.ahead > 0 && `${b.ahead} ahead`}
               {b.uncommitted && (
-                <span className="text-accTx">{b.ahead > 0 ? " · " : ""}uncommitted changes</span>
+                <span className="text-attnTx">{b.ahead > 0 ? " · " : ""}uncommitted changes</span>
               )}
             </span>
           </Link>

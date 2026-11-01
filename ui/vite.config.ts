@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -6,6 +7,8 @@ import { defineConfig } from "vite";
 // development), so the access token, Host and Origin checks see one origin.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // The palette test reads styles.css (styles.test.ts); Vitest empties CSS otherwise.
+  test: { css: { include: [/styles\.css/] } },
   // dist/app, not dist: the build empties its folder, and dist/.gitkeep must
   // survive so the Go embed always matches something on a fresh clone.
   // chunkSizeWarningLimit: the 500 kB default targets sites downloaded over the

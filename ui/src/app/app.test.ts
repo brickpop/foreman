@@ -341,7 +341,7 @@ describe("profileName", () => {
   });
 });
 
-import { asTheme } from "./theme";
+import { asAccent, asTheme } from "./theme";
 
 describe("asTheme", () => {
   it("reads a stored or served theme, System unless Dark or Light", () => {
@@ -349,6 +349,13 @@ describe("asTheme", () => {
     expect(asTheme("light")).toBe("light");
     for (const other of ["system", "neon", "", null, undefined])
       expect(asTheme(other)).toBe("system");
+  });
+});
+
+describe("the accent", () => {
+  it("reads a stored or served accent, blue unless one of them", () => {
+    expect(asAccent("teal")).toBe("teal");
+    for (const other of ["Teal", "neon", "", null, undefined]) expect(asAccent(other)).toBe("blue");
   });
 });
 

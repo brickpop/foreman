@@ -361,7 +361,7 @@ function AgentSession({
         )}
         {draft && !asleep && (
           // A box inset from the edges, apart from the terminal.
-          <div className="mx-3 my-2 flex items-center gap-3 rounded-lg border-2 border-acc bg-accSoft px-3.5 py-2 text-[12.5px] text-accTx">
+          <div className="mx-3 my-2 flex items-center gap-3 rounded-lg border-2 border-attn bg-attnSoft px-3.5 py-2 text-[12.5px] text-attnTx">
             {draft.onDraft ? (
               <>
                 <span className="flex-1">

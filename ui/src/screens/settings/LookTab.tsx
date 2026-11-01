@@ -1,12 +1,13 @@
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useState } from "react";
 import type { Preferences, Settings as SettingsData } from "../../api/client";
 import { permission } from "../../app/notifications";
-import { usePreferences, useSaveTerminalFont, useSaveTheme } from "../../app/queries";
-import { asTheme, savedTheme } from "../../app/theme";
+import { usePreferences, useSavePreferences } from "../../app/queries";
+import { type Accent, accents, asAccent, asTheme } from "../../app/theme";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { terminalFont, terminalFontSizes, terminalFonts } from "../../components/terminalFonts";
-import { Button, Segmented, Switch } from "../../components/ui";
+import { Button, Loading, Segmented, Switch } from "../../components/ui";
 import { inGlobalRepo, onThisMachine, Row, Section, useSave } from "./parts";
 
 /** Settings → Notifications & look. */
@@ -22,7 +23,7 @@ export function LookTab({ settings }: { settings?: SettingsData }) {
 const permissionColor = {
   on: "text-ok",
   blocked: "text-err",
-  "turn on": "text-accTx",
+  "turn on": "text-attnTx",
   "n/a": "text-tx4",
 };
 
@@ -75,48 +76,87 @@ function NotificationsSection({ settings }: { settings: SettingsData }) {
   );
 }
 
-/** The theme, one of the CEO's preferences. */
+/** The theme, the accent and the terminal's font: the CEO's preferences. */
 function AppearanceSection() {
-  const prefs = usePreferences();
-  const save = useSaveTheme();
+  const prefs = usePreferences().data;
+  const save = useSavePreferences();
   const toast = useToast();
-  const theme =
-    save.isPending && save.variables
-      ? save.variables
-      : prefs.data
-        ? asTheme(prefs.data.theme)
-        : savedTheme();
+  const change = (p: Partial<Preferences>, what: string) =>
+    save.mutate(p, {
+      onError: (e) => toast({ title: `${what} not saved`, body: e.message, color: "var(--err)" }),
+    });
   return (
     <Section label="Appearance" kept={onThisMachine}>
-      <Row title="Theme" explanation="System follows your operating system.">
-        <Segmented
-          label="Theme"
-          value={theme}
-          onChange={(t) =>
-            save.mutate(t, {
-              onError: (e) =>
-                toast({ title: "Theme not saved", body: e.message, color: "var(--err)" }),
-            })
-          }
-          options={[
-            { value: "system", label: "System" },
-            { value: "dark", label: "Dark" },
-            { value: "light", label: "Light" },
-          ]}
-        />
-      </Row>
-      {prefs.data && <TerminalFontRow prefs={prefs.data} />}
+      {prefs ? (
+        <>
+          <Row title="Theme" explanation="System follows your operating system.">
+            <Segmented
+              label="Theme"
+              value={asTheme(prefs.theme)}
+              onChange={(theme) => change({ theme }, "Theme")}
+              options={[
+                { value: "system", label: "System" },
+                { value: "dark", label: "Dark" },
+                { value: "light", label: "Light" },
+              ]}
+            />
+          </Row>
+          <Row
+            title="Accent"
+            explanation="Buttons, selection and links. What needs you keeps its own amber."
+          >
+            <AccentPicker
+              value={asAccent(prefs.accent)}
+              onChange={(accent) => change({ accent }, "Accent")}
+            />
+          </Row>
+          <TerminalFontRow prefs={prefs} onChange={(p) => change(p, "Font")} />
+        </>
+      ) : (
+        <Loading rows={3} />
+      )}
     </Section>
   );
 }
 
-function TerminalFontRow({ prefs }: { prefs: Preferences }) {
-  const save = useSaveTerminalFont();
-  const toast = useToast();
-  const change = (p: Partial<Preferences>) =>
-    save.mutate(p, {
-      onError: (e) => toast({ title: "Font not saved", body: e.message, color: "var(--err)" }),
-    });
+/** A swatch per accent, each in its own color (styles.css scopes an accent
+ * to any element with data-accent). */
+function AccentPicker({ value, onChange }: { value: Accent; onChange: (a: Accent) => void }) {
+  return (
+    <ToggleGroup.Root
+      type="single"
+      value={value}
+      onValueChange={(v) => v && onChange(asAccent(v))}
+      aria-label="Accent"
+      className="flex gap-1.5"
+    >
+      {accents.map((a) => (
+        <ToggleGroup.Item
+          key={a}
+          value={a}
+          data-accent={a}
+          aria-label={accentLabel(a)}
+          title={accentLabel(a)}
+          className={`grid size-[26px] place-items-center rounded-full border-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc ${
+            a === value ? "border-acc" : "border-transparent hover:border-line3"
+          }`}
+        >
+          <span className="size-4 rounded-full bg-acc" />
+        </ToggleGroup.Item>
+      ))}
+    </ToggleGroup.Root>
+  );
+}
+
+const accentLabel = (a: Accent) => a[0].toUpperCase() + a.slice(1);
+
+function TerminalFontRow({
+  prefs,
+  onChange,
+}: {
+  prefs: Preferences;
+  onChange: (p: Partial<Preferences>) => void;
+}) {
   return (
     <Row
       title="Terminal font"
@@ -127,13 +167,13 @@ function TerminalFontRow({ prefs }: { prefs: Preferences }) {
           label="Terminal font"
           value={terminalFont(prefs.terminalFont).id}
           options={terminalFonts.map((f) => ({ value: f.id, label: f.label }))}
-          onChange={(terminalFont) => change({ terminalFont })}
+          onChange={(terminalFont) => onChange({ terminalFont })}
         />
         <Select
           label="Terminal font size"
           value={prefs.terminalFontSize}
           options={terminalFontSizes.map((s) => ({ value: s, label: `${s} px` }))}
-          onChange={(terminalFontSize) => change({ terminalFontSize })}
+          onChange={(terminalFontSize) => onChange({ terminalFontSize })}
         />
       </span>
     </Row>

@@ -497,7 +497,7 @@ function CommentItem({ comment: c, comments }: { comment: ReviewComment; comment
     <div className="flex flex-col gap-1 rounded-lg border border-line bg-panel px-3 py-2">
       <span className="flex items-center gap-2 text-[12px] text-tx4">
         {draft ? (
-          <span className="rounded-[4px] border border-acc px-1.5 text-accTx">draft</span>
+          <span className="rounded-[4px] border border-attn px-1.5 text-attnTx">draft</span>
         ) : (
           `sent ${when(c.sentAt)}`
         )}

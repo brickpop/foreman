@@ -122,7 +122,7 @@ export function CallMap({
                 y1={p.y}
                 x2={q.x}
                 y2={q.y}
-                stroke={l.waiting ? "var(--acc)" : "var(--line3)"}
+                stroke={l.waiting ? "var(--attn)" : "var(--line3)"}
                 strokeWidth={Math.min(1 + (l.ab + l.ba) / 3, 4)}
                 strokeOpacity={!filter || selected(l.a, l.b) ? 0.8 : 0.3}
               />
@@ -143,7 +143,7 @@ export function CallMap({
               aria-pressed={on}
               title={`${name(l.a)} → ${name(l.b)}: ${l.ab} · ${name(l.b)} → ${name(l.a)}: ${l.ba}`}
               className={`absolute -translate-1/2 rounded-full border px-1.5 font-mono text-[10.5px] leading-[16px] ${
-                l.waiting ? "border-acc bg-accSoft text-accTx" : "border-line2 bg-panel text-tx3"
+                l.waiting ? "border-attn bg-attnSoft text-attnTx" : "border-line2 bg-panel text-tx3"
               } ${on ? "ring-1 ring-tx" : ""}`}
               style={{ left: (p.x + q.x) / 2, top: (p.y + q.y) / 2 }}
             >
@@ -218,7 +218,7 @@ export function ThreadRow({
           {state && (
             <span
               title={waiting}
-              className={`text-[11.5px] ${m.state === "queued" ? "text-accTx" : "text-tx4"}`}
+              className={`text-[11.5px] ${m.state === "queued" ? "text-attnTx" : "text-tx4"}`}
             >
               {state}
             </span>
@@ -292,7 +292,9 @@ function Bubble({
       {m.artifactRef && (
         <span className="font-mono text-[11.5px] text-tx3">Artifact: {m.artifactRef}</span>
       )}
-      {m.state === "queued" && <span className="text-[11.5px] text-accTx">Waiting: {waiting}</span>}
+      {m.state === "queued" && (
+        <span className="text-[11.5px] text-attnTx">Waiting: {waiting}</span>
+      )}
       {m.reason && <span className="text-[11.5px] text-err">{m.reason}</span>}
     </div>
   );

@@ -39,8 +39,8 @@ Padding `20px 24px 48px`. One row per agent (grid `auto 1fr auto`, padding `14px
 Padding `28px 24px 48px`, max 760px.
 
 - Intro: "The playbook is part of the team definition, so every deployment uses the same one. It's added to each member's session prompt. Each project's own gates and checks apply on top."
-- Steps: grid `28px 110px 1fr`: the number (Mono `--tx4`), who (600), the text. `who` resolves as in [Playbook and escalation](../models/team-definition.md#playbook-and-escalation): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → "You", a role → its members' names, an agent id → its name. An unknown `who` is shown as written with a warning icon (`--acc`) and the tooltip "No member matches this; check the team file".
-- "Escalate": one line per rule, the condition (`--tx2`) and the target (500); `ceo` shows as "You" in `--accTx`.
+- Steps: grid `28px 110px 1fr`: the number (Mono `--tx4`), who (600), the text. `who` resolves as in [Playbook and escalation](../models/team-definition.md#playbook-and-escalation): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → "You", a role → its members' names, an agent id → its name. An unknown `who` is shown as written with a warning icon (`--attn`) and the tooltip "No member matches this; check the team file".
+- "Escalate": one line per rule, the condition (`--tx2`) and the target (500); `ceo` shows as "You" in `--attnTx`.
 
 ## File
 

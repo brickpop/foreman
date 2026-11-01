@@ -194,7 +194,7 @@ function Preview({
               {members[id]?.status === "new" && (
                 <span className="text-[11.5px] text-accTx">new</span>
               )}
-              {members[id]?.status === "changed" && <span className="text-acc">•</span>}
+              {members[id]?.status === "changed" && <span className="text-attn">•</span>}
             </button>
           ))}
         </nav>

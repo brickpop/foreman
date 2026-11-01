@@ -68,7 +68,7 @@ export function RequestPanel({
             <Avatar
               look={who?.look}
               size={onProject ? 24 : 32}
-              ring={onProject ? undefined : "var(--acc)"}
+              ring={onProject ? undefined : "var(--attn)"}
             />
             <span className="font-semibold">{who?.name ?? r.instanceId}</span>
           </button>
@@ -77,7 +77,7 @@ export function RequestPanel({
             <Avatar
               look={who?.look}
               size={onProject ? 24 : 32}
-              ring={onProject ? undefined : "var(--acc)"}
+              ring={onProject ? undefined : "var(--attn)"}
             />
             <span className="font-semibold">Foreman</span>
           </>

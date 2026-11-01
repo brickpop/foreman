@@ -3,87 +3,78 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 
+/* One token set for both themes: light-dark(<light>, <dark>) picks by the
+   color-scheme, which data-theme sets (theme.ts), and System leaves to the
+   operating system. Dark is GitHub's dark dimmed, light is GitHub's light
+   (the CEO, 2026-11-02: functional, yet easy on the eyes). */
 :root {
-  --bg: #0e0f11;
-  --side: #0b0c0e;
-  --panel: #131518;
-  --raised: #1b1e22;
-  --hover: #17191c;
-  --term: #08090a;
-  --line: #1f2227;
-  --line2: #2c3036;
-  --line3: #3a3f46;
-  --tx: #e6e3dc;
-  --tx2: #c9c6bf;
-  --tx3: #9a9ca3;
-  --tx4: #80838a;
-  --acc: #e8a33d;
-  --accTx: #e8a33d;
-  --accInk: #17130b;
-  --accSoft: #1a1610;
-  --accLine: #3a3020;
-  --ok: #6fcf8e;
-  --info: #7aa7e8;
-  --team: #b79cf0;
-  --err: #e5675a;
-  --ask: #f2be6b;
-  --shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  color-scheme: light dark;
+  --bg: light-dark(#ffffff, #22272e);
+  --side: light-dark(#f6f8fa, #1c2128);
+  --panel: light-dark(#ffffff, #2d333b);
+  --raised: light-dark(#eaeef2, #373e47);
+  --hover: light-dark(#f3f4f6, #323942);
+  --term: light-dark(#f6f8fa, #1c2128);
+  --line: light-dark(#d8dee4, #373e47);
+  --line2: light-dark(#d0d7de, #444c56);
+  --line3: light-dark(#afb8c1, #545d68);
+  --tx: light-dark(#1f2328, #cdd9e5);
+  --tx2: light-dark(#424a53, #adbac7);
+  --tx3: light-dark(#59636e, #96a2af);
+  --tx4: light-dark(#6e7781, #848f9c);
+  --ok: light-dark(#1a7f37, #57ab5a);
+  --info: light-dark(#0550ae, #6cb6ff);
+  --team: light-dark(#8250df, #b083f0);
+  --err: light-dark(#cf222e, #f47067);
+  /* Attention, whatever the accent: what needs the CEO, waits, or warns. */
+  --attn: light-dark(#bf8700, #c69026);
+  --attnTx: light-dark(#9a6700, #daaa3f);
+  --attnInk: light-dark(#1f2328, #22272e);
+  --attnSoft: color-mix(in srgb, var(--attnTx) 14%, transparent);
+  --attnLine: color-mix(in srgb, var(--attnTx) 40%, transparent);
+  --accSoft: color-mix(in srgb, var(--accTx) 14%, transparent);
+  --accLine: color-mix(in srgb, var(--accTx) 40%, transparent);
+  --shadow: 0 12px 32px light-dark(rgb(140 149 159 / 0.3), rgb(0 0 0 / 0.45));
 }
-
-/* Light theme: chosen explicitly, or by the OS when the theme is "system". */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
 :root[data-theme="light"] {
-  --bg: #f5f3ee;
-  --side: #edeae3;
-  --panel: #ffffff;
-  --raised: #eeebe4;
-  --hover: #e6e2da;
-  --term: #fbfaf7;
-  --line: #e0dcd3;
-  --line2: #cfcac0;
-  --line3: #b5afa3;
-  --tx: #1b1a17;
-  --tx2: #3f3d38;
-  --tx3: #5f5d57;
-  --tx4: #75726b;
-  --acc: #e8a33d;
-  --accTx: #8a5200;
-  --accInk: #17130b;
-  --accSoft: #fbf1df;
-  --accLine: #ebcf9e;
-  --ok: #23824a;
-  --info: #2b66b5;
-  --team: #7445c2;
-  --err: #b8352a;
-  --ask: #8a5200;
-  --shadow: 0 16px 40px rgba(40, 30, 10, 0.18);
+  color-scheme: light;
 }
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) {
-    --bg: #f5f3ee;
-    --side: #edeae3;
-    --panel: #ffffff;
-    --raised: #eeebe4;
-    --hover: #e6e2da;
-    --term: #fbfaf7;
-    --line: #e0dcd3;
-    --line2: #cfcac0;
-    --line3: #b5afa3;
-    --tx: #1b1a17;
-    --tx2: #3f3d38;
-    --tx3: #5f5d57;
-    --tx4: #75726b;
-    --acc: #e8a33d;
-    --accTx: #8a5200;
-    --accInk: #17130b;
-    --accSoft: #fbf1df;
-    --accLine: #ebcf9e;
-    --ok: #23824a;
-    --info: #2b66b5;
-    --team: #7445c2;
-    --err: #b8352a;
-    --ask: #8a5200;
-    --shadow: 0 16px 40px rgba(40, 30, 10, 0.18);
-  }
+/* The accent (data-accent, theme.ts): a fill (--acc), its text (--accInk) and
+   the accent as text (--accTx); blue unless another is picked. On any
+   element, so a swatch can show its own (Settings). */
+:root,
+[data-accent="blue"] {
+  --acc: light-dark(#0969da, #316dca);
+  --accTx: light-dark(#0969da, #539bf5);
+  --accInk: #ffffff;
+}
+[data-accent="green"] {
+  --acc: light-dark(#1f883d, #347d39);
+  --accTx: light-dark(#1a7f37, #57ab5a);
+}
+[data-accent="purple"] {
+  --acc: light-dark(#8250df, #8256d0);
+  --accTx: light-dark(#8250df, #b083f0);
+}
+[data-accent="teal"] {
+  --acc: light-dark(#1b7c83, #1d7a72);
+  --accTx: light-dark(#1b7c83, #4cc3b5);
+}
+[data-accent="orange"] {
+  --acc: light-dark(#bc4c00, #ae5622);
+  --accTx: light-dark(#bc4c00, #e0823d);
+}
+[data-accent="pink"] {
+  --acc: light-dark(#bf3989, #ae4c82);
+  --accTx: light-dark(#bf3989, #e275ad);
+}
+[data-accent="amber"] {
+  --acc: light-dark(#bf8700, #c69026);
+  --accTx: light-dark(#9a6700, #daaa3f);
+  --accInk: light-dark(#1f2328, #22272e);
 }
 
 /* Tailwind utilities over the tokens: bg-panel, text-tx3, border-line2… */
@@ -110,7 +101,11 @@
   --color-info: var(--info);
   --color-team: var(--team);
   --color-err: var(--err);
-  --color-ask: var(--ask);
+  --color-attn: var(--attn);
+  --color-attnTx: var(--attnTx);
+  --color-attnInk: var(--attnInk);
+  --color-attnSoft: var(--attnSoft);
+  --color-attnLine: var(--attnLine);
   --shadow-overlay: var(--shadow);
   --font-sans: "Geist Variable", system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", monospace;
@@ -129,7 +124,7 @@ a {
   text-decoration: none;
 }
 ::selection {
-  background: rgb(232 163 61 / 0.35);
+  background: color-mix(in srgb, var(--acc) 35%, transparent);
 }
 
 /* Everything clickable shows the pointer (Tailwind 4 resets buttons to the
@@ -277,10 +272,10 @@ a {
   text-transform: uppercase;
 }
 .wiki blockquote.callout[data-callout="warning"] {
-  border-color: var(--acc);
+  border-color: var(--attn);
 }
 .wiki blockquote.callout[data-callout="warning"] .callout-label {
-  color: var(--accTx);
+  color: var(--attnTx);
 }
 .wiki blockquote.callout[data-callout="success"] {
   border-color: var(--ok);

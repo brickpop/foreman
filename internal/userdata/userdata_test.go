@@ -38,6 +38,19 @@ func TestPreferences(t *testing.T) {
 	if got := f.Get(); got.Theme != "dark" {
 		t.Errorf("a refused set changed it: %+v", got)
 	}
+	// The accent: one of the UI's, kept; another refused.
+	green := dark
+	green.Accent = "green"
+	if err := f.Set(green); err != nil || f.Get().Accent != "green" {
+		t.Errorf("green: %v, %+v", err, f.Get())
+	}
+	for _, bad := range []string{"", "Blue", "#ff0000"} {
+		odd := dark
+		odd.Accent = bad
+		if err := f.Set(odd); !errors.Is(err, ErrInvalid) {
+			t.Errorf("accent %q: %v", bad, err)
+		}
+	}
 	// A hand edit gone wrong is the defaults, never an error.
 	for _, bad := range []string{`theme = "neon"`, `theme = `, `colour = "red"`} {
 		if err := os.WriteFile(f.Path, []byte(bad), 0o600); err != nil {
@@ -48,25 +61,25 @@ func TestPreferences(t *testing.T) {
 		}
 	}
 	// A value that can't be kept is its default; the others stay.
-	edit := "theme = \"light\"\nterminal_font = \"comic-sans\"\nterminal_font_size = 99\n"
+	edit := "theme = \"light\"\naccent = \"chartreuse\"\nterminal_font = \"comic-sans\"\nterminal_font_size = 99\n"
 	if err := os.WriteFile(f.Path, []byte(edit), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.Get(); got != (Preferences{Theme: "light", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}) {
+	if got := f.Get(); got != (Preferences{Theme: "light", Accent: "blue", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}) {
 		t.Errorf("one bad value: %+v", got)
 	}
 	// A file from before the terminal settings has their defaults.
 	if err := os.WriteFile(f.Path, []byte(`theme = "dark"`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.Get(); got != (Preferences{Theme: "dark", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}) {
+	if got := f.Get(); got != (Preferences{Theme: "dark", Accent: "blue", TerminalFont: "jetbrains-mono", TerminalFontSize: 13}) {
 		t.Errorf("an older file: %+v", got)
 	}
 	// A font no longer offered (Geist Mono, IBM Plex Mono until 2026-10-20) reads as the default.
 	if err := os.WriteFile(f.Path, []byte("terminal_font = \"geist-mono\"\nterminal_font_size = 15\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.Get(); got != (Preferences{Theme: "system", TerminalFont: "jetbrains-mono", TerminalFontSize: 15}) {
+	if got := f.Get(); got != (Preferences{Theme: "system", Accent: "blue", TerminalFont: "jetbrains-mono", TerminalFontSize: 15}) {
 		t.Errorf("a retired font: %+v", got)
 	}
 	for _, bad := range []Preferences{

@@ -60,7 +60,7 @@ A `size × size` box (inline-block, never shrinks) holding an SVG with `viewBox=
 
 ## Ring and dot
 
-One meaning per mark: the **dot is the instance status**, everywhere a status is shown; the **ring is a "needs you" highlight** only (amber, on the requesting agent in request panels). The ring never encodes status.
+One meaning per mark: the **dot is the instance status**, everywhere a status is shown; the **ring is a "needs you" highlight** only (attention, `--attn`, on the requesting agent in request panels). The ring never encodes status.
 
 - **Ring**: an overlay with the avatar's radius and `box-shadow: inset 0 0 0 max(1.5, size/15)px <ring>` (one decimal).
 - **Dot**: a circle at `right: -3px; bottom: -3px`, diameter `max(7, round(size × 0.32))px`, background `<dot>`, `box-shadow: 0 0 0 2px <dotBorder>`. The dot color is the instance status color ([Design system](./design-system.md#status-colors)).
@@ -73,7 +73,7 @@ One meaning per mark: the **dot is the instance status**, everywhere a status is
 | 24 | Agent tab (Session), request panel in the project's Inbox (Needs you) | dot on tabs (`dotBorder --side`) |
 | 26 | In-flight row, Deployment agent row, review row | dot on Deployment agent rows (`dotBorder --panel`) |
 | 28 | Team rosters in lists | none, tooltip `<Name> · <Role>` |
-| 32 | Dashboard request panel | amber ring |
+| 32 | Dashboard request panel | attention ring (`--attn`) |
 | 38 | Team Members tab | none |
 | 72 | Agent page header | none |
 
@@ -81,4 +81,4 @@ Elsewhere, status is a separate 7–8px dot next to text, not on the avatar.
 
 ## Chief of Staff
 
-The [Chief of Staff](../features/chief-of-staff.md) is shown as a 28px amber tile with a "C" (`--acc` background, `--accInk` letter), not a face, in its page's header.
+The [Chief of Staff](../features/chief-of-staff.md) is shown as a 28px accent tile with a "C" (`--acc` background, `--accInk` letter), not a face, in its page's header.

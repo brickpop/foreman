@@ -94,7 +94,7 @@ function Configuration({ project }: { project: Project }) {
             {[
               [
                 "approval",
-                "text-accTx",
+                "text-attnTx",
                 "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer.",
               ],
               [

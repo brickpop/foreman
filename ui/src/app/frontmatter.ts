@@ -25,7 +25,7 @@ export function summary(fields: Field[]): SummaryPart[] {
     });
 }
 
-const tagColors = ["var(--acc)", "var(--info)", "var(--ok)", "var(--team)"];
+const tagColors = ["var(--attn)", "var(--info)", "var(--ok)", "var(--team)"];
 
 /** A tag's colour, the same wherever the tag shows: from its name. */
 export function tagColor(tag: string): string {

@@ -45,7 +45,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
       ...base,
       toggle: "needsMe",
       title: `${who} needs you${where}`,
-      color: "var(--acc)",
+      color: "var(--attn)",
     };
   }
   if (e.type === "review.withdrawn") {

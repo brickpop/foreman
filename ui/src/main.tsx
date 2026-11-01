@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ClientContext, httpClient, isNotBuilt } from "./api/client";
 import { router } from "./app/router";
-import { applyTheme, savedTheme } from "./app/theme";
+import { applyAccent, applyTheme, savedAccent, savedTheme } from "./app/theme";
 import "./styles.css";
 
 // The composition root: the only place that picks concrete implementations.
@@ -15,6 +15,7 @@ const queries = new QueryClient({
 });
 
 applyTheme(savedTheme());
+applyAccent(savedAccent());
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root");

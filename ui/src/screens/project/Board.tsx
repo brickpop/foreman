@@ -107,7 +107,7 @@ export function cellLook(takesDrop: boolean, over: boolean): string {
 const priorityColor: Record<string, string> = {
   quick: "text-ok",
   high: "text-err",
-  medium: "text-accTx",
+  medium: "text-attnTx",
   low: "text-tx4",
 };
 

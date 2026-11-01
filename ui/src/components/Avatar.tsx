@@ -173,7 +173,7 @@ export function statusColor(status: string): string {
     case "running":
       return "var(--ok)";
     case "awaiting":
-      return "var(--acc)";
+      return "var(--attn)";
     case "done":
       return "var(--info)";
     case "starting":

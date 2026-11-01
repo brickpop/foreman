@@ -25,7 +25,7 @@ import { useToast } from "../components/Toasts";
 import { deploymentOn } from "./project";
 import { type SerialSaver, serialSaver } from "./serialSave";
 import { withDoing } from "./sessions";
-import { applyTheme, asTheme, type Theme } from "./theme";
+import { applyAccent, applyTheme, asAccent, asTheme } from "./theme";
 
 // Server state, through TanStack Query: one hook per query, and server events
 // invalidating what they touch, so every screen has one data path
@@ -603,31 +603,21 @@ export function usePreferences() {
   const c = useClient();
   const prefs = useQuery({ queryKey: keys.preferences, queryFn: () => c.preferences.get() });
   useEffect(() => {
-    if (prefs.data) applyTheme(asTheme(prefs.data.theme));
+    if (!prefs.data) return;
+    applyTheme(asTheme(prefs.data.theme));
+    applyAccent(asAccent(prefs.data.accent));
   }, [prefs.data]);
   return prefs;
 }
 
-/** Saves the theme; shown at once, put back if refused. */
-export function useSaveTheme() {
+/** Saves some of the preferences (the theme, the accent, the terminal font):
+ * shown at once (usePreferences applies them, open terminals follow), and
+ * put back if refused. */
+export function useSavePreferences() {
   const c = useClient();
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: (theme: Theme) => c.preferences.save({ theme }),
-    onMutate: (theme: Theme) => applyTheme(theme),
-    onError: () => applyTheme(asTheme(queries.getQueryData<Preferences>(keys.preferences)?.theme)),
-    onSettled: () => queries.invalidateQueries({ queryKey: keys.preferences }),
-  });
-}
-
-/** Saves the terminal's font or size; open terminals
- * follow at once, and go back if it is refused. */
-export function useSaveTerminalFont() {
-  const c = useClient();
-  const queries = useQueryClient();
-  return useMutation({
-    mutationFn: (p: Pick<Partial<Preferences>, "terminalFont" | "terminalFontSize">) =>
-      c.preferences.save(p),
+    mutationFn: (p: Partial<Preferences>) => c.preferences.save(p),
     onMutate: (p) => {
       const before = queries.getQueryData<Preferences>(keys.preferences);
       if (before) queries.setQueryData(keys.preferences, { ...before, ...p });

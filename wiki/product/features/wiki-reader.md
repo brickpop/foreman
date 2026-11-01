@@ -27,7 +27,7 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 
 - Indentation: `10 + 14 × depth` px left padding; padding `5px 10px`; 13.5px; ellipsis on overflow.
 - Folders: 500, `--tx2`, led by a chevron (`--tx4`, turned down when open). Entries: 400, `--tx3`, their text in line with the folder names. The current entry: `--raised`, `--tx`.
-- A 6px amber **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").
+- A 6px attention (`--attn`) **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").
 
 ## Article
 
@@ -49,7 +49,7 @@ No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side,
 | Link to an entry not written yet | `--tx3`, dotted underline, titled "Not written yet"; still opens (and falls back to `index.md`) |
 | Link above the wiki (e.g. into a code repo) | Text, `--tx3` with a dotted underline, titled `<href> is outside the wiki`: never followed |
 | Link to a file the wiki carries | An image opens in a new tab; any other file (a PDF, a spreadsheet) is text like a link above the wiki, titled `Foreman doesn't show <path>`: Foreman serves the wiki's images only |
-| Callout `> [!warning] Title`, `[!success]`, `[!info]`, any word | `--panel`, radius 10, padding `12px 16px`, a colored border and an uppercase label (an element, so a screen reader hears it): warning `--acc`/`--accTx`, success `--ok`, info `--info`, any other `--line3`/`--tx3`. The label is the title, else the type word |
+| Callout `> [!warning] Title`, `[!success]`, `[!info]`, any word | `--panel`, radius 10, padding `12px 16px`, a colored border and an uppercase label (an element, so a screen reader hears it): warning `--attn`/`--attnTx`, success `--ok`, info `--info`, any other `--line3`/`--tx3`. The label is the title, else the type word |
 | Checkbox `- [ ]` | Tickable (see below) |
 | Code block | `<pre>` on `--term`, radius 8 |
 | Image | Inline, max width of the column, resolved by the engine. Only the wiki's own images load (the CEO, 2026-10-17); an image elsewhere shows as a link to it, and a missing one as its alt text, dotted |

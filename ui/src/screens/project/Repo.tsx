@@ -227,7 +227,7 @@ function BranchItem({
         <span className="text-[11.5px] text-tx4">
           {detail.join(" · ")}
           {b.uncommitted && (
-            <span className="text-accTx">{detail.length > 0 ? " · " : ""}uncommitted changes</span>
+            <span className="text-attnTx">{detail.length > 0 ? " · " : ""}uncommitted changes</span>
           )}
         </span>
       )}
@@ -566,7 +566,7 @@ function History({ project, at }: { project: string; at: At }) {
   );
 }
 
-const laneColors = ["var(--acc)", "var(--info)", "var(--ok)", "var(--tx3)"];
+const laneColors = ["var(--attn)", "var(--info)", "var(--ok)", "var(--tx3)"];
 const laneGap = 12;
 const x = (lane: number) => 10 + lane * laneGap;
 

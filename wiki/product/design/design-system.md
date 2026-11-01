@@ -8,40 +8,61 @@ tags: [design, ui]
 
 The visual language of the Foreman UI: tokens, type, spacing, surfaces and the small set of components every screen is built from. The visual reference is the clickable [prototype](./prototype/foreman-prototype.dc.html) (open it in a browser). It is reference only: its inline styles, simulated data and dead state are not production code. This entry is the source of truth when the two disagree. The [Avatar](./avatar.md) has its own entry.
 
-Two themes, **dark** and **light** (the CEO picks one, or `System` to follow the operating system; see [Settings](../features/settings.md#appearance)), built on the same tokens, with one accent: **amber**. Every color in the UI comes from a token, so a theme is a token set. The theme choice is one of the CEO's preferences (`~/.foreman/preferences.toml`, [Settings → Appearance](../features/settings.md#appearance)).
+Two themes, **dark** and **light** (the CEO picks one, or `System` to follow the operating system; see [Settings](../features/settings.md#appearance)), built on the same tokens. Since 2026-11-02 (the CEO: "too dark, and the yellow…"; functional yet fatigue-free) dark is GitHub's **dark dimmed** (slate greys, not black) and light is GitHub's **light** (cool neutral greys). The **accent** is the CEO's pick of seven (blue by default), and **attention** (what needs the CEO) keeps its own amber whatever the accent, so "needs you" never reads as a selection. Every color in the UI comes from a token, so a theme is a token set. The theme and the accent are the CEO's preferences (`~/.foreman/preferences.toml`, [Settings → Appearance](../features/settings.md#appearance)).
 
 ## Tokens
 
-Dark is `:root`; light overrides it under `html[data-theme="light"]`.
+One set for both themes in `ui/src/styles.css`: each token is `light-dark(<light>, <dark>)`, picked by the page's `color-scheme`: `light dark` (the operating system's) under System, `dark` or `light` under `html[data-theme]`. `ui/src/styles.test.ts` checks that every text token, and every accent's text and ink, keeps 4.5:1 (WCAG AA) on its page and fill in both themes.
 
 | Token | Dark | Light | Used for |
 |---|---|---|---|
-| `--bg` | `#0E0F11` | `#F5F3EE` | Page background, default avatar dot border, swatch inner ring |
-| `--side` | `#0B0C0E` | `#EDEAE3` | Sidebar, agent-tab strip, board cells |
-| `--panel` | `#131518` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
-| `--raised` | `#1B1E22` | `#EEEBE4` | Selected nav/segment, raised buttons, chips, stage chips |
-| `--hover` | `#17191C` | `#E6E2DA` | Row and item hover |
-| `--term` | `#08090A` | `#FBFAF7` | Terminals, `<pre>`, inputs, textareas, CoS result panel |
-| `--line` | `#1F2227` | `#E0DCD3` | Default borders and dividers |
-| `--line2` | `#2C3036` | `#CFCAC0` | Button and input borders, dashed empty states, scrollbar thumb |
-| `--line3` | `#3A3F46` | `#B5AFA3` | Hover border, selected segment border, toast border, unchecked box |
-| `--tx` | `#E6E3DC` | `#1B1A17` | Primary text |
-| `--tx2` | `#C9C6BF` | `#3F3D38` | Body and secondary text |
-| `--tx3` | `#9A9CA3` | `#5F5D57` | Muted text, subtitles |
-| `--tx4` | `#80838A` | `#75726B` | Section labels, meta, timestamps |
-| `--acc` | `#E8A33D` | `#E8A33D` | Amber accent: fills, active underline, dots |
-| `--accTx` | `#E8A33D` | `#8A5200` | Accent used as text: links, the `❯` prompt, the "lead" tag |
-| `--accInk` | `#17130B` | `#17130B` | Text on an amber fill |
-| `--accSoft` | `#1A1610` | `#FBF1DF` | Selected option background, "me" chat bubble |
-| `--accLine` | `#3A3020` | `#EBCF9E` | Border of `--accSoft` surfaces, "lead" tag border |
-| `--ok` | `#6FCF8E` | `#23824A` | Running, success, "token set" |
-| `--info` | `#7AA7E8` | `#2B66B5` | Done, question kind, info callout |
-| `--team` | `#B79CF0` | `#7445C2` | team-message markers, starting status, finding kind, `→` in Messages |
-| `--err` | `#E5675A` | `#B8352A` | Stopped, errors, blocked kind, high priority |
-| `--ask` | `#F2BE6B` | `#8A5200` | Escalation (`⚠`) lines in the terminal |
-| `--shadow` | `0 16px 40px rgba(0,0,0,.55)` | `0 16px 40px rgba(40,30,10,.18)` | Drawers, modals, toasts |
+| `--bg` | `#22272E` | `#FFFFFF` | Page background, default avatar dot border, swatch inner ring |
+| `--side` | `#1C2128` | `#F6F8FA` | Sidebar, agent-tab strip, board cells |
+| `--panel` | `#2D333B` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
+| `--raised` | `#373E47` | `#EAEEF2` | Selected nav/segment, raised buttons, chips, stage chips |
+| `--hover` | `#323942` | `#F3F4F6` | Row and item hover |
+| `--term` | `#1C2128` | `#F6F8FA` | Terminals, `<pre>`, inputs, textareas, CoS result panel |
+| `--line` | `#373E47` | `#D8DEE4` | Default borders and dividers |
+| `--line2` | `#444C56` | `#D0D7DE` | Button and input borders, dashed empty states, scrollbar thumb |
+| `--line3` | `#545D68` | `#AFB8C1` | Hover border, selected segment border, toast border, unchecked box |
+| `--tx` | `#CDD9E5` | `#1F2328` | Primary text |
+| `--tx2` | `#ADBAC7` | `#424A53` | Body and secondary text |
+| `--tx3` | `#96A2AF` | `#59636E` | Muted text, subtitles |
+| `--tx4` | `#848F9C` | `#6E7781` | Section labels, meta, timestamps |
+| `--acc` | [accent](#accents) | [accent](#accents) | The accent as a fill: primary buttons, toggles, active tab underline, selected option border, focus ring, the logo |
+| `--accTx` | [accent](#accents) | [accent](#accents) | The accent as text: links, the `❯` prompt, the "lead" tag, the selected branch or file |
+| `--accInk` | [accent](#accents) | [accent](#accents) | Text on an `--acc` fill |
+| `--accSoft` | `--accTx` at 14% | same | Selected option background, "me" chat bubble (translucent: right on any surface) |
+| `--accLine` | `--accTx` at 40% | same | Border of `--accSoft` surfaces, "lead" tag border |
+| `--attn` | `#C69026` | `#BF8700` | Attention as a fill: needs-you and changed dots, the Inbox count badge, the awaiting status and ring, a waiting call on the map |
+| `--attnTx` | `#DAAA3F` | `#9A6700` | Attention as text: approval kind, `needs you`, waiting and queued messages, uncommitted changes, medium priority, warnings |
+| `--attnInk` | `#22272E` | `#1F2328` | Text on an `--attn` fill |
+| `--attnSoft` / `--attnLine` | `--attnTx` at 14% / 40% | same | Warning boxes (a stale team file, a team replaced, a draft waiting) |
+| `--ok` | `#57AB5A` | `#1A7F37` | Running, success, "token set" |
+| `--info` | `#6CB6FF` | `#0550AE` | Done, question kind, info callout |
+| `--team` | `#B083F0` | `#8250DF` | team-message markers, starting status, finding kind, `→` in Messages |
+| `--err` | `#F47067` | `#CF222E` | Stopped, errors, blocked kind, high priority |
+| `--shadow` | `0 12px 32px rgba(0,0,0,.45)` | `0 12px 32px rgba(140,149,159,.3)` | Drawers, modals, toasts |
 
-Fixed values that are not tokens (keep them as named constants): modal backdrop `rgba(5,6,7,0.55)` in both themes; toggle knob `#fff`; selection `rgba(232,163,61,.35)`.
+The fixed palettes that only tell things apart (a tag's dot, a git graph's lanes) use `--attn`, `--info`, `--ok`, `--team`: never the accent, so they don't change with it.
+
+### Accents
+
+`html[data-accent]` picks one; the attribute works on any element, so a Settings swatch shows its own. Each is a fill, its text, and the accent as text (all white ink but amber's):
+
+| Accent | `--acc` dark | `--accTx` dark | `--acc` light | `--accTx` light |
+|---|---|---|---|---|
+| **blue** (default) | `#316DCA` | `#539BF5` | `#0969DA` | `#0969DA` |
+| green | `#347D39` | `#57AB5A` | `#1F883D` | `#1A7F37` |
+| purple | `#8256D0` | `#B083F0` | `#8250DF` | `#8250DF` |
+| teal | `#1D7A72` | `#4CC3B5` | `#1B7C83` | `#1B7C83` |
+| orange | `#AE5622` | `#E0823D` | `#BC4C00` | `#BC4C00` |
+| pink | `#AE4C82` | `#E275AD` | `#BF3989` | `#BF3989` |
+| amber | `#C69026` | `#DAAA3F` | `#BF8700` | `#9A6700` (ink `#22272E` / `#1F2328`) |
+
+Green, purple and amber share their hue with `--ok`, `--team` and attention: the CEO's pick.
+
+Fixed values that are not tokens (keep them as named constants): modal backdrop `rgba(5,6,7,0.55)` in both themes; toggle knob `#fff`. The selection is `--acc` at 35%.
 
 Global rules: `html, body` have no margin, `--bg` background and `--tx` color. Links are `--accTx`, with no underline, not even on hover: no clickable element shows an underline (the CEO's rule). Every clickable element (buttons, links, tabs, toggles) shows the pointer cursor; a disabled one shows `not-allowed`. WebKit scrollbars are 10px with a `--line2` thumb, radius 8px and a 2px `--bg` border; the agent-tab strip uses `scrollbar-width: thin`.
 
@@ -114,7 +135,7 @@ Instance status ([Instance](../models/instance.md)) maps to one color everywhere
 | Status | Color |
 |---|---|
 | `running` | `--ok` |
-| `awaiting` (needs the CEO) | `--acc` |
+| `awaiting` (needs the CEO) | `--attn` |
 | `idle` | `--tx4` |
 | `done` | `--info` |
 | `starting` | `--team` |
@@ -122,22 +143,22 @@ Instance status ([Instance](../models/instance.md)) maps to one color everywhere
 | `queued` (waiting for a session slot) | `--tx4` dot drawn as a dashed outline (no fill), so it reads differently from `idle` |
 | `asleep` (no session until it is woken) | `--tx4` dot drawn as a solid outline (no fill) |
 
-Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle` `--tx4`.
+Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle` `--tx4`.
 
 ## Chips and badges
 
 | Element | Style |
 |---|---|
-| **Request kind chip** | Mono 600 10.5px, `.05em`, uppercase; color and 1px border in the kind color; radius 4; padding `1px 6px`; no wrap. Kinds: Approval `--accTx`, Question `--info`, Review `--ok`, Blocked `--err`, Finding `--team` ([Requests](../features/requests.md)). In explanatory lists the same label appears without a border. |
-| **Count badge** (the sidebar's Inbox) | `--acc` background, `--accInk` text, Mono 600 10.5px, padding `1px 6px`, radius 9 |
-| **Needs-you dot** | 7px `--acc` circle |
-| **Changed dot** | 6px `--acc` circle, tooltip "Changed since you last looked" |
+| **Request kind chip** | Mono 600 10.5px, `.05em`, uppercase; color and 1px border in the kind color; radius 4; padding `1px 6px`; no wrap. Kinds: Approval `--attnTx`, Question `--info`, Review `--ok`, Blocked `--err`, Finding `--team` ([Requests](../features/requests.md)). In explanatory lists the same label appears without a border. |
+| **Count badge** (the sidebar's Inbox) | `--attn` background, `--attnInk` text, Mono 600 10.5px, padding `1px 6px`, radius 9 |
+| **Needs-you dot** | 7px `--attn` circle |
+| **Changed dot** | 6px `--attn` circle, tooltip "Changed since you last looked" |
 | **Frontmatter chip** | 12.5px, `--raised`, radius 5, padding `3px 8px`, `--tx3` key; the value in `--tx`. Format `key: value` |
 | **Stage chip** | 12.5px, `--tx2` on `--raised`, radius 5, padding `3px 8px` |
 | **"lead" tag** | 11.5px, `--accTx`, 1px `--accLine` border, radius 4, padding `0 5px` |
 | **Skill chip** | 13px, `--raised`, `--tx2`, padding `4px 6px 4px 10px`, radius 6, trailing `×` in `--tx4` (removes). The "+ add" input has a `1px dashed --line2` border and is 80px wide |
 | **Quick-reply chip** (CoS) | `--raised`, 1px `--line2`, radius 16, padding `6px 12px`, 500 13px; hover border `--acc` |
-| **Priority text** (board) | Mono 500 11.5px: quick `--ok` (no uncertainty, doable right now), high `--err`, medium `--accTx`, low `--tx4`; any other value `--tx4` |
+| **Priority text** (board) | Mono 500 11.5px: quick `--ok` (no uncertainty, doable right now), high `--err`, medium `--attnTx`, low `--tx4`; any other value `--tx4` |
 
 ## Buttons
 
@@ -164,7 +185,7 @@ Project state text (Dashboard): `needs you` `--accTx`, `on track` `--ok`, `idle`
 - **Toggle switch**: track 34×20, radius 10, `--acc` on, `--line3` off. Knob 16×16 `#fff` at `top: 2px`, `left: 2px` (off) or `16px` (on), 0.15s transition.
 - **Stepper**: two 28×28 outline buttons `−` and `+` around the value (Mono 500 14px, min-width 28px, centered).
 - **Color swatch**: 22×22, radius 6. Selected ring `box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--tx)`.
-- **Checkbox** (wiki): 16px, radius 4, 1.5px `--line3` border. Checked: amber fill, `✓` in `--accInk`, label `--tx3` with line-through.
+- **Checkbox** (wiki): 16px, radius 4, 1.5px `--line3` border. Checked: the accent's fill (`accent-color: var(--acc)`), label `--tx3` with line-through.
 
 ## Hover
 

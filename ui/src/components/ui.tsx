@@ -88,7 +88,7 @@ function segment(on: boolean) {
 }
 
 const kindColors: Record<string, string> = {
-  approval: "text-accTx border-accTx",
+  approval: "text-attnTx border-attnTx",
   question: "text-info border-info",
   review: "text-ok border-ok",
   blocked: "text-err border-err",
@@ -110,7 +110,7 @@ export function KindChip({ kind }: { kind: string }) {
 export function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="rounded-[9px] bg-acc px-1.5 py-px font-mono text-[10.5px] font-semibold text-accInk">
+    <span className="rounded-[9px] bg-attn px-1.5 py-px font-mono text-[10.5px] font-semibold text-attnInk">
       {count}
     </span>
   );
@@ -128,7 +128,7 @@ export function Dot({
   size?: number;
   title?: string;
 }) {
-  const style = status ? dotStyle(status) : { background: color ?? "var(--acc)" };
+  const style = status ? dotStyle(status) : { background: color ?? "var(--attn)" };
   return (
     <span
       className="inline-block shrink-0 rounded-full"

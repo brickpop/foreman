@@ -11,7 +11,7 @@ export function TeamPlaybook({ team }: { team: TeamConfig }) {
       r.text
     ) : (
       <span className="flex items-center gap-1" title="No member matches this; check the team file">
-        {r.text} <span className="text-acc">⚠</span>
+        {r.text} <span className="text-attn">⚠</span>
       </span>
     );
   };
@@ -36,7 +36,7 @@ export function TeamPlaybook({ team }: { team: TeamConfig }) {
             <span key={e.when} className="flex gap-2">
               <span className="text-tx2">{e.when}</span>
               <span>→</span>
-              <span className={`font-medium ${e.to === "ceo" ? "text-accTx" : ""}`}>
+              <span className={`font-medium ${e.to === "ceo" ? "text-attnTx" : ""}`}>
                 {who(e.to)}
               </span>
             </span>

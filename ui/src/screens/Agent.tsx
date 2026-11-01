@@ -108,7 +108,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
       </header>
 
       {conflict && (
-        <div className="flex flex-col gap-2 rounded-xl border border-acc bg-accSoft p-3.5">
+        <div className="flex flex-col gap-2 rounded-xl border border-attn bg-attnSoft p-3.5">
           <span className="text-[13.5px]">
             The team file changed elsewhere since you opened it. Your edit is still here.
           </span>

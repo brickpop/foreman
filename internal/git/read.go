@@ -127,13 +127,17 @@ func (g *CLI) kind(ctx context.Context, dir, commit, p string) (string, error) {
 	return strings.TrimSpace(out), err
 }
 
-// Log returns up to n commits of commit's history, newest first, after
-// skipping skip.
+// Log returns up to n commits of commit's history (every branch's for ""),
+// newest first, after skipping skip.
 func (g *CLI) Log(ctx context.Context, dir, commit string, skip, n int) ([]Commit, error) {
+	tip := commit
+	if tip == "" {
+		tip = "--branches"
+	}
 	// Children before their parents, also within one second; decorated with
 	// the branches only (no HEAD, no tags).
 	out, err := run(ctx, dir, "log", "--topo-order", "--decorate-refs=refs/heads/", "--format=%H%x1f%an%x1f%aI%x1f%P%x1f%D%x1f%s%x1e",
-		"--skip="+strconv.Itoa(skip), "-n", strconv.Itoa(n), commit, "--")
+		"--skip="+strconv.Itoa(skip), "-n", strconv.Itoa(n), tip, "--")
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +160,7 @@ func (g *CLI) Log(ctx context.Context, dir, commit string, skip, n int) ([]Commi
 			branches = strings.Split(f[4], ", ") // branch names have no spaces
 			slices.Sort(branches)
 		}
-		list = append(list, Commit{Hash: f[0], Author: f[1], Date: date, Subject: f[5], Merge: len(strings.Fields(f[3])) > 1, Branches: branches})
+		list = append(list, Commit{Hash: f[0], Author: f[1], Date: date, Subject: f[5], Parents: append([]string{}, strings.Fields(f[3])...), Branches: branches})
 	}
 	return list, nil
 }
@@ -201,4 +205,52 @@ func (g *CLI) RootCommit(ctx context.Context, dir string) (string, error) {
 		return "", ErrNoRef
 	}
 	return slices.Min(roots), nil
+}
+
+// PartedFrom is where head's work parted from main, the commit its change is
+// read against. A squash leaves that history intact, so it is their merge
+// base. When main holds head itself (merged with a merge commit), it is where
+// head parted from main's line before that merge; "" when main took head as
+// it was (a fast-forward), since nothing tells its change apart then.
+func (g *CLI) PartedFrom(ctx context.Context, dir, main, head string) (string, error) {
+	if !ValidBranch(ctx, main) {
+		return "", ErrBadBranch
+	}
+	if !hash.MatchString(head) {
+		return "", ErrNoRef
+	}
+	base, err := run(ctx, dir, "merge-base", "refs/heads/"+main, head)
+	if err != nil {
+		return "", err
+	}
+	if base = strings.TrimSpace(base); base != head {
+		return base, nil
+	}
+	// The oldest commit of main's own line that holds head: its merge.
+	line, err := run(ctx, dir, "rev-list", "--first-parent", "--ancestry-path", "--reverse", head+"..refs/heads/"+main)
+	if err != nil {
+		return "", err
+	}
+	merge, _, _ := strings.Cut(line, "\n")
+	if merge == "" {
+		return "", nil
+	}
+	if base, err = run(ctx, dir, "merge-base", merge+"^1", head); err != nil {
+		return "", err
+	}
+	if base = strings.TrimSpace(base); base == head {
+		return "", nil
+	}
+	return base, nil
+}
+
+// Keep points ref, under refs/foreman/, at commit, so its history outlives
+// the branches that held it. A name without a time is never pruned.
+func (g *CLI) Keep(ctx context.Context, dir, ref, commit string) error {
+	if !strings.HasPrefix(ref, "refs/foreman/") || !hash.MatchString(commit) {
+		return ErrNoRef
+	}
+	defer g.lock(ctx, dir)()
+	_, err := run(ctx, dir, "update-ref", ref, commit)
+	return err
 }

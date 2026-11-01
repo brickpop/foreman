@@ -198,9 +198,16 @@ func (b Browser) File(ctx context.Context, project, repo, ref, path string) (Fil
 	return f, nil
 }
 
-// Log returns a page of ref's history, after skip commits.
-func (b Browser) Log(ctx context.Context, project, repo, ref string, skip int) (LogPage, error) {
-	dir, commit, err := b.at(ctx, project, repo, ref)
+// Log returns a page of ref's history, or with all every branch's (ref
+// unread), after skip commits.
+func (b Browser) Log(ctx context.Context, project, repo, ref string, all bool, skip int) (LogPage, error) {
+	var dir, commit string
+	var err error
+	if all {
+		dir, _, err = b.dir(project, repo)
+	} else {
+		dir, commit, err = b.at(ctx, project, repo, ref)
+	}
 	if err != nil {
 		return LogPage{}, err
 	}

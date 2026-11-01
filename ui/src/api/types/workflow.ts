@@ -87,4 +87,9 @@ export interface RepoDiff {
   head: string; // the branch's head the diff was made at
   since: string; // with since: the head it starts from ("" for against main)
   diff: string;
+  /**
+   * Gone: a decided repo whose change can't be shown (not recorded, or
+   * git no longer has its commits).
+   */
+  gone: boolean;
 }

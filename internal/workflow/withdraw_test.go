@@ -221,3 +221,48 @@ func TestAMergeOutsideForemanWithdrawsTheReviewsItHolds(t *testing.T) {
 		t.Errorf("small's review %+v", v)
 	}
 }
+
+// A decided review still shows its change, as it was decided, however it
+// ended: merged (its branch then moves to the new main), dismissed with its
+// branches dropped, or withdrawn. Without a record it says so.
+func TestADecidedReviewKeepsItsDiff(t *testing.T) {
+	for _, end := range []string{"merged", "dismissed", "withdrawn"} {
+		t.Run(end, func(t *testing.T) {
+			f := newFixture(t)
+			f.integrated()
+			f.ok("mara", "request_merge", integration)
+			before, err := f.w.ReviewDiff(ctx, "rev-1", false)
+			if err != nil || len(before) != 1 || !strings.Contains(before[0].Diff, "LED-44.go") {
+				t.Fatalf("before %+v %v", before, err)
+			}
+			switch end {
+			case "merged":
+				err = f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api"))
+			case "dismissed":
+				_, err = f.w.DismissReview(ctx, "rev-1", Dismiss{DropBranches: true, StopTeam: true})
+			case "withdrawn":
+				f.ok("mara", "withdraw_merge", map[string]string{"branch": "lead/atlas/integration", "reason": "not needed"})
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			after, err := f.w.ReviewDiff(ctx, "rev-1", false)
+			if err != nil || len(after) != 1 || after[0].Gone || after[0].Diff != before[0].Diff || after[0].Head != before[0].Head {
+				t.Errorf("after %+v %v", after, err)
+			}
+			api := filepath.Join(f.root, "ledger", "api")
+			if kept := f.git(api, "rev-parse", "refs/foreman/decided/mr-1"); kept != before[0].Head {
+				t.Errorf("kept %q, want %s", kept, before[0].Head)
+			}
+			// Recorded before this was built, or git lost it: it says so.
+			mr := f.mr("mr-1")
+			mr.Head = ""
+			if _, err := f.db.MergeRequests().Save(ctx, mr); err != nil {
+				t.Fatal(err)
+			}
+			if gone, _ := f.w.ReviewDiff(ctx, "rev-1", false); len(gone) != 1 || !gone[0].Gone || gone[0].Diff != "" {
+				t.Errorf("unrecorded %+v", gone)
+			}
+		})
+	}
+}

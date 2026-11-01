@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // activityFixture: orion on ledger (stopped), then atlas on ledger and on
@@ -128,5 +129,37 @@ func TestActivityRefusals(t *testing.T) {
 	}
 	if p, err := db.Activity().Page(ctx, "nobody@nowhere", "", 50); err != nil || len(p.Items) != 0 {
 		t.Errorf("an unknown deployment: %+v %v", p, err)
+	}
+}
+
+// Each project's latest moment across what happens on it, ordered by time
+// rather than by the stored text (which doesn't sort below a second).
+func TestLatestActivityPerProject(t *testing.T) {
+	db := activityFixture(t,
+		[3]string{"atlas@ledger", "a", "2099-01-01T00:00:00Z"},
+		[3]string{"orion@ledger", "m", "2099-01-01T00:00:00.5Z"}, // a stopped team's still counts
+	)
+	if _, err := db.sql.Exec(`INSERT INTO projects (id, workspace, created_at) VALUES ('quiet', '', '2001-01-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.sql.Exec(`INSERT INTO merge_requests (project_id, author_instance, repo, branch, entry, state, created_at, merged_at)
+		VALUES ('relay', 'mara@relay', 'api', 'lead/atlas/x', 'e', 'merged', '2001-01-01T00:00:00Z', '2098-06-01T00:00:00Z')`); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := db.Activity().Latest(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for project, want := range map[string]string{
+		"ledger": "2099-01-01T00:00:00.5Z",
+		"relay":  "2098-06-01T00:00:00Z",
+		"quiet":  "2001-01-01T00:00:00Z",
+	} {
+		if got := latest[project].Format(time.RFC3339Nano); got != want {
+			t.Errorf("%s: %s, want %s", project, got, want)
+		}
+	}
+	if len(latest) != 3 {
+		t.Errorf("projects %v", latest)
 	}
 }

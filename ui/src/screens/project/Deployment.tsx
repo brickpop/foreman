@@ -166,9 +166,9 @@ function AgentRow({
         {w?.branches.map(({ repo, branch: b }) => (
           <Link
             key={repo}
-            to="/projects/$project/repos"
-            params={{ project }}
-            search={{ repo, branch: b.name }}
+            to="/projects/$project/repos/$repo"
+            params={{ project, repo }}
+            search={{ branch: b.name }}
             title={`Read ${b.name} in ${repo}`}
             className="flex min-w-0 items-baseline gap-2 rounded-md text-[13px] hover:underline"
           >

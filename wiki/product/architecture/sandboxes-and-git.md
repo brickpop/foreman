@@ -38,7 +38,7 @@ Stopping a deployment keeps the worktrees on disk; they are removed (`git worktr
 
 ## Backups
 
-What Foreman throws away, it keeps first, as a ref under `refs/foreman/<kind>/<time>/…` (time as `2026-10-22T09-30-00Z`, UTC): out of the branch list, restorable by hand, and deleted **30 days** after it was made (at Foreman's start, then hourly, and whenever a new one is made in that repo). A ref under `refs/foreman/` whose name carries no time is left alone.
+What Foreman throws away, it keeps first, as a ref under `refs/foreman/<kind>/<time>/…` (time as `2026-10-22T09-30-00Z`, UTC): out of the branch list, restorable by hand, and deleted **30 days** after it was made (at Foreman's start, then hourly, and whenever a new one is made in that repo). A ref under `refs/foreman/` whose name carries no time is left alone: `refs/foreman/decided/<merge request>`, the head a merge request had when it left open, kept for good so its review still shows its diff ([Reviews → Decided](../features/reviews.md#decided)).
 
 | Kind | What | Made by |
 |---|---|---|

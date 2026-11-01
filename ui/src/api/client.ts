@@ -247,6 +247,8 @@ export interface MessagesArea {
   /** A page of a deployment's team traffic, messages and git actions
    * together, newest first; before is the previous page's next. */
   activity(deployment: string, before?: string): Promise<ActivityPage>;
+  /** When something last happened on each project, by id. */
+  latestActivity(): Promise<Record<string, string>>;
 }
 
 export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
@@ -333,8 +335,9 @@ export interface ReposArea {
   /** A folder at a ref ("" is the root). */
   tree(project: string, repo: string, ref: string, path: string): Promise<TreeEntry[]>;
   file(project: string, repo: string, ref: string, path: string): Promise<RepoFile>;
-  /** A page of a ref's history, newest first; skip is the previous page's next. */
-  log(project: string, repo: string, ref: string, skip?: number): Promise<LogPage>;
+  /** A page of a ref's history, or with all every branch's, newest first;
+   * skip is the previous page's next. */
+  log(project: string, repo: string, ref: string, skip?: number, all?: boolean): Promise<LogPage>;
 }
 
 export interface ForemanClient {
@@ -564,10 +567,11 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         getJSON(
           `/api/projects/${id(project)}/repos/${id(repo)}/file?${new URLSearchParams({ ref, path })}`,
         ),
-      log: (project, repo, ref, skip = 0) =>
-        getJSON(
-          `/api/projects/${id(project)}/repos/${id(repo)}/log?${new URLSearchParams({ ref, skip: String(skip) })}`,
-        ),
+      log: (project, repo, ref, skip = 0, all = false) => {
+        const q = new URLSearchParams({ ref, skip: String(skip) });
+        if (all) q.set("all", "1");
+        return getJSON(`/api/projects/${id(project)}/repos/${id(repo)}/log?${q}`);
+      },
     },
     messages: {
       list: (deployment) => getJSON(`/api/messages?deployment=${id(deployment)}`),
@@ -576,6 +580,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         if (before) q.set("before", before);
         return getJSON(`/api/activity?${q}`);
       },
+      latestActivity: () => getJSON("/api/activity/latest"),
     },
     chiefOfStaff: {
       start: async (opener) => (await request("POST", "/api/cos", { opener })).json(),

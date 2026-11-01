@@ -15,7 +15,7 @@ type Commit struct {
 	Author  string    `json:"author"`
 	Date    time.Time `json:"date"`
 	Subject string    `json:"subject"`
-	Merge   bool      `json:"merge"` // more than one parent
+	Parents []string  `json:"parents"` // more than one: a merge
 	// Branches are the branches pointing at it.
 	Branches []string `json:"branches"`
 }

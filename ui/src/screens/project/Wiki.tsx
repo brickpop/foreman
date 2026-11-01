@@ -18,7 +18,9 @@ export function Wiki() {
   const repo = useProjectRepo(project);
   const navigate = useNavigate();
   const toast = useToast();
-  const [files, setFiles] = useState(false); // closed by default
+  // The tree is always shown; under 760px it folds behind Files, closed by
+  // default (the CEO, 2026-11-01).
+  const [files, setFiles] = useState(false);
   const lacking = useMissing(project).data ?? [];
   const tree = useTree(project);
   const path = entry ?? "index.md";
@@ -61,28 +63,28 @@ export function Wiki() {
       )}
       {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
       <div className="flex items-center gap-3">
-        <Button
-          variant={files ? "raised" : "secondary"}
-          aria-pressed={files}
-          onClick={() => setFiles(!files)}
-        >
-          <span className="flex items-center gap-2">
-            <TreeIcon />
-            Files
-          </span>
-        </Button>
+        <span className="hidden max-[760px]:block">
+          <Button
+            variant={files ? "raised" : "secondary"}
+            aria-pressed={files}
+            onClick={() => setFiles(!files)}
+          >
+            <span className="flex items-center gap-2">
+              <TreeIcon />
+              Files
+            </span>
+          </Button>
+        </span>
         <span className="truncate font-mono text-xs text-tx4">
           {repo}/wiki/{path}
         </span>
       </div>
-      <div
-        className={`grid w-full gap-8 ${files ? "grid-cols-[minmax(150px,200px)_minmax(0,1fr)]" : "grid-cols-[minmax(0,1fr)]"}`}
-      >
-        {files && (
-          <nav className="sticky top-4 self-start">
-            <Tree nodes={tree.data ?? []} current={path} depth={0} onOpen={open} />
-          </nav>
-        )}
+      <div className="grid w-full grid-cols-[minmax(150px,200px)_minmax(0,1fr)] gap-8 max-[760px]:grid-cols-[minmax(0,1fr)]">
+        <nav
+          className={`sticky top-4 self-start max-[760px]:static ${files ? "" : "max-[760px]:hidden"}`}
+        >
+          <Tree nodes={tree.data ?? []} current={path} depth={0} onOpen={open} />
+        </nav>
         {/* A comfortable measure for reading, whatever the window's width. */}
         <div className="min-w-0 max-w-[780px]">
           {current.data && (

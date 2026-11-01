@@ -152,6 +152,11 @@ type MergeRequest struct {
 	RejectedAt     time.Time `json:"rejectedAt"`
 	ReviewID       string    `json:"reviewId"`     // the review it is decided in
 	ReviewedHead   string    `json:"reviewedHead"` // the branch head at the CEO's last Request changes
+	// Where the branch stood when it left open (merged, dismissed, withdrawn):
+	// its head, kept under refs/foreman/decided/<id>, and the commit it parted
+	// from main at ("" after a fast-forward), so its review still shows it.
+	Head string `json:"head"`
+	Base string `json:"base"`
 }
 
 // Review groups the merge requests one lead branch opened, one per repo, for

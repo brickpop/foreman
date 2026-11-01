@@ -50,3 +50,15 @@ export function lastTeam(project: string, stopped: Deployment[]): string | undef
       undefined,
     )?.teamId;
 }
+
+/** The projects latest first: by when something last happened on each, as of
+ * the page's load (the CEO, 2026-11-01). One added since comes first; with no
+ * times yet, the order is left as it is. */
+export function latestFirst<T extends { id: string }>(
+  projects: T[],
+  latest: Record<string, string> | undefined,
+): T[] {
+  if (!latest) return projects;
+  const at = (p: T) => (p.id in latest ? Date.parse(latest[p.id]) : Number.POSITIVE_INFINITY);
+  return [...projects].sort((a, b) => at(b) - at(a) || a.id.localeCompare(b.id));
+}

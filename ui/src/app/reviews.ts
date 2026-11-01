@@ -123,6 +123,13 @@ export function openRepos(v: Review, mainOf: (repo: string) => string) {
     .map((m) => ({ repo: m.repo, main: mainOf(m.repo), conflicting: m.conflicting }));
 }
 
+/** How a repo of the review was decided: "merged", "dismissed" or
+ * "withdrawn"; "" while it is open. Its diff is then the change as decided. */
+export function decidedAs(v: Review, repo: string): string {
+  const state = v.mergeRequests.find((m) => m.repo === repo)?.state ?? "open";
+  return state === "open" ? "" : state === "rejected" ? "dismissed" : state;
+}
+
 /** The decision button for the repos ticked: one main for all, else per repo. */
 export function mergeLabel(ticked: { main: string }[]): string {
   const mains = new Set(ticked.map((r) => r.main));

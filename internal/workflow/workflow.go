@@ -52,6 +52,8 @@ type Git interface {
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
 	Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error)
 	Resolve(ctx context.Context, dir, ref string) (string, error)
+	PartedFrom(ctx context.Context, dir, main, head string) (string, error)
+	Keep(ctx context.Context, dir, ref, commit string) error
 	SyncSubmodules(ctx context.Context, dir string, recursive bool) error
 	DirtySubmodules(ctx context.Context, dir string) ([]string, error)
 	SetSubmodule(ctx context.Context, dir, path, ref, url, message string, by git.Author) (string, error)

@@ -6,7 +6,7 @@ tags: [feature, ui, config, teams]
 
 # Project settings
 
-The project's **Settings** section ([Project page](./project-page.md)): its configuration, read-only but for the profile its agents run on. The team on the project, which this page listed until 2026-10-31, is in [Deployment](./project-deployment.md) (the CEO: remove redundant info).
+The project's **Settings** section ([Project page](./project-page.md)): its configuration, read-only but for the profile its agents run on. The team on the project, which this page listed until 2026-10-31, is in [Deployment](./project-deployment.md) (the CEO: remove redundant info). Its code repos, which this page listed until 2026-11-01, are in [Repos](./repos.md#the-list) (the CEO).
 
 ## Configuration
 
@@ -44,7 +44,7 @@ Padding `24px 24px 48px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
   └─ state.db             deployments, sessions, requests (runtime)
   ```
 
-  The code repos are not in it: they are wherever the CEO keeps them, listed under **Code repos** ([Home → Layout](../models/home.md#layout)).
+  The code repos are not in it: they are wherever the CEO keeps them, listed in [Repos](./repos.md#the-list) ([Home → Layout](../models/home.md#layout)).
 
 - **"How work flows"**: four items, title (600) and body (`--tx2`, line-height 1.55):
   - **Team definition**: "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
@@ -55,12 +55,6 @@ Padding `24px 24px 48px`. A grid of columns (`repeat(auto-fit, minmax(340px, 1fr
 **Right column**:
 
 - **"Profile"** (first in the right column; the CEO, 2026-10-18): a select of the CEO's [profiles](../architecture/session-runner.md#credentials) (`<name> · <Harness>`, Mono), the project's own selected (`default` unless set; one that no longer exists stays listed and selected), then its state, `connected` (`--ok`), `not connected` or `doesn't exist` (`--err`). Under it: "Its agents run on this harness and login, from their next start. Profiles are yours on this machine, in Settings → Agents" (a link to [Settings → Profiles](./settings.md#profiles)). Choosing saves it on the project's [record](../models/project-config.md#the-project-record) (`PUT /api/projects/:id/profile {profile}`), never in `project.toml`, which the lead can write; choosing `default` empties it. While any of the project's running agents (starting, running, idle, awaiting) still runs on another profile, a bordered line under the select says so (the CEO, 2026-10-18): "<n> agents still run on <their profiles>: they switch at the next start.", plus, when that means another harness, "On <Harness>, each starts a new conversation." Beside it, **`Restart them`** (`Restart it` for one) restarts them now (`POST /api/instances/:id/restart` each). A run from before the instance kept its profile is judged by its harness. Agents asleep or stopped aren't listed: they start on the new profile anyway. One profile for all its agents for now ([Profiles per agent](../../backlog/profiles-per-agent.md), later).
-- **"Code repos"**: one line per repo of the [record](../models/project-config.md#the-project-record), Mono 13px: its name (`--tx`) and its path (`--tx3`), then small buttons: **`Locate…`** (only for a repo with a problem), **`Rename`** and **`Remove`**. Under it, when it has one, its problem in `--err` (a missing folder, or one that is another repo: `Locate it where it went, or remove it from the project`). For a repo without a problem, a line **Main branch** with a select of its branches (its main branch, which its agents start from and its merges go to; changing it is `PUT /api/projects/{id}/repos/{repo}/main`, allowed while a team is deployed), and, when the repo no longer has that branch, in `--err`: "<repo> has no branch <main>: pick its main branch, or agents can't start." (the CEO, 2026-10-21). With none, in `--err`: `None yet: agents need at least one repo to work on.` Then **`Add a repo`**. The routes and their refusals are in [Add a project → Code repos](./add-project.md#code-repos); a refusal is a toast "Repos not changed" with the reason.
-  - **Add a repo** opens a modal "Add a repo to <project>" with the [repo picking form](./add-project.md#picking-repos) (Existing repo or New empty repo); it closes once one is added.
-  - **Locate…** opens a modal "Locate <repo>": "Pick its folder now. It must be the same repo: Foreman checks they share a commit.", and the folder browser; a pick saves it.
-  - **Rename** turns the line into a field with the name, **`Rename`** and **`Cancel`**.
-  - **Remove** asks first: "Remove <repo> from <project>?", "Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
-  - While a team is deployed on the project, **Rename** and **Remove** are disabled, titled "Stop the team on this project first"; adding and locating aren't.
 - **"What comes to you"**: grid `84px 1fr`, the kind label (colored, Mono uppercase, no border) and a line:
   - Approval: "An agent hits one of this project’s gates (always_ask_ceo below) and pauses until you answer."
   - Question: "An agent needs information only you have. It keeps working on other things meanwhile."

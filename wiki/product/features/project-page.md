@@ -18,7 +18,7 @@ The page has no header of its own: its sections are listed in the [sidebar](./ap
 | **Inbox** | `inbox`, `inbox/<review>?since=1` | What waits on the CEO there, reviews first; a review opens inside it ([Reviews](./reviews.md)) |
 | **Wiki** | `wiki?entry=` | The project's description, then its wiki ([Wiki reader](./wiki-reader.md)) |
 | **Board** | `board` | Kanban boards over the wiki ([Board](./board.md)) |
-| **Repos** | `repos?repo=&branch=` | The code repos, read-only ([Repos](./repos.md)) |
+| **Repos** | `repos`, `repos/<repo>?branch=` | The repos, added and managed; each opens its page, its branches, files and history graph ([Repos](./repos.md)) |
 | **Deployment** | `deployment` | The team, its agents and their worktrees, the work in flight and merged; Deploy and Stop ([Project deployment](./project-deployment.md)) |
 | **Activity** | `activity` | The team's messages and git actions, with the map of who calls whom ([Project activity](./project-activity.md)) |
 | **Settings** | `settings` | The project's configuration ([Project settings](./project-settings.md)) |

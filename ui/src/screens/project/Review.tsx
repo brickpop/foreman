@@ -17,6 +17,7 @@ import {
 import {
   commentAt,
   type DismissChoice,
+  decidedAs,
   diffKey,
   dismissChoices,
   dismissLabel,
@@ -144,9 +145,9 @@ export function Review() {
           <span>
             {lead?.soul.name ?? v.lead} ·{" "}
             <Link
-              to="/projects/$project/repos"
-              params={{ project: v.projectId }}
-              search={{ repo: v.mergeRequests[0]?.repo, branch: v.branch }}
+              to="/projects/$project/repos/$repo"
+              params={{ project: v.projectId, repo: v.mergeRequests[0]?.repo ?? "" }}
+              search={{ branch: v.branch }}
               title="Read the branch in Repos"
               className="font-mono text-tx2 hover:text-tx"
             >
@@ -191,6 +192,7 @@ export function Review() {
             <div key={r.repo} className="flex flex-col gap-0.5">
               <SectionLabel>
                 {r.repo} → {r.main}
+                {decidedAs(v, r.repo) && ` · ${decidedAs(v, r.repo)}`}
               </SectionLabel>
               {r.files.map((f) => (
                 <button
@@ -212,7 +214,9 @@ export function Review() {
                   <span className="font-mono text-[11px] text-err">−{f.removed}</span>
                 </button>
               ))}
-              {r.files.length === 0 && <span className="px-1.5 text-tx4">No changes.</span>}
+              {r.files.length === 0 && (
+                <span className="px-1.5 text-tx4">{r.gone ? "Can't show it." : "No changes."}</span>
+              )}
             </div>
           ))}
         </nav>
@@ -222,7 +226,15 @@ export function Review() {
           <div className="flex flex-col gap-5 py-5">
             {diff.error && <p className="text-err">{diff.error.message}</p>}
             {diff.isPending && <Loading rows={8} />}
-            {diff.data?.length === 0 && <Empty>Nothing open to read: every repo is decided.</Empty>}
+            {diff.data?.length === 0 && <Empty>Nothing to read: the review has no repo.</Empty>}
+            {repos
+              .filter((r) => r.gone)
+              .map((r) => (
+                <Empty key={r.repo}>
+                  {r.repo}: the change can't be shown. It wasn't recorded when the review was
+                  decided, or git no longer has its commits.
+                </Empty>
+              ))}
             {repos.map((r) =>
               r.files.map((f) => (
                 <FileBox

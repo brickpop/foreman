@@ -167,9 +167,9 @@ function BranchLink({ project, repo, branch }: { project: string; repo?: string;
   if (!repo) return <span className="font-mono">{branch}</span>;
   return (
     <Link
-      to="/projects/$project/repos"
-      params={{ project }}
-      search={{ repo, branch }}
+      to="/projects/$project/repos/$repo"
+      params={{ project, repo }}
+      search={{ branch }}
       title={`Read ${branch} in ${repo}`}
       className="font-mono text-accTx hover:underline"
     >

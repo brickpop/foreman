@@ -147,7 +147,7 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
     case "repo":
       return (
         <Link
-          to="/projects/$project/settings"
+          to="/projects/$project/repos"
           params={{ project: s.subject }}
           className="text-[13px] text-accTx hover:underline"
         >

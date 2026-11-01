@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { Deployment, Instance } from "../api/client";
 import { replacingLine, sessionsEnd } from "./model";
-import { lastTeam, projectHome, reviewOf, sections, sessionOf, teamOn } from "./project";
+import {
+  lastTeam,
+  latestFirst,
+  projectHome,
+  reviewOf,
+  sections,
+  sessionOf,
+  teamOn,
+} from "./project";
 
 const inst = (id: string, deploymentId: string) => ({ id, deploymentId }) as Instance;
 
@@ -66,5 +74,29 @@ describe("deploying onto a project with a team", () => {
     );
     expect(sessionsEnd(1)).toBe("1 session ends");
     expect(sessionsEnd(0)).toBe("0 sessions end");
+  });
+});
+
+describe("the projects, latest first", () => {
+  const p = (...ids: string[]) => ids.map((id) => ({ id }));
+  it("orders by last activity, by time rather than text", () => {
+    const latest = {
+      ledger: "2026-11-01T09:00:00Z",
+      relay: "2026-11-01T09:00:00.5Z", // half a second later, though it sorts lower as text
+      quiet: "2025-01-01T00:00:00Z",
+    };
+    expect(latestFirst(p("ledger", "quiet", "relay"), latest).map((x) => x.id)).toEqual([
+      "relay",
+      "ledger",
+      "quiet",
+    ]);
+  });
+  it("puts a project added since the page loaded first, and ties by name", () => {
+    const latest = { b: "2026-11-01T09:00:00Z", a: "2026-11-01T09:00:00Z" };
+    expect(latestFirst(p("a", "b", "new"), latest).map((x) => x.id)).toEqual(["new", "a", "b"]);
+  });
+  it("leaves the order as it is until the times are in", () => {
+    const list = p("b", "a");
+    expect(latestFirst(list, undefined)).toBe(list);
   });
 });

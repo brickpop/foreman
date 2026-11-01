@@ -19,7 +19,7 @@ export interface Commit {
   author: string;
   date: string /* RFC 3339 */;
   subject: string;
-  merge: boolean; // more than one parent
+  parents: string[]; // more than one: a merge
   /**
    * Branches are the branches pointing at it.
    */

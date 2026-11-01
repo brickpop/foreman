@@ -7,9 +7,10 @@ import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
 import { useOpenChiefOfStaff } from "./chiefOfStaff";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
-import { reviewOf, sections, sessionOf } from "./project";
+import { latestFirst, reviewOf, sections, sessionOf } from "./project";
 import {
   useInstances,
+  useLatestActivity,
   useLiveEvents,
   usePreferences,
   useProjects,
@@ -136,8 +137,9 @@ function Sidebar({
   const instances = useInstances();
   const requests = useRequests();
   usePreferences(); // the theme
+  const latest = useLatestActivity();
   const model = sidebarModel(
-    projects.data ?? [],
+    latestFirst(projects.data ?? [], latest),
     teams.data ?? [],
     instances.data ?? [],
     requests.data ?? [],
@@ -214,20 +216,41 @@ function Sidebar({
 }
 
 /** A project in the sidebar; the one open lists its sections under it, the
- * Inbox with its count (the CEO, 2026-10-31: no second row of tabs). */
+ * Inbox with its count (the CEO, 2026-10-31: no second row of tabs). A click
+ * on the open one's name folds its sections, on another opens it (the CEO,
+ * 2026-11-01). */
 function ProjectRow({ project }: { project: SidebarProject }) {
   const current = useParams({ strict: false }).project === project.id;
+  const [open, setOpen] = useState(true);
+  // Opening a project shows its sections again.
+  useEffect(() => {
+    if (current) setOpen(true);
+  }, [current]);
   return (
     <>
-      <Link
-        to="/projects/$project"
-        params={{ project: project.id }}
-        className={`${rowItem} ${current ? "font-medium !text-tx" : ""}`}
-      >
-        {project.id}
-        {!current && project.inbox > 0 && <Dot title="Needs you" />}
-      </Link>
-      {current && (
+      {current ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={(e) => {
+            e.stopPropagation(); // keeps the narrow screens' overlay open
+            setOpen(!open);
+          }}
+          className={`${rowItem} text-left font-medium !text-tx`}
+        >
+          {project.id}
+          <span className="flex items-center gap-2">
+            {!open && project.inbox > 0 && <Dot title="Needs you" />}
+            <Chevron open={open} />
+          </span>
+        </button>
+      ) : (
+        <Link to="/projects/$project" params={{ project: project.id }} className={rowItem}>
+          {project.id}
+          {project.inbox > 0 && <Dot title="Needs you" />}
+        </Link>
+      )}
+      {current && open && (
         <nav className="mb-1 ml-3.5 flex flex-col gap-px border-l border-line2 pl-1.5">
           {sections.map((s) => (
             <Link

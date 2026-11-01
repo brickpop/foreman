@@ -31,6 +31,8 @@ Table `merge_requests`.
 | `note` | String | | | | Latest status line (e.g. "2 review comments", the CEO's reason for rejecting, the reason it was withdrawn) |
 | `review_id` | String → Review | yes | | | The [review](./review.md) it is decided in: its branch's open one, or a new one |
 | `reviewed_head` | String | | | | The branch head at the CEO's last Request changes: where "since your last review" starts |
+| `head` | String | | | | The branch head when it left `open`, kept at `refs/foreman/decided/<id>` so its decided diff stays readable ([Reviews → Decided](../features/reviews.md#decided)) |
+| `base` | String | | | | The commit that branch parted from `main` (empty for a fast-forward): the decided diff is `base…head` |
 | `created_at` | Timestamp | yes | now | | |
 | `merged_at` | Timestamp | | | | Set when Foreman merged it (Merge to main) or saw it merged on the forge |
 | `rejected_at` | Timestamp | | | | Set by Dismiss (on its review), or when its PR is closed on the forge without a merge |

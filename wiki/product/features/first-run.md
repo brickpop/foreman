@@ -35,7 +35,7 @@ Header: `Setup · N of M done`, then one panel, one row per step. Each row has a
 | **The `<profile>` profile connected** | each profile the projects use (`default` while there is no project) | `Not connected yet: its agents can't start`; for one that doesn't exist, the step fails: `No such profile: create it under Settings → Agents → Profiles, or pick another in the project's settings` | **Connect**: the login terminal ([Settings → Profiles](./settings.md#profiles)); for one that doesn't exist, a link to Profiles |
 | **A team** | always | `Create a team` | **Create a team**: the [Chief of Staff](./chief-of-staff.md)'s create-team flow |
 | **A project** | always | `Add a project` | **`New project`** opens the [New project](./add-project.md#the-dialog) dialog |
-| **A code repo in `<project>`** | each project with no code repo (and no problems) | `<project> has no code repo for agents to work in: add one` | **`Add a repo`**, a link to the project's [Settings](./project-settings.md) section, where Code repos adds one |
+| **A code repo in `<project>`** | each project with no code repo (and no problems) | `<project> has no code repo for agents to work in: add one` | **`Add a repo`**, a link to the project's [Repos](./repos.md#the-list) section, which adds one |
 
 ## The Podman machine (macOS)
 

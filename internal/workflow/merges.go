@@ -178,6 +178,7 @@ func (w *Workflow) free(ctx context.Context, item store.WorkItem) bool {
 // it, so they leave In flight with it: the work isn't wanted. A new
 // hand-off of one of their branches frees it (handed).
 func (w *Workflow) reject(ctx context.Context, mr store.MergeRequest, reason string) {
+	w.settle(ctx, &mr, "")
 	mr.State, mr.RejectedAt, mr.Note = store.MergeRejected, time.Now().UTC(), reason
 	w.saveMerge(ctx, mr)
 }
@@ -216,6 +217,7 @@ func (w *Workflow) Reconcile(ctx context.Context) {
 // still at head (the commit merged), moves to the new main: a squash left
 // its commits out of main, and a next review on it would show them again.
 func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, main, dir, head string) {
+	w.settle(ctx, &mr, head)
 	mr.State, mr.MergedAt, mr.Conflicting, mr.Note = store.MergeMerged, time.Now().UTC(), false, ""
 	w.saveMerge(ctx, mr)
 	if !w.anyOpen(ctx, mr.ReviewID) {
@@ -409,4 +411,28 @@ func (w *Workflow) publishRequest(kind string, r store.Request) {
 // OpenRequests lists what is open for the CEO.
 func (w *Workflow) OpenRequests(ctx context.Context) ([]store.Request, error) {
 	return w.Requests.Open(ctx)
+}
+
+// settle records where a merge request's branch stands as it leaves open:
+// its head (the one merged, else the branch's), kept under
+// refs/foreman/decided/<id> so the commits outlive the branch, and where it
+// parted from main, so its review still shows the change
+// (wiki/product/features/reviews.md#decided). A failure leaves them unset:
+// the review then says it can't show the change.
+func (w *Workflow) settle(ctx context.Context, mr *store.MergeRequest, head string) {
+	main, dir, err := w.repoOf(*mr)
+	if err == nil && head == "" {
+		head, err = w.Git.Resolve(ctx, dir, "refs/heads/"+mr.Branch)
+	}
+	if err == nil {
+		err = w.Git.Keep(ctx, dir, "refs/foreman/decided/"+mr.ID, head)
+	}
+	if err != nil {
+		slog.Info("recording a decided merge request", "id", mr.ID, "err", err)
+		return
+	}
+	mr.Head = head
+	if mr.Base, err = w.Git.PartedFrom(ctx, dir, main, head); err != nil {
+		slog.Info("where a decided merge request parted from main", "id", mr.ID, "err", err)
+	}
 }

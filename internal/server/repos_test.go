@@ -54,8 +54,8 @@ func (f *fakeRepos) File(_ context.Context, project, repo, ref, path string) (re
 	return repos.File{Path: path, Size: 6, Text: "# API\n"}, nil
 }
 
-func (f *fakeRepos) Log(_ context.Context, project, repo, ref string, skip int) (repos.LogPage, error) {
-	f.asked = append(f.asked, "log "+ref+" "+strconv.Itoa(skip))
+func (f *fakeRepos) Log(_ context.Context, project, repo, ref string, all bool, skip int) (repos.LogPage, error) {
+	f.asked = append(f.asked, "log "+ref+" "+strconv.FormatBool(all)+" "+strconv.Itoa(skip))
 	if err := f.check(project, repo, ref); err != nil {
 		return repos.LogPage{}, err
 	}
@@ -75,12 +75,12 @@ func TestRepoReads(t *testing.T) {
 	if file["text"] != "# API\n" {
 		t.Errorf("file %v", file)
 	}
-	for _, path := range []string{"/api/projects/ledger/repos/api/tree?ref=trunk&path=src%2Flib", "/api/projects/ledger/repos/api/log?ref=trunk&skip=50"} {
+	for _, path := range []string{"/api/projects/ledger/repos/api/tree?ref=trunk&path=src%2Flib", "/api/projects/ledger/repos/api/log?ref=trunk&skip=50", "/api/projects/ledger/repos/api/log?ref=trunk&all=1"} {
 		if w := send(h, "GET", path, ""); w.Code != http.StatusOK {
 			t.Errorf("%s: %d %s", path, w.Code, w.Body)
 		}
 	}
-	if got := strings.Join(f.asked, ","); got != "file trunk README.md,tree trunk src/lib,log trunk 50" {
+	if got := strings.Join(f.asked, ","); got != "file trunk README.md,tree trunk src/lib,log trunk false 50,log trunk true 0" {
 		t.Errorf("asked %s", got)
 	}
 	for path, want := range map[string]string{

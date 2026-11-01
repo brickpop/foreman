@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Deployment, MergeRequest, Review, ReviewComment, Team } from "../api/client";
 import {
   commentAt,
+  decidedAs,
   diffKey,
   dismissChoices,
   dismissLabel,
@@ -44,6 +45,21 @@ const comment = (more: Partial<ReviewComment>) =>
   }) as ReviewComment;
 
 describe("Reviews", () => {
+  it("names how each repo was decided, and none while open", () => {
+    const v = review([
+      mr("api", { state: "merged" }),
+      mr("web", { state: "rejected" }),
+      mr("cli", { state: "withdrawn" }),
+      mr("doc"),
+    ]);
+    expect(["api", "web", "cli", "doc", "gone"].map((r) => decidedAs(v, r))).toEqual([
+      "merged",
+      "dismissed",
+      "withdrawn",
+      "",
+      "",
+    ]);
+  });
   it("lists the repos still open, each with its main", () => {
     const v = review([mr("api"), mr("web"), mr("cli", { state: "merged" })]);
     expect(openRepos(v, mains).map((r) => [r.repo, r.main])).toEqual([
@@ -205,9 +221,9 @@ describe("Dismiss", () => {
 
 describe("mergeHeads", () => {
   const diffs = [
-    { repo: "api", main: "main", head: "a1b2", since: "", diff: "" },
-    { repo: "web", main: "trunk", head: "c3d4", since: "", diff: "" },
-    { repo: "docs", main: "main", head: "", since: "", diff: "" },
+    { repo: "api", main: "main", head: "a1b2", since: "", diff: "", gone: false },
+    { repo: "web", main: "trunk", head: "c3d4", since: "", diff: "", gone: false },
+    { repo: "docs", main: "main", head: "", since: "", diff: "", gone: false },
   ];
   it("names each repo ticked with the head its diff was shown at", () => {
     expect(mergeHeads(diffs, ["api", "web"])).toEqual({ api: "a1b2", web: "c3d4" });

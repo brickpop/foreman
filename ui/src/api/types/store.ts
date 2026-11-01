@@ -167,6 +167,13 @@ export interface MergeRequest {
   rejectedAt: string /* RFC 3339 */;
   reviewId: string; // the review it is decided in
   reviewedHead: string; // the branch head at the CEO's last Request changes
+  /**
+   * Where the branch stood when it left open (merged, dismissed, withdrawn):
+   * its head, kept under refs/foreman/decided/<id>, and the commit it parted
+   * from main at ("" after a fast-forward), so its review still shows it.
+   */
+  head: string;
+  base: string;
 }
 /**
  * Review groups the merge requests one lead branch opened, one per repo, for

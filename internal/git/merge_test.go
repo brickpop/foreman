@@ -361,3 +361,78 @@ func TestDropBranchCheckedOutInAWorktree(t *testing.T) {
 		t.Error("what wasn't committed isn't kept as it was")
 	}
 }
+
+// Where a branch's change starts, however main took it: open, squashed, by a
+// merge commit; nothing to tell apart after a fast-forward.
+func TestPartedFrom(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		merge func(t *testing.T, g *CLI, dir, head string)
+		none  bool // a fast-forward: "" expected
+	}{
+		{"open", func(*testing.T, *CLI, string, string) {}, false},
+		{"squashed", func(t *testing.T, g *CLI, dir, head string) {
+			if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "Feature"); err != nil {
+				t.Fatal(err)
+			}
+		}, false},
+		{"merge commit", func(t *testing.T, _ *CLI, dir, _ string) {
+			mustRun(t, dir, "merge", "-q", "--no-ff", "-m", "merge x", "lead/atlas/x")
+			write(t, filepath.Join(dir, "after"), "later\n")
+			mustRun(t, dir, "add", "after")
+			mustRun(t, dir, "commit", "-q", "-m", "after the merge")
+		}, false},
+		{"fast-forward", func(t *testing.T, _ *CLI, dir, _ string) {
+			mustRun(t, dir, "reset", "-q", "--hard", "lead/atlas/x")
+		}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g, dir := mergeFixture(t)
+			fork := mustRun(t, dir, "rev-parse", "main")
+			head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+			if tc.name != "fast-forward" { // main moves on meanwhile
+				write(t, filepath.Join(dir, "other"), "other\n")
+				mustRun(t, dir, "add", "other")
+				mustRun(t, dir, "commit", "-q", "-m", "other work")
+			}
+			tc.merge(t, g, dir, head)
+			got, err := g.PartedFrom(ctx, dir, "main", head)
+			want := fork
+			if tc.none {
+				want = ""
+			}
+			if err != nil || got != want {
+				t.Errorf("parted from %q %v, want %q", got, err, want)
+			}
+		})
+	}
+	g, dir := mergeFixture(t)
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if _, err := g.PartedFrom(ctx, dir, "-x", head); !errors.Is(err, ErrBadBranch) {
+		t.Errorf("a bad main: %v", err)
+	}
+	if _, err := g.PartedFrom(ctx, dir, "main", "lead/atlas/x"); !errors.Is(err, ErrNoRef) {
+		t.Errorf("a branch for the head: %v", err)
+	}
+}
+
+// A kept commit outlives its branch and the backups' pruning.
+func TestKeep(t *testing.T) {
+	g, dir := mergeFixture(t)
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if err := g.Keep(ctx, dir, "refs/foreman/decided/mr-1", head); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, dir, "branch", "-D", "lead/atlas/x")
+	if err := g.PruneBackups(ctx, dir, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustRun(t, dir, "rev-parse", "refs/foreman/decided/mr-1"); got != head {
+		t.Errorf("kept %q, want %s", got, head)
+	}
+	for _, bad := range [][2]string{{"refs/heads/x", head}, {"refs/foreman/decided/mr-1", "main"}} {
+		if err := g.Keep(ctx, dir, bad[0], bad[1]); !errors.Is(err, ErrNoRef) {
+			t.Errorf("%q: %v", bad, err)
+		}
+	}
+}

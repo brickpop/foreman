@@ -14,11 +14,11 @@ The section opens with the project's description (15px `--tx3`, at most 780px), 
 
 ## Layout
 
-A grid (gap 32) using the full width. Tree closed: the article alone, `minmax(0, 1fr)`. Tree open: `minmax(150px, 200px) minmax(0, 1fr)`, so the article shrinks by the tree. Body padding `20px 24px 48px`; the article at most 780px wide.
+A grid (gap 32) using the full width: the file tree, **always shown** (the CEO, 2026-11-01), `minmax(150px, 200px)`, then the article, `minmax(0, 1fr)`. Under 760px the tree goes above the article, behind the `Files` toggle. Body padding `20px 24px 48px`; the article at most 780px wide.
 
 ## Toolbar
 
-- **`Files`** toggle, a file-tree icon on its left (raised when open). **Closed by default.** It carries no changed dot: those sit on the entries and folders in the tree.
+- **`Files`** toggle, **under 760px only** (above it the tree is always shown, so no toggle): a file-tree icon on its left (raised when open), **closed by default**. It carries no changed dot: those sit on the entries and folders in the tree.
 - The current entry path (Mono 12px `--tx4`, ellipsis): `<project>/project/wiki/<path>`.
 
 ## File tree

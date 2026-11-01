@@ -30,7 +30,7 @@ PUT    /api/projects/:id/archived             {archived} → archives the projec
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)
-GET    /api/projects/:id/repos/:repo/log      ?ref=&skip= a page of history, newest first: {commits, next}, 50 commits; 404 NOT_FOUND for an unknown project, repo, ref or path
+GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next}, 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
 GET    /api/folders                           ?path= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
 GET    /api/folders/workspace                 ?name= where a project named name would go: {path, folder, folderExists} (the projects folder, ~ expanded; path is the folder itself while name isn't a valid one)
@@ -61,6 +61,7 @@ GET    /api/requests                          the open requests (today: review r
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
 GET    /api/activity?deployment=              [&before=<cursor>] a page of a deployment's team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; 400 BAD_REQUEST without a deployment or for a bad cursor
+GET    /api/activity/latest                   when something last happened on each project, {<project>: <time>}: a team message or action, a request, a merge request, a deploy or stop, else its creation (the projects' order)
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
 GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404

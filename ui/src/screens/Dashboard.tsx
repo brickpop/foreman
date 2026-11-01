@@ -12,10 +12,11 @@ import {
   teamCards,
   workingSummary,
 } from "../app/model";
-import { sessionOf } from "../app/project";
+import { latestFirst, sessionOf } from "../app/project";
 import {
   useAnswer,
   useInstances,
+  useLatestActivity,
   useProjects,
   useRequests,
   useSetup,
@@ -42,8 +43,9 @@ export function Dashboard() {
   const [newProject, setNewProject] = useState(false);
   const openChiefOfStaff = useOpenChiefOfStaff();
   const asks = inbox(requests.data ?? []);
+  const latest = useLatestActivity();
   const rows = projectRows(
-    projects.data ?? [],
+    latestFirst(projects.data ?? [], latest),
     teams.data ?? [],
     instances.data ?? [],
     requests.data ?? [],

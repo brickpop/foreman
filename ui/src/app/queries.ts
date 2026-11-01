@@ -528,6 +528,20 @@ export function useStoppedDeployments() {
 
 /** A deployment's team traffic a page at a time, newest first (a project's
  * Activity section). */
+/** When something last happened on each project, as the page loaded: the
+ * projects' order, kept while the CEO works so nothing reshuffles. */
+export function useLatestActivity(): Record<string, string> | undefined {
+  const c = useClient();
+  const q = useQuery({
+    queryKey: ["latest-activity"],
+    queryFn: () => c.messages.latestActivity(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const first = useRef<Record<string, string>>(undefined);
+  if (q.data && !first.current) first.current = q.data;
+  return first.current;
+}
+
 export function useActivity(deployment: string, enabled = true) {
   const c = useClient();
   return useInfiniteQuery({
@@ -562,12 +576,12 @@ export function useRepoFile(project: string, repo: string, ref: string, path: st
   });
 }
 
-/** A ref's history a page at a time, newest first. */
-export function useRepoLog(project: string, repo: string, ref: string) {
+/** A ref's history, or with all every branch's, a page at a time, newest first. */
+export function useRepoLog(project: string, repo: string, ref: string, all = false) {
   const c = useClient();
   return useInfiniteQuery({
-    queryKey: [...keys.repos, project, repo, ref, "log"],
-    queryFn: ({ pageParam }) => c.repos.log(project, repo, ref, pageParam),
+    queryKey: [...keys.repos, project, repo, all ? "" : ref, "log"],
+    queryFn: ({ pageParam }) => c.repos.log(project, repo, ref, pageParam, all),
     initialPageParam: 0,
     getNextPageParam: (last) => last.next || undefined,
   });

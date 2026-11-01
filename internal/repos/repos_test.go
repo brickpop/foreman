@@ -119,9 +119,18 @@ func TestFilesAsCommitted(t *testing.T) {
 	if err != nil || len(entries) != 1 || entries[0].Name != "project.toml" {
 		t.Errorf("project repo %+v %v", entries, err)
 	}
-	page, err := b.Log(ctx, "ledger", "api", "wt/tove/x", 0)
+	page, err := b.Log(ctx, "ledger", "api", "wt/tove/x", false, 0)
 	if err != nil || len(page.Commits) != 2 || page.Commits[0].Subject != "x" || page.Next != 0 {
 		t.Errorf("log %+v %v", page, err)
+	}
+	// Every branch's: the ref goes unread, and each commit appears once.
+	all, err := b.Log(ctx, "ledger", "api", "nope", true, 0)
+	seen := map[string]bool{}
+	for _, c := range all.Commits {
+		seen[c.Hash] = true
+	}
+	if err != nil || len(seen) != len(all.Commits) || len(all.Commits) < len(page.Commits) || !seen[page.Commits[0].Hash] {
+		t.Errorf("all branches %+v %v", all, err)
 	}
 }
 

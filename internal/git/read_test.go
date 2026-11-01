@@ -104,7 +104,7 @@ func TestLogPagesAndMarksMerges(t *testing.T) {
 	if want := []string{"Merge wt/tove/x", "notes", "app", "first"}; !slices.Equal(subjects, want) {
 		t.Errorf("log %v, want %v", subjects, want)
 	}
-	if !all[0].Merge || all[1].Merge || all[0].Author == "" || all[0].Date.IsZero() || len(all[0].Hash) != 40 {
+	if len(all[0].Parents) != 2 || len(all[1].Parents) != 1 || len(all[3].Parents) != 0 || all[3].Parents == nil || all[0].Author == "" || all[0].Date.IsZero() || len(all[0].Hash) != 40 {
 		t.Errorf("first %+v, second %+v", all[0], all[1])
 	}
 	// The branches at each commit, never HEAD or a tag; two at one commit both show.
@@ -120,6 +120,14 @@ func TestLogPagesAndMarksMerges(t *testing.T) {
 	}
 	if rest, err := g.Log(ctx, dir, main, 4, 2); err != nil || len(rest) != 0 {
 		t.Errorf("past the end: %+v %v", rest, err)
+	}
+	// Every branch's: one main lacks too, each commit once, children first.
+	first := all[len(all)-1].Hash
+	side := mustRun(t, dir, "commit-tree", "-p", first, "-m", "on the side", first+"^{tree}")
+	mustRun(t, dir, "update-ref", "refs/heads/side", side)
+	every, err := g.Log(ctx, dir, "", 0, 10)
+	if err != nil || len(every) != len(all)+1 || every[len(every)-1].Hash != first || !slices.ContainsFunc(every, func(c Commit) bool { return c.Subject == "on the side" }) {
+		t.Errorf("every branch %+v %v", every, err)
 	}
 }
 

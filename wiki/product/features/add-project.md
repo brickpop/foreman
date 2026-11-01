@@ -22,7 +22,7 @@ A modal ([App shell](./app-shell.md#overlays)) opened from **`+ New project`** i
 
 ## Picking repos
 
-The same form adds a repo from the dialog and from [Project settings](./project-settings.md) (`AddRepo`), a segmented **Existing repo | New empty repo**:
+The same form adds a repo from the dialog and from [Repos](./repos.md#the-list) (`AddRepo`), a segmented **Existing repo | New empty repo**:
 
 - **Existing repo**: the folder browser picks a git repo (its **Pick** button), or a pasted path (**Use**). The chosen path shows with **Change**. The **Repo name** follows the folder's name, made to fit the [rules](#names) (`My Repo` → `My-Repo`), until the CEO edits it. A repo without a `main` branch also shows **Main branch**, a select of its branches (the checkout's preselected): "This repo has no main branch. Pick its default: agents start their branches from it, and merges go to it. You can change it later in Project settings." ([Project config → The project record](../models/project-config.md#the-project-record)). **Add repo**.
 - **New empty repo**: the browser picks the folder it goes in (**Here**, or a pasted path), and the name (required) is its new folder: "Creates <folder>/<name> with a README in a first commit, on main." **Create repo**.

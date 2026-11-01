@@ -5,16 +5,13 @@ import { type Project, useClient } from "../../api/client";
 import { forgeLabel, harnessLabel, onOtherProfile } from "../../app/model";
 import {
   keys,
-  useBranches,
   useDeployments,
   useHomeFolder,
   useInstances,
   useProfiles,
   useTeams,
 } from "../../app/queries";
-import { AddRepo } from "../../components/AddRepo";
-import { Confirm, Modal } from "../../components/Overlays";
-import { RepoPicker } from "../../components/RepoPicker";
+import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { Button } from "../../components/ui";
@@ -92,7 +89,6 @@ function Configuration({ project }: { project: Project }) {
       </div>
       <div className="flex min-w-0 flex-col gap-6">
         <ProfileChoice project={project} />
-        <CodeRepos project={project} />
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
             {[
@@ -289,179 +285,6 @@ function ProfileChoice({ project }: { project: Project }) {
         </Link>
         .
       </span>
-    </Block>
-  );
-}
-
-/** The project's code repos, wherever they are on disk, each with what keeps
- * agents from using it; added, created, located, renamed and removed here.
- * Renaming and removing wait until no team is deployed on the project. */
-/** A repo's main branch, which its agents start from and its merges go to:
- * any of its branches. One it no longer has (renamed, or from before each repo
- * had its own) is flagged, since agents can't start without it. */
-function RepoMain({
-  repo,
-  onPick,
-}: {
-  repo: Project["repos"][number];
-  onPick: (main: string) => void;
-}) {
-  const branches = useBranches(repo.path);
-  const list = branches.data?.branches ?? [];
-  return (
-    <span className="flex flex-wrap items-center gap-2 text-[13px] text-tx3">
-      Main branch
-      <Select
-        label={`Main branch of ${repo.name}`}
-        value={repo.main}
-        mono
-        options={list.map((b) => ({ value: b, label: b }))}
-        onChange={(b) => b !== repo.main && onPick(b)}
-      />
-      {branches.data && !list.includes(repo.main) && (
-        <span className="text-err">
-          {repo.name} has no branch {repo.main}: pick its main branch, or agents can't start.
-        </span>
-      )}
-    </span>
-  );
-}
-
-function CodeRepos({ project }: { project: Project }) {
-  const client = useClient();
-  const queries = useQueryClient();
-  const toast = useToast();
-  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
-  const [adding, setAdding] = useState(false);
-  const [locating, setLocating] = useState<string>();
-  const [renaming, setRenaming] = useState<{ name: string; to: string }>();
-  const [removing, setRemoving] = useState<string>();
-  const change = useMutation({
-    mutationFn: (run: () => Promise<Project>) => run(),
-    onSuccess: () => queries.invalidateQueries({ queryKey: keys.projects }),
-    onError: (e: Error) =>
-      toast({ title: "Repos not changed", body: e.message, color: "var(--err)" }),
-  });
-  const stopFirst = deployed ? "Stop the team on this project first" : undefined;
-  return (
-    <Block title="Code repos">
-      {project.repos.length === 0 ? (
-        <p className="m-0 text-[13.5px] text-err">
-          None yet: agents need at least one repo to work on.
-        </p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {project.repos.map((r) => (
-            <li key={r.name} className="flex flex-col gap-0.5">
-              {renaming?.name === r.name ? (
-                <form
-                  className="flex items-center gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const to = renaming.to.trim();
-                    if (to && to !== r.name)
-                      change.mutate(() => client.home.renameRepo(project.id, r.name, to), {
-                        onSuccess: () => setRenaming(undefined),
-                      });
-                  }}
-                >
-                  <input
-                    value={renaming.to}
-                    onChange={(e) => setRenaming({ name: r.name, to: e.target.value })}
-                    aria-label={`New name for ${r.name}`}
-                    spellCheck={false}
-                    // biome-ignore lint/a11y/noAutofocus: opened by the Rename click, to type the name
-                    autoFocus
-                    className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
-                  />
-                  <Button type="submit" variant="small" disabled={change.isPending}>
-                    Rename
-                  </Button>
-                  <Button variant="small" onClick={() => setRenaming(undefined)}>
-                    Cancel
-                  </Button>
-                </form>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 font-mono text-[13px] break-all">
-                    <span className="text-tx">{r.name}</span>{" "}
-                    <span className="text-tx3">{r.path}</span>
-                  </span>
-                  {r.problem && (
-                    <Button variant="small" onClick={() => setLocating(r.name)}>
-                      Locate…
-                    </Button>
-                  )}
-                  <Button
-                    variant="small"
-                    disabled={deployed}
-                    title={stopFirst}
-                    onClick={() => setRenaming({ name: r.name, to: r.name })}
-                  >
-                    Rename
-                  </Button>
-                  <Button
-                    variant="small"
-                    disabled={deployed}
-                    title={stopFirst}
-                    onClick={() => setRemoving(r.name)}
-                  >
-                    Remove
-                  </Button>
-                </span>
-              )}
-              {r.problem && <span className="text-[13px] text-err">{r.problem}</span>}
-              {!r.problem && (
-                <RepoMain
-                  repo={r}
-                  onPick={(main) =>
-                    change.mutate(() => client.home.setRepoMain(project.id, r.name, main))
-                  }
-                />
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      <span>
-        <Button variant="small" onClick={() => setAdding(true)}>
-          Add a repo
-        </Button>
-      </span>
-      <Modal open={adding} onClose={() => setAdding(false)} title={`Add a repo to ${project.id}`}>
-        {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
-      </Modal>
-      <Modal
-        open={locating !== undefined}
-        onClose={() => setLocating(undefined)}
-        title={`Locate ${locating}`}
-      >
-        <div className="flex flex-col gap-3">
-          <p className="m-0 text-[13.5px] text-tx2">
-            Pick its folder now. It must be the same repo: Foreman checks they share a commit.
-          </p>
-          {locating && (
-            <RepoPicker
-              pick="repo"
-              onPick={(path) =>
-                change.mutate(() => client.home.locateRepo(project.id, locating, path), {
-                  onSuccess: () => setLocating(undefined),
-                })
-              }
-            />
-          )}
-        </div>
-      </Modal>
-      <Confirm
-        open={removing !== undefined}
-        title={`Remove ${removing} from ${project.id}?`}
-        body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
-        action="Remove"
-        onConfirm={() =>
-          removing && change.mutate(() => client.home.removeRepo(project.id, removing))
-        }
-        onClose={() => setRemoving(undefined)}
-      />
     </Block>
   );
 }

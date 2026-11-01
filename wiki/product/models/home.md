@@ -14,7 +14,7 @@ A project's own files are not in the home: they are in its **workspace**, a fold
 
 | Kind | Where | Who edits | UI behaviour |
 |---|---|---|---|
-| **Project record** | `state.db`: its name, its code repos (name, path, root commit), its profile | The UI ([Project settings](../features/project-settings.md)) | See [Project config → The project record](./project-config.md#the-project-record). |
+| **Project record** | `state.db`: its name, its code repos (name, path, root commit), its profile | The UI ([Project settings](../features/project-settings.md), the code repos from [Repos](../features/repos.md#the-list)) | See [Project config → The project record](./project-config.md#the-project-record). |
 | **Project config** | `<workspace>/project/project.toml`, in the project repo | CEO in their editor | **Read-only** in the UI. Changes by the Chief of Staff come later ([Project config with the Chief of Staff](../../backlog/cos-project-config.md)). See [Project config](./project-config.md). |
 | **Project knowledge base** | `<workspace>/project/wiki/` (`wiki.toml`, board, product, ADRs), in the project repo | The lead commits through `commit()` (no review); other agents through `contribute`; the CEO in their editor | Read-only prose. Exceptions, as in wikiview: toggling a checkbox, and moving a board card (rewrites one frontmatter field). See [Wiki engine](../architecture/wiki-engine.md). |
 | **Team definitions** | `config/teams/<team>.toml`, in the global repo | The UI (one commit per save, the Chief of Staff's proposals included), or the editor | Editable in the UI. Changes write to the file and apply to every running instance on its next turn. See [Team definition](./team-definition.md). |

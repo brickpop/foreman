@@ -6,6 +6,7 @@ import {
   bytes,
   crumbs,
   folderOf,
+  graph,
   isMarkdown,
   reposWith,
   shownAt,
@@ -101,19 +102,80 @@ describe("worktrees", () => {
     expect(reposWith(webFirst, "wt/tove/LED-44")).toEqual(["api", "web"]);
   });
 
-  it("shows the repo and branch asked for, else a sensible default", () => {
+  it("shows the branch asked for, else the repo's first; nothing for a repo it hasn't", () => {
     expect(shownAt(repos, "web", "wt/tove/LED-44")).toEqual({
       repo: "web",
       branch: "wt/tove/LED-44",
     });
     expect(shownAt(repos, "web", "gone")).toEqual({ repo: "web", branch: "trunk" });
-    // An unknown repo falls back to the first; the branch asked for stays when it has it.
-    expect(shownAt(repos, "nope", "wt/tove/LED-44")).toEqual({
-      repo: "api",
-      branch: "wt/tove/LED-44",
+    expect(shownAt(repos, "api")).toEqual({ repo: "api", branch: "main" });
+    expect(shownAt(repos, "nope", "main")).toBeUndefined();
+    expect(shownAt([], "api")).toBeUndefined();
+  });
+});
+
+describe("the history graph", () => {
+  const c = (hash: string, ...parents: string[]) => ({ hash, parents });
+  it("keeps a straight history in one lane", () => {
+    expect(graph([c("c", "b"), c("b", "a"), c("a")])).toEqual([
+      { lane: 0, top: [], bottom: [[0, 0]], width: 1 },
+      { lane: 0, top: [[0, 0]], bottom: [[0, 0]], width: 1 },
+      { lane: 0, top: [[0, 0]], bottom: [], width: 1 },
+    ]);
+  });
+  it("opens a lane for a merge's second parent and joins it back", () => {
+    expect(graph([c("m", "a", "b"), c("b", "a"), c("a")])).toEqual([
+      {
+        lane: 0,
+        top: [],
+        bottom: [
+          [0, 0],
+          [0, 1],
+        ],
+        width: 2,
+      },
+      {
+        lane: 1,
+        top: [
+          [0, 0],
+          [1, 1],
+        ],
+        bottom: [
+          [0, 0],
+          [1, 0],
+        ],
+        width: 2,
+      },
+      { lane: 0, top: [[0, 0]], bottom: [], width: 1 },
+    ]);
+  });
+  it("gives each branch tip its own lane, meeting where they part", () => {
+    const rows = graph([c("x", "a"), c("y", "a"), c("a", "r"), c("r")]);
+    expect(rows.map((r) => r.lane)).toEqual([0, 1, 0, 0]);
+    expect(rows[1]).toEqual({
+      lane: 1,
+      top: [[0, 0]],
+      bottom: [
+        [0, 0],
+        [1, 0],
+      ],
+      width: 2,
     });
-    expect(shownAt(repos, "nope", "gone")).toEqual({ repo: "api", branch: "main" });
-    expect(shownAt(repos)).toEqual({ repo: "api", branch: "main" });
-    expect(shownAt([])).toBeUndefined();
+    expect(rows[2].top).toEqual([[0, 0]]); // both lanes waited for a: one line into it
+  });
+  it("reuses a freed lane rather than widening, and leaves a parent not loaded open", () => {
+    const rows = graph([c("m", "a", "b"), c("b", "a"), c("a", "older"), c("n", "q", "p")]);
+    // b's lane 1 is free again once b came: the tip n takes it, its second
+    // parent the next; a's parent, not loaded, keeps lane 0 open below.
+    expect(rows[3]).toEqual({
+      lane: 1,
+      top: [[0, 0]],
+      bottom: [
+        [0, 0],
+        [1, 1],
+        [1, 2],
+      ],
+      width: 3,
+    });
   });
 });

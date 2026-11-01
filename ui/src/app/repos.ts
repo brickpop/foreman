@@ -15,15 +15,15 @@ export function branchOwner(branch: string, teams: Team[]): string | undefined {
   return undefined;
 }
 
-/** The repo and branch Repos shows: the ones asked for (the URL) when
- * the project has them, else the repo's first branch (main, when it has
- * one), else the first repo's. */
+/** The branch a repo's page shows: the one asked for (the URL) when the
+ * repo has it, else its first (main, when it has one). Undefined for a repo
+ * the project hasn't. */
 export function shownAt(
   repos: Repo[],
-  repo?: string,
+  repo: string,
   branch?: string,
 ): { repo: string; branch: string } | undefined {
-  const r = repos.find((x) => x.name === repo) ?? repos[0];
+  const r = repos.find((x) => x.name === repo);
   if (!r) return undefined;
   const b = r.branches.find((x) => x.name === branch) ?? r.branches[0];
   return { repo: r.name, branch: b?.name ?? r.main };
@@ -84,4 +84,50 @@ export function bytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** One row of the history graph: the commit's lane, and the lines through
+ * the row's top half (into the commit, or passing by) and bottom half (to
+ * its parents, or passing by), each from one lane to another. */
+export type GraphRow = {
+  lane: number;
+  top: [number, number][];
+  bottom: [number, number][];
+  /** Lanes the row needs drawn. */
+  width: number;
+};
+
+/** Lays commits (children before parents, as the log lists them) out in
+ * lanes, as `git log --graph` does: a commit takes the lane that waits for it
+ * (the leftmost, when several do), its first parent continues that lane, and
+ * any other parent takes a free one. A lane is freed when its commit comes,
+ * and kept in place otherwise, so lines never jump sideways. */
+export function graph(commits: { hash: string; parents: string[] }[]): GraphRow[] {
+  const lanes: (string | null)[] = []; // the commit each lane waits for
+  const free = () => {
+    const i = lanes.indexOf(null);
+    return i < 0 ? lanes.length : i;
+  };
+  return commits.map((c) => {
+    const waiting = lanes.indexOf(c.hash);
+    const lane = waiting < 0 ? free() : waiting; // < 0: a branch's tip
+    const top: [number, number][] = [];
+    lanes.forEach((h, i) => {
+      if (h !== null) top.push([i, h === c.hash ? lane : i]);
+    });
+    const passing = lanes.flatMap((h, i) => (h !== null && h !== c.hash ? [i] : []));
+    for (let i = 0; i < lanes.length; i++) if (lanes[i] === c.hash) lanes[i] = null;
+    const bottom: [number, number][] = passing.map((i) => [i, i]);
+    c.parents.forEach((p, n) => {
+      let to = lanes.indexOf(p);
+      if (to < 0) {
+        to = n === 0 ? lane : free();
+        lanes[to] = p;
+      }
+      bottom.push([lane, to]);
+    });
+    while (lanes.length > 0 && lanes[lanes.length - 1] === null) lanes.pop();
+    const used = [lane, ...top.flat(), ...bottom.flat()];
+    return { lane, top, bottom, width: Math.max(...used) + 1 };
+  });
 }

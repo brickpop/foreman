@@ -1,345 +1,229 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import type { Repo } from "../../api/client";
-import { when } from "../../app/model";
-import { useRepoFile, useRepoLog, useRepos, useRepoTree, useTeams } from "../../app/queries";
-import { branchOwner, bytes, crumbs, folderOf, isMarkdown, shownAt } from "../../app/repos";
-import { FileMarkdown } from "../../components/Markdown";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { type Project, useClient } from "../../api/client";
+import { keys, useBranches, useDeployments, useRepos } from "../../app/queries";
+import { AddRepo } from "../../components/AddRepo";
+import { Confirm, Modal } from "../../components/Overlays";
+import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
-import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
+import { useToast } from "../../components/Toasts";
+import { Button, Loading, Panel } from "../../components/ui";
 import { useProject } from "../Project";
 
-// A project's Repos section (wiki/product/features/repos.md): its repos,
-// read-only and as committed: each repo's branches, and a branch's files and
-// history. The repo and branch shown are in the URL, so a link (an agent's
-// worktree, on Deployment) opens them.
-
-type At = { repo: string; branch: string };
+// A project's Repos section (wiki/product/features/repos.md): its code repos,
+// wherever they are on disk, each with what keeps agents from using it, then
+// its project repo; each opens its own page (Repo). Added, created, located,
+// renamed and removed here (in Settings until 2026-11-01); renaming and
+// removing wait until no team is deployed on the project.
 
 export function Repos() {
   const project = useProject();
-  const repos = useRepos(project.id);
-  const search = useSearch({ from: "/projects/$project/repos" });
-  const navigate = useNavigate({ from: "/projects/$project/repos" });
-  const list = repos.data ?? [];
-  const at = shownAt(list, search.repo, search.branch);
-  const choose = (next: At) =>
-    navigate({ search: (s) => ({ ...s, repo: next.repo, branch: next.branch }), replace: true });
-  return (
-    <div className="flex flex-col gap-2.5 px-6 pt-6 pb-12">
-      {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
-      {repos.isPending && <Loading rows={6} />}
-      {at && (
-        <div className="grid h-[calc(100vh-80px)] min-h-[360px] grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-6">
-          <Branches repos={list} at={at} onChoose={choose} />
-          {/* Keyed by branch: another branch starts at its root. */}
-          <Browser key={`${at.repo} ${at.branch}`} project={project.id} at={at} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The repo picker, then the chosen repo's branches, scrolling within the
- * column: main first (the default branch), then whose each is, how far ahead
- * of main, and whether its worktree holds uncommitted changes. */
-function Branches({ repos, at, onChoose }: { repos: Repo[]; at: At; onChoose: (at: At) => void }) {
-  const teams = useTeams().data ?? [];
-  const repo = repos.find((r) => r.name === at.repo) ?? repos[0];
-  // The branch shown scrolls into the column's view, when a link opened one far down.
-  const selected = useRef<HTMLButtonElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: when the branch shown changes only, never on a refetch (it would undo the CEO's own scrolling)
-  useEffect(() => {
-    selected.current?.scrollIntoView({ block: "nearest" });
-  }, [at.repo, at.branch]);
-  const choose = (name: string) => {
-    const r = repos.find((x) => x.name === name);
-    if (r) onChoose({ repo: r.name, branch: r.branches[0]?.name ?? r.main });
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  // The branches, and the project repo, from the repos read.
+  const read = useRepos(project.id);
+  const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
+  const [adding, setAdding] = useState(false);
+  const [locating, setLocating] = useState<string>();
+  const [renaming, setRenaming] = useState<{ name: string; to: string }>();
+  const [removing, setRemoving] = useState<string>();
+  const change = useMutation({
+    mutationFn: (run: () => Promise<Project>) => run(),
+    onSuccess: () => queries.invalidateQueries({ queryKey: keys.projects }),
+    onError: (e: Error) =>
+      toast({ title: "Repos not changed", body: e.message, color: "var(--err)" }),
+  });
+  const stopFirst = deployed ? "Stop the team on this project first" : undefined;
+  const branches = (name: string) => {
+    const n = read.data?.find((r) => r.name === name)?.branches.length;
+    return n === undefined ? "" : `${n} ${n === 1 ? "branch" : "branches"}`;
   };
+  const projectRepo = read.data?.find((r) => r.project);
   return (
-    <nav className="flex min-h-0 min-w-0 flex-col gap-2">
-      <Select
-        label="Repository"
-        mono
-        value={repo.name}
-        onChange={choose}
-        options={repos.map((r) => ({
-          value: r.name,
-          label: `${r.name}/`,
-          detail: `${r.project ? "project repo · " : ""}${r.branches.length} ${r.branches.length === 1 ? "branch" : "branches"}`,
-        }))}
-      />
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto">
-        {repo.branches.map((b) => {
-          const on = at.branch === b.name;
-          const detail = [
-            b.name === repo.main && "default branch",
-            branchOwner(b.name, teams),
-            b.ahead > 0 && `${b.ahead} ahead of ${repo.main}`,
-          ].filter(Boolean);
-          return (
-            <button
-              key={b.name}
-              ref={on ? selected : undefined}
-              type="button"
-              aria-pressed={on}
-              onClick={() => onChoose({ repo: repo.name, branch: b.name })}
-              className={`flex min-w-0 flex-col rounded-md px-2 py-1 text-left ${on ? "bg-accSoft" : "hover:bg-hover"}`}
-            >
-              <span
-                className={`truncate font-mono text-[12.5px] ${on ? "text-accTx" : "text-tx2"}`}
-              >
-                {b.name}
-              </span>
-              {(detail.length > 0 || b.uncommitted) && (
-                <span className="text-[11.5px] text-tx4">
-                  {detail.join(" · ")}
-                  {b.uncommitted && (
-                    <span className="text-accTx">
-                      {detail.length > 0 ? " · " : ""}uncommitted changes
-                    </span>
-                  )}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-/** A branch's files or history. */
-function Browser({ project, at }: { project: string; at: At }) {
-  const [view, setView] = useState<"files" | "history">("files");
-  const [path, setPath] = useState("");
-  const [file, setFile] = useState(false); // path is a file, not a folder
-  const open = (p: string, isFile: boolean) => {
-    setPath(p);
-    setFile(isFile);
-  };
-  return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-3">
-      {/* The path on the left, the view on the right (the CEO, 2026-10-17). */}
-      <div className="flex flex-wrap items-center gap-3">
-        {view === "files" && (
-          <span className="flex min-w-0 flex-wrap items-center gap-1 font-mono text-[12.5px]">
-            <button type="button" onClick={() => open("", false)} className="text-accTx">
-              {at.repo}
-            </button>
-            {crumbs(path).map((c, i, all) => (
-              <span key={c.path} className="flex items-center gap-1">
-                <span className="text-tx4">/</span>
-                {i === all.length - 1 ? (
-                  <span className="text-tx">{c.name}</span>
-                ) : (
-                  <button type="button" onClick={() => open(c.path, false)} className="text-accTx">
-                    {c.name}
-                  </button>
-                )}
-              </span>
-            ))}
-          </span>
-        )}
-        <span className="flex-1" />
-        <Segmented
-          label="View"
-          value={view}
-          onChange={setView}
-          options={[
-            { value: "files", label: "Files" },
-            { value: "history", label: "History" },
-          ]}
-        />
-      </div>
-      {/* The view scrolls within the section, as the branches do, beside them. */}
-      <div className="min-h-0 flex-1 overflow-auto">
-        {view === "history" ? (
-          <History project={project} at={at} />
-        ) : file ? (
-          <FileView
-            project={project}
-            at={at}
-            path={path}
-            onUp={() => open(folderOf(path), false)}
-          />
-        ) : (
-          <Folder project={project} at={at} path={path} onOpen={open} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Folder({
-  project,
-  at,
-  path,
-  onOpen,
-}: {
-  project: string;
-  at: At;
-  path: string;
-  onOpen: (path: string, isFile: boolean) => void;
-}) {
-  const tree = useRepoTree(project, at.repo, at.branch, path);
-  if (tree.isPending) return <Loading rows={6} />;
-  if (tree.isError) return <p className="m-0 text-[13px] text-err">{tree.error.message}</p>;
-  if (tree.data.length === 0) return <Empty>Nothing committed here yet.</Empty>;
-  return (
-    <Panel>
-      {tree.data.map((e) => {
-        const to = path ? `${path}/${e.name}` : e.name;
-        const name = e.kind === "dir" ? `${e.name}/` : e.name;
-        return e.kind === "module" ? (
-          <div
-            key={e.name}
-            className="flex items-center gap-3 border-b border-line px-4 py-2 last:border-b-0"
-          >
-            <span className="flex-1 font-mono text-[13px] text-tx3">{name}</span>
-            <span className="text-[12px] text-tx4">submodule</span>
-          </div>
-        ) : (
-          <button
-            key={e.name}
-            type="button"
-            onClick={() => onOpen(to, e.kind !== "dir")}
-            className="flex w-full items-center gap-3 border-b border-line px-4 py-2 text-left last:border-b-0 hover:bg-hover"
-          >
-            <span
-              className={`flex-1 truncate font-mono text-[13px] ${e.kind === "dir" ? "text-tx" : "text-tx2"}`}
-            >
-              {name}
-            </span>
-            {e.kind === "link" && <span className="text-[12px] text-tx4">link</span>}
-            {e.kind === "file" && <span className="text-[12px] text-tx4">{bytes(e.size)}</span>}
-          </button>
-        );
-      })}
-    </Panel>
-  );
-}
-
-function FileView({
-  project,
-  at,
-  path,
-  onUp,
-}: {
-  project: string;
-  at: At;
-  path: string;
-  onUp: () => void;
-}) {
-  const file = useRepoFile(project, at.repo, at.branch, path);
-  const markdown = isMarkdown(path);
-  const [source, setSource] = useState(false);
-  if (file.isPending) return <Loading rows={8} />;
-  if (file.isError) return <p className="m-0 text-[13px] text-err">{file.error.message}</p>;
-  const f = file.data;
-  const note = f.binary
-    ? `A binary file (${bytes(f.size)}): not shown.`
-    : f.tooLarge
-      ? `Too large to show here (${bytes(f.size)}).`
-      : undefined;
-  return (
-    <div className="flex flex-col gap-2.5">
-      {/* Stays in view while the file scrolls. */}
-      <div className="sticky top-0 z-10 flex items-center gap-3 bg-bg pb-1">
-        <Button variant="small" onClick={onUp}>
-          ← Folder
-        </Button>
-        <span className="text-[12.5px] text-tx4">{bytes(f.size)}</span>
-        <span className="flex-1" />
-        {markdown && !note && (
-          <Segmented
-            label="Show"
-            value={source ? "source" : "rendered"}
-            onChange={(v) => setSource(v === "source")}
-            options={[
-              { value: "rendered", label: "Rendered" },
-              { value: "source", label: "Source" },
-            ]}
-          />
-        )}
-      </div>
-      {note ? (
-        <Empty>{note}</Empty>
-      ) : markdown && !source ? (
-        <Panel className="px-6 py-5">
-          <div className="wiki">
-            <FileMarkdown text={f.text} />
-          </div>
-        </Panel>
-      ) : (
-        <Lines text={f.text} />
+    <div className="flex max-w-[920px] flex-col gap-4 px-6 pt-6 pb-12">
+      {project.repos.length === 0 && (
+        <p className="m-0 text-[13.5px] text-err">
+          No code repo yet: agents need at least one to work on.
+        </p>
       )}
-    </div>
-  );
-}
-
-/** A file's text with its line numbers, which selecting the text leaves out. */
-function Lines({ text }: { text: string }) {
-  const lines = text.replace(/\n$/, "").split("\n");
-  const width = String(lines.length).length;
-  return (
-    <pre className="m-0 overflow-x-auto rounded-xl border border-line bg-term py-3 font-mono text-[12.5px] leading-[1.6] text-tx2 select-text">
-      {lines.map((line, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: a file's lines are positional
-        <div key={i} className="flex">
-          <span
-            className="shrink-0 pr-4 pl-4 text-right text-tx4 select-none"
-            style={{ width: `${width + 3}ch` }}
-          >
-            {i + 1}
-          </span>
-          <span className="pr-4 whitespace-pre">{line}</span>
-        </div>
-      ))}
-    </pre>
-  );
-}
-
-function History({ project, at }: { project: string; at: At }) {
-  const log = useRepoLog(project, at.repo, at.branch);
-  if (log.isPending) return <Loading rows={6} />;
-  if (log.isError) return <p className="m-0 text-[13px] text-err">{log.error.message}</p>;
-  const commits = log.data.pages.flatMap((p) => p.commits);
-  return (
-    <div className="flex flex-col gap-3">
       <Panel>
-        {commits.map((c) => (
+        {project.repos.map((r) => (
           <div
-            key={c.hash}
-            className="flex items-baseline gap-3 border-b border-line px-4 py-2.5 last:border-b-0"
+            key={r.name}
+            className="flex flex-col gap-1.5 border-b border-line px-4 py-3 last:border-b-0"
           >
-            <span className="font-mono text-[12px] text-tx4">{c.hash.slice(0, 7)}</span>
-            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-[13.5px] text-tx">
-                {c.subject}
-                {c.merge && <span className="ml-2 text-[11.5px] text-tx4">merge</span>}
-              </span>
-              {/* The branches at this commit, as a second line. */}
-              {c.branches.length > 0 && (
-                <span className="truncate font-mono text-[11.5px] text-accTx">
-                  {c.branches.join(", ")}
+            {renaming?.name === r.name ? (
+              <form
+                className="flex items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const to = renaming.to.trim();
+                  if (to && to !== r.name)
+                    change.mutate(() => client.home.renameRepo(project.id, r.name, to), {
+                      onSuccess: () => setRenaming(undefined),
+                    });
+                }}
+              >
+                <input
+                  value={renaming.to}
+                  onChange={(e) => setRenaming({ name: r.name, to: e.target.value })}
+                  aria-label={`New name for ${r.name}`}
+                  spellCheck={false}
+                  // biome-ignore lint/a11y/noAutofocus: opened by the Rename click, to type the name
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
+                />
+                <Button type="submit" variant="small" disabled={change.isPending}>
+                  Rename
+                </Button>
+                <Button variant="small" onClick={() => setRenaming(undefined)}>
+                  Cancel
+                </Button>
+              </form>
+            ) : (
+              <span className="flex items-center gap-3">
+                <span className="flex min-w-0 flex-1 flex-col">
+                  {r.problem ? (
+                    <span className="font-mono text-[14px] font-semibold text-tx">{r.name}/</span>
+                  ) : (
+                    <RepoLink project={project.id} repo={r.name} />
+                  )}
+                  <span className="font-mono text-[12.5px] break-all text-tx4">{r.path}</span>
                 </span>
-              )}
-            </span>
-            <span className="shrink-0 text-[12.5px] text-tx3">{c.author}</span>
-            <span className="shrink-0 text-[12px] text-tx4">{when(c.date)}</span>
+                <span className="text-[12.5px] text-tx4">{branches(r.name)}</span>
+                {r.problem && (
+                  <Button variant="small" onClick={() => setLocating(r.name)}>
+                    Locate…
+                  </Button>
+                )}
+                <Button
+                  variant="small"
+                  disabled={deployed}
+                  title={stopFirst}
+                  onClick={() => setRenaming({ name: r.name, to: r.name })}
+                >
+                  Rename
+                </Button>
+                <Button
+                  variant="small"
+                  disabled={deployed}
+                  title={stopFirst}
+                  onClick={() => setRemoving(r.name)}
+                >
+                  Remove
+                </Button>
+              </span>
+            )}
+            {r.problem && <span className="text-[13px] text-err">{r.problem}</span>}
+            {!r.problem && (
+              <RepoMain
+                repo={r}
+                onPick={(main) =>
+                  change.mutate(() => client.home.setRepoMain(project.id, r.name, main))
+                }
+              />
+            )}
           </div>
         ))}
+        {read.isPending && <Loading rows={1} />}
+        {projectRepo && (
+          <div className="flex items-center gap-3 px-4 py-3">
+            <span className="flex min-w-0 flex-1 flex-col">
+              <RepoLink project={project.id} repo={projectRepo.name} />
+              <span className="text-[12.5px] text-tx4">
+                The project repo: project.toml and the wiki
+              </span>
+            </span>
+            <span className="text-[12.5px] text-tx4">{branches(projectRepo.name)}</span>
+          </div>
+        )}
       </Panel>
-      {log.hasNextPage && (
-        <Button
-          className="self-start"
-          disabled={log.isFetchingNextPage}
-          onClick={() => log.fetchNextPage()}
-        >
-          Show more
+      {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
+      <span>
+        <Button variant="small" onClick={() => setAdding(true)}>
+          Add a repo
         </Button>
-      )}
+      </span>
+      <Modal open={adding} onClose={() => setAdding(false)} title={`Add a repo to ${project.id}`}>
+        {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
+      </Modal>
+      <Modal
+        open={locating !== undefined}
+        onClose={() => setLocating(undefined)}
+        title={`Locate ${locating}`}
+      >
+        <div className="flex flex-col gap-3">
+          <p className="m-0 text-[13.5px] text-tx2">
+            Pick its folder now. It must be the same repo: Foreman checks they share a commit.
+          </p>
+          {locating && (
+            <RepoPicker
+              pick="repo"
+              onPick={(path) =>
+                change.mutate(() => client.home.locateRepo(project.id, locating, path), {
+                  onSuccess: () => setLocating(undefined),
+                })
+              }
+            />
+          )}
+        </div>
+      </Modal>
+      <Confirm
+        open={removing !== undefined}
+        title={`Remove ${removing} from ${project.id}?`}
+        body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
+        action="Remove"
+        onConfirm={() =>
+          removing && change.mutate(() => client.home.removeRepo(project.id, removing))
+        }
+        onClose={() => setRemoving(undefined)}
+      />
     </div>
+  );
+}
+
+/** A repo's name, opening its page. */
+function RepoLink({ project, repo }: { project: string; repo: string }) {
+  return (
+    <Link
+      to="/projects/$project/repos/$repo"
+      params={{ project, repo }}
+      className="self-start font-mono text-[14px] font-semibold text-tx hover:text-accTx"
+    >
+      {repo}/
+    </Link>
+  );
+}
+
+/** A repo's main branch, which its agents start from and its merges go to:
+ * any of its branches. One it no longer has (renamed, or from before each repo
+ * had its own) is flagged, since agents can't start without it. */
+function RepoMain({
+  repo,
+  onPick,
+}: {
+  repo: Project["repos"][number];
+  onPick: (main: string) => void;
+}) {
+  const branches = useBranches(repo.path);
+  const list = branches.data?.branches ?? [];
+  return (
+    <span className="flex flex-wrap items-center gap-2 text-[13px] text-tx3">
+      Main branch
+      <Select
+        label={`Main branch of ${repo.name}`}
+        value={repo.main}
+        mono
+        options={list.map((b) => ({ value: b, label: b }))}
+        onChange={(b) => b !== repo.main && onPick(b)}
+      />
+      {branches.data && !list.includes(repo.main) && (
+        <span className="text-err">
+          {repo.name} has no branch {repo.main}: pick its main branch, or agents can't start.
+        </span>
+      )}
+    </span>
   );
 }

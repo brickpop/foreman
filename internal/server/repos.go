@@ -17,7 +17,7 @@ type Repos interface {
 	Repos(ctx context.Context, project string) ([]repos.Repo, error)
 	Tree(ctx context.Context, project, repo, ref, path string) ([]git.TreeEntry, error)
 	File(ctx context.Context, project, repo, ref, path string) (repos.File, error)
-	Log(ctx context.Context, project, repo, ref string, skip int) (repos.LogPage, error)
+	Log(ctx context.Context, project, repo, ref string, all bool, skip int) (repos.LogPage, error)
 }
 
 func repoRoutes(mux *http.ServeMux, rs Repos) {
@@ -46,7 +46,7 @@ func repoRoutes(mux *http.ServeMux, rs Repos) {
 			}
 			skip = n
 		}
-		page, err := rs.Log(r.Context(), r.PathValue("id"), r.PathValue("repo"), q.Get("ref"), skip)
+		page, err := rs.Log(r.Context(), r.PathValue("id"), r.PathValue("repo"), q.Get("ref"), q.Get("all") == "1", skip)
 		writeRead(w, page, err)
 	})
 }

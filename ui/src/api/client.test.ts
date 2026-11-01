@@ -168,11 +168,13 @@ describe("httpClient", () => {
     await client.repos.tree("ledger", "api", "wt/tove/x", "src/lib");
     await client.repos.file("ledger", "api", "main", "a b.md");
     await client.repos.log("ledger", "project", "main", 50);
+    await client.repos.log("ledger", "api", "main", 0, true);
     expect(calls.map((c) => c.url)).toEqual([
       "http://x/api/projects/ledger/repos",
       "http://x/api/projects/ledger/repos/api/tree?ref=wt%2Ftove%2Fx&path=src%2Flib",
       "http://x/api/projects/ledger/repos/api/file?ref=main&path=a+b.md",
       "http://x/api/projects/ledger/repos/project/log?ref=main&skip=50",
+      "http://x/api/projects/ledger/repos/api/log?ref=main&skip=0&all=1",
     ]);
   });
 

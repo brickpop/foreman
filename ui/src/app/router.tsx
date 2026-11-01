@@ -8,6 +8,7 @@ import { Board } from "../screens/project/Board";
 import { Deployment } from "../screens/project/Deployment";
 import { Inbox } from "../screens/project/Inbox";
 import { ProjectSettings } from "../screens/project/ProjectSettings";
+import { Repo } from "../screens/project/Repo";
 import { Repos } from "../screens/project/Repos";
 import { Review } from "../screens/project/Review";
 import { Session } from "../screens/project/Session";
@@ -68,14 +69,13 @@ const wiki = createRoute({
 
 const board = createRoute({ ...section("board"), component: Board });
 
-const reposRoute = createRoute({
-  ...section("repos"),
-  // repo and branch: what is read.
-  validateSearch: (s: Record<string, unknown>): { repo?: string; branch?: string } => ({
-    repo: text(s.repo),
-    branch: text(s.branch),
-  }),
-  component: Repos,
+const reposRoute = createRoute({ ...section("repos"), component: Repos });
+
+const repoRoute = createRoute({
+  ...section("repos/$repo"),
+  // branch: the one read.
+  validateSearch: (s: Record<string, unknown>): { branch?: string } => ({ branch: text(s.branch) }),
+  component: Repo,
 });
 
 const deployment = createRoute({ ...section("deployment"), component: Deployment });
@@ -123,6 +123,7 @@ export const router = createRouter({
       wiki,
       board,
       reposRoute,
+      repoRoute,
       deployment,
       activity,
       projectSettings,

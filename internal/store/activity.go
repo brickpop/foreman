@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // A project's Activity section (wiki/product/features/project-activity.md): the
@@ -18,6 +19,9 @@ type Activity interface {
 	// older than the cursor before ("": the newest). Its Next is the cursor
 	// of the following page, "" when there is none.
 	Page(ctx context.Context, deployment, before string, limit int) (ActivityPage, error)
+	// Latest is when something last happened on each project: a team message
+	// or action, a request, a merge request, a deploy, else its creation.
+	Latest(ctx context.Context) (map[string]time.Time, error)
 }
 
 // ErrBadCursor means a page's cursor isn't one Page gave.
@@ -152,4 +156,36 @@ func (s activity) load(ctx context.Context, selectFrom string, ids []int64, scan
 		}
 	}
 	return rows.Err()
+}
+
+func (s activity) Latest(ctx context.Context) (map[string]time.Time, error) {
+	// SQLite returns the bare column t of the row holding the MAX (julianday,
+	// since the stored text doesn't sort as text below a second).
+	rows, err := s.db.QueryContext(ctx, `SELECT project, t, MAX(julianday(t)) FROM (
+		SELECT d.project_id AS project, m.created_at AS t FROM team_messages m JOIN deployments d ON d.id = m.deployment_id
+		UNION ALL SELECT d.project_id, a.created_at FROM team_actions a JOIN deployments d ON d.id = a.deployment_id
+		UNION ALL SELECT project_id, COALESCE(resolved_at, created_at) FROM requests WHERE project_id IS NOT NULL
+		UNION ALL SELECT project_id, COALESCE(merged_at, rejected_at, created_at) FROM merge_requests WHERE project_id IS NOT NULL
+		UNION ALL SELECT project_id, COALESCE(stopped_at, created_at) FROM deployments
+		UNION ALL SELECT id, created_at FROM projects)
+		GROUP BY project`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	latest := map[string]time.Time{}
+	for rows.Next() {
+		var project string
+		var at sql.NullString
+		var day sql.NullFloat64
+		if err := rows.Scan(&project, &at, &day); err != nil {
+			return nil, err
+		}
+		t, err := parseTime(at)
+		if err != nil {
+			return nil, err
+		}
+		latest[project] = t
+	}
+	return latest, rows.Err()
 }

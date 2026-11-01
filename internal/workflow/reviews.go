@@ -93,6 +93,9 @@ type RepoDiff struct {
 	Head  string `json:"head"`  // the branch's head the diff was made at
 	Since string `json:"since"` // with since: the head it starts from ("" for against main)
 	Diff  string `json:"diff"`
+	// Gone: a decided repo whose change can't be shown (not recorded, or
+	// git no longer has its commits).
+	Gone bool `json:"gone"`
 }
 
 // status is a review's state from its merge requests, and its withdrawal.
@@ -283,10 +286,10 @@ func (w *Workflow) ReviewDiff(ctx context.Context, id string, since bool) ([]Rep
 			return nil, err
 		}
 		d := RepoDiff{Repo: mr.Repo, Main: main}
-		// A merged branch has nothing left to show against main; a dismissed one
-		// may be gone. Only the open ones have a change to read.
+		// A decided one shows the change as it was decided: main has moved,
+		// and its branch may be gone.
 		if mr.State != store.MergeOpen {
-			out = append(out, d)
+			out = append(out, w.decidedDiff(ctx, dir, d, mr))
 			continue
 		}
 		if d.Head, err = w.Git.Resolve(ctx, dir, "refs/heads/"+mr.Branch); err != nil {
@@ -604,4 +607,20 @@ func (w *Workflow) dropBranch(ctx context.Context, mr store.MergeRequest, branch
 	}
 	defer w.pruneBackups(ctx, dir)
 	return w.Git.DropBranch(ctx, dir, branch, git.BackupRef("dismissed", w.Now(), review+"/"+branch), main)
+}
+
+// decidedDiff is a decided repo's change, from where its branch parted from
+// main to the head recorded as it left open.
+func (w *Workflow) decidedDiff(ctx context.Context, dir string, d RepoDiff, mr store.MergeRequest) RepoDiff {
+	if mr.Head == "" || mr.Base == "" {
+		d.Gone = true
+		return d
+	}
+	diff, err := w.Git.Compare(ctx, dir, mr.Base, mr.Head, 3)
+	if err != nil {
+		d.Gone = true
+		return d
+	}
+	d.Head, d.Diff = mr.Head, diff
+	return d
 }

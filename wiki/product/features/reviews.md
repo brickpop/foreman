@@ -36,6 +36,14 @@ Four sections, each left out when empty, one panel of rows each but the requests
   - **Only what the CEO read** (the CEO, 2026-10-21): Merge sends, for each ticked repo, the head its diff was shown at, and a repo whose branch moved since (the lead committed meanwhile) isn't merged: the toast says `<repo>: the branch has new commits since you loaded this page. Read them, then merge again`, and the page reloads its diff. The other repos merge as usual.
   - **Then back to the Inbox**: once Merge, Request changes or Dismiss is done, the page goes back to the project's Inbox, whose next review is the next thing to do (the CEO, 2026-10-31).
 
+## Decided
+
+A repo of a review that is no longer open (merged, dismissed or withdrawn) keeps its diff (the CEO, 2026-11-01: a merged review's page used to be empty).
+
+- **Recorded when it leaves open**: Foreman keeps the branch's head at that moment as `refs/foreman/decided/<merge request id>` (so git never collects it, and backup pruning leaves it alone) and the commit the branch parted from `main`, on the merge request ([Merge request](../models/merge-request.md) `head`, `base`). For a branch `main` took through a merge commit, the parting point is found from before that merge.
+- **Shown read-only**: the diff `base…head`, the repo's label in the tree followed by `· merged`, `· dismissed` or `· withdrawn`. No line comments, no decision bar for it.
+- **Can't show it**: when nothing was recorded (decided before this, or a fast-forward merged on the forge, which leaves no parting point) or the commits are gone, the repo's group says `Can't show it.` and the page says why.
+
 ## What the lead gets
 
 **Request changes** sends one message to the lead, typed into its session when idle:

@@ -95,6 +95,7 @@ func (w *Workflow) withdraw(ctx context.Context, v Review, why, superseding, by 
 		if mr.State != store.MergeOpen {
 			continue
 		}
+		w.settle(ctx, &mr, "")
 		mr.State, mr.Note = store.MergeWithdrawn, why
 		w.saveMerge(ctx, mr)
 		ended[mr.ID], repos = mr.Repo, append(repos, mr.Repo)

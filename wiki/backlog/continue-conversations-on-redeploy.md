@@ -20,7 +20,8 @@ epic: workflow
 **Already right, keep it so:** Restart, a crash's automatic restart, a Foreman restart and a wake all continue. Another harness still starts fresh ([Agent runtime → Restarts](../product/architecture/agent-runtime.md#restarts)).
 
 - [ ] `POST /api/deployments` takes `fresh` (default false); the deployment carries it to its instances' first start
-- [ ] the first start continues unless `fresh` (or another harness); the fresh-start list is written only when starting fresh
+- [ ] the first start continues unless `fresh` (or another harness, or **another team**); the fresh-start list is written only when starting fresh
+- [ ] another team: agent ids are only unique within a team ([Agents share ids across teams](./archive/agents-share-ids-across-teams.md)), so a later team's `mara` on the project gets the same harness folder. It must start fresh: the folder needs to record which team its last conversation was with
 - [ ] a way for the dialog to know there are earlier conversations for the team's agents on the project (`Conversations` already lists them)
 - [ ] the dialog's checkbox ([Deploy a team](../product/features/deploy-team.md))
 - [ ] what a continued first start gets: no opener and no "your worktrees hold earlier work" notice (it remembers), like a restart; check that this holds for the lead's goal

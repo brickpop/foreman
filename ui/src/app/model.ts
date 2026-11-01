@@ -33,7 +33,8 @@ export function reloadLine(reload: ReturnType<typeof reloadOf>, teams: Team[]): 
   if (!reload.busy) {
     return `${runs} on an older prompt: Reload restarts ${n === 1 ? "it" : "them"} on the new one, continuing ${n === 1 ? "its conversation" : "their conversations"}.`;
   }
-  const name = agentOf(teams, reload.busy.id)?.soul.name || reload.busy.agentId;
+  const name =
+    agentOf(teams, reload.busy.deploymentId, reload.busy.id)?.soul.name || reload.busy.agentId;
   const why = reload.busy.status === "awaiting" ? "is waiting on you" : "is busy";
   return `${runs} on an older prompt. ${name} ${why}: the change applies at each agent's next start. Reload once they're idle.`;
 }
@@ -46,14 +47,14 @@ import type { Look, Soul, TeamConfig } from "../api/types/home";
 
 export type Agent = { id: string; soul: Soul; team: Team };
 
-/** The agent behind an instance id (agent@project), from the team files. */
-export function agentOf(teams: Team[], instance: string): Agent | undefined {
+/** The agent behind an instance id (agent@project) in a deployment
+ * (team@project), from the team files. Through the deployment's team: an
+ * agent id is only unique within its team (wiki/product/models/team-definition.md). */
+export function agentOf(teams: Team[], deployment: string, instance: string): Agent | undefined {
   const id = instance.split("@")[0];
-  for (const team of teams) {
-    const soul = team.config.agents[id];
-    if (soul) return { id, soul, team };
-  }
-  return undefined;
+  const team = teams.find((t) => t.id === deployment.split("@")[0]);
+  const soul = team?.config.agents[id];
+  return team && soul ? { id, soul, team } : undefined;
 }
 
 const kindOrder = ["blocked", "approval", "review", "question", "finding"];

@@ -3,11 +3,16 @@ import { agentOf } from "./model";
 
 // The Repos section's model (wiki/product/features/repos.md).
 
-/** Whose branch it is, by Foreman's names: wt/<agent>/… is that agent's,
- * lead/<team>/… that team's lead's; anything else is nobody's in particular. */
-export function branchOwner(branch: string, teams: Team[]): string | undefined {
+/** Whose branch it is, by Foreman's names: wt/<agent>/… is that agent's in
+ * the project's deployment (team@project, deploymentOn), lead/<team>/… that
+ * team's lead's; anything else is nobody's in particular. */
+export function branchOwner(
+  branch: string,
+  teams: Team[],
+  deployment: string | undefined,
+): string | undefined {
   const [kind, who] = branch.split("/");
-  if (kind === "wt" && who) return agentOf(teams, who)?.soul.name ?? who;
+  if (kind === "wt" && who) return agentOf(teams, deployment ?? "", who)?.soul.name ?? who;
   if (kind === "lead" && who) {
     const team = teams.find((t) => t.id === who);
     return team ? (team.config.agents[team.config.lead]?.name ?? team.config.lead) : who;

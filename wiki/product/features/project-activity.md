@@ -40,7 +40,7 @@ What an agent itself receives (a teammate's ask, a reply, the CEO's answer) is a
 
 ## Older sessions
 
-Below the timeline, only when the project has stopped deployments: **`Older sessions · N`** (a section label with a chevron), collapsed. Opened, one line per stopped deployment: chevron, the team's name (600), `stopped <time>` (`--tx4`), then, when Foreman stopped it on its own, `by Foreman: <reason>` (`--err`, [Deployment](../models/deployment.md)). Each opens its own timeline, paged the same way, without team names (the line above says it) and without `Open … session` (a stopped deployment has no sessions).
+Below the timeline, only when the project has stopped deployments: **`Older sessions · N`** (a section label with a chevron), collapsed. Opened, one line per stopped deployment: chevron, the team's name (600), `stopped <time>` (`--tx4`), then, when Foreman stopped it on its own, `by Foreman: <reason>` (`--err`, [Deployment](../models/deployment.md)). Each opens its own timeline, paged the same way, its agents named as that team has them (not as a later team with the same ids does), without team names (the line above says it) and without `Open … session` (a stopped deployment has no sessions).
 
 A redeployed pair reactivates its old row ([Deployment](../models/deployment.md)), so its earlier runs' traffic is in the timeline, not in Older sessions.
 

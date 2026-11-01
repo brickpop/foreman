@@ -197,10 +197,14 @@ func TestRefusedProposalsAreNeverShown(t *testing.T) {
 func TestThePromptNamesWhatIsTaken(t *testing.T) {
 	f := newFixture()
 	text := Prompt(f.teams.Teams(), "/ws/.foreman/teams")
-	for _, want := range []string{"/ws/.foreman/teams", ProposeTeam, "Team ids: atlas.", "mara (Mara, atlas)", "tove (Tove, atlas)", "`qa` (QA / Tester): Try to break"} {
+	for _, want := range []string{"/ws/.foreman/teams", ProposeTeam, "Team ids: atlas.", "unique in the team", "`qa` (QA / Tester): Try to break"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("the prompt lacks %q", want)
 		}
+	}
+	// Only team ids are taken: other teams' members don't constrain a new one.
+	if strings.Contains(text, "Tove") || strings.Contains(text, "unique across") {
+		t.Error("the prompt still lists other teams' members")
 	}
 	if empty := Prompt(nil, "/t"); !strings.Contains(empty, "Team ids: none yet.") {
 		t.Error("no teams")

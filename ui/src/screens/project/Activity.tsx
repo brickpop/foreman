@@ -34,7 +34,7 @@ export function Activity() {
   const d = useDeployments().data?.find((x) => x.projectId === project);
   const stopped = (useStoppedDeployments().data ?? []).filter((x) => x.projectId === project);
   const [filter, setFilter] = useState<Filter>(null);
-  const name = namesOf(teams);
+  const name = namesOf(teams, d?.id ?? "");
   return (
     <div className="flex flex-col gap-8 px-6 pt-6 pb-12">
       {d ? (
@@ -110,7 +110,7 @@ function Timeline({
   onOpen?: (instance: string) => void;
 }) {
   const activity = useActivity(deployment);
-  const name = namesOf(teams);
+  const name = namesOf(teams, deployment);
   const all = pageEntries(activity.data?.pages ?? []);
   const list = all.filter((e) => shows(e, filter));
   if (activity.isPending) return <Loading rows={5} />;

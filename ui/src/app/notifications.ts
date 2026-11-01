@@ -24,11 +24,12 @@ export type Notice = {
 
 /** The notice an event deserves, or none. */
 export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notice | undefined {
-  const name = (instance: string) => agentOf(teams, instance)?.soul.name ?? "Foreman";
+  const name = (deployment: string, instance: string) =>
+    agentOf(teams, deployment, instance)?.soul.name ?? "Foreman";
   const project = (instance: string) => instance.split("@")[1] ?? "";
   if (e.type === "request.created") {
     const r = e.data as Request;
-    const who = name(r.instanceId);
+    const who = name(r.deploymentId, r.instanceId);
     const where = r.projectId ? ` on ${r.projectId}` : "";
     const base = { body: r.summary, instance: r.instanceId, deployment: r.deploymentId };
     if (r.kind === "review") {
@@ -53,7 +54,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
     const w = e.data as Withdrawn;
     const lost = w.lostDrafts === 1 ? "draft comment" : `${w.lostDrafts} draft comments`;
     return {
-      title: `${w.by === "foreman" ? "Foreman" : name(w.lead)} withdrew ${w.review.branch}`,
+      title: `${w.by === "foreman" ? "Foreman" : name(w.deploymentId, w.lead)} withdrew ${w.review.branch}`,
       body:
         `${w.review.withdrawnReason}.` +
         (w.lostDrafts > 0 ? ` Your ${lost} on it ${w.lostDrafts === 1 ? "is" : "are"} lost.` : ""),
@@ -69,7 +70,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
     if (status === "queued") {
       // The CEO can act on it (the limit is theirs), but it isn't worth a browser notification.
       return {
-        title: `${name(id)} is waiting for a session slot`,
+        title: `${name(deployment, id)} is waiting for a session slot`,
         body: "Every slot is taken, idle agents included. They start when one frees; the limit is in Settings → Agents.",
         instance: id,
         deployment,
@@ -79,7 +80,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
     if (status !== "done") return undefined;
     return {
       toggle: "finishes",
-      title: `${name(id)} is done on ${project(id)}`,
+      title: `${name(deployment, id)} is done on ${project(id)}`,
       body: "Open the session to see the hand-off.",
       instance: id,
       deployment,

@@ -139,6 +139,8 @@ func TestTeamProblems(t *testing.T) {
 		"unknown field":     {`purpose =`, `mission = "x"` + "\npurpose =", "mission: not a field Foreman knows"},
 		"no name":           {`name = "Atlas"`, `name = " "`, "name: required"},
 		"escalation":        {`to = "lead"`, `to = ""`, "escalate[0]"},
+		// Names are compared trimmed: "Mara " reads as Mara.
+		"name twice": {`name = "Tove"`, `name = "Mara "`, `agents.tove.name: "Mara" is also mara's name`},
 	} {
 		src := strings.Replace(base, tc.from, tc.to, 1)
 		if src == base {

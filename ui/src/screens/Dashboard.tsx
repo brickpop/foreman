@@ -219,7 +219,7 @@ function AddCard({ onClick, children }: { onClick: () => void; children: ReactNo
 function DashboardRequest({ request: r, teams }: { request: Request; teams: Team[] }) {
   const navigate = useNavigate();
   const answer = useAnswer();
-  const agent = agentOf(teams, r.instanceId);
+  const agent = agentOf(teams, r.deploymentId, r.instanceId);
   const where = `on ${r.projectId}`;
   const context = agent ? `${agent.team.config.name} ${where}` : where;
   const openSession = () => navigate(sessionOf(r.instanceId));

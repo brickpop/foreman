@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type Instance, type Team, useClient } from "../../api/client";
 import { agentOf, harnessLabel, roleLabel, slotsTaken } from "../../app/model";
-import { lastTeam } from "../../app/project";
+import { latestStopped } from "../../app/project";
 import {
   keys,
   useDraft,
@@ -157,7 +157,7 @@ function NoTeam({ project }: { project: string }) {
           open
           onClose={() => setDeploy(false)}
           project={project}
-          initialTeam={lastTeam(project, stopped)}
+          initialTeam={latestStopped(project, stopped)?.teamId}
         />
       )}
     </div>
@@ -297,7 +297,7 @@ function AgentSession({
     mutationFn: (text: string) => client.agents.line(instance.id, text),
     onSuccess: () => setLine(""),
   });
-  const agent = agentOf(teams, instance.id);
+  const agent = agentOf(teams, instance.deploymentId, instance.id);
   // @ in the line offers the teammates' names (the agent's own left out).
   const teammates = Object.entries(agent?.team.config.agents ?? {})
     .filter(([id]) => id !== instance.agentId)

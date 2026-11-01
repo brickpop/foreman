@@ -56,7 +56,7 @@ export function Inbox() {
 }
 
 function ReviewRow({ review: v, teams }: { review: Review; teams: Team[] }) {
-  const lead = agentOf(teams, v.lead);
+  const lead = agentOf(teams, v.deploymentId, v.lead);
   const repos = v.mergeRequests.map((m) => m.repo).join(", ");
   return (
     <Link

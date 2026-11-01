@@ -26,7 +26,7 @@ func (e *InvalidError) Error() string {
 func (h *Home) SaveTeam(ctx context.Context, c TeamConfig, version string) (Team, error) {
 	h.mu.Lock()
 	defer h.unlock()
-	if p := h.checkTeam(c); len(p) > 0 {
+	if p := h.CheckTeam(c); len(p) > 0 {
 		return Team{}, &InvalidError{p}
 	}
 	data, err := encodeTeam(c)
@@ -128,18 +128,7 @@ func (h *Home) unlock() {
 }
 
 // CheckTeam is what a save of c would refuse, without saving: the team
-// file's rules, and those across teams against every other team as it is now.
+// file's rules. None span teams: an agent's id and name are its team's own.
 func (h *Home) CheckTeam(c TeamConfig) []string {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.checkTeam(c)
-}
-
-func (h *Home) checkTeam(c TeamConfig) []string {
-	if p := c.validate(c.Team); len(p) > 0 {
-		return p
-	}
-	teams := union(h.snap.teams, map[string]Team{c.Team: {ID: c.Team, Config: c}})
-	crossTeamProblems(teams)
-	return teams[c.Team].Problems
+	return c.validate(c.Team)
 }

@@ -14,7 +14,7 @@ Table `instances`.
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| `id` | String | yes | | `agent@project`, unique | Can't collide: agent ids are unique across all teams ([Team definition](./team-definition.md#schema)) |
+| `id` | String | yes | | `agent@project`, unique | Can't collide: one team works on a project at a time. A later team's agent of the same id takes the id over ([Team definition](./team-definition.md#schema)) |
 | `deployment_id` | String → Deployment | yes | | | |
 | `agent_id` | String | yes | | an agent of the deployment's team | |
 | `status` | String | yes | `starting` | enum below | Set at creation: `asleep`, or `queued` for the lead on deploy |

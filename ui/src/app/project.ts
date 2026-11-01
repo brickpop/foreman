@@ -40,15 +40,27 @@ export function reviewOf(project: string, review: string) {
   return { to: "/projects/$project/inbox/$review", params: { project, review } } as const;
 }
 
-/** The team that worked on the project last, from the stopped deployments:
- * the one a Deploy there starts with. */
-export function lastTeam(project: string, stopped: Deployment[]): string | undefined {
+/** The project's deployment: the running one, else the one that stopped last.
+ * Its team's agents are the ones a `wt/<agent>` branch or a card's assignee
+ * names: one team works on a project at a time, and a later team's agent of
+ * the same id takes over what the earlier one left. */
+export function deploymentOn(
+  project: string,
+  active: Deployment[],
+  stopped: Deployment[],
+): Deployment | undefined {
+  return active.find((d) => d.projectId === project) ?? latestStopped(project, stopped);
+}
+
+/** The deployment that stopped last on the project: its team worked there
+ * last (the one a Deploy there starts with), and named what it left. */
+export function latestStopped(project: string, stopped: Deployment[]): Deployment | undefined {
   return stopped
     .filter((d) => d.projectId === project)
     .reduce<Deployment | undefined>(
       (a, d) => (!a || Date.parse(d.stoppedAt) > Date.parse(a.stoppedAt) ? d : a),
       undefined,
-    )?.teamId;
+    );
 }
 
 /** The projects latest first: by when something last happened on each, as of

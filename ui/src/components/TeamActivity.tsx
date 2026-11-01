@@ -21,13 +21,13 @@ const ry = 100;
 
 export type Names = (id: string) => string;
 
-/** Who an id is, as the rows name them: an agent by its soul's name, the CEO
- * as You, Foreman as itself. */
-export function namesOf(teams: Team[]): Names {
+/** Who an id is, as the rows name them: an agent by its soul's name in the
+ * deployment's team (team@project), the CEO as You, Foreman as itself. */
+export function namesOf(teams: Team[], deployment: string): Names {
   return (id) => {
     if (id === "foreman") return "Foreman";
     if (id === "ceo") return "You";
-    return agentOf(teams, id)?.soul.name ?? id.split("@")[0];
+    return agentOf(teams, deployment, id)?.soul.name ?? id.split("@")[0];
   };
 }
 

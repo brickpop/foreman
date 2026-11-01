@@ -12,8 +12,8 @@ One member of a [team definition](./team-definition.md): who the agent is (name,
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
-| (key) | String | yes | | slug, unique across all teams | Agent id: the slug of the display name ([Team definition](./team-definition.md#schema)) |
-| `name` | String | yes | | unique across all teams | Display name, used in @-mentions, tabs, prompts |
+| (key) | String | yes | | slug, unique in the team | Agent id: the slug of the display name ([Team definition](./team-definition.md#schema)) |
+| `name` | String | yes | | unique in the team | Display name, used in @-mentions, tabs, prompts |
 | `role` | String | yes | | `team_lead`, `architect`, `engineer`, `qa`, `reviewer`, or a custom role in snake_case (e.g. `security_auditor`) | Labels: Team Lead, Architect, Engineer, QA / Tester, Reviewer; a custom role is shown with underscores as spaces, capitalised ("Security auditor"). Snake_case so a playbook can name it as a `who` ([Team definition](./team-definition.md#playbook-and-escalation)). No role but the lead's grants write access to the knowledge base |
 | `personality` | String | | | | One or a few lines |
 | `skills` | Array of String | | `[]` | no duplicates | Shown as chips |
@@ -41,7 +41,7 @@ Used when a role is hired without a custom `instruction` (the CoS appends `Focus
 
 ## Invariants
 
-- Display names are unique across all teams.
+- Display names are unique within the team; another team may use the same one ([Team definition](./team-definition.md#invariants)).
 - The soul is the same in every deployment; only the composed [session prompt](../architecture/session-prompt.md) differs per project.
 - A soul edit reaches each running instance as a context-update message on its next turn, and a full re-prompt at its next restart.
 

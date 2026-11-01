@@ -129,7 +129,7 @@ export function Review() {
       </Page>
     );
   const project = projects.data?.find((p) => p.id === v.projectId);
-  const lead = agentOf(teams.data ?? [], v.lead);
+  const lead = agentOf(teams.data ?? [], v.deploymentId, v.lead);
   // Two panes under the header, each scrolling on its own: going to a file
   // moves the diffs, never the tree.
   return (

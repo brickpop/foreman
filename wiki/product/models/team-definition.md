@@ -55,7 +55,7 @@ beard = "none"            # none | stubble | full | mustache
 | `name` | String | yes | | | Display name |
 | `purpose` | String | | | one line | What the team is for, shown under its name on the [Team page](../features/team-page.md). Free text; there are no team kinds |
 | `lead` | String | yes | | an id in `agents` | The team lead: the CEO's default contact, the only member who can call `request_merge` |
-| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids are **unique across all teams** (the slug of the display name, which is unique across all teams too), so the instance id `agent@project`, the worktree paths and `wt/<agent>/…` branches can never collide when teams follow one another on a project (Stop keeps their worktrees). Their order in the file is the roster's order everywhere, lead first: the Session's agent tabs, Deployment, Members, the session prompt |
+| `agents` | Map id → [Agent soul](./agent-soul.md) | yes | | at least the lead | Agent ids (the slug of the display name) are **unique within the team only**: two teams may each have a `qa` called QA, a role being the natural name (the CEO, 2026-11-02; [Agents share ids across teams](../../backlog/archive/agents-share-ids-across-teams.md)). One team works on a project at a time, so the instance id `agent@project` never collides; a later team's agent of the same id **takes over** what the earlier one left on the project: its worktree, its `wt/<agent>/…` branches, its harness folder and logs (the same role in spirit), its conversation starting fresh. Anything naming an agent finds it through the deployment's team (`team@project`), never by the id alone. Their order in the file is the roster's order everywhere, lead first: the Session's agent tabs, Deployment, Members, the session prompt |
 | `playbook` | Array of single-key inline tables `{ who = "text" }` | | `[]` | | Ordered steps. `who` as in [Playbook and escalation](#playbook-and-escalation) |
 | `escalate` | Array of tables `[[escalate]]` with `when`, `to` | | `[]` | `to`: a `who` ([Playbook and escalation](#playbook-and-escalation)) | Escalation table. Project gates ([Project config](./project-config.md)) apply on top |
 
@@ -88,10 +88,9 @@ Each example carries a full roster with job descriptions, a playbook and an esca
 ## Invariants
 
 - `lead` names an existing agent of the team.
-- Agent display names are unique across all teams, so @-mentions and avatars stay unambiguous.
+- Agent display names are unique within the team (compared trimmed), so @-mentions, which only ever name teammates, stay unambiguous.
 - A soul names no harness: the project's [profile](../architecture/session-runner.md#credentials) does. An old file's `harness` and `command` lines load, are ignored, and go with the next save ([Agent soul](./agent-soul.md#what-it-runs-on)).
 - A team file never carries secrets or deployment state.
-- Agent ids are unique across all teams, not just within the team.
 - An agent can't be removed, and a team file can't be deleted, while it is deployed: stop the deployments first. Removing an undeployed agent removes its soul and keeps its worktrees and branches on disk.
 
 ## Writes

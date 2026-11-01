@@ -48,8 +48,9 @@ func Prompt(teams []home.Team, teamsDir string) string {
 	line("- `team`: its id, lowercase letters, digits and hyphens (`atlas`); the file is `<id>.toml`. Never change an existing team's id.")
 	line("- `name`: how it reads (`Atlas`); `purpose`: one line, what it is for.")
 	line("- `lead`: the id of its team lead, one of `agents`.")
-	line("- `agents`: each member by id (lowercase letters, digits and hyphens, unique across all teams): " +
-		"`name` (unique across all teams), `role` (snake_case), `personality`, `skills` (a few words each), " +
+	line("- `agents`: each member by id (lowercase letters, digits and hyphens, unique in the team): " +
+		"`name` (unique in the team; the role itself is a fine name, as `QA`, and other teams may use the same ids and names), " +
+		"`role` (snake_case), `personality`, `skills` (a few words each), " +
 		"`instruction` (the job description; empty means the role's default). Leave `look` out for a new member: " +
 		"Foreman gives them a face. Keep an existing member's `look` as it is.")
 	line("- `order`: the member ids in the order the team lists them, the lead first.")
@@ -71,7 +72,6 @@ func Prompt(teams []home.Team, teamsDir string) string {
 	line("## Taken")
 	line("")
 	line("Team ids: %s.", list(teamIDs(teams)))
-	line("Member ids and names: %s.", list(members(teams)))
 	return b.String()
 }
 
@@ -82,17 +82,6 @@ func teamIDs(teams []home.Team) []string {
 	}
 	slices.Sort(ids)
 	return ids
-}
-
-func members(teams []home.Team) []string {
-	var out []string
-	for _, t := range teams {
-		for _, id := range t.Config.Roster() {
-			out = append(out, fmt.Sprintf("%s (%s, %s)", id, t.Config.Agents[id].Name, t.ID))
-		}
-	}
-	slices.Sort(out)
-	return out
 }
 
 func list(items []string) string {

@@ -32,6 +32,15 @@ describe("noticeFor", () => {
     });
   });
 
+  it("names the agent as its own team has it, when another team shares the id", () => {
+    const orion = { id: "orion", config: { lead: "tove", agents: { tove: { name: "QA" } } } };
+    const both = [orion as unknown as Team, team];
+    expect(noticeFor(request({}), both, instances)?.title).toBe("Tove needs you on ledger");
+    expect(noticeFor(request({ deploymentId: "orion@ledger" }), both, instances)?.title).toBe(
+      "QA needs you on ledger",
+    );
+  });
+
   it("calls a review a merge request, gated by its own toggle", () => {
     const n = noticeFor(
       request({

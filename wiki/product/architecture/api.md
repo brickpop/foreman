@@ -107,7 +107,7 @@ GET    /api/events                            SSE: requests, status, file change
 A project's Activity section pages its team's traffic with `/api/activity?deployment=` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
 Its Repos section reads its repos read-only with `/api/projects/:id/repos…` ([Repos](../features/repos.md)); its Deployment section lists the agents' worktrees from the same list, each branch naming the `agent` that has it checked out ([Project deployment](../features/project-deployment.md)).
 The project routes answer with the project as it is now; a refusal is 400 INVALID, 409 EXISTS or 409 DEPLOYED with the reason. Removing a project deletes its history too ([Add a project → Removing a project](../features/add-project.md#removing-a-project)).
-Resource ids: project = its name (unique in any case); team = team id; instance = `agent@project` (agent ids are unique across teams, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
+Resource ids: project = its name (unique in any case); team = team id; instance = `agent@project` (one team per project at a time; agent ids are unique within a team only, so the agent behind an instance is found through its deployment's team, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
 ## Error format
 

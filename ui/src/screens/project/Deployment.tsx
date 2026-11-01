@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Instance, type Team, useClient } from "../../api/client";
 import { agentOf, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
-import { lastTeam, sessionOf } from "../../app/project";
+import { latestStopped, sessionOf } from "../../app/project";
 import {
   useDeployments,
   useInstances,
@@ -42,6 +42,8 @@ export function Deployment() {
   const trees = worktrees(repos.data ?? []);
   // The worktrees no agent of the team holds: an earlier team's, kept by its Stop.
   const left = trees.filter((w) => !roster.some((i) => i.agentId === w.agent));
+  // Named as the team that stopped last there has them: the one that left them, usually.
+  const earlier = latestStopped(project.id, stopped);
   const client = useClient();
   const toast = useToast();
   const reload = reloadOf(roster);
@@ -114,6 +116,7 @@ export function Deployment() {
                   worktree={trees.find((w) => w.agent === i.agentId)}
                   project={project.id}
                   teams={teams.data ?? []}
+                  deployment={i.deploymentId}
                 />
               ))}
               {left.map((w) => (
@@ -123,6 +126,7 @@ export function Deployment() {
                   worktree={w}
                   project={project.id}
                   teams={teams.data ?? []}
+                  deployment={earlier?.id ?? ""}
                 />
               ))}
             </Panel>
@@ -136,7 +140,7 @@ export function Deployment() {
           open
           onClose={() => setDeploy(false)}
           project={project.id}
-          initialTeam={d ? undefined : lastTeam(project.id, stopped)}
+          initialTeam={d ? undefined : earlier?.teamId}
         />
       )}
       {stopping && d && (
@@ -155,15 +159,18 @@ function AgentRow({
   worktree: w,
   project,
   teams,
+  deployment,
 }: {
   agent: string;
   instance?: Instance;
   worktree?: Worktree;
   project: string;
   teams: Team[];
+  /** Whose team the agent is in (team@project). */
+  deployment: string;
 }) {
   const navigate = useNavigate();
-  const agent = agentOf(teams, `${id}@${project}`);
+  const agent = agentOf(teams, deployment, id);
   return (
     <div className="grid grid-cols-[auto_minmax(140px,220px)_1fr_auto] items-start gap-3 border-b border-line px-4 py-3 last:border-b-0">
       <Avatar

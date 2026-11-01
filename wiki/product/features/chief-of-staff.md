@@ -28,7 +28,7 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 
 `propose_team(team)`: the whole team definition as it should be ([Team definition](../models/team-definition.md)): a new team, or an existing one with a member added (hire) or changed (refine). One tool for the three cases, since each is the team file as it should become.
 
-- Foreman checks it as it would a save (the [invariants](../models/team-definition.md#invariants): ids and display names unique across all teams, the lead in the roster, valid roles and looks). An invalid proposal is not shown: the call returns the reasons, and the CoS fixes it and calls again.
+- Foreman checks it as it would a save (the [invariants](../models/team-definition.md#invariants): ids and display names unique within the team (other teams may use the same ones), the lead in the roster, valid roles and looks). An invalid proposal is not shown: the call returns the reasons, and the CoS fixes it and calls again.
 - A valid one opens the [preview](#the-page) and returns. A newer proposal replaces the one on screen.
 - A member proposed without a face (no background color) gets one on the page, drawn once per proposal; **Create** sends those faces, so the one shown is the one saved.
 - It never writes. The CEO's **Create** / **Save** does, carrying the version of the team file the proposal was based on: if the file changed meanwhile (an edit on the Agent page, in an editor), nothing is written, the preview says so, and the CoS is told to propose again from the current file.

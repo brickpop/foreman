@@ -255,8 +255,15 @@ func (c TeamConfig) validate(id string) problems {
 			p.add("escalate[%d]: when and to are required", i)
 		}
 	}
+	named := map[string]string{} // a name → the first agent with it
 	for _, aid := range sortedKeys(c.Agents) {
 		p = append(p, c.Agents[aid].validate("agents."+aid, aid)...)
+		name := strings.TrimSpace(c.Agents[aid].Name)
+		if other, ok := named[name]; ok && name != "" {
+			p.add("agents.%s.name: %q is also %s's name", aid, name, other)
+		} else {
+			named[name] = aid
+		}
 	}
 	return p
 }

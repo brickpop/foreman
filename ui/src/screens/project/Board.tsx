@@ -5,6 +5,7 @@ import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client
 import { agentOf } from "../../app/model";
 import {
   useBoards,
+  useDeploymentOn,
   useEntry,
   useMissing,
   useMoveCard,
@@ -287,6 +288,7 @@ function Cell({
 }) {
   const [over, setOver] = useState(false);
   const teams = useTeams();
+  const deployment = useDeploymentOn(useProject().id)?.id ?? "";
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: a drop target; the keyboard path is each card's status menu
     <div
@@ -312,7 +314,9 @@ function Cell({
     >
       {label && <span className="px-1 text-xs text-tx4">{label}</span>}
       {cards.map((card) => {
-        const assignee = card.assignee ? agentOf(teams.data ?? [], `${card.assignee}@`) : undefined;
+        const assignee = card.assignee
+          ? agentOf(teams.data ?? [], deployment, card.assignee)
+          : undefined;
         return (
           // biome-ignore lint/a11y/noStaticElementInteractions: dragged and clicked; the keyboard paths are the title button and the status menu
           // biome-ignore lint/a11y/useKeyWithClickEvents: the title button is the keyboard path to the sheet

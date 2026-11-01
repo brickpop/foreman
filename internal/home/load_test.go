@@ -157,16 +157,17 @@ func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 	}
 }
 
-func TestAgentsAreUniqueAcrossTeams(t *testing.T) {
+// An agent's id and name are its team's own: two teams may each have a mara
+// called Mara (the CEO, 2026-11-02: a role is the natural name).
+func TestTeamsShareAgentIdsAndNames(t *testing.T) {
 	h := loaded(t, func(root string) {
 		writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
 		other := strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `name = "Atlas"`, `name = "Orion"`).Replace(teamExample)
 		writeFile(t, filepath.Join(root, "config", "teams", "orion.toml"), other)
 	})
 	for _, id := range []string{"atlas", "orion"} {
-		team, _ := h.Team(id)
-		if !hasProblem(team.Problems, "agents.mara: the id is also used") || !hasProblem(team.Problems, `"Mara" is also used`) {
-			t.Errorf("%s problems %v", id, team.Problems)
+		if team, _ := h.Team(id); len(team.Problems) != 0 || team.Config.Agents["mara"].Name != "Mara" {
+			t.Errorf("%s: %+v", id, team)
 		}
 	}
 }
@@ -228,11 +229,14 @@ func TestInvalidSavesWriteNothing(t *testing.T) {
 	if _, err := h.SaveTeam(ctx, c, ""); !errors.As(err, &invalid) || !hasProblem(invalid.Problems, "lead") {
 		t.Errorf("invalid save: %v", err)
 	}
-	// Another team can't reuse an agent of atlas.
+	// Two of orion's agents can't share a name.
 	orion, _ := ParseTeam("atlas", []byte(teamExample))
 	orion.Team, orion.Name = "orion", "Orion"
-	if _, err := h.SaveTeam(ctx, orion, ""); !errors.As(err, &invalid) || !hasProblem(invalid.Problems, "also used") {
-		t.Errorf("duplicate agent across teams: %v", err)
+	tove := orion.Agents["tove"]
+	tove.Name = "Mara"
+	orion.Agents["tove"] = tove
+	if _, err := h.SaveTeam(ctx, orion, ""); !errors.As(err, &invalid) || !hasProblem(invalid.Problems, "is also mara's name") {
+		t.Errorf("a name twice in a team: %v", err)
 	}
 	if _, err := os.Stat(h.Path("config", "teams", "orion.toml")); err == nil {
 		t.Error("an invalid team was written")
@@ -346,7 +350,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 }
 
 // CheckTeam refuses what SaveTeam would, writing nothing: the file's rules,
-// a team id that isn't one folder name, and agents of other teams.
+// a team id that isn't one folder name. Another team's agents are no concern.
 func TestCheckTeam(t *testing.T) {
 	h := loaded(t, func(root string) {
 		writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
@@ -364,8 +368,8 @@ func TestCheckTeam(t *testing.T) {
 	}
 	orion := c
 	orion.Team, orion.Name = "orion", "Orion"
-	if p := h.CheckTeam(orion); !hasProblem(p, "also used in team atlas") {
-		t.Errorf("an agent of atlas in orion: %v", p)
+	if p := h.CheckTeam(orion); len(p) != 0 {
+		t.Errorf("atlas's agents in orion: %v", p)
 	}
 	if _, err := os.Stat(h.Path("config", "teams", "orion.toml")); err == nil {
 		t.Error("checking wrote the team")

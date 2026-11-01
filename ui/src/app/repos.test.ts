@@ -25,11 +25,21 @@ const atlas = {
 
 describe("the Repos section's model", () => {
   it("names whose branch it is", () => {
-    expect(branchOwner("wt/tove/LED-44", [atlas])).toBe("Tove");
-    expect(branchOwner("lead/atlas/integration", [atlas])).toBe("Mara");
-    expect(branchOwner("wt/gone/x", [atlas])).toBe("gone"); // a soul since removed
-    expect(branchOwner("main", [atlas])).toBeUndefined();
-    expect(branchOwner("feature/x", [atlas])).toBeUndefined();
+    const on = "atlas@ledger";
+    expect(branchOwner("wt/tove/LED-44", [atlas], on)).toBe("Tove");
+    expect(branchOwner("lead/atlas/integration", [atlas], on)).toBe("Mara");
+    expect(branchOwner("wt/gone/x", [atlas], on)).toBe("gone"); // a soul since removed
+    expect(branchOwner("main", [atlas], on)).toBeUndefined();
+    expect(branchOwner("feature/x", [atlas], on)).toBeUndefined();
+    // Never a team on the project: the id as it is.
+    expect(branchOwner("wt/tove/LED-44", [atlas], undefined)).toBe("tove");
+    // The team on the project names it, even when another team has a tove too.
+    const orion = {
+      id: "orion",
+      config: { lead: "tove", agents: { tove: { name: "QA" } } },
+    } as unknown as Team;
+    expect(branchOwner("wt/tove/LED-44", [atlas, orion], "orion@ledger")).toBe("QA");
+    expect(branchOwner("lead/atlas/integration", [atlas, orion], "orion@ledger")).toBe("Mara");
   });
 
   it("breaks a path into crumbs and finds its folder", () => {

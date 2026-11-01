@@ -22,6 +22,7 @@ import {
 } from "../api/client";
 import type { Event } from "../api/types/events";
 import { useToast } from "../components/Toasts";
+import { deploymentOn } from "./project";
 import { type SerialSaver, serialSaver } from "./serialSave";
 import { withDoing } from "./sessions";
 import { applyTheme, asTheme, type Theme } from "./theme";
@@ -526,8 +527,15 @@ export function useStoppedDeployments() {
   });
 }
 
-/** A deployment's team traffic a page at a time, newest first (a project's
- * Activity section). */
+/** The project's deployment (deploymentOn): the running one, else the one
+ * that stopped last. Its team is whose agents the project's branches and
+ * cards name. */
+export function useDeploymentOn(project: string) {
+  const active = useDeployments().data ?? [];
+  const stopped = useStoppedDeployments().data ?? [];
+  return deploymentOn(project, active, stopped);
+}
+
 /** When something last happened on each project, as the page loaded: the
  * projects' order, kept while the CEO works so nothing reshuffles. */
 export function useLatestActivity(): Record<string, string> | undefined {
@@ -542,6 +550,8 @@ export function useLatestActivity(): Record<string, string> | undefined {
   return first.current;
 }
 
+/** A deployment's team traffic a page at a time, newest first (a project's
+ * Activity section). */
 export function useActivity(deployment: string, enabled = true) {
   const c = useClient();
   return useInfiniteQuery({

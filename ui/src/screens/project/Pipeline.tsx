@@ -144,7 +144,7 @@ function ProjectRequest({
 }) {
   const navigate = useNavigate();
   const answer = useAnswer();
-  const agent = agentOf(teams, r.instanceId);
+  const agent = agentOf(teams, r.deploymentId, r.instanceId);
   const openSession = () => navigate(sessionOf(r.instanceId));
   const context = agent ? `${agent.team.config.name} on ${project.id}` : `on ${project.id}`;
   const who = agent && { name: agent.soul.name, look: agent.soul.look };
@@ -193,7 +193,7 @@ function WorkRow({
   live: boolean;
 }) {
   const navigate = useNavigate();
-  const author = agentOf(teams, w.authorInstance);
+  const author = agentOf(teams, w.deploymentId, w.authorInstance);
   const title = useEntryTitle(project, w.cardRef);
   const tone =
     w.checksStatus === "fail" ? "text-err" : w.checksStatus === "pass" ? "text-ok" : "text-tx3";
@@ -239,7 +239,7 @@ function MergeRow({
   live: boolean;
 }) {
   const navigate = useNavigate();
-  const lead = agentOf(teams, mr.authorInstance);
+  const lead = agentOf(teams, mr.deploymentId, mr.authorInstance);
   const title = useEntryTitle(project, mr.entry);
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
@@ -291,7 +291,7 @@ function CarriedItem({
   project: string;
   teams: Team[];
 }) {
-  const author = agentOf(teams, w.authorInstance);
+  const author = agentOf(teams, w.deploymentId, w.authorInstance);
   const title = useEntryTitle(project, w.cardRef);
   return (
     <span className="ml-9 flex items-center gap-2 text-[13px] text-tx2">

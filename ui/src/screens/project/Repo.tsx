@@ -4,7 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import type { RepoBranch, Repo as RepoInfo } from "../../api/client";
 import { withoutTitle } from "../../app/frontmatter";
 import { when } from "../../app/model";
-import { useRepoFile, useRepoLog, useRepos, useRepoTree, useTeams } from "../../app/queries";
+import {
+  useDeploymentOn,
+  useRepoFile,
+  useRepoLog,
+  useRepos,
+  useRepoTree,
+  useTeams,
+} from "../../app/queries";
 import {
   branchOwner,
   bytes,
@@ -193,6 +200,7 @@ function BranchItem({
   onClick: () => void;
 }) {
   const teams = useTeams().data ?? [];
+  const deployment = useDeploymentOn(useProject().id)?.id;
   // The branch shown is in view when the list opens, however far down.
   const self = useRef<HTMLButtonElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the list opens
@@ -201,7 +209,7 @@ function BranchItem({
   }, []);
   const detail = [
     b.name === main && "default branch",
-    branchOwner(b.name, teams),
+    branchOwner(b.name, teams, deployment),
     b.ahead > 0 && `${b.ahead} ahead of ${main}`,
   ].filter(Boolean);
   return (

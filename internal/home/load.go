@@ -280,7 +280,6 @@ func (h *Home) scan(prev snapshot) snapshot {
 		}
 		s.teams[t.ID] = t
 	}
-	crossTeamProblems(s.teams)
 
 	s.settings = SettingsFile{Settings: DefaultSettings(), Problems: []string{}}
 	if data, err := os.ReadFile(h.config(settingsFile)); err == nil {
@@ -371,48 +370,6 @@ func topOfRepo(dir string) bool {
 func inside(path, dir string) bool {
 	rel, err := filepath.Rel(dir, path)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
-// crossTeamProblems adds the rules that span team files: agent ids and display
-// names are unique across the home.
-func crossTeamProblems(teams map[string]Team) {
-	ids, names := map[string][]string{}, map[string][]string{}
-	for _, tid := range sortedKeys(teams) {
-		for aid, soul := range teams[tid].Config.Agents {
-			ids[aid] = append(ids[aid], tid)
-			if soul.Name != "" {
-				names[soul.Name] = append(names[soul.Name], tid)
-			}
-		}
-	}
-	for _, tid := range sortedKeys(teams) {
-		t := teams[tid]
-		for _, aid := range sortedKeys(t.Config.Agents) {
-			if others := without(ids[aid], tid); len(others) > 0 {
-				t.Problems = append(t.Problems, fmt.Sprintf("agents.%s: the id is also used in team %s", aid, strings.Join(others, ", ")))
-			}
-			if name := t.Config.Agents[aid].Name; name != "" {
-				if others := without(names[name], tid); len(others) > 0 || count(names[name], tid) > 1 {
-					t.Problems = append(t.Problems, fmt.Sprintf("agents.%s.name: %q is also used by another agent", aid, name))
-				}
-			}
-		}
-		teams[tid] = t
-	}
-}
-
-func without(list []string, v string) []string {
-	return slices.DeleteFunc(slices.Clone(list), func(s string) bool { return s == v })
-}
-
-func count(list []string, v string) int {
-	n := 0
-	for _, s := range list {
-		if s == v {
-			n++
-		}
-	}
-	return n
 }
 
 // Projects returns every project, by id.

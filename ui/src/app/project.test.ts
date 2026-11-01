@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { Deployment, Instance } from "../api/client";
 import { replacingLine, sessionsEnd } from "./model";
 import {
-  lastTeam,
+  deploymentOn,
   latestFirst,
+  latestStopped,
   projectHome,
   reviewOf,
   sections,
@@ -54,16 +55,24 @@ describe("a project's page", () => {
     });
   });
 
-  it("suggests the team that worked on it last, from its stopped deployments only", () => {
-    const stopped = (id: string, stoppedAt: string) =>
-      ({ id, teamId: id.split("@")[0], projectId: id.split("@")[1], stoppedAt }) as Deployment;
-    const list = [
-      stopped("atlas@ledger", "2026-10-20T10:00:00Z"),
-      stopped("orion@ledger", "2026-10-30T10:00:00Z"),
-      stopped("vesper@relay", "2026-10-31T10:00:00Z"),
-    ];
-    expect(lastTeam("ledger", list)).toBe("orion");
-    expect(lastTeam("harbor", list)).toBeUndefined();
+  const stopped = (id: string, stoppedAt: string) =>
+    ({ id, teamId: id.split("@")[0], projectId: id.split("@")[1], stoppedAt }) as Deployment;
+  const list = [
+    stopped("atlas@ledger", "2026-10-20T10:00:00Z"),
+    stopped("orion@ledger", "2026-10-30T10:00:00Z"),
+    stopped("vesper@relay", "2026-10-31T10:00:00Z"),
+  ];
+
+  it("finds the team that worked on it last, from its stopped deployments only", () => {
+    expect(latestStopped("ledger", list)?.teamId).toBe("orion");
+    expect(latestStopped("harbor", list)).toBeUndefined();
+  });
+
+  it("finds its deployment: the running one, else the one that stopped last", () => {
+    const running = [{ id: "atlas@relay", projectId: "relay" } as Deployment];
+    expect(deploymentOn("relay", running, list)?.id).toBe("atlas@relay");
+    expect(deploymentOn("ledger", running, list)?.id).toBe("orion@ledger");
+    expect(deploymentOn("harbor", running, list)).toBeUndefined();
   });
 });
 

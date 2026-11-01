@@ -220,7 +220,7 @@ describe("the Dashboard's model", () => {
   });
 });
 
-import { palettes, randomLook, resolveWho, roleLabel, roster } from "./model";
+import { agentOf, palettes, randomLook, resolveWho, roleLabel, roster } from "./model";
 
 describe("teams", () => {
   const atlas = {
@@ -242,6 +242,22 @@ describe("teams", () => {
     expect(resolveWho(atlas.config, "tove")).toEqual({ text: "Tove", known: true });
     expect(resolveWho(atlas.config, "engineer")).toEqual({ text: "Tove, Ilya", known: true });
     expect(resolveWho(atlas.config, "designer")).toEqual({ text: "designer", known: false });
+  });
+
+  it("finds an agent through its deployment's team: ids are only unique within a team", () => {
+    const orion = {
+      id: "orion",
+      config: { lead: "mara", agents: { mara: { name: "Auditor" } } },
+    } as unknown as Team;
+    const teams = [atlas, orion];
+    expect(agentOf(teams, "atlas@ledger", "mara@ledger")?.soul.name).toBe("Mara");
+    expect(agentOf(teams, "orion@ledger", "mara@ledger")?.soul.name).toBe("Auditor");
+    expect(agentOf(teams, "orion@ledger", "mara@ledger")?.team.id).toBe("orion");
+    // Another team having the id doesn't make it this team's.
+    expect(agentOf(teams, "orion@ledger", "tove@ledger")).toBeUndefined();
+    // A team file since deleted, or no deployment at all (Foreman's own requests).
+    expect(agentOf(teams, "vesper@ledger", "mara@ledger")).toBeUndefined();
+    expect(agentOf(teams, "", "mara@ledger")).toBeUndefined();
   });
 
   it("labels roles", () => {
@@ -392,7 +408,7 @@ import { reloadLine, reloadOf } from "./model";
 
 describe("reloadOf", () => {
   const inst = (id: string, status: string, behind = false) =>
-    ({ id, agentId: id.split("@")[0], status, behind }) as Instance;
+    ({ id, agentId: id.split("@")[0], deploymentId: "atlas@ledger", status, behind }) as Instance;
   const teams = [
     {
       id: "atlas",

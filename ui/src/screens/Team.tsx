@@ -2,7 +2,7 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { roleLabel, roster } from "../app/model";
+import { roleLabel, roster, type TeamTab, teamTab } from "../app/model";
 import { useDeployments, useHomeFolder, useInstances, useRequests, useTeams } from "../app/queries";
 import { Avatar } from "../components/Avatar";
 import { DeployDialog } from "../components/DeployDialog";
@@ -10,8 +10,6 @@ import { StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { TeamPlaybook } from "../components/TeamPlaybook";
 import { Button, Dot, Empty, Loading, Panel } from "../components/ui";
-
-export type TeamTab = "deployments" | "members" | "playbook" | "file";
 
 const tabs: { tab: TeamTab; label: string }[] = [
   { tab: "deployments", label: "Deployments" },
@@ -24,15 +22,16 @@ const tabs: { tab: TeamTab; label: string }[] = [
 // deployed, its members, its playbook and its file.
 export function Team() {
   const { team: id } = useParams({ from: "/teams/$team" });
-  const { tab } = useSearch({ from: "/teams/$team" });
+  const { tab: asked } = useSearch({ from: "/teams/$team" });
   const teams = useTeams();
   const deployments = useDeployments();
   const openChiefOfStaff = useOpenChiefOfStaff();
   const [deploy, setDeploy] = useState(false);
   const team = teams.data?.find((t) => t.id === id);
-  if (teams.isPending) return <Loading rows={5} className="m-12" />;
+  if (teams.isPending || deployments.isPending) return <Loading rows={5} className="m-12" />;
   if (!team) return <p className="p-12 text-tx3">No team {id}.</p>;
   const mine = (deployments.data ?? []).filter((d) => d.teamId === id);
+  const tab = teamTab(asked, mine.length > 0);
   return (
     <div className="flex flex-col">
       <header className="flex flex-col gap-4 px-6 pt-6">

@@ -14,8 +14,9 @@ import { Review } from "../screens/project/Review";
 import { Session } from "../screens/project/Session";
 import { Wiki } from "../screens/project/Wiki";
 import { Settings } from "../screens/Settings";
-import { Team, type TeamTab } from "../screens/Team";
+import { Team } from "../screens/Team";
 import { cosSearch } from "./chiefOfStaff";
+import { type TeamTab, teamTabs } from "./model";
 import { Shell } from "./Shell";
 import { settingsSearch } from "./settings";
 
@@ -82,12 +83,12 @@ const deployment = createRoute({ ...section("deployment"), component: Deployment
 const activity = createRoute({ ...section("activity"), component: Activity });
 const projectSettings = createRoute({ ...section("settings"), component: ProjectSettings });
 
-const teamTabs: TeamTab[] = ["deployments", "members", "playbook", "file"];
 export const teamRoute = createRoute({
   getParentRoute: () => root,
   path: "teams/$team",
-  validateSearch: (s: Record<string, unknown>): { tab: TeamTab } => ({
-    tab: teamTabs.includes(s.tab as TeamTab) ? (s.tab as TeamTab) : "deployments",
+  // No tab in the URL: the page picks one from whether the team is deployed.
+  validateSearch: (s: Record<string, unknown>): { tab?: TeamTab } => ({
+    tab: teamTabs.includes(s.tab as TeamTab) ? (s.tab as TeamTab) : undefined,
   }),
   component: Team,
 });

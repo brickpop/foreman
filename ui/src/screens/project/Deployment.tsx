@@ -48,7 +48,6 @@ export function Deployment() {
               <Link
                 to="/teams/$team"
                 params={{ team: d.teamId }}
-                search={{ tab: "deployments" }}
                 className="self-start text-base font-semibold hover:underline"
               >
                 {teamName}

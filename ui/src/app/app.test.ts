@@ -383,3 +383,22 @@ describe("onOtherProfile", () => {
     expect(onOtherProfile(list, "ledger", { name: "pi", harness: "pi" })).toEqual([]);
   });
 });
+
+import { teamTab } from "./model";
+
+describe("teamTab", () => {
+  it("opens a deployed team on Deployments, one not deployed on Members", () => {
+    expect(teamTab(undefined, true)).toBe("deployments");
+    expect(teamTab(undefined, false)).toBe("members");
+  });
+
+  it("keeps the tab the URL asks for, even Deployments with none", () => {
+    expect(teamTab("deployments", false)).toBe("deployments");
+    expect(teamTab("file", true)).toBe("file");
+  });
+
+  it("falls back on an unknown tab", () => {
+    expect(teamTab("nope", false)).toBe("members");
+    expect(teamTab(3, true)).toBe("deployments");
+  });
+});

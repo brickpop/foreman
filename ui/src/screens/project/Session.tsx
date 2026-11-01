@@ -111,12 +111,7 @@ export function Session() {
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-2.5">
         <Dot status={d.status} title={d.status} />
         <h1 className="m-0 truncate text-[15px] font-semibold">
-          <Link
-            to="/teams/$team"
-            params={{ team: d.id.split("@")[0] }}
-            search={{ tab: "deployments" }}
-            className="hover:underline"
-          >
+          <Link to="/teams/$team" params={{ team: d.id.split("@")[0] }} className="hover:underline">
             {d.team}
           </Link>{" "}
           <span className="font-normal text-tx3">· {project}</span>

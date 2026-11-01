@@ -15,7 +15,7 @@ Padding `24px 24px 0`.
 - H1 with the team name; under it, the team's one-line `purpose` (15px `--tx3`), when set ([Team definition](../models/team-definition.md)).
 - Subline: `Deployed on N project(s)`, or `Not deployed`.
 - Buttons: outline **`Hire`** (the [Chief of Staff](./chief-of-staff.md#the-page), to hire for this team) and primary **`Deploy to a project`** ([Deploy a team](./deploy-team.md), this team preset).
-- Tabs (padding `9px 14px`, 500; active `--tx` with a 2px `--acc` bottom border over the 1px `--line` rule, inactive `--tx3`; no badges): `Deployments · Members · Playbook · File`.
+- Tabs (padding `9px 14px`, 500; active `--tx` with a 2px `--acc` bottom border over the 1px `--line` rule, inactive `--tx3`; no badges): `Deployments · Members · Playbook · File`. With no tab in the URL, the page opens on **Deployments** while the team is deployed and on **Members** while it isn't (the CEO, 2026-11-01: nothing to see on an empty Deployments).
 
 ## Deployments
 

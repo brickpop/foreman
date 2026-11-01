@@ -30,4 +30,5 @@ epic: workflow
 - [x] UI: Repos list (from Settings) and the repo page; Settings without code repos
 - [x] commit graph: every branch in lanes beside the history. Left out to stay small: a commit opening its diff (needs a commit-diff endpoint), branch labels on the lanes
 - [x] specs: Project page, App shell, Dashboard, Wiki reader, Reviews, Review model, Repos, Project settings, API
+- [x] Team page opens on Members while the team isn't deployed (the CEO, 2026-11-01); test
 - [ ] tried by the CEO in the browser

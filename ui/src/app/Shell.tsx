@@ -186,7 +186,6 @@ function Sidebar({
               key={t.id}
               to="/teams/$team"
               params={{ team: t.id }}
-              search={{ tab: "deployments" }}
               className={rowItem}
               activeProps={navActive}
               // Active on every tab, and on its members' Agent pages (paths under it).

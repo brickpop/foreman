@@ -168,7 +168,6 @@ function TeamCardView({ team: t, onDeploy }: { team: TeamCard; onDeploy?: () => 
       <Link
         to="/teams/$team"
         params={{ team: t.id }}
-        search={{ tab: "deployments" }}
         className={`text-[15px] font-semibold ${cover}`}
       >
         {t.name}

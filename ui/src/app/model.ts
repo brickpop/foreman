@@ -334,3 +334,13 @@ export function waitingReason(
       return `${name} isn't running`;
   }
 }
+
+export type TeamTab = "deployments" | "members" | "playbook" | "file";
+export const teamTabs: TeamTab[] = ["deployments", "members", "playbook", "file"];
+
+/** The Team page's tab: the one in the URL, else Deployments while the team is
+ * deployed and Members while it isn't (nothing to show on Deployments). */
+export function teamTab(asked: unknown, deployed: boolean): TeamTab {
+  if (teamTabs.includes(asked as TeamTab)) return asked as TeamTab;
+  return deployed ? "deployments" : "members";
+}

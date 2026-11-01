@@ -1,7 +1,8 @@
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import type { Instance, Team } from "../../api/client";
-import { agentOf, roleLabel, when } from "../../app/model";
+import { type Instance, type Team, useClient } from "../../api/client";
+import { agentOf, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
 import { lastTeam, sessionOf } from "../../app/project";
 import {
   useDeployments,
@@ -14,8 +15,9 @@ import { type Worktree, worktrees } from "../../app/repos";
 import { rosterOrder } from "../../app/sessions";
 import { Avatar } from "../../components/Avatar";
 import { DeployDialog } from "../../components/DeployDialog";
-import { StopIcon } from "../../components/icons";
+import { ReloadIcon, StopIcon } from "../../components/icons";
 import { StopDialog } from "../../components/StopDialog";
+import { useToast } from "../../components/Toasts";
 import { Button, Empty, LeadTag, Loading, Panel } from "../../components/ui";
 import { useProject } from "../Project";
 import { InFlight } from "./Pipeline";
@@ -23,7 +25,8 @@ import { InFlight } from "./Pipeline";
 // A project's Deployment section (wiki/product/features/project-deployment.md):
 // the team on it, its agents with what they do and the branch
 // each has checked out (and the worktrees earlier teams left); then the work
-// on its way to main, and what merged. Deploy (replacing the team) and Stop.
+// on its way to main, and what merged. Deploy (replacing the team), Reload
+// (its agents left on an older prompt) and Stop.
 export function Deployment() {
   const project = useProject();
   const repos = useRepos(project.id);
@@ -39,6 +42,15 @@ export function Deployment() {
   const trees = worktrees(repos.data ?? []);
   // The worktrees no agent of the team holds: an earlier team's, kept by its Stop.
   const left = trees.filter((w) => !roster.some((i) => i.agentId === w.agent));
+  const client = useClient();
+  const toast = useToast();
+  const reload = reloadOf(roster);
+  // Each restart continues its agent's conversation, on the prompt as it is now.
+  const restart = useMutation({
+    mutationFn: () => Promise.all(reload.behind.map((i) => client.agents.restart(i.id))),
+    onError: (e: Error) =>
+      toast({ title: "Agents not reloaded", body: e.message, color: "var(--err)" }),
+  });
   return (
     <div className="flex flex-col gap-8 px-6 pt-6 pb-12">
       <section className="flex flex-col gap-2.5">
@@ -60,6 +72,16 @@ export function Deployment() {
           <Button onClick={() => setDeploy(true)}>
             {d ? "Deploy another team" : "Deploy a team"}
           </Button>
+          {reload.behind.length > 0 && (
+            <Button
+              className="inline-flex items-center gap-1.5"
+              disabled={!!reload.busy || restart.isPending}
+              onClick={() => restart.mutate()}
+            >
+              <ReloadIcon />
+              Reload
+            </Button>
+          )}
           {d && (
             <Button
               variant="danger"
@@ -71,6 +93,9 @@ export function Deployment() {
             </Button>
           )}
         </div>
+        {reload.behind.length > 0 && (
+          <p className="m-0 text-[13px] text-tx3">{reloadLine(reload, teams.data ?? [])}</p>
+        )}
         {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
         {!d && repos.isPending && <Loading />}
         {!d && left.length === 0 && repos.isSuccess ? (

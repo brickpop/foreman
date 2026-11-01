@@ -325,7 +325,6 @@ type WithdrawMergeArgs struct { Branch, Reason, SupersededBy string } // branch,
 | Dismiss on its review, its team kept working | the review's lead | `From Foreman: the CEO dismissed the review of lead/atlas/settlement-v2 without merging (ledger-api). Stop work on it, and don't request it again.`, then `The CEO's note: <note>` when there is one ([Reviews → What the lead gets](../features/reviews.md#what-the-lead-gets)). A team stopped with the close, or not running, is told nothing |
 | Its PR closed on the forge (not built) | the merge request's lead | As Dismiss on its review, its team kept working |
 | "Owning team fixes now" on a finding | the named team's lead | `From the CEO: <team> fixes "<finding>" now.` |
-| A soul or team edit | each running instance | `From Foreman: your definition changed. Read it with read_message("msg-N").` (the changed sections, stored as a message of kind `notice`; [Session prompt → Updates](./session-prompt.md#updates)) |
 
 ## Messages
 

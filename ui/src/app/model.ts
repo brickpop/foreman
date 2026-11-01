@@ -15,6 +15,29 @@ export function onOtherProfile(
   );
 }
 
+/** A deployment's Reload (wiki/product/models/team-definition.md#reload):
+ * its live agents whose run started on an older prompt, and the first one
+ * busy (on its way up, working, or waiting on the CEO), which holds it back
+ * so no turn is ever cut. */
+export function reloadOf(instances: Instance[]): { behind: Instance[]; busy?: Instance } {
+  return {
+    behind: instances.filter((i) => i.behind),
+    busy: instances.find((i) => ["queued", "starting", "running", "awaiting"].includes(i.status)),
+  };
+}
+
+/** What Reload would do, or why it waits. */
+export function reloadLine(reload: ReturnType<typeof reloadOf>, teams: Team[]): string {
+  const n = reload.behind.length;
+  const runs = n === 1 ? "1 agent runs" : `${n} agents run`;
+  if (!reload.busy) {
+    return `${runs} on an older prompt: Reload restarts ${n === 1 ? "it" : "them"} on the new one, continuing ${n === 1 ? "its conversation" : "their conversations"}.`;
+  }
+  const name = agentOf(teams, reload.busy.id)?.soul.name || reload.busy.agentId;
+  const why = reload.busy.status === "awaiting" ? "is waiting on you" : "is busy";
+  return `${runs} on an older prompt. ${name} ${why}: the change applies at each agent's next start. Reload once they're idle.`;
+}
+
 import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
 import type { Look, Soul, TeamConfig } from "../api/types/home";
 

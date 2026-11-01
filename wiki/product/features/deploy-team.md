@@ -14,6 +14,7 @@ A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project,
 - **Team** option group, only without a team preset.
 - **Project** option group. A project where the selected team is already deployed is disabled and labelled `<project> (already there)`; one with another team on it carries that team's name (`<project> · <Team>`, the name in `--tx4`).
 - **Replacing**: when the project chosen has another team, an accent box (`--accSoft`, `--accLine`, `--accTx`) says so before Deploy: `Replaces <Team> on <project>: <n> sessions end. Worktrees and branches are kept.`
+- **Earlier conversations**: when the team's agents already have conversations on the chosen project (it worked there before), a checkbox, off by default: `Start fresh: the agents don't continue their earlier conversations here (kept on disk).` Unchecked, each agent continues its last conversation on the project (the CEO, 2026-11-02). Not shown when there are none.
 - Buttons: `Cancel`, and primary **`Deploy`**, disabled until team and project are set and the pair is new.
 
 ## Effect

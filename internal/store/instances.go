@@ -21,12 +21,12 @@ func (db *DB) Instances() Instances { return instances{db.sql} }
 
 type instances struct{ db *sql.DB }
 
-const instanceColumns = "id, deployment_id, agent_id, status, task, pid, pty_id, sandbox_path, harness, profile, harness_session_id, started_at, restarts, stop_reason"
+const instanceColumns = "id, deployment_id, agent_id, status, task, pid, pty_id, sandbox_path, harness, profile, harness_session_id, started_at, restarts, stop_reason, prompt_hash"
 
 func (s instances) Put(ctx context.Context, i Instance) error {
-	_, err := s.db.ExecContext(ctx, "INSERT OR REPLACE INTO instances ("+instanceColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	_, err := s.db.ExecContext(ctx, "INSERT OR REPLACE INTO instances ("+instanceColumns+") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		i.ID, i.DeploymentID, i.AgentID, i.Status, nullText(i.Task), nullInt(i.PID), nullText(i.PtyID), i.SandboxPath, i.Harness, i.Profile,
-		nullText(i.HarnessSessionID), timeText(i.StartedAt), i.Restarts, i.StopReason)
+		nullText(i.HarnessSessionID), timeText(i.StartedAt), i.Restarts, i.StopReason, i.PromptHash)
 	return err
 }
 
@@ -56,7 +56,7 @@ func scanInstance(row interface{ Scan(...any) error }) (Instance, error) {
 	var task, ptyID, sessionID, started sql.NullString
 	var pid sql.NullInt64
 	err := row.Scan(&i.ID, &i.DeploymentID, &i.AgentID, &i.Status, &task, &pid, &ptyID, &i.SandboxPath, &i.Harness, &i.Profile,
-		&sessionID, &started, &i.Restarts, &i.StopReason)
+		&sessionID, &started, &i.Restarts, &i.StopReason, &i.PromptHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Instance{}, ErrNotFound
 	}

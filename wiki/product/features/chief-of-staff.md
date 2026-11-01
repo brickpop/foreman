@@ -6,7 +6,7 @@ tags: [feature, ui, agents, teams]
 
 # Chief of Staff
 
-Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Nothing else: it raises no requests, appears on no Dashboard, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [global repo](../models/home.md#the-global-repo), only on the CEO's click.
+Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Creating teams is its main job: a deployed team is usually amended by its own lead, who has the context of the conversation with the CEO ([Team definition → Proposals](../models/team-definition.md#proposals)). Amending through the CoS stays allowed, and is the only way for a team that isn't deployed (the CEO, 2026-11-02). Nothing else: it raises no requests, appears on no Dashboard, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [global repo](../models/home.md#the-global-repo), only on the CEO's click.
 
 ## How it runs
 

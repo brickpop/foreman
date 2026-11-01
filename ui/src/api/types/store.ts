@@ -33,6 +33,12 @@ export interface Instance {
    * "" for a run from before it was kept.
    */
   profile: string;
+  /**
+   * Behind says its run started on an older prompt than its team, project
+   * and settings compose now: the instance manager works it out on each
+   * list, never stored.
+   */
+  behind: boolean;
   startedAt: string /* RFC 3339 */;
   restarts: number /* int */;
   /**

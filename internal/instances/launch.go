@@ -2,6 +2,8 @@ package instances
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
@@ -141,6 +143,15 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	mounts = append(mounts, runner.Mount{Source: dir, Target: dir})
 
 	text := m.compose(inst, dep, team, project)
+	if hash := promptHash(text); hash != inst.PromptHash {
+		err := m.change(ctx, id, func(i *store.Instance) bool {
+			i.PromptHash = hash
+			return true
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
 	first := inst.StartedAt.IsZero()
 	session := harness.Session{
 		Instance: id, Sandbox: inst.SandboxPath, Dir: dir, Prompt: text, Login: on.login,
@@ -184,6 +195,35 @@ func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.T
 		Tools:        m.tools(inst.AgentID == team.Config.Lead),
 		Instructions: m.Config.Settings().Settings.Instructions,
 	})
+}
+
+// promptHash tells one composed prompt from another, so a run's can be
+// compared with what its instance would get now (behind).
+func promptHash(text string) string {
+	sum := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(sum[:])
+}
+
+// behind marks the live instances whose run started on an older prompt than
+// the one composed now: a team, project or settings change since, which
+// reaches them at their next start, or at once on the CEO's Reload
+// (wiki/product/models/team-definition.md#reload). A run from before the
+// hash was kept is never marked: there is nothing to compare.
+func (m *Manager) behind(dep store.Deployment, insts []store.Instance) {
+	team, err := m.Config.Team(dep.TeamID)
+	if err != nil {
+		return
+	}
+	project, err := m.Config.Project(dep.ProjectID)
+	if err != nil {
+		return
+	}
+	for i, inst := range insts {
+		switch inst.Status {
+		case Running, Idle, Awaiting:
+			insts[i].Behind = inst.PromptHash != "" && promptHash(m.compose(inst, dep, team, project)) != inst.PromptHash
+		}
+	}
 }
 
 // tools are the team tools an instance gets: none without foreman-agent.

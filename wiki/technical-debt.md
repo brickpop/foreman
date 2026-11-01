@@ -89,3 +89,10 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
   - **The Session section's last agent is kept in memory:** a reload, or another browser, opens the project on the agent named in the URL, else on the lead ([UI state](./product/models/ui-state.md) is planned).
 - **Why:** each is rare or cheap next to what the card had to land, and the CEO asked for no workarounds.
 - **Fix:** Deploy's stop and write in one store transaction (the processes stopped after it commits); the activity filter sent to `/api/activity` as a query parameter, so the server pages the matches; the last agent saved with the `ui_state` table.
+
+## Reload's busy check is the UI's
+
+- **State:** the Deployment header's `Reload` ([Team definition → Reload](./product/models/team-definition.md#reload)) is disabled while an agent is busy, judged in the UI from the statuses it last got; it then calls `POST /api/instances/:id/restart` for each agent behind, which restarts whatever it is told to.
+- **Why:** the same shape as Project settings' `Restart them`, and the window is short: statuses arrive as events within a moment.
+- **Impact:** an agent that starts a turn between the last status the page got and the click (a message delivered to it) is restarted mid-turn: that turn's unfinished part is lost, its conversation kept. Two tabs clicking at once restart an agent twice.
+- **Fix:** a `POST /api/deployments/:id/reload` that checks the statuses on the server and restarts the agents behind in one step, refusing with `409 BUSY`; when a mid-turn restart is seen in use, or with the approval pane's **Reload now?** ([The lead proposes changes to its own team](./backlog/lead-proposes-team.md)).

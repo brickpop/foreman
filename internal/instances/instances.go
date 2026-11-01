@@ -219,6 +219,7 @@ func (m *Manager) List(ctx context.Context) ([]store.Instance, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.behind(dep, insts)
 		list = append(list, insts...)
 	}
 	m.mu.Lock()

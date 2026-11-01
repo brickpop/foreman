@@ -302,7 +302,7 @@ func TestInstanceRoundTripsEveryField(t *testing.T) {
 		ID: "mara@ledger", DeploymentID: "atlas@ledger", AgentID: "mara", Status: "running",
 		Task: "LED-44", PID: 4242, PtyID: "c0ffee", SandboxPath: "/ws/ledger/.sandboxes/mara",
 		Harness: "claude-code", Profile: "work", HarnessSessionID: "s-1", StartedAt: at, Restarts: 2,
-		StopReason: "app has no branch main",
+		StopReason: "app has no branch main", PromptHash: "9f2c",
 	}
 	bare := Instance{ID: "tove@ledger", DeploymentID: "atlas@ledger", AgentID: "tove", Status: "starting",
 		SandboxPath: "/ws/ledger/.sandboxes/tove", Harness: "claude-code"}

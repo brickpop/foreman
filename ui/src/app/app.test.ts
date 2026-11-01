@@ -73,21 +73,25 @@ describe("staleKeys", () => {
       keys.teams,
       ["prompt"],
       keys.setup,
+      keys.instances,
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "settings" } })).toEqual([
       keys.settings,
       keys.setup,
       ["prompt"],
       ["workspace"],
+      keys.instances,
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "project" } })).toEqual([
       keys.projects,
       keys.setup,
+      keys.instances,
     ]);
     expect(staleKeys({ type: "projects.changed", data: {} })).toEqual([
       keys.projects,
       keys.setup,
       keys.repos,
+      keys.instances,
     ]);
     expect(staleKeys({ type: "setup.changed", data: {} })).toEqual([keys.setup, keys.maintenance]);
     expect(staleKeys({ type: "instance.status", data: {} })).toEqual([keys.instances]);
@@ -381,6 +385,57 @@ describe("onOtherProfile", () => {
   it("doesn't take a project for another that ends the same", () => {
     const list = [inst("mara@my-ledger", "running", "default")];
     expect(onOtherProfile(list, "ledger", { name: "pi", harness: "pi" })).toEqual([]);
+  });
+});
+
+import { reloadLine, reloadOf } from "./model";
+
+describe("reloadOf", () => {
+  const inst = (id: string, status: string, behind = false) =>
+    ({ id, agentId: id.split("@")[0], status, behind }) as Instance;
+  const teams = [
+    {
+      id: "atlas",
+      config: { name: "Atlas", agents: { mara: { name: "Mara" }, tove: { name: "Tove" } } },
+    },
+  ] as unknown as Team[];
+
+  it("offers it for the agents behind once nobody is busy", () => {
+    const r = reloadOf([inst("mara@ledger", "idle", true), inst("tove@ledger", "asleep")]);
+    expect(r.behind.map((i) => i.id)).toEqual(["mara@ledger"]);
+    expect(r.busy).toBeUndefined();
+    expect(reloadLine(r, teams)).toBe(
+      "1 agent runs on an older prompt: Reload restarts it on the new one, continuing its conversation.",
+    );
+  });
+
+  it("holds it while any agent is on its way up, working or waiting on the CEO", () => {
+    for (const status of ["queued", "starting", "running", "awaiting"]) {
+      const r = reloadOf([inst("mara@ledger", "idle", true), inst("tove@ledger", status)]);
+      expect(r.busy?.id).toBe("tove@ledger");
+    }
+    // Asleep or stopped hold nothing back: they start on the new prompt anyway.
+    for (const status of ["asleep", "stopped", "idle"]) {
+      expect(reloadOf([inst("tove@ledger", status)]).busy).toBeUndefined();
+    }
+  });
+
+  it("says who holds it back, and why", () => {
+    const behind = [inst("mara@ledger", "idle", true), inst("ivo@ledger", "idle", true)];
+    expect(reloadLine(reloadOf([...behind, inst("tove@ledger", "running")]), teams)).toBe(
+      "2 agents run on an older prompt. Tove is busy: the change applies at each agent's next start. Reload once they're idle.",
+    );
+    expect(reloadLine(reloadOf([...behind, inst("tove@ledger", "awaiting")]), teams)).toMatch(
+      /^2 agents run on an older prompt\. Tove is waiting on you:/,
+    );
+    // An agent no team file names any more goes by its id.
+    expect(reloadLine(reloadOf([...behind, inst("zed@ledger", "running")]), teams)).toMatch(
+      /\. zed is busy:/,
+    );
+  });
+
+  it("offers nothing when nobody is behind", () => {
+    expect(reloadOf([inst("mara@ledger", "running")]).behind).toEqual([]);
   });
 });
 

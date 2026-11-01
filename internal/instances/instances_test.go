@@ -1866,3 +1866,81 @@ func TestASleepThatCantStopLeavesTheAgentAwake(t *testing.T) {
 	}
 	f.output("mara@ledger", "still here")
 }
+
+// A team, project or settings change leaves the live agents' runs behind
+// until they start again; asleep ones get it at their wake anyway.
+func TestAChangeLeavesLiveAgentsBehindUntilTheyStartAgain(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	behind := func() map[string]bool {
+		t.Helper()
+		list, err := f.m.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]bool{}
+		for _, i := range list {
+			got[i.ID] = i.Behind
+		}
+		return got
+	}
+	if got := behind(); got["mara@ledger"] || got["tove@ledger"] {
+		t.Fatalf("behind right after the deploy: %v", got)
+	}
+
+	// A soul edit.
+	team, err := f.hm.Team("atlas")
+	if err != nil {
+		t.Fatal(err)
+	}
+	soul := team.Config.Agents["mara"]
+	soul.Personality = "Blunt and fast."
+	team.Config.Agents["mara"] = soul
+	if _, err := f.hm.SaveTeam(ctx, team.Config, team.Version); err != nil {
+		t.Fatal(err)
+	}
+	if got := behind(); !got["mara@ledger"] || got["tove@ledger"] {
+		t.Errorf("after a soul edit: %v (asleep tove isn't behind: it starts on the new one)", got)
+	}
+
+	// Restarting it catches up, on the new prompt.
+	if err := f.m.Restart(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	prompt := f.hm.Path("harness", "ledger", "mara", "fake", "PROMPT.md")
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		if given, _ := os.ReadFile(prompt); strings.Contains(string(given), "Blunt and fast.") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("never restarted on the new prompt")
+		}
+	}
+	f.waitStatus("mara@ledger", Running)
+	if got := behind(); got["mara@ledger"] {
+		t.Errorf("behind after its restart: %v", got)
+	}
+
+	// The CEO's instructions are part of the prompt too.
+	s := f.hm.Settings()
+	s.Settings.Instructions = "Answer in Catalan."
+	if _, err := f.hm.SaveSettings(ctx, s.Settings, s.Version); err != nil {
+		t.Fatal(err)
+	}
+	if got := behind(); !got["mara@ledger"] {
+		t.Errorf("not behind after the instructions changed: %v", got)
+	}
+
+	// A run from before the hash was kept has nothing to compare: never behind.
+	inst := f.status("mara@ledger")
+	inst.PromptHash = ""
+	if err := f.db.Instances().Put(ctx, inst); err != nil {
+		t.Fatal(err)
+	}
+	if got := behind(); got["mara@ledger"] {
+		t.Errorf("a run with no hash is behind: %v", got)
+	}
+}

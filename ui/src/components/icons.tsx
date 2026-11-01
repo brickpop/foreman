@@ -64,6 +64,15 @@ export function StopIcon() {
   );
 }
 
+/** A circling arrow: Reload (a deployment's agents restart on their new prompt). */
+export function ReloadIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 shrink-0">
+      <path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3" {...line} />
+    </svg>
+  );
+}
+
 /** A tick: done (Copied). */
 export function CheckIcon() {
   return (

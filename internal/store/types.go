@@ -30,10 +30,17 @@ type Instance struct {
 	Harness      string `json:"harness"`
 	// Profile is the one its current run started on (Harness is its harness);
 	// "" for a run from before it was kept.
-	Profile          string    `json:"profile"`
-	HarnessSessionID string    `json:"-"` // for the harness's own resume
-	StartedAt        time.Time `json:"startedAt"`
-	Restarts         int       `json:"restarts"`
+	Profile          string `json:"profile"`
+	HarnessSessionID string `json:"-"` // for the harness's own resume
+	// PromptHash is the hash of the session prompt its current run started
+	// with; "" for a run from before it was kept.
+	PromptHash string `json:"-"`
+	// Behind says its run started on an older prompt than its team, project
+	// and settings compose now: the instance manager works it out on each
+	// list, never stored.
+	Behind    bool      `json:"behind"`
+	StartedAt time.Time `json:"startedAt"`
+	Restarts  int       `json:"restarts"`
 	// StopReason is why Foreman stopped it on its own (a start that failed, a
 	// crash loop); "" otherwise, cleared on each start.
 	StopReason string `json:"stopReason"`

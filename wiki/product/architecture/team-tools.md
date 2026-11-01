@@ -49,7 +49,7 @@ Marker glyphs (the UI colours them):
 | Glyph | Meaning | Examples |
 |---|---|---|
 | `⇄` | team-message traffic (violet) | `⇄ Mara → Rhea · ask · msg-41` · `⇄ Rhea → Mara · reply · msg-41` · `⇄ Tove handed off wt/tove/LED-44 to Mara` |
-| `ⓘ` | System note | `ⓘ Mara's definition changed` · `ⓘ Foreman restarted, output may be missing` |
+| `ⓘ` | System note | `ⓘ Foreman restarted, output may be missing` |
 | `⚠` | Escalation | `⚠ Ilya escalated an approval: new dependency decimal.js` |
 | `✓` / `✗` | Success / error | `✓ CEO answered Ilya: approve` · `✗ Delivery to Rhea expired: deployment stopped` |
 

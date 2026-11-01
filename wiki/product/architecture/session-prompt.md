@@ -115,7 +115,7 @@ The composed prompt is plain Markdown, written as the **user-level instruction f
 | Codex CLI | `$CODEX_HOME/AGENTS.md` | Global instructions |
 | Custom | The adapter's choice (a flag with a file path, or the first stdin message) | |
 
-Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and merges), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn; a soul edit while running is announced by a context-update message (below) and takes full effect at the next restart. To verify per harness in the [Prove epic](../../backlog/epics/prove.md).
+Why this way: nothing is written into the project's repos (an `AGENTS.md` in the sandbox would show up in diffs and merges), and the project's own `AGENTS.md` / `CLAUDE.md` still apply on top, as project rules. Every harness reads its own file natively, without long command-line flags. It's the same mechanism a human uses to give a harness standing instructions, so it behaves the same way. The file is regenerated at every spawn, so a soul edit takes effect at the instance's next start, or at once on a reload ([Updates](#updates)). To verify per harness in the [Prove epic](../../backlog/epics/prove.md).
 
 ## Variable parts
 
@@ -142,6 +142,6 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 
 ## Updates
 
-- A soul or team edit doesn't recompose running prompts. Each running instance gets a **context-update message** on its next turn ([Agent runtime](./agent-runtime.md)): the changed sections of its prompt in full (not a diff), delivered as a message of kind `notice` (`From Foreman: your definition changed. Read it with read_message("msg-N").`), one message per turn however many saves happened. The full re-prompt happens at the next restart.
+- A soul or team edit doesn't touch running prompts, and running agents aren't told: each instance gets the new prompt at its next start (a wake counts), or at once when the CEO reloads the deployment ([Team definition → Reload](../models/team-definition.md#reload); the CEO, 2026-11-02, replacing a context-update message that was never built).
 - Knowledge-base access: read and write for the lead, who commits it through `commit()`, naming the repo `project` (no review); read only for everyone else, who use `contribute`. The container mount mode enforces it ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)). `{wiki access}` reads `read and write: edit, then commit its repo, project` or `read only, by design, not a fault: …`. Both sides are told, because a lead that doesn't know asks members to write wiki files, and a member asked to takes its read-only mount for a fault (seen 2026-10-18: "Arca's sandbox filesystem is read-only"). The sandbox line names `project/` as the shared checkout for the same reason: a member saw the lead's uncommitted edits there and took it for its own branch.
-- Roster changes (a hire) are a team edit: existing members learn about the new teammate through the same context update.
+- Roster changes (a hire) are a team edit: existing members learn about the new teammate the same way, at their next start or on a reload. The lead sees the new member at once through `team()`.

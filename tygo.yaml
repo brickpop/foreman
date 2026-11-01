@@ -41,8 +41,10 @@ packages:
     include_files: [types.go]
     type_mappings:
       git.Commit: "git.Commit"
+      wiki.Field: "wiki.Field"
     frontmatter: |
       import type * as git from "./git";
+      import type * as wiki from "./wiki";
   - path: github.com/brickpop/foreman/internal/profiles
     output_path: ui/src/api/types/profiles.ts
     include_files: [types.go]

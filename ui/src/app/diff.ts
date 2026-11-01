@@ -79,3 +79,19 @@ export function diffFiles(diff: string): FileDiff[] {
   }
   return files;
 }
+
+/** Lock files and the like: written by tools, rarely read in a review. */
+const generated =
+  /(^|\/)(bun\.lockb?|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|go\.sum|Cargo\.lock|poetry\.lock|uv\.lock|composer\.lock|Gemfile\.lock)$/;
+
+/** More changed lines than a file shows before the CEO opens it. */
+export const largeDiff = 500;
+
+/** Why a file starts folded, if it does: a large change, or a generated file
+ * (as GitHub folds them). Drawing them all at once is what makes a big
+ * review slow; the CEO opens the ones worth reading. */
+export function foldedAtFirst(f: FileDiff): string | undefined {
+  if (generated.test(f.path)) return "generated: open it to read";
+  if (f.added + f.removed > largeDiff) return "large diff: open it to read";
+  return undefined;
+}

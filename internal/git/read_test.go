@@ -129,6 +129,13 @@ func TestLogPagesAndMarksMerges(t *testing.T) {
 	if err != nil || len(every) != len(all)+1 || every[len(every)-1].Hash != first || !slices.ContainsFunc(every, func(c Commit) bool { return c.Subject == "on the side" }) {
 		t.Errorf("every branch %+v %v", every, err)
 	}
+	// Count: the whole history, past any page; every branch's for "".
+	if n, err := g.Count(ctx, dir, main); err != nil || n != len(all) {
+		t.Errorf("count %d %v, want %d", n, err, len(all))
+	}
+	if n, err := g.Count(ctx, dir, ""); err != nil || n != len(every) {
+		t.Errorf("count every branch %d %v, want %d", n, err, len(every))
+	}
 }
 
 // By the last commit, not by name or creation: a branch made long ago and

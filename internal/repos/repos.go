@@ -1,5 +1,5 @@
-// Package repos serves a project's Repositories tab
-// (wiki/product/features/repositories.md): its code repos and its project
+// Package repos serves a project's Repos section
+// (wiki/product/features/repos.md): its code repos and its project
 // repo, read-only, as committed.
 package repos
 
@@ -8,10 +8,14 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"regexp"
 	"slices"
+
+	"github.com/agentic-wiki/wiki/parse"
 
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
+	"github.com/brickpop/foreman/internal/wiki"
 )
 
 // FileLimit is the largest file shown; a larger one says so.
@@ -22,6 +26,9 @@ const logPage = 50
 
 // projectRepo is the project repo's folder, listed among the repos.
 const projectRepo = "project"
+
+// markdown names the files shown rendered, their frontmatter apart.
+var markdown = regexp.MustCompile(`(?i)\.(md|markdown)$`)
 
 // ErrNoRepo means the project has no such repo.
 var ErrNoRepo = errors.New("repos: no such repo")
@@ -43,6 +50,7 @@ type Git interface {
 	Tree(ctx context.Context, dir, commit, path string) ([]git.TreeEntry, error)
 	File(ctx context.Context, dir, commit, path string, limit int64) ([]byte, int64, error)
 	Log(ctx context.Context, dir, commit string, skip, n int) ([]git.Commit, error)
+	Count(ctx context.Context, dir, commit string) (int, error)
 }
 
 // Browser reads a project's repos.
@@ -194,6 +202,10 @@ func (b Browser) File(ctx context.Context, project, repo, ref, path string) (Fil
 		f.Binary = true
 	default:
 		f.Text = string(content)
+		if f.Markdown = markdown.MatchString(path); f.Markdown {
+			fm, body := parse.Frontmatter(f.Text)
+			f.Frontmatter, f.Body = wiki.Fields(fm, nil), body
+		}
 	}
 	return f, nil
 }
@@ -215,7 +227,11 @@ func (b Browser) Log(ctx context.Context, project, repo, ref string, all bool, s
 	if err != nil {
 		return LogPage{}, err
 	}
-	page := LogPage{Commits: commits}
+	total, err := b.Git.Count(ctx, dir, commit)
+	if err != nil {
+		return LogPage{}, err
+	}
+	page := LogPage{Commits: commits, Total: total}
 	if len(commits) == logPage {
 		page.Next = max(skip, 0) + logPage
 	}

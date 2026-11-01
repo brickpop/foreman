@@ -37,7 +37,7 @@ import type {
   WorkItem,
 } from "./types/store";
 import type { Preferences } from "./types/userdata";
-import type { Board, Card, Entry, Node } from "./types/wiki";
+import type { Board, Card, Entry, Field, Node } from "./types/wiki";
 import type {
   Dismiss,
   Dismissed,
@@ -66,6 +66,7 @@ export type {
   Doing,
   Draft,
   Entry,
+  Field,
   Folder,
   FolderEntry,
   ForgeAccount,

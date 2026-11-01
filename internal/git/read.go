@@ -254,3 +254,16 @@ func (g *CLI) Keep(ctx context.Context, dir, ref, commit string) error {
 	_, err := run(ctx, dir, "update-ref", ref, commit)
 	return err
 }
+
+// Count is how many commits commit's history holds (every branch's for "").
+func (g *CLI) Count(ctx context.Context, dir, commit string) (int, error) {
+	tip := commit
+	if tip == "" {
+		tip = "--branches"
+	}
+	out, err := run(ctx, dir, "rev-list", "--count", tip, "--")
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(out))
+}

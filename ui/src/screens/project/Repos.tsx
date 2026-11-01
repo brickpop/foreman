@@ -1,21 +1,25 @@
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { type Project, useClient } from "../../api/client";
-import { keys, useBranches, useDeployments, useRepos } from "../../app/queries";
+import { type ReactNode, useState } from "react";
+import { type Project, type Repo, useClient } from "../../api/client";
+import { keys, useDeployments, useRepos } from "../../app/queries";
+import { repoTitle } from "../../app/repos";
 import { AddRepo } from "../../components/AddRepo";
 import { Confirm, Modal } from "../../components/Overlays";
 import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, Loading, Panel } from "../../components/ui";
+import { Button, card, cover, Loading } from "../../components/ui";
 import { useProject } from "../Project";
 
-// A project's Repos section (wiki/product/features/repos.md): its code repos,
-// wherever they are on disk, each with what keeps agents from using it, then
-// its project repo; each opens its own page (Repo). Added, created, located,
-// renamed and removed here (in Settings until 2026-11-01); renaming and
-// removing wait until no team is deployed on the project.
+// A project's Repos section (wiki/product/features/repos.md): a card per
+// code repo, wherever it is on disk, each opening its own page (Repo), with
+// what keeps agents from using it; then its project repo. Added, created,
+// located, renamed, removed and given their main branch here, from each
+// card's ⋯ menu; renaming and removing wait until no team is deployed.
+
+type Changing = { what: "main" | "rename" | "locate" | "remove"; repo: string };
 
 export function Repos() {
   const project = useProject();
@@ -26,21 +30,22 @@ export function Repos() {
   const read = useRepos(project.id);
   const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
   const [adding, setAdding] = useState(false);
-  const [locating, setLocating] = useState<string>();
-  const [renaming, setRenaming] = useState<{ name: string; to: string }>();
-  const [removing, setRemoving] = useState<string>();
+  const [changing, setChanging] = useState<Changing>();
+  const [renameTo, setRenameTo] = useState("");
+  const close = () => setChanging(undefined);
   const change = useMutation({
     mutationFn: (run: () => Promise<Project>) => run(),
     onSuccess: () => queries.invalidateQueries({ queryKey: keys.projects }),
     onError: (e: Error) =>
       toast({ title: "Repos not changed", body: e.message, color: "var(--err)" }),
   });
-  const stopFirst = deployed ? "Stop the team on this project first" : undefined;
-  const branches = (name: string) => {
-    const n = read.data?.find((r) => r.name === name)?.branches.length;
-    return n === undefined ? "" : `${n} ${n === 1 ? "branch" : "branches"}`;
-  };
+  const readOf = (name: string) => read.data?.find((r) => r.name === name);
   const projectRepo = read.data?.find((r) => r.project);
+  const open = (what: Changing["what"], repo: string) => {
+    if (what === "rename") setRenameTo(repo);
+    setChanging({ what, repo });
+  };
+  const target = project.repos.find((r) => r.name === changing?.repo);
   return (
     <div className="flex max-w-[920px] flex-col gap-4 px-6 pt-6 pb-12">
       {project.repos.length === 0 && (
@@ -48,98 +53,25 @@ export function Repos() {
           No code repo yet: agents need at least one to work on.
         </p>
       )}
-      <Panel>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
         {project.repos.map((r) => (
-          <div
+          <RepoCard
             key={r.name}
-            className="flex flex-col gap-1.5 border-b border-line px-4 py-3 last:border-b-0"
-          >
-            {renaming?.name === r.name ? (
-              <form
-                className="flex items-center gap-2"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const to = renaming.to.trim();
-                  if (to && to !== r.name)
-                    change.mutate(() => client.home.renameRepo(project.id, r.name, to), {
-                      onSuccess: () => setRenaming(undefined),
-                    });
-                }}
-              >
-                <input
-                  value={renaming.to}
-                  onChange={(e) => setRenaming({ name: r.name, to: e.target.value })}
-                  aria-label={`New name for ${r.name}`}
-                  spellCheck={false}
-                  // biome-ignore lint/a11y/noAutofocus: opened by the Rename click, to type the name
-                  autoFocus
-                  className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
-                />
-                <Button type="submit" variant="small" disabled={change.isPending}>
-                  Rename
-                </Button>
-                <Button variant="small" onClick={() => setRenaming(undefined)}>
-                  Cancel
-                </Button>
-              </form>
-            ) : (
-              <span className="flex items-center gap-3">
-                <span className="flex min-w-0 flex-1 flex-col">
-                  {r.problem ? (
-                    <span className="font-mono text-[14px] font-semibold text-tx">{r.name}/</span>
-                  ) : (
-                    <RepoLink project={project.id} repo={r.name} />
-                  )}
-                  <span className="font-mono text-[12.5px] break-all text-tx4">{r.path}</span>
-                </span>
-                <span className="text-[12.5px] text-tx4">{branches(r.name)}</span>
-                {r.problem && (
-                  <Button variant="small" onClick={() => setLocating(r.name)}>
-                    Locate…
-                  </Button>
-                )}
-                <Button
-                  variant="small"
-                  disabled={deployed}
-                  title={stopFirst}
-                  onClick={() => setRenaming({ name: r.name, to: r.name })}
-                >
-                  Rename
-                </Button>
-                <Button
-                  variant="small"
-                  disabled={deployed}
-                  title={stopFirst}
-                  onClick={() => setRemoving(r.name)}
-                >
-                  Remove
-                </Button>
-              </span>
-            )}
-            {r.problem && <span className="text-[13px] text-err">{r.problem}</span>}
-            {!r.problem && (
-              <RepoMain
-                repo={r}
-                onPick={(main) =>
-                  change.mutate(() => client.home.setRepoMain(project.id, r.name, main))
-                }
-              />
-            )}
-          </div>
+            project={project.id}
+            repo={r}
+            read={readOf(r.name)}
+            deployed={deployed}
+            onChange={open}
+          />
         ))}
-        {read.isPending && <Loading rows={1} />}
         {projectRepo && (
-          <div className="flex items-center gap-3 px-4 py-3">
-            <span className="flex min-w-0 flex-1 flex-col">
-              <RepoLink project={project.id} repo={projectRepo.name} />
-              <span className="text-[12.5px] text-tx4">
-                The project repo: project.toml and the wiki
-              </span>
-            </span>
-            <span className="text-[12.5px] text-tx4">{branches(projectRepo.name)}</span>
-          </div>
+          <Card project={project.id} name={projectRepo.name} title="Project repo">
+            <span className="text-[12.5px] text-tx4">project.toml and the wiki</span>
+            <span className="text-[12.5px] text-tx3">{count(projectRepo)}</span>
+          </Card>
         )}
-      </Panel>
+      </div>
+      {read.isPending && <Loading rows={1} />}
       {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
       <span>
         <Button variant="small" onClick={() => setAdding(true)}>
@@ -150,20 +82,81 @@ export function Repos() {
         {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
       </Modal>
       <Modal
-        open={locating !== undefined}
-        onClose={() => setLocating(undefined)}
-        title={`Locate ${locating}`}
+        open={changing?.what === "main"}
+        onClose={close}
+        title={`Main branch of ${target ? repoTitle(target.name) : ""}`}
+      >
+        {target && (
+          <div className="flex flex-col gap-3">
+            <p className="m-0 text-[13.5px] text-tx2">
+              Its agents start from it, and its merges go to it.
+            </p>
+            <Select
+              label={`Main branch of ${target.name}`}
+              value={target.main}
+              mono
+              className="self-start"
+              options={(readOf(target.name)?.branches ?? []).map((b) => ({
+                value: b.name,
+                label: b.name,
+              }))}
+              onChange={(main) =>
+                main !== target.main &&
+                change.mutate(() => client.home.setRepoMain(project.id, target.name, main), {
+                  onSuccess: close,
+                })
+              }
+            />
+          </div>
+        )}
+      </Modal>
+      <Modal
+        open={changing?.what === "rename"}
+        onClose={close}
+        title={`Rename ${changing?.repo ?? ""}`}
+      >
+        {changing && (
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const to = renameTo.trim();
+              if (to && to !== changing.repo)
+                change.mutate(() => client.home.renameRepo(project.id, changing.repo, to), {
+                  onSuccess: close,
+                });
+            }}
+          >
+            <input
+              value={renameTo}
+              onChange={(e) => setRenameTo(e.target.value)}
+              aria-label={`New name for ${changing.repo}`}
+              spellCheck={false}
+              // biome-ignore lint/a11y/noAutofocus: opened by Rename, to type the name
+              autoFocus
+              className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
+            />
+            <Button type="submit" variant="small" disabled={change.isPending}>
+              Rename
+            </Button>
+          </form>
+        )}
+      </Modal>
+      <Modal
+        open={changing?.what === "locate"}
+        onClose={close}
+        title={`Locate ${changing?.repo ?? ""}`}
       >
         <div className="flex flex-col gap-3">
           <p className="m-0 text-[13.5px] text-tx2">
             Pick its folder now. It must be the same repo: Foreman checks they share a commit.
           </p>
-          {locating && (
+          {changing?.what === "locate" && (
             <RepoPicker
               pick="repo"
               onPick={(path) =>
-                change.mutate(() => client.home.locateRepo(project.id, locating, path), {
-                  onSuccess: () => setLocating(undefined),
+                change.mutate(() => client.home.locateRepo(project.id, changing.repo, path), {
+                  onSuccess: close,
                 })
               }
             />
@@ -171,59 +164,157 @@ export function Repos() {
         </div>
       </Modal>
       <Confirm
-        open={removing !== undefined}
-        title={`Remove ${removing} from ${project.id}?`}
+        open={changing?.what === "remove"}
+        title={`Remove ${changing?.repo ?? ""} from ${project.id}?`}
         body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
         action="Remove"
         onConfirm={() =>
-          removing && change.mutate(() => client.home.removeRepo(project.id, removing))
+          changing && change.mutate(() => client.home.removeRepo(project.id, changing.repo))
         }
-        onClose={() => setRemoving(undefined)}
+        onClose={close}
       />
     </div>
   );
 }
 
-/** A repo's name, opening its page. */
-function RepoLink({ project, repo }: { project: string; repo: string }) {
+const count = (r: Repo) =>
+  `${r.branches.length} ${r.branches.length === 1 ? "branch" : "branches"}`;
+
+/** A code repo's card: its name as words, its folder, its main branch and
+ * branch count, and what keeps agents from using it. */
+function RepoCard({
+  project,
+  repo: r,
+  read,
+  deployed,
+  onChange,
+}: {
+  project: string;
+  repo: Project["repos"][number];
+  read?: Repo;
+  deployed: boolean;
+  onChange: (what: Changing["what"], repo: string) => void;
+}) {
+  const noMain = read && !read.branches.some((b) => b.name === r.main);
   return (
-    <Link
-      to="/projects/$project/repos/$repo"
-      params={{ project, repo }}
-      className="self-start font-mono text-[14px] font-semibold text-tx hover:text-accTx"
+    <Card
+      project={project}
+      name={r.name}
+      title={repoTitle(r.name)}
+      opens={!r.problem}
+      menu={
+        <RepoMenu repo={r.name} problem={!!r.problem} deployed={deployed} onChange={onChange} />
+      }
     >
-      {repo}/
-    </Link>
+      <span className="font-mono text-[12px] break-all text-tx4">{r.path}</span>
+      {r.problem ? (
+        <span className="text-[13px] text-err">{r.problem}</span>
+      ) : (
+        <span className="text-[12.5px] text-tx3">
+          <span className="font-mono">{r.main}</span>
+          {read && ` · ${count(read)}`}
+        </span>
+      )}
+      {noMain && (
+        <span className="text-[13px] text-err">
+          No branch {r.main}: pick its main branch, or agents can't start.
+        </span>
+      )}
+    </Card>
   );
 }
 
-/** A repo's main branch, which its agents start from and its merges go to:
- * any of its branches. One it no longer has (renamed, or from before each repo
- * had its own) is flagged, since agents can't start without it. */
-function RepoMain({
-  repo,
-  onPick,
+/** A card, all of it opening the repo's page (unless it can't be read); its
+ * menu sits above that link. */
+function Card({
+  project,
+  name,
+  title,
+  opens = true,
+  menu,
+  children,
 }: {
-  repo: Project["repos"][number];
-  onPick: (main: string) => void;
+  project: string;
+  name: string;
+  title: string;
+  opens?: boolean;
+  menu?: ReactNode;
+  children: ReactNode;
 }) {
-  const branches = useBranches(repo.path);
-  const list = branches.data?.branches ?? [];
   return (
-    <span className="flex flex-wrap items-center gap-2 text-[13px] text-tx3">
-      Main branch
-      <Select
-        label={`Main branch of ${repo.name}`}
-        value={repo.main}
-        mono
-        options={list.map((b) => ({ value: b, label: b }))}
-        onChange={(b) => b !== repo.main && onPick(b)}
-      />
-      {branches.data && !list.includes(repo.main) && (
-        <span className="text-err">
-          {repo.name} has no branch {repo.main}: pick its main branch, or agents can't start.
-        </span>
-      )}
-    </span>
+    <div className={`${card} min-w-0 gap-1.5 ${opens ? "hover:border-line3" : ""}`}>
+      <span className="flex items-center gap-2">
+        {opens ? (
+          <Link
+            to="/projects/$project/repos/$repo"
+            params={{ project, repo: name }}
+            title={name}
+            className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-tx ${cover}`}
+          >
+            {title}
+          </Link>
+        ) : (
+          <span title={name} className="min-w-0 flex-1 truncate text-[15px] font-semibold text-tx">
+            {title}
+          </span>
+        )}
+        {menu && <span className="relative z-10">{menu}</span>}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+const item =
+  "cursor-pointer rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover data-[disabled]:cursor-default data-[disabled]:text-tx4";
+
+function RepoMenu({
+  repo,
+  problem,
+  deployed,
+  onChange,
+}: {
+  repo: string;
+  problem: boolean;
+  deployed: boolean;
+  onChange: (what: Changing["what"], repo: string) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger
+        aria-label={`Change ${repo}`}
+        className="grid size-7 place-items-center rounded-md text-tx3 hover:bg-hover hover:text-tx data-[state=open]:bg-hover"
+      >
+        ⋯
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content
+          align="end"
+          sideOffset={4}
+          className="z-50 flex min-w-44 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay"
+        >
+          {problem ? (
+            <Menu.Item className={item} onSelect={() => onChange("locate", repo)}>
+              Locate…
+            </Menu.Item>
+          ) : (
+            <Menu.Item className={item} onSelect={() => onChange("main", repo)}>
+              Main branch…
+            </Menu.Item>
+          )}
+          <Menu.Item className={item} disabled={deployed} onSelect={() => onChange("rename", repo)}>
+            Rename…
+          </Menu.Item>
+          <Menu.Item className={item} disabled={deployed} onSelect={() => onChange("remove", repo)}>
+            Remove…
+          </Menu.Item>
+          {deployed && (
+            <Menu.Label className="max-w-56 px-2 py-1 text-[11.5px] text-tx4">
+              Stop the team on this project first to rename or remove it.
+            </Menu.Label>
+          )}
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }

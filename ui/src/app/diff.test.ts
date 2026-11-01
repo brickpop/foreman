@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffFiles } from "./diff";
+import { diffFiles, type FileDiff, foldedAtFirst, largeDiff } from "./diff";
 
 // As `git diff main...branch` prints it.
 const diff = [
@@ -79,5 +79,27 @@ describe("diffFiles", () => {
 
   it("has no files for no changes", () => {
     expect(diffFiles("")).toEqual([]);
+  });
+});
+
+describe("foldedAtFirst", () => {
+  const file = (path: string, added: number, removed = 0): FileDiff => ({
+    path,
+    change: "",
+    lines: [],
+    added,
+    removed,
+  });
+
+  it("folds a change over the limit, counting both sides", () => {
+    expect(foldedAtFirst(file("src/a.ts", largeDiff))).toBeUndefined();
+    expect(foldedAtFirst(file("src/a.ts", largeDiff, 1))).toMatch(/large/);
+  });
+
+  it("folds lock files however small, by their whole name only", () => {
+    expect(foldedAtFirst(file("ui/bun.lock", 1))).toMatch(/generated/);
+    expect(foldedAtFirst(file("go.sum", 2))).toMatch(/generated/);
+    expect(foldedAtFirst(file("docs/not-go.sum.md", 2))).toBeUndefined();
+    expect(foldedAtFirst(file("mybun.lock", 2))).toBeUndefined();
   });
 });

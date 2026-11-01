@@ -30,12 +30,29 @@ export interface Entry {
   path: string;
   title: string;
   version: string; // guards the writes
-  frontmatter: { [key: string]: string}; // lists joined with ", "
+  frontmatter: Field[]; // by key
   body: string; // frontmatter stripped
   links: Link[];
   headings: Heading[];
   checkboxes: Checkbox[];
   backlinks: Backlink[];
+}
+/**
+ * Field is one frontmatter field, as the reader shows it: its values in
+ * order, a scalar being a list of one, none for an empty one.
+ */
+export interface Field {
+  key: string;
+  values: Value[];
+}
+/**
+ * Value is one value of a field. To is the entry it names (a value ending in
+ * .md, as the engine reads references), with Title its title; both "" otherwise.
+ */
+export interface Value {
+  text: string;
+  to: string;
+  title: string;
 }
 /**
  * Link is one link of the body, resolved by the engine. Raw is the lookup

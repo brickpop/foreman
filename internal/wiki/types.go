@@ -19,15 +19,30 @@ type Node struct {
 // lookup tables for what the browser must not work out itself (the engine's
 // rules), as wikiview serves it.
 type Entry struct {
-	Path        string            `json:"path"`
-	Title       string            `json:"title"`
-	Version     string            `json:"version"`     // guards the writes
-	Frontmatter map[string]string `json:"frontmatter"` // lists joined with ", "
-	Body        string            `json:"body"`        // frontmatter stripped
-	Links       []Link            `json:"links"`
-	Headings    []Heading         `json:"headings"`
-	Checkboxes  []Checkbox        `json:"checkboxes"`
-	Backlinks   []Backlink        `json:"backlinks"`
+	Path        string     `json:"path"`
+	Title       string     `json:"title"`
+	Version     string     `json:"version"`     // guards the writes
+	Frontmatter []Field    `json:"frontmatter"` // by key
+	Body        string     `json:"body"`        // frontmatter stripped
+	Links       []Link     `json:"links"`
+	Headings    []Heading  `json:"headings"`
+	Checkboxes  []Checkbox `json:"checkboxes"`
+	Backlinks   []Backlink `json:"backlinks"`
+}
+
+// Field is one frontmatter field, as the reader shows it: its values in
+// order, a scalar being a list of one, none for an empty one.
+type Field struct {
+	Key    string  `json:"key"`
+	Values []Value `json:"values"`
+}
+
+// Value is one value of a field. To is the entry it names (a value ending in
+// .md, as the engine reads references), with Title its title; both "" otherwise.
+type Value struct {
+	Text  string `json:"text"`
+	To    string `json:"to"`
+	Title string `json:"title"`
 }
 
 // Link is one link of the body, resolved by the engine. Raw is the lookup

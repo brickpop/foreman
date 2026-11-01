@@ -74,8 +74,15 @@ const reposRoute = createRoute({ ...section("repos"), component: Repos });
 
 const repoRoute = createRoute({
   ...section("repos/$repo"),
-  // branch: the one read.
-  validateSearch: (s: Record<string, unknown>): { branch?: string } => ({ branch: text(s.branch) }),
+  // branch: the one read; path: the file open (none: the README); history:
+  // the branch's history instead of its files.
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { branch?: string; path?: string; history?: true } => ({
+    branch: text(s.branch),
+    path: text(s.path),
+    ...(s.history === true || s.history === "1" ? { history: true as const } : {}),
+  }),
   component: Repo,
 });
 

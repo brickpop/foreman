@@ -3,6 +3,7 @@ package wiki
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/agentic-wiki/wiki/bundle"
 	"github.com/agentic-wiki/wiki/index"
+	"github.com/agentic-wiki/wiki/parse"
 
 	"github.com/brickpop/foreman/internal/home"
 )
@@ -172,7 +174,7 @@ func (w *Wikis) Entry(project, p string) (Entry, error) {
 		Path:        rel(e.Path),
 		Title:       title(e),
 		Version:     home.Version([]byte(raw)),
-		Frontmatter: frontmatter(e),
+		Frontmatter: Fields(e.Frontmatter(), ref(idx, e)),
 		Body:        body,
 		Links:       links(idx, e),
 		Headings:    headings(e, offset),
@@ -283,20 +285,25 @@ func backlinks(idx *index.Index, e *index.Entry) []Backlink {
 	return out
 }
 
-// frontmatter is each field as the chips show it: a list joined with ", ".
-// Not shown: the index's own keys (leading underscore), and okf_version,
-// the format's bookkeeping on the root index.md (wikiview hides it too).
-func frontmatter(e *index.Entry) map[string]string {
-	out := map[string]string{}
-	for k, v := range e.Frontmatter() {
+// Fields is a frontmatter as the reader shows it, by key. Not shown: the
+// index's own keys (leading underscore), and okf_version, the format's
+// bookkeeping on the root index.md (wikiview hides it too). ref resolves a
+// value that names an entry; nil resolves none (a repo file's frontmatter).
+func Fields(fm map[string]any, ref func(v string) Value) []Field {
+	out := []Field{}
+	for _, k := range slices.Sorted(maps.Keys(fm)) {
 		if strings.HasPrefix(k, "_") || k == "okf_version" {
 			continue
 		}
-		if list := e.FieldList(k); len(list) > 0 {
-			out[k] = strings.Join(list, ", ")
-		} else if v != nil {
-			out[k] = fmt.Sprint(v)
+		f := Field{Key: k, Values: []Value{}}
+		for _, v := range parse.Strings(fm, k) {
+			if ref == nil {
+				f.Values = append(f.Values, Value{Text: v})
+			} else {
+				f.Values = append(f.Values, ref(v))
+			}
 		}
+		out = append(out, f)
 	}
 	return out
 }

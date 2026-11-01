@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"testing"
 
@@ -114,7 +115,8 @@ func TestTreeOrderAndFolders(t *testing.T) {
 func TestEntry(t *testing.T) {
 	w, dir := fixture(t, map[string]string{
 		"index.md": "---\nokf_version: \"0.1\"\n---\n# Home\n\nSee [the plan](plan/a.md#goals).\n",
-		"plan/a.md": "---\ntype: note\ntitle: Plan A\ntags: [x, y]\nstatus: todo\n---\n" +
+		"plan/a.md": "---\ntype: note\ntitle: Plan A\ntags: [x, y]\nstatus: todo\n" +
+			"blocked_by: [../other.md, /other.md#why, gone.md, ../../above.md]\nempty:\n_engine: hidden\n---\n" +
 			"# Plan A\n\n## Goals\n\n- [ ] first\n- [x] second\n\n## Goals\n\n" +
 			"[home](../index.md) [later](not-yet.md) [diagram](img/d.png) ![shot](img/d.png) [contract](c.pdf)\n" +
 			"[up](../../../code.go) [web](https://example.com) [here](#goals)\n",
@@ -132,16 +134,32 @@ func TestEntry(t *testing.T) {
 	if e.Body[:9] != "# Plan A\n" {
 		t.Errorf("body starts %q: the frontmatter should be stripped", e.Body[:9])
 	}
-	if e.Frontmatter["tags"] != "x, y" || e.Frontmatter["status"] != "todo" || e.Frontmatter["type"] != "note" {
-		t.Errorf("frontmatter = %v", e.Frontmatter)
+	// By key, lists kept apart, the engine's own keys left out; a reference
+	// links the entry it names, from here or from the root, never above the wiki.
+	other := Value{To: "other.md", Title: "Other"}
+	want := []Field{
+		{Key: "blocked_by", Values: []Value{
+			{Text: "../other.md", To: other.To, Title: other.Title},
+			{Text: "/other.md#why", To: other.To, Title: other.Title},
+			{Text: "gone.md"},
+			{Text: "../../above.md"},
+		}},
+		{Key: "empty", Values: []Value{}},
+		{Key: "status", Values: []Value{{Text: "todo"}}},
+		{Key: "tags", Values: []Value{{Text: "x"}, {Text: "y"}}},
+		{Key: "title", Values: []Value{{Text: "Plan A"}}},
+		{Key: "type", Values: []Value{{Text: "note"}}},
+	}
+	if !reflect.DeepEqual(e.Frontmatter, want) {
+		t.Errorf("frontmatter = %+v\nwant %+v", e.Frontmatter, want)
 	}
 
 	// Headings: ids by the engine's rule, the repeat numbered, lines in the body.
 	if len(e.Headings) != 3 || e.Headings[1].ID != "goals" || e.Headings[2].ID != "goals-1" || e.Headings[1].BodyLine != 3 {
 		t.Errorf("headings = %+v", e.Headings)
 	}
-	// Checkboxes: the file line (6 lines of frontmatter before the body) for writes.
-	if len(e.Checkboxes) != 2 || e.Checkboxes[0].Line != 11 || e.Checkboxes[0].BodyLine != 5 || !e.Checkboxes[1].Done {
+	// Checkboxes: the file line (9 lines of frontmatter before the body) for writes.
+	if len(e.Checkboxes) != 2 || e.Checkboxes[0].Line != 14 || e.Checkboxes[0].BodyLine != 5 || !e.Checkboxes[1].Done {
 		t.Errorf("checkboxes = %+v", e.Checkboxes)
 	}
 

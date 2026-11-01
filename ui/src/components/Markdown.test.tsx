@@ -8,7 +8,7 @@ const entry = (body: string, tables: Partial<Entry> = {}): Entry => ({
   path: "plan/a.md",
   title: "A",
   version: "v1",
-  frontmatter: {},
+  frontmatter: [],
   body,
   links: [],
   headings: [],

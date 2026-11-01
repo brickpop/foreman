@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { type ReactNode, useRef, useState } from "react";
+import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
-import { type DiffLine, diffFiles, type FileDiff } from "../../app/diff";
+import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
 import { agentOf, forgeOf, linkLine, mainOf, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
@@ -44,10 +44,10 @@ import { Button, Empty, Loading, SectionLabel, Segmented } from "../../component
 // and outdated comments, and the decision: merge the repos ticked, request
 // changes (sending the draft comments), or dismiss it.
 
-/** The comments a screen part changes, and how. */
+/** The comments a screen part changes, and how. Where the CEO is writing a
+ * new one goes to that file only (FileBox's writing), so opening a comment
+ * box redraws one file, never the whole review. */
 type Comments = {
-  /** Where the CEO is writing a new comment, if anywhere. */
-  composing?: NewComment;
   compose: (c?: NewComment) => void;
   add: (c: NewComment) => void;
   edit: (c: ReviewComment, body: string) => void;
@@ -72,14 +72,13 @@ export function Review() {
   const toast = useToast();
   const failed = (e: Error) => toast({ title: "Not done", body: e.message, color: "var(--err)" });
   const [composing, compose] = useState<NewComment>();
-  // The files folded away, by fileId; a click in the tree unfolds its file.
-  const [folded, setFolded] = useState<Set<string>>(new Set());
-  const fold = (file: string, on: boolean) => {
-    const next = new Set(folded);
-    if (on) next.add(file);
-    else next.delete(file);
-    setFolded(next);
-  };
+  // The CEO's fold or unfold of each file, by fileId; a file not touched yet
+  // is as foldedAtFirst has it. A click in the tree unfolds its file.
+  const [folds, setFolds] = useState<Map<string, boolean>>(new Map());
+  const fold = useCallback(
+    (file: string, on: boolean) => setFolds((now) => new Map(now).set(file, on)),
+    [],
+  );
   const add = useReviewChange((c, n: NewComment) => c.reviews.addComment(id, n), failed);
   const edit = useReviewChange(
     (c, e: { comment: string; body: string }) => c.reviews.editComment(id, e.comment, e.body),
@@ -88,6 +87,33 @@ export function Review() {
   const remove = useReviewChange(
     (c, comment: string) => c.reviews.deleteComment(id, comment),
     failed,
+  );
+  // Worked out once per diff and per change of the comments, not on each
+  // render: a big review has tens of thousands of lines.
+  const repos = useMemo(
+    () => (diff.data ?? []).map((d) => ({ ...d, files: diffFiles(d.diff) })),
+    [diff.data],
+  );
+  const placed = useMemo(() => {
+    const shown = new Set(
+      repos.flatMap((r) =>
+        r.files.flatMap((f) =>
+          f.lines.map((l) => diffKey(r.repo, f.path, l)).filter((k) => k !== undefined),
+        ),
+      ),
+    );
+    return placeComments(v?.comments ?? [], since, shown);
+  }, [repos, v?.comments, since]);
+  const open = v !== undefined && isOpen(v);
+  const comments: Comments = useMemo(
+    () => ({
+      compose,
+      add: (n) => add.mutate(n, { onSuccess: () => compose(undefined) }),
+      edit: (c, body) => edit.mutate({ comment: c.id, body }),
+      remove: (c) => remove.mutate(c.id),
+      open,
+    }),
+    [add.mutate, edit.mutate, remove.mutate, open],
   );
 
   if (review.error)
@@ -104,23 +130,6 @@ export function Review() {
     );
   const project = projects.data?.find((p) => p.id === v.projectId);
   const lead = agentOf(teams.data ?? [], v.lead);
-  const repos = (diff.data ?? []).map((d) => ({ ...d, files: diffFiles(d.diff) }));
-  const shown = new Set(
-    repos.flatMap((r) =>
-      r.files.flatMap((f) =>
-        f.lines.map((l) => diffKey(r.repo, f.path, l)).filter((k) => k !== undefined),
-      ),
-    ),
-  );
-  const placed = placeComments(v.comments, since, shown);
-  const comments: Comments = {
-    composing,
-    compose,
-    add: (n) => add.mutate(n, { onSuccess: () => compose(undefined) }),
-    edit: (c, body) => edit.mutate({ comment: c.id, body }),
-    remove: (c) => remove.mutate(c.id),
-    open: isOpen(v),
-  };
   // Two panes under the header, each scrolling on its own: going to a file
   // moves the diffs, never the tree.
   return (
@@ -245,8 +254,11 @@ export function Review() {
                   since={since}
                   at={placed.at}
                   comments={comments}
-                  folded={folded.has(fileId(r.repo, f.path))}
-                  onFold={(on) => fold(fileId(r.repo, f.path), on)}
+                  writing={
+                    composing?.repo === r.repo && composing.path === f.path ? composing : undefined
+                  }
+                  folded={folds.get(fileId(r.repo, f.path)) ?? foldedAtFirst(f) !== undefined}
+                  onFold={fold}
                 />
               )),
             )}
@@ -292,14 +304,17 @@ const lineLook: Record<DiffLine["kind"], string> = {
 };
 
 /** One file's diff: its lines numbered on each side, the comments under the
- * line they're on, and a + on a line to comment on it. Its header folds it. */
-function FileBox({
+ * line they're on, and a + on a line to comment on it. Its header folds it.
+ * Memoized, and drawn by the browser only near the view (content-visibility),
+ * so a review of hundreds of files stays quick: a click redraws its own file. */
+const FileBox = memo(function FileBox({
   repo,
   head,
   file: f,
   since,
   at,
   comments,
+  writing,
   folded,
   onFold,
 }: {
@@ -309,10 +324,13 @@ function FileBox({
   since: boolean;
   at: Map<string, ReviewComment[]>;
   comments: Comments;
+  /** The new comment being written on this file, if one is. */
+  writing?: NewComment;
   folded: boolean;
-  onFold: (folded: boolean) => void;
+  onFold: (file: string, folded: boolean) => void;
 }) {
-  const writing = comments.composing;
+  const id = fileId(repo, f.path);
+  const why = folded ? foldedAtFirst(f) : undefined;
   const box = useRef<HTMLElement>(null);
   const header = useRef<HTMLButtonElement>(null);
   const toggle = () => {
@@ -323,7 +341,7 @@ function FileBox({
       !folded &&
       (box.current?.getBoundingClientRect().top ?? 0) <
         (header.current?.getBoundingClientRect().top ?? 0);
-    onFold(!folded);
+    onFold(id, !folded);
     if (stuck) requestAnimationFrame(() => box.current?.scrollIntoView({ block: "start" }));
   };
   return (
@@ -331,7 +349,7 @@ function FileBox({
     // stuck, the header is square, with nothing showing past its corners.
     <section
       ref={box}
-      id={fileId(repo, f.path)}
+      id={id}
       className="shrink-0 overflow-clip rounded-[10px] border border-line2"
     >
       <button
@@ -345,61 +363,72 @@ function FileBox({
         <span className="text-tx4">{repo}</span>
         <span className="font-medium text-tx">{f.path}</span>
         {f.change && <span className="text-tx4">{f.change}</span>}
+        {why && <span className="font-sans text-[12px] text-tx4">{why}</span>}
         <span className="flex-1" />
         <span className="text-[11.5px] text-ok">+{f.added}</span>
         <span className="text-[11.5px] text-err">−{f.removed}</span>
       </button>
-      <div hidden={folded} className="bg-term py-1 font-mono text-[12.5px] leading-[1.6]">
-        {f.lines.map((line, i) => {
-          const key = diffKey(repo, f.path, line);
-          const start = comments.open ? commentAt(repo, f.path, line, head, since) : undefined;
-          const here =
-            writing !== undefined &&
-            lineKey(writing.repo, writing.path, writing.side as "new" | "old", writing.line) ===
-              key;
-          return (
-            // biome-ignore lint/suspicious/noArrayIndexKey: a diff line's place is its identity
-            <div key={i}>
-              <div
-                className={`group grid grid-cols-[40px_40px_minmax(0,1fr)] ${lineLook[line.kind]}`}
-              >
-                <span className="relative pr-1.5 text-right text-tx4 select-none">
-                  {start && (
-                    <button
-                      type="button"
-                      aria-label={`Comment on line ${start.line}`}
-                      onClick={() => comments.compose(start)}
-                      className="absolute top-px left-0.5 hidden size-[18px] place-items-center rounded bg-acc pb-[3px] leading-none font-semibold text-accInk group-hover:grid"
-                    >
-                      +
-                    </button>
-                  )}
-                  {line.old}
-                </span>
-                <span className="pr-1.5 text-right text-tx4 select-none">{line.new}</span>
-                <span className="px-2 whitespace-pre-wrap select-text">{line.text || " "}</span>
-              </div>
-              {key && (at.get(key)?.length || here) && (
-                <div className="flex flex-col gap-2 border-y border-line bg-panel px-3 py-2.5 font-sans text-[14px]">
-                  {at.get(key)?.map((c) => (
-                    <CommentItem key={c.id} comment={c} comments={comments} />
-                  ))}
-                  {here && writing && (
-                    <Composer
-                      placeholder="What should change here?"
-                      onSave={(body) => comments.add({ ...writing, body })}
-                      onCancel={() => comments.compose(undefined)}
-                    />
-                  )}
+      {/* Folded, its lines aren't built at all; open, the browser draws them
+          only near the view, holding their height (20px a line) meanwhile. */}
+      {!folded && (
+        <div
+          className="bg-term py-1 font-mono text-[12.5px] leading-[1.6]"
+          style={{
+            contentVisibility: "auto",
+            containIntrinsicSize: `auto ${f.lines.length * 20 + 8}px`,
+          }}
+        >
+          {f.lines.map((line, i) => {
+            const key = diffKey(repo, f.path, line);
+            const start = comments.open ? commentAt(repo, f.path, line, head, since) : undefined;
+            const here =
+              writing !== undefined &&
+              lineKey(writing.repo, writing.path, writing.side as "new" | "old", writing.line) ===
+                key;
+            return (
+              // biome-ignore lint/suspicious/noArrayIndexKey: a diff line's place is its identity
+              <div key={i}>
+                <div
+                  className={`group grid grid-cols-[40px_40px_minmax(0,1fr)] ${lineLook[line.kind]}`}
+                >
+                  <span className="relative pr-1.5 text-right text-tx4 select-none">
+                    {start && (
+                      <button
+                        type="button"
+                        aria-label={`Comment on line ${start.line}`}
+                        onClick={() => comments.compose(start)}
+                        className="absolute top-px left-0.5 hidden size-[18px] place-items-center rounded bg-acc pb-[3px] leading-none font-semibold text-accInk group-hover:grid"
+                      >
+                        +
+                      </button>
+                    )}
+                    {line.old}
+                  </span>
+                  <span className="pr-1.5 text-right text-tx4 select-none">{line.new}</span>
+                  <span className="px-2 whitespace-pre-wrap select-text">{line.text || " "}</span>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                {key && (at.get(key)?.length || here) && (
+                  <div className="flex flex-col gap-2 border-y border-line bg-panel px-3 py-2.5 font-sans text-[14px]">
+                    {at.get(key)?.map((c) => (
+                      <CommentItem key={c.id} comment={c} comments={comments} />
+                    ))}
+                    {here && writing && (
+                      <Composer
+                        placeholder="What should change here?"
+                        onSave={(body) => comments.add({ ...writing, body })}
+                        onCancel={() => comments.compose(undefined)}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
-}
+});
 
 /** The general comments with a box to write one, then the comments listed
  * apart from the diff. */

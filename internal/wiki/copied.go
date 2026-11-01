@@ -1,8 +1,9 @@
 package wiki
 
 // Copied from wikiview v0.13.0 (internal/slug, internal/server/entry.go),
-// whose Go code is internal and can't be imported. They go when wikiview and
-// the engine export them (wiki/technical-debt.md).
+// whose Go code is internal and can't be imported, and from the engine, which
+// keeps these rules unexported. They go when wikiview and the engine export
+// them (wiki/technical-debt.md).
 
 import (
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/agentic-wiki/wiki/index"
 )
 
 // headingIDs assigns an id to each heading text, in document order, by the
@@ -73,4 +76,32 @@ func readableName(name string) string {
 		offset += len(word) + 1
 	}
 	return name
+}
+
+// Copied from the engine v0.10.0 (index/index.go: frontmatterRewrites and
+// normalizeLink, unexported): which frontmatter values are references.
+
+// ref is v as a value of e's frontmatter: a link to the entry it names when
+// it is a reference (ends in .md, as the engine reads them: relative to e, or
+// from the wiki's root with a leading /) to an entry that exists. One that
+// climbs above the wiki names nothing, as the engine has it.
+func ref(idx *index.Index, e *index.Entry) func(v string) Value {
+	return func(v string) Value {
+		target, _, _ := strings.Cut(v, "#")
+		if !strings.HasSuffix(target, ".md") {
+			return Value{Text: v}
+		}
+		if !strings.HasPrefix(target, "/") {
+			target = path.Join(strings.TrimPrefix(path.Dir(e.Path), "/"), target)
+			if target == ".." || strings.HasPrefix(target, "../") {
+				return Value{Text: v}
+			}
+		}
+		// Rooted, so Resolve looks it up by path, never by file name.
+		to, err := idx.Resolve("/" + strings.TrimPrefix(path.Clean(target), "/"))
+		if err != nil {
+			return Value{Text: v}
+		}
+		return Value{Text: v, To: rel(to.Path), Title: title(to)}
+	}
 }

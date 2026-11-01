@@ -1,20 +1,11 @@
 import { type Entry, useClient } from "../api/client";
+import { withoutTitle } from "../app/frontmatter";
+import { Frontmatter } from "./Frontmatter";
 import { Markdown } from "./Markdown";
-import { FieldChip } from "./ui";
 
-// One wiki entry (wiki/product/features/wiki-reader.md#article): frontmatter
-// chips, then its Markdown. Links between entries open in the reader;
-// checkboxes tick (the only write).
-
-/** The chips to show, and the `title` field, which is the page's heading
- * rather than a chip: a card's body doesn't repeat it. */
-export function chipsOf(frontmatter: Record<string, string>): {
-  title?: string;
-  fields: [string, string][];
-} {
-  const { title, ...rest } = frontmatter;
-  return { title: title || undefined, fields: Object.entries(rest).filter(([, v]) => v !== "") };
-}
+// One wiki entry (wiki/product/features/wiki-reader.md#article): its
+// frontmatter, then its Markdown. Links between entries open in the reader,
+// from the body and from the frontmatter; checkboxes tick (the only write).
 
 export function WikiArticle({
   project,
@@ -30,16 +21,11 @@ export function WikiArticle({
   onTick: (line: number, done: boolean) => void;
 }) {
   const client = useClient();
-  const { title, fields } = chipsOf(entry.frontmatter);
+  // The title field is the heading: a card's body doesn't repeat it.
+  const { title, fields } = withoutTitle(entry.frontmatter);
   return (
     <article className="flex flex-col gap-3.5">
-      {fields.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {fields.map(([k, v]) => (
-            <FieldChip key={k} name={k} value={v} />
-          ))}
-        </div>
-      )}
+      <Frontmatter fields={fields} onOpen={onOpen} />
       <div className={`wiki ${size === "sheet" ? "sheet" : ""}`}>
         {title && <h1>{title}</h1>}
         <Markdown

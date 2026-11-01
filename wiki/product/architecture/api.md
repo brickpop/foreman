@@ -29,8 +29,8 @@ PUT    /api/projects/:id/profile              {profile} → the profile its agen
 PUT    /api/projects/:id/archived             {archived} → archives the project (409 DEPLOYED while a team is deployed on it) or unarchives it
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
-GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge} (over 1 MB: no text)
-GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next}, 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
+GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge, markdown, frontmatter, body} (over 1 MB: no text; a .md or .markdown file has its frontmatter apart, as the wiki reader's fields, and body is its text without it)
+GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next, total} (total: the commits it holds in all), 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
 GET    /api/folders                           ?path= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
 GET    /api/folders/workspace                 ?name= where a project named name would go: {path, folder, folderExists} (the projects folder, ~ expanded; path is the folder itself while name isn't a valid one)

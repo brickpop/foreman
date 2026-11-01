@@ -77,7 +77,29 @@ export function folderOf(path: string): string {
   return path.split("/").slice(0, -1).join("/");
 }
 
-export const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
+/** A repo's name as people read it (the CEO, 2026-11-02): hyphens and
+ * underscores as spaces, the first letter capital. foreman-ui is "Foreman ui".
+ * Only how it shows: its id, folder and URL stay the name. */
+export function repoTitle(name: string): string {
+  const words = name.replace(/[-_]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The file a folder opens with, as GitHub does: its README, else its
+ * index.md (a wiki's), whatever their case; undefined with neither. */
+export function readmeOf(entries: { name: string; kind: string }[]): string | undefined {
+  const files = entries.filter((e) => e.kind === "file").map((e) => e.name);
+  return (
+    files.find((n) => /^readme(\.(md|markdown|txt))?$/i.test(n)) ??
+    files.find((n) => /^index\.(md|markdown)$/i.test(n))
+  );
+}
+
+/** The branches whose name has the query in it, whatever its case. */
+export function matching<T extends { name: string }>(branches: T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  return q ? branches.filter((b) => b.name.toLowerCase().includes(q)) : branches;
+}
 
 /** A size as people read it: 12 B, 3.4 KB, 1.2 MB. */
 export function bytes(n: number): string {

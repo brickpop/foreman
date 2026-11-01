@@ -7,8 +7,10 @@ import {
   crumbs,
   folderOf,
   graph,
-  isMarkdown,
+  matching,
+  readmeOf,
   reposWith,
+  repoTitle,
   shownAt,
   worktrees,
 } from "./repos";
@@ -41,9 +43,7 @@ describe("the Repos section's model", () => {
     expect(folderOf("README.md")).toBe("");
   });
 
-  it("tells Markdown and sizes", () => {
-    expect(isMarkdown("docs/README.MD")).toBe(true);
-    expect(isMarkdown("main.go")).toBe(false);
+  it("tells sizes", () => {
     expect([bytes(12), bytes(3482), bytes(1258291)]).toEqual(["12 B", "3.4 KB", "1.2 MB"]);
   });
 });
@@ -177,5 +177,39 @@ describe("the history graph", () => {
       ],
       width: 3,
     });
+  });
+});
+
+describe("repoTitle", () => {
+  it("reads a slug as words, only the first capital", () => {
+    expect(repoTitle("foreman-ui")).toBe("Foreman ui");
+    expect(repoTitle("api")).toBe("Api");
+    expect(repoTitle("my__data--set_")).toBe("My data set");
+  });
+});
+
+describe("readmeOf", () => {
+  const file = (name: string) => ({ name, kind: "file" });
+
+  it("opens the README first, whatever its case, then index.md", () => {
+    expect(readmeOf([file("index.md"), file("Readme.MD"), file("a.go")])).toBe("Readme.MD");
+    expect(readmeOf([file("README")])).toBe("README");
+    expect(readmeOf([file("main.go"), file("INDEX.md")])).toBe("INDEX.md");
+  });
+
+  it("opens nothing without one, and never a folder or a near name", () => {
+    expect(readmeOf([{ name: "README.md", kind: "dir" }, file("readme-old.md")])).toBeUndefined();
+    expect(readmeOf([])).toBeUndefined();
+  });
+});
+
+describe("matching", () => {
+  const b = (name: string) => ({ name });
+
+  it("keeps the branches with the query in their name, any case; all for none", () => {
+    const all = [b("main"), b("wt/tove/LED-44"), b("lead/atlas/release")];
+    expect(matching(all, "led").map((x) => x.name)).toEqual(["wt/tove/LED-44"]);
+    expect(matching(all, "  ")).toBe(all);
+    expect(matching(all, "nope")).toEqual([]);
   });
 });

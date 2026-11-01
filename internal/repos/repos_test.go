@@ -6,11 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
+	"github.com/brickpop/foreman/internal/wiki"
 )
 
 var ctx = context.Background()
@@ -58,6 +60,7 @@ func fixture(t *testing.T) Browser {
 	api := filepath.Join(root, "ledger", "api")
 	gitIn(t, root, "init", "--quiet", "--initial-branch=trunk", api)
 	write(t, filepath.Join(api, "README.md"), "# API\n")
+	write(t, filepath.Join(api, "docs", "Guide.MD"), "---\ntype: guide\ntags: [a, b]\n---\n# Guide\n")
 	write(t, filepath.Join(api, "logo.png"), "\x89PNG\x00\x01")
 	write(t, filepath.Join(api, "big.txt"), strings.Repeat("x", FileLimit+1))
 	gitIn(t, api, "add", ".")
@@ -109,6 +112,18 @@ func TestFilesAsCommitted(t *testing.T) {
 	if err != nil || f.Text != "package x\n" || f.Size != 10 {
 		t.Errorf("x.go %+v %v", f, err)
 	}
+	// Markdown, by its extension in any case: its frontmatter apart, the text whole.
+	g, err := b.File(ctx, "ledger", "api", "trunk", "docs/Guide.MD")
+	wantFM := []wiki.Field{{Key: "tags", Values: []wiki.Value{{Text: "a"}, {Text: "b"}}}, {Key: "type", Values: []wiki.Value{{Text: "guide"}}}}
+	if err != nil || !g.Markdown || g.Body != "# Guide\n" || !strings.HasPrefix(g.Text, "---\n") || !reflect.DeepEqual(g.Frontmatter, wantFM) {
+		t.Errorf("markdown %+v %v", g, err)
+	}
+	if r, _ := b.File(ctx, "ledger", "api", "trunk", "README.md"); !r.Markdown || r.Body != "# API\n" || len(r.Frontmatter) != 0 {
+		t.Errorf("markdown without frontmatter %+v", r)
+	}
+	if f.Markdown || f.Frontmatter != nil || f.Body != "" {
+		t.Errorf("x.go read as Markdown: %+v", f)
+	}
 	if f, _ := b.File(ctx, "ledger", "api", "trunk", "logo.png"); !f.Binary || f.Text != "" {
 		t.Errorf("binary %+v", f)
 	}
@@ -120,7 +135,7 @@ func TestFilesAsCommitted(t *testing.T) {
 		t.Errorf("project repo %+v %v", entries, err)
 	}
 	page, err := b.Log(ctx, "ledger", "api", "wt/tove/x", false, 0)
-	if err != nil || len(page.Commits) != 2 || page.Commits[0].Subject != "x" || page.Next != 0 {
+	if err != nil || len(page.Commits) != 2 || page.Commits[0].Subject != "x" || page.Next != 0 || page.Total != 2 {
 		t.Errorf("log %+v %v", page, err)
 	}
 	// Every branch's: the ref goes unread, and each commit appears once.
@@ -129,7 +144,7 @@ func TestFilesAsCommitted(t *testing.T) {
 	for _, c := range all.Commits {
 		seen[c.Hash] = true
 	}
-	if err != nil || len(seen) != len(all.Commits) || len(all.Commits) < len(page.Commits) || !seen[page.Commits[0].Hash] {
+	if err != nil || len(seen) != len(all.Commits) || len(all.Commits) < len(page.Commits) || !seen[page.Commits[0].Hash] || all.Total != len(all.Commits) {
 		t.Errorf("all branches %+v %v", all, err)
 	}
 }

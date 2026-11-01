@@ -1,6 +1,9 @@
 package repos
 
-import "github.com/brickpop/foreman/internal/git"
+import (
+	"github.com/brickpop/foreman/internal/git"
+	"github.com/brickpop/foreman/internal/wiki"
+)
 
 // Repo is one of a project's repos, with its branches.
 type Repo struct {
@@ -25,6 +28,11 @@ type File struct {
 	Text     string `json:"text"`     // "" when binary or too large
 	Binary   bool   `json:"binary"`   // has a NUL byte: not text
 	TooLarge bool   `json:"tooLarge"` // over FileLimit
+	// A Markdown file (.md, .markdown) has its frontmatter apart, and Body is
+	// its text without it; Text stays whole, for its source.
+	Markdown    bool         `json:"markdown"`
+	Frontmatter []wiki.Field `json:"frontmatter"`
+	Body        string       `json:"body"`
 }
 
 // LogPage is a page of a ref's history, newest first; Next is the skip of the
@@ -32,4 +40,5 @@ type File struct {
 type LogPage struct {
 	Commits []git.Commit `json:"commits"`
 	Next    int          `json:"next"`
+	Total   int          `json:"total"` // how many commits the history holds in all
 }

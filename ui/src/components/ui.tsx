@@ -138,15 +138,6 @@ export function Dot({
   );
 }
 
-/** A frontmatter chip, `key: value`. */
-export function FieldChip({ name, value }: { name: string; value: string }) {
-  return (
-    <span className="rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx3">
-      {name}: <span className="text-tx">{value}</span>
-    </span>
-  );
-}
-
 /** The "lead" tag. */
 export function LeadTag() {
   return (

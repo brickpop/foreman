@@ -78,7 +78,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | Radius | Used on |
 |---|---|
 | 4px | Kind chip, "lead" tag, checkbox |
-| 5px | Frontmatter chip, stage chip |
+| 5px | Frontmatter chip (a tag or a list value, [Wiki reader](../features/wiki-reader.md#frontmatter)), stage chip |
 | 6px | Nav items, small buttons, swatches, skill chips, settings inputs |
 | 7px | Standard buttons |
 | 8px | Board card, code block, textareas |

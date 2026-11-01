@@ -30,8 +30,8 @@ import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
 import {
   Button,
+  Card,
   cover,
-  GridCard,
   Loading,
   PageTitle,
   SectionLabel,
@@ -133,7 +133,8 @@ const stateColor = { "needs you": "var(--attn)", "on track": "var(--ok)", idle: 
 function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
   const repos = project?.repos ?? [];
   return (
-    <GridCard
+    <Card
+      opens
       head={
         <>
           <Link
@@ -166,13 +167,14 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
         {repos.length === 0 && <span className="text-[12.5px] text-tx4">No code repo yet</span>}
       </span>
       <span className="text-[12.5px] text-tx4">{row.line}</span>
-    </GridCard>
+    </Card>
   );
 }
 
 function TeamCardView({ team: t, onDeploy }: { team: TeamCard; onDeploy?: () => void }) {
   return (
-    <GridCard
+    <Card
+      opens
       head={
         <>
           <Link
@@ -210,7 +212,7 @@ function TeamCardView({ team: t, onDeploy }: { team: TeamCard; onDeploy?: () => 
           </Button>
         )}
       </span>
-    </GridCard>
+    </Card>
   );
 }
 

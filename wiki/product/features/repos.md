@@ -12,7 +12,7 @@ A project's **Repos** section ([Project page](./project-page.md); Repositories u
 
 `/projects/<project>/repos`, at most 920px wide: a grid of **cards** (at least 260px wide, 12px apart; the CEO, 2026-11-02, replacing a panel of rows), one per code repo of the [record](../models/project-config.md#the-project-record), then the **project repo**'s. The CEO moved them here from Settings on 2026-11-01: the repos are managed where they are read.
 
-- **A card** (a [grid card](../design/design-system.md#surfaces), as the Dashboard's: the name and the `⋯` menu in its header band, the rest in its body, 6px apart) opens the repo's page wherever it is clicked (hover border `--line3`), except a repo with a problem, which can't be read. On it:
+- **A card** (a [card](../design/design-system.md#surfaces), as the Dashboard's: the name and the `⋯` menu in its header band, the rest in its body, 6px apart) opens the repo's page wherever it is clicked (hover border `--line3`), except a repo with a problem, which can't be read. On it:
   - its **name as words** (600 15px; the CEO, 2026-11-02: not a path): hyphens and underscores read as spaces, the first letter capital, so `foreman-ui` is "Foreman ui". Only how it shows: the repo's id, its folder name, the URL and every other place a repo is named (branch lines, reviews) keep `foreman-ui`. Its id is the name's tooltip;
   - its path (Mono 12px `--tx4`);
   - its main branch (Mono) and `· N branches` (12.5px `--tx3`); or, for a repo with a problem, the problem in `--err` (a missing folder, or one that is another repo: `Locate it where it went, or remove it from the project`);

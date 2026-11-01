@@ -39,26 +39,32 @@ export function Button({ variant = "secondary", className = "", ...props }: Butt
   );
 }
 
-/** A card on a grid of cards (Dashboard, Repos): a header band holding its
- * name and status, over its body. */
-export function GridCard({
+/** A card (Dashboard and Repos grids, Settings sections): a header band
+ * holding its name and status or controls, over its body; no body while
+ * collapsed. */
+export function Card({
   head,
-  opens = true,
+  opens = false,
+  danger = false,
   children,
 }: {
   head: ReactNode;
   /** Whether it opens something (its title link covering it): then it shows hover. */
   opens?: boolean;
-  children: ReactNode;
+  /** Irreversible actions inside: its border in --err. */
+  danger?: boolean;
+  children?: ReactNode;
 }) {
   return (
     <article
-      className={`relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel ${opens ? "hover:border-line3" : ""}`}
+      className={`relative flex min-w-0 flex-col overflow-hidden rounded-xl border bg-panel ${danger ? "border-err/50" : "border-line"} ${opens ? "hover:border-line3" : ""}`}
     >
-      <header className="flex min-h-[44px] items-center gap-2 border-b border-line bg-head px-4 py-2">
+      <header
+        className={`flex min-h-[44px] items-center gap-2 bg-head px-4 py-2 ${children ? "border-b border-line" : ""}`}
+      >
         {head}
       </header>
-      <div className="flex flex-1 flex-col gap-3 px-4 py-3.5">{children}</div>
+      {children && <div className="flex flex-1 flex-col gap-3 px-4 py-3.5">{children}</div>}
     </article>
   );
 }

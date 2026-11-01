@@ -20,7 +20,7 @@ One set for both themes in `ui/src/styles.css`: each token is `light-dark(<light
 | `--side` | `#1C2128` | `#F6F8FA` | Sidebar, agent-tab strip, board cells |
 | `--panel` | `#2D333B` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
 | `--raised` | `#373E47` | `#EAEEF2` | Selected nav/segment, raised buttons, chips, stage chips |
-| `--head` | `#373E47` | `#F6F8FA` | A grid card's header band (GitHub's box header: a step lighter than the card in dark, a step darker in light) |
+| `--head` | `#373E47` | `#F6F8FA` | A card's header band (GitHub's box header: a step lighter than the card in dark, a step darker in light) |
 | `--hover` | `#323942` | `#F3F4F6` | Row and item hover |
 | `--term` | `#1C2128` | `#F6F8FA` | Terminals, `<pre>`, inputs, textareas, CoS result panel |
 | `--line` | `#373E47` | `#D8DEE4` | Default borders and dividers |
@@ -122,7 +122,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 
 - Default border: `1px solid var(--line)`. Inputs and buttons: `1px solid var(--line2)`.
 - **Panel**: `--panel` background, `--line` border, radius 12. A list inside a panel separates rows with a `--line` bottom border and clips with `overflow: hidden`.
-- **Grid card** (`GridCard`; Dashboard projects and teams, Repos; the CEO, 2026-11-02: cards were dull): a panel in two parts. A **header band** (`--head`, `--line` bottom border, padding `8px 16px`, at least 44px) holds the name (600 15px, cut with an ellipsis) and, on the right, its **status pill** or its menu; the **body** (padding `14px 16px`, gap 12) holds the rest. A card that opens something gets a `--line3` border on hover, and its name's link covers all of it.
+- **Card** (`Card`; Dashboard projects and teams, Repos, Project settings; the CEO, 2026-11-02: cards were dull): a panel in two parts. A **header band** (`--head`, `--line` bottom border, padding `8px 16px`, at least 44px) holds the name (600 15px, cut with an ellipsis) and, on the right, its **status pill** or its menu; the **body** (padding `14px 16px`, gap 12) holds the rest. A card that opens something gets a `--line3` border on hover, and its name's link covers all of it. A collapsed card (Project settings → How it works) is its band alone. A **danger** card (irreversible actions) has an `--err` border at 50%.
 - **Status pill** (`StatusPill`): the status's 7px dot and word (12px `--tx2`) on a 16% tint of its color, fully rounded, padding `2px 8px`.
 - **Loading** (`Loading`): where data is still on its way, faint bars (12px, `--hover`, pulsing unless the CEO's system asks for reduced motion) in a panel, in place of the content and never its empty state, which would read as "there's none". Every list, page and file view that waits on the server shows it (the CEO, 2026-10-21).
 - **Empty state**: `1px dashed var(--line2)`, radius 12, `--tx3` text, centered copy.

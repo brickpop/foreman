@@ -10,7 +10,7 @@ import { Confirm, Modal } from "../../components/Overlays";
 import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, cover, GridCard, Loading } from "../../components/ui";
+import { Button, Card, cover, Loading } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
@@ -66,10 +66,10 @@ export function Repos() {
         ))}
         {read.isPending && <Loading rows={2} />}
         {projectRepo && (
-          <Card project={project.id} name={projectRepo.name} title="Project repo">
+          <Frame project={project.id} name={projectRepo.name} title="Project repo">
             <span className="text-[12.5px] text-tx4">project.toml and the wiki</span>
             <span className="text-[12.5px] text-tx3">{count(projectRepo)}</span>
-          </Card>
+          </Frame>
         )}
       </div>
       {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
@@ -201,7 +201,7 @@ function RepoCard({
 }) {
   const noMain = read && !read.branches.some((b) => b.name === r.main);
   return (
-    <Card
+    <Frame
       project={project}
       name={r.name}
       title={readable(r.name)}
@@ -224,13 +224,13 @@ function RepoCard({
           No branch {r.main}: pick its main branch, or agents can't start.
         </span>
       )}
-    </Card>
+    </Frame>
   );
 }
 
 /** A card, all of it opening the repo's page (unless it can't be read); its
  * menu sits above that link. */
-function Card({
+function Frame({
   project,
   name,
   title,
@@ -246,7 +246,7 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <GridCard
+    <Card
       opens={opens}
       head={
         <>
@@ -272,7 +272,7 @@ function Card({
       }
     >
       <div className="flex flex-col gap-1.5">{children}</div>
-    </GridCard>
+    </Card>
   );
 }
 

@@ -38,7 +38,7 @@ Today only review requests are built, so the section doesn't show yet.
 
 One card per project not [archived](../models/project-config.md#the-project-record) (cards at least 240px wide), latest first, as the [sidebar](./app-shell.md#sidebar) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
 
-- A [grid card](../design/design-system.md#surfaces). In its header band, the name, and on the right its state as a status pill: `needs you` (`--attn`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
+- A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right its state as a status pill: `needs you` (`--attn`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
 - Its description (13.5px `--tx3`, two lines, kept at two so cards line up), or `No description yet.`
 - Its code repos as Mono chips (`--raised`), the first three then `+<n>`; a repo with a problem in `--err`, the problem as its tooltip; `No code repo yet` when it has none.
 - `<Team> · <n> agents working` (one team at most), or `No team deployed` (12.5px `--tx4`).
@@ -47,7 +47,7 @@ One card per project not [archived](../models/project-config.md#the-project-reco
 
 One card per team (at least 240px wide), then a dashed **`+ New team`** card (`The Chief of Staff drafts it with you.`) opening the [Chief of Staff](./chief-of-staff.md) to create a team. A card opens the team's page ([Team](./team-page.md)).
 
-- A [grid card](../design/design-system.md#surfaces). In its header band, the name, and on the right a status pill: `deployed` (`--ok`) or `not deployed` (`--tx4`).
+- A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right a status pill: `deployed` (`--ok`) or `not deployed` (`--tx4`).
 - Its purpose (two lines, as a project's description), or `No purpose written yet.`
 - `<n> agents: <names>` (12.5px `--tx4`, the lead first, cut with an ellipsis, all of them in its title).
 - `On <project>, <project>` when deployed (12.5px `--tx4`), and a ghost **`Deploy`** opening Deploy a team with this team preset (shown once there is a project).

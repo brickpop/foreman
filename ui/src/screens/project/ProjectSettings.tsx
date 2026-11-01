@@ -14,7 +14,7 @@ import {
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button } from "../../components/ui";
+import { Button, Card } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Settings section (wiki/product/features/project-settings.md):
@@ -53,42 +53,12 @@ function Configuration({ project }: { project: Project }) {
         ]
   ).join("\n");
   return (
-    <section className="grid grid-cols-[repeat(auto-fit,minmax(340px,1fr))] gap-9 px-6 pt-6 pb-12">
-      <div className="flex min-w-0 max-w-[520px] flex-col gap-6">
+    <section className="flex max-w-[760px] flex-col gap-6 px-6 pt-6 pb-12">
+      <Section title="General">
         <Workspace project={project} />
-        <Block title="Where things live">
-          <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
-            {tree}
-          </pre>
-        </Block>
-        <Block title="How work flows">
-          {[
-            [
-              "Team definition",
-              "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.",
-            ],
-            [
-              "Deployment",
-              "A team on this project, one at most. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix.",
-            ],
-            [
-              "Session prompt",
-              "Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt.",
-            ],
-            [
-              "Enforced by Foreman",
-              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main.",
-            ],
-          ].map(([title, body]) => (
-            <div key={title} className="flex flex-col gap-0.5">
-              <span className="font-semibold">{title}</span>
-              <span className="leading-[1.55] text-tx2">{body}</span>
-            </div>
-          ))}
-        </Block>
-      </div>
-      <div className="flex min-w-0 flex-col gap-6">
         <ProfileChoice project={project} />
+      </Section>
+      <Section title="Rules" aside="project.toml">
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
             {[
@@ -145,7 +115,7 @@ function Configuration({ project }: { project: Project }) {
             </span>
           )}
         </Block>
-        <Block title="project.toml">
+        <Block title="The file">
           <span className="font-mono text-[12.5px] text-tx3">
             {project.path}/project.toml · read-only
           </span>
@@ -160,10 +130,44 @@ function Configuration({ project }: { project: Project }) {
           <pre className="m-0 overflow-x-auto rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2 select-text">
             {project.source}
           </pre>
-          <ArchiveProject project={project} />
-          <RemoveProject project={project} />
         </Block>
-      </div>
+      </Section>
+      <Section title="How it works" collapsible>
+        <Block title="Where things live">
+          <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
+            {tree}
+          </pre>
+        </Block>
+        <Block title="How work flows">
+          {[
+            [
+              "Team definition",
+              "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.",
+            ],
+            [
+              "Deployment",
+              "A team on this project, one at most. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix.",
+            ],
+            [
+              "Session prompt",
+              "Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt.",
+            ],
+            [
+              "Enforced by Foreman",
+              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main.",
+            ],
+          ].map(([title, body]) => (
+            <div key={title} className="flex flex-col gap-0.5">
+              <span className="font-semibold">{title}</span>
+              <span className="leading-[1.55] text-tx2">{body}</span>
+            </div>
+          ))}
+        </Block>
+      </Section>
+      <Section title="Danger zone" danger>
+        <ArchiveProject project={project} />
+        <RemoveProject project={project} />
+      </Section>
     </section>
   );
 }
@@ -340,7 +344,7 @@ function ArchiveProject({ project }: { project: Project }) {
       <Confirm
         open={confirming}
         title={`Stop ${names.join(", ")} and archive ${readable(project.id)}?`}
-        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${readable(project.id)}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${project.id} is archived.`}
+        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${readable(project.id)}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${readable(project.id)} is archived.`}
         action="Stop and archive"
         onConfirm={() => archive.mutate()}
         onClose={() => setConfirming(false)}
@@ -424,6 +428,58 @@ function RemoveProject({ project }: { project: Project }) {
         </label>
       </Confirm>
     </Block>
+  );
+}
+
+/** A group of settings: a card titled in its header band, its blocks one
+ * under another, a line between them. A collapsible one (reference text)
+ * starts closed. */
+function Section({
+  title,
+  aside,
+  collapsible = false,
+  danger = false,
+  children,
+}: {
+  title: string;
+  /** Where its settings come from, after the title. */
+  aside?: string;
+  collapsible?: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(!collapsible);
+  const label = (
+    <>
+      <h2 className={`m-0 text-[14px] font-semibold ${danger ? "text-err" : ""}`}>{title}</h2>
+      {aside && <span className="font-mono text-[12px] text-tx4">{aside}</span>}
+    </>
+  );
+  return (
+    <Card
+      danger={danger}
+      head={
+        collapsible ? (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="-mx-4 -my-2 flex flex-1 items-center gap-2 self-stretch px-4 py-2 text-left"
+          >
+            <span className={`text-tx4 transition-transform ${open ? "rotate-90" : ""}`}>›</span>
+            {label}
+          </button>
+        ) : (
+          label
+        )
+      }
+    >
+      {open && (
+        <div className="flex flex-col divide-y divide-line [&>*]:py-4 [&>*:first-child]:pt-0.5 [&>*:last-child]:pb-0.5">
+          {children}
+        </div>
+      )}
+    </Card>
   );
 }
 

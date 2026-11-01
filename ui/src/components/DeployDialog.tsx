@@ -18,9 +18,9 @@ import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
-// Assigns a team to a project, with an optional goal
-// (wiki/product/features/deploy-team.md). A project has one team at most:
-// another one there is replaced, and the dialog says so first.
+// Assigns a team to a project (wiki/product/features/deploy-team.md). A
+// project has one team at most: another one there is replaced, and the dialog
+// says so first.
 // Opened with a team preset (Team page, Dashboard), a project preset (its
 // Session and Deployment sections), or neither (Dashboard). The project's
 // profile, not connected, is connected from here.
@@ -59,7 +59,6 @@ export function DeployDialog({
   const instances = useInstances();
   const [team, setTeam] = useState(presetTeam ?? initialTeam);
   const [project, setProject] = useState(presetProject);
-  const [goal, setGoal] = useState("");
   const [connecting, setConnecting] = useState<string>();
   // The project's profile: its agents run on it, so it must be connected first.
   const profiles = useProfiles();
@@ -83,7 +82,7 @@ export function DeployDialog({
   const replaced = project && !already(project) ? on(project) : undefined;
   const ending = (instances.data ?? []).filter((i) => i.deploymentId === replaced?.id).length;
   const deploy = useMutation({
-    mutationFn: () => client.agents.deploy(team ?? "", project ?? "", goal.trim()),
+    mutationFn: () => client.agents.deploy(team ?? "", project ?? ""),
     onSuccess: async (d) => {
       // Its agents loaded first: until then the Session section doesn't know
       // the team, and would offer to deploy one.
@@ -95,7 +94,6 @@ export function DeployDialog({
       const lead = `${t?.config.lead}@${d.projectId}`;
       const members = Object.keys(t?.config.agents ?? {}).length;
       onClose();
-      setGoal("");
       navigate(sessionOf(lead));
       toast({
         title: `${t?.config.name ?? d.teamId} deployed to ${d.projectId}`,
@@ -153,16 +151,6 @@ export function DeployDialog({
             );
           })}
         </Group>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[13px] font-medium text-tx4">Goal on this project (optional)</span>
-          <textarea
-            rows={3}
-            value={goal}
-            onChange={(e) => setGoal(e.target.value)}
-            placeholder="What does done look like? Or leave it empty and give it to the lead in its session."
-            className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
-          />
-        </label>
         {replaced && team && (
           <p className="m-0 rounded-lg border border-accLine bg-accSoft px-3 py-2.5 text-[13px] text-accTx">
             {replacingLine(nameOf(replaced.teamId), replaced.projectId, ending)}

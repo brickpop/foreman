@@ -168,7 +168,7 @@ export interface AgentsArea {
   stoppedDeployments(): Promise<Deployment[]>;
   /** An instance's session prompt, exactly as composed for its harness. */
   prompt(instance: string): Promise<string>;
-  deploy(team: string, project: string, goal: string): Promise<Deployment>;
+  deploy(team: string, project: string): Promise<Deployment>;
   stop(deployment: string): Promise<void>;
   /** Starts an asleep instance; any other is left as it is. */
   wake(instance: string): Promise<void>;
@@ -464,9 +464,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       stoppedDeployments: () => getJSON("/api/deployments?status=stopped"),
       prompt: async (instance) =>
         (await getJSON<{ prompt: string }>(`/api/instances/${id(instance)}/prompt`)).prompt,
-      deploy: async (team, project, goal) =>
+      deploy: async (team, project) =>
         (
-          await request("POST", "/api/deployments", { team, project, goal })
+          await request("POST", "/api/deployments", { team, project })
         ).json() as Promise<Deployment>,
       stop: (deployment) => send("DELETE", `/api/deployments/${id(deployment)}`),
       wake: (instance) => send("POST", `/api/instances/${id(instance)}/wake`),

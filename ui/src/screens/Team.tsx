@@ -110,9 +110,6 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                   >
                     {d.projectId}
                   </Link>
-                  <span className={d.goal ? "text-tx2" : "text-tx4"}>
-                    {d.goal || "No goal set"}
-                  </span>
                   <Link
                     to="/projects/$project/session"
                     params={{ project: d.projectId }}

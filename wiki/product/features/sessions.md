@@ -14,7 +14,7 @@ A project has one team at most ([Deployment](../models/deployment.md#invariants)
 
 **Header** (padding `10px 16px`, bottom border): the team's **status dot** (its liveliest agent's status, in the order awaiting the CEO, running, starting, queued, idle, done, asleep, stopped, coloured as the agents' own dots, with the status as its title), the team's name (600 15px, a link to its [Team page](./team-page.md)) and `· <project>` (`--tx3`), the shown agent's branch ([Agent tabs](#agent-tabs)), and an amber needs-you dot when a request of the team is open. Nothing else: the project's Inbox, Board, Deployment (Stop included) and the rest are in the sidebar.
 
-**No team on the project**: an empty state, `No team is on <project>, so there are no sessions. Deploy one, with a goal or without.`, with a primary **`Deploy a team`** opening [Deploy a team](./deploy-team.md) on the project, the team that worked here last chosen at first.
+**No team on the project**: an empty state, `No team is on <project>, so there are no sessions. Deploy one.`, with a primary **`Deploy a team`** opening [Deploy a team](./deploy-team.md) on the project, the team that worked here last chosen at first.
 
 ## The URL
 

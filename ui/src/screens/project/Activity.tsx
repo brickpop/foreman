@@ -177,10 +177,7 @@ function OlderSessions({ deployments, teams }: { deployments: Deployment[]; team
             >
               <Chevron open={shown === d.id} />
               <span className="font-semibold">{teamName(teams, d)}</span>
-              <span className="text-[13px] text-tx4">
-                stopped {when(d.stoppedAt)}
-                {d.goal && ` · ${d.goal}`}
-              </span>
+              <span className="text-[13px] text-tx4">stopped {when(d.stoppedAt)}</span>
               {d.stopReason && (
                 <span className="text-[13px] text-err">by Foreman: {d.stopReason}</span>
               )}

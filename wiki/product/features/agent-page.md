@@ -35,4 +35,4 @@ Padding `24px 24px 48px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, g
 - A switcher `on <project>` (option buttons), shown when the agent runs on more than one deployment.
 - The composed prompt in a `<pre>`, exactly as given to the harness ([Session prompt](../architecture/session-prompt.md), `GET /api/instances/:id/prompt`).
 
-When the team isn't deployed anywhere, the full template is shown with `{project}`, `{goal}`, `{repos}`… as highlighted placeholders (`--accTx` on `--accSoft`), and the switcher is hidden ([Session prompt](../architecture/session-prompt.md)).
+When the team isn't deployed anywhere, the full template is shown with `{project}`, `{sandbox}`, `{repos}`… as highlighted placeholders (`--accTx` on `--accSoft`), and the switcher is hidden ([Session prompt](../architecture/session-prompt.md)).

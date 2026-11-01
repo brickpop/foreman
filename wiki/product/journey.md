@@ -40,15 +40,15 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 
 > **Phasing.** Every agent has its own worktree from epic 1 ([Terminal multiplexer](../backlog/epics/terminal-multiplexer.md)); the `switch`, `commit` and `merge` tools and hand-offs that name a branch come with epic 2 ([Messaging and hand-offs](../backlog/epics/messaging-handoffs.md)). Work items, checks and integration detection (16, 17) and the merge and PR in 19 rely on the [Git epic](../backlog/epics/git.md).
 
-**9. Deploy.** Team → **Deploy to a project** → `ledger`, goal "Add idempotency keys to POST /settle" → **Deploy**.
+**9. Deploy.** Team → **Deploy to a project** → `ledger` → **Deploy**. The goal isn't asked: it is ledger's, in its wiki's `backlog/index.md`, none yet.
 - *Under the hood:* the deployment is stored (State store). Instance manager `Ensure(deployment)`, for each member:
   1. Git `Prepare`: a worktree of `ledger-api` at `~/workspace/foreman/ledger/agents/<agent>/ledger-api` (`git worktree add` on the host), on `wt/<agent>/main`; Mara's is on `lead/atlas/integration`.
   2. Image builder `Ensure(ledger)` → the image ledger's agents run on (`localhost/foreman/harness` while every project shares one).
-  3. Harness adapter `Launch`: the session prompt (soul + team + project + goal) as the instance's `CLAUDE.md`, the MCP config pointing at `foreman-agent`, the hooks config.
+  3. Harness adapter `Launch`: the session prompt (soul + team + project, pointing to the goal in the wiki) as the instance's `CLAUDE.md`, the MCP config pointing at `foreman-agent`, the hooks config.
   4. Agent link: registers the instance's token.
   5. Execution engine `Start`: the container with its worktree (rw) and `ledger-api/.git` (read-only: agents read git, Foreman writes it) at their host paths, the live project repo `~/workspace/foreman/ledger/project/` at `<sandbox>/project` (rw for Mara, the lead, read-only for the others), its private config, the shared login file, `~/.gitconfig` (ro).
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
-  7. **Kickoff:** only Mara, the lead, starts now: her harness starts with the goal as its opening message (`Your goal on ledger: …`), so she starts working at once. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
+  7. **Kickoff:** only Mara, the lead, starts now, with no opening message. The CEO opens ledger's Session and writes to her; finding no goal in the wiki, she asks for it first ("Add idempotency keys to POST /settle"), writes it in `backlog/index.md` and plans from it. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
 **10. Watch.** Dashboard: "4 sessions working across 1 projects". The ledger card → its **Session** → Mara's terminal (the lead's tab is first).
 - *Under the hood:* Web server → Terminal `Attach` → a View: the snapshot of Mara's screen, then live output (WebSocket, raw bytes).
@@ -121,7 +121,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 
 | # | Gap | Proposal (to decide) |
 |---|---|---|
-| G1 | ~~**Kickoff**~~ | **Resolved** (2026-10-15): only the lead starts on deploy, its harness launched with the goal as its opening message (still an interactive session); the other members sleep until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)) |
+| G1 | ~~**Kickoff**~~ | **Resolved** (2026-10-15): only the lead starts on deploy, its harness launched with the goal as its opening message (still an interactive session); the other members sleep until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)). Since 2026-10-31 no opening message: the goal is the project's, in its wiki, and the lead asks the CEO for it when there is none ([Session prompt](./architecture/session-prompt.md)) |
 | G2 | ~~**How the Chief of Staff runs**~~ | **Resolved** (2026-10-18): an ad-hoc session like the login container, on the `default` profile, with its own folder and `config/teams/` read-only; it proposes with `propose_team` and Foreman writes on the CEO's click, one commit, no branch or review ([Chief of Staff → How it runs](./features/chief-of-staff.md#how-it-runs)) |
 | G3 | ~~**Who writes cards**~~ | **Resolved** by the CEO's repo model: the lead writes the knowledge base (the live project repo), and commit through `commit()` (no review); everyone else contributes through `contribute` ([Sandboxes and git policy](./architecture/sandboxes-and-git.md#project-knowledge-base)) |
 | G4 | ~~**Screen after a Foreman restart**~~ | **Resolved** (2026-10-14): a container still running is resumed (Foreman re-attaches and rebuilds the screen by replaying the session log into a fresh emulator); a container that is gone gets a new terminal session ([Agent runtime → Restarts](./architecture/agent-runtime.md#restarts)) |

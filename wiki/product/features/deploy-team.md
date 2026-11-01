@@ -6,7 +6,7 @@ tags: [feature, ui, teams, runtime]
 
 # Deploy a team
 
-A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project, with an optional goal, creating a [deployment](../models/deployment.md). A project has one team at most: deploying another one **replaces** the team there (the CEO, 2026-10-31). Opened from the [Team page](./team-page.md) and a Dashboard team card (team preset), the Dashboard header (nothing preset), or a project's [Session](./sessions.md) with no team and its [Deployment](./project-deployment.md) section (project preset, and the team that worked on the project last chosen at first, still changeable, when none is there now).
+A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project, creating a [deployment](../models/deployment.md). A project has one team at most: deploying another one **replaces** the team there (the CEO, 2026-10-31). Opened from the [Team page](./team-page.md) and a Dashboard team card (team preset), the Dashboard header (nothing preset), or a project's [Session](./sessions.md) with no team and its [Deployment](./project-deployment.md) section (project preset, and the team that worked on the project last chosen at first, still changeable, when none is there now).
 
 ## Content
 
@@ -14,12 +14,11 @@ A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project,
 - **Team** option group, only without a team preset.
 - **Project** option group. A project where the selected team is already deployed is disabled and labelled `<project> (already there)`; one with another team on it carries that team's name (`<project> · <Team>`, the name in `--tx4`).
 - **Replacing**: when the project chosen has another team, an accent box (`--accSoft`, `--accLine`, `--accTx`) says so before Deploy: `Replaces <Team> on <project>: <n> sessions end. Worktrees and branches are kept.`
-- **"Goal on this project (optional)"**: textarea (3 rows), placeholder `What does done look like? Or leave it empty and give it to the lead in its session.` Optional (the CEO, 2026-10-16): when the project is already defined, the CEO may prefer to give the goal in the lead's session.
 - Buttons: `Cancel`, and primary **`Deploy`**, disabled until team and project are set and the pair is new.
 
 ## Effect
 
-`POST /api/deployments {team, project, goal?}` (a blank goal is none) ([API](../architecture/api.md)). The team on the project, if another, is stopped first, as by Stop ([Deployment → Lifecycle](../models/deployment.md#lifecycle)); the team's deployments on other projects are untouched. A refused deploy replaces nothing.
+`POST /api/deployments {team, project}` ([API](../architecture/api.md)). The team on the project, if another, is stopped first, as by Stop ([Deployment → Lifecycle](../models/deployment.md#lifecycle)); the team's deployments on other projects are untouched. A refused deploy replaces nothing.
 
 It is refused, with the reason shown in the dialog and nothing created, before Podman runs (`409 NOT_READY`; the dialog says so beforehand, linking to the setup on the Dashboard, [First run](./first-run.md#deploying)), when the team or project has problems, when the project is archived, or when the project's [profile](../architecture/session-runner.md#credentials) doesn't exist, runs a harness that isn't supported yet, or has no login yet (`profile work isn't connected yet: Connect it under Settings → Agents → Profiles`).
 
@@ -29,4 +28,4 @@ An **archived** project reads `<id> (archived)` among the projects, and once cho
 
 1. The deployment is created; every member gets an [instance](../models/instance.md). Only the lead starts: `starting` (or `queued` when the session limit is reached, [Agent runtime](../architecture/agent-runtime.md#concurrency)) with the task `Cloning <repos>`. The other members are `asleep` until they have work ([Lazy starts](../architecture/agent-runtime.md#lazy-starts)).
 2. The lead's worktrees are created and its session starts ([Sandboxes and git policy](../architecture/sandboxes-and-git.md), [Agent runtime](../architecture/agent-runtime.md)). The first lines of a session read `<harness> · <workspace>/agents/<agent>` and `Worktrees of <repos> · reading project/wiki`.
-3. The dialog closes, Foreman opens the project's [Session](./sessions.md) on the lead (the next thing the CEO does is talk to the lead), the "deployed" toast appears (click opens the lead's session), and the lead is already working: its harness started with the goal as its opening message. Without a goal it starts with no opening message and waits for the CEO's.
+3. The dialog closes, Foreman opens the project's [Session](./sessions.md) on the lead (the next thing the CEO does is talk to the lead), the "deployed" toast appears (click opens the lead's session), and the lead waits for the CEO's first message: no goal is asked here, since it is the project's, kept in its wiki, and changes over time; the lead asks for it when there is none ([Session prompt](../architecture/session-prompt.md)) (the CEO, 2026-10-31).

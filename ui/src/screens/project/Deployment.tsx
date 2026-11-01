@@ -21,7 +21,7 @@ import { useProject } from "../Project";
 import { InFlight } from "./Pipeline";
 
 // A project's Deployment section (wiki/product/features/project-deployment.md):
-// the team on it and its goal, its agents with what they do and the branch
+// the team on it, its agents with what they do and the branch
 // each has checked out (and the worktrees earlier teams left); then the work
 // on its way to main, and what merged. Deploy (replacing the team) and Stop.
 export function Deployment() {
@@ -53,9 +53,7 @@ export function Deployment() {
               >
                 {teamName}
               </Link>
-              <span className={`text-[13.5px] ${d.goal ? "text-tx3" : "text-tx4"}`}>
-                {d.goal || "No goal set"} · deployed {when(d.createdAt)}
-              </span>
+              <span className="text-[13.5px] text-tx4">deployed {when(d.createdAt)}</span>
             </span>
           ) : (
             <span className="flex-1" />

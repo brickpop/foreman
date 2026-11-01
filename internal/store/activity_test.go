@@ -16,7 +16,7 @@ func activityFixture(t *testing.T, rows ...[3]string) *DB {
 	db := open(t)
 	for _, d := range []string{"orion@ledger", "atlas@ledger", "atlas@relay"} {
 		team, project, _ := strings.Cut(d, "@")
-		if _, err := db.Deployments().Deploy(ctx, team, project, ""); err != nil {
+		if _, err := db.Deployments().Deploy(ctx, team, project); err != nil {
 			t.Fatal(err)
 		}
 		if d == "orion@ledger" { // a project has one team at a time

@@ -84,7 +84,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	adapter := on.adapter
 	// The project's profile as it is now: a change reaches the agent here.
 	// Another harness can't continue this one's conversation: the run starts
-	// fresh, and a lead gets its goal again.
+	// fresh.
 	switched := inst.Harness != on.harness
 	if switched || inst.Profile != on.profile {
 		inst.Harness, inst.Profile = on.harness, on.profile
@@ -154,13 +154,6 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 			"FOREMAN_AGENT_URL=" + m.Agent.URL, "FOREMAN_AGENT_TOKEN=" + m.Agent.Token(id),
 		}}
 	}
-	if lead && dep.Goal != "" {
-		// The kickoff (journey G1): the lead starts on the goal at once. The
-		// adapter gives it only to a session that starts fresh, so a restart
-		// that continues the conversation doesn't get the goal twice, and one
-		// with nothing to continue still gets it.
-		session.Opener = fmt.Sprintf("Your goal on %s: %s", project.ID, dep.Goal)
-	}
 	l, err := adapter.Launch(session)
 	if err != nil {
 		return nil, err
@@ -187,7 +180,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 // compose is an instance's session prompt: launch writes it, Prompt shows it.
 func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
-		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Repos: project.Repos, Goal: dep.Goal,
+		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Repos: project.Repos,
 		Tools:        m.tools(inst.AgentID == team.Config.Lead),
 		Instructions: m.Config.Settings().Settings.Instructions,
 	})

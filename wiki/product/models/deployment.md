@@ -6,7 +6,7 @@ tags: [model, teams, runtime]
 
 # Deployment
 
-A [team](./team-definition.md) assigned to a project, with an optional goal. Runtime state kept by Foreman in `state.db`, never in `project.toml` ([Persistence](../architecture/persistence.md)). A deployment gets its own [instances](./instance.md), worktrees and team-message channel: agents in two deployments never mix, even when they share a soul. A project has **one team at most** (the CEO, 2026-10-31): a deployment is also the project's team, whose work the CEO follows inside the [project](../features/project-page.md). Created from [Deploy a team](../features/deploy-team.md), stopped from the [Team page](../features/team-page.md) or the project's [Deployment](../features/project-deployment.md) section.
+A [team](./team-definition.md) assigned to a project. Its goal isn't the deployment's: it is the project's, in the project wiki (the CEO, 2026-10-31; [Session prompt](../architecture/session-prompt.md)). Runtime state kept by Foreman in `state.db`, never in `project.toml` ([Persistence](../architecture/persistence.md)). A deployment gets its own [instances](./instance.md), worktrees and team-message channel: agents in two deployments never mix, even when they share a soul. A project has **one team at most** (the CEO, 2026-10-31): a deployment is also the project's team, whose work the CEO follows inside the [project](../features/project-page.md). Created from [Deploy a team](../features/deploy-team.md), stopped from the [Team page](../features/team-page.md) or the project's [Deployment](../features/project-deployment.md) section.
 
 ## Schema
 
@@ -17,7 +17,6 @@ Table `deployments`.
 | `id` | String | yes | | unique | The prototype keys it `team@project` |
 | `team_id` | String | yes | | a team file id | |
 | `project_id` | String | yes | | a project id | |
-| `goal` | String | no | `""` | trimmed | "What does done look like?" Part of every member's [session prompt](../architecture/session-prompt.md). Empty when the CEO gives it in the lead's session instead (the CEO, 2026-10-16); the lists show `No goal set` |
 | `status` | String | yes | `active` | enum: `active`, `stopped` | |
 | `created_at` | Timestamp | yes | now | | |
 | `stopped_at` | Timestamp | | | set when stopped | |
@@ -34,6 +33,6 @@ Table `deployments`.
 ## Invariants
 
 - At most one **active** deployment per project, so per (team, project) pair too. The store refuses a second team's deploy (`ErrProjectTaken`), and a partial unique index on `deployments (project_id) WHERE status = 'active'` holds it in the schema; the runtime's Deploy replaces the team there before writing, serialized so two deploys can't race. The Deploy dialog disables already-deployed pairs and warns before a replacement.
-- At most one row per (team, project) pair: re-deploying a stopped pair **reactivates** that row (new goal, `status: active`, `stopped_at` and `stop_reason` cleared), keeping its `msg-N` counter, team-message history and worktrees.
+- At most one row per (team, project) pair: re-deploying a stopped pair **reactivates** that row (`status: active`, `stopped_at` and `stop_reason` cleared), keeping its `msg-N` counter, team-message history and worktrees.
 - Team messaging is scoped to a deployment: `nyx@ledger` cannot message `nyx@relay`.
 - Stopping one deployment never touches another.

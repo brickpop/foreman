@@ -20,7 +20,6 @@ type Input struct {
 	Sandbox string          // the agent's sandbox, at the same path on the host and in its container
 	Config  home.ProjectConfig
 	Repos   []home.Repo // the project's code repos, each with its main branch
-	Goal    string      // the deployment's goal
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
 	// describes those and no others. Without ask, it describes working alone,
 	// the CEO relaying; without commit, git is read-only and the CEO reviews.
@@ -137,7 +136,7 @@ func Compose(in Input) string {
 	line("")
 	line("## This assignment")
 	line("Project: %s", in.Project)
-	line("Goal: %s", goal(in.Goal, lead))
+	line("Goal: %s", goal(in.Sandbox, lead))
 	line("Your sandbox: %s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Sandbox)
 	line("Branches: %s", branches(in, lead, has))
 	if has("switch") {
@@ -469,7 +468,7 @@ func instruction(s home.Soul, merges bool) string {
 // CEO's instructions are already known, so they show as they are.
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
-		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", Goal: "{goal}",
+		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}",
 		Repos:        []home.Repo{{Name: "{repo}", Main: "{main}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead),
@@ -477,15 +476,13 @@ func Template(team home.TeamConfig, agent, instructions string) string {
 	})
 }
 
-// goal is the assignment's goal, or who gives it when the CEO deployed
-// without one (to give it in the lead's session).
-func goal(g string, lead bool) string {
-	switch {
-	case strings.TrimSpace(g) != "":
-		return strings.TrimSpace(g)
-	case lead:
-		return "none set yet: the CEO gives it in this session. Wait for it."
-	default:
-		return "none set yet: the CEO gives it to your lead, who tells you what to work on."
+// goal says where the project's goal is: the "Current goal" line of its
+// wiki's backlog index, which the lead keeps. Pointed to, not copied, since
+// it changes over time while a session runs (the CEO, 2026-10-31).
+func goal(sandbox string, lead bool) string {
+	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/project/wiki/backlog/index.md", sandbox)
+	if lead {
+		return at + ", which you keep. It changes over time: read it again before planning new work. When it is missing or says none yet, ask the CEO for it in this session before anything else, then write it there. When the CEO changes it, update it there and tell your team."
 	}
+	return at + ", kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on."
 }

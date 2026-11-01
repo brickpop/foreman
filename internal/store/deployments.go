@@ -23,9 +23,9 @@ var (
 // Deployments is the deployments table.
 type Deployments interface {
 	// Deploy creates the deployment of team on project, or reactivates the
-	// stopped one with the new goal (one row per pair, keeping its history).
+	// stopped one (one row per pair, keeping its history).
 	// ErrActive if it is already active, ErrProjectTaken if another team is.
-	Deploy(ctx context.Context, team, project, goal string) (Deployment, error)
+	Deploy(ctx context.Context, team, project string) (Deployment, error)
 	// Stop marks it stopped, with why when Foreman stopped it on its own (""
 	// for the CEO's Stop); stopping a stopped deployment changes nothing.
 	Stop(ctx context.Context, id, reason string) error
@@ -39,9 +39,9 @@ func (db *DB) Deployments() Deployments { return deployments{db.sql} }
 
 type deployments struct{ db *sql.DB }
 
-const deploymentColumns = "id, team_id, project_id, goal, status, created_at, stopped_at, stop_reason"
+const deploymentColumns = "id, team_id, project_id, status, created_at, stopped_at, stop_reason"
 
-func (d deployments) Deploy(ctx context.Context, team, project, goal string) (Deployment, error) {
+func (d deployments) Deploy(ctx context.Context, team, project string) (Deployment, error) {
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Deployment{}, err
@@ -60,13 +60,13 @@ func (d deployments) Deploy(ctx context.Context, team, project, goal string) (De
 	err = tx.QueryRowContext(ctx, "SELECT status FROM deployments WHERE team_id = ? AND project_id = ?", team, project).Scan(&status)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		_, err = tx.ExecContext(ctx, "INSERT INTO deployments (id, team_id, project_id, goal, created_at) VALUES (?, ?, ?, ?, ?)",
-			id, team, project, goal, timeText(time.Now()))
+		_, err = tx.ExecContext(ctx, "INSERT INTO deployments (id, team_id, project_id, created_at) VALUES (?, ?, ?, ?)",
+			id, team, project, timeText(time.Now()))
 	case err != nil:
 	case status == DeploymentActive:
 		return Deployment{}, ErrActive
 	default:
-		_, err = tx.ExecContext(ctx, "UPDATE deployments SET goal = ?, status = 'active', stopped_at = NULL, stop_reason = '' WHERE id = ?", goal, id)
+		_, err = tx.ExecContext(ctx, "UPDATE deployments SET status = 'active', stopped_at = NULL, stop_reason = '' WHERE id = ?", id)
 	}
 	if err != nil {
 		return Deployment{}, err
@@ -108,7 +108,7 @@ func (d deployments) List(ctx context.Context) ([]Deployment, error) {
 func scanDeployment(row interface{ Scan(...any) error }) (Deployment, error) {
 	var dep Deployment
 	var created, stopped sql.NullString
-	err := row.Scan(&dep.ID, &dep.TeamID, &dep.ProjectID, &dep.Goal, &dep.Status, &created, &stopped, &dep.StopReason)
+	err := row.Scan(&dep.ID, &dep.TeamID, &dep.ProjectID, &dep.Status, &created, &stopped, &dep.StopReason)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Deployment{}, ErrNotFound
 	}

@@ -150,7 +150,7 @@ function NoTeam({ project }: { project: string }) {
     <div className="px-6 pt-6 pb-12">
       <Empty>
         <span className="flex flex-col items-center gap-3">
-          No team is on {project}, so there are no sessions. Deploy one, with a goal or without.
+          No team is on {project}, so there are no sessions. Deploy one.
           <Button variant="primary" onClick={() => setDeploy(true)}>
             Deploy a team
           </Button>

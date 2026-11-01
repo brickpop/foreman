@@ -4,13 +4,11 @@ import "time"
 
 // The rows, as the UI reads them too (tygo.yaml).
 
-// Deployment is a team assigned to a project with a goal
-// (wiki/product/models/deployment.md).
+// Deployment is a team assigned to a project (wiki/product/models/deployment.md).
 type Deployment struct {
 	ID         string    `json:"id"` // team@project
 	TeamID     string    `json:"teamId"`
 	ProjectID  string    `json:"projectId"`
-	Goal       string    `json:"goal"`
 	Status     string    `json:"status"` // DeploymentActive or DeploymentStopped
 	CreatedAt  time.Time `json:"createdAt"`
 	StoppedAt  time.Time `json:"stoppedAt"`  // zero while active

@@ -4,14 +4,12 @@
 // source: types.go
 
 /**
- * Deployment is a team assigned to a project with a goal
- * (wiki/product/models/deployment.md).
+ * Deployment is a team assigned to a project (wiki/product/models/deployment.md).
  */
 export interface Deployment {
   id: string; // team@project
   teamId: string;
   projectId: string;
-  goal: string;
   status: string; // DeploymentActive or DeploymentStopped
   createdAt: string /* RFC 3339 */;
   stoppedAt: string /* RFC 3339 */; // zero while active

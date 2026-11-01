@@ -99,7 +99,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "ship"); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, db: db, s: &sessions{typed: map[string]string{}}}

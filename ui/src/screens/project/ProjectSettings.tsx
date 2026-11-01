@@ -72,7 +72,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Deployment",
-              "A team on this project, with an optional goal. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix.",
+              "A team on this project, one at most. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix.",
             ],
             [
               "Session prompt",
@@ -639,7 +639,7 @@ function StillOnAnother({
         {stale.length === 1 ? "1 agent still runs" : `${stale.length} agents still run`} on {on}:{" "}
         {stale.length === 1 ? "it switches" : "they switch"} at the next start.
         {switching &&
-          ` On ${harnessLabel(profile.harness)}, ${stale.length === 1 ? "it starts" : "each starts"} a new conversation; a lead gets its goal again.`}
+          ` On ${harnessLabel(profile.harness)}, ${stale.length === 1 ? "it starts" : "each starts"} a new conversation.`}
       </span>
       <Button variant="small" disabled={restart.isPending} onClick={() => restart.mutate()}>
         {stale.length === 1 ? "Restart it" : "Restart them"}

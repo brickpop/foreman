@@ -32,7 +32,7 @@ Status values: `asleep | queued | starting | running | idle | awaiting | done | 
 
 A container runs only for an agent that has work (the CEO's decision, 2026-10-15): starting five containers when one agent is doing anything is waste.
 
-- **On deploy only the lead starts.** Its harness starts with the goal as its **opening message**, `Your goal on <project>: <goal>`, and stays an interactive session ([Harness adapters](./harness-adapters.md): opener); the goal is in its session prompt too. Only on its first start: a restart continues the conversation and never gives the goal twice.
+- **On deploy only the lead starts**, with no opening message: the CEO writes first, in its Session (the CEO, 2026-10-31; until then the goal was typed in as its first message). The goal is the project's, in its wiki, which its [session prompt](./session-prompt.md) points to.
 - **The other members are `asleep`:** an instance with no container, no sandbox yet, and no session slot.
 - **Waking** an asleep instance queues it and starts it like any other (`POST /api/instances/:id/wake`). In epic 1 the CEO wakes one with **Start** in its session ([Sessions](../features/sessions.md#the-terminal)); from epic 2 a delivery to it (an `ask`, a handoff, a reply) wakes it first ([Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md)). Waking any other status does nothing.
 - After a Foreman restart, an asleep instance stays asleep. The restore itself waits until Podman first answers ([First run](../features/first-run.md#foreman-always-starts)): Foreman serves before that.
@@ -45,7 +45,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 | — | deployment created / agent hired | the lead on deploy: `queued` if no slot, else `starting`; every other member, and a hire, `asleep` |
 | `asleep` | woken: the CEO's Start, or (epic 2) a delivery to it | `queued` if no slot, else `starting` |
 | `queued` | a slot frees | `starting` |
-| `starting` | sandbox ready and harness spawned | `running` (lead with a goal) or `idle` |
+| `starting` | sandbox ready and harness spawned | `running` or `idle` |
 | `running` | harness idle signal ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)) | `idle`, or `done` if it handed off and has nothing assigned |
 | `idle` / `done` | CEO input, team message or reply delivered | `running` |
 | `idle` | another instance waits for a slot; quiet a minute, with nothing else running ([Idle agents make room](#idle-agents-make-room)) | `asleep` |
@@ -76,7 +76,7 @@ After a crash (or that second Ctrl-C), containers are still running. On the next
 ## Restarts
 
 - **How:** when the adapter supports it, the harness resumes its own session. Claude Code: `claude --continue`, the latest conversation in the instance's private config dir, which is always its own (no session id needed). That dir outlives deployments, so a deployment's first start writes down the conversations already there (`foreman-fresh-start`), and a restart continues only one that isn't on that list; with none, it starts fresh (found 2026-10-16: it would have picked up the previous deployment's conversation). A session that starts fresh gets the lead's goal as its opener; one that continues doesn't get it twice. Others by their session id, stored on the [instance](../models/instance.md) (Codex session resume). Otherwise it starts fresh with a summary: the last task note (`instances.task`) plus the instance's last team messages.
-- **Another harness starts fresh** (the CEO, 2026-10-18): a start on another harness than the instance's last run (the project's profile changed) can't continue that conversation, so it starts fresh, and a lead gets its goal again. Another profile on the same harness (another account) continues.
+- **Another harness starts fresh** (the CEO, 2026-10-18): a start on another harness than the instance's last run (the project's profile changed) can't continue that conversation, so it starts fresh. Another profile on the same harness (another account) continues.
 - **The CEO's Restart** (Project settings, for agents still on another profile): stops a running instance and starts it again at once, on the project's profile as it is now, with its one automatic restart back. One that isn't up is left as it is.
 - **A clean exit is not a crash** (the CEO's decision, 2026-10-16): a harness that ends with code 0 (the CEO's `/exit`, say) goes **asleep**, holding no slot, and wakes like any sleeper, on a message or the CEO's Start, picking up its conversation. Messages already waiting for it wake it at once.
 - **When, automatically:** a crash gets **one** automatic restart (counted in `instances.restarts`) before a blocked request is raised; a second crash, or any rate limit, goes straight to the CEO. A rate limit is never retried automatically. A stopped instance of an active deployment starts again on the CEO's **Start again** (its pane), with its one automatic restart back; messages never revive it, so a crash can't loop.

@@ -10,10 +10,10 @@ import (
 	"github.com/brickpop/foreman/internal/store"
 )
 
-// Deploy deploys team on project with goal and starts its lead; the other
+// Deploy deploys team on project and starts its lead; the other
 // members sleep until woken. A project has one team at most: another team
 // deployed on it is stopped first, as by Stop.
-func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (store.Deployment, error) {
+func (m *Manager) Deploy(ctx context.Context, teamID, projectID string) (store.Deployment, error) {
 	if err := m.blocked(); err != nil {
 		return store.Deployment{}, err
 	}
@@ -27,7 +27,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID, goal string) (s
 	if err := m.replace(ctx, teamID, projectID); err != nil {
 		return store.Deployment{}, err
 	}
-	dep, err := m.Deployments.Deploy(ctx, teamID, projectID, goal)
+	dep, err := m.Deployments.Deploy(ctx, teamID, projectID)
 	if err != nil {
 		return store.Deployment{}, err
 	}

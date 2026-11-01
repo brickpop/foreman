@@ -48,7 +48,7 @@ func newStore(t *testing.T) *store.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "ship"); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	for _, a := range []string{"mara", "tove"} {

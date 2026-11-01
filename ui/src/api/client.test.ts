@@ -22,13 +22,12 @@ afterEach(() => vi.unstubAllGlobals());
 describe("httpClient", () => {
   it("deploys with a JSON body", async () => {
     const calls = stubFetch(201, { id: "atlas@ledger" });
-    const dep = await httpClient("http://x").agents.deploy("atlas", "ledger", "Ship it");
+    const dep = await httpClient("http://x").agents.deploy("atlas", "ledger");
     expect(dep.id).toBe("atlas@ledger");
     expect(calls[0]).toMatchObject({ url: "http://x/api/deployments", method: "POST" });
     expect(JSON.parse(calls[0].body ?? "")).toEqual({
       team: "atlas",
       project: "ledger",
-      goal: "Ship it",
     });
     expect(calls[0].headers).toEqual({ "Content-Type": "application/json" });
   });
@@ -77,7 +76,7 @@ describe("httpClient", () => {
       error: "This team is already deployed on this project",
       code: "ALREADY_DEPLOYED",
     });
-    await expect(httpClient("http://x").agents.deploy("a", "b", "c")).rejects.toThrow(
+    await expect(httpClient("http://x").agents.deploy("a", "b")).rejects.toThrow(
       "already deployed",
     );
   });

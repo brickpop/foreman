@@ -60,7 +60,7 @@ func TestOpenCreatesTheSchemaAndReopensWithTheData(t *testing.T) {
 	if mode != "wal" {
 		t.Errorf("journal mode %q, want wal", mode)
 	}
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "ship it"); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	_ = db.Close()
@@ -164,14 +164,14 @@ func TestMigrationsMustBeNumberedWithoutGaps(t *testing.T) {
 func TestDeployStopAndRedeploy(t *testing.T) {
 	deps := open(t).Deployments()
 	before := time.Now().Add(-time.Second)
-	d, err := deps.Deploy(ctx, "atlas", "ledger", "ship invoices")
+	d, err := deps.Deploy(ctx, "atlas", "ledger")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.ID != "atlas@ledger" || d.Status != DeploymentActive || d.Goal != "ship invoices" || d.CreatedAt.Before(before) || !d.StoppedAt.IsZero() {
+	if d.ID != "atlas@ledger" || d.Status != DeploymentActive || d.CreatedAt.Before(before) || !d.StoppedAt.IsZero() {
 		t.Errorf("deployed %+v", d)
 	}
-	if _, err := deps.Deploy(ctx, "atlas", "ledger", "again"); !errors.Is(err, ErrActive) {
+	if _, err := deps.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrActive) {
 		t.Errorf("second deploy while active: %v", err)
 	}
 
@@ -189,12 +189,12 @@ func TestDeployStopAndRedeploy(t *testing.T) {
 		t.Error("stopping twice moved stopped_at")
 	}
 
-	// Re-deploying reactivates the same row: new goal, same id and creation.
-	r, err := deps.Deploy(ctx, "atlas", "ledger", "ship payments")
+	// Re-deploying reactivates the same row: same id and creation.
+	r, err := deps.Deploy(ctx, "atlas", "ledger")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.ID != d.ID || r.Status != DeploymentActive || r.Goal != "ship payments" || !r.CreatedAt.Equal(d.CreatedAt) || !r.StoppedAt.IsZero() {
+	if r.ID != d.ID || r.Status != DeploymentActive || !r.CreatedAt.Equal(d.CreatedAt) || !r.StoppedAt.IsZero() {
 		t.Errorf("redeployed %+v, first %+v", r, d)
 	}
 }
@@ -208,22 +208,22 @@ func TestDeploymentLookupsAndRules(t *testing.T) {
 		t.Errorf("stop unknown: %v", err)
 	}
 	for _, pair := range [][2]string{{"atlas", "relay"}, {"atlas", "ledger"}} {
-		if _, err := deps.Deploy(ctx, pair[0], pair[1], "goal"); err != nil {
+		if _, err := deps.Deploy(ctx, pair[0], pair[1]); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// One team per project: another is refused until the first stops.
-	if _, err := deps.Deploy(ctx, "build", "ledger", "goal"); !errors.Is(err, ErrProjectTaken) {
+	if _, err := deps.Deploy(ctx, "build", "ledger"); !errors.Is(err, ErrProjectTaken) {
 		t.Errorf("a second team on ledger: %v", err)
 	}
 	if err := deps.Stop(ctx, "atlas@ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := deps.Deploy(ctx, "build", "ledger", "goal"); err != nil {
+	if _, err := deps.Deploy(ctx, "build", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	// Nor can the first come back while the second is there.
-	if _, err := deps.Deploy(ctx, "atlas", "ledger", "goal"); !errors.Is(err, ErrProjectTaken) {
+	if _, err := deps.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrProjectTaken) {
 		t.Errorf("atlas back on ledger beside build: %v", err)
 	}
 	list, err := deps.List(ctx)
@@ -243,10 +243,10 @@ func TestDeploymentLookupsAndRules(t *testing.T) {
 // deployment on a project can't be written at all.
 func TestOneActiveDeploymentPerProjectInTheSchema(t *testing.T) {
 	db := open(t)
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "goal"); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
-	insert := "INSERT INTO deployments (id, team_id, project_id, goal, created_at, status) VALUES (?, ?, 'ledger', '', '2026-10-31T00:00:00Z', ?)"
+	insert := "INSERT INTO deployments (id, team_id, project_id, created_at, status) VALUES (?, ?, 'ledger', '2026-10-31T00:00:00Z', ?)"
 	if _, err := db.sql.Exec(insert, "build@ledger", "build", DeploymentActive); err == nil {
 		t.Error("a second active deployment on ledger was written")
 	}
@@ -265,7 +265,7 @@ func TestConcurrentDeploysOfOnePair(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := deps.Deploy(ctx, "atlas", "ledger", "goal")
+			_, err := deps.Deploy(ctx, "atlas", "ledger")
 			errs <- err
 		}()
 	}
@@ -289,7 +289,7 @@ func TestConcurrentDeploysOfOnePair(t *testing.T) {
 
 func deployed(t *testing.T, db *DB, team, project string) {
 	t.Helper()
-	if _, err := db.Deployments().Deploy(ctx, team, project, "goal"); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, team, project); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -393,14 +393,14 @@ func TestReadsDoNotWaitForAWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.Exec("UPDATE deployments SET goal = 'changing' WHERE id = 'atlas@ledger'"); err != nil {
+	if _, err := tx.Exec("UPDATE deployments SET stop_reason = 'changing' WHERE id = 'atlas@ledger'"); err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
 	go func() {
 		d, err := db.Deployments().Get(ctx, "atlas@ledger")
-		if err == nil && d.Goal != "goal" {
-			err = errors.New("read saw an uncommitted write: " + d.Goal)
+		if err == nil && d.StopReason != "" {
+			err = errors.New("read saw an uncommitted write: " + d.StopReason)
 		}
 		done <- err
 	}()
@@ -419,7 +419,7 @@ func TestReadsDoNotWaitForAWrite(t *testing.T) {
 func deployTwo(t *testing.T, db *DB) {
 	t.Helper()
 	for _, p := range []string{"ledger", "relay"} {
-		if _, err := db.Deployments().Deploy(ctx, "atlas", p, "g"); err != nil {
+		if _, err := db.Deployments().Deploy(ctx, "atlas", p); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -542,7 +542,7 @@ func TestMessageRules(t *testing.T) {
 
 func TestActions(t *testing.T) {
 	db := open(t)
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "g"); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	a := db.Actions()
@@ -576,7 +576,7 @@ func TestWorkItems(t *testing.T) {
 	db := open(t)
 	deps := db.Deployments()
 	for _, p := range []struct{ team, project string }{{"orion", "ledger"}, {"atlas", "ledger"}, {"atlas", "relay"}} {
-		if _, err := deps.Deploy(ctx, p.team, p.project, ""); err != nil {
+		if _, err := deps.Deploy(ctx, p.team, p.project); err != nil {
 			t.Fatal(err)
 		}
 		if p.team == "orion" { // a project has one team at a time
@@ -636,7 +636,7 @@ func TestWorkItems(t *testing.T) {
 
 func TestMergeRequests(t *testing.T) {
 	db := open(t)
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", ""); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	mrs := db.MergeRequests()
@@ -915,7 +915,7 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 		if err := p.AddRepo(ctx, id, RepoRecord{Name: "api", Path: "/h/" + id, RootCommit: "a"}); err != nil {
 			t.Fatal(err)
 		}
-		dep, err := db.Deployments().Deploy(ctx, "atlas", id, "")
+		dep, err := db.Deployments().Deploy(ctx, "atlas", id)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -966,7 +966,7 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 	if err := p.Create(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	dep, err := db.Deployments().Deploy(ctx, "atlas", "ledger", "fresh")
+	dep, err := db.Deployments().Deploy(ctx, "atlas", "ledger")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -979,7 +979,7 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 // it, and a redeploy clears it.
 func TestStopReason(t *testing.T) {
 	deps := open(t).Deployments()
-	d, _ := deps.Deploy(ctx, "atlas", "ledger", "")
+	d, _ := deps.Deploy(ctx, "atlas", "ledger")
 	if err := deps.Stop(ctx, d.ID, "its project is gone"); err != nil {
 		t.Fatal(err)
 	}
@@ -989,7 +989,7 @@ func TestStopReason(t *testing.T) {
 	if got, _ := deps.Get(ctx, d.ID); got.StopReason != "its project is gone" {
 		t.Errorf("reason %q", got.StopReason)
 	}
-	r, _ := deps.Deploy(ctx, "atlas", "ledger", "")
+	r, _ := deps.Deploy(ctx, "atlas", "ledger")
 	if r.StopReason != "" {
 		t.Errorf("redeployed with reason %q", r.StopReason)
 	}

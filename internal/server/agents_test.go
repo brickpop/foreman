@@ -23,7 +23,7 @@ type fakeAgents struct {
 	restarted []string
 }
 
-func (f *fakeAgents) Deploy(_ context.Context, team, project, goal string) (store.Deployment, error) {
+func (f *fakeAgents) Deploy(_ context.Context, team, project string) (store.Deployment, error) {
 	switch project {
 	case "busy":
 		return store.Deployment{}, store.ErrActive
@@ -32,7 +32,7 @@ func (f *fakeAgents) Deploy(_ context.Context, team, project, goal string) (stor
 	case "early":
 		return store.Deployment{}, fmt.Errorf("%w: podman isn't running", instances.ErrNotReady)
 	}
-	f.deployed = append(f.deployed, deployRequest{team, project, goal})
+	f.deployed = append(f.deployed, deployRequest{team, project})
 	return store.Deployment{ID: team + "@" + project, Status: store.DeploymentActive}, nil
 }
 
@@ -75,18 +75,14 @@ func TestInstancesAreListedWithTheirStatus(t *testing.T) {
 func TestDeployAndStop(t *testing.T) {
 	a := &fakeAgents{}
 	h := withAgents(a)
-	w := send(h, "POST", "/api/deployments", `{"team":"atlas","project":"ledger","goal":"Ship it"}`)
+	w := send(h, "POST", "/api/deployments", `{"team":"atlas","project":"ledger"}`)
 	var dep map[string]any
 	_ = json.Unmarshal(w.Body.Bytes(), &dep)
-	if w.Code != http.StatusCreated || dep["id"] != "atlas@ledger" || len(a.deployed) != 1 || a.deployed[0].Goal != "Ship it" {
+	if w.Code != http.StatusCreated || dep["id"] != "atlas@ledger" || len(a.deployed) != 1 || a.deployed[0] != (deployRequest{"atlas", "ledger"}) {
 		t.Errorf("deploy: %d %s %+v", w.Code, w.Body, a.deployed)
 	}
 	if w := send(h, "DELETE", "/api/deployments/atlas@ledger", ""); w.Code != http.StatusNoContent || len(a.stopped) != 1 {
 		t.Errorf("stop: %d %+v", w.Code, a.stopped)
-	}
-	// Without a goal (the CEO gives it in the lead's session); blank is none.
-	if w := send(h, "POST", "/api/deployments", `{"team":"atlas","project":"cal","goal":"  "}`); w.Code != http.StatusCreated || a.deployed[1].Goal != "" {
-		t.Errorf("no goal: %d %s %+v", w.Code, w.Body, a.deployed)
 	}
 }
 
@@ -98,10 +94,10 @@ func TestDeployErrors(t *testing.T) {
 		code               string
 	}{
 		{"POST", "/api/deployments", `not json`, 400, "BAD_REQUEST"},
-		{"POST", "/api/deployments", `{"project":"ledger","goal":"g"}`, 400, "BAD_REQUEST"},
-		{"POST", "/api/deployments", `{"team":"atlas","project":"busy","goal":"g"}`, 409, "ALREADY_DEPLOYED"},
-		{"POST", "/api/deployments", `{"team":"atlas","project":"broken","goal":"g"}`, 400, "CANT_DEPLOY"},
-		{"POST", "/api/deployments", `{"team":"atlas","project":"early","goal":"g"}`, 409, "NOT_READY"},
+		{"POST", "/api/deployments", `{"project":"ledger"}`, 400, "BAD_REQUEST"},
+		{"POST", "/api/deployments", `{"team":"atlas","project":"busy"}`, 409, "ALREADY_DEPLOYED"},
+		{"POST", "/api/deployments", `{"team":"atlas","project":"broken"}`, 400, "CANT_DEPLOY"},
+		{"POST", "/api/deployments", `{"team":"atlas","project":"early"}`, 409, "NOT_READY"},
 		{"POST", "/api/instances/early@ledger/wake", ``, 409, "NOT_READY"},
 		{"DELETE", "/api/deployments/nope@x", ``, 404, "NOT_FOUND"},
 	} {
@@ -121,7 +117,7 @@ func (f *fakeAgents) DeploymentsIn(_ context.Context, status string) ([]store.De
 		return []store.Deployment{{ID: "atlas@relay", ProjectID: "relay", Status: status}}, nil
 	}
 	return []store.Deployment{
-		{ID: "atlas@ledger", ProjectID: "ledger", Goal: "Ship it", Status: status},
+		{ID: "atlas@ledger", ProjectID: "ledger", Status: status},
 		{ID: "orion@billing", ProjectID: "billing", Status: status},
 		{ID: "build@relay", ProjectID: "relay", Status: status},
 	}, nil
@@ -131,7 +127,7 @@ func TestDeploymentsAreListed(t *testing.T) {
 	h := withAgents(&fakeAgents{})
 	var list []map[string]any
 	decodeBody(t, get(t, h, "/api/deployments"), &list)
-	if len(list) != 3 || list[0]["goal"] != "Ship it" || list[0]["status"] != "active" {
+	if len(list) != 3 || list[0]["id"] != "atlas@ledger" || list[0]["status"] != "active" {
 		t.Errorf("deployments %v", list)
 	}
 	decodeBody(t, get(t, h, "/api/deployments?status=stopped"), &list)

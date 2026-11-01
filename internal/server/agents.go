@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/store"
@@ -14,7 +13,7 @@ import (
 // Agents deploys teams and lists their instances (implemented by the
 // instance manager).
 type Agents interface {
-	Deploy(ctx context.Context, team, project, goal string) (store.Deployment, error)
+	Deploy(ctx context.Context, team, project string) (store.Deployment, error)
 	Stop(ctx context.Context, deployment string) error
 	List(ctx context.Context) ([]store.Instance, error)
 	// DeploymentsIn lists the deployments with status (active or stopped).
@@ -32,7 +31,6 @@ type Agents interface {
 type deployRequest struct {
 	Team    string `json:"team"`
 	Project string `json:"project"`
-	Goal    string `json:"goal"`
 }
 
 func agentRoutes(mux *http.ServeMux, a Agents) {
@@ -97,15 +95,14 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 	mux.HandleFunc("POST /api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		var req deployRequest
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {team, project, goal?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {team, project}")
 			return
 		}
 		if req.Team == "" || req.Project == "" {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "team and project are required")
 			return
 		}
-		// The goal is optional: the CEO may give it in the lead's session.
-		dep, err := a.Deploy(r.Context(), req.Team, req.Project, strings.TrimSpace(req.Goal))
+		dep, err := a.Deploy(r.Context(), req.Team, req.Project)
 		switch {
 		case errors.Is(err, store.ErrActive):
 			writeError(w, http.StatusConflict, "ALREADY_DEPLOYED", "This team is already deployed on this project")

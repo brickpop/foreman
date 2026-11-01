@@ -19,7 +19,7 @@ epic: workflow
 - **Inbox** (was Reviews, now per project): the reviews needing the CEO, the project's other requests (Needs you, from Overview), what waits on the lead, the last done. A review opens inside it (`← Inbox`). Merge, Request changes and Dismiss go back to the Inbox; the Merge toast opens the session.
 - **Wiki** (was Overview): the wiki reader; the project's path and description head it (the big project header goes).
 - **Board** keeps its name (it is wikiview's `board`, one word for one or several). **Repos** (was Repositories).
-- **Deployment** (replaces Worktrees): the team on the project and its goal, its members (each opening its session), their worktrees, the work in flight and merged; Stop, and Deploy (replacing). Project settings lose their "Teams on this project" section to it.
+- **Deployment** (replaces Worktrees): the team on the project, its members (each opening its session), their worktrees, the work in flight and merged; Stop, and Deploy (replacing). Project settings lose their "Teams on this project" section to it.
 - **Activity**: the session's Activity panel goes; the section holds it all: the timeline on the left, the "who calls whom" map on the right filtering it, older sessions below.
 - **Dashboard**: At work goes. A card per project (its team and state; opens Session, or Wiki without a team), then a card per team.
 - **Compact and consistent**: the same slim padding on every section; reading text (wiki, review comments, empty states) keeps a comfortable max width.
@@ -35,6 +35,7 @@ epic: workflow
 - [x] Dashboard: project cards, team cards; `DeploymentCard`, `sessionGroups`, the Sessions list code removed
 - [x] Deploy dialog: the replacement warning; Stop dialog's links
 - [x] tests: the section routes and defaults, the sidebar model, the Deploy replacement wording, the activity filter over pages
+- [x] the goal is the project's (the CEO, 2026-10-31): the "Current goal" line of its wiki's `backlog/index.md`, kept by the lead, pointed to by every session prompt; no goal on deploy, no opening message (the CEO writes first; the lead asks for the goal when there is none); the deployment's `goal` column dropped (migration 011)
 - [ ] tried by the CEO in the browser
 
 Known edges left: [Technical debt → One team per project](../technical-debt.md#one-team-per-project-known-edges). Open for the CEO: the journey and use cases still tell two teams on one project (Vesper beside Atlas on ledger).

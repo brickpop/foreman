@@ -10,13 +10,13 @@ The end-to-end scenarios v1 must pass. Each one becomes an end-to-end test; the 
 
 ## 1. Start from scratch
 
-Run `foreman`, open the UI, then use **+ New project** to make `ledger` and add its repo `~/dev/ledger-api` (already cloned). Next, use **+ New team** to have the Chief of Staff draft "Atlas", a team to build features. Finally, deploy Atlas to ledger with a goal, and the sessions start.
+Run `foreman`, open the UI, then use **+ New project** to make `ledger` and add its repo `~/dev/ledger-api` (already cloned). Next, use **+ New team** to have the Chief of Staff draft "Atlas", a team to build features. Finally, deploy Atlas to ledger, and give its lead the goal in its Session.
 
 Acceptance:
 - [ ] `foreman` serves the UI on `localhost:8888`, and `~/.foreman/config/` exists as a git repo (the global repo). A second `foreman` only prints the first one's URL.
 - [ ] The [Add a project](./features/add-project.md) dialog creates the project repo `~/workspace/foreman/ledger/project/` (`git init`, `project.toml`, a starter wiki) and adds `~/dev/ledger-api` to the project's record by its path. Nothing is cloned, and nothing is written in `~/dev/ledger-api` but its `.git`.
 - [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a team from the purpose and shows it in the preview beside its terminal, one tab per member; the CEO's **Create Atlas** writes `~/.foreman/config/teams/atlas.toml`, one commit in the global repo, and Atlas appears in the sidebar within 1 s. A draft that breaks the team file's invariants (a name already used) is never shown.
-- [ ] [Deploying](./features/deploy-team.md) Atlas to ledger with a goal creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
+- [ ] [Deploying](./features/deploy-team.md) Atlas to ledger creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
 
 ## 2. Delegate through the lead
 

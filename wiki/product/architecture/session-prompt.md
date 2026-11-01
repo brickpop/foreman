@@ -6,9 +6,9 @@ tags: [architecture, agents, teams, sessions]
 
 # Session prompt
 
-The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from these sources, and last the [CEO's instructions](#the-ceos-instructions): the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [deployment](../models/deployment.md) (goal) the [project config](../models/project-config.md) (gates, checks) and the instance's sandbox. It is passed to the harness as described by its [adapter](./harness-adapters.md).
+The prompt composer builds each [instance](../models/instance.md)'s session prompt at spawn, from these sources, and last the [CEO's instructions](#the-ceos-instructions): the [agent soul](../models/agent-soul.md), the [team definition](../models/team-definition.md) (roster, playbook, escalation), the [project config](../models/project-config.md) (gates, checks) and the instance's sandbox. It is passed to the harness as described by its [adapter](./harness-adapters.md).
 
-The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)). For an agent whose team isn't deployed anywhere, it shows the full template with the deployment-dependent variables (`{project}`, `{sandbox}`, `{goal}`, `{repos}`, `{checks}`, `{gates}`…) left as highlighted placeholders, so the whole shape is visible before deploying.
+The [Agent page](../features/agent-page.md) shows this exact composed text, one version per deployment (`GET /api/instances/:id/prompt`, [API](./api.md)). For an agent whose team isn't deployed anywhere, it shows the full template with the deployment-dependent variables (`{project}`, `{sandbox}`, `{repos}`, `{checks}`, `{gates}`…) left as highlighted placeholders, so the whole shape is visible before deploying.
 
 ## Template
 
@@ -21,7 +21,7 @@ The [Agent page](../features/agent-page.md) shows this exact composed text, one 
 
 ## This assignment
 Project: {project}
-Goal: {deployment.goal}
+Goal: the "Current goal" line at the top of {sandbox}/project/wiki/backlog/index.md, {who keeps it}
 Your sandbox: {sandbox} (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
 Branches: {branches}
 {worktrees persist}
@@ -95,7 +95,7 @@ The CEO's own rules for every agent. Where one conflicts with what Foreman says 
 {instructions}
 ```
 
-Without a goal, the line says who gives it: the lead reads `Goal: none set yet: the CEO gives it in this session. Wait for it.`, a member `Goal: none set yet: the CEO gives it to your lead, who tells you what to work on.`
+**The goal** is the project's, not the deployment's (the CEO, 2026-10-31): the "Current goal" line of the project wiki's `backlog/index.md`, which the starter wiki carries ([Add a project → Effect](../features/add-project.md#effect)). The prompt points to it rather than copying it, since it changes while sessions run. The lead keeps it: it reads it again before planning new work; when it is missing or says none yet, it asks the CEO in its session before anything else and writes it there; when the CEO changes it, it updates it and tells the team. A member reads it again before each new piece of work, and until there is one its lead tells it what to work on.
 
 **Phasing:** the prompt describes exactly the team tools Foreman offers the agent (`prompt.Offered`, which the team-tool router serves too, so the two can't drift), and none when the agent started without `foreman-agent`. The [Messaging and hand-offs](../../backlog/epics/messaging-handoffs.md) epic brings them in steps: today `ask`, `reply`, `read_message`, `switch`, `commit`, `merge`, `abort_merge`, `set_submodule` (since 2026-10-19), `handoff` (members), `contribute` and, since the Git epic (2026-10-17), `request_merge` (the lead), since 2026-10-22 `withdraw_merge` and `reviews` (the lead), and since 2026-10-23 `team` (the lead); `escalate` is still to come. Each piece of the prompt follows its tool: without `ask`, teammates can't be reached and the CEO relays; without `commit`, a Git section says git is read-only and the CEO reviews the uncommitted work; without `switch`, the agent's branch was made for it; without `request_merge`, the lead's default job doesn't end with merges, and its branches line says to merge accepted hand-offs with `merge` and to tell the CEO which lead branch is ready for review; without `escalate`, the messages note says nothing about approvals. The checks line says "Before any handoff" for a member with `handoff`, "Before you request a merge" for the lead with `request_merge`, else "Before you tell the CEO you're done". The outcome rule (two lines under the tools) comes with `reply`, since an agent otherwise tends to paste a transcript; so does the rule that a reply ends its ask (two more lines), since a lead otherwise answers replies and sends "closing the loop" asks, each of which demands another reply (seen 2026-10-19).
 

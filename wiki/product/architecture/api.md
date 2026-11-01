@@ -44,7 +44,7 @@ DELETE /api/cos                              stops it (the CEO left the page); t
 POST   /api/cos/proposal                     {id, looks}: writes proposal id, the one on screen, with the faces the page drew for members proposed without one; one commit → the team; 409 STALE (replaced, or none), 409 CONFLICT (the team changed since: the CoS is asked again), 400 INVALID
 
 GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
-POST   /api/deployments                       {team, project, goal?} (a blank goal is none: the CEO gives it in the lead's session); replaces the team on the project, if another (stopped as by DELETE); 201 the deployment; 409 ALREADY_DEPLOYED (this pair is active), NOT_READY; 400 CANT_DEPLOY
+POST   /api/deployments                       {team, project}; replaces the team on the project, if another (stopped as by DELETE); 201 the deployment; 409 ALREADY_DEPLOYED (this pair is active), NOT_READY; 400 CANT_DEPLOY
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status and activity line (doing)
 GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness

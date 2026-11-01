@@ -146,7 +146,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger", ""); err != nil {
+	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, root: root, m: m, db: db, teams: &teams{running: map[string]bool{"atlas@ledger": true}}}

@@ -6,11 +6,11 @@ tags: [feature, ui, git, pipeline]
 
 # Project deployment
 
-A project's **Deployment** section ([Project page](./project-page.md)): the team on the project and its goal, its agents with what each is doing and the branch it has checked out, then the work on its way to `main` and what merged. It replaced the Worktrees tab and Project settings' "Teams on this project" on 2026-10-31, both of which listed the same agents (the CEO: remove redundant info). A project has one team at most ([Deployment](../models/deployment.md#invariants)).
+A project's **Deployment** section ([Project page](./project-page.md)): the team on the project, its agents with what each is doing and the branch it has checked out, then the work on its way to `main` and what merged. It replaced the Worktrees tab and Project settings' "Teams on this project" on 2026-10-31, both of which listed the same agents (the CEO: remove redundant info). A project has one team at most ([Deployment](../models/deployment.md#invariants)).
 
 ## The team
 
-- **Header**: the team's name (600 16px), a link to its [Team page](./team-page.md); under it the goal (13.5px `--tx3`, or `No goal set` in `--tx4`) and `deployed <time>`. On the right, **`Deploy another team`** (with no team: **`Deploy a team`**), which opens [Deploy a team](./deploy-team.md) on this project (with no team, the team that worked here last chosen at first), and **`Stop`** in the danger style, led by the stop icon, which stops the team after the same confirmation as the Team page's ([Team page → Deployments](./team-page.md#deployments)).
+- **Header**: the team's name (600 16px), a link to its [Team page](./team-page.md); under it `deployed <time>` (13.5px `--tx4`). No goal here: it is the project's, in its wiki ([Session prompt](../architecture/session-prompt.md)). On the right, **`Deploy another team`** (with no team: **`Deploy a team`**), which opens [Deploy a team](./deploy-team.md) on this project (with no team, the team that worked here last chosen at first), and **`Stop`** in the danger style, led by the stop icon, which stops the team after the same confirmation as the Team page's ([Team page → Deployments](./team-page.md#deployments)).
 - **One panel, a row per agent** (padding `12px 16px`, rows split by `--line`): first the team's agents, the lead first then the team file's order; then any worktree an earlier team left on the project (Stop keeps worktrees), by agent id.
   - Avatar 26, with its status dot while it is on the team.
   - Its name (500) and the `lead` tag, then `<Team> · <role>` (12.5px `--tx4`).
@@ -29,4 +29,3 @@ Every branch in them is a link to its code in Repos: a merge request's in its re
 ## Limits
 
 - **Committed work only**: Repos reads what a branch has committed; an agent's uncommitted changes show only as the `uncommitted changes` flag.
-- **The goal can't be edited** once deployed: Stop, then deploy the team again with the new goal (it reactivates the same deployment, history included); or give it to the lead in its session.

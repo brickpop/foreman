@@ -103,13 +103,13 @@ func TestReviewsListOnlyTheLeadsRecentOnes(t *testing.T) {
 	if err := deps.Stop(ctx, "atlas@ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := deps.Deploy(ctx, "orion", "ledger", ""); err != nil {
+	if _, err := deps.Deploy(ctx, "orion", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	if err := deps.Stop(ctx, "orion@ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := deps.Deploy(ctx, "atlas", "ledger", ""); err != nil {
+	if _, err := deps.Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
 	review("orion@ledger", "lead/orion/x", store.MergeOpen, time.Now())

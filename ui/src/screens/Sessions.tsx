@@ -1,3 +1,4 @@
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -25,9 +26,12 @@ import {
 import { branchOf } from "../app/repos";
 import {
   activeDeployments,
+  agentStep,
   applyMention,
   countdown,
+  draftNotice,
   isLineShortcut,
+  keepOrder,
   linePlaceholder,
   lineShortcut,
   mentionAt,
@@ -38,6 +42,7 @@ import {
   type SessionsView,
   sessionRows,
   sessionsView,
+  stepAgent,
   stoppedLine,
 } from "../app/sessions";
 import { ActivityPanel } from "../components/ActivityPanel";
@@ -49,7 +54,6 @@ import { Terminal, type TerminalHandle } from "../components/Terminal";
 import { useToast } from "../components/Toasts";
 import {
   Button,
-  card,
   cover,
   Dot,
   Empty,
@@ -57,6 +61,7 @@ import {
   Loading,
   outlineLink,
   PageTitle,
+  Panel,
 } from "../components/ui";
 
 // The terminal multiplexer (wiki/product/features/sessions.md): the list of
@@ -105,6 +110,21 @@ export function Sessions() {
     if (view) lastView.set(view.deployment, view);
     if (shown !== asked) navigate({ to: "/sessions", search: view ?? {}, replace: true });
   }, [ready, shown, asked]);
+  // Cmd+Shift+← / → move between the agent tabs, from anywhere on the page
+  // (the window's capture phase, before the terminal: the agent never gets them).
+  const step = useRef<(by: number) => void>(undefined);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const by = agentStep(e);
+      if (!by || !step.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+      step.current(by);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+  step.current = undefined; // set below, only while a deployment's page shows
 
   if (!ready) return <Loading rows={5} className="m-12" />;
   if (!view)
@@ -125,6 +145,16 @@ export function Sessions() {
     show({ ...view, agent: id.split("@")[0] });
     setFocusAsk((f) => ({ id, n: f.n + 1 }));
   };
+  step.current = (by) => {
+    const next =
+      instance &&
+      stepAgent(
+        roster.map((i) => i.id),
+        instance.id,
+        by,
+      );
+    if (next) pick(next);
+  };
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-2.5">
@@ -135,7 +165,13 @@ export function Sessions() {
         {instance && <AgentBranch key={instance.id} shown={instance} />}
         {d?.needsYou && <Dot title="Needs you" />}
         <span className="flex-1" />
-        {/* Back to what the team works on: the project's tasks and their status. */}
+        {/* The project, from its session: the team here, the rest one link away. */}
+        <span aria-current="page" className={`${outlineLink} border-line3 bg-raised text-tx`}>
+          Team
+        </span>
+        <Link to="/reviews" search={{ project: d?.project }} className={outlineLink}>
+          Reviews
+        </Link>
         <Link
           to="/projects/$project"
           params={{ project: d?.project ?? "" }}
@@ -144,22 +180,12 @@ export function Sessions() {
         >
           Board
         </Link>
-        <button
-          type="button"
-          aria-pressed={activity}
-          onClick={() => show({ ...view, view: activity ? undefined : "activity" })}
-          className={`${outlineLink} ${activity ? "border-line3 bg-raised text-tx" : ""}`}
-        >
-          Activity
-        </button>
-        <Button
-          variant="danger"
-          className="inline-flex items-center gap-1.5"
-          onClick={() => setStopping(true)}
-        >
-          <StopIcon />
-          Stop
-        </Button>
+        <DeploymentMenu
+          project={d?.project ?? ""}
+          activity={activity}
+          onActivity={(on) => show({ ...view, view: on ? "activity" : undefined })}
+          onStop={() => setStopping(true)}
+        />
         {stopping && toStop && (
           <StopDialog
             deployment={toStop}
@@ -194,6 +220,66 @@ export function Sessions() {
         />
       )}
     </div>
+  );
+}
+
+/** The deployment's own controls, under one menu: the Activity panel, the
+ * project's settings, and Stop. */
+function DeploymentMenu({
+  project,
+  activity,
+  onActivity,
+  onStop,
+}: {
+  project: string;
+  activity: boolean;
+  onActivity: (on: boolean) => void;
+  onStop: () => void;
+}) {
+  const navigate = useNavigate();
+  const item =
+    "flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover data-[highlighted]:text-tx";
+  return (
+    <Menu.Root>
+      <Menu.Trigger className={`${outlineLink} data-[state=open]:border-line3`}>
+        Deployment <span className="text-[10px] text-tx4">▾</span>
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content
+          align="end"
+          sideOffset={4}
+          className="z-50 flex min-w-48 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay"
+        >
+          <Menu.CheckboxItem
+            checked={activity}
+            onCheckedChange={onActivity}
+            className={`${item} justify-between`}
+          >
+            Show activity
+            <span className="w-3 text-accTx">
+              <Menu.ItemIndicator>✓</Menu.ItemIndicator>
+            </span>
+          </Menu.CheckboxItem>
+          <Menu.Item
+            className={item}
+            onSelect={() =>
+              navigate({
+                to: "/projects/$project",
+                params: { project },
+                search: { tab: "settings" },
+              })
+            }
+          >
+            Project settings
+          </Menu.Item>
+          <Menu.Separator className="my-1 h-px bg-line" />
+          <Menu.Item className={`${item} text-err data-[highlighted]:text-err`} onSelect={onStop}>
+            <StopIcon />
+            Stop deployment
+          </Menu.Item>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -399,20 +485,26 @@ function Session({
             // A box inset from the edges, so the Activity panel beside it never hides
             // a side of its border.
             <div className="mx-3 my-2 flex items-center gap-3 rounded-lg border-2 border-acc bg-accSoft px-3.5 py-2 text-[12.5px] text-accTx">
-              <span className="flex-1">
-                {draft.waiting === 1 ? "1 message" : `${draft.waiting} messages`} waiting for your
-                line: send or clear it.{" "}
-                <span className="font-mono text-tx">
-                  {draft.paused ? "Paused" : countdown(draft.leftMs)}
-                </span>
-                {!draft.paused && !draft.counting && " (waits while you type)"}
-              </span>
-              <Button
-                variant="tiny"
-                onClick={() => client.agents.pauseCountdown(instance.id, !draft.paused)}
-              >
-                {draft.paused ? "Resume" : "Pause"}
-              </Button>
+              {draft.onDraft ? (
+                <>
+                  <span className="flex-1">
+                    {draftNotice(draft.waiting, name, true)}{" "}
+                    <span className="font-mono text-tx">
+                      {draft.paused ? "Paused" : countdown(draft.leftMs)}
+                    </span>
+                    {!draft.paused && !draft.counting && " (waits while you type)"}
+                  </span>
+                  <Button
+                    variant="tiny"
+                    onClick={() => client.agents.pauseCountdown(instance.id, !draft.paused)}
+                  >
+                    {draft.paused ? "Resume" : "Pause"}
+                  </Button>
+                </>
+              ) : (
+                // The line went out: they follow at the agent's next idle, never dropped.
+                <span className="flex-1">{draftNotice(draft.waiting, name, false)}</span>
+              )}
             </div>
           )}
           {lineMode && !asleep && (
@@ -569,6 +661,10 @@ function SessionsList({ rows, summary }: { rows: SessionRow[]; summary: string }
     const tick = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(tick);
   }, []);
+  // Sorted on entering only: the order is kept from then on.
+  const order = useRef<string[]>(undefined);
+  const shown = keepOrder(rows, order.current);
+  order.current = shown.map((r) => r.id);
   return (
     <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-12 pt-12 pb-16 max-[760px]:px-4">
       <div className="flex flex-wrap items-end gap-4">
@@ -581,11 +677,11 @@ function SessionsList({ rows, summary }: { rows: SessionRow[]; summary: string }
       {rows.length === 0 ? (
         <Empty>No team is deployed yet, so there are no sessions.</Empty>
       ) : (
-        <div className="flex flex-col gap-2">
-          {rows.map((r) => (
+        <Panel>
+          {shown.map((r) => (
             <SessionsRow key={r.id} row={r} now={now} />
           ))}
-        </div>
+        </Panel>
       )}
       {/* Mounted only while open: each opening starts fresh. */}
       {deploy && <DeployDialog open onClose={() => setDeploy(false)} />}
@@ -593,13 +689,14 @@ function SessionsList({ rows, summary }: { rows: SessionRow[]; summary: string }
   );
 }
 
-/** One active deployment, named by its project (what the CEO follows); the
- * team only a chip. The row opens the deployment's page. */
+/** One active deployment, a row of the list, named by its project (what the
+ * CEO follows); below, the team running it and the start of its goal. The row
+ * opens the deployment's page. */
 function SessionsRow({ row: r, now }: { row: SessionRow; now: Date }) {
   return (
-    <article className={`${card} !flex-row items-center !gap-3 hover:border-line3`}>
+    <article className="relative flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0 hover:bg-hover">
       <Dot status={r.status} title={r.status} />
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex items-center gap-2">
           <Link
             to="/sessions"
@@ -610,10 +707,12 @@ function SessionsRow({ row: r, now }: { row: SessionRow; now: Date }) {
           </Link>
           {r.needsYou && <Dot title="Needs you" />}
         </span>
-        {r.goal && <span className="truncate text-[13.5px] text-tx3">{r.goal}</span>}
-      </span>
-      <span className="shrink-0 rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx3">
-        {r.team}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 rounded-[5px] bg-raised px-2 py-[3px] text-[12px] text-tx3">
+            {r.team}
+          </span>
+          {r.goal && <span className="truncate text-[13px] text-tx3">{r.goal}</span>}
+        </span>
       </span>
       <span
         className={`w-14 shrink-0 text-[12.5px] ${r.state === "working" ? "text-ok" : "text-tx4"}`}

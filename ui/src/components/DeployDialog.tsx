@@ -47,7 +47,13 @@ export function DeployDialog({
   const [connecting, setConnecting] = useState<string>();
   // The project's profile: its agents run on it, so it must be connected first.
   const profiles = useProfiles();
-  const profileName = projects.data?.find((p) => p.id === project)?.profile;
+  const chosen = projects.data?.find((p) => p.id === project);
+  const profileName = chosen?.profile;
+  // An archived project takes no deployment: unarchived from here, as from its settings.
+  const unarchive = useMutation({
+    mutationFn: () => client.home.setArchived(project ?? "", false),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.projects }),
+  });
   const profile = profiles.data?.find((p) => p.name === profileName);
   const profileReady = profile?.connected ?? false;
   // Agents start only once Podman runs (and the instances are restored).
@@ -79,7 +85,8 @@ export function DeployDialog({
       });
     },
   });
-  const ready = team && project && !already(project) && profileReady && !engineDown;
+  const ready =
+    team && project && !already(project) && !chosen?.archived && profileReady && !engineDown;
   return (
     <Modal
       open={open}
@@ -118,7 +125,7 @@ export function DeployDialog({
                 className={option(p.id === project, there)}
                 onClick={() => setProject(p.id)}
               >
-                {there ? `${p.id} (already there)` : p.id}
+                {there ? `${p.id} (already there)` : p.archived ? `${p.id} (archived)` : p.id}
               </button>
             );
           })}
@@ -133,6 +140,22 @@ export function DeployDialog({
             className="resize-y rounded-lg border border-line2 bg-term px-3 py-2 text-tx placeholder:text-tx4"
           />
         </label>
+        {chosen?.archived && (
+          <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
+            <span className="flex-1">
+              <span className="font-mono">{chosen.id}</span> is archived, so no team can be deployed
+              to it.
+              {unarchive.error && <span className="text-err"> {unarchive.error.message}</span>}
+            </span>
+            <Button
+              variant="small"
+              disabled={unarchive.isPending}
+              onClick={() => unarchive.mutate()}
+            >
+              Unarchive
+            </Button>
+          </div>
+        )}
         {profileName && profiles.data && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
             <span className="flex-1">

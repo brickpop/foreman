@@ -178,23 +178,40 @@ func (m *Messenger) counting(d *draft) bool {
 	return !d.paused && m.now().Sub(d.lastKey) >= m.Quiet
 }
 
-// release ends a draft and its countdown. Called with m.mu held.
+// release ends a draft and its countdown. The messages it held still wait,
+// for the agent's next idle, and the notice says so until they are delivered
+// (forget). Called with m.mu held.
 func (m *Messenger) release(id string, d *draft) {
 	wasHolding := d.holding
-	*d = draft{lastKey: d.lastKey}
+	*d = draft{lastKey: d.lastKey, waiting: d.waiting}
 	if wasHolding {
 		m.publishDraft(id, d)
 	}
 }
 
-// forget drops an instance's draft: its session ended or restarted, so its
-// prompt is empty again.
+// recount keeps the notice of messages that outlived their draft at the
+// number still queued (more came while the agent's turn ran).
+func (m *Messenger) recount(id string, waiting int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if d := m.drafts[id]; d != nil && !d.holding && d.waiting > 0 && d.waiting != waiting {
+		d.waiting = waiting
+		m.publishDraft(id, d)
+	}
+}
+
+// forget drops an instance's draft and its notice: what waited was delivered,
+// or its session ended or restarted, so its prompt is empty again.
 func (m *Messenger) forget(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if d := m.drafts[id]; d != nil {
-		m.release(id, d)
+		shown := d.holding || d.waiting > 0
+		*d = draft{} // stops its countdown
 		delete(m.drafts, id)
+		if shown {
+			m.publishDraft(id, d)
+		}
 	}
 }
 
@@ -202,12 +219,9 @@ func (m *Messenger) publishDraft(id string, d *draft) {
 	if m.Publish == nil {
 		return
 	}
-	waiting := d.waiting
-	if !d.holding {
-		waiting = 0
-	}
 	m.Publish(events.Event{Type: "instance.draft", Data: Draft{
-		ID: id, Waiting: waiting, LeftMs: max(d.left, 0).Milliseconds(), Counting: d.holding && m.counting(d), Paused: d.paused,
+		ID: id, Waiting: d.waiting, OnDraft: d.holding, LeftMs: max(d.left, 0).Milliseconds(),
+		Counting: d.holding && m.counting(d), Paused: d.paused,
 	}})
 }
 

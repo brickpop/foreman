@@ -5,11 +5,13 @@
 
 /**
  * Draft is the instance.draft event's data: what the pane shows while
- * messages wait on the CEO's draft in an agent's terminal.
+ * messages wait on the CEO's draft in an agent's terminal, and then, once the
+ * line went out, until they are delivered.
  */
 export interface Draft {
   id: string;
   waiting: number /* int */; // 0: nothing waits (the notice goes away)
+  onDraft: boolean; // false: the draft went out, they wait for the agent's turn to end
   leftMs: number /* int64 */; // the countdown
   counting: boolean; // false while the CEO types, or paused
   paused: boolean;

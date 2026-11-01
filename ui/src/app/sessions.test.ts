@@ -2,19 +2,24 @@ import { describe, expect, it } from "vitest";
 import type { Deployment, Instance, Request, Team } from "../api/client";
 import {
   activeDeployments,
+  agentStep,
   applyMention,
   countdown,
   deploymentStatus,
+  draftNotice,
   isLineShortcut,
+  keepOrder,
   linePlaceholder,
   lineShortcut,
   mentionAt,
   mentionMatches,
   mostRecentAgent,
   rosterOrder,
+  type SessionRow,
   type SessionsView,
   sessionRows,
   sessionsView,
+  stepAgent,
   stoppedLine,
   withDoing,
 } from "./sessions";
@@ -112,6 +117,20 @@ describe("countdown", () => {
     expect(countdown(1)).toBe("0:01");
     expect(countdown(0)).toBe("0:00");
     expect(countdown(-5)).toBe("0:00");
+  });
+});
+
+describe("draftNotice", () => {
+  it("asks for the line while the messages wait on it", () => {
+    expect(draftNotice(1, "Mara", true)).toBe("1 message waiting for your line: send or clear it.");
+  });
+  it("says they still come once the line went out", () => {
+    expect(draftNotice(1, "Mara", false)).toBe(
+      "1 message waiting: it goes in when Mara's turn ends.",
+    );
+    expect(draftNotice(3, "Mara", false)).toBe(
+      "3 messages waiting: they go in when Mara's turn ends.",
+    );
   });
 });
 
@@ -312,5 +331,67 @@ describe("sessionRows", () => {
     expect(state("queued", "done")).toBe("idle");
     expect(state("asleep", "stopped")).toBe("asleep");
     expect(state("stopped")).toBe("stopped");
+  });
+});
+
+describe("keepOrder", () => {
+  const row = (id: string) => ({ id }) as SessionRow;
+  const ids = (rows: SessionRow[]) => rows.map((r) => r.id);
+
+  it("takes the rows' own order on entering", () => {
+    expect(ids(keepOrder([row("a"), row("b")], undefined))).toEqual(["a", "b"]);
+  });
+  it("keeps it when the activity would reorder them", () => {
+    expect(ids(keepOrder([row("c"), row("b"), row("a")], ["a", "b", "c"]))).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+  it("puts a new deployment on top and drops one gone", () => {
+    expect(ids(keepOrder([row("d"), row("e"), row("c"), row("a")], ["a", "b", "c"]))).toEqual([
+      "d",
+      "e",
+      "a",
+      "c",
+    ]);
+  });
+});
+
+describe("moving between agents by keyboard", () => {
+  const key = (code: string, mod: "ctrl" | "cmd", more = {}) => ({
+    code,
+    ctrlKey: mod === "ctrl",
+    metaKey: mod === "cmd",
+    shiftKey: true,
+    altKey: false,
+    ...more,
+  });
+
+  it("is Cmd+Shift+← / → on a Mac and Ctrl+Shift elsewhere", () => {
+    expect(agentStep(key("ArrowLeft", "cmd"), true)).toBe(-1);
+    expect(agentStep(key("ArrowRight", "cmd"), true)).toBe(1);
+    expect(agentStep(key("ArrowLeft", "ctrl"), false)).toBe(-1);
+    expect(agentStep(key("ArrowRight", "ctrl"), false)).toBe(1);
+  });
+
+  it("leaves the agent every other key", () => {
+    expect(agentStep(key("ArrowLeft", "ctrl"), true)).toBe(0); // Ctrl is the terminal's on a Mac
+    expect(agentStep(key("ArrowRight", "cmd"), false)).toBe(0);
+    expect(agentStep(key("ArrowRight", "cmd", { shiftKey: false }), true)).toBe(0); // Cmd+→
+    expect(agentStep(key("ArrowRight", "cmd", { altKey: true }), true)).toBe(0);
+    expect(agentStep(key("ArrowUp", "cmd"), true)).toBe(0);
+    expect(agentStep(key("KeyL", "cmd"), true)).toBe(0); // the Line input's
+  });
+
+  it("steps through the tabs in order, round the ends", () => {
+    const roster = ["lead@p", "a@p", "b@p"];
+    expect(stepAgent(roster, "a@p", 1)).toBe("b@p");
+    expect(stepAgent(roster, "a@p", -1)).toBe("lead@p");
+    expect(stepAgent(roster, "b@p", 1)).toBe("lead@p");
+    expect(stepAgent(roster, "lead@p", -1)).toBe("b@p");
+    expect(stepAgent(["lead@p"], "lead@p", 1)).toBe("lead@p");
+    expect(stepAgent(roster, "gone@p", 1)).toBe("lead@p");
+    expect(stepAgent([], "x@p", 1)).toBeUndefined();
   });
 });

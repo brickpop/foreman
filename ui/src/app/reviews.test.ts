@@ -16,6 +16,7 @@ import {
   openRepos,
   placeComments,
   reviewGroups,
+  reviewProjects,
   reviewTeam,
   statusLabel,
 } from "./reviews";
@@ -217,5 +218,17 @@ describe("mergeHeads", () => {
     expect(mergeHeads(undefined, ["api"])).toBeUndefined();
     expect(mergeHeads(diffs, ["api", "docs"])).toBeUndefined();
     expect(mergeHeads(diffs, ["api", "gone"])).toBeUndefined();
+  });
+});
+
+describe("reviewProjects", () => {
+  const on = (projectId: string) => ({ projectId }) as Review;
+  it("names each project with a review once, by name", () => {
+    expect(reviewProjects([on("relay"), on("ledger"), on("relay")])).toEqual(["ledger", "relay"]);
+  });
+  it("offers the project asked for, even with no review yet", () => {
+    expect(reviewProjects([on("relay")], "harbor")).toEqual(["harbor", "relay"]);
+    expect(reviewProjects([], "harbor")).toEqual(["harbor"]);
+    expect(reviewProjects([])).toEqual([]);
   });
 });

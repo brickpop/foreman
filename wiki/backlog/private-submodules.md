@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: in-progress
 priority: high
 tags: [bug]
 epic: git
@@ -33,7 +33,14 @@ Foreman is doing what it was designed to do ([Sandboxes and git policy → Submo
 
 **Edge cases:** an scp-like URL (`git@host:org/repo.git`) and an `ssh://` one; a URL relative to the repo's remote (`../platform-doc.git`); nested submodules with `recursive_submodules`; a submodule whose URL on the agent's branch differs from the one on `main` (same name, new URL: not approved); the CEO's checkout never having run `submodule update`; a pin present locally under another submodule name.
 
-- [ ] decide the option with the CEO
-- [ ] the fill (and the policy change in [Sandboxes and git policy](../product/architecture/sandboxes-and-git.md#submodules), the [Security](../product/architecture/security.md) spec if credentials are used)
-- [ ] tell the agent and the CEO when a submodule can't be filled at a start
-- [ ] tests: an ssh submodule on `main` fills; one only on an agent's branch is still refused; a changed URL under an approved name is refused; the agent and the CEO are told on a failure
+## Decided (the CEO, 2026-10-30): the https counterpart, then the CEO's checkout
+
+Not the CEO's credentials: an SSH URL is tried as its https counterpart, still without credentials (a public repo answers), and failing that the submodule comes from the CEO's own checkout, `<repo>/.git/modules/<name>`, locally.
+
+- [x] the fill: `update` one submodule at a time, `httpsOf`, then `ceoCopy` with local paths allowed for that one clone, never recursively. The URL `.gitmodules` gives is never used for the fallback, so a changed URL under an approved name gets the CEO's copy, never the new URL (`internal/git/submodules.go`)
+- [x] the policy in [Sandboxes and git policy → Submodules](../product/architecture/sandboxes-and-git.md#submodules) and [Protocol → `set_submodule`](../product/architecture/protocol.md#set_submodule). No credential is used, so [Security](../product/architecture/security.md) is unchanged
+- [x] tests: the URL forms; a private submodule filled from the CEO's checkout; one the CEO hasn't checked out (the error says what to run there); an agent's `file://` URL never fetched; a nested local URL refused after a fallback (checked to fail without the guard)
+- [ ] tell the agent and the CEO when a submodule can't be filled at a start: still only a `WARN` in the server log (`internal/instances/launch.go`)
+- [ ] the CEO checks `strategy-doc/platform-doc` fills for Sol: it needs `platform-doc` checked out in the CEO's own `strategy-doc` clone
+
+**Edge cases, as they stand:** a URL relative to the repo's remote (`../platform-doc.git`) is still refused; nested submodules never come from the CEO's checkout, only over https; `set_submodule(url)` still accepts only https.

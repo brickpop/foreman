@@ -146,7 +146,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `request.created` / `request.resolved` | Workflow creates or resolves a request | the request |
 | `review.withdrawn` | the lead, or Foreman, withdrew a review ([Reviews → Withdrawn](../features/reviews.md#withdrawn)) | review, deploymentId, lead, by (`lead` or `foreman`), lostDrafts |
 | `instance.status` | an instance changes status or task | id, status, task |
-| `instance.draft` | messages wait on the CEO's draft in an agent's terminal, each countdown step, and when they stop waiting | id, waiting (0: the notice goes), leftMs, counting, paused |
+| `instance.draft` | messages wait on the CEO's draft in an agent's terminal, each countdown step, when the draft goes out (they still wait, for the agent's next idle), and when they are delivered | id, waiting (0: the notice goes), onDraft (false once the draft went out), leftMs, counting, paused |
 | `instance.doing` | an agent's harness reports a step of its work (a hook): its new activity line ([Harness adapters → Activity lines](./harness-adapters.md#activity-lines)) | id, doing (line, at) |
 | `instance.marker` | Messaging or Workflow notes agent traffic for the CEO (shown beside the terminal, never written into it: [Protocol](./protocol.md#text-into-a-session-deliveries-and-markers)) | id, text, kind (`ask`, `reply`, `handoff`, `escalate`, `pr`, `note`) |
 | `deployment.created` / `deployment.stopped` | | deployment |

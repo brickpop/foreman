@@ -10,12 +10,12 @@ Where the CEO reviews a lead's branch as on a forge, and decides it (the CEO, 20
 
 ## The Reviews page
 
-`/reviews`, the sidebar's **Reviews** entry, across projects, with the amber count of reviews that need the CEO ([App shell](./app-shell.md#sidebar)). Same width and title as the Dashboard: `Reviews`, subtitle `The leads' branches on their way to main.`
+`/reviews`, the sidebar's **Reviews** entry, across projects (or one: `?project=<id>`, chosen with a `Project` select at the title's right, `All projects` or each project with a review, and the one asked for; a session's **Reviews** links it, the CEO, 2026-10-30), with the amber count of reviews that need the CEO ([App shell](./app-shell.md#sidebar)). Same width and title as the Dashboard: `Reviews`, subtitle `The leads' branches on their way to main.`
 
 Three sections, each left out when empty, one panel of rows each: **Needs you** (`needs-review`), **Waiting on the lead** (`changes-requested`) and **Done** (merged, dismissed or withdrawn, the last 20). The server lists them newest first (the latest opened).
 
 - **Row** (grid `auto 1fr auto`, padding `12px 16px`, the whole row a link to its page): Avatar 26 of the lead; the entry's title (500), then `<project> · <Lead> · <repos> · <branch>` (branch in Mono); on the right the status (`Needs your review`, `Changes requested`, `Merged`, `Dismissed`, `Withdrawn`) over its time.
-- **Empty**: `No reviews yet. A lead's request_merge() opens one.`
+- **Empty**: `No reviews yet. A lead's request_merge() opens one.`; narrowed to a project, `No reviews on <project> yet. Its lead's request_merge() opens one.`
 
 ## A review's page
 

@@ -222,7 +222,11 @@ func (m *Messenger) Deliver(id string) {
 		return
 	}
 	queued, err := m.Messages.Queued(ctx, id)
-	if err != nil || len(queued) == 0 {
+	if err != nil {
+		return
+	}
+	if len(queued) == 0 {
+		m.recount(id, 0) // they went another way (expired): the notice goes
 		return
 	}
 	switch inst.Status {
@@ -233,6 +237,7 @@ func (m *Messenger) Deliver(id string) {
 		return
 	case "idle":
 	default:
+		m.recount(id, len(queued))
 		return // its next idle brings them
 	}
 	dep, err := m.Deployments.Get(ctx, inst.DeploymentID)

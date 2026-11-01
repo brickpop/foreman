@@ -93,6 +93,15 @@ export function sessionRows(
     .sort((a, b) => ms(b.lastActivity) - ms(a.lastActivity));
 }
 
+/** The rows in the order the list had (ids), so nothing moves while the CEO is
+ * on it (the CEO, 2026-10-30): the latest first only on entering. A deployment
+ * new since goes on top; one gone drops out. */
+export function keepOrder(rows: SessionRow[], order: string[] | undefined): SessionRow[] {
+  if (!order) return rows;
+  const rank = (r: SessionRow) => order.indexOf(r.id);
+  return [...rows].sort((a, b) => rank(a) - rank(b));
+}
+
 /** The agent of a deployment that did something last: where its work is. */
 export function mostRecentAgent(instances: Instance[], deployment: string): string | undefined {
   const mine = instances.filter((i) => i.deploymentId === deployment && i.doing);
@@ -169,6 +178,15 @@ export function stoppedLine(name: string, reason: string): string {
   return `${why} Messages for them wait until you start them again; they pick up their conversation.`;
 }
 
+/** The notice of messages held by the CEO's draft: on it, they wait for the
+ * line; once it went out, for the agent's turn to end. */
+export function draftNotice(waiting: number, name: string, onDraft: boolean): string {
+  const messages = waiting === 1 ? "1 message" : `${waiting} messages`;
+  return onDraft
+    ? `${messages} waiting for your line: send or clear it.`
+    : `${messages} waiting: ${waiting === 1 ? "it goes" : "they go"} in when ${name}'s turn ends.`;
+}
+
 /** A countdown as m:ss, rounded up (it reaches 0:00 only at the end). */
 export function countdown(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -191,9 +209,27 @@ type Keys = {
   metaKey: boolean;
 };
 
+/** Foreman's own keys on a session: Cmd+Shift on a Mac, Ctrl+Shift elsewhere
+ * (on a Mac, Ctrl is the terminal's). */
+const sessionKeys = (e: Keys, mac: boolean) =>
+  (mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey) && e.shiftKey && !e.altKey;
+
 export function isLineShortcut(e: Keys, mac = isMac): boolean {
-  const mod = mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
-  return e.code === "KeyL" && mod && e.shiftKey && !e.altKey;
+  return e.code === "KeyL" && sessionKeys(e, mac);
+}
+
+/** The agent tab a key moves to: Cmd+Shift+← / → (Ctrl+Shift off a Mac) the
+ * previous / next one (the CEO, 2026-10-30), 0 for any other key. */
+export function agentStep(e: Keys, mac = isMac): -1 | 0 | 1 {
+  if (!sessionKeys(e, mac)) return 0;
+  return e.code === "ArrowLeft" ? -1 : e.code === "ArrowRight" ? 1 : 0;
+}
+
+/** The agent `step` tabs away from `shown`, round the ends. */
+export function stepAgent(roster: string[], shown: string, step: number): string | undefined {
+  const at = roster.indexOf(shown);
+  if (at < 0 || roster.length === 0) return roster[0];
+  return roster[(at + step + roster.length) % roster.length];
 }
 
 /** The @mention being typed just before the caret, if any: where its `@` is,

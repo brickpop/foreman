@@ -64,3 +64,23 @@ The list "made no sense": what the CEO follows is the project, not which agent i
 - [x] the last activity relative (`ago` in `app/model.ts`, beside `when`), the list redrawn every 30 s; tests: each unit boundary, a time ahead of the clock
 - [x] specs: Sessions (The list), Dashboard (no longer shared)
 - [ ] tried by the CEO in the browser
+
+## Changed (the CEO, 2026-10-30)
+
+- **Sorted on entering only.** A list that reorders while the CEO is on it makes no sense: the latest activity first when the page opens, then the order holds; a deployment new since goes on top, one gone drops out (`keepOrder` in `app/sessions.ts`).
+- **One grouped panel**, as on Reviews: corners rounded only at its top and bottom, a line between rows.
+- **A second line under the project**: the team's chip, then the start of the goal.
+
+- [x] `keepOrder`, the list in a `Panel`; tests: the entering order, held against new activity, a new deployment on top, one gone dropped
+- [x] spec: Sessions (The list)
+- [ ] tried by the CEO in the browser
+
+## Changed (the CEO, 2026-10-30): Sessions as the router for a project
+
+- **The header's buttons**: `Team` (this page, shown on), `Reviews` (the Reviews page narrowed to the project), `Board`, and a `Deployment ▾` menu (Show activity, Project settings, Stop deployment). Links to the existing pages, not tabs inside the session ("tabs within tabs?"); the project page's `<Team> · Sessions` button is the way back.
+- **Reviews takes `?project=`**, with a Project select on the page (the CEO's idea: the session's link applies the filter).
+- **`⌘⇧←` / `⌘⇧→`** (Ctrl+Shift off a Mac) move to the previous / next agent, round the ends.
+
+- [x] `DeploymentMenu` (Radix dropdown), the `/reviews` route's `project`, `reviewProjects`, `agentStep` / `stepAgent`; tests for the helpers and the keys (each platform, the keys left to the agent, the ends)
+- [x] specs: Sessions (Header, Agent tabs), Reviews
+- [ ] tried by the CEO in the browser

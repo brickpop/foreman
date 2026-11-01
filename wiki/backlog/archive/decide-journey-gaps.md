@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: done
 priority: high
 tags: [decision]
 epic: terminal-multiplexer
@@ -8,7 +8,7 @@ epic: terminal-multiplexer
 
 # Decide the journey gaps G1–G5
 
-The end-to-end journey surfaced five gaps, each with a proposal: [The journey → Gaps](../product/journey.md#gaps-this-journey-surfaces). The CEO decides each; the answer goes into the specs it concerns and the journey's table entry is removed.
+The end-to-end journey surfaced five gaps, each with a proposal: [The journey → Gaps](../../product/journey.md#gaps-this-journey-surfaces). The CEO decides each; the answer goes into the specs it concerns and the journey's table entry is removed.
 
 - [x] G1 kickoff: only the lead starts on deploy, with the goal as its harness's opening message; the other members sleep until they have work (decided 2026-10-15)
 - [x] G2 how the Chief of Staff runs: an ad-hoc session like the login container, on the `default` profile, with `.foreman/teams/` read-only; it proposes, Foreman writes on the CEO's click (decided 2026-10-18)

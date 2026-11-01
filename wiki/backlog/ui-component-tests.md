@@ -16,6 +16,7 @@ epic: terminal-multiplexer
 - Project settings: the workspace's Copy; for a project made before workspaces, the "Move into a workspace" offer pre-filled and sent; Remove sends `deleteWorktrees` and `deleteRepo` only when ticked, both unticked at each opening;
 - Settings → System → Projects folder: Save and Discard only once edited, as the instructions;
 - Settings → Instructions for every agent: Save and Discard appear only once the text differs; a failed save keeps the text; once saved, the field shows it (no flash of the old text) and follows a change on disk while not edited;
+- Deploy a team: an archived project reads `<id> (archived)`, Deploy stays disabled while it is chosen, and the row's Unarchive sends `setArchived(id, false)` then enables Deploy;
 - the repo picker: an Existing repo's name follows the picked folder until edited, a New empty repo's path is the picked folder plus its name, and the browser offers no `..` at `$HOME` (`parent` empty).
 
 - [ ] the dependencies and the vitest environment; the tech stack entry

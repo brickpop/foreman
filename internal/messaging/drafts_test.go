@@ -116,6 +116,51 @@ func TestSendingTheDraftLetsTheMessageFollow(t *testing.T) {
 	f.eventually("delivered after the send", func() bool { return strings.HasPrefix(f.s.of("mara@ledger"), "Message msg-1") })
 }
 
+// Once the CEO's line went out (a paused countdown, sent from the Line input,
+// found 2026-10-30), the notice stays until the messages are delivered at the
+// agent's next idle, counting any that came meanwhile: it never just vanishes.
+func TestTheNoticeStaysUntilTheHeldMessagesAreDelivered(t *testing.T) {
+	f := newDraftFixture(t)
+	f.m.Typed("mara@ledger", []byte("half a th"))
+	f.ask("build cal")
+	f.eventually("the notice", func() bool { return f.lastDraft().Waiting == 1 })
+	f.m.PauseCountdown("mara@ledger", true)
+	if err := f.m.Line("mara@ledger", "ought"); err != nil {
+		t.Fatal(err)
+	}
+	f.setStatus("mara@ledger", "running") // the line started her turn
+	if d := f.lastDraft(); d.Waiting != 1 || d.OnDraft || d.Paused || d.Counting {
+		t.Errorf("after the send: %+v", d)
+	}
+	f.ask("and tests")
+	f.eventually("counted", func() bool { return f.lastDraft().Waiting == 2 })
+	time.Sleep(80 * time.Millisecond) // past the quiet time: she's still busy
+	if got := f.s.of("mara@ledger"); strings.Contains(got, "msg-") || f.lastDraft().Waiting != 2 {
+		t.Fatalf("typed %q, notice %+v", got, f.lastDraft())
+	}
+	f.setStatus("mara@ledger", "idle")
+	f.m.StatusChanged("mara@ledger", "idle")
+	f.eventually("delivered", func() bool { return strings.Contains(f.s.of("mara@ledger"), "msg-2") })
+	f.eventually("the notice goes", func() bool { return f.lastDraft().Waiting == 0 })
+}
+
+// A notice for messages that went another way (the deployment stopped) goes.
+func TestTheNoticeGoesWhenNothingWaitsAnyMore(t *testing.T) {
+	f := newDraftFixture(t)
+	f.m.Typed("mara@ledger", []byte("draft"))
+	f.ask("build cal")
+	f.eventually("the notice", func() bool { return f.lastDraft().Waiting == 1 })
+	f.setStatus("mara@ledger", "running")
+	f.m.Typed("mara@ledger", []byte("\r"))
+	if _, err := f.db.Messages().Expire(ctx, "atlas@ledger", "deployment_stopped"); err != nil {
+		t.Fatal(err)
+	}
+	f.m.Deliver("mara@ledger")
+	if d := f.lastDraft(); d.Waiting != 0 {
+		t.Errorf("%+v", d)
+	}
+}
+
 // The countdown runs only while the CEO isn't typing; at zero the message
 // goes after the draft, marked as unfinished.
 func TestTheCountdownWaitsForTheCEOThenAppends(t *testing.T) {

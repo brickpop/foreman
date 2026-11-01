@@ -31,7 +31,14 @@ const sessions = createRoute({
   component: Sessions,
 });
 
-const reviews = createRoute({ getParentRoute: () => root, path: "reviews", component: Reviews });
+const reviews = createRoute({
+  getParentRoute: () => root,
+  path: "reviews",
+  // project: the one project shown (a session's Reviews links it); none: every project's.
+  validateSearch: (s: Record<string, unknown>): { project?: string } =>
+    typeof s.project === "string" && s.project !== "" ? { project: s.project } : {},
+  component: Reviews,
+});
 
 const review = createRoute({
   getParentRoute: () => root,

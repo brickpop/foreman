@@ -340,7 +340,7 @@ export function ThreadRow({
 function useWaiting(instance: string, name: Names): string {
   const instances = useInstances().data ?? [];
   const max = useSettings().data?.settings.maxSessions ?? 0;
-  const draft = useDraft(instance) !== undefined;
+  const draft = useDraft(instance)?.onDraft === true;
   if (!instance) return "";
   const to = instances.find((i) => i.id === instance);
   return waitingReason(to, name(instance), instances, max, draft);

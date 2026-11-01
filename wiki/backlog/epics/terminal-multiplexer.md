@@ -18,6 +18,6 @@ The global repo `~/.foreman/config/` is a git repo (team files and settings, one
 
 In this epic there is no messaging yet: every agent works only on what the CEO types into it.
 
-**Blocked by:** [Prove](./prove.md) (experiments A, B and E), and [the decisions on the journey's gaps](../decide-journey-gaps.md).
+**Blocked by:** [Prove](./prove.md) (experiments A, B and E), and [the decisions on the journey's gaps](../archive/decide-journey-gaps.md).
 
 **Exit criteria:** the steps above work end to end on macOS and Fedora with Claude Code, covered by tests (Go and UI) and by a written manual check on both machines; the specs they touch are `built` or `partial` with the gaps named.

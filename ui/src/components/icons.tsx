@@ -90,3 +90,34 @@ export function PromptIcon() {
     </svg>
   );
 }
+
+/** A folder, its flap raised when open: a file tree's folder row. */
+export function FolderIcon({ open }: { open: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 shrink-0">
+      {open ? (
+        <path
+          d="M2 12.5V4a1 1 0 0 1 1-1h3l1.5 1.5H12a1 1 0 0 1 1 1V7M2 12.5L4 7h10.5l-2 5.5z"
+          {...line}
+        />
+      ) : (
+        <path
+          d="M2 12V4a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"
+          {...line}
+        />
+      )}
+    </svg>
+  );
+}
+
+/** A page with a folded corner: a file tree's file row. */
+export function FileIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 shrink-0">
+      <path
+        d="M4 1.5h5.5L12.5 4.5V14a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5zM9.5 1.5v3h3"
+        {...line}
+      />
+    </svg>
+  );
+}

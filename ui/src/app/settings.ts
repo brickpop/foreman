@@ -1,19 +1,20 @@
 // The Settings screen's tabs (wiki/product/features/settings.md), by topic.
 
-export type SettingsTab = "agents" | "git" | "look" | "system";
+export type SettingsTab = "teams" | "agents" | "git" | "look" | "system";
 
 export const settingsTabs: { tab: SettingsTab; label: string }[] = [
+  { tab: "teams", label: "Teams" },
   { tab: "agents", label: "Agents" },
   { tab: "git", label: "Git & forges" },
   { tab: "look", label: "Notifications & look" },
   { tab: "system", label: "System" },
 ];
 
-/** The tab in the URL; Agents, the first, isn't spelled out. Anything else,
- * the old Workspace and Global tabs included, opens Agents. */
-export function settingsSearch(s: Record<string, unknown>): { tab?: SettingsTab } {
-  const tab = settingsTabs.find((t) => t.tab === s.tab)?.tab;
-  return { tab: tab === "agents" ? undefined : tab };
+/** The tab a URL names (/settings/<tab>, or the old /settings?tab=<tab>);
+ * anything else, the old Workspace and Global tabs included, is Teams, the
+ * first. */
+export function settingsTab(asked: unknown): SettingsTab {
+  return settingsTabs.find((t) => t.tab === asked)?.tab ?? "teams";
 }
 
 /** The stuck-after choices, in minutes, and the log cap's, in MB. */

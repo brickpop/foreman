@@ -64,6 +64,7 @@ GET    /api/messages?deployment=              message log
 GET    /api/activity?deployment=              [&before=<cursor>] a page of a deployment's team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; 400 BAD_REQUEST without a deployment or for a bad cursor
 GET    /api/activity/latest                   when something last happened on each project, {<project>: <time>}: a team message or action, a request, a merge request, a deploy or stop, else its creation (the projects' order)
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
+POST   /api/projects/:id/cleanup                removes what agents running nowhere left on the project, only what is safe → {removed, kept} ([Project deployment → Earlier teams](../features/project-deployment.md#earlier-teams))
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
 GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404
 GET    /api/reviews/:id/diff                  [?since=1] [{repo, target, head, since, diff, gone, targetGone}] per repo open in it: against its target, or from the head at the last Request changes; targetGone (no head, no diff) when its target's branch was deleted outside Foreman

@@ -188,10 +188,7 @@ function ProfilesSection() {
     >
       {profiles.isError && <p className="m-0 text-[13px] text-err">{profiles.error.message}</p>}
       {(profiles.data ?? []).map((p) => (
-        <div
-          key={p.name}
-          className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-line py-3"
-        >
+        <div key={p.name} className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="truncate font-mono font-semibold">{p.name}</span>
             <span className="text-[13px] text-tx4">{harnessLabel(p.harness)}</span>
@@ -263,7 +260,7 @@ function NewProfile({
   });
   return (
     <form
-      className="flex flex-wrap items-center gap-2 border-b border-line py-3 text-[13px]"
+      className="flex flex-wrap items-center gap-2 text-[13px]"
       onSubmit={(e) => {
         e.preventDefault();
         if (name) create.mutate();
@@ -321,32 +318,34 @@ function InstructionsSection({ settings }: { settings: SettingsData }) {
       kept={inGlobalRepo}
       intro="Your standing rules, as you'd write them in your own CLAUDE.md or AGENTS.md. Foreman adds them at the end of every agent's session prompt, from its next start. Where they conflict with Foreman's own rules (team tools, git, the wiki), Foreman's win."
     >
-      <textarea
-        rows={8}
-        value={draft ?? settings.instructions}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="e.g. Write commit messages in English. Prefer small functions."
-        aria-label="Instructions for every agent"
-        className="w-full resize-y rounded-[8px] border border-line2 bg-term px-3 py-2 font-mono text-[13px] text-tx placeholder:text-tx4"
-      />
-      {changed && (
-        <div className="mt-2 flex gap-2">
-          <Button
-            variant="primary"
-            disabled={saving}
-            onClick={async () => {
-              setSaving(true);
-              await save((s) => ({ ...s, instructions: draft }));
-              setSaving(false);
-            }}
-          >
-            Save
-          </Button>
-          <Button disabled={saving} onClick={() => setDraft(undefined)}>
-            Discard
-          </Button>
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        <textarea
+          rows={8}
+          value={draft ?? settings.instructions}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="e.g. Write commit messages in English. Prefer small functions."
+          aria-label="Instructions for every agent"
+          className="w-full resize-y rounded-[8px] border border-line2 bg-term px-3 py-2 font-mono text-[13px] text-tx placeholder:text-tx4"
+        />
+        {changed && (
+          <div className="flex gap-2">
+            <Button
+              variant="primary"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                await save((s) => ({ ...s, instructions: draft }));
+                setSaving(false);
+              }}
+            >
+              Save
+            </Button>
+            <Button disabled={saving} onClick={() => setDraft(undefined)}>
+              Discard
+            </Button>
+          </div>
+        )}
+      </div>
     </Section>
   );
 }

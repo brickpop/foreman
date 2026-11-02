@@ -13,7 +13,7 @@ The project's **Settings** section ([Project page](./project-page.md)): its conf
 Padding `24px 24px 48px`. One column, at most 760px wide, of four [cards](../design/design-system.md#surfaces), 24px apart (the CEO, 2026-11-02: grouped, it was "pure non-structure"). Each card is titled in its header band (600 14px), its blocks one under another with a `--line` between them, each block's title a small label (13px 500 `--tx4`):
 
 1. **General**: Workspace, then Profile.
-2. **Rules**, `project.toml` after the title (Mono 12px `--tx4`): What comes to you, Merges, then the file itself ("The file").
+2. **Rules**, `project.toml` after the title (12.5px `--tx4`, as Settings says where each card is kept): What comes to you, Merges, then the file itself ("The file").
 3. **How it works**, **collapsed** at first (a `›` in its header turns down when open; the CEO: reference text, out of the way): Where things live, then How work flows.
 4. **Danger zone**, its border and title in `--err`: Archive, then Remove.
 

@@ -36,6 +36,26 @@ func (h *Home) layout(id, workspace string) (repo, agents, harness string) {
 // holding a worktree of each code repo.
 func (p Project) Sandbox(agent string) string { return filepath.Join(p.agents, agent) }
 
+// WorktreeAgent is the agent whose sandbox holds a worktree (its folder is
+// <sandbox>/<repo>), sandbox giving an agent's sandbox; "" when it is no
+// agent's (the CEO's checkout, another project's agent). Folders compare as
+// the file system sees them: git reports worktrees with symlinks resolved
+// (macOS's /var is /private/var).
+func WorktreeAgent(tree string, sandbox func(agent string) string) string {
+	dir := filepath.Dir(tree)
+	agent := filepath.Base(dir)
+	resolve := func(p string) string {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return r
+		}
+		return filepath.Clean(p)
+	}
+	if resolve(sandbox(agent)) == resolve(dir) {
+		return agent
+	}
+	return ""
+}
+
 // HarnessDir is an agent's private harness folder: its config and
 // conversations, in Foreman's home, which only the CEO can read.
 func (p Project) HarnessDir(agent string) string {

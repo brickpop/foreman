@@ -38,7 +38,7 @@ The [Terminal](./building-blocks.md#2-terminal-terminal) holding a process tees 
   - the instance's sandbox `<workspace>/agents/<agent>/` (its git worktrees) → read-write, as the working directory, **at the same path as on the host** (as `pclaude` does: harnesses key their session history by path, and paths in output match what the CEO sees)
   - each code repo's `.git` → **read-only**, at its own real path, wherever the CEO keeps the repo: a worktree points at its repo by host path, and agents read git but never write it ([Sandboxes and git policy](./sandboxes-and-git.md#agents-and-git))
   - the instance's private harness folder `~/.foreman/harness/<project>/<agent>/` → read-write, at the same path ([Credentials](#credentials))
-  - the live project repo `<workspace>/project/` → at `<sandbox>/project`, read-write for the lead, read-only for everyone else, with its `.git` read-only for everyone ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base))
+  - the live project repo `<workspace>/project/` → at the same path, read-write for the lead, read-only for everyone else, with its `.git` read-only for everyone ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base))
   - the login of the project's profile and the `foreman-agent` binary ([Credentials](#credentials), [Team tools → Transport](./team-tools.md#transport))
   - no `~/.config`, no `~/.ssh`, no keychain, nothing else of `~/.foreman/` (secrets, state, the global repo, other sandboxes), no other agents' worktrees, none of the CEO's working files.
 - **Harness credentials:** see [Credentials](#credentials). The host's harness config directories are never mounted.

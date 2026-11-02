@@ -82,11 +82,11 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | Wiki list item, link, checkbox | 15px / line-height 1.6 |
 | Dialog title | 20px / 600 |
 | Page subtitle | 15px / `--tx3` |
-| Section label ("Projects", "Needs you", …) | 13px / 500 / `--tx4` |
-| Sidebar section label | 12px / 500 / `--tx4`, padding `4px 10px 6px` |
+| Section title ("Projects", "Needs you", "Waiting on the lead", …), a page's sections (the CEO, 2026-11-02: they read as titles) | 15px / 600 / `--tx`, its count after it when it helps (13px / 400 / `--tx4`) |
+| Group label (a repo inside a review's tree, a kind of outdated comment) | 13px / 500 / `--tx4` |
 | Brand | 15px / 600 / -0.01em |
 | Nav item | 14px / 500 |
-| Sidebar project / team row | 13.5px |
+| Sidebar project row | 13.5px |
 | Request text | Dashboard 16px, project Inbox (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
 | Kind chip | Mono 600 10.5px, `letter-spacing: .05em`, uppercase |
 | Meta mono (paths, branches) | Mono 400 11.5–12.5px, `--tx4` or `--tx3` |
@@ -171,7 +171,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--line2` border (`--err` on hover), `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
-| **Segmented** | On: `--raised`, `--line2` border (`--line3` for board tabs), `--tx`. Off: transparent, `--tx3` | Board switcher, Theme |
+| **Segmented** | On: `--accSoft`, `--accTx`, 500 (the CEO, 2026-11-02: the one chosen stands out). Off: transparent, `--tx3` | Board switcher, Deployment's views, a review's change, Theme |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, prompt switcher, Deploy dialog choices |
 | **Select** (`components/Select.tsx`, the one dropdown; the CEO, 2026-10-18) | A trigger like an input (`--panel`, 1px `--line2`, radius 7, 13px, the chosen label and a `▾`; `--acc` border while open), opening a menu like the Board's (`--panel`, `--line2`, radius 8, `--shadow`, at least the trigger's width, at most 360px tall, scrolling): one row per choice, `✓` beside the chosen one, a detail on the right in `--tx4`. Arrow keys and typing a letter move through it | The repo picker, a project's profile, a new profile's harness, the Podman machine's memory and CPUs. No native `<select>` |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |

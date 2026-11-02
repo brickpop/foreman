@@ -37,7 +37,15 @@ import {
 } from "../../app/reviews";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, CopyButton, Empty, Loading, SectionLabel, Segmented } from "../../components/ui";
+import {
+  Button,
+  CopyButton,
+  Empty,
+  Loading,
+  SectionLabel,
+  SectionTitle,
+  Segmented,
+} from "../../components/ui";
 
 // One review of a lead's branch (wiki/product/features/reviews.md): its files
 // by repo, each file's diff with the CEO's comments on its lines, the general
@@ -461,7 +469,7 @@ function Conversation({
 }) {
   return (
     <section className="flex flex-col gap-3 pb-6">
-      <SectionLabel>General comments</SectionLabel>
+      <SectionTitle>General comments</SectionTitle>
       {general.map((c) => (
         <CommentItem key={c.id} comment={c} comments={comments} />
       ))}

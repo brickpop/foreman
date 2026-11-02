@@ -6,7 +6,7 @@ tags: [feature, ui, requests]
 
 # Dashboard
 
-The start page: the projects and the teams, each a click from where it is handled. The screen at `/`, the sidebar's first entry; it was called Home until 2026-10-20, when "home" came to mean only Foreman's folder, `~/.foreman` ([Home](../models/home.md)) (the CEO).
+The start page: the projects and the teams, each a click from where it is handled. The screen at `/`, opened by the sidebar's brand; it was called Home until 2026-10-20, when "home" came to mean only Foreman's folder, `~/.foreman` ([Home](../models/home.md)) (the CEO).
 
 It was the CEO's inbox until 2026-10-21, when the CEO took the reviews out of it: they are decided in each project's [Inbox](./reviews.md#the-inbox), which has the sidebar's count, so a list of them here was the same thing twice. The Dashboard became a page to get started from, and to see the whole at a glance (the CEO, 2026-10-21). Its **At work** section (a card per active deployment) went on 2026-10-31, when the work moved into each project: a project card opens its team at work (the CEO).
 
@@ -45,7 +45,7 @@ One card per project not [archived](../models/project-config.md#the-project-reco
 
 ## Teams
 
-One card per team (at least 240px wide), then a dashed **`+ New team`** card (`The Chief of Staff drafts it with you.`) opening the [Chief of Staff](./chief-of-staff.md) to create a team. A card opens the team's page ([Team](./team-page.md)).
+One card per team (at least 240px wide), then a dashed **`+ New team`** card (`The Chief of Staff drafts it with you.`) opening the [Chief of Staff](./chief-of-staff.md) to create a team. A card opens the team's page ([Team](./team-page.md)). [Settings → Teams](./settings.md#teams) shows the same cards.
 
 - A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right a status pill: `deployed` (`--ok`) or `not deployed` (`--tx4`).
 - Its purpose (two lines, as a project's description), or `No purpose written yet.`

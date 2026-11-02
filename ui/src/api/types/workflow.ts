@@ -2,6 +2,28 @@
 import type * as store from "./store";
 
 //////////
+// source: cleanup.go
+
+/**
+ * Cleanup is what CleanUp did on a project: what went, and what stayed with
+ * why, so the CEO sees what is left to do by hand.
+ */
+export interface Cleanup {
+  removed: Cleaned[];
+  kept: Cleaned[];
+}
+/**
+ * Cleaned is one worktree or branch of an agent, in one code repo.
+ */
+export interface Cleaned {
+  agent: string;
+  repo: string;
+  what: string; // "worktree" or "branch"
+  branch: string; // the branch, or the worktree's
+  why?: string;
+}
+
+//////////
 // source: reviews.go
 
 /**

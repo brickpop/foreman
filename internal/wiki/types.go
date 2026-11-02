@@ -100,7 +100,6 @@ type Board struct {
 	StatusField string   `json:"statusField"` // the field the columns come from, e.g. status
 	LaneField   string   `json:"laneField"`   // the field the lanes come from, e.g. priority
 	Cards       []Card   `json:"cards"`
-	Declaration string   `json:"declaration"` // quoted from wiki.toml
 	Problems    []string `json:"problems"`
 }
 

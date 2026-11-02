@@ -1,11 +1,10 @@
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import type { Instance, Project, Request, Team } from "../api/client";
+import type { Instance, Project, Request } from "../api/client";
 import { Chevron } from "../components/icons";
 import { NewProject } from "../components/NewProject";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
-import { useOpenChiefOfStaff } from "./chiefOfStaff";
 import { readable } from "./model";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
 import { latestFirst, reviewOf, sections, sessionOf } from "./project";
@@ -19,6 +18,7 @@ import {
   useSettings,
   useTeams,
 } from "./queries";
+import { deploymentStatus } from "./sessions";
 
 // The frame every screen lives in (wiki/product/features/app-shell.md): the
 // sidebar, the main area, and the overlays.
@@ -76,42 +76,38 @@ export type SidebarProject = {
   /** What waits on the CEO there: its open requests, reviews included (its
    * Inbox's count). */
   inbox: number;
+  /** Its team's status while it is busy (its liveliest agent's: awaiting,
+   * running, starting, queued), for a dot on its Session item; none at rest. */
+  busy?: string;
 };
 
 export type SidebarModel = {
   projects: SidebarProject[];
   /** The archived projects, in a collapsed group of their own. */
   archived: SidebarProject[];
-  teams: { id: string; name: string; deployedOn: string }[];
 };
 
-/** What the sidebar shows, from the projects, teams, instances and requests. */
+const busy = ["awaiting", "running", "starting", "queued"];
+
+/** What the sidebar shows, from the projects, instances and requests. */
 export function sidebarModel(
   projects: Project[],
-  teams: Team[],
   instances: Instance[],
   requests: Request[],
 ): SidebarModel {
   const open = requests.filter((r) => r.status === "open");
-  const deployments = new Set(instances.map((i) => i.deploymentId).filter(Boolean));
-  const row = (p: Project) => ({
-    id: p.id,
-    inbox: open.filter((r) => r.projectId === p.id).length,
-  });
+  const row = (p: Project): SidebarProject => {
+    const on = instances.filter((i) => i.deploymentId.split("@")[1] === p.id);
+    const status = deploymentStatus(on);
+    return {
+      id: p.id,
+      inbox: open.filter((r) => r.projectId === p.id).length,
+      ...(on.length > 0 && busy.includes(status) && { busy: status }),
+    };
+  };
   return {
     projects: projects.filter((p) => !p.archived).map(row),
     archived: projects.filter((p) => p.archived).map(row),
-    teams: teams.map((t) => {
-      const on = [...deployments]
-        .filter((d) => d.startsWith(`${t.id}@`))
-        .map((d) => d.split("@")[1]);
-      return {
-        id: t.id,
-        name: t.config.name || t.id,
-        deployedOn:
-          on.length === 0 ? "—" : on.length === 1 ? readable(on[0]) : `${on.length} projects`,
-      };
-    }),
   };
 }
 
@@ -131,22 +127,16 @@ function Sidebar({
   open: boolean;
   onClose: () => void;
 }) {
-  const openChiefOfStaff = useOpenChiefOfStaff();
   const projects = useProjects();
-  const teams = useTeams();
   const instances = useInstances();
   const requests = useRequests();
   usePreferences(); // the theme
   const latest = useLatestActivity();
   const model = sidebarModel(
     latestFirst(projects.data ?? [], latest),
-    teams.data ?? [],
     instances.data ?? [],
     requests.data ?? [],
   );
-  // The port the browser reached Foreman on: the one it is bound to, whatever
-  // settings.toml says (--port wins over it).
-  const port = window.location.port;
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: closes the overlay after a link was followed; the links are the keyboard path
     <aside
@@ -164,50 +154,22 @@ function Sidebar({
         </span>
         <span className="text-[15px] font-semibold tracking-[-0.01em]">Foreman</span>
       </Link>
-      <div className="flex min-h-0 flex-1 flex-col gap-[18px] overflow-auto px-2.5 pb-3">
-        <section className="flex flex-col gap-0.5">
-          <Label>Projects</Label>
-          {model.projects.map((p) => (
-            <ProjectRow key={p.id} project={p} />
-          ))}
-          <Archived projects={model.archived} />
-          <button
-            type="button"
-            onClick={onNewProject}
-            className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
-          >
-            + New project
-          </button>
-        </section>
-        <section className="flex flex-col gap-0.5">
-          <Label>Teams</Label>
-          {model.teams.map((t) => (
-            <Link
-              key={t.id}
-              to="/teams/$team"
-              params={{ team: t.id }}
-              className={rowItem}
-              activeProps={navActive}
-              // Active on every tab, and on its members' Agent pages (paths under it).
-              activeOptions={{ includeSearch: false }}
-            >
-              {t.name}
-              <span className="text-xs text-tx4">{t.deployedOn}</span>
-            </Link>
-          ))}
-          <button
-            type="button"
-            onClick={() => openChiefOfStaff({ start: "create-team" })}
-            className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
-          >
-            + New team
-          </button>
-        </section>
-      </div>
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto px-2.5 pb-3">
+        {model.projects.map((p) => (
+          <ProjectRow key={p.id} project={p} />
+        ))}
+        <Archived projects={model.archived} />
+        <button
+          type="button"
+          onClick={onNewProject}
+          className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
+        >
+          + New project
+        </button>
+      </nav>
       <footer className="flex flex-col gap-1 border-t border-line px-2.5 py-3">
         <Link to="/settings" className={rowItem} activeProps={navActive}>
           Settings
-          <span className="font-mono text-[11.5px] text-tx4">localhost:{port}</span>
         </Link>
       </footer>
     </aside>
@@ -261,6 +223,9 @@ function ProjectRow({ project }: { project: SidebarProject }) {
             >
               {s.label}
               {s.path === "inbox" && <CountBadge count={project.inbox} />}
+              {s.path === "session" && project.busy && (
+                <Dot status={project.busy} title={project.busy} />
+              )}
             </Link>
           ))}
         </nav>
@@ -294,10 +259,6 @@ function Archived({ projects }: { projects: SidebarModel["archived"] }) {
       {shown && projects.map((p) => <ProjectRow key={p.id} project={p} />)}
     </>
   );
-}
-
-function Label({ children }: { children: string }) {
-  return <div className="px-2.5 pt-1 pb-1.5 text-xs font-medium text-tx4">{children}</div>;
 }
 
 /** Follows the server's events: caches refresh, and what the CEO should hear

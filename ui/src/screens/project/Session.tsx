@@ -112,7 +112,11 @@ export function Session() {
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-2.5">
         <Dot status={d.status} title={d.status} />
         <h1 className="m-0 truncate text-[15px] font-semibold">
-          <Link to="/teams/$team" params={{ team: d.id.split("@")[0] }} className="hover:underline">
+          <Link
+            to="/settings/teams/$team"
+            params={{ team: d.id.split("@")[0] }}
+            className="hover:underline"
+          >
             {d.team}
           </Link>{" "}
           <span className="font-normal text-tx3">· {readable(project)}</span>
@@ -534,7 +538,7 @@ function Queued({ name }: { name: string }) {
         {name} is waiting for a session slot: {slotsTaken(instances)} of {max} are taken, idle
         agents included. They start as soon as one frees, and get their messages then.
       </p>
-      <Link to="/settings" className="text-[13.5px] text-accTx">
+      <Link to="/settings/$tab" params={{ tab: "agents" }} className="text-[13.5px] text-accTx">
         Raise the limit in Settings
       </Link>
     </div>

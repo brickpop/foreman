@@ -1,7 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import type { Project, Request, Team } from "../api/client";
-import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
 import {
   agentOf,
   greeting,
@@ -9,8 +8,6 @@ import {
   type ProjectRow,
   projectRows,
   readable,
-  type TeamCard,
-  teamCards,
   workingSummary,
 } from "../app/model";
 import { latestFirst, sessionOf } from "../app/project";
@@ -28,13 +25,14 @@ import { DeployDialog } from "../components/DeployDialog";
 import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
+import { AddCard, TeamGrid } from "../components/TeamGrid";
 import {
   Button,
   Card,
   cover,
   Loading,
   PageTitle,
-  SectionLabel,
+  SectionTitle,
   StatusPill,
 } from "../components/ui";
 
@@ -47,9 +45,8 @@ export function Dashboard() {
   const projects = useProjects();
   const teams = useTeams();
   const setup = useSetup();
-  const [deploy, setDeploy] = useState<{ team?: string }>();
+  const [deploy, setDeploy] = useState(false);
   const [newProject, setNewProject] = useState(false);
-  const openChiefOfStaff = useOpenChiefOfStaff();
   const asks = inbox(requests.data ?? []);
   const latest = useLatestActivity();
   const rows = projectRows(
@@ -58,8 +55,7 @@ export function Dashboard() {
     instances.data ?? [],
     requests.data ?? [],
   );
-  const cards = teamCards(teams.data ?? [], instances.data ?? []);
-  const canDeploy = cards.length > 0 && rows.length > 0;
+  const canDeploy = (teams.data ?? []).length > 0 && rows.length > 0;
   return (
     <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-10 px-6 pt-6 pb-12 max-[760px]:px-4">
       <div className="flex flex-wrap items-end gap-4">
@@ -67,7 +63,7 @@ export function Dashboard() {
         <span className="flex-1" />
         <div className="flex gap-2">
           <Button onClick={() => setNewProject(true)}>New project</Button>
-          <Button variant="primary" disabled={!canDeploy} onClick={() => setDeploy({})}>
+          <Button variant="primary" disabled={!canDeploy} onClick={() => setDeploy(true)}>
             Deploy a team
           </Button>
         </div>
@@ -75,7 +71,7 @@ export function Dashboard() {
       {setup.data && setupPending(setup.data) && <SetupChecklist steps={setup.data} />}
       {asks.length > 0 && (
         <section className="flex flex-col gap-2.5">
-          <SectionLabel>Needs you</SectionLabel>
+          <SectionTitle count={asks.length}>Needs you</SectionTitle>
           {asks.map((r) => (
             <DashboardRequest key={r.id} request={r} teams={teams.data ?? []} />
           ))}
@@ -98,22 +94,9 @@ export function Dashboard() {
         </div>
       </Section>
       <Section title="Teams">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-          {teams.isPending && <Loading className="min-h-[132px]" />}
-          {cards.map((t) => (
-            <TeamCardView
-              key={t.id}
-              team={t}
-              onDeploy={rows.length > 0 ? () => setDeploy({ team: t.id }) : undefined}
-            />
-          ))}
-          <AddCard onClick={() => openChiefOfStaff({ start: "create-team" })}>
-            <span className="font-semibold text-tx2">+ New team</span>
-            <span>The Chief of Staff drafts it with you.</span>
-          </AddCard>
-        </div>
+        <TeamGrid />
       </Section>
-      {deploy && <DeployDialog open onClose={() => setDeploy(undefined)} team={deploy.team} />}
+      {deploy && <DeployDialog open onClose={() => setDeploy(false)} />}
       {newProject && <NewProject onClose={() => setNewProject(false)} />}
     </div>
   );
@@ -122,7 +105,7 @@ export function Dashboard() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
-      <SectionLabel>{title}</SectionLabel>
+      <SectionTitle>{title}</SectionTitle>
       {children}
     </section>
   );
@@ -168,63 +151,6 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
       </span>
       <span className="text-[12.5px] text-tx4">{row.line}</span>
     </Card>
-  );
-}
-
-function TeamCardView({ team: t, onDeploy }: { team: TeamCard; onDeploy?: () => void }) {
-  return (
-    <Card
-      opens
-      head={
-        <>
-          <Link
-            to="/teams/$team"
-            params={{ team: t.id }}
-            className={`min-w-0 flex-1 truncate text-[15px] font-semibold ${cover}`}
-          >
-            {t.name}
-          </Link>
-          {t.on.length > 0 ? (
-            <StatusPill color="var(--ok)">deployed</StatusPill>
-          ) : (
-            <StatusPill color="var(--tx4)">not deployed</StatusPill>
-          )}
-        </>
-      }
-    >
-      <p className="line-clamp-2 min-h-[2lh] text-[13.5px] text-tx3">
-        {t.purpose || "No purpose written yet."}
-      </p>
-      <span
-        className="truncate text-[12.5px] text-tx4"
-        title={t.members.map((s) => s.name).join(", ")}
-      >
-        {t.members.length} {t.members.length === 1 ? "agent" : "agents"}
-        {t.members.length > 0 && `: ${t.members.map((s) => s.name).join(", ")}`}
-      </span>
-      <span className="flex items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-[12.5px] text-tx4">
-          {t.on.length > 0 && `On ${t.on.map(readable).join(", ")}`}
-        </span>
-        {onDeploy && (
-          <Button variant="ghost" className="relative z-10" onClick={onDeploy}>
-            Deploy
-          </Button>
-        )}
-      </span>
-    </Card>
-  );
-}
-
-function AddCard({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-[132px] flex-col items-start justify-center gap-1 rounded-xl border border-dashed border-line2 px-4 py-3.5 text-left text-[13px] text-tx4 hover:border-line3 hover:text-tx3"
-    >
-      {children}
-    </button>
   );
 }
 

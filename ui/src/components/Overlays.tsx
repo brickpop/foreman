@@ -77,8 +77,8 @@ export function Drawer({
           className="fixed top-0 right-0 flex h-full flex-col border-l border-line2 bg-panel shadow-overlay focus:outline-none"
           style={{ width: `min(${width}px, 100vw)`, zIndex: 44 }}
         >
-          <header className="flex items-center justify-between border-b border-line px-5 py-4">
-            <Dialog.Title className="text-[15px] font-semibold">{title}</Dialog.Title>
+          <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+            <Dialog.Title className="min-w-0 text-[15px] font-semibold">{title}</Dialog.Title>
             <Dialog.Close
               aria-label="Close"
               className="text-[18px] text-tx3 hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"

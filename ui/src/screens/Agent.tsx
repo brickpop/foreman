@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { isConflict, type Soul, type Team } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
@@ -7,6 +7,7 @@ import { sessionOf } from "../app/project";
 import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
 import { useToast } from "../components/Toasts";
 import { Button, Dot, Loading } from "../components/ui";
+import { Crumbs } from "./Settings";
 
 // One agent's soul (wiki/product/features/agent-page.md): who it is, and
 // the exact prompt each deployment gives it (what it runs on is its project's
@@ -16,19 +17,20 @@ const option = (on: boolean) =>
   `rounded-[6px] border px-2.5 py-1 text-[13px] ${on ? "border-acc bg-accSoft text-tx" : "border-line2 text-tx2 hover:border-line3"}`;
 
 export function Agent() {
-  const { team: teamId, agent: id } = useParams({ from: "/teams/$team/agents/$agent" });
+  const { team: teamId, agent: id } = useParams({ from: "/settings/teams/$team/agents/$agent" });
   const teams = useTeams();
   const team = teams.data?.find((t) => t.id === teamId);
   const soul = team?.config.agents[id];
-  if (teams.isPending) return <Loading rows={5} className="m-12" />;
+  if (teams.isPending) return <Loading rows={5} />;
   if (!team || !soul)
     return (
-      <p className="p-12 text-tx3">
+      <p className="text-tx3">
         No agent {id} on team {teamId}.
       </p>
     );
   return (
-    <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(360px,1fr))] gap-10 px-6 pt-6 pb-12">
+    <div className="flex flex-col gap-6">
+      <Crumbs team={{ id: team.id, name: team.config.name }} agent={soul.name} />
       <Editor key={`${team.id}/${id}`} team={team} id={id} saved={soul} />
       <PromptView team={team} id={id} />
     </div>
@@ -92,14 +94,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
       <header className="flex items-center gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="m-0 text-[26px] font-semibold tracking-[-0.02em]">{draft.name}</h1>
-          <Link
-            to="/teams/$team"
-            params={{ team: team.id }}
-            search={{ tab: "members" }}
-            className="text-tx3"
-          >
-            {roleLabel(draft.role)} · {team.config.name}
-          </Link>
+          <p className="m-0 text-tx3">{roleLabel(draft.role)}</p>
         </div>
       </header>
 

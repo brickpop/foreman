@@ -38,6 +38,8 @@ import type {
 import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Field, Node } from "./types/wiki";
 import type {
+  Cleaned,
+  Cleanup,
   Dismiss,
   Dismissed,
   RepoDiff,
@@ -58,6 +60,8 @@ export type {
   Board,
   Branches,
   Card,
+  Cleaned,
+  Cleanup,
   Commit,
   Deployment,
   Dismiss,
@@ -259,6 +263,9 @@ export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
 
 export interface PipelineArea {
   list(project: string): Promise<Pipeline>;
+  /** Removes what agents no longer running left on the project, only what
+   * is safe; says what it removed and what it kept, with why. */
+  cleanUp(project: string): Promise<Cleanup>;
 }
 
 /** A comment the CEO writes: on a line of a repo's diff (its side, line, and
@@ -542,6 +549,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     pipeline: {
       list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
+      cleanUp: async (project) =>
+        (await request("POST", `/api/projects/${id(project)}/cleanup`)).json() as Promise<Cleanup>,
     },
     reviews: {
       list: () => getJSON("/api/reviews"),

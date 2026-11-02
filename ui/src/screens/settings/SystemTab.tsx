@@ -109,7 +109,7 @@ function MaintenanceSection() {
         </span>
       </Row>
       {status.data?.images.length === 0 && (
-        <p className="m-0 border-b border-line py-3.5 text-[13.5px] text-tx3">
+        <p className="m-0 text-[13.5px] text-tx3">
           Agents run directly on this machine: no images to build.
         </p>
       )}
@@ -121,7 +121,7 @@ function MaintenanceSection() {
           busy={building || rebuild.isPending}
         />
       ))}
-      {rebuild.error && <p className="m-0 pt-2 text-[13px] text-err">{rebuild.error.message}</p>}
+      {rebuild.error && <p className="m-0 text-[13px] text-err">{rebuild.error.message}</p>}
     </Section>
   );
 }
@@ -138,7 +138,7 @@ function ImageRow({
   const [log, setLog] = useState(false);
   const state = imageState[image.state] ?? { label: image.state, color: "text-tx3" };
   return (
-    <div className="flex flex-col gap-2.5 border-b border-line py-3.5">
+    <div className="flex flex-col gap-2.5">
       <div className="grid grid-cols-[1fr_auto] items-center gap-4">
         <span className="flex flex-col gap-0.5">
           <span className="font-mono text-[13px]">{image.name}</span>

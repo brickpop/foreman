@@ -116,7 +116,6 @@ export function Board() {
   const lacking = useMissing(project).data ?? [];
   const boards = useBoards(project);
   const [chosen, setChosen] = useState<string>();
-  const [toml, setToml] = useState(false);
   const [sheet, setSheet] = useState<string>();
   const [dragging, setDragging] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
@@ -183,24 +182,15 @@ export function Board() {
   return (
     <div className="flex flex-1 flex-col gap-4 px-6 pt-6 pb-12">
       {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
-      <div className="flex items-center gap-3">
-        {list.length > 1 && (
+      {list.length > 1 && (
+        <div>
           <Segmented
             label="Boards"
             value={board.id}
             onChange={setChosen}
             options={list.map((b) => ({ value: b.id, label: b.name }))}
           />
-        )}
-        <span className="flex-1" />
-        <Button variant="muted" className="font-mono" onClick={() => setToml(!toml)}>
-          {toml ? "Hide wiki.toml" : "wiki.toml"}
-        </Button>
-      </div>
-      {toml && (
-        <pre className="max-w-[620px] rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2">
-          {board.declaration}
-        </pre>
+        </div>
       )}
       {board.problems.length > 0 && (
         <p className="text-[13px] text-err">{board.problems.join(" · ")}</p>
@@ -450,11 +440,18 @@ function SideSheet({
       width={sheetWidth}
       keepOpenOn="[data-card]"
       title={
-        <span className="flex items-center gap-3">
-          <span className="font-mono text-[12.5px] font-normal text-tx3">
+        <span className="flex min-w-0 items-center gap-3">
+          <span
+            className="min-w-0 truncate font-mono text-[12.5px] font-normal text-tx3"
+            title={`${repo}/wiki/${path}`}
+          >
             {repo}/wiki/{path}
           </span>
-          <Button variant="small" onClick={() => path && open(path)}>
+          <Button
+            variant="small"
+            className="shrink-0 whitespace-nowrap"
+            onClick={() => path && open(path)}
+          >
             Open in wiki
           </Button>
         </span>

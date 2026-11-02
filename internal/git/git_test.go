@@ -369,3 +369,32 @@ func TestHousekeepingNeverDetaches(t *testing.T) {
 		t.Error("maintenance ran without --no-detach")
 	}
 }
+
+// Removing a worktree takes its folder and keeps its branch; one with work not
+// committed, even a new file, stays as it is.
+func TestRemoveWorktree(t *testing.T) {
+	r := codeRepo(t, "main")
+	g := New()
+	clean, dirty := filepath.Join(t.TempDir(), "mara", "api"), filepath.Join(t.TempDir(), "tove", "api")
+	for _, wt := range []struct{ dir, branch string }{{clean, "wt/mara/main"}, {dirty, "wt/tove/main"}} {
+		if err := g.Prepare(ctx, r, wt.dir, wt.branch, "main"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(t, filepath.Join(dirty, "draft.txt"), "not committed\n")
+	if err := g.RemoveWorktree(ctx, r, clean); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(clean); !os.IsNotExist(err) {
+		t.Errorf("the folder stayed: %v", err)
+	}
+	if !g.HasBranch(ctx, r, "wt/mara/main") {
+		t.Error("its branch went with it")
+	}
+	if err := g.RemoveWorktree(ctx, r, dirty); !errors.Is(err, ErrUncommitted) {
+		t.Errorf("%v, want ErrUncommitted", err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dirty, "draft.txt")); string(data) != "not committed\n" {
+		t.Errorf("the work went: %q", data)
+	}
+}

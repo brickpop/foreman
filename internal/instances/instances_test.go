@@ -1414,6 +1414,10 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	rec := &specs{}
 	f.deps.Runner = rec
 	f.m = New(f.deps)
+	// The empty mount point an earlier launch left.
+	if err := os.MkdirAll(filepath.Join(f.hm.Sandbox("ledger", "mara"), "project"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
@@ -1425,12 +1429,16 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	want := []runner.Mount{
 		{Source: mara, Target: mara},
 		{Source: filepath.Join(realAPI, ".git"), Target: filepath.Join(realAPI, ".git"), ReadOnly: true},
-		{Source: project, Target: filepath.Join(mara, "project")},
-		{Source: filepath.Join(project, ".git"), Target: filepath.Join(mara, "project", ".git"), ReadOnly: true},
+		// At its real path, as everything else: no mount point in the sandbox.
+		{Source: project, Target: project},
+		{Source: filepath.Join(project, ".git"), Target: filepath.Join(project, ".git"), ReadOnly: true},
 		{Source: harnessDir, Target: harnessDir},
 	}
 	if got := rec.last(); !slices.Equal(got.Mounts, want) || got.Labels[HomeLabel] != f.hm.Root() {
 		t.Errorf("the lead's mounts:\n%+v\nwant\n%+v\nlabels %v", got.Mounts, want, got.Labels)
+	}
+	if _, err := os.Stat(filepath.Join(mara, "project")); !os.IsNotExist(err) {
+		t.Errorf("a project/ folder in the sandbox: %v", err)
 	}
 	if info, err := os.Stat(harnessDir); err != nil || info.Mode().Perm() != 0o700 {
 		t.Errorf("the harness folder is readable by others: %v", info.Mode())
@@ -1439,7 +1447,7 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitStatus("tove@ledger", Running)
-	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: project, Target: filepath.Join(f.hm.Sandbox("ledger", "tove"), "project"), ReadOnly: true}) {
+	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: project, Target: project, ReadOnly: true}) {
 		t.Errorf("a member's project repo: %+v", got.Mounts[2])
 	}
 }

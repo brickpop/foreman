@@ -83,9 +83,6 @@ func TestBoards(t *testing.T) {
 	if sprint.Cards[2].Title != "Review me" {
 		t.Errorf("a card's title field: %+v", sprint.Cards[2])
 	}
-	if !strings.HasPrefix(sprint.Declaration, "[[tool.wikiview.board]]\nid      = \"sprint\"") || !strings.HasSuffix(sprint.Declaration, `lanes   = ["high"]`) {
-		t.Errorf("declaration = %q", sprint.Declaration)
-	}
 	if len(sprint.Problems) != 0 || sprint.Problems == nil {
 		t.Errorf("problems = %#v, want an empty list", sprint.Problems)
 	}

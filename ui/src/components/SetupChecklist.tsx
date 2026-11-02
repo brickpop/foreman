@@ -9,7 +9,7 @@ import { ConnectDialog } from "./ConnectDialog";
 import { CheckIcon } from "./icons";
 import { NewProject } from "./NewProject";
 import { Select } from "./Select";
-import { Button, Panel, SectionLabel } from "./ui";
+import { Button, Panel, SectionTitle } from "./ui";
 
 // The setup checklist (wiki/product/features/first-run.md): the Dashboard shows it
 // while any step is left, in order, each row with what to do and its button.
@@ -20,9 +20,9 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
     steps.find((s) => s.kind === "running")?.state === "todo";
   return (
     <section className="flex flex-col gap-2.5">
-      <SectionLabel>
+      <SectionTitle>
         Setup · {done} of {steps.length} done
-      </SectionLabel>
+      </SectionTitle>
       <Panel>
         {steps.map((s, i) => (
           <StepRow
@@ -108,8 +108,8 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
     case "image":
       return s.state === "failed" ? (
         <Link
-          to="/settings"
-          search={{ tab: "system" }}
+          to="/settings/$tab"
+          params={{ tab: "system" }}
           className="text-[13px] text-accTx hover:underline"
         >
           Maintenance
@@ -118,7 +118,11 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
     case "profile":
       // One that doesn't exist (failed) is created or swapped in Settings.
       return s.state === "failed" ? (
-        <Link to="/settings" className="text-[13px] text-accTx hover:underline">
+        <Link
+          to="/settings/$tab"
+          params={{ tab: "agents" }}
+          className="text-[13px] text-accTx hover:underline"
+        >
           Profiles
         </Link>
       ) : (

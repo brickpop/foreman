@@ -10,11 +10,11 @@ One agent's **soul** ([Agent soul](../models/agent-soul.md)): who it is, what it
 
 ## Layout
 
-Padding `24px 24px 48px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, gap 40).
+In Settings, at `/settings/teams/<team>/agents/<agent>` (the CEO, 2026-11-02), in its frame: max 760px, padding `24px 24px 48px` ([Settings → Teams](./settings.md#teams)). One column, 24px apart: the breadcrumb `Settings › Teams › <Team> › <Agent>` (its team step opens the [Team page](./team-page.md)), the soul, then the session prompt (two columns until 2026-11-02, which 760px no longer holds).
 
-## Left column
+## The soul
 
-- **Header**: H1 name (26px), and `<Role> · <Team>` (`--tx3`; opens the team's Members tab, [Team page](./team-page.md)).
+- **Header**: H1 name (26px), and its role (`--tx3`).
 - **"Running on"**: one row per deployment (grid `auto auto 1fr auto`, `--panel`, radius 9): an 8px status dot, the project's readable name ([App shell](./app-shell.md#sidebar); 600, never wrapped), the current task (ellipsis), and a **`Session`** button (the project's [Session](./sessions.md) on this agent). If the team isn't deployed: `Not running. <Team> isn't deployed to any project.`
 - No harness choice (the CEO, 2026-10-18): an agent runs on its project's [profile](../architecture/session-runner.md#credentials), chosen in [Project settings](./project-settings.md); see [Agent soul → What it runs on](../models/agent-soul.md#what-it-runs-on).
 - **"Personality"**: textarea (3 rows, 15px).
@@ -24,7 +24,7 @@ Padding `24px 24px 48px`. Two columns (`repeat(auto-fit, minmax(360px, 1fr))`, g
 
 **Saving**: no save button. Text fields (personality, skills input, job description) save on blur or Enter; removing a skill saves immediately. Each save writes the team file ([API](../architecture/api.md), `PUT /api/teams/:id/agents/:agent`) and shows `✓ Saved. Applies on every project.` for 3 s. Each instance gets the new prompt at its next start; running ones aren't told ([Team definition → Reload](../models/team-definition.md#reload)). A save that conflicts with a change made elsewhere meanwhile (the CEO's editor, another tab, a Chief of Staff proposal saved) never drops the edit: it stays in the field and a prompt offers **Keep mine** (saves it over the new version) or **Take theirs** (drops it). Low priority.
 
-## Right column
+## The session prompt
 
 - "Session prompt" (600), subline: "Generated at session start from this soul plus the project. The soul is the same everywhere; the context isn't."
 - A switcher `on <project>` (option buttons), shown when the agent runs on more than one deployment.

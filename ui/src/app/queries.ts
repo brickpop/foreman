@@ -70,9 +70,10 @@ export function useProjects() {
   return useQuery({ queryKey: keys.projects, queryFn: () => c.home.projects() });
 }
 
-/** Where a project's repo is on disk, for showing paths: <home>/projects/<id>. */
+/** Where a project's repo is on disk, for showing paths: <workspace>/project
+ * (in the home, projects/<id>, for one made before workspaces). */
 export function useProjectRepo(project: string): string {
-  return `${useHomeFolder().data?.path ?? "~/.foreman"}/projects/${project}`;
+  return useProjects().data?.find((p) => p.id === project)?.path ?? "";
 }
 
 export function useTeams() {
@@ -568,6 +569,17 @@ export function useActivity(deployment: string, enabled = true) {
 export function useRepos(project: string) {
   const c = useClient();
   return useQuery({ queryKey: [...keys.repos, project], queryFn: () => c.repos.list(project) });
+}
+
+/** Removes what agents no longer running left on the project (only what is
+ * safe); its repos then show what is left. */
+export function useCleanUp(project: string) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: () => c.pipeline.cleanUp(project),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.repos }),
+  });
 }
 
 export function useRepoTree(project: string, repo: string, ref: string, path: string) {

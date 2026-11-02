@@ -9,6 +9,7 @@ import { StopIcon } from "../components/icons";
 import { StopDialog } from "../components/StopDialog";
 import { TeamPlaybook } from "../components/TeamPlaybook";
 import { Button, Dot, Empty, Loading, Panel } from "../components/ui";
+import { Crumbs } from "./Settings";
 
 const tabs: { tab: TeamTab; label: string }[] = [
   { tab: "deployments", label: "Deployments" },
@@ -20,22 +21,23 @@ const tabs: { tab: TeamTab; label: string }[] = [
 // One team definition (wiki/product/features/team-page.md): where it is
 // deployed, its members, its playbook and its file.
 export function Team() {
-  const { team: id } = useParams({ from: "/teams/$team" });
-  const { tab: asked } = useSearch({ from: "/teams/$team" });
+  const { team: id } = useParams({ from: "/settings/teams/$team" });
+  const { tab: asked } = useSearch({ from: "/settings/teams/$team" });
   const teams = useTeams();
   const deployments = useDeployments();
   const openChiefOfStaff = useOpenChiefOfStaff();
   const [deploy, setDeploy] = useState(false);
   const team = teams.data?.find((t) => t.id === id);
-  if (teams.isPending || deployments.isPending) return <Loading rows={5} className="m-12" />;
-  if (!team) return <p className="p-12 text-tx3">No team {id}.</p>;
+  if (teams.isPending || deployments.isPending) return <Loading rows={5} />;
+  if (!team) return <p className="text-tx3">No team {id}.</p>;
   const mine = (deployments.data ?? []).filter((d) => d.teamId === id);
   const tab = teamTab(asked, mine.length > 0);
   return (
-    <div className="flex flex-col">
-      <header className="flex flex-col gap-4 px-6 pt-6">
-        <div className="flex items-end gap-4">
-          <div className="flex flex-1 flex-col gap-1">
+    <div className="flex flex-col gap-6">
+      <header className="flex flex-col gap-4">
+        <Crumbs team={{ id, name: team.config.name }} />
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             <h1 className="m-0 text-[30px] font-semibold tracking-[-0.02em]">{team.config.name}</h1>
             {team.config.purpose && (
               <p className="m-0 text-[15px] text-tx3">{team.config.purpose}</p>
@@ -55,7 +57,7 @@ export function Team() {
           {tabs.map((t) => (
             <Link
               key={t.tab}
-              to="/teams/$team"
+              to="/settings/teams/$team"
               params={{ team: id }}
               search={{ tab: t.tab }}
               className={`-mb-px border-b-2 px-3.5 py-[9px] font-medium ${
@@ -83,7 +85,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
   const [stopping, setStopping] = useState<Deployment>();
   const sessions = (d: Deployment) => (instances.data ?? []).filter((i) => i.deploymentId === d.id);
   return (
-    <section className="flex w-full max-w-[920px] flex-col gap-3 px-6 pt-6 pb-12">
+    <section className="flex flex-col gap-3">
       {deployments.length === 0 ? (
         <Empty>Not deployed anywhere. Deploy it to a project to start sessions.</Empty>
       ) : (
@@ -146,14 +148,14 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
   const instances = useInstances();
   const ids = roster(team.config);
   return (
-    <section className="flex w-full max-w-[920px] flex-col px-6 pt-5 pb-12">
+    <section className="flex flex-col">
       {ids.map((agent) => {
         const soul = team.config.agents[agent];
         if (!soul) return null;
         return (
           <Link
             key={agent}
-            to="/teams/$team/agents/$agent"
+            to="/settings/teams/$team/agents/$agent"
             params={{ team: team.id, agent }}
             className="grid grid-cols-[1fr_auto] items-center gap-3.5 border-b border-line px-1.5 py-3.5 text-tx hover:bg-hover"
           >
@@ -184,7 +186,7 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
 
 function Playbook({ team }: { team: TeamData }) {
   return (
-    <section className="flex w-full max-w-[760px] flex-col gap-6 px-6 pt-7 pb-12">
+    <section className="flex flex-col gap-6">
       <p className="m-0 text-tx2">
         The playbook is part of the team definition, so every deployment uses the same one. It's
         added to each member's session prompt. Each project's own gates and checks apply on top.
@@ -197,7 +199,7 @@ function Playbook({ team }: { team: TeamData }) {
 function File({ team }: { team: TeamData }) {
   const home = useHomeFolder();
   return (
-    <section className="flex w-full max-w-[860px] flex-col gap-3 px-6 pt-7 pb-12">
+    <section className="flex flex-col gap-3">
       <span className="font-mono text-[12.5px] text-tx3">
         {home.data?.path ?? "~/.foreman"}/config/teams/{team.id}.toml
       </span>

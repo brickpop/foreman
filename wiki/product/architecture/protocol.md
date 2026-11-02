@@ -244,11 +244,11 @@ type HandoffResult struct { WorkItem string; Checks string }                  //
 
 ```go
 type ContributeArgs   struct { Kind string; Title string; Body string } // kind: "finding" | "proposal" | "note"
-type ContributeResult struct { Path string }                            // "project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md"
+type ContributeResult struct { Path string }                            // "<workspace>/project/wiki/inbox/2026-10-14-tove-flaky-settle-test.md": on disk, the same path in the lead's container
 ```
 
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter. A body is at most 32,000 characters: it becomes a file, not a line in the lead's conversation, so a whole design record fits (the CEO, 2026-10-19; messages keep 8,000). Limits count characters, not bytes. A taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
-- Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in project/wiki/inbox/<file>.` The lead decides what becomes of it.
+- Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in <workspace>/project/wiki/inbox/<file>.` The lead decides what becomes of it.
 - Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the project's Activity shows the title.
 - Errors: `bad_kind`, `too_long`.
 

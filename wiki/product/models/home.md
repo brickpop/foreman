@@ -82,8 +82,7 @@ A project's workspace, in the projects folder ([Global settings](./global-settin
    │  └─ wiki/             knowledge base (wiki.toml, index.md, backlog/, product/, adr/, inbox/)
    └─ agents/
       └─ mara/             mara's sandbox
-         ├─ ledger-api/    a git worktree of each code repo, on the agent's branch
-         └─ project/       the project repo's mount point (writable for the lead only)
+         └─ ledger-api/    a git worktree of each code repo, on the agent's branch
 ```
 
 The code repos are wherever the CEO keeps them, e.g. `~/dev/ledger-api`. A project made before workspaces has its project repo at `~/.foreman/projects/<name>/` and its sandboxes at `~/.foreman/sandboxes/<name>/<agent>/`, each with its harness folder inside (`.harness/`), until it is moved ([Project settings](../features/project-settings.md)).

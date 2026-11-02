@@ -76,6 +76,10 @@ func (tg *targets) CreateTarget(ctx context.Context, project, repo, name, from, 
 	return config{tg.root, tg}.Project(project)
 }
 
+func (c config) Sandbox(project, agent string) string {
+	return filepath.Join(c.root, project, ".sandboxes", agent)
+}
+
 func (c config) Projects() []home.Project {
 	p, _ := c.Project("ledger")
 	return []home.Project{p}
@@ -500,11 +504,12 @@ func TestContributeFilesANoteAndTellsTheLead(t *testing.T) {
 	// The lead's unfinished edit in the same checkout stays out of the commit.
 	writeFile(t, filepath.Join(project, "wiki", "board.md"), "unfinished\n")
 	text := f.ok("tove", "contribute", map[string]string{"kind": "finding", "title": "Flaky settle test!", "body": "It fails 1 in 20.", "author": "mara"})
-	path := "project/wiki/inbox/2026-10-16-tove-flaky-settle-test.md"
+	// The path on disk: the same for the lead in its container.
+	path := filepath.Join(project, "wiki", "inbox", "2026-10-16-tove-flaky-settle-test.md")
 	if text != "Filed "+path+"." {
 		t.Errorf("%q", text)
 	}
-	data, err := os.ReadFile(filepath.Join(f.root, "ledger", path))
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

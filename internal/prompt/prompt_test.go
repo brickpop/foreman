@@ -1,7 +1,6 @@
 package prompt
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -32,7 +31,7 @@ var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge"
 
 func input(agent string, tools []string) Input {
 	return Input{
-		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/.foreman/sandboxes/ledger/" + agent, Tools: tools,
+		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/workspace/ledger/agents/" + agent, ProjectRepo: "/home/ceo/workspace/ledger/project", Tools: tools,
 		Repos:  []home.Repo{{Name: "api", Default: "main"}},
 		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
 	}
@@ -47,12 +46,13 @@ Own the UI.
 
 ## This assignment
 Project: ledger
-Goal: the "Current goal" line at the top of /home/ceo/.foreman/sandboxes/ledger/tove/project/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
-Your sandbox: /home/ceo/.foreman/sandboxes/ledger/tove (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)
+Goal: the "Current goal" line at the top of /home/ceo/workspace/ledger/project/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
+Your sandbox: /home/ceo/workspace/ledger/agents/tove (your own git worktree of each code repo)
 Branches: you work on wt/tove/main, made for you from main.
-Knowledge base: /home/ceo/.foreman/sandboxes/ledger/tove/project/wiki (read only, by design, not a fault)
+Project repo: /home/ceo/workspace/ledger/project (the project's one shared checkout, the same for every agent)
+Knowledge base: /home/ceo/workspace/ledger/project/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
-Read /home/ceo/.foreman/sandboxes/ledger/tove/project/AGENTS.md first: how this project's wiki and tasks work.
+Read /home/ceo/workspace/ledger/project/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on ledger
 - Mara, Team Lead (lead)
@@ -247,7 +247,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove", "")
-	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", `Goal: the "Current goal" line at the top of {sandbox}/project/wiki/backlog/index.md`, "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", `Goal: the "Current goal" line at the top of {project repo}/wiki/backlog/index.md`, "Project repo: {project repo} (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -258,10 +258,10 @@ func TestTemplateShowsThePlaceholders(t *testing.T) {
 // lead keeps it and asks the CEO for it when there is none; a member only
 // reads it.
 func TestTheGoalIsInTheWiki(t *testing.T) {
-	at := `Goal: the "Current goal" line at the top of /home/ceo/.foreman/sandboxes/ledger/%s/project/wiki/backlog/index.md, `
+	at := `Goal: the "Current goal" line at the top of /home/ceo/workspace/ledger/project/wiki/backlog/index.md, `
 	for agent, want := range map[string][]string{
-		"mara": {fmt.Sprintf(at, "mara") + "which you keep.", "ask the CEO for it in this session before anything else, then write it there", "update it there and tell your team"},
-		"tove": {fmt.Sprintf(at, "tove") + "kept by your lead.", "your lead tells you what to work on"},
+		"mara": {at + "which you keep.", "ask the CEO for it in this session before anything else, then write it there", "update it there and tell your team"},
+		"tove": {at + "kept by your lead.", "your lead tells you what to work on"},
 	} {
 		got := Compose(input(agent, every))
 		for _, w := range want {

@@ -21,6 +21,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** code, a route and a UI offer kept for a one-off move; the old paths stay named in the code. Its known edges, accepted for a one-off: the moves are renames, so a workspace on another file system than the home is refused by the OS (`EXDEV`, "invalid cross-device link") and nothing moves; a stopped deployment's instance rows keep their old `sandbox_path` until a redeploy writes new ones (nothing reads them meanwhile: a start uses the row a deploy just wrote); a conversation folder Claude Code named with a hash (a path over 200 characters) can't be carried over, so the move is refused; and a failed undo (a rename back that fails too) is ignored, leaving that folder where it got to.
 - **Fix:** removed once the CEO has migrated every project: [Remove the workspace migration](./backlog/remove-workspace-migration.md).
 
+## The old project mount point
+
+- **State:** until 2026-11-02 the project repo was mounted in each container at `<sandbox>/project`, so every sandbox a launch made holds an empty `project/` folder. Each launch removes it when empty (`os.Remove` in `instances/launch.go`), since the project repo is now mounted at its real path.
+- **Why:** sandboxes made before then would keep a confusing empty folder, which an agent may take for the project repo.
+- **Impact:** one line run at every launch; a sandbox never launched again keeps its folder (Clean up removes the worktrees, not it).
+- **Fix:** removed with [Remove the workspace migration](./backlog/remove-workspace-migration.md), once every deployment has relaunched.
+
 ## Old team files' `look`
 
 - **State:** a team file still carrying a member's `[agents.<id>.look]` table (avatars, removed 2026-11-02) loads: `retiredLook` in `internal/home/config.go` keeps it out of the problems, and the next save drops it ([Agent soul](./product/models/agent-soul.md#schema)).
@@ -77,7 +84,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
   - **A workspace inside an enclosing git repo** (`~/workspace` a repo itself) is refused only when that repo is a code repo of some project; otherwise git run there on the host (the Direct engine) sees the enclosing repo. In a container it isn't mounted.
   - **The workspace is typed, not browsed** in New project and in the move offer: the folder browser lists repos to add, not a place for a new folder.
 - **Why:** the card landed the layout; the dialog and the clean-up have cards of their own.
-- **Fix:** the folder browser picks the workspace in [Restructure the New project dialog](./backlog/new-project-dialog.md); kept worktrees cleaned up from [Remove a stopped deployment's worktrees](./backlog/remove-worktrees.md).
+- **Fix:** the folder browser picks the workspace in [Restructure the New project dialog](./backlog/new-project-dialog.md). Deployment's [Clean up](./product/features/project-deployment.md#earlier-teams) (2026-11-02) cleans a live project's earlier teams' worktrees; a removed project's kept worktrees still have no action in Foreman: the CEO deletes the folders, and `git worktree prune` in each repo forgets them.
 
 ## Projects as records: known edges
 

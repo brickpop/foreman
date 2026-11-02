@@ -6,18 +6,23 @@ tags: [feature, ui, home, config, security]
 
 # Settings screen
 
-The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: with no workspace any more, the old `Workspace | Global` split said nothing, both being machine-wide; that workspace was the folder Foreman once ran on, not a [project's workspace](../models/project-config.md#the-workspace)). The tab is in the URL, `/settings?tab=git|look|system`; **Agents**, the first, has none, and any other value, the old `workspace` and `global` included, opens Agents. The same tab bar as a project's.
+The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: with no workspace any more, the old `Workspace | Global` split said nothing, both being machine-wide; that workspace was the folder Foreman once ran on, not a [project's workspace](../models/project-config.md#the-workspace)). Each tab is a path, `/settings/teams|agents|git|look|system` (the CEO, 2026-11-02, replacing `/settings?tab=`); `/settings` opens **Teams**, the first, and so does any other tab name, the old `workspace` and `global` included; an old `/settings?tab=<tab>` link opens that tab. The same tab bar as a project's.
 
 | Tab | Sections |
 |---|---|
+| **Teams** | [Teams](#teams) |
 | **Agents** | [Profiles](#profiles), [Instructions for every agent](#instructions-for-every-agent), [Running agents](#running-agents) |
 | **Git & forges** | [Forge accounts](#forge-accounts), [Global repo](#global-repo) |
 | **Notifications & look** | [Notifications](#notifications), [Appearance](#appearance) |
 | **System** | [Home](#home), [Projects](#projects), [Maintenance](#maintenance) |
 
-**Each section says where it is kept**, after its label (` · Global repo`, `--tx4`, not bold): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **Global repo + this machine** (hosts in the global repo, tokens on this machine; [secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
+**Each section says where it is kept**, after its title, in its card's header band (`Global repo`, `--tx4`): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home), or, for Forge accounts, **Global repo + this machine** (hosts in the global repo, tokens on this machine; [secrets](../models/secrets.md)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
 
-Padding `24px 24px 48px`, max 760px. H1 "Settings"; sections labelled 13px `--tx4`, 36px apart; rows (grid `1fr auto`, padding `14px 0`, bottom border) with a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent) and the [projects folder](#projects), which save on **Save** (Discard drops the edit).
+Padding `24px 24px 48px`, max 760px, on every Settings page, the team and agent pages included. H1 "Settings"; each section a **titled card** as in [Project settings](./project-settings.md) (the CEO, 2026-11-02): its title (14px, 600) and where it is kept (12.5px `--tx4`) in the header band, then its intro and its rows, a `--line` between them (16px above and below each); 36px between cards. A row (grid `1fr auto`) has a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent) and the [projects folder](#projects), which save on **Save** (Discard drops the edit).
+
+## Teams
+
+The teams, as on the [Dashboard](./dashboard.md#teams), the same cards: one per team, opening its [page](./team-page.md), then the dashed **`+ New team`** card (the [Chief of Staff](./chief-of-staff.md)'s create-team flow). They moved here from the sidebar (the CEO, 2026-11-02). A team's page is `/settings/teams/<team>` and an agent's `/settings/teams/<team>/agents/<agent>`, in the Settings frame (760px), with a breadcrumb in place of the Settings title and tabs: `Settings › Teams › <Team>` (`› <Agent>` on an agent's), each step a link but the last (13.5px, `--tx3`, the last `--tx2`). The old `/teams/<team>` and `/teams/<team>/agents/<agent>` links open them there.
 
 ## Instructions for every agent
 

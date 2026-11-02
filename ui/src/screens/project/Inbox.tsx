@@ -1,12 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import { isNotBuilt, type Review, type Team } from "../../api/client";
-import { agentOf, inbox, readable, when } from "../../app/model";
+import { agentOf, inbox, when } from "../../app/model";
 import { reviewOf } from "../../app/project";
 import { useRequests, useReviews, useTeams } from "../../app/queries";
 import { reviewGroups, statusLabel } from "../../app/reviews";
-import { Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../components/ui";
+import { Empty, Loading, NotBuilt, Panel, SectionTitle } from "../../components/ui";
 import { useProject } from "../Project";
-import { NeedsYou } from "./Pipeline";
+import { ProjectRequest } from "./Pipeline";
 
 // A project's Inbox (wiki/product/features/reviews.md#the-inbox): what waits
 // on the CEO there (the reviews to decide, then the other requests), what
@@ -17,39 +17,45 @@ export function Inbox() {
   const teams = useTeams();
   const requests = inbox(useRequests().data ?? []).filter((r) => r.projectId === project.id);
   const groups = reviewGroups((reviews.data ?? []).filter((v) => v.projectId === project.id));
-  const list = (label: string, shown: Review[]) =>
+  const rows = (shown: Review[]) =>
     shown.length > 0 && (
-      <section className="flex flex-col gap-2.5">
-        <SectionLabel>{label}</SectionLabel>
-        <Panel>
-          {shown.map((v) => (
-            <ReviewRow key={v.id} review={v} teams={teams.data ?? []} />
-          ))}
-        </Panel>
+      <Panel>
+        {shown.map((v) => (
+          <ReviewRow key={v.id} review={v} teams={teams.data ?? []} />
+        ))}
+      </Panel>
+    );
+  const list = (title: string, shown: Review[]) =>
+    shown.length > 0 && (
+      <section className="flex flex-col gap-3">
+        <SectionTitle count={shown.length}>{title}</SectionTitle>
+        {rows(shown)}
       </section>
     );
-  const none =
-    groups.needsYou.length + groups.waiting.length + groups.done.length + requests.length === 0 &&
-    !reviews.isPending;
+  if (isNotBuilt(reviews.error)) return <NotBuilt what="reviews" />;
+  const needsYou = groups.needsYou.length + requests.length;
   return (
     <div className="flex max-w-[920px] flex-col gap-8 px-6 pt-6 pb-12">
-      {isNotBuilt(reviews.error) ? (
-        <NotBuilt what="reviews" />
-      ) : reviews.error ? (
-        <p className="text-err">{reviews.error.message}</p>
-      ) : reviews.isPending ? (
-        <Loading rows={4} />
-      ) : (
-        list("Needs your review", groups.needsYou)
-      )}
-      <NeedsYou project={project} />
+      {/* Always shown: what the CEO opens the Inbox for, even when nothing is there. */}
+      <section className="flex flex-col gap-3">
+        <SectionTitle count={reviews.isPending ? undefined : needsYou}>Needs you</SectionTitle>
+        {reviews.error ? (
+          <p className="m-0 text-err">{reviews.error.message}</p>
+        ) : reviews.isPending ? (
+          <Loading rows={3} />
+        ) : needsYou === 0 ? (
+          <Empty>Nothing needs you yet.</Empty>
+        ) : (
+          <>
+            {rows(groups.needsYou)}
+            {requests.map((r) => (
+              <ProjectRequest key={r.id} request={r} project={project} teams={teams.data ?? []} />
+            ))}
+          </>
+        )}
+      </section>
       {list("Waiting on the lead", groups.waiting)}
       {list("Done", groups.done)}
-      {none && !reviews.error && (
-        <Empty>
-          Nothing waits on you on {readable(project.id)}. A lead's request_merge() opens a review.
-        </Empty>
-      )}
     </div>
   );
 }

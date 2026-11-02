@@ -118,7 +118,6 @@ export interface Board {
   statusField: string; // the field the columns come from, e.g. status
   laneField: string; // the field the lanes come from, e.g. priority
   cards: Card[];
-  declaration: string; // quoted from wiki.toml
   problems: string[];
 }
 /**

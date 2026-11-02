@@ -14,12 +14,13 @@ import (
 
 // Input is everything a session prompt is made of.
 type Input struct {
-	Agent   string          // the agent's id in Team.Agents
-	Team    home.TeamConfig // souls, roster, playbook
-	Project string          // the project's id
-	Sandbox string          // the agent's sandbox, at the same path on the host and in its container
-	Config  home.ProjectConfig
-	Repos   []home.Repo // the project's code repos, each with its targets
+	Agent       string          // the agent's id in Team.Agents
+	Team        home.TeamConfig // souls, roster, playbook
+	Project     string          // the project's id
+	Sandbox     string          // the agent's sandbox, at the same path on the host and in its container
+	ProjectRepo string          // the project repo, at the same path on the host and in its container
+	Config      home.ProjectConfig
+	Repos       []home.Repo // the project's code repos, each with its targets
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
 	// describes those and no others. Without ask, it describes working alone,
 	// the CEO relaying; without commit, git is read-only and the CEO reviews.
@@ -63,7 +64,7 @@ var teamTools = []teamTool{
 	{"targets", anyone, anyone, true, []string{"targets()                           Each repo's targets: the branches only the CEO's merges write."}},
 	{"commit", anyone, membersOnly, true, []string{
 		"commit(commits)                     Commit the repos you name, each with its own message:",
-		"                                    [{repo, message}], repo being its folder in your sandbox.",
+		"                                    [{repo, message}], repo being its folder's name.",
 	}},
 	{"merge", anyone, anyone, true, []string{
 		"merge(branch)                       Merge a branch (the lead's, a target, a teammate's) into yours.",
@@ -159,12 +160,12 @@ func Compose(in Input) string {
 	line("")
 	line("## This assignment")
 	line("Project: %s", in.Project)
-	line("Goal: %s", goal(in.Sandbox, lead))
+	line("Goal: %s", goal(in.ProjectRepo, lead))
 	if code {
-		line("Your sandbox: %s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Sandbox)
+		line("Your sandbox: %s (your own git worktree of each code repo)", in.Sandbox)
 		line("Branches: %s", branches(in, lead, has))
 	} else {
-		line("Your sandbox: %s (project/: the project's one shared checkout, the same for every agent). This project has no code repo: its work is its knowledge base.", in.Sandbox)
+		line("Your sandbox: %s, your working folder. This project has no code repo: its work is its knowledge base.", in.Sandbox)
 	}
 	if has("switch") {
 		line("%s", persisting(lead && len(in.Team.Roster()) > 1, has))
@@ -172,7 +173,8 @@ func Compose(in Input) string {
 	if has("commit") && code {
 		line("%s", provingTests)
 	}
-	line("Knowledge base: %s/project/wiki (%s)", in.Sandbox, wikiAccess(lead, has))
+	line("Project repo: %s (the project's one shared checkout, the same for every agent)", in.ProjectRepo)
+	line("Knowledge base: %s/wiki (%s)", in.ProjectRepo, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	if lead && len(in.Team.Roster()) > 1 {
 		// Without this, a lead writes cards that tell members to write wiki
@@ -187,7 +189,7 @@ func Compose(in Input) string {
 	if !lead && has("contribute") {
 		line("%s", memberReviews)
 	}
-	line("Read %s/project/AGENTS.md first: how this project's wiki and tasks work.", in.Sandbox)
+	line("Read %s/AGENTS.md first: how this project's wiki and tasks work.", in.ProjectRepo)
 	line("")
 	line("## Your team on %s", in.Project)
 	for _, id := range in.Team.Roster() {
@@ -504,7 +506,7 @@ func instruction(s home.Soul, merges bool) string {
 // CEO's instructions are already known, so they show as they are.
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
-		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}",
+		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", ProjectRepo: "{project repo}",
 		Repos:        []home.Repo{{Name: "{repo}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead, true),
@@ -515,8 +517,8 @@ func Template(team home.TeamConfig, agent, instructions string) string {
 // goal says where the project's goal is: the "Current goal" line of its
 // wiki's backlog index, which the lead keeps. Pointed to, not copied, since
 // it changes over time while a session runs (the CEO, 2026-10-31).
-func goal(sandbox string, lead bool) string {
-	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/project/wiki/backlog/index.md", sandbox)
+func goal(projectRepo string, lead bool) string {
+	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/wiki/backlog/index.md", projectRepo)
 	if lead {
 		return at + ", which you keep. It changes over time: read it again before planning new work. When it is missing or says none yet, ask the CEO for it in this session before anything else, then write it there. When the CEO changes it, update it there and tell your team."
 	}

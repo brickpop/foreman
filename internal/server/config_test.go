@@ -279,7 +279,7 @@ func TestPromptTemplateOfAnAgent(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: c, UI: builtUI})
 	var body map[string]string
 	decodeBody(t, get(t, h, "/api/teams/atlas/agents/mara/prompt"), &body)
-	if !strings.Contains(body["prompt"], "Project: {project}\n") || !strings.Contains(body["prompt"], "{sandbox}/project/wiki/backlog/index.md") {
+	if !strings.Contains(body["prompt"], "Project: {project}\n") || !strings.Contains(body["prompt"], "{project repo}/wiki/backlog/index.md") {
 		t.Errorf("template %q", body["prompt"])
 	}
 	for _, path := range []string{"/api/teams/atlas/agents/ghost/prompt", "/api/teams/nope/agents/mara/prompt"} {

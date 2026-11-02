@@ -86,7 +86,7 @@ function ForgeRow({
     },
   });
   return (
-    <div className="flex flex-col gap-3 border-b border-line py-3">
+    <div className="flex flex-col gap-3">
       <div className="grid grid-cols-[130px_1fr_auto] items-center gap-4">
         <span className="font-medium">{forge.label}</span>
         <span className="truncate font-mono text-[13px] text-tx3">{url || "—"}</span>
@@ -169,7 +169,7 @@ function GlobalRepoSection({ settings }: { settings: SettingsData }) {
       intro="Where your team definitions and settings are hosted, so Sync can push them there. Without
           a forge they stay on this machine. Nothing is pushed automatically."
     >
-      <div className="flex flex-col gap-2.5 py-1.5">
+      <div className="flex flex-col gap-2.5">
         <Segmented
           label="Global repo forge"
           value={kind}

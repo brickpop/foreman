@@ -1,10 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { type Instance, type Team, useClient } from "../../api/client";
+import { type Cleaned, type Instance, type Team, useClient } from "../../api/client";
 import { agentOf, readable, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
-import { latestStopped, sessionOf } from "../../app/project";
+import { deploymentView, deploymentViews, latestStopped, sessionOf } from "../../app/project";
 import {
+  useCleanUp,
   useDeployments,
   useInstances,
   useRepos,
@@ -15,11 +16,21 @@ import { type Worktree, worktrees } from "../../app/repos";
 import { rosterOrder } from "../../app/sessions";
 import { DeployDialog } from "../../components/DeployDialog";
 import { ReloadIcon, StopIcon } from "../../components/icons";
+import { Confirm } from "../../components/Overlays";
 import { StopDialog } from "../../components/StopDialog";
 import { useToast } from "../../components/Toasts";
-import { Button, Dot, Empty, LeadTag, Loading, Panel } from "../../components/ui";
+import {
+  Button,
+  Dot,
+  Empty,
+  LeadTag,
+  Loading,
+  Panel,
+  SectionTitle,
+  Segmented,
+} from "../../components/ui";
 import { useProject } from "../Project";
-import { InFlight } from "./Pipeline";
+import { InFlight, Merged } from "./Pipeline";
 
 // A project's Deployment section (wiki/product/features/project-deployment.md):
 // the team on it, its agents with what they do and the branch
@@ -43,6 +54,9 @@ export function Deployment() {
   const left = trees.filter((w) => !roster.some((i) => i.agentId === w.agent));
   // Named as the team that stopped last there has them: the one that left them, usually.
   const earlier = latestStopped(project.id, stopped);
+  const search = useSearch({ from: "/projects/$project/deployment" });
+  const navigate = useNavigate({ from: "/projects/$project/deployment" });
+  const view = deploymentView(search.view, roster.length + left.length > 0);
   const client = useClient();
   const toast = useToast();
   const reload = reloadOf(roster);
@@ -59,7 +73,7 @@ export function Deployment() {
           {d ? (
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <Link
-                to="/teams/$team"
+                to="/settings/teams/$team"
                 params={{ team: d.teamId }}
                 className="self-start text-base font-semibold hover:underline"
               >
@@ -97,15 +111,18 @@ export function Deployment() {
         {reload.behind.length > 0 && (
           <p className="m-0 text-[13px] text-tx3">{reloadLine(reload, teams.data ?? [])}</p>
         )}
-        {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
-        {!d && repos.isPending && <Loading />}
-        {!d && left.length === 0 && repos.isSuccess ? (
-          <Empty>
-            No team is on {readable(project.id)}. Deploy one and each member gets its own worktree
-            of the project's repos.
-          </Empty>
-        ) : (
-          (roster.length > 0 || left.length > 0) && (
+      </section>
+      <Segmented
+        label="Show"
+        value={view}
+        onChange={(v) => navigate({ search: { view: v } })}
+        options={deploymentViews.map((v) => ({ value: v.view, label: v.label }))}
+      />
+      {view === "agents" && (
+        <>
+          {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
+          {repos.isPending && <Loading />}
+          {roster.length > 0 && (
             <Panel>
               {roster.map((i) => (
                 <AgentRow
@@ -118,21 +135,30 @@ export function Deployment() {
                   deployment={i.deploymentId}
                 />
               ))}
-              {left.map((w) => (
-                <AgentRow
-                  key={w.agent}
-                  agent={w.agent}
-                  worktree={w}
-                  project={project.id}
-                  teams={teams.data ?? []}
-                  deployment={earlier?.id ?? ""}
-                />
-              ))}
             </Panel>
-          )
-        )}
-      </section>
-      <InFlight project={project} />
+          )}
+          {!d && repos.isSuccess && (
+            <Empty>
+              No team is on {readable(project.id)}. Deploy one and each member gets its own worktree
+              of the project's repos.
+            </Empty>
+          )}
+          {left.length > 0 && (
+            <EarlierTeams
+              project={project.id}
+              left={left}
+              teams={teams.data ?? []}
+              deployment={earlier?.id ?? ""}
+            />
+          )}
+        </>
+      )}
+      {view === "inflight" && <InFlight project={project} />}
+      {view === "merged" && (
+        <div className="flex flex-col gap-3">
+          <Merged project={project} />
+        </div>
+      )}
       {/* Mounted only while open: each opening starts fresh. */}
       {deploy && (
         <DeployDialog
@@ -222,5 +248,91 @@ function AgentRow({
         <span className="text-xs text-tx4">not on the team</span>
       )}
     </div>
+  );
+}
+
+/** The worktrees earlier teams' agents left, kept by their Stop so a redeploy
+ * resumes them. Clean up removes only what is safe (a worktree with nothing
+ * uncommitted, a wt/ branch a target holds) and lists what it kept, with why. */
+function EarlierTeams({
+  project,
+  left,
+  teams,
+  deployment,
+}: {
+  project: string;
+  left: Worktree[];
+  teams: Team[];
+  deployment: string;
+}) {
+  const clean = useCleanUp(project);
+  const toast = useToast();
+  const [asking, setAsking] = useState(false);
+  const [kept, setKept] = useState<Cleaned[]>([]);
+  const run = () =>
+    clean.mutate(undefined, {
+      onSuccess: (done) => {
+        setKept(done.kept);
+        toast({
+          title:
+            done.removed.length > 0
+              ? `Cleaned up: ${done.removed.length} removed`
+              : "Nothing was safe to remove",
+          body:
+            done.kept.length > 0
+              ? `${done.kept.length} kept, each with why, under the agents.`
+              : "Nothing was kept.",
+          color: "var(--ok)",
+        });
+      },
+      onError: (e) => toast({ title: "Not cleaned up", body: e.message, color: "var(--err)" }),
+    });
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <SectionTitle count={left.length}>Left by earlier teams</SectionTitle>
+          <span className="text-[13px] text-tx3">
+            Their worktrees stay after a Stop, so a redeploy picks them up.
+          </span>
+        </span>
+        <Button disabled={clean.isPending} onClick={() => setAsking(true)}>
+          Clean up
+        </Button>
+      </div>
+      <Panel>
+        {left.map((w) => (
+          <AgentRow
+            key={w.agent}
+            agent={w.agent}
+            worktree={w}
+            project={project}
+            teams={teams}
+            deployment={deployment}
+          />
+        ))}
+      </Panel>
+      {kept.length > 0 && (
+        <div className="flex flex-col gap-1 text-[13px] text-tx3">
+          <span>Kept by the last clean up:</span>
+          {kept.map((c) => (
+            <span key={`${c.agent} ${c.repo} ${c.what} ${c.branch}`}>
+              <span className="font-mono text-[12.5px] text-tx2">
+                {c.repo} {c.what === "branch" ? c.branch : `${c.agent}'s worktree`}
+              </span>
+              : {c.why}.
+            </span>
+          ))}
+        </div>
+      )}
+      <Confirm
+        open={asking}
+        onClose={() => setAsking(false)}
+        title="Clean up what earlier teams left?"
+        body="Removes their worktrees that hold nothing uncommitted, and their wt/ branches a target already holds (kept aside a while, recoverable by hand). Everything else stays, and is listed with why."
+        action="Clean up"
+        onConfirm={run}
+      />
+    </section>
   );
 }

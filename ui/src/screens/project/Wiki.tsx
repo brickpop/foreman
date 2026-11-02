@@ -1,10 +1,11 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isNotBuilt, type Node } from "../../api/client";
 import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
-import { Chevron, TreeIcon } from "../../components/icons";
+import { TreeChildren, TreeRow } from "../../components/FileTree";
+import { TreeIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
-import { Button, Dot, NotBuilt } from "../../components/ui";
+import { Button, Dot, NotBuilt, Panel } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 import { useProject } from "../Project";
@@ -30,9 +31,12 @@ export function Wiki() {
   );
   const open = (p: string, replace = false) =>
     navigate({ to: "/projects/$project/wiki", params: { project }, search: { entry: p }, replace });
-  // Opening an entry, from anywhere, shows its top. The page scrolls in <main>.
+  // Opening an entry, from anywhere, shows its top; the tree keeps its place.
+  // Under 760px the panes stack and the page scrolls, in <main>.
+  const article = useRef<HTMLDivElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: on every entry shown
   useEffect(() => {
+    article.current?.scrollTo({ top: 0 });
     document.querySelector("main")?.scrollTo({ top: 0 });
   }, [path]);
   // An unknown path falls back to index.md, replacing it so Back doesn't return to it.
@@ -56,47 +60,63 @@ export function Wiki() {
       </div>
     );
   if (tree.error) return <p className="px-6 pt-6 text-[13px] text-err">{tree.error.message}</p>;
+  // The tree and the entry scroll apart, as a repo's page does (the CEO, 2026-11-02).
   return (
-    <div className="flex flex-col gap-5 px-6 pt-5 pb-12">
+    <div className="flex h-full min-h-[420px] flex-col gap-4 px-6 pt-6 pb-6 max-[760px]:h-auto max-[760px]:pb-12">
+      {/* As a repo's page is headed (Repos → a repo), so the two read alike. */}
+      <header className="flex flex-col gap-0.5">
+        <h1 className="m-0 text-[18px] font-semibold">Knowledge base</h1>
+        <span className="truncate font-mono text-[12.5px] text-tx4" title={`${repo}/wiki`}>
+          {repo}/wiki
+        </span>
+      </header>
       {config.description && (
         <p className="m-0 max-w-[780px] text-[15px] text-tx3">{config.description}</p>
       )}
       {lacking.length > 0 && <ScaffoldNotice project={project} missing={lacking} />}
-      <div className="flex items-center gap-3">
-        <span className="hidden max-[760px]:block">
-          <Button
-            variant={files ? "raised" : "secondary"}
-            aria-pressed={files}
-            onClick={() => setFiles(!files)}
-          >
-            <span className="flex items-center gap-2">
-              <TreeIcon />
-              Files
-            </span>
-          </Button>
-        </span>
-        <span className="truncate font-mono text-xs text-tx4">
-          {repo}/wiki/{path}
-        </span>
-      </div>
-      <div className="grid w-full grid-cols-[minmax(150px,200px)_minmax(0,1fr)] gap-8 max-[760px]:grid-cols-[minmax(0,1fr)]">
-        <nav
-          className={`sticky top-4 self-start max-[760px]:static ${files ? "" : "max-[760px]:hidden"}`}
+      <span className="hidden max-[760px]:block">
+        <Button
+          variant={files ? "raised" : "secondary"}
+          aria-pressed={files}
+          onClick={() => setFiles(!files)}
         >
-          <Tree nodes={tree.data ?? []} current={path} depth={0} onOpen={open} />
+          <span className="flex items-center gap-2">
+            <TreeIcon />
+            Files
+          </span>
+        </Button>
+      </span>
+      <div className="grid min-h-0 w-full flex-1 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] gap-6 max-[760px]:grid-cols-[minmax(0,1fr)]">
+        <nav
+          aria-label="Files"
+          className={`flex min-h-0 flex-col overflow-auto pr-1 max-[760px]:overflow-visible ${files ? "" : "max-[760px]:hidden"}`}
+        >
+          <Tree nodes={tree.data ?? []} current={path} onOpen={open} />
         </nav>
         {/* A comfortable measure for reading, whatever the window's width. */}
-        <div className="min-w-0 max-w-[780px]">
-          {current.data && (
-            <WikiArticle
-              project={project}
-              entry={current.data}
-              onOpen={open}
-              onTick={(line, done) =>
-                tick.mutate({ path, line, done, version: current.data.version })
-              }
-            />
-          )}
+        {/* The scroller is a block: a flex column of its height would shrink
+            the panel to fit, clipping the entry instead of scrolling it. */}
+        <div ref={article} className="min-h-0 min-w-0 overflow-auto max-[760px]:overflow-visible">
+          <div className="flex max-w-[820px] flex-col gap-2.5 pb-6">
+            {/* The entry's path, in view while it scrolls, as a repo's file's is. */}
+            <div className="sticky top-0 z-10 bg-bg pb-1">
+              <span className="block truncate font-mono text-[12.5px] text-tx2" title={path}>
+                {path}
+              </span>
+            </div>
+            {current.data && (
+              <Panel className="px-6 py-5">
+                <WikiArticle
+                  project={project}
+                  entry={current.data}
+                  onOpen={open}
+                  onTick={(line, done) =>
+                    tick.mutate({ path, line, done, version: current.data.version })
+                  }
+                />
+              </Panel>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -116,50 +136,35 @@ function holds(n: Node, path: string): boolean {
 function Tree({
   nodes,
   current,
-  depth,
   onOpen,
 }: {
   nodes: Node[];
   current: string;
-  depth: number;
   onOpen: (path: string) => void;
 }) {
-  return (
-    <ul className="m-0 list-none p-0">
-      {nodes.map((n) =>
-        n.folder ? (
-          <Folder key={n.path} node={n} current={current} depth={depth} onOpen={onOpen} />
-        ) : (
-          <li key={n.path}>
-            <button
-              type="button"
-              onClick={() => onOpen(n.path)}
-              style={{ paddingLeft: 10 + 14 * depth }}
-              className={`flex w-full items-center gap-1.5 rounded-md py-[5px] pr-2.5 text-left text-[13.5px] ${
-                n.path === current ? "bg-raised text-tx" : "text-tx3 hover:bg-hover"
-              }`}
-            >
-              {/* In line with the folder names beside it. */}
-              <span className="w-3 shrink-0" />
-              <span className="truncate">{n.title || n.path}</span>
-              {n.changed && <Dot size={6} title="Changed since you last looked" />}
-            </button>
-          </li>
-        ),
-      )}
-    </ul>
+  return nodes.map((n) =>
+    n.folder ? (
+      <Folder key={n.path} node={n} current={current} onOpen={onOpen} />
+    ) : (
+      <TreeRow
+        key={n.path}
+        current={n.path === current}
+        onClick={() => onOpen(n.path)}
+        after={n.changed && <Dot size={6} title="Changed since you last looked" />}
+      >
+        {n.title || n.path}
+      </TreeRow>
+    ),
   );
 }
 
 function Folder({
   node,
   current,
-  depth,
   onOpen,
 }: {
   node: Node;
   current: string;
-  depth: number;
   onOpen: (path: string) => void;
 }) {
   const [open, setOpen] = useState(holds(node, current));
@@ -175,25 +180,24 @@ function Folder({
     setOpen(!open);
   };
   return (
-    <li>
-      <button
-        type="button"
-        aria-expanded={open}
+    <>
+      <TreeRow
+        folder
+        open={open}
+        current={current === index}
         onClick={toggle}
-        style={{ paddingLeft: 10 + 14 * depth }}
-        className={`flex w-full items-center gap-1.5 rounded-md py-[5px] pr-2.5 text-left text-[13.5px] font-medium ${
-          current === index ? "bg-raised text-tx" : "text-tx2 hover:bg-hover"
-        }`}
+        after={
+          !open &&
+          hasChanged(node.children) && <Dot size={6} title="Changed since you last looked" />
+        }
       >
-        <span className="text-tx4">
-          <Chevron open={open} />
-        </span>
-        <span className="truncate">{node.title || node.path}</span>
-        {!open && hasChanged(node.children) && (
-          <Dot size={6} title="Changed since you last looked" />
-        )}
-      </button>
-      {open && <Tree nodes={node.children} current={current} depth={depth + 1} onOpen={onOpen} />}
-    </li>
+        {node.title || node.path}
+      </TreeRow>
+      {open && (
+        <TreeChildren>
+          <Tree nodes={node.children} current={current} onOpen={onOpen} />
+        </TreeChildren>
+      )}
+    </>
   );
 }

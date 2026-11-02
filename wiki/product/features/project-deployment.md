@@ -11,18 +11,33 @@ A project's **Deployment** section ([Project page](./project-page.md)): the team
 ## The team
 
 - **Header**: the team's name (600 16px), a link to its [Team page](./team-page.md); under it `deployed <time>` (13.5px `--tx4`). No goal here: it is the project's, in its wiki ([Session prompt](../architecture/session-prompt.md)). On the right, **`Deploy another team`** (with no team: **`Deploy a team`**), which opens [Deploy a team](./deploy-team.md) on this project (with no team, the team that worked here last chosen at first), **`Reload`** (led by the reload icon) while some agent runs on an older prompt, which restarts those agents on the new one, continuing their conversations, and is disabled while an agent is busy, with a line under the header saying which ([Team definition → Reload](../models/team-definition.md#reload)), and **`Stop`** in the danger style, led by the stop icon, which stops the team after the same confirmation as the Team page's ([Team page → Deployments](./team-page.md#deployments)).
-- **One panel, a row per agent** (padding `12px 16px`, rows split by `--line`): first the team's agents, the lead first then the team file's order; then any worktree an earlier team left on the project (Stop keeps worktrees) that no agent of the team holds: one of the same id takes it over ([Team definition](../models/team-definition.md#schema)). Each is named as the team that stopped there last has it, else by its agent id.
+- **A selector** under the header (the CEO, 2026-11-02, so each list has the whole width and the page stops growing): **`Agents · In flight · Merged`**, one shown at a time, in the [segmented](../design/design-system.md#buttons) style; in the URL as `?view=inflight|merged`. With none in the URL, Agents while there are agents to show (the team's, or worktrees an earlier team left), else In flight.
+
+### Agents
+
+- **One panel, a row per agent of the team** (padding `12px 16px`, rows split by `--line`), the lead first, then the team file's order.
   - An 8px status dot while it is on the team (a worktree left by an earlier team has none).
   - Its name (500) and, for the lead, the ["lead" tag](../design/design-system.md#chips-and-badges) unless its name says it already, then `<Team> · <role>` (12.5px `--tx4`).
   - What it is doing, its [activity line](../architecture/harness-adapters.md#activity-lines) and when (Mono 12px `--tx3`), while there is one. Then a line per repo: the repo (Mono 12px `--tx4`), the branch checked out there (Mono 12.5px `--accTx`), `N ahead` when it has commits its repo's default branch hasn't, and `uncommitted changes` (`--accTx`) when the worktree holds changes not committed yet. Each line opens [Repos](./repos.md) on that repo and branch. A team agent with no worktree yet says `No worktree yet: made at its first start.`
   - **`Session`** for the team's agents (opens it in the [Session](./sessions.md) section), else `not on the team` (`--tx4`).
-- **Empty** (no team, no worktree left): `No team is on <project>. Deploy one and each member gets its own worktree of the project's repos.`
+- **Empty** (no team): `No team is on <project>. Deploy one and each member gets its own worktree of the project's repos.`
 
-Where a branch is checked out comes from git (`git worktree list`), on `GET /api/projects/:id/repos`: each branch's `agent` is the agent whose sandbox holds that worktree ([Repos → Data](./repos.md#data)). Removing a stopped team's worktrees is not built yet ([Remove a stopped deployment's worktrees](../../backlog/remove-worktrees.md)).
+Where a branch is checked out comes from git (`git worktree list`), on `GET /api/projects/:id/repos`: each branch's `agent` is the agent whose sandbox holds that worktree ([Repos → Data](./repos.md#data)).
 
-## In flight, then Merged
+### Earlier teams
 
-The [project pipeline](./project-pipeline.md)'s **In flight** and **Merged** sections: the work moving towards its targets, and what merged in the last 7 days. Side by side, half the width each, when both fit at 440px or more (the CEO, 2026-10-17); stacked otherwise, and either one alone takes the whole width.
+Apart from the team's (the CEO, 2026-11-02): **`Left by earlier teams`** ([section title](../design/design-system.md#type), with their count), `Their worktrees stay after a Stop, so a redeploy picks them up.` (13px `--tx3`), and **`Clean up`** on the right; then a panel of their rows, as above. A row is a worktree an earlier team left on the project (Stop keeps worktrees) that no agent of the team holds: one of the same id takes it over ([Team definition](../models/team-definition.md#schema)). Each is named as the team that stopped there last has it, else by its agent id.
+
+**Clean up** asks first (`Clean up what earlier teams left?`, `Removes their worktrees that hold nothing uncommitted, and their wt/ branches a target already holds (kept aside a while, recoverable by hand). Everything else stays, and is listed with why.`, **`Clean up`** in the danger style), then `POST /api/projects/:id/cleanup` removes **only what is safe** (the CEO, 2026-11-02), in each code repo, of every agent with a worktree in the project's sandboxes that runs on no project (a repo may be in several):
+
+- its **worktree**, when it holds nothing not committed (git refuses otherwise) and no merge is under way (`git worktree remove`, its folder included; its branch stays);
+- its **`wt/<agent>/*` branches** a target of the repo holds all of, and that nothing has checked out, each head kept under `refs/foreman/cleaned/<time>/` until backups are pruned ([Resume and backups](../../backlog/archive/resume-and-clean-desks.md)). A lead's `lead/<team>/*` branches stay: they are a review's.
+
+It answers `{removed, kept}`, each a list of `{agent, repo, what (worktree | branch), branch, why}`; a toast says how many went, and what was kept is listed under the panel with why (`changes not committed`, `a merge is under way in it`, `no target holds all of it`, `it is checked out`). Nothing else changes: the agents' harness folders (their conversations) and sandbox folders stay.
+
+## In flight and Merged
+
+The [project pipeline](./project-pipeline.md)'s **In flight** and **Merged**: the work moving towards its targets, and what merged in the last 7 days (each with a calm line when empty: `No work in flight. It shows here from a hand-off to the lead to its merge.`, `Nothing merged in the last 7 days.`).
 
 Every branch in them is a link to its code in Repos: a merge request's in its repo; a work item's (which names no repo) in the first repo that has the branch with commits beyond its default branch, else the first that has it at all. A merge request's **Review** opens its review in the [Inbox](./reviews.md).
 

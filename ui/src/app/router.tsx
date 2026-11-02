@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { Agent } from "../screens/Agent";
 import { ChiefOfStaff } from "../screens/ChiefOfStaff";
 import { Dashboard } from "../screens/Dashboard";
@@ -13,12 +13,13 @@ import { Repos } from "../screens/project/Repos";
 import { Review } from "../screens/project/Review";
 import { Session } from "../screens/project/Session";
 import { Wiki } from "../screens/project/Wiki";
-import { Settings } from "../screens/Settings";
+import { Settings, SettingsFrame } from "../screens/Settings";
 import { Team } from "../screens/Team";
 import { cosSearch } from "./chiefOfStaff";
 import { type TeamTab, teamTabs } from "./model";
+import { type DeploymentView, deploymentViews } from "./project";
 import { Shell } from "./Shell";
-import { settingsSearch } from "./settings";
+import { settingsTab } from "./settings";
 
 // One route per screen (wiki/product/features/app-shell.md), and one per
 // section of a project (wiki/product/features/project-page.md), with typed
@@ -86,22 +87,63 @@ const repoRoute = createRoute({
   component: Repo,
 });
 
-const deployment = createRoute({ ...section("deployment"), component: Deployment });
+const deployment = createRoute({
+  ...section("deployment"),
+  // No view in the URL: the page picks one from whether there are agents.
+  validateSearch: (s: Record<string, unknown>): { view?: DeploymentView } => ({
+    view: deploymentViews.some((v) => v.view === s.view) ? (s.view as DeploymentView) : undefined,
+  }),
+  component: Deployment,
+});
 const activity = createRoute({ ...section("activity"), component: Activity });
 const projectSettings = createRoute({ ...section("settings"), component: ProjectSettings });
 
-export const teamRoute = createRoute({
+// Settings: its tabs, then the teams' and their agents' pages, which live
+// there (the CEO, 2026-11-02: the sidebar holds only the projects).
+const settingsRoute = createRoute({
   getParentRoute: () => root,
+  path: "settings",
+  component: SettingsFrame,
+});
+
+// /settings opens Teams; an old /settings?tab=<tab> link opens that tab.
+const settingsHome = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "/",
+  validateSearch: (s: Record<string, unknown>): { tab?: unknown } => ({ tab: s.tab }),
+  beforeLoad: ({ search }) => {
+    throw redirect({
+      to: "/settings/$tab",
+      params: { tab: settingsTab(search.tab) },
+      replace: true,
+    });
+  },
+});
+
+const settingsTabRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "$tab",
+  beforeLoad: ({ params }) => {
+    if (settingsTab(params.tab) !== params.tab)
+      throw redirect({ to: "/settings/$tab", params: { tab: "teams" }, replace: true });
+  },
+  component: Settings,
+});
+
+// No tab in the URL: the page picks one from whether the team is deployed.
+const teamSearch = (s: Record<string, unknown>): { tab?: TeamTab } => ({
+  tab: teamTabs.includes(s.tab as TeamTab) ? (s.tab as TeamTab) : undefined,
+});
+
+const teamRoute = createRoute({
+  getParentRoute: () => settingsRoute,
   path: "teams/$team",
-  // No tab in the URL: the page picks one from whether the team is deployed.
-  validateSearch: (s: Record<string, unknown>): { tab?: TeamTab } => ({
-    tab: teamTabs.includes(s.tab as TeamTab) ? (s.tab as TeamTab) : undefined,
-  }),
+  validateSearch: teamSearch,
   component: Team,
 });
 
-export const agentRoute = createRoute({
-  getParentRoute: () => root,
+const agentRoute = createRoute({
+  getParentRoute: () => settingsRoute,
   path: "teams/$team/agents/$agent",
   component: Agent,
 });
@@ -113,11 +155,22 @@ const chiefOfStaff = createRoute({
   component: ChiefOfStaff,
 });
 
-const settings = createRoute({
+// Where the team pages were before they moved into Settings.
+const oldTeam = createRoute({
   getParentRoute: () => root,
-  path: "settings",
-  validateSearch: settingsSearch,
-  component: Settings,
+  path: "teams/$team",
+  validateSearch: teamSearch,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({ to: "/settings/teams/$team", params, search, replace: true });
+  },
+});
+
+const oldAgent = createRoute({
+  getParentRoute: () => root,
+  path: "teams/$team/agents/$agent",
+  beforeLoad: ({ params }) => {
+    throw redirect({ to: "/settings/teams/$team/agents/$agent", params, replace: true });
+  },
 });
 
 export const router = createRouter({
@@ -136,10 +189,10 @@ export const router = createRouter({
       activity,
       projectSettings,
     ]),
-    teamRoute,
-    agentRoute,
     chiefOfStaff,
-    settings,
+    settingsRoute.addChildren([settingsHome, settingsTabRoute, teamRoute, agentRoute]),
+    oldTeam,
+    oldAgent,
   ]),
 });
 

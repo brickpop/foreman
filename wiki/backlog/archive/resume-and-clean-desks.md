@@ -16,7 +16,7 @@ epic: git
 - **Idle desks follow main.** A home branch (`wt/<agent>/main`, `lead/<team>/integration`) with nothing unmerged and nothing uncommitted moves to the current `main`: on deploy, and after a merge. A desk with work stays as it is.
 - **`discard(repos?)`**, a team tool: the agent's worktrees back to their branch as committed (changes reverted, new files removed, ignored ones kept); the changes are first saved as a commit under `refs/foreman/discarded/…`. Refused during an unfinished merge (`abort_merge()` first). Agents can't do it with git: the index is under the read-only `.git` (`git restore` fails).
 - **Close dropping a branch an idle worktree holds:** its changes not committed are saved beside the branch's backup, then the worktree is reset to `main`: no more "kept" branches for changes in the way.
-- **Stop is unchanged:** worktrees and branches stay. Removing worktrees is its own explicit action: [Remove a stopped deployment's worktrees](../remove-worktrees.md).
+- **Stop is unchanged:** worktrees and branches stay. Removing worktrees is its own explicit action: [Remove a stopped deployment's worktrees](./remove-worktrees.md).
 - **Backups expire:** every saved copy under `refs/foreman/` carries its date in its name and is deleted 30 days later.
 - **A resumed agent is told what it has:** a notice when its session starts fresh (the session prompt stays the same for every run: live git state would go stale in it), listing its branches with work main lacks, its changes not committed and, for the lead, its open reviews. The prompt says, always, that worktrees persist and to check where you are (the CEO, 2026-10-22).
 

@@ -3,6 +3,7 @@ import type { Deployment, Instance } from "../api/client";
 import { replacingLine, sessionsEnd } from "./model";
 import {
   deploymentOn,
+  deploymentView,
   latestFirst,
   latestStopped,
   projectHome,
@@ -107,5 +108,20 @@ describe("the projects, latest first", () => {
   it("leaves the order as it is until the times are in", () => {
     const list = p("b", "a");
     expect(latestFirst(list, undefined)).toBe(list);
+  });
+});
+
+describe("deploymentView", () => {
+  it("opens on Agents while there are agents, else In flight", () => {
+    expect(deploymentView(undefined, true)).toBe("agents");
+    expect(deploymentView(undefined, false)).toBe("inflight");
+  });
+
+  it("keeps the view asked for, and ignores an unknown one", () => {
+    expect(deploymentView("merged", true)).toBe("merged");
+    expect(deploymentView("agents", false)).toBe("agents");
+    for (const asked of ["Merged", "", 3, ["merged"]]) {
+      expect(deploymentView(asked, true)).toBe("agents");
+    }
   });
 });

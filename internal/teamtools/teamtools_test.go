@@ -36,7 +36,8 @@ func (c config) Project(id string) (home.Project, error) {
 	}
 	return p, nil
 }
-func (config) Projects() []home.Project { return nil }
+func (config) Projects() []home.Project      { return nil }
+func (config) Sandbox(string, string) string { return "" }
 
 // spy is a block that records the calls that reach it.
 type spy struct{ calls []string }

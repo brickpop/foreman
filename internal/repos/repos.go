@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
 	"regexp"
 	"slices"
 
@@ -124,7 +123,7 @@ func (b Browser) branches(ctx context.Context, project, dir, def string) ([]Bran
 		if tree, ok := trees[name]; ok {
 			clean, err := b.Git.Clean(ctx, tree)
 			br.Uncommitted = err == nil && !clean
-			br.Agent = b.agentOf(project, tree)
+			br.Agent = home.WorktreeAgent(tree, func(agent string) string { return b.Config.Sandbox(project, agent) })
 		}
 		list = append(list, br)
 	}
@@ -139,29 +138,6 @@ func (b Browser) branches(ctx context.Context, project, dir, def string) ([]Bran
 		return 0
 	})
 	return list, nil
-}
-
-// agentOf is the agent whose sandbox holds the worktree (its folder is
-// <sandbox>/<repo>), or "" when it is no agent's (the CEO's checkout).
-func (b Browser) agentOf(project, tree string) string {
-	sandbox := filepath.Dir(tree)
-	agent := filepath.Base(sandbox)
-	if samePath(b.Config.Sandbox(project, agent), sandbox) {
-		return agent
-	}
-	return ""
-}
-
-// samePath compares two folders as the file system sees them: git reports
-// worktrees with symlinks resolved (macOS's /var is /private/var).
-func samePath(a, b string) bool {
-	resolve := func(p string) string {
-		if r, err := filepath.EvalSymlinks(p); err == nil {
-			return r
-		}
-		return filepath.Clean(p)
-	}
-	return resolve(a) == resolve(b)
 }
 
 // at is the repo's folder and the commit ref names.

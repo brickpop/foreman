@@ -74,3 +74,18 @@ export function latestFirst<T extends { id: string }>(
   const at = (p: T) => (p.id in latest ? Date.parse(latest[p.id]) : Number.POSITIVE_INFINITY);
   return [...projects].sort((a, b) => at(b) - at(a) || a.id.localeCompare(b.id));
 }
+
+export type DeploymentView = "agents" | "inflight" | "merged";
+export const deploymentViews: { view: DeploymentView; label: string }[] = [
+  { view: "agents", label: "Agents" },
+  { view: "inflight", label: "In flight" },
+  { view: "merged", label: "Merged" },
+];
+
+/** The Deployment section's view: the one in the URL, else Agents while there
+ * are agents to show (the team's, or an earlier team's worktrees), else In
+ * flight. */
+export function deploymentView(asked: unknown, agents: boolean): DeploymentView {
+  const known = deploymentViews.find((v) => v.view === asked)?.view;
+  return known ?? (agents ? "agents" : "inflight");
+}

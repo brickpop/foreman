@@ -5,7 +5,7 @@ import { sidebarModel } from "./Shell";
 
 const project = (id: string) => ({ id }) as Project;
 const team = (id: string, name: string) => ({ id, config: { name } }) as Team;
-const instance = (deploymentId: string) => ({ deploymentId }) as Instance;
+const instance = (deploymentId: string, status: string) => ({ deploymentId, status }) as Instance;
 const request = (projectId: string, status = "open", kind = "question") =>
   ({ projectId, status, kind }) as Request;
 
@@ -13,7 +13,6 @@ describe("sidebarModel", () => {
   it("counts each project's Inbox: its open requests, reviews included", () => {
     const m = sidebarModel(
       [project("ledger"), project("relay"), project("harbor")],
-      [],
       [],
       [
         request("ledger"),
@@ -37,7 +36,6 @@ describe("sidebarModel", () => {
         { ...project("harbor"), archived: true },
       ],
       [],
-      [],
       [request("harbor")],
     );
     expect(m.projects).toEqual([{ id: "ledger", inbox: 0 }]);
@@ -47,23 +45,19 @@ describe("sidebarModel", () => {
     ]);
   });
 
-  it("says where each team is deployed", () => {
+  it("marks a project's Session while its team is busy, not at rest", () => {
     const m = sidebarModel(
-      [],
-      [team("atlas", "Atlas"), team("vesper", "Vesper"), team("orion", "")],
+      [project("ledger"), project("relay"), project("harbor"), project("big-ledger")],
       [
-        instance("atlas@big-ledger"),
-        instance("atlas@big-ledger"),
-        instance("vesper@ledger"),
-        instance("vesper@relay"),
+        instance("atlas@ledger", "idle"),
+        instance("atlas@ledger", "running"),
+        instance("orion@relay", "idle"),
+        instance("orion@relay", "asleep"),
+        instance("vesper@big-ledger", "awaiting"),
       ],
       [],
     );
-    expect(m.teams).toEqual([
-      { id: "atlas", name: "Atlas", deployedOn: "Big ledger" },
-      { id: "vesper", name: "Vesper", deployedOn: "2 projects" },
-      { id: "orion", name: "orion", deployedOn: "—" },
-    ]);
+    expect(m.projects.map((p) => p.busy)).toEqual(["running", undefined, undefined, "awaiting"]);
   });
 });
 

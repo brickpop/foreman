@@ -15,7 +15,7 @@ import {
 import { rosterOrder } from "../../app/sessions";
 import { Chevron } from "../../components/icons";
 import { ActionRow, CallMap, FilterStrip, namesOf, ThreadRow } from "../../components/TeamActivity";
-import { Button, Empty, Loading, Panel, SectionLabel } from "../../components/ui";
+import { Button, Empty, Loading, Panel, SectionTitle } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Activity section (wiki/product/features/project-activity.md):
@@ -164,7 +164,7 @@ function OlderSessions({ deployments, teams }: { deployments: Deployment[]; team
         className="flex items-center gap-1.5 self-start"
       >
         <Chevron open={open} />
-        <SectionLabel>Older sessions · {deployments.length}</SectionLabel>
+        <SectionTitle count={deployments.length}>Older sessions</SectionTitle>
       </button>
       {open &&
         deployments.map((d) => (

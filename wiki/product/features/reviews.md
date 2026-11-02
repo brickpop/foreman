@@ -12,10 +12,10 @@ Where the CEO reviews a lead's branch as on a forge, and decides it (the CEO, 20
 
 `/projects/<project>/inbox`, a section of the [Project page](./project-page.md), with the sidebar's count of what waits on the CEO there: the project's open requests, reviews included ([App shell](./app-shell.md#sidebar)). At most 920px wide, 32px between sections, no title (the sidebar names it).
 
-Four sections, each left out when empty, one panel of rows each but the requests: **Needs your review** (`needs-review`), then the project's other open requests, **Needs you** (one [request panel](./project-pipeline.md#1-needs-you) each), then **Waiting on the lead** (`changes-requested`) and **Done** (merged, dismissed or withdrawn, the last 20). The server lists the reviews newest first (the latest opened).
+Three sections, each under a [section title](../design/design-system.md#type) with its count (the CEO, 2026-11-02: titles that read as such): **Needs you**, always shown, the reviews to decide (`needs-review`, a panel of rows) then the project's other open requests (one [request panel](./project-pipeline.md#1-needs-you) each); then, each left out when empty, **Waiting on the lead** (`changes-requested`) and **Done** (merged, dismissed or withdrawn, the last 20). The server lists the reviews newest first (the latest opened).
 
 - **Row** (grid `1fr auto`, padding `12px 16px`, the whole row a link to its page): the entry's title (500), then `<Lead> · <repos> · <branch>` (branch in Mono); on the right the status (`Needs your review`, `Changes requested`, `Merged`, `Dismissed`, `Withdrawn`) over its time.
-- **Empty**: `Nothing waits on you on <project>. A lead's request_merge() opens a review.`
+- **Nothing needs you**: under its title, `Nothing needs you yet.` in the calm [empty style](../design/design-system.md#surfaces), whatever waits on the lead or is done.
 
 ## A review's page
 

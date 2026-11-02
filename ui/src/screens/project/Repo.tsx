@@ -23,8 +23,8 @@ import {
   readmeOf,
   shownAt,
 } from "../../app/repos";
+import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Frontmatter } from "../../components/Frontmatter";
-import { Chevron } from "../../components/icons";
 import { FileMarkdown } from "../../components/Markdown";
 import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
 import { useProject } from "../Project";
@@ -317,7 +317,7 @@ function Tree({
       return next;
     });
   return (
-    <nav aria-label="Files" className="min-h-0 overflow-auto pr-1">
+    <nav aria-label="Files" className="flex min-h-0 flex-col overflow-auto pr-1">
       <Folder
         project={project}
         at={at}
@@ -355,71 +355,53 @@ function Folder({
   onPick: (path: string) => void;
 }) {
   const tree = useRepoTree(project, at.repo, at.branch, path);
-  const indent = { paddingLeft: 8 + depth * 14 };
   if (tree.isPending) return <Loading rows={depth === 0 ? 6 : 1} />;
   if (tree.isError)
-    return (
-      <p className="m-0 py-1 text-[12.5px] text-err" style={indent}>
-        {tree.error.message}
-      </p>
-    );
+    return <p className="m-0 px-1.5 py-1 text-[12.5px] text-err">{tree.error.message}</p>;
   if (tree.data.length === 0 && depth === 0)
     return <p className="m-0 px-2 text-[13px] text-tx4">Nothing committed here yet.</p>;
-  const row =
-    "flex w-full min-w-0 items-center gap-1.5 rounded-md py-[3px] pr-2 text-left font-mono text-[12.5px]";
   return tree.data.map((e) => {
     const to = path ? `${path}/${e.name}` : e.name;
     if (e.kind === "module")
       return (
-        <span key={e.name} className={`${row} text-tx4`} style={indent} title="A submodule">
-          <span className="w-3" />
-          <span className="truncate">{e.name}</span>
-          <span className="font-sans text-[11px]">submodule</span>
-        </span>
+        <TreeRow key={e.name} mono after={<span className="font-sans text-[11px]">submodule</span>}>
+          {e.name}
+        </TreeRow>
       );
     if (e.kind === "dir") {
       const isOpen = open.has(to);
       return (
-        <div key={e.name}>
-          <button
-            type="button"
-            aria-expanded={isOpen}
-            onClick={() => onToggle(to)}
-            className={`${row} text-tx hover:bg-hover`}
-            style={indent}
-          >
-            <Chevron open={isOpen} />
-            <span className="truncate">{e.name}</span>
-          </button>
+        <div key={e.name} className="flex flex-col">
+          <TreeRow folder mono open={isOpen} onClick={() => onToggle(to)}>
+            {e.name}
+          </TreeRow>
           {isOpen && (
-            <Folder
-              project={project}
-              at={at}
-              path={to}
-              depth={depth + 1}
-              open={open}
-              selected={selected}
-              onToggle={onToggle}
-              onPick={onPick}
-            />
+            <TreeChildren>
+              <Folder
+                project={project}
+                at={at}
+                path={to}
+                depth={depth + 1}
+                open={open}
+                selected={selected}
+                onToggle={onToggle}
+                onPick={onPick}
+              />
+            </TreeChildren>
           )}
         </div>
       );
     }
-    const on = to === selected;
     return (
-      <button
+      <TreeRow
         key={e.name}
-        type="button"
-        aria-current={on ? "page" : undefined}
+        mono
+        current={to === selected}
         onClick={() => onPick(to)}
-        className={`${row} ${on ? "bg-accSoft text-accTx" : "text-tx2 hover:bg-hover"}`}
-        style={indent}
+        after={e.kind === "link" && <span className="font-sans text-[11px] text-tx4">link</span>}
       >
-        <span className="w-3 shrink-0" />
-        <span className="truncate">{e.name}</span>
-        {e.kind === "link" && <span className="font-sans text-[11px] text-tx4">link</span>}
-      </button>
+        {e.name}
+      </TreeRow>
     );
   });
 }

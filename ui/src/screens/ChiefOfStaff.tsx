@@ -121,7 +121,7 @@ function StartError({ error }: { error: Error }) {
     <div className="flex flex-col gap-2 p-6 text-[13.5px]">
       <p className="m-0 text-err">{error.message}</p>
       {code === "NOT_CONNECTED" && (
-        <Link to="/settings" className="text-accTx">
+        <Link to="/settings/$tab" params={{ tab: "agents" }} className="text-accTx">
           Open Settings → Agents → Profiles
         </Link>
       )}
@@ -152,7 +152,11 @@ function Preview({
     onSuccess: (saved) => {
       queries.invalidateQueries({ queryKey: keys.teams });
       if (isNew)
-        navigate({ to: "/teams/$team", params: { team: saved.id }, search: { tab: "members" } });
+        navigate({
+          to: "/settings/teams/$team",
+          params: { team: saved.id },
+          search: { tab: "members" },
+        });
       else onSaved(saved.config.name);
     },
   });

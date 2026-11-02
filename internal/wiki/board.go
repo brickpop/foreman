@@ -2,9 +2,7 @@ package wiki
 
 import (
 	"fmt"
-	"os"
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -44,8 +42,6 @@ func (w *Wikis) Boards(project string) ([]Board, error) {
 		// A value of the wrong type: shown where the boards would be.
 		return []Board{{ID: "#1", Name: "wiki.toml", Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Problems: []string{err.Error()}}}, nil
 	}
-	raw, _ := os.ReadFile(filepath.Join(idx.Bundle.Dir, "wiki.toml"))
-	quoted := quotes(string(raw))
 	out := []Board{}
 	for i, d := range decls {
 		b := Board{ID: d.ID, Name: d.Name, Columns: []string{}, Lanes: []string{}, Cards: []Card{}}
@@ -58,9 +54,6 @@ func (w *Wikis) Boards(project string) ([]Board, error) {
 			b.ID = fmt.Sprintf("#%d", i+1)
 		}
 		b.Problems = append([]string{}, problems[i]...)
-		if i < len(quoted) {
-			b.Declaration = quoted[i]
-		}
 		out = append(out, b)
 	}
 	return out, nil
@@ -193,28 +186,6 @@ func ordered(field string, declared, found []string) []string {
 	}
 	if slices.Contains(found, "") {
 		out = append(out, "")
-	}
-	return out
-}
-
-// quotes cuts each [[tool.wikiview.board]] table out of wiki.toml's text, in
-// order, to show the CEO the declaration as written.
-func quotes(toml string) []string {
-	var out []string
-	var current *strings.Builder
-	for _, line := range strings.SplitAfter(toml, "\n") {
-		header := strings.TrimSpace(line)
-		switch {
-		case header == "[[tool.wikiview.board]]":
-			current = &strings.Builder{}
-			out = append(out, "")
-		case strings.HasPrefix(header, "["):
-			current = nil
-		}
-		if current != nil {
-			current.WriteString(line)
-			out[len(out)-1] = strings.TrimSpace(current.String())
-		}
 	}
 	return out
 }

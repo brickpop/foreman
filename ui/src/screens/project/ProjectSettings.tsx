@@ -14,7 +14,7 @@ import {
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, Card } from "../../components/ui";
+import { Button, GroupCard } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Settings section (wiki/product/features/project-settings.md):
@@ -54,11 +54,11 @@ function Configuration({ project }: { project: Project }) {
   ).join("\n");
   return (
     <section className="flex max-w-[760px] flex-col gap-6 px-6 pt-6 pb-12">
-      <Section title="General">
+      <GroupCard title="General">
         <Workspace project={project} />
         <ProfileChoice project={project} />
-      </Section>
-      <Section title="Rules" aside="project.toml">
+      </GroupCard>
+      <GroupCard title="Rules" aside="project.toml">
         <Block title="What comes to you">
           <div className="grid grid-cols-[84px_1fr] gap-x-3 gap-y-2">
             {[
@@ -131,8 +131,8 @@ function Configuration({ project }: { project: Project }) {
             {project.source}
           </pre>
         </Block>
-      </Section>
-      <Section title="How it works" collapsible>
+      </GroupCard>
+      <GroupCard title="How it works" collapsible>
         <Block title="Where things live">
           <pre className="m-0 overflow-x-auto font-mono text-[13px] leading-[1.7] whitespace-pre text-tx2">
             {tree}
@@ -163,11 +163,11 @@ function Configuration({ project }: { project: Project }) {
             </div>
           ))}
         </Block>
-      </Section>
-      <Section title="Danger zone" danger>
+      </GroupCard>
+      <GroupCard title="Danger zone" danger>
         <ArchiveProject project={project} />
         <RemoveProject project={project} />
-      </Section>
+      </GroupCard>
     </section>
   );
 }
@@ -284,7 +284,7 @@ function ProfileChoice({ project }: { project: Project }) {
       <span className="text-[13.5px] text-tx2">
         Its agents run on this harness and login, from their next start. Profiles are yours on this
         machine, in{" "}
-        <Link to="/settings" className="text-accTx hover:underline">
+        <Link to="/settings/$tab" params={{ tab: "agents" }} className="text-accTx hover:underline">
           Settings → Agents
         </Link>
         .
@@ -428,58 +428,6 @@ function RemoveProject({ project }: { project: Project }) {
         </label>
       </Confirm>
     </Block>
-  );
-}
-
-/** A group of settings: a card titled in its header band, its blocks one
- * under another, a line between them. A collapsible one (reference text)
- * starts closed. */
-function Section({
-  title,
-  aside,
-  collapsible = false,
-  danger = false,
-  children,
-}: {
-  title: string;
-  /** Where its settings come from, after the title. */
-  aside?: string;
-  collapsible?: boolean;
-  danger?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(!collapsible);
-  const label = (
-    <>
-      <h2 className={`m-0 text-[14px] font-semibold ${danger ? "text-err" : ""}`}>{title}</h2>
-      {aside && <span className="font-mono text-[12px] text-tx4">{aside}</span>}
-    </>
-  );
-  return (
-    <Card
-      danger={danger}
-      head={
-        collapsible ? (
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            className="-mx-4 -my-2 flex flex-1 items-center gap-2 self-stretch px-4 py-2 text-left"
-          >
-            <span className={`text-tx4 transition-transform ${open ? "rotate-90" : ""}`}>›</span>
-            {label}
-          </button>
-        ) : (
-          label
-        )
-      }
-    >
-      {open && (
-        <div className="flex flex-col divide-y divide-line [&>*]:py-4 [&>*:first-child]:pt-0.5 [&>*:last-child]:pb-0.5">
-          {children}
-        </div>
-      )}
-    </Card>
   );
 }
 

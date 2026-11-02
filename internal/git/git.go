@@ -187,6 +187,18 @@ func (g *CLI) MoveWorktree(ctx context.Context, repo, from, to string) error {
 	return err
 }
 
+// RemoveWorktree removes one of repo's worktrees, its folder included; its
+// branch stays. Git refuses one with changes not committed (tracked or not),
+// so nothing is lost: ErrUncommitted.
+func (g *CLI) RemoveWorktree(ctx context.Context, repo, worktree string) error {
+	defer g.lock(ctx, repo)()
+	_, err := run(ctx, repo, "worktree", "remove", "--", worktree)
+	if err != nil && strings.Contains(err.Error(), "contains modified or untracked files") {
+		return ErrUncommitted
+	}
+	return err
+}
+
 // PruneWorktrees makes repo forget its worktrees whose folder is gone (a
 // project's sandboxes removed); their branches stay.
 func (g *CLI) PruneWorktrees(ctx context.Context, repo string) error {

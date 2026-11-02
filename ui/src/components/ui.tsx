@@ -70,6 +70,58 @@ export function Card({
   );
 }
 
+/** A group of settings (Settings, Project settings): a card titled in its
+ * header band, its rows one under another, a line between them. A collapsible
+ * one (reference text) starts closed. */
+export function GroupCard({
+  title,
+  aside,
+  collapsible = false,
+  danger = false,
+  children,
+}: {
+  title: string;
+  /** Where its settings are kept or come from, after the title. */
+  aside?: string;
+  collapsible?: boolean;
+  danger?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(!collapsible);
+  const label = (
+    <>
+      <h2 className={`m-0 text-[14px] font-semibold ${danger ? "text-err" : ""}`}>{title}</h2>
+      {aside && <span className="text-[12.5px] text-tx4">{aside}</span>}
+    </>
+  );
+  return (
+    <Card
+      danger={danger}
+      head={
+        collapsible ? (
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="-mx-4 -my-2 flex flex-1 items-center gap-2 self-stretch px-4 py-2 text-left"
+          >
+            <span className={`text-tx4 transition-transform ${open ? "rotate-90" : ""}`}>›</span>
+            {label}
+          </button>
+        ) : (
+          label
+        )
+      }
+    >
+      {open && (
+        <div className="flex flex-col divide-y divide-line [&>*]:py-4 [&>*:first-child]:pt-0.5 [&>*:last-child]:pb-0.5">
+          {children}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /** A status in a card's header: its dot and word on a tint of its color. */
 export function StatusPill({ color, children }: { color: string; children: ReactNode }) {
   return (
@@ -123,7 +175,7 @@ export function Segmented<T extends string>({
 function segment(on: boolean) {
   return `rounded-[6px] border px-3 py-1 text-[13px] focus-visible:outline-2 focus-visible:outline-acc disabled:opacity-45 ${
     on
-      ? "border-line2 bg-raised text-tx"
+      ? "border-transparent bg-accSoft font-medium text-accTx"
       : "border-transparent bg-transparent text-tx3 hover:text-tx2"
   }`;
 }
@@ -238,8 +290,20 @@ export function NotBuilt({ what }: { what: string }) {
 }
 
 /** A section label ("Projects", "Needs you"). */
+/** A small label over a group inside a section (a review's repo in its tree). */
 export function SectionLabel({ children }: { children: ReactNode }) {
   return <div className="text-[13px] font-medium text-tx4">{children}</div>;
+}
+
+/** A page section's title (Needs you, Projects, In flight), with how many it
+ * holds when that helps. */
+export function SectionTitle({ children, count }: { children: ReactNode; count?: number }) {
+  return (
+    <h2 className="m-0 flex items-baseline gap-2 text-[15px] font-semibold text-tx">
+      {children}
+      {count !== undefined && <span className="text-[13px] font-normal text-tx4">{count}</span>}
+    </h2>
+  );
 }
 
 /** A page's H1, with its subtitle. */

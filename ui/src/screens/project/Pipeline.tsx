@@ -7,7 +7,7 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { agentOf, inbox, readable, when } from "../../app/model";
+import { agentOf, readable, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   useAnswer,
@@ -15,12 +15,11 @@ import {
   useInstances,
   usePipeline,
   useRepos,
-  useRequests,
   useTeams,
 } from "../../app/queries";
 import { reposWith } from "../../app/repos";
 import { RequestPanel } from "../../components/RequestPanel";
-import { Button, Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../components/ui";
+import { Button, Empty, Loading, NotBuilt, Panel } from "../../components/ui";
 
 // A project's pipeline (wiki/product/features/project-pipeline.md): what needs
 // the CEO, in its Inbox (a review opens its page there); the work moving
@@ -35,27 +34,10 @@ export function sourceLabel(r: Request): string {
 
 const stageLabels = ["in worktree", "handed to lead", "lead reviewing", "integrated"];
 
-/** What waits on the CEO on this project but its reviews, in its Inbox;
- * nothing when nothing does. */
-export function NeedsYou({ project }: { project: Project }) {
-  const requests = useRequests();
-  const teams = useTeams();
-  const open = inbox(requests.data ?? []).filter((r) => r.projectId === project.id);
-  if (open.length === 0) return null;
-  return (
-    <section className="flex flex-col gap-2.5">
-      <SectionLabel>Needs you</SectionLabel>
-      {open.map((r) => (
-        <ProjectRequest key={r.id} request={r} project={project} teams={teams.data ?? []} />
-      ))}
-    </section>
-  );
-}
-
-/** The work on its way to its targets, and what merged in the last 7 days: on the
- * Deployment section, under the agents' worktrees. Each branch links to its
- * code in Repos. */
-export function InFlight({ project }: { project: Project }) {
+// The work on its way to its targets, and what merged in the last 7 days: the
+// Deployment section's In flight and Merged views. Each branch links to its
+// code in Repos.
+function usePipelineOf(project: Project) {
   const pipeline = usePipeline(project.id);
   const teams = useTeams();
   const instances = useInstances();
@@ -63,11 +45,11 @@ export function InFlight({ project }: { project: Project }) {
   const mrs = pipeline.data?.mergeRequests ?? [];
   const items = pipeline.data?.workItems ?? [];
   const live = new Set((instances.data ?? []).map((i) => i.deploymentId));
-  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
-  const merged = mrs
-    .filter((m) => m.state === "merged" && Date.parse(m.mergedAt) >= weekAgo)
-    .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))
-    .slice(0, 20);
+  return { pipeline, teams: teams.data ?? [], repos, mrs, items, live };
+}
+
+export function InFlight({ project }: { project: Project }) {
+  const { pipeline, teams, repos, mrs, items, live } = usePipelineOf(project);
   const openMrs = mrs.filter((m) => m.state === "open");
   // In flight on their own: every work item no merge request carries, integrated
   // ones included (they wait for the lead's request_merge). A dismissed review's
@@ -75,62 +57,59 @@ export function InFlight({ project }: { project: Project }) {
   const carried = (w: (typeof items)[number]) => mrs.some((m) => m.id === w.mergeRequestId);
   const loose = items.filter((w) => !carried(w));
   if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
-  // Side by side when both fit (the CEO, 2026-10-17); one alone takes the width.
+  if (pipeline.isPending) return <Loading />;
+  if (loose.length === 0 && openMrs.length === 0)
+    return (
+      <Empty>No work in flight. It shows here from a hand-off to the lead to its merge.</Empty>
+    );
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(440px,100%),1fr))] items-start gap-9">
-      <section className="flex min-w-0 flex-col gap-2.5">
-        <div className="flex items-baseline gap-2">
-          <SectionLabel>In flight</SectionLabel>
-          <span className="text-xs text-tx4">worktree → lead → target</span>
-        </div>
-        {pipeline.isPending ? (
-          <Loading />
-        ) : loose.length === 0 && openMrs.length === 0 ? (
-          <Empty>No work in flight.</Empty>
-        ) : (
-          <Panel>
-            {loose.map((w) => (
-              <WorkRow
-                key={w.id}
-                item={w}
-                project={project.id}
-                repo={reposWith(repos, w.branch)[0]}
-                teams={teams.data ?? []}
-                live={live.has(w.deploymentId)}
-              />
-            ))}
-            {openMrs.map((m) => (
-              <MergeRow
-                key={m.id}
-                mr={m}
-                project={project.id}
-                teams={teams.data ?? []}
-                items={items.filter((w) => w.mergeRequestId === m.id)}
-                live={live.has(m.deploymentId)}
-              />
-            ))}
-          </Panel>
-        )}
-      </section>
-      {merged.length > 0 && (
-        <section className="flex min-w-0 flex-col gap-2.5">
-          <SectionLabel>Merged</SectionLabel>
-          {merged.map((m) => (
-            <MergedRow
-              key={m.id}
-              mr={m}
-              project={project.id}
-              teams={teams.data ?? []}
-              items={items.filter((w) => w.mergeRequestId === m.id)}
-            />
-          ))}
-        </section>
-      )}
-    </div>
+    <Panel>
+      {loose.map((w) => (
+        <WorkRow
+          key={w.id}
+          item={w}
+          project={project.id}
+          repo={reposWith(repos, w.branch)[0]}
+          teams={teams}
+          live={live.has(w.deploymentId)}
+        />
+      ))}
+      {openMrs.map((m) => (
+        <MergeRow
+          key={m.id}
+          mr={m}
+          project={project.id}
+          teams={teams}
+          items={items.filter((w) => w.mergeRequestId === m.id)}
+          live={live.has(m.deploymentId)}
+        />
+      ))}
+    </Panel>
   );
 }
 
-function ProjectRequest({
+export function Merged({ project }: { project: Project }) {
+  const { pipeline, teams, mrs, items } = usePipelineOf(project);
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const merged = mrs
+    .filter((m) => m.state === "merged" && Date.parse(m.mergedAt) >= weekAgo)
+    .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))
+    .slice(0, 20);
+  if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
+  if (pipeline.isPending) return <Loading />;
+  if (merged.length === 0) return <Empty>Nothing merged in the last 7 days.</Empty>;
+  return merged.map((m) => (
+    <MergedRow
+      key={m.id}
+      mr={m}
+      project={project.id}
+      teams={teams}
+      items={items.filter((w) => w.mergeRequestId === m.id)}
+    />
+  ));
+}
+
+export function ProjectRequest({
   request: r,
   project,
   teams,

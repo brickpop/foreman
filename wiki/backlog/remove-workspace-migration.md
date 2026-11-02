@@ -16,5 +16,5 @@ Blocked by [Project workspaces](./project-workspaces.md), then by the CEO saying
 
 - [ ] the CEO confirms every project is migrated
 - [ ] remove the server's migration (the moves, the adapters' conversation renames), its route and types, the Project settings offer, and their tests
-- [ ] remove the old layout's leftovers: a home's `projects/` or `sandboxes/` is just an unknown folder
+- [ ] remove the old layout's leftovers: a home's `projects/` or `sandboxes/` is just an unknown folder; and the launch's removal of the old `<sandbox>/project` mount point ([Technical debt](../technical-debt.md#the-old-project-mount-point))
 - [ ] the specs (Home, Project settings, Harness adapters, API) and the technical-debt item

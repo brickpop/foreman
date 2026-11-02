@@ -49,6 +49,8 @@ type Git interface {
 	Discard(ctx context.Context, worktree, backup string) (bool, error)
 	Freshen(ctx context.Context, repo, branch, def string) (bool, error)
 	PruneBackups(ctx context.Context, dir string, before time.Time) error
+	Worktrees(ctx context.Context, dir string) (map[string]string, error)
+	RemoveWorktree(ctx context.Context, repo, worktree string) error
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
 	Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error)
 	Resolve(ctx context.Context, dir, ref string) (string, error)
@@ -63,6 +65,8 @@ type Git interface {
 type Config interface {
 	Project(id string) (home.Project, error)
 	Projects() []home.Project
+	// Sandbox is an agent's sandbox on a project: its worktrees' folder.
+	Sandbox(project, agent string) string
 }
 
 // Wiki reads a project's wiki entries (the Wiki block).
@@ -147,7 +151,7 @@ var definitions = []agentlink.Tool{
 			`"from":{"type":"string","description":"Only for a new branch whose work lands on a target other than the default: that target, e.g. release/2.0"}`, "branch")},
 	{Name: "commit", Description: "Commit everything you changed in each repo you name, on the branch checked out there, with that repo's message (git is read-only for you); repos you don't name are left as they are. After a merge with conflicts, committing a repo concludes its merge once no conflict markers are left.",
 		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
-			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; the lead's project repo is project"},`+
+			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; project for the project repo (the lead only)"},`+
 			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
 	{Name: "merge", Description: "Merge a branch (a target, the lead's, a teammate's) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
@@ -672,7 +676,7 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 	if err := t.w.Git.CommitAs(ctx, project.dir, "Contribution: "+title, t.author(), rel); err != nil {
 		return gitError(err)
 	}
-	path := "project/" + rel
+	path := filepath.Join(project.dir, rel)
 	if !t.c.Lead {
 		if _, err := t.w.Messages.Send(ctx, store.TeamMessage{DeploymentID: t.c.Deployment.ID, FromInstance: t.c.Instance.ID,
 			ToInstance: t.c.LeadInstance(), Kind: "contribute", Body: title + ", in " + path + ".", ArtifactRef: path}); err != nil {

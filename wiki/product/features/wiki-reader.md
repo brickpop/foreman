@@ -8,30 +8,32 @@ tags: [feature, ui, wiki]
 
 The project's **Wiki** section ([Project page](./project-page.md); Overview until 2026-10-31): a reader for the project's wiki bundle (`wiki/` in its project repo, `<workspace>/project/wiki/`), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only (what waits on the CEO is in the [Inbox](./reviews.md#the-inbox)). Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
 
+## Header
+
+Headed as a repo's page is ([Repos → A repo's page](./repos.md#a-repos-page); the CEO, 2026-11-02, so the two readers look alike): **`Knowledge base`** (18px, 600), and under it the wiki's folder on this machine, `<project repo>/wiki` (Mono 12.5px `--tx4`, ellipsis, its whole path as its title), the project repo being where it really is (`<workspace>/project`; for a project made before workspaces, `~/.foreman/projects/<name>`).
+
 ## The description
 
-The section opens with the project's description (15px `--tx3`, at most 780px), from [Project config](../models/project-config.md), when it has one. The old project header (name, path, `<Team> · Sessions` links, tabs) is gone since 2026-10-31: the name and sections are in the [sidebar](./app-shell.md#sidebar), the work in [Session](./sessions.md), the path in [Settings](./project-settings.md) (`<path>/project.toml · read-only`).
+Under the header, the project's description (15px `--tx3`, at most 780px), from [Project config](../models/project-config.md), when it has one. The old project header (name, path, `<Team> · Sessions` links, tabs) is gone since 2026-10-31: the name and sections are in the [sidebar](./app-shell.md#sidebar), the work in [Session](./sessions.md), the path in [Settings](./project-settings.md) (`<path>/project.toml · read-only`).
 
 ## Layout
 
-A grid (gap 32) using the full width: the file tree, **always shown** (the CEO, 2026-11-01), `minmax(150px, 200px)`, then the article, `minmax(0, 1fr)`. Under 760px the tree goes above the article, behind the `Files` toggle. Body padding `20px 24px 48px`; the article at most 780px wide.
+A grid (gap 24) using the full width, as a repo's page: the file tree, **always shown** (the CEO, 2026-11-01), `minmax(180px, 260px)`, then the entry, `minmax(0, 1fr)`, at most 820px wide. The tree and the entry **scroll apart**, each in its own pane, the page filling the window (the CEO, 2026-11-02): opening an entry shows its top while the tree stays where it is. Under 760px the tree goes above the entry, behind the `Files` toggle. There the two stack and the page scrolls as one. Body padding `24px 24px 24px` (`48px` at the bottom under 760px), 16px between the header, the description and the grid.
 
 ## Toolbar
 
 - **`Files`** toggle, **under 760px only** (above it the tree is always shown, so no toggle): a file-tree icon on its left (raised when open), **closed by default**. It carries no changed dot: those sit on the entries and folders in the tree.
-- The current entry path (Mono 12px `--tx4`, ellipsis): `<project>/project/wiki/<path>`.
 
 ## File tree
 
 Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` first, then subfolders, then entries, alphabetically. Folders are collapsed except those on the path to the current entry. A click anywhere on a folder's row expands or collapses it; expanding a folder that has an `index.md` also opens it.
 
-- Indentation: `10 + 14 × depth` px left padding; padding `5px 10px`; 13.5px; ellipsis on overflow.
-- Folders: 500, `--tx2`, led by a chevron (`--tx4`, turned down when open). Entries: 400, `--tx3`, their text in line with the folder names. The current entry: `--raised`, `--tx`.
+- **The file tree's look**, the same as a repo's ([Repos → A repo's page](./repos.md#a-repos-page)): a folder row has a chevron (turned down when open) and a folder icon (open or closed), a file row a file icon (both `--tx4`), in line with the folder names; an open folder's contents are indented 13px under its chevron, with a 1px `--line` guide down their left. Rows padding `3px 6px`, 13.5px, `--tx2`, ellipsis on overflow; the entries by their title. The current entry: `--accSoft`, `--accTx`. (The CEO, 2026-11-02, replacing indentation by padding alone.)
 - A 6px attention (`--attn`) **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").
 
 ## Article
 
-Full width of its column, gap 14. Opens `index.md` by default.
+As a repo's file is shown: the entry's path in the wiki (Mono 12.5px `--tx2`, ellipsis) stays at the top of the view while it scrolls, then the entry in a panel (padding `20px 24px`), gap 14 inside. Opens `index.md` by default.
 
 No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as wikiview has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them.
 
@@ -40,7 +42,7 @@ No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side,
 
 | Element | Rendering |
 |---|---|
-| H1 | Page title (30px) |
+| H1 | Page title (24px; the CEO, 2026-11-02: 30px was too big) |
 | H2 | 18px / 600, anchor target |
 | H3 | 15.5px / 600, anchor target (new: the prototype rendered no H3) |
 | Paragraph | 15.5px / 1.65 / `--tx2`, with inline emphasis, code and links |
@@ -69,7 +71,7 @@ As wikiview shows it (its `EntryView`; the CEO, 2026-11-02, replacing the `key: 
 
 ## Behaviour
 
-- **Opening an entry** (tree, link, board "Open in wiki"): shows it in the Wiki section (`?entry=<path>`), closes the side sheet, marks the entry seen, scrolls to the top. An unknown path falls back to `index.md`.
+- **Opening an entry** (tree, link, board "Open in wiki"): shows it in the Wiki section (`?entry=<path>`), closes the side sheet, marks the entry seen, scrolls the entry's pane to its top (the tree keeps its place). An unknown path falls back to `index.md`.
 - **Ticking a checkbox** writes that one character to the file atomically, guarded by the entry's version; on conflict the box reverts and an error toast explains it ([API](../architecture/api.md), `PUT /api/wiki/:project/checkbox/:path`).
 - **File changes** (agents or the CEO's editor) appear within about 1 s ([Persistence](../architecture/persistence.md)): the open entry re-renders, and changed entries get their dot.
 - Prose is read-only. The only writes are a checkbox tick here and a card move on the [Board](./board.md).

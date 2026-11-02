@@ -92,4 +92,9 @@ export interface RepoDiff {
    * git no longer has its commits).
    */
   gone: boolean;
+  /**
+   * TargetGone: an open repo whose target's branch went outside Foreman: no
+   * diff and no head, so it can't merge until the CEO picks another target.
+   */
+  targetGone: boolean;
 }

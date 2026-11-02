@@ -38,6 +38,11 @@ func (config) Team(id string) (home.Team, error) {
 	return atlas, nil
 }
 
+// Project: every project has a code repo, so every tool is offered.
+func (config) Project(id string) (home.Project, error) {
+	return home.Project{ID: id, Repos: []home.Repo{{Name: "api", Default: "main"}}}, nil
+}
+
 // sessions records what is typed into each instance and who was woken.
 type sessions struct {
 	mu    sync.Mutex
@@ -149,7 +154,7 @@ func (f *fixture) state(ref string) string {
 // serves exactly what the prompt describes is teamtools' test.
 func TestToolDefinitions(t *testing.T) {
 	for _, tool := range newFixture(t).m.Tools() {
-		if !json.Valid(tool.InputSchema) || tool.Description == "" || !slices.Contains(prompt.Offered(false), tool.Name) {
+		if !json.Valid(tool.InputSchema) || tool.Description == "" || !slices.Contains(prompt.Offered(false, true), tool.Name) {
 			t.Errorf("%s: a bad definition, or a tool no one is offered", tool.Name)
 		}
 	}

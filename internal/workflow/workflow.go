@@ -172,14 +172,16 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"},`+
 			`"into":{"type":"string","description":"The target it merges into, the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "entry")},
-	{Name: "create_target", Description: "Make a new target in one repo: a new branch name at from, any commit or branch of that repo. Work for it starts there with switch(branch, from), and lands there with request_merge(branch, entry, into); only the CEO merges into it. A target across repos is one call per repo.",
+	{Name: "create_target", Description: "Make a new target in one repo: a new branch name at from, one of its targets or an older commit of one (work the CEO merged). Work for it starts there with switch(branch, from), and lands there with request_merge(branch, entry, into); only the CEO merges into it. A target across repos is one call per repo.",
 		InputSchema: object(`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api"},`+
 			`"name":{"type":"string","description":"The new branch, e.g. release/2.0: not one the repo has, nor wt/* or lead/*"},`+
-			`"from":{"type":"string","description":"A commit (its hash) or a branch of that repo, e.g. main"}`, "repo", "name", "from")},
+			`"from":{"type":"string","description":"One of the repo's targets, e.g. main, or a commit (its hash) one holds"}`, "repo", "name", "from")},
 	{Name: "withdraw_merge", Description: "Withdraw your open request to merge a lead branch, in every repo, before the CEO decides it: the work is superseded by another of your branches, or no longer wanted. The branch stays. The CEO's draft comments on it are lost.",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>, with a review open"},`+
 			`"reason":{"type":"string","description":"Why, for the CEO"},`+
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
+	{Name: "targets", Description: "Each repo's targets: the branches only the CEO's merges write, where work starts from (switch from) and lands (request_merge into). The default branch first; for the others, who made them and at which commit. Read-only.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "team", Description: "Where each teammate stands: its status, when its harness last reported, and each repo's branch with whether it holds uncommitted changes or a merge under way. Read-only; wakes nobody.",
@@ -250,6 +252,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "create_target":
 		act.Branch = strings.TrimSpace(a.Name)
 		res = t.createTarget(ctx, strings.TrimSpace(a.Repo), act.Branch, strings.TrimSpace(a.From))
+	case "targets":
+		return t.targets() // read-only: not an action
 	case "reviews":
 		return t.reviews(ctx) // read-only: not an action
 	case "team":

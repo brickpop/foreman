@@ -15,7 +15,7 @@ import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
 // code repo, wherever it is on disk, each opening its own page (Repo), with
-// what keeps agents from using it, and its targets; then its project repo.
+// what keeps agents from using it, and its other targets; then its project repo.
 // Added, created, located, renamed, removed and given their default branch
 // here, from each card's ⋯ menu; renaming and removing wait until no team is
 // deployed. A target the lead made is removed from its card.
@@ -54,8 +54,8 @@ export function Repos() {
   return (
     <div className="flex max-w-[920px] flex-col gap-4 px-6 pt-6 pb-12">
       {project.repos.length === 0 && (
-        <p className="m-0 text-[13.5px] text-err">
-          No code repo yet: agents need at least one to work on.
+        <p className="m-0 text-[13.5px] text-tx3">
+          No code repo: agents work in the project's wiki only. Add one for them to write code.
         </p>
       )}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
@@ -99,7 +99,7 @@ export function Repos() {
           <div className="flex flex-col gap-3">
             <p className="m-0 text-[13.5px] text-tx2">
               Its agents start from it, and its merges go to it unless the lead names another
-              target. Open merge requests into the old one move to the new one.
+              target. The old one stays a target, and open merge requests keep theirs.
             </p>
             <Select
               label={`Default branch of ${target.name}`}
@@ -219,6 +219,7 @@ function RepoCard({
   onChange: (what: Changing["what"], repo: string, target?: string) => void;
 }) {
   const has = (branch: string) => !read || read.branches.some((b) => b.name === branch);
+  const others = r.targets.filter((t) => !t.default);
   return (
     <Frame
       project={project}
@@ -243,13 +244,13 @@ function RepoCard({
           No branch {r.defaultBranch}: pick its default branch, or agents can't start.
         </span>
       )}
-      {r.targets.length > 0 && (
+      {others.length > 0 && (
         <span className="relative z-10 flex flex-wrap items-center gap-1.5 text-[12.5px] text-tx4">
           Targets
-          {r.targets.map((t) => (
+          {others.map((t) => (
             <span
               key={t.name}
-              title={`Made by ${t.madeBy.split("@")[0]} at ${t.from.slice(0, 7)}, ${when(t.createdAt)}${has(t.name) ? "" : ". Its branch is gone: remove it, or make it again"}`}
+              title={`${t.madeBy ? `Made by ${t.madeBy.split("@")[0]} at ${t.from.slice(0, 7)}` : "Set by you"}, ${when(t.createdAt)}${has(t.name) ? "" : ". Its branch is gone: a review still goes into it, so move that review to another target"}`}
               className={`flex items-center gap-1 rounded-[5px] bg-raised py-px pr-0.5 pl-1.5 font-mono text-[11.5px] ${has(t.name) ? "text-tx3" : "text-err"}`}
             >
               {t.name}

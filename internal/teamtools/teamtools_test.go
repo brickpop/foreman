@@ -24,11 +24,17 @@ var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 	Team: "atlas", Lead: "mara", Agents: map[string]home.Soul{"mara": {Name: "Mara"}, "tove": {Name: "Tove"}},
 }}
 
-type config struct{}
+// config is the home: every project has one code repo, unless bare (a
+// research team's, only a wiki).
+type config struct{ bare bool }
 
 func (config) Team(string) (home.Team, error) { return atlas, nil }
-func (config) Project(id string) (home.Project, error) {
-	return home.Project{ID: id, Config: home.ProjectConfig{}}, nil
+func (c config) Project(id string) (home.Project, error) {
+	p := home.Project{ID: id, Config: home.ProjectConfig{}}
+	if !c.bare {
+		p.Repos = []home.Repo{{Name: "api", Default: "main"}}
+	}
+	return p, nil
 }
 func (config) Projects() []home.Project { return nil }
 
@@ -77,12 +83,36 @@ func TestEveryOfferedToolIsServed(t *testing.T) {
 				t.Errorf("%s: %v", tool.Name, err)
 			}
 		}
-		if want := prompt.Offered(id == "mara@ledger"); !slices.Equal(names, want) {
+		if want := prompt.Offered(id == "mara@ledger", true); !slices.Equal(names, want) {
 			t.Errorf("%s served %v, the prompt says %v", id, names, want)
 		}
 	}
 	if tools := r.List("nobody@ledger"); tools != nil {
 		t.Errorf("an unknown instance got %v", tools)
+	}
+}
+
+// On a project with no code repo, the git tools aren't offered, nor served.
+func TestNoCodeRepoNoGitTools(t *testing.T) {
+	db := newStore(t)
+	r := &teamtools.Router{Instances: db.Instances(), Deployments: db.Deployments(), Config: config{bare: true}, Blocks: []teamtools.Block{
+		messaging.New(messaging.Deps{Messages: db.Messages(), Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}}),
+		workflow.New(workflow.Deps{Config: config{}}),
+	}}
+	for id, want := range map[string][]string{
+		"mara@ledger": {"ask", "reply", "read_message", "commit", "contribute", "team"},
+		"tove@ledger": {"ask", "reply", "read_message", "contribute"},
+	} {
+		var names []string
+		for _, tool := range r.List(id) {
+			names = append(names, tool.Name)
+		}
+		if !slices.Equal(names, want) {
+			t.Errorf("%s: %v, want %v", id, names, want)
+		}
+	}
+	if res := r.Call(ctx, "mara@ledger", "switch", nil); !res.Error || !strings.HasPrefix(res.Text, "unknown_tool") {
+		t.Errorf("switch served: %+v", res)
 	}
 }
 

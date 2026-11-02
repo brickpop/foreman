@@ -267,7 +267,12 @@ func TestAddRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(p.Repos, []Repo{{Name: "app", Path: app, Default: "main", Targets: []Target{}, root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, Default: "main", Targets: []Target{}, root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
+	repos := slices.Clone(p.Repos)
+	for i := range repos {
+		repos[i].Targets = nil
+	}
+	if !reflect.DeepEqual(repos, []Repo{{Name: "app", Path: app, Default: "main", root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, Default: "main", root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 ||
+		!slices.Equal(p.Targets("app"), []string{"main"}) || !p.Repos[0].Targets[0].Default || p.Repos[0].Targets[0].MadeBy != "" {
 		t.Errorf("aragon %+v", p)
 	}
 	if p, err := h.AddRepo(ctx, "app-only", "app", app, ""); err != nil || len(p.Repos) != 1 {
@@ -853,6 +858,7 @@ func TestARepoHasItsOwnDefaultBranch(t *testing.T) {
 	for name, tc := range map[string]struct{ def, says string }{
 		"no main, none picked": {"", "has no branch main: pick its default branch"},
 		"a branch it hasn't":   {"trunk", `has no branch "trunk"`},
+		"an agent's branch":    {"wt/tove/x", "agents write it"},
 	} {
 		if _, err := h.AddRepo(ctx, "aragon", "poc", poc, tc.def); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.says) {
 			t.Errorf("%s: %v", name, err)
@@ -919,7 +925,7 @@ func TestTargets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := p.Repos[0].Targets; len(got) != 1 || got[0].Name != "release/1.0" || got[0].From != first || got[0].MadeBy != "mara@aragon" || got[0].CreatedAt.IsZero() {
+	if got := p.Repos[0].Targets[1:]; len(got) != 1 || got[0].Name != "release/1.0" || got[0].From != first || got[0].MadeBy != "mara@aragon" || got[0].CreatedAt.IsZero() {
 		t.Errorf("recorded %+v", got)
 	}
 	if at := gitOut(t, app, "rev-parse", "release/1.0"); at != first {
@@ -936,28 +942,37 @@ func TestTargets(t *testing.T) {
 	}
 
 	gitOut(t, app, "branch", "taken")
+	// Work no target holds: on a branch of its own, never merged.
+	gitOut(t, app, "checkout", "--quiet", "-b", "lead/atlas/unreviewed")
+	writeFile(t, filepath.Join(app, "RISKY"), "x\n")
+	gitOut(t, app, "add", "RISKY")
+	gitOut(t, app, "commit", "--quiet", "-m", "risky")
+	unreviewed := gitOut(t, app, "rev-parse", "HEAD")
+	gitOut(t, app, "checkout", "--quiet", "main")
 	for name, c := range map[string]struct {
 		repo, branch, from string
 		want               error
 	}{
-		"a branch it has":   {"app", "taken", "main", ErrExists},
-		"a target it has":   {"app", "release/1.0", "main", ErrExists},
-		"its default":       {"app", "main", "main", ErrExists},
-		"a member's branch": {"app", "wt/tove/x", "main", ErrInvalid},
-		"a lead's branch":   {"app", "lead/atlas/x", "main", ErrInvalid},
-		"a bad name":        {"app", "x..y", "main", ErrInvalid},
-		"a from it hasn't":  {"app", "release/2.0", "nope", ErrInvalid},
-		"no such repo":      {"web", "release/2.0", "main", ErrNotFound},
-		"the project repo":  {"project", "release/2.0", "main", ErrNotFound},
+		"a branch it has":        {"app", "taken", "main", ErrExists},
+		"a target it has":        {"app", "release/1.0", "main", ErrExists},
+		"its default":            {"app", "main", "main", ErrExists},
+		"a member's branch":      {"app", "wt/tove/x", "main", ErrInvalid},
+		"a lead's branch":        {"app", "lead/atlas/x", "main", ErrInvalid},
+		"a bad name":             {"app", "x..y", "main", ErrInvalid},
+		"a from it hasn't":       {"app", "release/2.0", "nope", ErrInvalid},
+		"a from no target holds": {"app", "release/2.0", "lead/atlas/unreviewed", ErrInvalid},
+		"its commit, by hash":    {"app", "release/2.0", unreviewed, ErrInvalid},
+		"no such repo":           {"web", "release/2.0", "main", ErrNotFound},
+		"the project repo":       {"project", "release/2.0", "main", ErrNotFound},
 	} {
 		if _, err := h.CreateTarget(ctx, "aragon", c.repo, c.branch, c.from, "mara@aragon"); !errors.Is(err, c.want) {
 			t.Errorf("%s: %v, want %v", name, err, c.want)
 		}
 	}
-	if p, _ := h.Project("aragon"); len(p.Repos[0].Targets) != 2 {
+	if p, _ := h.Project("aragon"); len(p.Repos[0].Targets) != 3 {
 		t.Errorf("a refusal recorded something: %+v", p.Repos[0].Targets)
 	}
-	if out := gitOut(t, app, "branch", "--list", "x..y", "release/2.0", "wt/*", "lead/*"); out != "" {
+	if out := gitOut(t, app, "branch", "--list", "x..y", "release/2.0", "wt/*"); out != "" {
 		t.Errorf("a refusal made %q", out)
 	}
 
@@ -979,5 +994,29 @@ func TestTargets(t *testing.T) {
 	h.reload()
 	if p, _ := h.Project("aragon"); !slices.Equal(p.Targets("app"), []string{"main", "release/1.0"}) {
 		t.Errorf("after a reload: %v", p.Targets("app"))
+	}
+
+	// The default moves to a target, then to a branch that wasn't one: each old
+	// default stays a target.
+	if p, err := h.SetRepoDefault(ctx, "aragon", "app", "release/1.0"); err != nil || p.Default("app") != "release/1.0" || !slices.Equal(p.Targets("app"), []string{"release/1.0", "main"}) {
+		t.Errorf("to a target: %v %v", p.Targets("app"), err)
+	}
+	p, err = h.SetRepoDefault(ctx, "aragon", "app", "taken")
+	if err != nil || !slices.Equal(p.Targets("app"), []string{"taken", "main", "release/1.0"}) || p.Repos[0].Targets[0].From != gitOut(t, app, "rev-parse", "taken") {
+		t.Errorf("to a new branch: %+v %v", p.Repos[0].Targets, err)
+	}
+	if _, err := h.SetRepoDefault(ctx, "aragon", "app", "nope"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a branch it hasn't: %v", err)
+	}
+	// An agent's branch, which agents write, is never a target.
+	if _, err := h.SetRepoDefault(ctx, "aragon", "app", "lead/atlas/unreviewed"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a lead branch as the default: %v", err)
+	}
+
+	// A target whose branch went outside Foreman is forgotten.
+	gitOut(t, app, "branch", "-D", "release/1.0")
+	h.ForgetGoneTargets(ctx)
+	if p, _ := h.Project("aragon"); !slices.Equal(p.Targets("app"), []string{"taken", "main"}) {
+		t.Errorf("after its branch went: %v", p.Targets("app"))
 	}
 }

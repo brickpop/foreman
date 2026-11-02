@@ -265,12 +265,11 @@ export function linkLine(mr: MergeRequest, forge: string): string {
   return `${pr}${mr.repo} · ${mr.branch} → ${mr.target}${tail ? ` · ${tail}` : ""}`;
 }
 
-/** A project's repo's targets, the branches its merges may go to: its
- * default first, then the others, oldest first. None for a repo the project
- * hasn't (or before it has loaded). */
+/** A project's repo's targets, the branches its merges may go to, as the
+ * server lists them: the default first, then the others, oldest first. None
+ * for a repo the project hasn't (or before it has loaded). */
 export function targetsOf(project: Project | undefined, repo: string): string[] {
-  const r = project?.repos.find((x) => x.name === repo);
-  return r ? [r.defaultBranch, ...r.targets.map((t) => t.name)] : [];
+  return project?.repos.find((x) => x.name === repo)?.targets.map((t) => t.name) ?? [];
 }
 
 /** The forge a merge request can become a PR on ("none": no Create PR): its

@@ -19,9 +19,8 @@ describe("setup", () => {
     }
   });
 
-  it("titles name the profile and the project", () => {
+  it("titles name the profile", () => {
     expect(stepTitle(step("profile", "todo", "work"))).toBe("The work profile connected");
-    expect(stepTitle(step("repo", "todo", "ledger"))).toBe("A code repo in ledger");
   });
 
   it("offers memory in whole GiB within the bounds, and none on a Mac too small", () => {

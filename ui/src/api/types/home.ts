@@ -163,17 +163,19 @@ export interface Project {
 export interface Repo {
   name: string; // unique in the project
   path: string; // absolute
-  defaultBranch: string; // the target agents start from and merges go to unless told otherwise
-  targets: Target[]; // its other targets, oldest first
+  defaultBranch: string; // its default target's name (from Targets): agents start from it, merges go to it unless told otherwise
+  targets: Target[]; // every target, the default first, then oldest first
   problem: string; // why agents can't use it (missing, …); "" when they can
 }
 /**
- * Target is a branch of a code repo, besides its default, that merges may go
- * to (wiki/product/features/pipeline-and-merges.md#merge-targets): who made
- * it (the lead's instance), at which commit and when.
+ * Target is a branch of a code repo that merges may go to
+ * (wiki/product/features/pipeline-and-merges.md#merge-targets): whether it is
+ * the default, who made it (the lead's instance; "": the CEO), at which commit
+ * ("" for one the CEO set) and when.
  */
 export interface Target {
   name: string;
+  default: boolean;
   madeBy: string;
   from: string;
   createdAt: any /* time.Time */;

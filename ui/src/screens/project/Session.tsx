@@ -34,10 +34,10 @@ import {
   stoppedLine,
 } from "../../app/sessions";
 import { DeployDialog } from "../../components/DeployDialog";
-import { CheckIcon, CopyIcon, PromptIcon } from "../../components/icons";
+import { PromptIcon } from "../../components/icons";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
-import { Button, Dot, Empty, LeadTag, Loading } from "../../components/ui";
+import { Button, CopyButton, Dot, Empty, LeadTag, Loading } from "../../components/ui";
 
 // A project's Session section (wiki/product/features/sessions.md): the team
 // on the project, its agent tabs and the chosen agent's terminal. The rest of
@@ -270,7 +270,6 @@ function AgentSession({
   const client = useClient();
   const draft = useDraft(instance.id);
   const newline = useHarnesses().data?.find((h) => h.id === instance.harness)?.newline;
-  const [copied, setCopied] = useState(false);
   const [lineMode, setLineMode] = useState(false);
   const lineInput = useRef<HTMLTextAreaElement>(null);
   // Line opens with the keyboard in it (autoFocus), and closes back to the terminal.
@@ -335,11 +334,6 @@ function AgentSession({
   };
   const name = agent?.soul.name ?? instance.agentId;
   const isLead = instance.agentId === lead;
-  const copy = async () => {
-    await navigator.clipboard.writeText(terminal.current?.text() ?? "");
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
-  };
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       {controls &&
@@ -347,9 +341,11 @@ function AgentSession({
           <span className="flex items-center gap-2.5 text-[12.5px] text-tx4">
             {harnessLabel(instance.harness)}
             {!asleep && (
-              <IconButton onClick={copy} label={copied ? "Copied" : "Copy the whole buffer"}>
-                {copied ? <CheckIcon /> : <CopyIcon />}
-              </IconButton>
+              <CopyButton
+                text={() => terminal.current?.text() ?? ""}
+                label="Copy the whole buffer"
+                className="size-7"
+              />
             )}
             {!asleep && (
               <IconButton

@@ -96,6 +96,9 @@ type RepoDiff struct {
 	// Gone: a decided repo whose change can't be shown (not recorded, or
 	// git no longer has its commits).
 	Gone bool `json:"gone"`
+	// TargetGone: an open repo whose target's branch went outside Foreman: no
+	// diff and no head, so it can't merge until the CEO picks another target.
+	TargetGone bool `json:"targetGone"`
 }
 
 // status is a review's state from its merge requests, and its withdrawal.
@@ -199,16 +202,23 @@ func (w *Workflow) heads(ctx context.Context, mrs []store.MergeRequest) map[stri
 // follow places a comment on the branch's head. One on the branch's side
 // moves with the lines added or removed above it, and is outdated once its
 // own line changed; one on the target's side (a removed line) once its file
-// changed. A comment in a repo no longer open stays where it was written.
+// changed, or once its repo merges into another target than the one it was
+// read on. A comment in a repo no longer open stays where it was written.
 func (w *Workflow) follow(ctx context.Context, mrs []store.MergeRequest, heads map[string]string, c store.ReviewComment) Comment {
 	out := Comment{ReviewComment: c, Now: c.Line}
 	head, open := heads[c.Repo]
-	if c.Repo == "" || !open || head == c.Commit {
+	if c.Repo == "" || !open {
 		return out
 	}
 	i := slices.IndexFunc(mrs, func(mr store.MergeRequest) bool { return mr.Repo == c.Repo })
-	_, dir, err := w.repoOf(mrs[i])
-	if err != nil {
+	target, dir, err := w.repoOf(mrs[i])
+	switch {
+	case err != nil:
+		return out
+	case c.Side == "old" && c.Target != target:
+		out.Outdated = true // its line was the other target's
+		return out
+	case head == c.Commit:
 		return out
 	}
 	diff, err := w.Git.Compare(ctx, dir, c.Commit, head, 0, c.Path)
@@ -292,6 +302,11 @@ func (w *Workflow) ReviewDiff(ctx context.Context, id string, since bool) ([]Rep
 			out = append(out, w.decidedDiff(ctx, dir, d, mr))
 			continue
 		}
+		if !w.Git.HasBranch(ctx, dir, target) {
+			d.TargetGone = true
+			out = append(out, d)
+			continue
+		}
 		if d.Head, err = w.Git.Resolve(ctx, dir, "refs/heads/"+mr.Branch); err != nil {
 			return nil, err
 		}
@@ -319,6 +334,11 @@ func (w *Workflow) AddComment(ctx context.Context, reviewID string, c store.Revi
 	c = store.ReviewComment{ReviewID: reviewID, Repo: c.Repo, Path: c.Path, Side: c.Side, Line: c.Line, Commit: c.Commit, Snippet: c.Snippet, Body: strings.TrimSpace(c.Body)}
 	if err := validComment(v, c); err != nil {
 		return c, err
+	}
+	for _, mr := range v.MergeRequests {
+		if mr.Repo == c.Repo && mr.State == store.MergeOpen {
+			c.Target = mr.Target
+		}
 	}
 	return w.ReviewComments.Save(ctx, c)
 }

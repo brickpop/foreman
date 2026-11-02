@@ -210,6 +210,7 @@ export interface ReviewComment {
   line: number /* int */; // on its side, in the commit it was written on
   commit: string;
   snippet: string; // the line's text then
+  target: string; // the target its repo merged into then, which its old side was read on
   body: string;
   state: string; // draft or sent
   createdAt: string /* RFC 3339 */;

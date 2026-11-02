@@ -158,12 +158,12 @@ function Repos({ project, onClose }: { project: Project; onClose: () => void }) 
     <div className="flex flex-col gap-4">
       <p className="m-0 text-[13.5px] text-tx2">
         {repos.length === 0
-          ? "Agents work on code repos: add at least one, here or later in the project's Settings."
+          ? "Add the code repos agents work on, here or later on its Repos page. With none, they work in its wiki only (research, say)."
           : `Added: ${repos.join(", ")}. Add another, or finish.`}
       </p>
       <AddRepo project={project.id} onAdded={(p) => setRepos(p.repos.map((r) => r.name))} />
       <div className="flex justify-end border-t border-line pt-4">
-        <Button onClick={onClose}>{repos.length === 0 ? "Later" : "Done"}</Button>
+        <Button onClick={onClose}>Done</Button>
       </div>
     </div>
   );

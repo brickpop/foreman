@@ -40,7 +40,7 @@ One card per project not [archived](../models/project-config.md#the-project-reco
 
 - A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right its state as a status pill: `needs you` (`--attn`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
 - Its description (13.5px `--tx3`, two lines, kept at two so cards line up), or `No description yet.`
-- Its code repos as Mono chips (`--raised`), the first three then `+<n>`; a repo with a problem in `--err`, the problem as its tooltip; `No code repo yet` when it has none.
+- Its code repos as Mono chips (`--raised`), the first three then `+<n>`; a repo with a problem in `--err`, the problem as its tooltip; `No code repo` (`--tx4`) when it has none.
 - `<Team> · <n> agents working` (one team at most), or `No team deployed` (12.5px `--tx4`).
 
 ## Teams

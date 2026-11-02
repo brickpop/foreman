@@ -164,7 +164,7 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
         {repos.length > 3 && (
           <span className="font-mono text-[11.5px] text-tx4">+{repos.length - 3}</span>
         )}
-        {repos.length === 0 && <span className="text-[12.5px] text-tx4">No code repo yet</span>}
+        {repos.length === 0 && <span className="text-[12.5px] text-tx4">No code repo</span>}
       </span>
       <span className="text-[12.5px] text-tx4">{row.line}</span>
     </Card>

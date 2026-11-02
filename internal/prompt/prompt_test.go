@@ -158,7 +158,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 // Today's step: messaging, the git tools, request_merge and withdraw_merge (the lead's); no escalate yet.
 func TestTodaysTools(t *testing.T) {
 	for _, agent := range []string{"mara", "ilya"} {
-		got := Compose(input(agent, Offered(agent == "mara")))
+		got := Compose(input(agent, Offered(agent == "mara", true)))
 		for _, want := range []string{
 			"Work with them only through the tools below.",
 			"ask(teammate, request)", "reply(request_id, output)", "read_message(id)",
@@ -180,14 +180,14 @@ func TestTodaysTools(t *testing.T) {
 			}
 		}
 	}
-	lead := Compose(input("mara", Offered(true)))
+	lead := Compose(input("mara", Offered(true, true)))
 	if !strings.Contains(lead, "request_merge(branch, entry, into)") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from.") || !strings.Contains(lead, "create_target(repo, name, from)") ||
 		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") || !strings.Contains(lead, "reviews()                           Where your reviews stand") ||
 		!strings.Contains(lead, "team()                              Where each teammate stands") ||
 		!strings.Contains(lead, "requests merges") || strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
 		t.Errorf("lead:\n%s", lead)
 	}
-	member := Compose(input("ilya", Offered(false)))
+	member := Compose(input("ilya", Offered(false, true)))
 	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") || strings.Contains(member, "create_target") || strings.Contains(member, "withdraw_merge") || strings.Contains(member, "team()") {
 		t.Errorf("member:\n%s", member)
 	}
@@ -200,7 +200,7 @@ func TestWorktreesPersist(t *testing.T) {
 	persist := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
 		"New work goes on a new topic: switch(<topic>) makes it from the default branch, switch(<topic>, from) from another target. Earlier work you resume, or commit to its topic before switching. What you don't want: discard()."
 	handOut := "Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to, and the target it starts from when it isn't the default."
-	lead, member := Compose(input("mara", Offered(true))), Compose(input("ilya", Offered(false)))
+	lead, member := Compose(input("mara", Offered(true, true))), Compose(input("ilya", Offered(false, true)))
 	if !strings.Contains(lead, persist+" "+handOut) {
 		t.Errorf("lead:\n%s", lead)
 	}
@@ -215,7 +215,7 @@ func TestWorktreesPersist(t *testing.T) {
 // The role decides: handoff for members, request_merge and withdraw_merge for
 // the lead; a tool not built yet goes to nobody.
 func TestOfferedFollowsTheRole(t *testing.T) {
-	lead, member := Offered(true), Offered(false)
+	lead, member := Offered(true, true), Offered(false, true)
 	for _, name := range []string{"handoff", "escalate"} {
 		if slices.Contains(lead, name) {
 			t.Errorf("the lead gets %s: %v", name, lead)
@@ -283,7 +283,6 @@ func TestTheDefaultBranchOfEachRepo(t *testing.T) {
 	}{
 		{[]home.Repo{{Name: "api", Default: "main"}, {Name: "web", Default: "main"}}, "made for you from main."},
 		{[]home.Repo{{Name: "poc", Default: "master"}, {Name: "web", Default: "main"}}, "made for you from master in poc, main in web."},
-		{nil, "made for you from main."},
 	} {
 		in := input("tove", nil)
 		in.Repos = tc.repos
@@ -293,23 +292,45 @@ func TestTheDefaultBranchOfEachRepo(t *testing.T) {
 	}
 }
 
-// Agents learn each repo's targets, the default first, once a repo has more
-// than its default; with none, nothing is said.
-func TestTargetsAreListed(t *testing.T) {
-	in := input("ilya", Offered(false))
-	in.Repos = []home.Repo{{Name: "api", Default: "main", Targets: []home.Target{{Name: "release/2.0"}, {Name: "hotfix"}}}, {Name: "web", Default: "trunk"}}
-	want := " Targets, which only the CEO's merges write: api: main (default), release/2.0, hotfix; web: trunk (default)."
-	if got := Compose(in); !strings.Contains(got, want) {
-		t.Errorf("no %q in\n%s", want, got)
+// A project with no code repo (a research team's) leaves out what only code
+// needs: branches, worktrees, git rules and the git tools. The lead still
+// commits the project repo, by name.
+func TestAProjectWithNoCodeRepo(t *testing.T) {
+	for _, agent := range []string{"mara", "ilya"} {
+		lead := agent == "mara"
+		in := input(agent, Offered(lead, false))
+		in.Repos = nil
+		// From the assignment on: a built-in role's job text is the team's to choose
+		full := Compose(in)
+		got := full[strings.Index(full, "## This assignment"):]
+		for _, gone := range []string{"Branches:", "worktree", "## Git", "switch(", "handoff(", "request_merge(", "targets(", "Tests bound for a target"} {
+			if strings.Contains(got, gone) {
+				t.Errorf("%s: %q in\n%s", agent, gone, got)
+			}
+		}
+		if !strings.Contains(got, "This project has no code repo: its work is its knowledge base.") {
+			t.Errorf("%s: not told there is no code repo:\n%s", agent, got)
+		}
+		if commits := strings.Contains(got, "commit the project\nrepo only through commit(), naming project."); commits != lead {
+			t.Errorf("%s: commit note %v, want %v", agent, commits, lead)
+		}
 	}
-	in.Repos[0].Targets = nil
-	if got := Compose(in); strings.Contains(got, "Targets, which") {
-		t.Errorf("listed with none but defaults:\n%s", got)
-	}
-	lead := input("mara", Offered(true))
-	lead.Repos = []home.Repo{{Name: "api", Default: "main", Targets: []home.Target{{Name: "release/2.0"}}}}
-	if got := Compose(lead); !strings.Contains(got, "Withdraw a request before you replace it. Targets, which only the CEO's merges write: api: main (default), release/2.0.") {
-		t.Errorf("lead:\n%s", got)
+}
+
+// Targets are never in the prompt, so making or removing one leaves every
+// agent's prompt as it was: targets() tells them, to the lead and members alike.
+func TestTargetsAreAskedForNotListed(t *testing.T) {
+	for _, agent := range []string{"ilya", "mara"} {
+		in := input(agent, Offered(agent == "mara", true))
+		in.Repos = []home.Repo{{Name: "api", Default: "main", Targets: []home.Target{{Name: "main", Default: true}}}}
+		before := Compose(in)
+		in.Repos[0].Targets = append(in.Repos[0].Targets, home.Target{Name: "release/2.0"})
+		if after := Compose(in); after != before || strings.Contains(after, "release/2.0") {
+			t.Errorf("%s: a new target changed the prompt", agent)
+		}
+		if !strings.Contains(before, "\ntargets()  ") {
+			t.Errorf("%s: no targets():\n%s", agent, before)
+		}
 	}
 }
 
@@ -318,7 +339,7 @@ func TestTargetsAreListed(t *testing.T) {
 // the CEO decides from, few merge requests, one card or topic per branch,
 // and no proof tests in main.
 func TestTheLeadsLessons(t *testing.T) {
-	lead, member := Compose(input("mara", Offered(true))), Compose(input("ilya", Offered(false)))
+	lead, member := Compose(input("mara", Offered(true, true))), Compose(input("ilya", Offered(false, true)))
 	brief := "When the CEO must decide, bring a brief that stands alone: the question in plain words, who it affects, the options with their consequences, and your recommendation."
 	for _, want := range []string{
 		"by its author through contribute(), or by you the moment it arrives. To pass one on, link its entry: never retype it, and never present a summary as the full text.",

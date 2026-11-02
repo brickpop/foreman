@@ -35,101 +35,116 @@ const (
 	anyone role = iota
 	leadOnly
 	membersOnly
+	nobody
 )
 
-// teamTool is a team tool as the prompt knows it: who gets it, whether it
-// exists yet (the Messaging and hand-offs epic brings them in steps), and its
-// lines in the Tools section ({team}: the team's id;
-// wiki/product/architecture/session-prompt.md#template).
+// teamTool is a team tool as the prompt knows it: who gets it, who of them
+// needs a code repo for it (a project may have none: a research team works
+// only on the wiki), whether it exists yet (the Messaging and hand-offs epic
+// brings them in steps), and its lines in the Tools section ({team}: the
+// team's id; wiki/product/architecture/session-prompt.md#template).
 type teamTool struct {
 	name  string
 	role  role
+	code  role
 	built bool
 	rows  []string
 }
 
 // teamTools are every team tool, in the order the prompt lists them.
 var teamTools = []teamTool{
-	{"ask", anyone, true, []string{"ask(teammate, request)              Get info or work. Keep going meanwhile."}},
-	{"reply", anyone, true, []string{"reply(request_id, output)           Answer a request. Only `output` is returned."}},
-	{"read_message", anyone, true, []string{"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."}},
-	{"switch", anyone, true, []string{
+	{"ask", anyone, nobody, true, []string{"ask(teammate, request)              Get info or work. Keep going meanwhile."}},
+	{"reply", anyone, nobody, true, []string{"reply(request_id, output)           Answer a request. Only `output` is returned."}},
+	{"read_message", anyone, nobody, true, []string{"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."}},
+	{"switch", anyone, anyone, true, []string{
 		"switch(branch, from)                Go to one of your branches; a new one starts from from, a target",
 		"                                    (each repo's default branch when left out).",
 	}},
-	{"commit", anyone, true, []string{
+	{"targets", anyone, anyone, true, []string{"targets()                           Each repo's targets: the branches only the CEO's merges write."}},
+	{"commit", anyone, membersOnly, true, []string{
 		"commit(commits)                     Commit the repos you name, each with its own message:",
 		"                                    [{repo, message}], repo being its folder in your sandbox.",
 	}},
-	{"merge", anyone, true, []string{
+	{"merge", anyone, anyone, true, []string{
 		"merge(branch)                       Merge a branch (the lead's, a target, a teammate's) into yours.",
 		"                                    On conflicts: resolve the markers, then commit those repos.",
 	}},
-	{"abort_merge", anyone, true, []string{"abort_merge()                       Back out of an unfinished merge."}},
-	{"discard", anyone, true, []string{"discard(repos)                      Throw away what you didn't commit (all repos if none named)."}},
-	{"set_submodule", anyone, true, []string{
+	{"abort_merge", anyone, anyone, true, []string{"abort_merge()                       Back out of an unfinished merge."}},
+	{"discard", anyone, anyone, true, []string{"discard(repos)                      Throw away what you didn't commit (all repos if none named)."}},
+	{"set_submodule", anyone, anyone, true, []string{
 		"set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a branch, tag or commit;",
 		"                                    url adds a new one. Switch and merge keep submodules in step.",
 	}},
 	// The lead hands nothing off: it works only on lead branches.
-	{"handoff", membersOnly, true, []string{"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."}},
-	{"contribute", anyone, true, []string{"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."}},
-	{"escalate", anyone, false, []string{
+	{"handoff", membersOnly, anyone, true, []string{"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."}},
+	{"contribute", anyone, nobody, true, []string{"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."}},
+	{"escalate", anyone, nobody, false, []string{
 		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
 		"                                    For an approval, wait for the answer before that step.",
 	}},
-	{"request_merge", leadOnly, true, []string{
+	{"request_merge", leadOnly, anyone, true, []string{
 		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/{team}/* branches into into,",
 		"                                    a target (each repo's default branch when left out);",
 		"                                    entry: the wiki card that explains the work. Only you can.",
 		"                                    Call it again on the same branch to refresh it.",
 	}},
-	{"create_target", leadOnly, true, []string{
-		"create_target(repo, name, from)     Make a new target in one repo: branch name at from (a commit or",
-		"                                    a branch). Work for it starts there; only the CEO merges into it.",
+	{"create_target", leadOnly, anyone, true, []string{
+		"create_target(repo, name, from)     Make a new target in one repo: branch name at from (a target, or",
+		"                                    an older commit of one). Work for it starts there; only the CEO merges into it.",
 	}},
-	{"withdraw_merge", leadOnly, true, []string{
+	{"withdraw_merge", leadOnly, anyone, true, []string{
 		"withdraw_merge(branch, reason,      Take back your open request to merge a branch, before the CEO",
 		"  superseded_by)                    decides it: superseded_by, another of your branches under review",
 		"                                    that holds all of it. When the CEO merges a branch that holds",
 		"                                    all of another under review, Foreman withdraws that one itself.",
 	}},
-	{"reviews", leadOnly, true, []string{
+	{"reviews", leadOnly, anyone, true, []string{
 		"reviews()                           Where your reviews stand, with the CEO's comments on changes",
 		"                                    requested. Read it again whenever you're unsure.",
 	}},
-	{"team", leadOnly, true, []string{
+	{"team", leadOnly, nobody, true, []string{
 		"team()                              Where each teammate stands: status, last report, branches.",
 		"                                    Check it before you ask a teammate how it's going.",
 	}},
 }
 
-// Offered is the team tools an agent gets: those built, as its role allows.
-// The team-tool router serves exactly these.
-func Offered(lead bool) []string {
+// Offered is the team tools an agent gets: those built, as its role allows,
+// leaving out those it would need a code repo for on a project with none
+// (code: the project has one). The team-tool router serves exactly these.
+func Offered(lead, code bool) []string {
 	var tools []string
 	for _, t := range teamTools {
-		if t.built && t.forRole(lead) {
+		if t.built && t.role.covers(lead) && (code || !t.code.covers(lead)) {
 			tools = append(tools, t.name)
 		}
 	}
 	return tools
 }
 
-func (t teamTool) forRole(lead bool) bool {
-	return t.role == anyone || (t.role == leadOnly) == lead
+// covers says whether the role includes the lead (lead) or a member.
+func (r role) covers(lead bool) bool {
+	switch r {
+	case anyone:
+		return true
+	case leadOnly:
+		return lead
+	case membersOnly:
+		return !lead
+	}
+	return false
 }
 
 // forRole: whether a role may have the tool named.
 func forRole(name string, lead bool) bool {
 	i := slices.IndexFunc(teamTools, func(t teamTool) bool { return t.name == name })
-	return i >= 0 && teamTools[i].forRole(lead)
+	return i >= 0 && teamTools[i].role.covers(lead)
 }
 
 // Compose returns the session prompt, as Markdown.
 func Compose(in Input) string {
 	soul := in.Team.Agents[in.Agent]
 	lead := in.Agent == in.Team.Lead
+	code := len(in.Repos) > 0 // a research team's project may have none: the wiki is all its work
 	has := func(tool string) bool { return forRole(tool, lead) && slices.Contains(in.Tools, tool) }
 	var b strings.Builder
 	line := func(format string, a ...any) { fmt.Fprintf(&b, format+"\n", a...) }
@@ -145,12 +160,16 @@ func Compose(in Input) string {
 	line("## This assignment")
 	line("Project: %s", in.Project)
 	line("Goal: %s", goal(in.Sandbox, lead))
-	line("Your sandbox: %s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Sandbox)
-	line("Branches: %s", branches(in, lead, has))
+	if code {
+		line("Your sandbox: %s (your own git worktree of each code repo, plus project/: the project's one shared checkout, the same for every agent)", in.Sandbox)
+		line("Branches: %s", branches(in, lead, has))
+	} else {
+		line("Your sandbox: %s (project/: the project's one shared checkout, the same for every agent). This project has no code repo: its work is its knowledge base.", in.Sandbox)
+	}
 	if has("switch") {
 		line("%s", persisting(lead && len(in.Team.Roster()) > 1, has))
 	}
-	if has("commit") {
+	if has("commit") && code {
 		line("%s", provingTests)
 	}
 	line("Knowledge base: %s/project/wiki (%s)", in.Sandbox, wikiAccess(lead, has))
@@ -182,17 +201,22 @@ func Compose(in Input) string {
 			line("- %s, %s", s.Name, RoleLabel(s.Role))
 		}
 	}
-	if has("ask") {
+	switch {
+	case has("ask") && code:
 		line("You can't see their worktrees, only the branches they name. Work with them only through the tools below.")
-	} else {
+	case has("ask"):
+		line("Work with them only through the tools below.")
+	case code:
 		line("You can't see their worktrees, and there is no way to reach them yet: the CEO relays what is needed.")
+	default:
+		line("There is no way to reach them yet: the CEO relays what is needed.")
 	}
 	line("They are separate sessions that Foreman runs: your harness's own agent or messaging tools don't reach them.")
 	if len(in.Tools) > 0 {
 		line("")
 		b.WriteString(tools(in, lead, has))
 	}
-	if !has("commit") {
+	if !has("commit") && code {
 		line("")
 		line("## Git")
 		line("Git is read-only for you (status, diff, log, blame work). Don't commit, branch or merge:")
@@ -257,25 +281,6 @@ func defaults(repos []home.Repo) string {
 	return strings.Join(each, ", ")
 }
 
-// targets lists each repo's targets, its default first, when a repo has more
-// than its default (with a leading space, to follow a sentence); "" otherwise.
-func targets(repos []home.Repo) string {
-	var each []string
-	more := false
-	for _, r := range repos {
-		names := []string{r.Default + " (default)"}
-		for _, t := range r.Targets {
-			names = append(names, t.Name)
-		}
-		more = more || len(r.Targets) > 0
-		each = append(each, r.Name+": "+strings.Join(names, ", "))
-	}
-	if !more {
-		return ""
-	}
-	return " Targets, which only the CEO's merges write: " + strings.Join(each, "; ") + "."
-}
-
 func branches(in Input, lead bool, has func(string) bool) string {
 	switching := has("switch")
 	switch {
@@ -286,13 +291,13 @@ func branches(in Input, lead bool, has func(string) bool) string {
 	case lead && has("request_merge"):
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch, from). "+
 			"Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), "+
-			"resolve any conflicts and commit(), then call request_merge again.%s %s%s", in.Team.Team, in.Team.Team, oneTopic(has), fewRequests, targets(in.Repos))
+			"resolve any conflicts and commit(), then call request_merge again.%s %s", in.Team.Team, in.Team.Team, oneTopic(has), fewRequests)
 	case lead:
 		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch, from). "+
 			"Merge the hand-offs you accept into it with merge(branch). When told a target moved, merge it in with merge(<that target>). "+
-			"Tell the CEO which lead branch is ready for review.%s%s", in.Team.Team, in.Team.Team, oneTopic(has), targets(in.Repos))
+			"Tell the CEO which lead branch is ready for review.%s", in.Team.Team, in.Team.Team, oneTopic(has))
 	default:
-		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch, from). Never push to a target.%s%s", in.Agent, oneCard(has), targets(in.Repos))
+		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch, from). Never push to a target.%s", in.Agent, oneCard(has))
 	}
 }
 
@@ -393,9 +398,13 @@ func tools(in Input, lead bool, has func(string) bool) string {
 		}
 	}
 	notes := ""
-	if has("commit") {
+	switch {
+	case has("commit") && has("switch"):
 		notes += "Git is read-only for you (status, diff, log, blame work); branch, commit\n" +
 			"and merge only through switch(), commit() and merge().\n"
+	case has("commit"):
+		notes += "Git is read-only for you (status, diff, log, blame work); commit the project\n" +
+			"repo only through commit(), naming project.\n"
 	}
 	if has("read_message") {
 		notes += "Messages arrive in this session as one line, \"Message msg-N from <name> (<kind>): …\".\n" +
@@ -498,7 +507,7 @@ func Template(team home.TeamConfig, agent, instructions string) string {
 		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}",
 		Repos:        []home.Repo{{Name: "{repo}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
-		Tools:        Offered(agent == team.Lead),
+		Tools:        Offered(agent == team.Lead, true),
 		Instructions: instructions,
 	})
 }

@@ -979,18 +979,26 @@ func closeOnce(c chan struct{}) {
 	}
 }
 
-// Without a code repo agents would have nothing to work in: refused, with
-// what to do.
-func TestDeployRefusesAProjectWithoutRepos(t *testing.T) {
+// A project with no code repo (a research team's) deploys: its agents work in
+// the project repo, and the lead's prompt offers commit but no git tools.
+func TestDeployAProjectWithoutRepos(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
+	f.deps.Agent = AgentLink{Host: "/bin/foreman-agent", Path: "/opt/foreman/foreman-agent", URL: "http://h:8889",
+		Token: func(id string) string { return "token-of-" + id }}
+	f.m = New(f.deps)
 	if _, err := f.hm.RemoveRepo(ctx, "ledger", "ledger-api"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no code repo") {
-		t.Errorf("%v", err)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+		t.Fatal(err)
 	}
-	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
-		t.Errorf("deployed anyway: %+v", deps)
+	f.waitStatus("mara@ledger", Running)
+	shown, err := f.m.Prompt(ctx, "mara@ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(shown, "no code repo") || !strings.Contains(shown, "commit(") || strings.Contains(shown, "switch(") {
+		t.Errorf("not a no-code prompt:\n%s", shown)
 	}
 }
 

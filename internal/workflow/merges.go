@@ -60,6 +60,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		r      repo
 		mr     store.MergeRequest
 		exists bool
+		held   bool // moved to a target that holds all of it already
 	}
 	var requests []request
 	var lacking []string
@@ -70,7 +71,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		}
 		found = true
 		mr, err := t.w.MergeRequests.OpenFor(ctx, t.project.ID, r.name, branch)
-		exists := err == nil
+		exists, was := err == nil, mr.Target
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return teamtools.Refusal("internal", "%v", err)
 		}
@@ -83,10 +84,12 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 			mr.Target = t.project.Default(r.name)
 		}
 		if !t.project.IsTarget(r.name, mr.Target) {
-			// Only a repo with new commits needs it: reckoned from its default.
+			// A repo the review has open goes with it, so the review never
+			// splits; any other needs it only with new commits, reckoned from
+			// its default.
 			if merged, err := t.w.Git.Merged(ctx, r.dir, t.project.Default(r.name), branch); err != nil {
 				return gitError(err)
-			} else if !merged {
+			} else if exists || !merged {
 				lacking = append(lacking, r.name)
 			}
 			continue
@@ -96,16 +99,17 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		}
 		if merged, err := t.w.Git.Merged(ctx, r.dir, mr.Target, branch); err != nil {
 			return gitError(err)
-		} else if merged {
+		} else if merged && !(exists && mr.Target != was) {
 			continue
+		} else {
+			requests = append(requests, request{r, mr, exists, merged})
 		}
-		requests = append(requests, request{r, mr, exists})
 	}
 	switch {
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case len(lacking) > 0:
-		return teamtools.Refusal("no_such_target", "%s has new commits in %s, which has no target %s: create it there first with create_target, or split the work", branch, strings.Join(lacking, ", "), into)
+		return teamtools.Refusal("no_such_target", "%s is open or has new commits in %s, which has no target %s: create it there first with create_target, or split the work (targets() lists them)", branch, strings.Join(lacking, ", "), into)
 	case len(requests) == 0:
 		return teamtools.Refusal("nothing_to_merge", "%s changes nothing in its target, in any repo", branch)
 	}
@@ -123,6 +127,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		reviewID = review.ID
 	}
 	var made []string
+	waiting := false
 	for _, q := range requests {
 		mr := q.mr
 		if !q.exists {
@@ -137,9 +142,17 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		t.w.carry(ctx, q.r.dir, mr)
 		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: q.r.name, Branch: branch, MergeRequest: mr.ID})
 		what := fmt.Sprintf("%s (%s) into %s", q.r.name, mr.ID, mr.Target)
-		if q.exists {
+		switch {
+		case q.held:
+			// Settled now, not at the next Reconcile: the review never shows it
+			// open for the CEO to merge what is there already.
+			head, _ := t.w.Git.Resolve(ctx, q.r.dir, "refs/heads/"+branch)
+			t.w.merged(ctx, mr, mr.Target, q.r.dir, head)
+			what += ", which holds all of it already: counted as merged"
+		case q.exists:
 			what += ", refreshed"
 		}
+		waiting = waiting || !q.held
 		made = append(made, what)
 	}
 	// Asked again after changes were requested: the review waits on the CEO again.
@@ -150,7 +163,11 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		}
 	}
 	t.w.review(ctx, reviewID)
-	return agentlink.Result{Text: fmt.Sprintf("Review %s, %s: waiting for the CEO.", reviewID, strings.Join(made, ", "))}
+	next := "waiting for the CEO"
+	if !waiting {
+		next = "nothing left for the CEO"
+	}
+	return agentlink.Result{Text: fmt.Sprintf("Review %s, %s: %s.", reviewID, strings.Join(made, ", "), next)}
 }
 
 // carry gives the merge request the integrated work items of its deployment
@@ -481,7 +498,7 @@ func (w *Workflow) settle(ctx context.Context, mr *store.MergeRequest, head stri
 }
 
 // createTarget makes a new target in one of the project's code repos: a new
-// branch name at from, any commit or branch of it
+// branch name at from, a commit some target holds
 // (wiki/product/features/pipeline-and-merges.md#merge-targets).
 func (t tool) createTarget(ctx context.Context, repo, name, from string) agentlink.Result {
 	if !t.c.Lead {
@@ -514,6 +531,27 @@ func (t tool) createTarget(ctx context.Context, repo, name, from string) agentli
 	}
 	t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: repo, Branch: name, Created: true})
 	return agentlink.Result{Text: fmt.Sprintf("%s is a target of %s now, at %s. Start work for it with switch(<topic>, %q); ask for its merges with request_merge(<branch>, <entry>, %q).", name, repo, at, name, name)}
+}
+
+// targets lists each code repo's targets, the default first, with who made
+// the others and at which commit. Read-only.
+func (t tool) targets() agentlink.Result {
+	lines := []string{"Targets, the branches only the CEO's merges write. Start work for one with switch(<topic>, <target>); ask for its merge with request_merge(<branch>, <entry>, <target>)."}
+	for _, r := range t.project.Repos {
+		var each []string
+		for _, tg := range r.Targets {
+			switch by, _, _ := strings.Cut(tg.MadeBy, "@"); {
+			case tg.Default:
+				each = append(each, tg.Name+" (default)")
+			case by != "":
+				each = append(each, fmt.Sprintf("%s (made by %s at %.8s)", tg.Name, by, tg.From))
+			default:
+				each = append(each, tg.Name)
+			}
+		}
+		lines = append(lines, r.Name+": "+strings.Join(each, ", "))
+	}
+	return agentlink.Result{Text: strings.Join(lines, "\n")}
 }
 
 // reason is a home error's message without its sentinel's.

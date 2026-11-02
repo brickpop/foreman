@@ -100,7 +100,12 @@ func (g *CLI) Branches(ctx context.Context, dir, prefix string) ([]string, error
 // Contains reports whether branch into has branch's head in its history:
 // branch was merged into it (or into is branch itself, or ahead of it).
 func (g *CLI) Contains(ctx context.Context, dir, into, branch string) (bool, error) {
-	_, err := run(ctx, dir, "merge-base", "--is-ancestor", "refs/heads/"+branch, "refs/heads/"+into)
+	return g.InHistory(ctx, dir, into, "refs/heads/"+branch)
+}
+
+// InHistory reports whether commit (a hash or a ref) is in branch's history.
+func (g *CLI) InHistory(ctx context.Context, dir, branch, commit string) (bool, error) {
+	_, err := run(ctx, dir, "merge-base", "--is-ancestor", commit, "refs/heads/"+branch)
 	var exit *exec.ExitError
 	switch {
 	case err == nil:

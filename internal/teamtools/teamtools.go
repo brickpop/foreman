@@ -36,9 +36,10 @@ type Block interface {
 	Call(ctx context.Context, c Caller, name string, args json.RawMessage) agentlink.Result
 }
 
-// Config is the team files, as loaded.
+// Config is the team files and projects, as loaded.
 type Config interface {
 	Team(id string) (home.Team, error)
+	Project(id string) (home.Project, error)
 }
 
 // Router serves the team tools of every block.
@@ -76,12 +77,19 @@ func (r *Router) List(instance string) []agentlink.Tool {
 		return nil
 	}
 	var tools []agentlink.Tool
-	for _, name := range prompt.Offered(c.Lead) {
+	for _, name := range r.offered(c) {
 		if t, _, ok := r.find(name); ok {
 			tools = append(tools, t)
 		}
 	}
 	return tools
+}
+
+// offered are the tools the caller gets: its role's, those needing a code
+// repo only while its project has one.
+func (r *Router) offered(c Caller) []string {
+	p, err := r.Config.Project(c.Deployment.ProjectID)
+	return prompt.Offered(c.Lead, err != nil || len(p.Repos) > 0)
 }
 
 // Call implements agentlink.Tools.
@@ -91,7 +99,7 @@ func (r *Router) Call(ctx context.Context, instance, name string, args json.RawM
 		return Refusal("unknown_caller", "%v", err)
 	}
 	_, block, ok := r.find(name)
-	if !ok || !slices.Contains(prompt.Offered(c.Lead), name) {
+	if !ok || !slices.Contains(r.offered(c), name) {
 		return Refusal("unknown_tool", "%q isn't one of your tools", name)
 	}
 	if c.Deployment.Status != store.DeploymentActive {

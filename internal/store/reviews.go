@@ -124,9 +124,9 @@ func (s reviewComments) Save(ctx context.Context, c ReviewComment) (ReviewCommen
 	if c.ID == "" {
 		c.CreatedAt = time.Now().UTC()
 	}
-	values := []any{c.ReviewID, c.Repo, c.Path, c.Side, c.Line, c.Commit, c.Snippet, c.Body, c.State, timeText(c.CreatedAt), timeText(c.SentAt)}
+	values := []any{c.ReviewID, c.Repo, c.Path, c.Side, c.Line, c.Commit, c.Snippet, c.Body, c.State, timeText(c.CreatedAt), timeText(c.SentAt), c.Target}
 	if c.ID == "" {
-		res, err := s.db.ExecContext(ctx, "INSERT INTO review_comments (review_id, repo, path, side, line, commit_sha, snippet, body, state, created_at, sent_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
+		res, err := s.db.ExecContext(ctx, "INSERT INTO review_comments (review_id, repo, path, side, line, commit_sha, snippet, body, state, created_at, sent_at, target) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
 		if err != nil {
 			return c, err
 		}
@@ -138,7 +138,7 @@ func (s reviewComments) Save(ctx context.Context, c ReviewComment) (ReviewCommen
 	if err != nil {
 		return c, err
 	}
-	res, err := s.db.ExecContext(ctx, "UPDATE review_comments SET review_id = ?, repo = ?, path = ?, side = ?, line = ?, commit_sha = ?, snippet = ?, body = ?, state = ?, created_at = ?, sent_at = ? WHERE seq = ?", append(values, seq)...)
+	res, err := s.db.ExecContext(ctx, "UPDATE review_comments SET review_id = ?, repo = ?, path = ?, side = ?, line = ?, commit_sha = ?, snippet = ?, body = ?, state = ?, created_at = ?, sent_at = ?, target = ? WHERE seq = ?", append(values, seq)...)
 	return c, touched(res, err)
 }
 
@@ -171,7 +171,7 @@ func (s reviewComments) Delete(ctx context.Context, id string) error {
 }
 
 func (s reviewComments) query(ctx context.Context, where string, args ...any) ([]ReviewComment, error) {
-	rows, err := s.db.QueryContext(ctx, "SELECT seq, review_id, repo, path, side, line, commit_sha, snippet, body, state, created_at, sent_at FROM review_comments "+where+" ORDER BY seq", args...)
+	rows, err := s.db.QueryContext(ctx, "SELECT seq, review_id, repo, path, side, line, commit_sha, snippet, body, state, created_at, sent_at, target FROM review_comments "+where+" ORDER BY seq", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (s reviewComments) query(ctx context.Context, where string, args ...any) ([
 		var c ReviewComment
 		var seq int64
 		var created, sent sql.NullString
-		if err := rows.Scan(&seq, &c.ReviewID, &c.Repo, &c.Path, &c.Side, &c.Line, &c.Commit, &c.Snippet, &c.Body, &c.State, &created, &sent); err != nil {
+		if err := rows.Scan(&seq, &c.ReviewID, &c.Repo, &c.Path, &c.Side, &c.Line, &c.Commit, &c.Snippet, &c.Body, &c.State, &created, &sent, &c.Target); err != nil {
 			return nil, err
 		}
 		c.ID = "com-" + strconv.FormatInt(seq, 10)

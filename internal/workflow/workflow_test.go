@@ -45,7 +45,7 @@ func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
 	repos := []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
 	for i := range repos {
-		repos[i].Targets = c.targets.made[repos[i].Name]
+		repos[i].Targets = append([]home.Target{{Name: repos[i].Default, Default: true}}, c.targets.made[repos[i].Name]...)
 	}
 	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: repos}, nil
 }

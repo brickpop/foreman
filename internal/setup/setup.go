@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime"
-	"sort"
 	"sync"
 	"time"
 
@@ -239,13 +238,6 @@ func (s *Setup) Steps(ctx context.Context) []Step {
 	}
 	steps = append(steps, presence("team", len(teams), "Create a team"))
 	steps = append(steps, presence("project", len(projects), "Add a project"))
-	sort.Slice(projects, func(i, j int) bool { return projects[i].ID < projects[j].ID })
-	for _, p := range projects {
-		if len(p.Repos) == 0 && len(p.Problems) == 0 {
-			steps = append(steps, Step{Kind: "repo", Subject: p.ID, State: "todo",
-				Detail: p.ID + " has no code repo for agents to work in: add one"})
-		}
-	}
 	return steps
 }
 

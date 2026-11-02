@@ -226,9 +226,34 @@ describe("Dismiss", () => {
 
 describe("mergeHeads", () => {
   const diffs = [
-    { repo: "api", target: "main", head: "a1b2", since: "", diff: "", gone: false },
-    { repo: "web", target: "trunk", head: "c3d4", since: "", diff: "", gone: false },
-    { repo: "docs", target: "main", head: "", since: "", diff: "", gone: false },
+    {
+      repo: "api",
+      target: "main",
+      head: "a1b2",
+      since: "",
+      diff: "",
+      gone: false,
+      targetGone: false,
+    },
+    {
+      repo: "web",
+      target: "trunk",
+      head: "c3d4",
+      since: "",
+      diff: "",
+      gone: false,
+      targetGone: false,
+    },
+    { repo: "docs", target: "main", head: "", since: "", diff: "", gone: false, targetGone: false },
+    {
+      repo: "cli",
+      target: "release/1.0",
+      head: "",
+      since: "",
+      diff: "",
+      gone: false,
+      targetGone: true,
+    },
   ];
   it("names each repo ticked with the head its diff was shown at", () => {
     expect(mergeHeads(diffs, ["api", "web"])).toEqual({ api: "a1b2", web: "c3d4" });
@@ -238,5 +263,7 @@ describe("mergeHeads", () => {
     expect(mergeHeads(undefined, ["api"])).toBeUndefined();
     expect(mergeHeads(diffs, ["api", "docs"])).toBeUndefined();
     expect(mergeHeads(diffs, ["api", "gone"])).toBeUndefined();
+    // Its target deleted: no head until the CEO moves it to another target.
+    expect(mergeHeads(diffs, ["api", "cli"])).toBeUndefined();
   });
 });

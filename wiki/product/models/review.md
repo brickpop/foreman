@@ -36,6 +36,7 @@ Table `review_comments`.
 | `line` | Integer | | | > 0 | Its number on that side, when written |
 | `commit_sha` | String | | | a commit hash | The branch head it was read at |
 | `snippet` | String | | | ≤ 500 characters | The line's text, quoted in the message to the lead |
+| `target` | String | | | | The target its repo merged into when it was written (since 2026-11-02): a comment on the old side is outdated once its repo goes to another |
 | `body` | String | yes | | ≤ the team tools' message limit | |
 | `state` | String | yes | `draft` | enum: `draft`, `sent` | |
 | `created_at` | Timestamp | yes | now | | |
@@ -60,7 +61,7 @@ Derived, never stored:
 - **A branch's open review** is the review of any of its open merge requests. `request_merge` adds the repos it opens to it; with none open, it starts a new review. So a branch merged (or dismissed) and requested again gets a new review, and the old one stays as it was.
 - **One review request per review**, raised only while it needs the CEO: by `request_merge` when the review has an open merge request, no open request, and changes aren't requested. Request changes resolves it (`changes requested`); the lead's next `request_merge` clears `changes_requested_at` and raises a new one. Once no merge request is left open it resolves (`merged`, `dismissed` or `withdrawn`).
 - **Comments are drafts until Request changes**, which sends every draft, and the CEO's optional note, to the lead in one message, then marks them `sent`. Only a draft can be edited or deleted; comments are written only while the review is open, and a line comment only on a repo open in it.
-- **A sent comment follows its line.** One on the `new` side moves as the lead's commits shift it (`git diff -U0 <its commit> <head> -- <path>`), and is **outdated** once its own line changed. One on the `old` side is outdated once its file changed. One whose commit is gone (history rewritten) is outdated. A comment in a repo no longer open stays where it was written.
+- **A sent comment follows its line.** One on the `new` side moves as the lead's commits shift it (`git diff -U0 <its commit> <head> -- <path>`), and is **outdated** once its own line changed. One on the `old` side is outdated once its file changed, or once its repo goes to another target than the one it was written against (its `target`). One whose commit is gone (history rewritten) is outdated. A comment in a repo no longer open stays where it was written.
 - **Merging is per repo:** Merge takes the repos the CEO ticked; each merges [as before](../features/pipeline-and-merges.md#merge-to-a-target), and those left out stay open on the review.
 - **Withdrawn is whole:** the lead withdraws the review, never some of its repos; the CEO's drafts on it are deleted, as they can no longer be sent. Foreman withdraws an open review of a lead when each repo still open in it is held by its target after the CEO merged another review of that lead ([Protocol → `withdraw_merge`](../architecture/protocol.md#withdraw_merge)).
 - Merge requests opened before reviews existed: open ones were grouped into one review per (project, branch); closed ones have none.

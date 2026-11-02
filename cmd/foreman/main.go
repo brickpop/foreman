@@ -312,8 +312,9 @@ func run(args []string, stdout io.Writer) error {
 		Actions: state.Actions(), Publish: bus.Publish, WorkItems: state.WorkItems(),
 		MergeRequests: state.MergeRequests(), Wiki: wikis, Requests: state.Requests(),
 		Reviews: state.Reviews(), ReviewComments: state.ReviewComments()})
-	// A merge request merged outside Foreman (the CEO's own git, a forge) is
-	// noticed within half a minute; backups past their time go hourly.
+	// A merge request merged outside Foreman (the CEO's own git, a forge), and
+	// a target whose branch was deleted outside it, are noticed within half a
+	// minute; backups past their time go hourly.
 	go func() {
 		tick, hourly := time.NewTicker(30*time.Second), time.NewTicker(time.Hour)
 		defer tick.Stop()
@@ -324,6 +325,7 @@ func run(args []string, stdout io.Writer) error {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
+				h.ForgetGoneTargets(ctx)
 				flow.Reconcile(ctx)
 			case <-hourly.C:
 				flow.PruneBackups(ctx)

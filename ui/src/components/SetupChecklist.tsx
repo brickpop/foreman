@@ -144,16 +144,6 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
           {dialog && <NewProject onClose={() => setDialog(false)} />}
         </>
       );
-    case "repo":
-      return (
-        <Link
-          to="/projects/$project/repos"
-          params={{ project: s.subject }}
-          className="text-[13px] text-accTx hover:underline"
-        >
-          Add a repo
-        </Link>
-      );
     default:
       return null;
   }

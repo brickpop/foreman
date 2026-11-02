@@ -192,6 +192,7 @@ type ReviewComment struct {
 	Line      int       `json:"line"` // on its side, in the commit it was written on
 	Commit    string    `json:"commit"`
 	Snippet   string    `json:"snippet"` // the line's text then
+	Target    string    `json:"target"`  // the target its repo merged into then, which its old side was read on
 	Body      string    `json:"body"`
 	State     string    `json:"state"` // draft or sent
 	CreatedAt time.Time `json:"createdAt"`

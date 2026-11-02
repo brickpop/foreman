@@ -120,15 +120,15 @@ describe("forgeOf", () => {
 describe("targetsOf", () => {
   const project = {
     repos: [
-      { name: "api", defaultBranch: "main", targets: [] },
+      { name: "api", defaultBranch: "main", targets: [{ name: "main", default: true }] },
       {
         name: "poc",
         defaultBranch: "master",
-        targets: [{ name: "release/2.0" }, { name: "hotfix" }],
+        targets: [{ name: "master", default: true }, { name: "release/2.0" }, { name: "hotfix" }],
       },
     ],
   } as unknown as Project;
-  it("is the repo's default branch, then its other targets", () => {
+  it("is the repo's targets as listed, its default first", () => {
     expect(targetsOf(project, "poc")).toEqual(["master", "release/2.0", "hotfix"]);
     expect(targetsOf(project, "api")).toEqual(["main"]);
   });

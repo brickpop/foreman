@@ -249,8 +249,9 @@ func (h *Home) RemoveRepo(ctx context.Context, project, name string) (Project, e
 }
 
 // SetRepoDefault sets the branch a repo's agents start from and its merges
-// go to unless told otherwise: one the repo has. Its open merge requests into
-// the old one go to the new one; worktrees made before stay on their branches.
+// go to unless told otherwise: one the repo has, a target from then on. The
+// old default stays a target, merge requests keep theirs, and worktrees made
+// before stay on their branches.
 func (h *Home) SetRepoDefault(ctx context.Context, project, name, branch string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -262,10 +263,15 @@ func (h *Home) SetRepoDefault(ctx context.Context, project, name, branch string)
 	if i < 0 {
 		return Project{}, ErrNotFound
 	}
-	if !h.git.HasBranch(ctx, p.Repos[i].Path, branch) {
+	if agentBranch(branch) {
+		return Project{}, fmt.Errorf("%w: %s is an agent's branch (wt/*, lead/*): agents write it, so it can't be a target", ErrInvalid, branch)
+	}
+	commit, err := h.git.Resolve(ctx, p.Repos[i].Path, "refs/heads/"+branch)
+	if err != nil {
 		return Project{}, fmt.Errorf("%w: %s has no branch %q", ErrInvalid, name, branch)
 	}
-	if err := h.records.SetRepoDefault(ctx, project, name, branch); err != nil {
+	t := store.TargetRecord{Name: branch, From: commit, CreatedAt: time.Now().UTC()}
+	if err := h.records.SetRepoDefault(ctx, project, name, t); err != nil {
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
@@ -274,7 +280,8 @@ func (h *Home) SetRepoDefault(ctx context.Context, project, name, branch string)
 // CreateTarget makes a new branch name in a code repo at from (a commit or a
 // branch of it) and records it as one of the repo's targets, made by the
 // lead's instance by (wiki/product/features/pipeline-and-merges.md#merge-targets).
-// A name the repo has as a branch, or in an agent's namespace, is refused.
+// A name the repo has as a branch, or in an agent's namespace, is refused;
+// so is a from no target holds: a target starts from work the CEO merged.
 func (h *Home) CreateTarget(ctx context.Context, project, repo, name, from, by string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -288,7 +295,7 @@ func (h *Home) CreateTarget(ctx context.Context, project, repo, name, from, by s
 		return Project{}, fmt.Errorf("%w: no code repo %q", ErrNotFound, repo)
 	case !r.Ready():
 		return Project{}, fmt.Errorf("%w: %s can't be used: %s", ErrInvalid, repo, r.Problem)
-	case strings.HasPrefix(name, "wt/") || strings.HasPrefix(name, "lead/"):
+	case agentBranch(name):
 		return Project{}, fmt.Errorf("%w: %s is an agent's branch name (wt/*, lead/*)", ErrInvalid, name)
 	case h.git.HasBranch(ctx, r.Path, name):
 		return Project{}, fmt.Errorf("%w: %s has a branch %s already", ErrExists, repo, name)
@@ -296,6 +303,9 @@ func (h *Home) CreateTarget(ctx context.Context, project, repo, name, from, by s
 	commit, err := h.git.Resolve(ctx, r.Path, from)
 	if err != nil {
 		return Project{}, fmt.Errorf("%w: %s has no branch or commit %q", ErrInvalid, repo, from)
+	}
+	if !h.heldByATarget(ctx, r, commit) {
+		return Project{}, fmt.Errorf("%w: %s is in no target of %s: a target starts from work the CEO merged, so start it from one (%s) or a commit of one", ErrInvalid, from, repo, strings.Join(p.Targets(repo), ", "))
 	}
 	// Recorded first: a branch made and then not recorded would be left behind.
 	t := store.TargetRecord{Name: name, MadeBy: by, From: commit, CreatedAt: time.Now().UTC()}
@@ -333,6 +343,52 @@ func (h *Home) RemoveTarget(ctx context.Context, project, repo, name string) (Pr
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
+}
+
+// agentBranch says whether branch is in an agents' namespace: agents write
+// those branches, so none can be a target.
+func agentBranch(branch string) bool {
+	return strings.HasPrefix(branch, "wt/") || strings.HasPrefix(branch, "lead/")
+}
+
+// heldByATarget says whether commit is in the history of one of r's targets.
+func (h *Home) heldByATarget(ctx context.Context, r Repo, commit string) bool {
+	for _, t := range r.Targets {
+		if in, err := h.git.InHistory(ctx, r.Path, t.Name, commit); err == nil && in {
+			return true
+		}
+	}
+	return false
+}
+
+// ForgetGoneTargets forgets each target other than a default whose branch
+// went outside Foreman (git is what says a target exists), unless a merge
+// request into it is open: its review then says it is gone, for the CEO to
+// pick another. A gone default is a repo problem instead (agents can't start).
+func (h *Home) ForgetGoneTargets(ctx context.Context) {
+	h.mu.Lock()
+	defer h.unlock()
+	forgot := false
+	for _, p := range h.snap.projects {
+		for _, r := range p.Repos {
+			for _, t := range r.Targets {
+				if t.Default || !r.Ready() || h.git.HasBranch(ctx, r.Path, t.Name) {
+					continue
+				}
+				switch err := h.records.RemoveTarget(ctx, p.ID, r.Name, t.Name); {
+				case err == nil:
+					forgot = true
+				case !errors.Is(err, store.ErrInUse):
+					slog.Warn("forgetting a gone target", "project", p.ID, "repo", r.Name, "target", t.Name, "err", err)
+				}
+			}
+		}
+	}
+	if forgot {
+		old := h.snap
+		h.snap = h.scan(old)
+		h.publish(diff(old, h.snap))
+	}
 }
 
 // SetProfile names the profile a project's agents run on: a profile's name,
@@ -390,6 +446,8 @@ func (h *Home) usableRepo(ctx context.Context, p Project, name, path, def string
 		def = "main"
 	case def == "":
 		return "", "", fmt.Errorf("%w: %s has no branch main: pick its default branch", ErrInvalid, path)
+	case agentBranch(def):
+		return "", "", fmt.Errorf("%w: %s is an agent's branch (wt/*, lead/*): agents write it, so it can't be the default", ErrInvalid, def)
 	case !h.git.HasBranch(ctx, real, def):
 		return "", "", fmt.Errorf("%w: %s has no branch %q", ErrInvalid, path, def)
 	}

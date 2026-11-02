@@ -43,8 +43,8 @@ type Project struct {
 type Repo struct {
 	Name    string   `json:"name"`          // unique in the project
 	Path    string   `json:"path"`          // absolute
-	Default string   `json:"defaultBranch"` // the target agents start from and merges go to unless told otherwise
-	Targets []Target `json:"targets"`       // its other targets, oldest first
+	Default string   `json:"defaultBranch"` // its default target's name (from Targets): agents start from it, merges go to it unless told otherwise
+	Targets []Target `json:"targets"`       // every target, the default first, then oldest first
 	Problem string   `json:"problem"`       // why agents can't use it (missing, …); "" when they can
 	root    string   // its first commit, which Locate looks for
 }
@@ -102,7 +102,7 @@ func (p Project) Targets(name string) []string {
 	if !ok {
 		return nil
 	}
-	list := []string{r.Default}
+	var list []string
 	for _, t := range r.Targets {
 		list = append(list, t.Name)
 	}
@@ -123,11 +123,13 @@ func (p Project) repo(name string) (Repo, bool) {
 	return Repo{}, false
 }
 
-// Target is a branch of a code repo, besides its default, that merges may go
-// to (wiki/product/features/pipeline-and-merges.md#merge-targets): who made
-// it (the lead's instance), at which commit and when.
+// Target is a branch of a code repo that merges may go to
+// (wiki/product/features/pipeline-and-merges.md#merge-targets): whether it is
+// the default, who made it (the lead's instance; "": the CEO), at which commit
+// ("" for one the CEO set) and when.
 type Target struct {
 	Name      string    `json:"name"`
+	Default   bool      `json:"default"`
 	MadeBy    string    `json:"madeBy"`
 	From      string    `json:"from"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -359,7 +361,7 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 	return p
 }
 
-// targets are a repo's other targets as recorded: never nil, so the API
+// targets are a repo's targets as recorded: never nil, so the API
 // sends a list.
 func targets(records []store.TargetRecord) []Target {
 	list := []Target{}

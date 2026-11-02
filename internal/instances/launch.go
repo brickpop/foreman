@@ -47,9 +47,6 @@ func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (hom
 	if len(project.Problems) > 0 {
 		return team, project, on, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}
-	if len(project.Repos) == 0 {
-		return team, project, on, fmt.Errorf("%w: project %s has no code repo for agents to work in: add one to it first", ErrInvalid, projectID)
-	}
 	if err := m.sharing(ctx, teamID, project); err != nil {
 		return team, project, on, err
 	}
@@ -192,7 +189,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
 		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, Config: project.Config, Repos: project.Repos,
-		Tools:        m.tools(inst.AgentID == team.Config.Lead),
+		Tools:        m.tools(inst.AgentID == team.Config.Lead, len(project.Repos) > 0),
 		Instructions: m.Config.Settings().Settings.Instructions,
 	})
 }
@@ -226,12 +223,13 @@ func (m *Manager) behind(dep store.Deployment, insts []store.Instance) {
 	}
 }
 
-// tools are the team tools an instance gets: none without foreman-agent.
-func (m *Manager) tools(lead bool) []string {
+// tools are the team tools an instance gets: none without foreman-agent; the
+// git ones only while its project has a code repo.
+func (m *Manager) tools(lead, code bool) []string {
 	if m.Agent.Host == "" {
 		return nil
 	}
-	return prompt.Offered(lead)
+	return prompt.Offered(lead, code)
 }
 
 // sharing refuses a team on a project that shares a repo with another

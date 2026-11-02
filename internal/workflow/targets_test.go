@@ -260,3 +260,118 @@ func TestDroppedBranchGoesToTheDefault(t *testing.T) {
 		t.Error("the lead's worktree isn't at the default branch")
 	}
 }
+
+// targets() lists each repo's targets, the default first, with who made the
+// others and at which commit; for members too.
+func TestTargetsTool(t *testing.T) {
+	f := newFixture(t)
+	f.release()
+	at := f.git(filepath.Join(f.root, "ledger", "api"), "rev-parse", "release/1.0")
+	text := f.ok("tove", "targets", map[string]string{})
+	for _, want := range []string{"api: main (default), release/1.0 (made by mara at " + at[:8] + ")", "web: trunk (default)", "switch(<topic>, <target>)"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("no %q in %q", want, text)
+		}
+	}
+}
+
+// A refresh naming into takes every repo the review has open along, or is
+// refused: a review never ends up split between targets unasked.
+func TestIntoMovesTheWholeReview(t *testing.T) {
+	f := newFixture(t)
+	f.release()
+	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	for _, r := range []string{"api", "web"} {
+		writeFile(t, filepath.Join(f.wt("mara", r), "fix.go"), "package fix\n")
+	}
+	f.ok("mara", "commit", commits("api", "fix", "web", "fix"))
+	fix := map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md"}
+	f.ok("mara", "request_merge", fix) // api into main, web into trunk
+	// web's work reaches trunk outside Foreman: nothing new there any more,
+	// but its merge request is still open.
+	web := filepath.Join(f.root, "ledger", "web")
+	f.git(web, "update-ref", "refs/heads/trunk", "lead/atlas/fix")
+	fix["into"] = "release/1.0"
+	if text := f.refused("mara", "request_merge", fix, "no_such_target"); !strings.Contains(text, "in web, which has no target release/1.0") {
+		t.Errorf("%q", text)
+	}
+	if f.mr("mr-1").Target != "main" || f.mr("mr-2").Target != "trunk" {
+		t.Errorf("moved on a refusal: %s %s", f.mr("mr-1").Target, f.mr("mr-2").Target)
+	}
+}
+
+// Moving a merge request to a target that holds all of it already settles it
+// there and then: the review never shows it open, and nothing waits on the CEO.
+func TestIntoATargetThatHoldsItIsMerged(t *testing.T) {
+	f := newFixture(t)
+	f.release()
+	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "fix.go"), "package fix\n")
+	f.ok("mara", "commit", commits("api", "fix"))
+	fix := map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md"}
+	f.ok("mara", "request_merge", fix) // into main
+	f.git(filepath.Join(f.root, "ledger", "api"), "update-ref", "refs/heads/release/1.0", "lead/atlas/fix")
+	fix["into"] = "release/1.0"
+	if text := f.ok("mara", "request_merge", fix); !strings.Contains(text, "api (mr-1) into release/1.0, which holds all of it already: counted as merged") || !strings.HasSuffix(text, ": nothing left for the CEO.") {
+		t.Errorf("%q", text)
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeMerged || mr.Target != "release/1.0" {
+		t.Errorf("%s into %s", mr.State, mr.Target)
+	}
+	if open, _ := f.w.OpenRequests(ctx); len(open) != 0 {
+		t.Errorf("still waits on the CEO: %+v", open)
+	}
+}
+
+// Moving a review's repo to another target outdates the comments on its
+// removed lines (they were the old target's), not those on the branch's.
+func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
+	f := newFixture(t)
+	f.release()
+	f.integrated()
+	f.ok("mara", "request_merge", integration)
+	head := f.git(filepath.Join(f.root, "ledger", "api"), "rev-parse", "lead/atlas/integration")
+	for _, side := range []string{"old", "new"} {
+		if _, err := f.w.AddComment(ctx, "rev-1", store.ReviewComment{Repo: "api", Path: "LED-44.go", Side: side, Line: 1, Commit: head, Body: side}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	outdated := func() []bool {
+		var each []bool
+		for _, c := range f.review("rev-1").Comments {
+			each = append(each, c.Outdated)
+		}
+		return each
+	}
+	if got := outdated(); len(got) != 2 || got[0] || got[1] {
+		t.Fatalf("before: %v", got)
+	}
+	if err := f.w.RetargetReview(ctx, "rev-1", "api", "release/1.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := outdated(); !got[0] || got[1] {
+		t.Errorf("after: %v, want the removed line's only", got)
+	}
+}
+
+// A target deleted outside Foreman while a merge request goes into it: its
+// repo shows no diff and no head, so it can't merge until moved elsewhere.
+func TestTargetGoneUnderAnOpenReview(t *testing.T) {
+	f := newFixture(t)
+	f.release()
+	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "fix.go"), "package fix\n")
+	f.ok("mara", "commit", commits("api", "the fix"))
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"})
+	f.git(filepath.Join(f.root, "ledger", "api"), "branch", "-D", "release/1.0")
+	diffs, err := f.w.ReviewDiff(ctx, "rev-1", false)
+	if err != nil || len(diffs) != 1 || !diffs[0].TargetGone || diffs[0].Head != "" || diffs[0].Diff != "" {
+		t.Fatalf("%+v %v", diffs, err)
+	}
+	if err := f.w.RetargetReview(ctx, "rev-1", "api", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); diffs[0].TargetGone || diffs[0].Head == "" {
+		t.Errorf("moved to main: %+v", diffs[0])
+	}
+}

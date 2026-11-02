@@ -1,6 +1,7 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
 import { saysLead } from "../app/model";
+import { CheckIcon, CopyIcon } from "./icons";
 
 // The design system's small building blocks (wiki/product/design/design-system.md):
 // screens use these, never raw styles for the same thing.
@@ -305,4 +306,40 @@ export function dotStyle(status: string): { background: string; border?: string 
   if (status === "queued") return { background: "var(--bg)", border: "1.5px dashed var(--tx4)" };
   if (status === "asleep") return { background: "var(--bg)", border: "1.5px solid var(--tx4)" };
   return { background: statusColor(status) };
+}
+
+/** An icon button that copies text (read when clicked) to the clipboard: a
+ * check, then the icon again, says it took. The clipboard needs a secure page
+ * (localhost or https), so elsewhere it says it couldn't. */
+export function CopyButton({
+  text,
+  label,
+  className = "size-6",
+}: {
+  text: () => string;
+  label: string;
+  className?: string;
+}) {
+  const [shown, setShown] = useState<"copied" | "failed" | null>(null);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text());
+      setShown("copied");
+    } catch {
+      setShown("failed");
+    }
+    setTimeout(() => setShown(null), 1400);
+  };
+  const said = shown === "copied" ? "Copied" : shown === "failed" ? "Couldn't copy" : label;
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={said}
+      title={said}
+      className={`inline-flex shrink-0 items-center justify-center rounded-md text-tx3 hover:bg-hover hover:text-tx ${className}`}
+    >
+      {shown === "copied" ? <CheckIcon /> : <CopyIcon />}
+    </button>
+  );
 }

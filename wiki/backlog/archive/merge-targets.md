@@ -44,8 +44,16 @@ The design: [Pipeline and merges → Merge targets](../../product/features/pipel
 Migration 014 (`project_repos.default_branch`, `repo_targets`, `merge_requests.target`). Decided while building:
 
 - A refresh of a merge request without `into` keeps its current target (the CEO may have moved it).
-- A new default branch takes the open merge requests into the old one, and a target of the same name stops being one.
 - Moving a review's repo to another target forgets a conflict found before and tells the lead.
 - Work any target holds counts as merged, for hand-off's `nothing_new` and the resume notice.
 - A dismissed branch still checked out goes back to the default branch, as idle desks do.
-- The prompt lists targets only when a repo has one besides its default.
+- Revised the same day, after the CEO's review (migration 015):
+  - **One list of targets** per repo, the default flagged among them. Changing the default moves the flag: the old one stays a target, merge requests keep theirs.
+  - **`from` must be held by a target**: a target starts only from work the CEO merged, so creating one changes no code and needs no approval.
+  - **Targets are never in the prompt**; every agent has `targets()` instead, so a target made or removed leaves prompts as they were.
+  - **Git says whether a target exists**: one whose branch went is forgotten within 30 s, unless a review goes into it, which then says so and can't merge that repo until moved.
+  - **A refresh naming `into` moves every repo the review has open**, or is refused: a review never splits between targets unasked.
+  - **Comments on removed lines are outdated after a retarget**, as on a forge when a PR's base changes (each comment keeps the target it was read against).
+  - **A merge request moved into a target that holds it already is merged at once**, and the tool says so, rather than showing open until the next 30 s check.
+  - **An agent's branch (`wt/`, `lead/`) is never a default or a target.**
+- Also (2026-11-02): **a project with no code repo can be deployed** (a research team's): its agents get no git tools, and the lead commits the project repo ([Team tools → No code repo](../../product/architecture/team-tools.md#no-code-repo)). The setup checklist no longer asks for a code repo.

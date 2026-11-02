@@ -24,8 +24,6 @@ export function stepTitle(s: SetupStep): string {
       return "A team";
     case "project":
       return "A project";
-    case "repo":
-      return `A code repo in ${s.subject}`;
     default:
       return s.kind;
   }

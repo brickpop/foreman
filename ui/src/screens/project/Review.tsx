@@ -37,7 +37,7 @@ import {
 } from "../../app/reviews";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, Empty, Loading, SectionLabel, Segmented } from "../../components/ui";
+import { Button, CopyButton, Empty, Loading, SectionLabel, Segmented } from "../../components/ui";
 
 // One review of a lead's branch (wiki/product/features/reviews.md): its files
 // by repo, each file's diff with the CEO's comments on its lines, the general
@@ -160,7 +160,12 @@ export function Review() {
               className="font-mono text-tx2 hover:text-tx"
             >
               {v.branch}
-            </Link>{" "}
+            </Link>
+            <CopyButton
+              text={() => v.branch}
+              label="Copy the branch name"
+              className="-my-1 ml-0.5 size-6 align-middle"
+            />{" "}
             · {statusLabel(v.status)} · {when(v.updatedAt)}
           </span>
         </p>
@@ -223,7 +228,13 @@ export function Review() {
                 </button>
               ))}
               {r.files.length === 0 && (
-                <span className="px-1.5 text-tx4">{r.gone ? "Can't show it." : "No changes."}</span>
+                <span className={`px-1.5 ${r.targetGone ? "text-err" : "text-tx4"}`}>
+                  {r.targetGone
+                    ? `${r.target} is gone.`
+                    : r.gone
+                      ? "Can't show it."
+                      : "No changes."}
+                </span>
               )}
             </div>
           ))}
@@ -235,6 +246,14 @@ export function Review() {
             {diff.error && <p className="text-err">{diff.error.message}</p>}
             {diff.isPending && <Loading rows={8} />}
             {diff.data?.length === 0 && <Empty>Nothing to read: the review has no repo.</Empty>}
+            {repos
+              .filter((r) => r.targetGone)
+              .map((r) => (
+                <Empty key={r.repo}>
+                  {r.repo}: its target, {r.target}, is gone (its branch was deleted outside
+                  Foreman). Pick another target for it below to see its change and merge it.
+                </Empty>
+              ))}
             {repos
               .filter((r) => r.gone)
               .map((r) => (

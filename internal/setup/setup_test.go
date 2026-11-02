@@ -255,11 +255,11 @@ func TestSteps(t *testing.T) {
 			[]profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}},
 			[]string{"image todo", "profile:default done", "team todo", "project todo"}},
 		// The profiles the projects use: one not connected, one that doesn't exist.
-		{"a project without a repo, one with problems, one with a repo",
+		{"a project without a repo is no step: a research team needs none",
 			config{teams: []home.Team{team}, projects: []home.Project{
-				{ID: "web", Repos: []home.Repo{{Name: "app", Path: "/home/ceo/app"}}}, {ID: "ledger"}, {ID: "broken", Problems: []string{"bad toml"}}}},
+				{ID: "web", Repos: []home.Repo{{Name: "app", Path: "/home/ceo/app"}}}, {ID: "ledger"}}},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code"}, {Name: "gone"}},
-			[]string{"image todo", "profile:default todo", "profile:gone failed", "team done", "project done", "repo:ledger todo"}},
+			[]string{"image todo", "profile:default todo", "profile:gone failed", "team done", "project done"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			s := New(Deps{Images: &images{state: "missing"}, Config: c.config,

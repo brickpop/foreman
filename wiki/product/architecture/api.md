@@ -23,7 +23,7 @@ POST   /api/projects/:id/migrate              {workspace} → legacy: move a pro
 POST   /api/projects/:id/repos                {name, path, defaultBranch?, new?} → add an existing code repo at path, with its default branch (main when it has one, else the `defaultBranch` given, one of its branches), or with new, create an empty one on main at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
 PUT    /api/projects/:id/repos/:repo          {path} → Locate: the repo's new path, which must hold its root commit (400 INVALID)
 PUT    /api/projects/:id/repos/:repo/name     {name} → rename it; agents' worktrees move, open merge requests follow (400 INVALID, 409 EXISTS, 409 DEPLOYED)
-PUT    /api/projects/:id/repos/:repo/default  {branch} → its default branch, one it has: agents start from it, merges go to it unless the lead names another target; open merge requests into the old one move to it, a target of that name stops being one (400 INVALID)
+PUT    /api/projects/:id/repos/:repo/default  {branch} → its default branch, one it has: agents start from it, merges go to it unless the lead names another target; it becomes a target if it wasn't one, the old one stays a target, open merge requests keep theirs (400 INVALID)
 DELETE /api/projects/:id/repos/:repo/targets/:target  stop a target the lead made being one; its branch stays (400 INVALID for the default branch, 404 NOT_FOUND, 409 IN_USE while a merge request into it is open)
 DELETE /api/projects/:id/repos/:repo          remove it from the project; its folder and branches stay (409 DEPLOYED while a team is deployed on the project)
 PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
@@ -66,7 +66,7 @@ GET    /api/activity/latest                   when something last happened on ea
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
 GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404
-GET    /api/reviews/:id/diff                  [?since=1] [{repo, target, head, since, diff}] per repo open in it: against its target, or from the head at the last Request changes
+GET    /api/reviews/:id/diff                  [?since=1] [{repo, target, head, since, diff, gone, targetGone}] per repo open in it: against its target, or from the head at the last Request changes; targetGone (no head, no diff) when its target's branch was deleted outside Foreman
 POST   /api/reviews/:id/comments              {repo, path, side, line, commit, snippet, body} (no repo: general): a draft comment; 200 the comment; 400 INVALID; 409 NOT_OPEN
 PUT    /api/reviews/:id/comments/:comment     {body}: edits a draft; 204; 409 SENT
 DELETE /api/reviews/:id/comments/:comment     deletes a draft; 204; 409 SENT

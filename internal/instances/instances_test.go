@@ -163,6 +163,46 @@ func (f *fixture) waitStatus(id, want string) store.Instance {
 	return inst
 }
 
+// waitDeployment waits for the deployment id to reach the status want and
+// returns it. A deployment stops in a later step than its agents, so a test
+// that reads it must wait for it, not for an agent.
+func (f *fixture) waitDeployment(id, want string) store.Deployment {
+	f.t.Helper()
+	var d store.Deployment
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		var err error
+		if d, err = f.db.Deployments().Get(ctx, id); err != nil {
+			f.t.Fatal(err)
+		}
+		if d.Status == want {
+			return d
+		}
+	}
+	f.t.Fatalf("deployment %s is %s, never %s", id, d.Status, want)
+	return d
+}
+
+// waitEvent waits for the last event of type typ about the deployment id, and
+// returns the deployment it carries.
+func (f *fixture) waitEvent(typ, id string) store.Deployment {
+	f.t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		f.mu.Lock()
+		var found *store.Deployment
+		for _, e := range f.events {
+			if dep, ok := e.Data.(store.Deployment); ok && e.Type == typ && dep.ID == id {
+				found = &dep
+			}
+		}
+		f.mu.Unlock()
+		if found != nil {
+			return *found
+		}
+	}
+	f.t.Fatalf("no %s event for %s", typ, id)
+	return store.Deployment{}
+}
+
 func (f *fixture) branch(dir string) string {
 	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
 	if err != nil {
@@ -1660,19 +1700,12 @@ func TestAGoneProjectStopsAfterARecheck(t *testing.T) {
 	}
 	f.m.ProjectsChanged(ctx)
 	f.waitStatus("mara@ledger", Stopped)
-	d, _ := f.db.Deployments().Get(ctx, "atlas@ledger")
-	if d.Status != store.DeploymentStopped || d.StopReason != "ledger is gone: all its code repos are missing" {
+	// The deployment stops, and its event is sent, after its agents: wait for each.
+	d := f.waitDeployment("atlas@ledger", store.DeploymentStopped)
+	if d.StopReason != "ledger is gone: all its code repos are missing" {
 		t.Errorf("deployment %+v", d)
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	var stopped *store.Deployment
-	for _, e := range f.events {
-		if dep, ok := e.Data.(store.Deployment); ok && e.Type == "deployment.stopped" {
-			stopped = &dep
-		}
-	}
-	if stopped == nil || stopped.StopReason != d.StopReason {
+	if stopped := f.waitEvent("deployment.stopped", "atlas@ledger"); stopped.StopReason != d.StopReason {
 		t.Errorf("the event: %+v", stopped)
 	}
 }

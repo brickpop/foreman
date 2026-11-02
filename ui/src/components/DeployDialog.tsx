@@ -16,6 +16,7 @@ import {
 } from "../app/queries";
 import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
+import { Select } from "./Select";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
@@ -24,7 +25,7 @@ import { Button } from "./ui";
 // says so first.
 // Opened with a team preset (Team page, Dashboard), a project preset (its
 // Session and Team sections), or neither (Dashboard). The project's
-// profile, not connected, is connected from here.
+// profile is picked here too (saved on Deploy), and connected from here.
 
 const option = (on: boolean, disabled = false) =>
   `rounded-[7px] border px-3 py-1.5 text-[13px] ${
@@ -62,9 +63,11 @@ export function DeployDialog({
   const [project, setProject] = useState(presetProject);
   const [connecting, setConnecting] = useState<string>();
   // The project's profile: its agents run on it, so it must be connected first.
+  // Another one picked here becomes the project's on Deploy.
   const profiles = useProfiles();
   const chosen = projects.data?.find((p) => p.id === project);
-  const profileName = chosen?.profile;
+  const [picked, setPicked] = useState<string>();
+  const profileName = picked ?? chosen?.profile;
   // An archived project takes no deployment: unarchived from here, as from its settings.
   const unarchive = useMutation({
     mutationFn: () => client.home.setArchived(project ?? "", false),
@@ -84,11 +87,20 @@ export function DeployDialog({
   const ending = (instances.data ?? []).filter((i) => i.deploymentId === replaced?.id).length;
   // Agents that worked here before continue their conversations, unless the
   // CEO starts fresh; offered only when there are some.
-  const continuing = useContinuing(team, project).data ?? [];
+  // None continues on another harness: its conversations are the old one's.
+  const saved = profiles.data?.find((p) => p.name === chosen?.profile);
+  const sameHarness = !saved || saved.harness === profile?.harness;
+  const known = useContinuing(team, project).data ?? [];
+  const continuing = sameHarness ? known : [];
   const [fresh, setFresh] = useState(false);
   const deploy = useMutation({
-    mutationFn: () =>
-      client.agents.deploy(team ?? "", project ?? "", fresh && continuing.length > 0),
+    mutationFn: async () => {
+      if (picked && picked !== chosen?.profile) {
+        await client.home.setProfile(project ?? "", picked);
+        await queries.invalidateQueries({ queryKey: keys.projects });
+      }
+      return client.agents.deploy(team ?? "", project ?? "", fresh && continuing.length > 0);
+    },
     onSuccess: async (d) => {
       // Its agents loaded first: until then the Session section doesn't know
       // the team, and would offer to deploy one.
@@ -147,7 +159,10 @@ export function DeployDialog({
                 disabled={there}
                 aria-pressed={p.id === project}
                 className={option(p.id === project, there)}
-                onClick={() => setProject(p.id)}
+                onClick={() => {
+                  setProject(p.id);
+                  setPicked(undefined);
+                }}
               >
                 {there
                   ? `${readable(p.id)} (already there)`
@@ -199,18 +214,31 @@ export function DeployDialog({
         {profileName && profiles.data && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
             <span className="flex-1">
-              {!profile ? (
-                <>
-                  The <span className="font-mono">{profileName}</span> profile doesn’t exist: pick
-                  another in the project’s settings.
-                </>
-              ) : (
-                <>
-                  Its agents run on the <span className="font-mono">{profile.name}</span> profile (
-                  {harnessLabel(profile.harness)})
-                  {profile.connected ? "." : ", which isn’t connected yet, so they can’t start."}
-                </>
-              )}
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                Its agents run on
+                <Select
+                  label="Profile"
+                  mono
+                  value={profileName}
+                  onChange={setPicked}
+                  options={[
+                    ...profiles.data.map((p) => ({
+                      value: p.name,
+                      label: p.name,
+                      detail: harnessLabel(p.harness),
+                    })),
+                    // The one the project names, even when that profile is gone.
+                    ...(!profile ? [{ value: profileName, label: profileName }] : []),
+                  ]}
+                />
+              </span>
+              <span className="mt-1 block text-tx3">
+                {!profile
+                  ? "That profile doesn’t exist: pick another."
+                  : profile.connected
+                    ? `${harnessLabel(profile.harness)}.${picked && picked !== chosen?.profile ? " It becomes the project’s profile on Deploy." : ""}`
+                    : `${harnessLabel(profile.harness)}, not connected yet, so they can’t start.`}
+              </span>
             </span>
             {profile && !profile.connected && (
               <Button variant="small" onClick={() => setConnecting(profile.name)}>

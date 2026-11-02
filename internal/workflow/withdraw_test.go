@@ -125,7 +125,7 @@ func TestAWithdrawnReviewsHandOffsGoWithTheNextRequest(t *testing.T) {
 		t.Errorf("work item %+v", w)
 	}
 	// Asked again, it's a new review, and takes it.
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-2, api (mr-2): waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-2, api (mr-2) into main: waiting for the CEO." {
 		t.Errorf("%q", text)
 	}
 	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-2" {

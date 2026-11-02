@@ -56,7 +56,7 @@ func (t tool) reviewText(ctx context.Context, v Review) (string, error) {
 	fmt.Fprintf(&b, "%s %s: %s (%s)", v.ID, v.Branch, v.Title, v.Entry)
 	var repos []string
 	for _, mr := range v.MergeRequests {
-		repos = append(repos, mr.Repo+" "+t.repoState(v, mr))
+		repos = append(repos, mr.Repo+" → "+t.targetOf(mr)+": "+t.repoState(v, mr))
 	}
 	b.WriteString("\n  " + strings.Join(repos, " · "))
 	if v.Status == ReviewWithdrawn {
@@ -108,9 +108,18 @@ func (t tool) repoState(v Review, mr store.MergeRequest) string {
 	}
 	switch {
 	case mr.Conflicting:
-		return "conflicts with " + t.project.Main(mr.Repo)
+		return "conflicts"
 	case v.Status == ReviewChangesRequested:
 		return "changes requested"
 	}
 	return "waiting for the CEO"
+}
+
+// targetOf is the branch a merge request merges into: its repo's default
+// when it names none.
+func (t tool) targetOf(mr store.MergeRequest) string {
+	if mr.Target == "" {
+		return t.project.Default(mr.Repo)
+	}
+	return mr.Target
 }

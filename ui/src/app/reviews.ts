@@ -122,11 +122,11 @@ export function isOpen(v: Review): boolean {
   return v.status === ReviewNeedsYou || v.status === ReviewChangesRequested;
 }
 
-/** The repos still open in a review, with the main each merges into. */
-export function openRepos(v: Review, mainOf: (repo: string) => string) {
+/** The repos still open in a review, with the target each merges into. */
+export function openRepos(v: Review) {
   return v.mergeRequests
     .filter((m) => m.state === "open")
-    .map((m) => ({ repo: m.repo, main: mainOf(m.repo), conflicting: m.conflicting }));
+    .map((m) => ({ repo: m.repo, target: m.target, conflicting: m.conflicting }));
 }
 
 /** How a repo of the review was decided: "merged", "dismissed" or
@@ -136,10 +136,10 @@ export function decidedAs(v: Review, repo: string): string {
   return state === "open" ? "" : state === "rejected" ? "dismissed" : state;
 }
 
-/** The decision button for the repos ticked: one main for all, else per repo. */
-export function mergeLabel(ticked: { main: string }[]): string {
-  const mains = new Set(ticked.map((r) => r.main));
-  return mains.size === 1 ? `Merge to ${ticked[0].main}` : "Merge";
+/** The decision button for the repos ticked: one target for all, else per repo. */
+export function mergeLabel(ticked: { target: string }[]): string {
+  const targets = new Set(ticked.map((r) => r.target));
+  return targets.size === 1 ? `Merge to ${ticked[0].target}` : "Merge";
 }
 
 /** What Merge sends: each ticked repo with the head its diff was shown at,
@@ -169,7 +169,7 @@ export function lineKey(repo: string, path: string, side: "new" | "old", line: n
   return `${repo}\u0000${path}\u0000${side}\u0000${line}`;
 }
 
-/** The place a diff line holds comments at: a removed line on main's side,
+/** The place a diff line holds comments at: a removed line on the target's side,
  * the others on the branch's. None for a hunk header. */
 export function diffKey(repo: string, path: string, line: DiffLine): string | undefined {
   if (line.kind === "del" && line.old !== undefined) return lineKey(repo, path, "old", line.old);
@@ -180,8 +180,8 @@ export function diffKey(repo: string, path: string, line: DiffLine): string | un
 
 /**
  * The comments by where they show: on their line (a new-side one at the line
- * it moved to; an old-side one, a removed line, only against main, where
- * main's numbering is the one it was written on), general ones, the outdated
+ * it moved to; an old-side one, a removed line, only against the target, where
+ * the target's numbering is the one it was written on), general ones, the outdated
  * ones, whose line changed since, and those whose line the diff shown doesn't
  * have (its repo merged, dismissed or withdrawn, its file out of the since view).
  */
@@ -210,7 +210,7 @@ export function drafts(comments: ReviewComment[]): number {
 
 /**
  * The comment a click on a diff line starts: on the branch's side for a line
- * kept or added, main's for a removed one (only against main: since the last
+ * kept or added, the target's for a removed one (only against it: since the last
  * look, the old side is the branch as it was). None on a hunk header.
  */
 export function commentAt(

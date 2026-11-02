@@ -103,8 +103,8 @@ function Configuration({ project }: { project: Project }) {
           <span className="font-medium">{forgeLabel(forge.kind)}</span>
           <span className="text-[13.5px] text-tx2">
             {forge.kind === "none"
-              ? "No forge. You merge requested branches into main from their review, in the Inbox; Foreman does the merge."
-              : `Merge to main from a branch's review, in the Inbox, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
+              ? "No forge. You merge requested branches into their target from their review, in the Inbox; Foreman does the merge."
+              : `Merge from a branch's review, in the Inbox, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
           </span>
           {forge.projectRepo && (
             <span className="flex items-center gap-3 text-[13px] text-tx3">
@@ -154,7 +154,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Enforced by Foreman",
-              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges to main.",
+              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges.",
             ],
           ].map(([title, body]) => (
             <div key={title} className="flex flex-col gap-0.5">

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 )
 
@@ -16,7 +17,7 @@ import (
 // fresh is told what that is, once, so it resumes it or moves on.
 
 // Resumed tells an agent whose session starts fresh what its worktrees hold
-// from before: its branches with work main lacks, the changes it hasn't
+// from before: its branches with work no target has, the changes it hasn't
 // committed, and for the lead the reviews still open. Nothing when there is
 // nothing.
 func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) {
@@ -32,14 +33,13 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	unmerged := map[string][]string{} // branch → its repos
 	var uncommitted []string
 	for _, r := range worktreesIn(project, inst.SandboxPath) {
-		main := project.Main(r.name)
 		branches, err := w.Git.Branches(ctx, r.dir, prefix)
 		if err != nil {
 			slog.Info("what a worktree holds", "instance", inst.ID, "repo", r.name, "err", err)
 			continue
 		}
 		for _, b := range branches {
-			if merged, err := w.Git.Merged(ctx, r.dir, main, b); err == nil && !merged {
+			if !w.inATarget(ctx, project, r, b) {
 				unmerged[b] = append(unmerged[b], r.name)
 			}
 		}
@@ -70,7 +70,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 		for _, b := range slices.Sorted(maps.Keys(unmerged)) {
 			each = append(each, fmt.Sprintf("%s (%s)", b, strings.Join(unmerged[b], ", ")))
 		}
-		text += " Branches with work main hasn't got: " + strings.Join(each, ", ") + "."
+		text += " Branches with work no target has: " + strings.Join(each, ", ") + "."
 	}
 	if len(uncommitted) > 0 {
 		text += " Changes not committed in " + strings.Join(uncommitted, ", ") + "."
@@ -78,7 +78,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	if len(open) > 0 {
 		text += " Your reviews still open: " + strings.Join(open, ", ") + "."
 	}
-	text += " Resume what is still wanted; new work goes on a new topic, made from main with switch(<topic>)."
+	text += " Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from)."
 	if len(uncommitted) > 0 {
 		text += " Changes you don't want: discard()."
 	}
@@ -86,4 +86,15 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 		ToInstance: inst.ID, Kind: "notice", Body: text}); err != nil {
 		slog.Warn("telling an agent what it left", "instance", inst.ID, "err", err)
 	}
+}
+
+// inATarget says whether one of the repo's targets holds all of branch: its
+// default or another. Unknown (a git error) counts as not.
+func (w *Workflow) inATarget(ctx context.Context, project home.Project, r repo, branch string) bool {
+	for _, t := range project.Targets(r.name) {
+		if merged, err := w.Git.Merged(ctx, r.dir, t, branch); err == nil && merged {
+			return true
+		}
+	}
+	return false
 }

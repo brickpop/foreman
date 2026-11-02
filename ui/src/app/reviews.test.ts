@@ -30,7 +30,6 @@ const review = (mrs: MergeRequest[]) =>
     status: "needs-review",
     mergeRequests: mrs,
   }) as Review;
-const mains = (repo: string) => (repo === "web" ? "trunk" : "main");
 
 const comment = (more: Partial<ReviewComment>) =>
   ({
@@ -60,17 +59,23 @@ describe("Reviews", () => {
       "",
     ]);
   });
-  it("lists the repos still open, each with its main", () => {
-    const v = review([mr("api"), mr("web"), mr("cli", { state: "merged" })]);
-    expect(openRepos(v, mains).map((r) => [r.repo, r.main])).toEqual([
+  it("lists the repos still open, each with its target", () => {
+    const v = review([
+      mr("api", { target: "main" }),
+      mr("web", { target: "release/2.0" }),
+      mr("cli", { state: "merged", target: "main" }),
+    ]);
+    expect(openRepos(v).map((r) => [r.repo, r.target])).toEqual([
       ["api", "main"],
-      ["web", "trunk"],
+      ["web", "release/2.0"],
     ]);
   });
 
-  it("labels the merge by the mains ticked", () => {
-    expect(mergeLabel([{ main: "main" }, { main: "main" }])).toBe("Merge to main");
-    expect(mergeLabel([{ main: "main" }, { main: "trunk" }])).toBe("Merge");
+  it("labels the merge by the targets ticked", () => {
+    expect(mergeLabel([{ target: "release/2.0" }, { target: "release/2.0" }])).toBe(
+      "Merge to release/2.0",
+    );
+    expect(mergeLabel([{ target: "main" }, { target: "trunk" }])).toBe("Merge");
   });
 
   it("has a since-your-last-look only once changes were requested on an open repo", () => {
@@ -87,7 +92,7 @@ describe("Reviews", () => {
     const twice = comment({ id: "c5", line: 5, now: 5 });
     const merged = comment({ id: "c6", repo: "web", now: 5 });
     const all = [moved, removed, changed, general, twice, merged];
-    // The lines the diff shows: api's a.go, line 5 kept (it was 3 on main) and 7 removed.
+    // The lines the diff shows: api's a.go, line 5 kept (it was 3 on the target) and 7 removed.
     const shown = new Set(
       [
         diffKey("api", "a.go", { kind: "ctx", text: " x", old: 3, new: 5 }),
@@ -104,7 +109,7 @@ describe("Reviews", () => {
     expect(main.outdated.map((c) => c.id)).toEqual(["c3"]);
     // web merged: its diff isn't shown, so its comment is listed apart, not lost.
     expect(main.elsewhere.map((c) => c.id)).toEqual(["c6"]);
-    // Since the last look, main's side isn't shown: a removed line's comment can't sit there.
+    // Since the last look, the target's side isn't shown: a removed line's comment can't sit there.
     expect(placeComments(all, true, shown).outdated.map((c) => c.id)).toEqual(["c2", "c3"]);
     expect(drafts([comment({ state: "draft" }), moved, comment({ state: "draft" })])).toBe(2);
   });
@@ -221,9 +226,9 @@ describe("Dismiss", () => {
 
 describe("mergeHeads", () => {
   const diffs = [
-    { repo: "api", main: "main", head: "a1b2", since: "", diff: "", gone: false },
-    { repo: "web", main: "trunk", head: "c3d4", since: "", diff: "", gone: false },
-    { repo: "docs", main: "main", head: "", since: "", diff: "", gone: false },
+    { repo: "api", target: "main", head: "a1b2", since: "", diff: "", gone: false },
+    { repo: "web", target: "trunk", head: "c3d4", since: "", diff: "", gone: false },
+    { repo: "docs", target: "main", head: "", since: "", diff: "", gone: false },
   ];
   it("names each repo ticked with the head its diff was shown at", () => {
     expect(mergeHeads(diffs, ["api", "web"])).toEqual({ api: "a1b2", web: "c3d4" });

@@ -136,7 +136,7 @@ export interface ActionRepo {
   mergeRequest?: string;
 }
 /**
- * WorkItem is a member's piece of work on its way to main
+ * WorkItem is a member's piece of work on its way to a target
  * (wiki/product/models/work-item.md).
  */
 export interface WorkItem {
@@ -151,7 +151,7 @@ export interface WorkItem {
   mergeRequestId: string;
 }
 /**
- * MergeRequest asks the CEO to merge a branch into a repo's main
+ * MergeRequest asks the CEO to merge a branch into one of a repo's targets
  * (wiki/product/models/merge-request.md).
  */
 export interface MergeRequest {
@@ -161,6 +161,7 @@ export interface MergeRequest {
   authorInstance: string;
   repo: string; // one of the project's code repos
   branch: string;
+  target: string; // the branch it merges into: its repo's default or another target
   entry: string; // the wiki card explaining the work
   state: string; // open, merged, rejected or withdrawn
   checksStatus: string;
@@ -176,7 +177,7 @@ export interface MergeRequest {
   /**
    * Where the branch stood when it left open (merged, dismissed, withdrawn):
    * its head, kept under refs/foreman/decided/<id>, and the commit it parted
-   * from main at ("" after a fast-forward), so its review still shows it.
+   * from its target at ("" after a fast-forward), so its review still shows it.
    */
   head: string;
   base: string;
@@ -205,7 +206,7 @@ export interface ReviewComment {
   reviewId: string;
   repo: string;
   path: string;
-  side: string; // new (the branch) or old (main); "" for a general one
+  side: string; // new (the branch) or old (the target); "" for a general one
   line: number /* int */; // on its side, in the commit it was written on
   commit: string;
   snippet: string; // the line's text then

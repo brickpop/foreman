@@ -21,7 +21,7 @@ export function branchOwner(
 }
 
 /** The branch a repo's page shows: the one asked for (the URL) when the
- * repo has it, else its first (main, when it has one). Undefined for a repo
+ * repo has it, else its first (its default branch, when it has it). Undefined for a repo
  * the project hasn't. */
 export function shownAt(
   repos: Repo[],
@@ -31,7 +31,7 @@ export function shownAt(
   const r = repos.find((x) => x.name === repo);
   if (!r) return undefined;
   const b = r.branches.find((x) => x.name === branch) ?? r.branches[0];
-  return { repo: r.name, branch: b?.name ?? r.main };
+  return { repo: r.name, branch: b?.name ?? r.defaultBranch };
 }
 
 export type Worktree = {

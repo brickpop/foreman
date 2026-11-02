@@ -9,14 +9,14 @@ import (
 type Repo struct {
 	Name     string   `json:"name"`
 	Project  bool     `json:"project"` // the project repo (project/), listed last
-	Main     string   `json:"main"`
-	Branches []Branch `json:"branches"` // main first, then newest commit first
+	Default  string   `json:"defaultBranch"`
+	Branches []Branch `json:"branches"` // the default first, then newest commit first
 }
 
 // Branch is one branch of a repo.
 type Branch struct {
 	Name        string `json:"name"`
-	Ahead       int    `json:"ahead"`       // commits main doesn't have
+	Ahead       int    `json:"ahead"`       // commits the default branch doesn't have
 	Uncommitted bool   `json:"uncommitted"` // its worktree has changes not committed yet
 	Agent       string `json:"agent"`       // whose worktree has it checked out (an agent id); "" for none
 }

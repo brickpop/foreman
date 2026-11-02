@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -67,6 +68,14 @@ func (f *fakeReviews) RequestChanges(_ context.Context, id, note string) error {
 
 func (f *fakeReviews) MergeReview(_ context.Context, id string, heads map[string]string) error {
 	f.merges = heads
+	return f.err
+}
+
+func (f *fakeReviews) RetargetReview(_ context.Context, id, repo, target string) error {
+	if target == "gone" {
+		return fmt.Errorf("%w: gone isn't a target of %s", workflow.ErrInvalid, repo)
+	}
+	f.did = append(f.did, fmt.Sprintf("retarget %s %s %s", id, repo, target))
 	return f.err
 }
 
@@ -134,19 +143,25 @@ func TestReviewRoutes(t *testing.T) {
 	if w := send(h, "POST", "/api/reviews/rev-1/merge", `{"heads":{"api":"a1b2","web":"c3d4"}}`); w.Code != http.StatusNoContent || len(f.merges) != 2 || f.merges["api"] != "a1b2" || f.merges["web"] != "c3d4" {
 		t.Errorf("merge: %d %v", w.Code, f.merges)
 	}
+	if w := send(h, "PUT", "/api/reviews/rev-1/target", `{"repo":"api","target":"release/2.0"}`); w.Code != http.StatusNoContent || !slices.Contains(f.did, "retarget rev-1 api release/2.0") {
+		t.Errorf("retarget: %d %v", w.Code, f.did)
+	}
+	if w := send(h, "PUT", "/api/reviews/rev-1/target", `{"repo":"api","target":"gone"}`); w.Code != http.StatusBadRequest || errorCode(w.Body.String()) != "INVALID: gone isn't a target of api" {
+		t.Errorf("retarget to no target: %d %s", w.Code, w.Body)
+	}
 	// The dismissal answers with the branches it kept, for the CEO.
 	if w := send(h, "POST", "/api/reviews/rev-1/dismiss", `{"note":"not now","dropBranches":true,"stopTeam":true}`); w.Code != http.StatusOK ||
 		strings.TrimSpace(w.Body.String()) != `{"kept":[{"repo":"api","branch":"lead/atlas/x","why":"changes in the way"}]}` {
 		t.Errorf("dismiss: %d %s", w.Code, w.Body)
 	}
-	if got, want := strings.Join(f.did, "; "), "edit rev-1 com-2 better; delete rev-1 com-2; changes rev-1 see below; dismiss rev-1 not now drop=true stop=true"; got != want {
+	if got, want := strings.Join(f.did, "; "), "edit rev-1 com-2 better; delete rev-1 com-2; changes rev-1 see below; retarget rev-1 api release/2.0; dismiss rev-1 not now drop=true stop=true"; got != want {
 		t.Errorf("did %q, want %q", got, want)
 	}
 
 	// A merge that stops in some repos says which, and why; the others merged.
 	f.err = errors.Join(fmt.Errorf("api: %w", workflow.ErrConflict), fmt.Errorf("web: %w", workflow.ErrLocalChanges), fmt.Errorf("docs: %w", workflow.ErrBranchMoved))
 	w = send(h, "POST", "/api/reviews/rev-1/merge", `{"heads":{"api":"a1b2","web":"c3d4","docs":"e5f6"}}`)
-	if msg := errorCode(w.Body.String()); w.Code != http.StatusConflict || !strings.HasPrefix(msg, "NOT_MERGED: api conflicts with its main") || !strings.Contains(msg, ". web: your checkout has uncommitted changes") ||
+	if msg := errorCode(w.Body.String()); w.Code != http.StatusConflict || !strings.HasPrefix(msg, "NOT_MERGED: api conflicts with its target") || !strings.Contains(msg, ". web: your checkout has uncommitted changes") ||
 		!strings.HasSuffix(msg, ". docs: the branch has new commits since you loaded this page. Read them, then merge again") {
 		t.Errorf("not merged: %d %s", w.Code, msg)
 	}

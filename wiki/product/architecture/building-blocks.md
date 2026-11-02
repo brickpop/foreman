@@ -78,7 +78,7 @@ Every arrow, in words:
 | Web server | Home & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
 | Workflow | Messaging | Deliver answers, notices ("PR #128 opened", "main moved") to agents |
-| Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge to main, push a branch for a PR, or Sync a reserved repo (Git epic) |
+| Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge into a target, push a branch for a PR, or Sync a reserved repo (Git epic) |
 | Workflow | Forge adapter | On the CEO's Create PR: open, then poll, comment on and close pull requests |
 | Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
@@ -286,19 +286,20 @@ Everything Foreman does with repositories on the agents' behalf, on the host. Ea
 ```go
 type Git interface {
     Prepare(instance, repo) (path string, err error) // the instance's worktree of the repo, made if missing
-    Switch(instance, repo, branch) error             // switch its worktree to the branch, made from main if missing
+    Switch(instance, repo, branch, from) error       // switch its worktree to the branch, made from from (a target; the default branch) if missing
     Commit(instance, repo, message) (commit string, err error) // everything changed in its worktree (or the live project repo, for its writers), on its branch, authored as the agent
     Merge(instance, repo, branch) (conflicts []string, err error) // merge a branch into its worktree; conflicts stay as markers
     AbortMerge(instance, repo) error                 // back out of an unfinished merge
-    Prune(instance, repo) error                      // its deployment ended: delete its wt/* branches already merged into main
+    Prune(instance, repo) error                      // its deployment ended: delete its wt/* branches already merged into a target
     Contains(repo, branch, into string) (bool, error) // integration detection: is the work in a lead branch?
-    MergeToMain(repo, branch) error                  // the CEO's Merge to main: merge the branch into main on the host
+    Squash(repo, target, branch) error               // the CEO's Merge: the branch into its target on the host, one commit
+    CreateBranch(repo, branch, commit) error          // the lead's create_target: a new target branch at a commit
     Push(repo, branch, remote) error                 // on the CEO's Create PR (the branch) or Sync (a reserved repo's main), with Foreman's token
     Fetch(repo) error                                // after a merge on the forge, and as Sync's first step: fetch the forge's main into the repo
 }
 ```
 
-**Phasing.** `Prepare` (a worktree and home branch per agent) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit`, `Merge` and `AbortMerge`, behind the `switch`, `commit`, `merge` and `abort_merge` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `MergeToMain`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
+**Phasing.** `Prepare` (a worktree and home branch per agent) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit`, `Merge` and `AbortMerge`, behind the `switch`, `commit`, `merge` and `abort_merge` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `Squash`, `CreateBranch`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
 
 ## The foundation blocks
 
@@ -459,7 +460,7 @@ Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pen
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
 Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
 Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Dashboard
-CEO, on a review: Merge ──▶ Workflow ──▶ Git.MergeToMain  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Request changes, Dismiss ──▶ delivered to the lead
+CEO, on a review: Merge ──▶ Workflow ──▶ Git.Squash  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Request changes, Dismiss ──▶ delivered to the lead
 (after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
 ```
 

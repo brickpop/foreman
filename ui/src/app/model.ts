@@ -253,22 +253,24 @@ export function forgeLabel(kind: string): string {
 }
 
 /** A merge request's line on its review's decision bar: its PR, its repo and branch, and its checks. */
-export function linkLine(mr: MergeRequest, forge: string, main = "main"): string {
+export function linkLine(mr: MergeRequest, forge: string): string {
   const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
   // No checks status: the project has no checks (or they haven't run): nothing to say.
   const tail = mr.conflicting
-    ? `conflicts with ${main}`
+    ? `conflicts with ${mr.target}`
     : mr.checksStatus
       ? `checks ${mr.checksStatus}`
       : "";
   // The repo first: a review ticks its repos one by one.
-  return `${pr}${mr.repo} · ${mr.branch} → ${main}${tail ? ` · ${tail}` : ""}`;
+  return `${pr}${mr.repo} · ${mr.branch} → ${mr.target}${tail ? ` · ${tail}` : ""}`;
 }
 
-/** The main branch of a project's repo, which its merges go to; main until
- * the project has loaded. */
-export function mainOf(project: Project | undefined, repo: string): string {
-  return project?.repos.find((r) => r.name === repo)?.main ?? "main";
+/** A project's repo's targets, the branches its merges may go to: its
+ * default first, then the others, oldest first. None for a repo the project
+ * hasn't (or before it has loaded). */
+export function targetsOf(project: Project | undefined, repo: string): string[] {
+  const r = project?.repos.find((x) => x.name === repo);
+  return r ? [r.defaultBranch, ...r.targets.map((t) => t.name)] : [];
 }
 
 /** The forge a merge request can become a PR on ("none": no Create PR): its

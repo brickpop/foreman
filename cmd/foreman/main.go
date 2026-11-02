@@ -308,7 +308,7 @@ func run(args []string, stdout io.Writer) error {
 		Config: h, Sessions: manager, Publish: bus.Publish, Pause: 150 * time.Millisecond,
 		Delivered: func(ctx context.Context, msg store.TeamMessage) { flow.Delivered(ctx, msg) },
 	})
-	flow = workflow.New(workflow.Deps{Git: gitCLI, Config: h, Messages: messenger, Teams: manager,
+	flow = workflow.New(workflow.Deps{Git: gitCLI, Config: h, Messages: messenger, Teams: manager, Targets: h,
 		Actions: state.Actions(), Publish: bus.Publish, WorkItems: state.WorkItems(),
 		MergeRequests: state.MergeRequests(), Wiki: wikis, Requests: state.Requests(),
 		Reviews: state.Reviews(), ReviewComments: state.ReviewComments()})

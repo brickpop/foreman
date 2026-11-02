@@ -55,7 +55,7 @@ const inbox = createRoute({ ...section("inbox"), component: Inbox });
 
 const review = createRoute({
   ...section("inbox/$review"),
-  // since: the change since the CEO last requested changes, instead of against main.
+  // since: the change since the CEO last requested changes, instead of against its target.
   validateSearch: (s: Record<string, unknown>): { since?: true } =>
     s.since === true || s.since === "1" ? { since: true } : {},
   component: Review,

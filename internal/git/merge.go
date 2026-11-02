@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// The CEO's Merge to main (wiki/product/features/pipeline-and-merges.md#merge-to-main).
+// The CEO's merge into a target (wiki/product/features/pipeline-and-merges.md#merge-to-a-target).
 
 var (
 	// ErrConflict means the branch doesn't merge cleanly into the target:
@@ -149,12 +149,12 @@ func (g *CLI) MoveBranch(ctx context.Context, dir, branch, from, to string) erro
 
 // DropBranch discards branch, its head first kept under backup (a BackupRef),
 // so a mistake can be undone by hand. A branch checked out in a worktree
-// can't go: it moves to where branch main is instead, and the worktree is
+// can't go: it moves to where branch def is instead, and the worktree is
 // made clean, an unfinished merge abandoned; what it held not committed is
 // kept first under backup + "@uncommitted". Only for a worktree nobody works
 // in.
-func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, main string) error {
-	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, main) || !strings.HasPrefix(backup, "refs/foreman/") {
+func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, def string) error {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, def) || !strings.HasPrefix(backup, "refs/foreman/") {
 		return ErrBadBranch
 	}
 	defer g.lock(ctx, dir)()
@@ -170,7 +170,7 @@ func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, main string) 
 		return err
 	}
 	if tree, ok := trees[branch]; ok {
-		target, err := g.Resolve(ctx, dir, "refs/heads/"+main)
+		target, err := g.Resolve(ctx, dir, "refs/heads/"+def)
 		if err == nil {
 			_, err = saveChanges(ctx, tree, backup+"@uncommitted")
 		}

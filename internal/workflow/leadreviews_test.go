@@ -62,12 +62,12 @@ func TestReviewsTellTheLeadWhereItsReviewsStand(t *testing.T) {
 	text := f.ok("mara", "reviews", map[string]string{})
 	want := "Your reviews, open or decided in the last 7 days, newest first:\n\n" +
 		"rev-2 lead/atlas/big: Export invoices (backlog/led-44.md)\n" +
-		"  api changes requested · web conflicts with trunk\n" +
+		"  api → main: changes requested · web → trunk: conflicts\n" +
 		"  The CEO's note: Nearly there.\n" +
 		"  - api big.go:1 (changed since) `package big`: Name it bigger\n" +
 		"  - Add a test\n\n" +
 		"rev-1 lead/atlas/small: Export invoices (backlog/led-44.md)\n" +
-		"  api dismissed (the CEO's note: not now) · web dismissed (the CEO's note: not now)"
+		"  api → main: dismissed (the CEO's note: not now) · web → trunk: dismissed (the CEO's note: not now)"
 	if text != want {
 		t.Errorf("got\n%s\nwant\n%s", text, want)
 	}
@@ -124,8 +124,8 @@ func TestReviewsListOnlyTheLeadsRecentOnes(t *testing.T) {
 	}
 	for _, want := range []string{
 		"lead/atlas/still-open", // open, however old
-		"rev-1 lead/atlas/small: Export invoices (backlog/led-44.md)\n  api withdrawn · web withdrawn\n  Withdrawn: all of it is in big, superseded by rev-2.",
-		"rev-2 lead/atlas/big: Export invoices (backlog/led-44.md)\n  api waiting for the CEO · web waiting for the CEO",
+		"rev-1 lead/atlas/small: Export invoices (backlog/led-44.md)\n  api → main: withdrawn · web → trunk: withdrawn\n  Withdrawn: all of it is in big, superseded by rev-2.",
+		"rev-2 lead/atlas/big: Export invoices (backlog/led-44.md)\n  api → main: waiting for the CEO · web → trunk: waiting for the CEO",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("missing %q in:\n%s", want, text)

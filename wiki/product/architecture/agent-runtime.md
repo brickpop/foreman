@@ -11,9 +11,9 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 ## Instance lifecycle
 
 1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then an instance for each team member: the lead `starting` (or `queued`), every other member `asleep` ([Lazy starts](#lazy-starts)). Steps 2–3 happen when an instance starts, so an asleep member has no sandbox yet.
-2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. `Git.Prepare` makes a git worktree of each code repo at `<workspace>/agents/<agent>/<repo>` if it doesn't exist yet, and brings the agent's home branch up to `main` when it is idle ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
-   - lead: `lead/<team>/integration` (created from `main` if missing)
-   - members: their home branch `wt/<agent>/main` (created from `main`). They create `wt/<agent>/<topic>` when assigned a card.
+2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. `Git.Prepare` makes a git worktree of each code repo at `<workspace>/agents/<agent>/<repo>` if it doesn't exist yet, and brings the agent's home branch up to its repo's default branch when it is idle ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
+   - lead: `lead/<team>/integration` (created from the default branch if missing)
+   - members: their home branch `wt/<agent>/main` (created from the default branch). They create `wt/<agent>/<topic>` when assigned a card, from the default branch or the target the lead names.
 3. **Compose prompt** ([Session prompt](./session-prompt.md)) and **spawn** the harness in its container with the sandbox as working directory ([Harness adapters](./harness-adapters.md)).
 4. **Run**: status follows harness signals and team-message activity:
    - `running`: producing output / working a turn
@@ -21,7 +21,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
    - `awaiting`: has an open [request](../models/request.md) to the CEO
    - `done`: handed off, nothing assigned
 5. **Crash / exit / rate limit**: Foreman marks the instance `stopped` and raises a **blocked** request ([Requests](../features/requests.md)).
-6. **Stop deployment**: terminate the processes (containers) and keep worktrees on disk; `Git.Prune` deletes the agents' `wt/*` branches already merged into `main` ([Branches](./sandboxes-and-git.md#branches)). Other deployments of the same team are not affected.
+6. **Stop deployment**: terminate the processes (containers) and keep worktrees on disk; `Git.Prune` deletes the agents' `wt/*` branches already merged into a target ([Branches](./sandboxes-and-git.md#branches)). Other deployments of the same team are not affected.
 7. **Soul edit**: when a [team definition](../models/team-definition.md) changes, nothing running is touched: each instance gets the new prompt at its next start, or at once when the CEO reloads the deployment ([Team definition → Reload](../models/team-definition.md#reload)). A member hired into an active deployment gets its instance, asleep.
 
 Status values: `asleep | queued | starting | running | idle | awaiting | done | stopped`.

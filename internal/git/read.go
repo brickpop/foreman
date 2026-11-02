@@ -207,27 +207,27 @@ func (g *CLI) RootCommit(ctx context.Context, dir string) (string, error) {
 	return slices.Min(roots), nil
 }
 
-// PartedFrom is where head's work parted from main, the commit its change is
+// PartedFrom is where head's work parted from target, the commit its change is
 // read against. A squash leaves that history intact, so it is their merge
-// base. When main holds head itself (merged with a merge commit), it is where
-// head parted from main's line before that merge; "" when main took head as
+// base. When target holds head itself (merged with a merge commit), it is where
+// head parted from target's line before that merge; "" when target took head as
 // it was (a fast-forward), since nothing tells its change apart then.
-func (g *CLI) PartedFrom(ctx context.Context, dir, main, head string) (string, error) {
-	if !ValidBranch(ctx, main) {
+func (g *CLI) PartedFrom(ctx context.Context, dir, target, head string) (string, error) {
+	if !ValidBranch(ctx, target) {
 		return "", ErrBadBranch
 	}
 	if !hash.MatchString(head) {
 		return "", ErrNoRef
 	}
-	base, err := run(ctx, dir, "merge-base", "refs/heads/"+main, head)
+	base, err := run(ctx, dir, "merge-base", "refs/heads/"+target, head)
 	if err != nil {
 		return "", err
 	}
 	if base = strings.TrimSpace(base); base != head {
 		return base, nil
 	}
-	// The oldest commit of main's own line that holds head: its merge.
-	line, err := run(ctx, dir, "rev-list", "--first-parent", "--ancestry-path", "--reverse", head+"..refs/heads/"+main)
+	// The oldest commit of target's own line that holds head: its merge.
+	line, err := run(ctx, dir, "rev-list", "--first-parent", "--ancestry-path", "--reverse", head+"..refs/heads/"+target)
 	if err != nil {
 		return "", err
 	}

@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/store"
@@ -39,11 +41,12 @@ type Project struct {
 
 // Repo is one of a project's code repos, anywhere on disk.
 type Repo struct {
-	Name    string `json:"name"`    // unique in the project
-	Path    string `json:"path"`    // absolute
-	Main    string `json:"main"`    // the branch agents start from and merges go to
-	Problem string `json:"problem"` // why agents can't use it (missing, …); "" when they can
-	root    string // its first commit, which Locate looks for
+	Name    string   `json:"name"`          // unique in the project
+	Path    string   `json:"path"`          // absolute
+	Default string   `json:"defaultBranch"` // the target agents start from and merges go to unless told otherwise
+	Targets []Target `json:"targets"`       // its other targets, oldest first
+	Problem string   `json:"problem"`       // why agents can't use it (missing, …); "" when they can
+	root    string   // its first commit, which Locate looks for
 }
 
 // Ready says whether agents can use the repo.
@@ -82,15 +85,52 @@ func (p Project) RepoDir(name string) (string, bool) {
 	return "", false
 }
 
-// Main is the main branch of the repo named name: the code repo's own, or
-// main for the project repo (Foreman makes it on main) and any other name.
-func (p Project) Main(name string) string {
-	for _, r := range p.Repos {
-		if r.Name == name && name != projectRepo {
-			return r.Main
-		}
+// Default is the default branch of the repo named name: the code repo's
+// own, or main for the project repo (Foreman makes it on main) and any other
+// name.
+func (p Project) Default(name string) string {
+	if r, ok := p.repo(name); ok {
+		return r.Default
 	}
 	return "main"
+}
+
+// Targets are the code repo's targets by name, its default first; none for
+// any other name.
+func (p Project) Targets(name string) []string {
+	r, ok := p.repo(name)
+	if !ok {
+		return nil
+	}
+	list := []string{r.Default}
+	for _, t := range r.Targets {
+		list = append(list, t.Name)
+	}
+	return list
+}
+
+// IsTarget says whether branch is one of the code repo's targets.
+func (p Project) IsTarget(name, branch string) bool {
+	return slices.Contains(p.Targets(name), branch)
+}
+
+func (p Project) repo(name string) (Repo, bool) {
+	for _, r := range p.Repos {
+		if r.Name == name && name != projectRepo {
+			return r, true
+		}
+	}
+	return Repo{}, false
+}
+
+// Target is a branch of a code repo, besides its default, that merges may go
+// to (wiki/product/features/pipeline-and-merges.md#merge-targets): who made
+// it (the lead's instance), at which commit and when.
+type Target struct {
+	Name      string    `json:"name"`
+	MadeBy    string    `json:"madeBy"`
+	From      string    `json:"from"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Team is a team file.
@@ -309,7 +349,7 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 		p.Config, p.Problems = ParseProject(data)
 	}
 	for _, rec := range r.Repos {
-		repo := Repo{Name: rec.Name, Path: rec.Path, Main: rec.Main, Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
+		repo := Repo{Name: rec.Name, Path: rec.Path, Default: rec.Default, Targets: targets(rec.Targets), Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
 		if !repo.Ready() {
 			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.Name, repo.Problem))
 		}
@@ -317,6 +357,16 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 	}
 	p.Problems = normalize(p.Problems)
 	return p
+}
+
+// targets are a repo's other targets as recorded: never nil, so the API
+// sends a list.
+func targets(records []store.TargetRecord) []Target {
+	list := []Target{}
+	for _, t := range records {
+		list = append(list, Target(t))
+	}
+	return list
 }
 
 // checkRepo says why agents can't use a repo, or "": its folder moved or went,
@@ -459,7 +509,7 @@ func diff(old, cur snapshot) []Change {
 		o, inOld := old.projects[id]
 		c, inCur := cur.projects[id]
 		switch {
-		case inOld != inCur || !slices.Equal(o.Repos, c.Repos) || o.Profile != c.Profile || o.Archived != c.Archived:
+		case inOld != inCur || !reflect.DeepEqual(o.Repos, c.Repos) || o.Profile != c.Profile || o.Archived != c.Archived:
 			projectsChanged = true
 			if inOld && inCur && o.Version != c.Version {
 				changes = append(changes, Change{Kind: "project", ID: id, Version: c.Version, Problems: c.Problems})

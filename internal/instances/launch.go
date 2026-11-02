@@ -108,7 +108,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {
 		repoDir, worktree := repo.Path, filepath.Join(inst.SandboxPath, repo.Name)
-		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, repo.Main); err != nil {
+		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, repo.Default); err != nil {
 			return nil, err
 		}
 		// An agent starts without a submodule that can't be fetched (offline,

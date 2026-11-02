@@ -88,11 +88,11 @@ type Withdrawn struct {
 
 // RepoDiff is one repo's change in a review.
 type RepoDiff struct {
-	Repo  string `json:"repo"`
-	Main  string `json:"main"`
-	Head  string `json:"head"`  // the branch's head the diff was made at
-	Since string `json:"since"` // with since: the head it starts from ("" for against main)
-	Diff  string `json:"diff"`
+	Repo   string `json:"repo"`
+	Target string `json:"target"` // the branch it merges into
+	Head   string `json:"head"`   // the branch's head the diff was made at
+	Since  string `json:"since"`  // with since: the head it starts from ("" for against its target)
+	Diff   string `json:"diff"`
 	// Gone: a decided repo whose change can't be shown (not recorded, or
 	// git no longer has its commits).
 	Gone bool `json:"gone"`
@@ -198,7 +198,7 @@ func (w *Workflow) heads(ctx context.Context, mrs []store.MergeRequest) map[stri
 
 // follow places a comment on the branch's head. One on the branch's side
 // moves with the lines added or removed above it, and is outdated once its
-// own line changed; one on main's side (a removed line) once its file
+// own line changed; one on the target's side (a removed line) once its file
 // changed. A comment in a repo no longer open stays where it was written.
 func (w *Workflow) follow(ctx context.Context, mrs []store.MergeRequest, heads map[string]string, c store.ReviewComment) Comment {
 	out := Comment{ReviewComment: c, Now: c.Line}
@@ -268,9 +268,9 @@ func hunkRange(header string) (oldStart, oldCount, newCount int, ok bool) {
 	return oldStart, oldCount, newCount, ok1 && ok2
 }
 
-// ReviewDiff is each repo's change in a review: against its main (what a
+// ReviewDiff is each repo's change in a review: against its target (what a
 // merge takes), or with since only what the lead did since the CEO last
-// requested changes (a repo never reviewed yet shows against main).
+// requested changes (a repo never reviewed yet shows against its target).
 func (w *Workflow) ReviewDiff(ctx context.Context, id string, since bool) ([]RepoDiff, error) {
 	if _, err := w.Reviews.Get(ctx, id); err != nil {
 		return nil, err
@@ -281,12 +281,12 @@ func (w *Workflow) ReviewDiff(ctx context.Context, id string, since bool) ([]Rep
 	}
 	out := []RepoDiff{}
 	for _, mr := range mrs {
-		main, dir, err := w.repoOf(mr)
+		target, dir, err := w.repoOf(mr)
 		if err != nil {
 			return nil, err
 		}
-		d := RepoDiff{Repo: mr.Repo, Main: main}
-		// A decided one shows the change as it was decided: main has moved,
+		d := RepoDiff{Repo: mr.Repo, Target: target}
+		// A decided one shows the change as it was decided: its target has moved,
 		// and its branch may be gone.
 		if mr.State != store.MergeOpen {
 			out = append(out, w.decidedDiff(ctx, dir, d, mr))
@@ -299,7 +299,7 @@ func (w *Workflow) ReviewDiff(ctx context.Context, id string, since bool) ([]Rep
 			d.Since = mr.ReviewedHead
 			d.Diff, err = w.Git.Compare(ctx, dir, mr.ReviewedHead, d.Head, 3)
 		} else {
-			d.Diff, err = w.Git.Diff(ctx, dir, main, d.Head)
+			d.Diff, err = w.Git.Diff(ctx, dir, target, d.Head)
 		}
 		if err != nil {
 			return nil, err
@@ -492,8 +492,8 @@ func changesMessage(v Review, note string, comments []Comment) string {
 }
 
 // MergeReview merges the review's open merge requests in the repos named,
-// each at the head the CEO read (heads: repo → commit), into its repo's
-// main; the others stay open in the review. A repo that can't be merged (a
+// each at the head the CEO read (heads: repo → commit), into its target;
+// the others stay open in the review. A repo that can't be merged (a
 // conflict, the CEO's local changes, a branch that moved since) stops
 // nothing else; the error names it.
 func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]string) error {
@@ -517,11 +517,48 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 	}
 	var failed []error
 	for _, mr := range picked {
-		if err := w.mergeToMain(ctx, mr, heads[mr.Repo]); err != nil {
+		if err := w.mergeToTarget(ctx, mr, heads[mr.Repo]); err != nil {
 			failed = append(failed, fmt.Errorf("%s: %w", mr.Repo, err))
 		}
 	}
 	return errors.Join(failed...)
+}
+
+// RetargetReview changes the target the review's open merge request in repo
+// merges into: another of the repo's targets, which git still has. Its diff
+// is then against it, a conflict found before is forgotten (the next merge
+// tells), and the lead is told.
+func (w *Workflow) RetargetReview(ctx context.Context, id, repo, target string) error {
+	v, err := w.openReview(ctx, id)
+	if err != nil {
+		return err
+	}
+	i := slices.IndexFunc(v.MergeRequests, func(mr store.MergeRequest) bool { return mr.Repo == repo && mr.State == store.MergeOpen })
+	if i < 0 {
+		return fmt.Errorf("%w: %s has nothing open in this review", ErrNotOpen, repo)
+	}
+	mr := v.MergeRequests[i]
+	project, err := w.Config.Project(mr.ProjectID)
+	if err != nil {
+		return err
+	}
+	if !project.IsTarget(repo, target) {
+		return fmt.Errorf("%w: %s isn't a target of %s", ErrInvalid, target, repo)
+	}
+	from, dir, err := w.repoOf(mr)
+	if err != nil {
+		return err
+	}
+	if from == target {
+		return nil
+	}
+	if !w.Git.HasBranch(ctx, dir, target) {
+		return fmt.Errorf("%w: %s has no branch %s any more", ErrInvalid, repo, target)
+	}
+	mr.Target, mr.Conflicting, mr.Note = target, false, ""
+	w.saveMerge(ctx, mr)
+	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: the CEO changed where %s merges in %s: into %s, no longer %s. Its review is reckoned against %s now; when told %s moved, merge that in.", mr.Branch, repo, target, from, target, target))
+	return nil
 }
 
 // DismissReview ends the review unmerged, in every repo still open in it: the
@@ -530,7 +567,7 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 // and nobody is told; while it keeps running, the lead is told to stop work
 // on it, with the CEO's note. With DropBranches its branches go: the lead
 // branch and the members' branches it carried, each kept under
-// refs/foreman/dismissed/ (a branch checked out moves to main instead, what its
+// refs/foreman/dismissed/ (a branch checked out moves to its target instead, what its
 // worktree held not committed kept too), only while no agent works in them:
 // ErrInvalid when the team runs on. A branch that can't go (a git error)
 // stays, listed in Dismissed with why.
@@ -600,17 +637,23 @@ func (w *Workflow) branchesOf(ctx context.Context, mr store.MergeRequest) []stri
 
 // dropBranch discards one of a dismissed review's branches in a merge
 // request's repo, keeping its head under refs/foreman/dismissed/<time>/<review>/.
+// One checked out moves to the default branch, as idle desks do, whatever the
+// review's target.
 func (w *Workflow) dropBranch(ctx context.Context, mr store.MergeRequest, branch, review string) error {
-	main, dir, err := w.repoOf(mr)
+	_, dir, err := w.repoOf(mr)
+	if err != nil {
+		return err
+	}
+	project, err := w.Config.Project(mr.ProjectID)
 	if err != nil {
 		return err
 	}
 	defer w.pruneBackups(ctx, dir)
-	return w.Git.DropBranch(ctx, dir, branch, git.BackupRef("dismissed", w.Now(), review+"/"+branch), main)
+	return w.Git.DropBranch(ctx, dir, branch, git.BackupRef("dismissed", w.Now(), review+"/"+branch), project.Default(mr.Repo))
 }
 
 // decidedDiff is a decided repo's change, from where its branch parted from
-// main to the head recorded as it left open.
+// its target to the head recorded as it left open.
 func (w *Workflow) decidedDiff(ctx context.Context, dir string, d RepoDiff, mr store.MergeRequest) RepoDiff {
 	if mr.Head == "" || mr.Base == "" {
 		d.Gone = true

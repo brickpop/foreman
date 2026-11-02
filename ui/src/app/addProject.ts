@@ -42,10 +42,10 @@ export function createdBody(created: boolean, cloned: boolean, path: string): st
   return `Made its project repo at ${path}, with project.toml and a starter wiki.`;
 }
 
-/** The main branch to send when adding an existing repo: none when it has a
- * main (the server takes that), else the CEO's pick, by default the branch its
- * checkout is on, or its first. */
-export function mainToSend(b: Branches | undefined, chosen?: string): string | undefined {
+/** The default branch to send when adding an existing repo: none when it has
+ * a main (the server takes that), else the CEO's pick, by default the branch
+ * its checkout is on, or its first. */
+export function defaultToSend(b: Branches | undefined, chosen?: string): string | undefined {
   if (!b || b.branches.includes("main")) return undefined;
   if (chosen && b.branches.includes(chosen)) return chosen;
   return b.branches.includes(b.current) ? b.current : b.branches[0];

@@ -1674,7 +1674,7 @@ func TestAFailedStartSaysWhy(t *testing.T) {
 	if !strings.HasPrefix(inst.StopReason, "couldn't start: ") || !strings.Contains(inst.StopReason, `has no branch "main"`) {
 		t.Errorf("stop reason %q", inst.StopReason)
 	}
-	if _, err := f.hm.SetRepoMain(ctx, "ledger", "ledger-api", "master"); err != nil {
+	if _, err := f.hm.SetRepoDefault(ctx, "ledger", "ledger-api", "master"); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.m.Wake(ctx, "mara@ledger"); err != nil {

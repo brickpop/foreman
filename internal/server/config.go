@@ -41,10 +41,10 @@ type Config interface {
 	// while a team is deployed on it). Legacy: it goes once the CEO has
 	// migrated (wiki/backlog/remove-workspace-migration.md).
 	Migrate(ctx context.Context, id, workspace string) (home.Project, error)
-	// AddRepo adds an existing repo, by its folder, with main as its main
+	// AddRepo adds an existing repo, by its folder, with def as its default
 	// branch ("": main, which it must have); NewRepo creates an empty one at
 	// a new folder, on main, and adds it.
-	AddRepo(ctx context.Context, project, name, path, main string) (home.Project, error)
+	AddRepo(ctx context.Context, project, name, path, def string) (home.Project, error)
 	NewRepo(ctx context.Context, project, name, path string) (home.Project, error)
 	// LocateRepo points a missing repo at its new folder; RemoveRepo takes a
 	// repo out of the project (refused while a team is deployed on it).
@@ -53,12 +53,15 @@ type Config interface {
 	// RenameRepo renames a repo, its agents' worktrees with it (refused while
 	// a team is deployed on the project).
 	RenameRepo(ctx context.Context, project, name, newName string) (home.Project, error)
-	// SetRepoMain sets a repo's main branch, one it has.
-	SetRepoMain(ctx context.Context, project, name, main string) (home.Project, error)
+	// SetRepoDefault sets a repo's default branch, one it has.
+	SetRepoDefault(ctx context.Context, project, name, branch string) (home.Project, error)
+	// RemoveTarget stops one of a repo's other targets being one (refused
+	// while a merge request into it is open: home.ErrInUse).
+	RemoveTarget(ctx context.Context, project, repo, name string) (home.Project, error)
 	// Browse lists a folder for picking repos and workspaces, inside the
 	// CEO's home folder ("" is the folder Foreman was started from).
 	Browse(path string) (home.Folder, error)
-	// RepoBranches lists a folder's branches, to pick a repo's main branch.
+	// RepoBranches lists a folder's branches, to pick a repo's default branch.
 	RepoBranches(ctx context.Context, path string) (home.Branches, error)
 	// SetProfile names the profile the project's agents run on.
 	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
@@ -137,13 +140,13 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Name string `json:"name"`
-			Path string `json:"path"`
-			Main string `json:"main"`
-			New  bool   `json:"new"`
+			Name    string `json:"name"`
+			Path    string `json:"path"`
+			Default string `json:"defaultBranch"`
+			New     bool   `json:"new"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, main?, new?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, defaultBranch?, new?}")
 			return
 		}
 		var p home.Project
@@ -151,7 +154,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		if req.New {
 			p, err = c.NewRepo(r.Context(), r.PathValue("id"), req.Name, req.Path)
 		} else {
-			p, err = c.AddRepo(r.Context(), r.PathValue("id"), req.Name, req.Path, req.Main)
+			p, err = c.AddRepo(r.Context(), r.PathValue("id"), req.Name, req.Path, req.Default)
 		}
 		writeProject(w, p, err)
 	})
@@ -163,15 +166,20 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		b, err := c.RepoBranches(r.Context(), r.URL.Query().Get("path"))
 		writeProject(w, b, err)
 	})
-	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}/main", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}/default", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Main string `json:"main"`
+			Branch string `json:"branch"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {main}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {branch}")
 			return
 		}
-		p, err := c.SetRepoMain(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Main)
+		p, err := c.SetRepoDefault(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Branch)
+		writeProject(w, p, err)
+	})
+	// A target's name may hold slashes (release/2.0).
+	mux.HandleFunc("DELETE /api/projects/{id}/repos/{repo}/targets/{target...}", func(w http.ResponseWriter, r *http.Request) {
+		p, err := c.RemoveTarget(r.Context(), r.PathValue("id"), r.PathValue("repo"), r.PathValue("target"))
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {
@@ -304,6 +312,8 @@ func writeProject(w http.ResponseWriter, v any, err error) {
 		writeError(w, http.StatusConflict, "EXISTS", strings.TrimPrefix(err.Error(), home.ErrExists.Error()+": "))
 	case errors.Is(err, home.ErrDeployed):
 		writeError(w, http.StatusConflict, "DEPLOYED", strings.TrimPrefix(err.Error(), home.ErrDeployed.Error()+": "))
+	case errors.Is(err, home.ErrInUse):
+		writeError(w, http.StatusConflict, "IN_USE", strings.TrimPrefix(err.Error(), home.ErrInUse.Error()+": "))
 	default:
 		writeFound(w, v, err, "project")
 	}

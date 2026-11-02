@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
-import { forgeOf, linkLine, mainOf } from "../../app/model";
+import { forgeOf, linkLine, targetsOf } from "../../app/model";
 import { cellLook, columnLabel, laneLabel, lanesShown, moveOf, revealBy } from "./Board";
 import { sourceLabel } from "./Pipeline";
 
@@ -85,6 +85,7 @@ describe("Changes", () => {
     const mr = {
       repo: "web",
       branch: "lead/atlas/integration",
+      target: "main",
       checksStatus: "pass",
     } as MergeRequest;
     expect(linkLine(mr, "forgejo")).toBe("web · lead/atlas/integration → main · checks pass");
@@ -97,10 +98,10 @@ describe("Changes", () => {
     expect(linkLine({ ...mr, checksStatus: "" }, "none")).toBe(
       "web · lead/atlas/integration → main",
     );
-    expect(linkLine({ ...mr, checksStatus: "running" }, "none", "develop")).toBe(
+    expect(linkLine({ ...mr, checksStatus: "running", target: "develop" }, "none")).toBe(
       "web · lead/atlas/integration → develop · checks running",
     );
-    expect(linkLine({ ...mr, conflicting: true }, "none", "develop")).toBe(
+    expect(linkLine({ ...mr, conflicting: true, target: "develop" }, "none")).toBe(
       "web · lead/atlas/integration → develop · conflicts with develop",
     );
   });
@@ -116,19 +117,23 @@ describe("forgeOf", () => {
   });
 });
 
-describe("mainOf", () => {
+describe("targetsOf", () => {
   const project = {
     repos: [
-      { name: "api", path: "/h/api", main: "main", problem: "" },
-      { name: "poc", path: "/h/poc", main: "master", problem: "" },
+      { name: "api", defaultBranch: "main", targets: [] },
+      {
+        name: "poc",
+        defaultBranch: "master",
+        targets: [{ name: "release/2.0" }, { name: "hotfix" }],
+      },
     ],
   } as unknown as Project;
-  it("is the repo's own main branch", () => {
-    expect(mainOf(project, "poc")).toBe("master");
-    expect(mainOf(project, "api")).toBe("main");
+  it("is the repo's default branch, then its other targets", () => {
+    expect(targetsOf(project, "poc")).toEqual(["master", "release/2.0", "hotfix"]);
+    expect(targetsOf(project, "api")).toEqual(["main"]);
   });
-  it("is main for a repo it doesn't have, or before the project loads", () => {
-    expect(mainOf(project, "gone")).toBe("main");
-    expect(mainOf(undefined, "poc")).toBe("main");
+  it("is none for a repo it doesn't have, or before the project loads", () => {
+    expect(targetsOf(project, "gone")).toEqual([]);
+    expect(targetsOf(undefined, "poc")).toEqual([]);
   });
 });

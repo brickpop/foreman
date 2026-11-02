@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -266,7 +267,7 @@ func TestAddRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(p.Repos, []Repo{{Name: "app", Path: app, Main: "main", root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, Main: "main", root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
+	if !reflect.DeepEqual(p.Repos, []Repo{{Name: "app", Path: app, Default: "main", Targets: []Target{}, root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, Default: "main", Targets: []Target{}, root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
 		t.Errorf("aragon %+v", p)
 	}
 	if p, err := h.AddRepo(ctx, "app-only", "app", app, ""); err != nil || len(p.Repos) != 1 {
@@ -405,7 +406,7 @@ func TestNewRepo(t *testing.T) {
 	if err != nil || len(p.Repos) != 1 || p.Repos[0].Path != path || !p.Repos[0].Ready() {
 		t.Fatalf("%+v %v", p, err)
 	}
-	if branch := gitOut(t, path, "branch", "--show-current"); branch != "main" || p.Repos[0].Main != "main" {
+	if branch := gitOut(t, path, "branch", "--show-current"); branch != "main" || p.Repos[0].Default != "main" {
 		t.Errorf("branch %q", branch)
 	}
 	if log := gitOut(t, path, "log", "--format=%s", "--name-only"); log != "First commit\n\nREADME.md" {
@@ -821,7 +822,7 @@ func TestGone(t *testing.T) {
 
 // A repo's main branch is main when it has one; otherwise the CEO picks one
 // of its branches (RepoBranches lists them), and can change it later.
-func TestARepoHasItsOwnMainBranch(t *testing.T) {
+func TestARepoHasItsOwnDefaultBranch(t *testing.T) {
 	h := loaded(t, nil)
 	if _, _, err := h.NewProject(ctx, "aragon", "", workspace("aragon")); err != nil {
 		t.Fatal(err)
@@ -849,11 +850,11 @@ func TestARepoHasItsOwnMainBranch(t *testing.T) {
 	if _, err := h.RepoBranches(ctx, filepath.Join(t.TempDir(), "x")); !errors.Is(err, ErrInvalid) {
 		t.Errorf("branches of no repo: %v", err)
 	}
-	for name, tc := range map[string]struct{ main, says string }{
-		"no main, none picked": {"", "has no branch main: pick its main branch"},
+	for name, tc := range map[string]struct{ def, says string }{
+		"no main, none picked": {"", "has no branch main: pick its default branch"},
 		"a branch it hasn't":   {"trunk", `has no branch "trunk"`},
 	} {
-		if _, err := h.AddRepo(ctx, "aragon", "poc", poc, tc.main); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.says) {
+		if _, err := h.AddRepo(ctx, "aragon", "poc", poc, tc.def); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), tc.says) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -861,22 +862,22 @@ func TestARepoHasItsOwnMainBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, err := h.AddRepo(ctx, "aragon", "poc", poc, "master")
-	if err != nil || p.Repos[0].Main != "main" || p.Repos[1].Main != "master" {
+	if err != nil || p.Repos[0].Default != "main" || p.Repos[1].Default != "master" {
 		t.Fatalf("%+v %v", p.Repos, err)
 	}
 
-	if _, err := h.SetRepoMain(ctx, "aragon", "poc", "trunk"); !errors.Is(err, ErrInvalid) {
-		t.Errorf("a main it hasn't: %v", err)
+	if _, err := h.SetRepoDefault(ctx, "aragon", "poc", "trunk"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a default it hasn't: %v", err)
 	}
-	if _, err := h.SetRepoMain(ctx, "aragon", "nope", "main"); !errors.Is(err, ErrNotFound) {
+	if _, err := h.SetRepoDefault(ctx, "aragon", "nope", "main"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("no such repo: %v", err)
 	}
-	if p, err = h.SetRepoMain(ctx, "aragon", "poc", "feature"); err != nil || p.Repos[1].Main != "feature" || p.Repos[0].Main != "main" {
+	if p, err = h.SetRepoDefault(ctx, "aragon", "poc", "feature"); err != nil || p.Repos[1].Default != "feature" || p.Repos[0].Default != "main" {
 		t.Errorf("changed: %+v %v", p.Repos, err)
 	}
 	// Kept in the record: a reload still has it.
 	h.reload()
-	if p, _ := h.Project("aragon"); p.Repos[1].Main != "feature" {
+	if p, _ := h.Project("aragon"); p.Repos[1].Default != "feature" {
 		t.Errorf("after a reload: %+v", p.Repos)
 	}
 }
@@ -893,5 +894,90 @@ func TestSuggestWorkspace(t *testing.T) {
 		if s, _ := h.SuggestWorkspace(name); s.Path != s.Folder {
 			t.Errorf("%q: %+v", name, s)
 		}
+	}
+}
+
+// The lead's targets: a new branch at any commit or branch of the repo,
+// recorded with who made it; refused for a name the repo has, an agent's
+// namespace, a bad name, a from it hasn't, or no such repo, each leaving
+// nothing behind. Removing one keeps its branch; the default can't go.
+func TestTargets(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "aragon", "", workspace("aragon")); err != nil {
+		t.Fatal(err)
+	}
+	app := codeRepo(t, "dev/app")
+	first := gitOut(t, app, "rev-parse", "HEAD")
+	writeFile(t, filepath.Join(app, "NEWS"), "v2\n")
+	gitOut(t, app, "add", "NEWS")
+	gitOut(t, app, "commit", "--quiet", "-m", "news")
+	if _, err := h.AddRepo(ctx, "aragon", "app", app, ""); err != nil {
+		t.Fatal(err)
+	}
+
+	p, err := h.CreateTarget(ctx, "aragon", "app", "release/1.0", first[:8], "mara@aragon")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := p.Repos[0].Targets; len(got) != 1 || got[0].Name != "release/1.0" || got[0].From != first || got[0].MadeBy != "mara@aragon" || got[0].CreatedAt.IsZero() {
+		t.Errorf("recorded %+v", got)
+	}
+	if at := gitOut(t, app, "rev-parse", "release/1.0"); at != first {
+		t.Errorf("made at %s, want %s", at, first)
+	}
+	if b := gitOut(t, app, "branch", "--show-current"); b != "main" {
+		t.Errorf("the CEO's checkout moved to %s", b)
+	}
+	if _, err := h.CreateTarget(ctx, "aragon", "app", "hotfix", "main", "mara@aragon"); err != nil {
+		t.Errorf("from a branch: %v", err)
+	}
+	if !p.IsTarget("app", "release/1.0") || !p.IsTarget("app", "main") || p.IsTarget("app", "wt/tove/main") {
+		t.Errorf("targets %v", p.Targets("app"))
+	}
+
+	gitOut(t, app, "branch", "taken")
+	for name, c := range map[string]struct {
+		repo, branch, from string
+		want               error
+	}{
+		"a branch it has":   {"app", "taken", "main", ErrExists},
+		"a target it has":   {"app", "release/1.0", "main", ErrExists},
+		"its default":       {"app", "main", "main", ErrExists},
+		"a member's branch": {"app", "wt/tove/x", "main", ErrInvalid},
+		"a lead's branch":   {"app", "lead/atlas/x", "main", ErrInvalid},
+		"a bad name":        {"app", "x..y", "main", ErrInvalid},
+		"a from it hasn't":  {"app", "release/2.0", "nope", ErrInvalid},
+		"no such repo":      {"web", "release/2.0", "main", ErrNotFound},
+		"the project repo":  {"project", "release/2.0", "main", ErrNotFound},
+	} {
+		if _, err := h.CreateTarget(ctx, "aragon", c.repo, c.branch, c.from, "mara@aragon"); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+	if p, _ := h.Project("aragon"); len(p.Repos[0].Targets) != 2 {
+		t.Errorf("a refusal recorded something: %+v", p.Repos[0].Targets)
+	}
+	if out := gitOut(t, app, "branch", "--list", "x..y", "release/2.0", "wt/*", "lead/*"); out != "" {
+		t.Errorf("a refusal made %q", out)
+	}
+
+	// Removed: no longer a target, its branch kept. The default can't be.
+	if _, err := h.RemoveTarget(ctx, "aragon", "app", "main"); !errors.Is(err, ErrInvalid) {
+		t.Errorf("the default: %v", err)
+	}
+	if _, err := h.RemoveTarget(ctx, "aragon", "app", "nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such target: %v", err)
+	}
+	p, err = h.RemoveTarget(ctx, "aragon", "app", "hotfix")
+	if err != nil || p.IsTarget("app", "hotfix") {
+		t.Errorf("removed: %v %v", p.Targets("app"), err)
+	}
+	if out := gitOut(t, app, "branch", "--list", "hotfix"); out == "" {
+		t.Error("its branch went too")
+	}
+	// Kept in the record: a reload still has it.
+	h.reload()
+	if p, _ := h.Project("aragon"); !slices.Equal(p.Targets("app"), []string{"main", "release/1.0"}) {
+		t.Errorf("after a reload: %v", p.Targets("app"))
 	}
 }

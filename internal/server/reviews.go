@@ -25,6 +25,9 @@ type Reviews interface {
 	// MergeReview: workflow.ErrConflict, ErrLocalChanges or ErrBranchMoved
 	// for each repo that couldn't be merged (the others are).
 	MergeReview(ctx context.Context, id string, heads map[string]string) error
+	// RetargetReview changes where one repo of the review merges: another of
+	// its targets (workflow.ErrInvalid otherwise).
+	RetargetReview(ctx context.Context, id, repo, target string) error
 	// DismissReview: workflow.ErrInvalid when dropping the branches of a team
 	// left running.
 	DismissReview(ctx context.Context, id string, c workflow.Dismiss) (workflow.Dismissed, error)
@@ -82,6 +85,16 @@ func reviewRoutes(mux *http.ServeMux, rv Reviews) {
 		}
 		writeReview(w, nil, rv.MergeReview(r.Context(), r.PathValue("id"), req.Heads))
 	})
+	mux.HandleFunc("PUT /api/reviews/{id}/target", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Repo   string `json:"repo"`
+			Target string `json:"target"`
+		}
+		if !decode(w, r, &req, "expected {repo, target}") {
+			return
+		}
+		writeReview(w, nil, rv.RetargetReview(r.Context(), r.PathValue("id"), req.Repo, req.Target))
+	})
 	mux.HandleFunc("POST /api/reviews/{id}/dismiss", func(w http.ResponseWriter, r *http.Request) {
 		var req workflow.Dismiss
 		if !decode(w, r, &req, "expected {note, dropBranches, stopTeam}") {
@@ -135,7 +148,7 @@ func notMerged(err error) string {
 		repo, _, _ := strings.Cut(e.Error(), ":")
 		switch {
 		case errors.Is(e, workflow.ErrConflict):
-			lines = append(lines, repo+" conflicts with its main: the lead was asked to merge it in, then to ask again")
+			lines = append(lines, repo+" conflicts with its target: the lead was asked to merge it in, then to ask again")
 		case errors.Is(e, workflow.ErrLocalChanges):
 			lines = append(lines, repo+": your checkout has uncommitted changes the merge would overwrite: commit or stash them, then merge again")
 		case errors.Is(e, workflow.ErrBranchMoved):

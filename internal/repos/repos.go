@@ -59,7 +59,7 @@ type Browser struct {
 	Git    Git
 }
 
-// dir is the folder of one of the project's repos, with its main branch.
+// dir is the folder of one of the project's repos, with its default branch.
 func (b Browser) dir(project, repo string) (string, string, error) {
 	p, err := b.Config.Project(project)
 	if err != nil {
@@ -69,12 +69,12 @@ func (b Browser) dir(project, repo string) (string, string, error) {
 	if !ok {
 		return "", "", ErrNoRepo
 	}
-	return dir, p.Main(repo), nil
+	return dir, p.Default(repo), nil
 }
 
 // Repos lists the project's code repos agents can use (a missing one is a
 // problem shown on the project), then its project repo, each with its
-// branches: main first, then the others by name.
+// branches: the default first, then the others by name.
 func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 	p, err := b.Config.Project(project)
 	if err != nil {
@@ -88,20 +88,20 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 		}
 	}
 	for _, name := range append(names, projectRepo) {
-		dir, main, err := b.dir(project, name)
+		dir, def, err := b.dir(project, name)
 		if err != nil {
 			return nil, err
 		}
-		branches, err := b.branches(ctx, project, dir, main)
+		branches, err := b.branches(ctx, project, dir, def)
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, Repo{Name: name, Project: name == projectRepo, Main: main, Branches: branches})
+		list = append(list, Repo{Name: name, Project: name == projectRepo, Default: def, Branches: branches})
 	}
 	return list, nil
 }
 
-func (b Browser) branches(ctx context.Context, project, dir, main string) ([]Branch, error) {
+func (b Browser) branches(ctx context.Context, project, dir, def string) ([]Branch, error) {
 	names, err := b.Git.RecentBranches(ctx, dir)
 	if err != nil {
 		return nil, err
@@ -110,14 +110,14 @@ func (b Browser) branches(ctx context.Context, project, dir, main string) ([]Bra
 	if err != nil {
 		return nil, err
 	}
-	// A repo cloned with another default branch (master) has no main to
-	// count from: its branches show no ahead count.
-	hasMain := slices.Contains(names, main)
+	// A default branch deleted outside Foreman leaves nothing to count from:
+	// its branches show no ahead count.
+	hasDefault := slices.Contains(names, def)
 	list := []Branch{}
 	for _, name := range names {
 		br := Branch{Name: name}
-		if hasMain && name != main {
-			if br.Ahead, err = b.Git.Ahead(ctx, dir, name, main); err != nil {
+		if hasDefault && name != def {
+			if br.Ahead, err = b.Git.Ahead(ctx, dir, name, def); err != nil {
 				return nil, err
 			}
 		}
@@ -128,12 +128,12 @@ func (b Browser) branches(ctx context.Context, project, dir, main string) ([]Bra
 		}
 		list = append(list, br)
 	}
-	// main first, then the most recently committed.
+	// The default first, then the most recently committed.
 	slices.SortStableFunc(list, func(x, y Branch) int {
 		switch {
-		case x.Name == main && y.Name != main:
+		case x.Name == def && y.Name != def:
 			return -1
-		case y.Name == main && x.Name != main:
+		case y.Name == def && x.Name != def:
 			return 1
 		}
 		return 0

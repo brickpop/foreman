@@ -289,3 +289,39 @@ func TestBranchesAndContains(t *testing.T) {
 		t.Error("an unknown branch is an error, not 'not contained'")
 	}
 }
+
+// A target is made at a commit, nothing checked out anywhere; one the repo
+// has, or a bad name, is refused, and nothing changes.
+func TestCreateBranch(t *testing.T) {
+	r, wts := worktrees(t, "tove")
+	g := New()
+	first := gitOut(t, r, "rev-parse", "main")
+	write(t, filepath.Join(r, "NEWS"), "v2\n")
+	if err := g.Commit(ctx, r, "news", "NEWS"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.CreateBranch(ctx, r, "release/1.0", first); err != nil {
+		t.Fatal(err)
+	}
+	if at := gitOut(t, r, "rev-parse", "release/1.0"); at != first {
+		t.Errorf("at %s, want %s", at, first)
+	}
+	if branchOf(t, r) != "main" || branchOf(t, wts["tove"]) != "wt/tove/main" {
+		t.Error("a checkout moved")
+	}
+	for name, c := range map[string]struct {
+		branch string
+		want   error
+	}{
+		"one it has":  {"main", ErrBranchExists},
+		"a bad name":  {"release/..", ErrBadBranch},
+		"option-like": {"-f", ErrBadBranch},
+	} {
+		if err := g.CreateBranch(ctx, r, c.branch, first); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if at := gitOut(t, r, "rev-parse", "main"); at == first {
+		t.Error("main was moved")
+	}
+}

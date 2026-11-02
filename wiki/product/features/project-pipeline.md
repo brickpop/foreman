@@ -6,7 +6,7 @@ tags: [feature, ui, requests, pipeline]
 
 # Project pipeline
 
-What needs the CEO on a project, the work moving towards `main`, and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/archive/project-code-tab.md)):
+What needs the CEO on a project, the work moving towards its [targets](./pipeline-and-merges.md#merge-targets), and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/archive/project-code-tab.md)):
 
 - **Needs you** is in the project's [Inbox](./reviews.md#the-inbox), after its reviews, only when something waits; the Inbox's sidebar badge counts both (the CEO, 2026-10-31; above the wiki on Overview until then).
 - **In flight** and **Merged** are in the project's [Deployment](./project-deployment.md) section, under its agents (on Repositories from 2026-10-17 to 2026-10-21, then Worktrees until 2026-10-31).
@@ -33,7 +33,7 @@ By kind:
 
 ## 2. In flight
 
-Label "In flight" with the subtitle `worktree → lead → main`. One panel listing this project's open pipeline entries, rows separated by a `--line` border ([Pipeline and merges](./pipeline-and-merges.md)):
+Label "In flight" with the subtitle `worktree → lead → target`. One panel listing this project's open pipeline entries, rows separated by a `--line` border ([Pipeline and merges](./pipeline-and-merges.md)):
 
 **Work items** not in a merge request ([Work item](../models/work-item.md)), rows (grid `1fr auto auto`, padding `12px 16px`):
 
@@ -43,7 +43,7 @@ Label "In flight" with the subtitle `worktree → lead → main`. One panel list
 
 **Open merge requests** ([Merge request](../models/merge-request.md)), after the work items:
 
-- The entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <main>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<main>` is that repo's main branch (its `main` in `project.toml`), here and on every Merge button.
+- The entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <target>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<target>` is where that merge request goes: the repo's default branch unless the lead named another target, here and on every Merge button.
 - The stage chip `merge requested` (or `PR open`), **`Review`** (opens its [review](./reviews.md)), and **`Open PR ↗`** (once a PR exists) or **`Session`**.
 - Under it, a compact line per work item it carries (indented 16px): the board card title, the branch (Mono `--tx4`), the author's name (`--tx4`).
 
@@ -53,4 +53,4 @@ Entries of a stopped [deployment](../models/deployment.md) stay listed with a `s
 
 ## 3. Merged
 
-Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and that repo's main; local time, with the date when not today); under each, its work items as the same compact lines.
+Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and the target it merged into; local time, with the date when not today); under each, its work items as the same compact lines.

@@ -10,7 +10,7 @@ import (
 )
 
 // The pipeline: work items on their way to the lead branch, then merge
-// requests on their way to main (wiki/product/features/pipeline-and-merges.md).
+// requests on their way to their targets (wiki/product/features/pipeline-and-merges.md).
 // Work items move on hand-offs, deliveries and integration
 // (wiki/product/architecture/protocol.md#work-items-and-merge-requests).
 

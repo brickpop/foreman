@@ -32,7 +32,7 @@ func (f *fakeRepos) Repos(_ context.Context, project string) ([]repos.Repo, erro
 	if err := f.check(project, "api", "trunk"); err != nil {
 		return nil, err
 	}
-	return []repos.Repo{{Name: "api", Main: "trunk"}, {Name: "project", Project: true, Main: "main"}}, nil
+	return []repos.Repo{{Name: "api", Default: "trunk"}, {Name: "project", Project: true, Default: "main"}}, nil
 }
 
 func (f *fakeRepos) Tree(_ context.Context, project, repo, ref, path string) ([]git.TreeEntry, error) {

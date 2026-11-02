@@ -7,7 +7,7 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { agentOf, inbox, mainOf, readable, when } from "../../app/model";
+import { agentOf, inbox, readable, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   useAnswer,
@@ -24,7 +24,7 @@ import { Button, Empty, Loading, NotBuilt, Panel, SectionLabel } from "../../com
 
 // A project's pipeline (wiki/product/features/project-pipeline.md): what needs
 // the CEO, in its Inbox (a review opens its page there); the work moving
-// towards main, and what recently merged, in its Deployment section.
+// towards its targets, and what recently merged, in its Deployment section.
 
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
@@ -52,7 +52,7 @@ export function NeedsYou({ project }: { project: Project }) {
   );
 }
 
-/** The work on its way to main, and what merged in the last 7 days: on the
+/** The work on its way to its targets, and what merged in the last 7 days: on the
  * Deployment section, under the agents' worktrees. Each branch links to its
  * code in Repos. */
 export function InFlight({ project }: { project: Project }) {
@@ -81,7 +81,7 @@ export function InFlight({ project }: { project: Project }) {
       <section className="flex min-w-0 flex-col gap-2.5">
         <div className="flex items-baseline gap-2">
           <SectionLabel>In flight</SectionLabel>
-          <span className="text-xs text-tx4">worktree → lead → main</span>
+          <span className="text-xs text-tx4">worktree → lead → target</span>
         </div>
         {pipeline.isPending ? (
           <Loading />
@@ -104,7 +104,6 @@ export function InFlight({ project }: { project: Project }) {
                 key={m.id}
                 mr={m}
                 project={project.id}
-                main={mainOf(project, m.repo)}
                 teams={teams.data ?? []}
                 items={items.filter((w) => w.mergeRequestId === m.id)}
                 live={live.has(m.deploymentId)}
@@ -121,7 +120,6 @@ export function InFlight({ project }: { project: Project }) {
               key={m.id}
               mr={m}
               project={project.id}
-              main={mainOf(project, m.repo)}
               teams={teams.data ?? []}
               items={items.filter((w) => w.mergeRequestId === m.id)}
             />
@@ -225,15 +223,12 @@ function WorkRow({
 function MergeRow({
   mr,
   project,
-  main,
   teams,
   items,
   live,
 }: {
   mr: MergeRequest;
   project: string;
-  /** The project's protected branch. */
-  main: string;
   teams: Team[];
   items: WorkItem[];
   live: boolean;
@@ -251,7 +246,7 @@ function MergeRow({
           </span>
           <span className="truncate text-[12.5px] text-tx3">
             {lead?.soul.name ?? mr.authorInstance} · {mr.repo} ·{" "}
-            <BranchLink project={project} repo={mr.repo} branch={mr.branch} /> → {main}
+            <BranchLink project={project} repo={mr.repo} branch={mr.branch} /> → {mr.target}
             {mr.checksStatus && ` · checks ${mr.checksStatus}`}
             {mr.note && <span className={mr.conflicting ? "text-err" : ""}> · {mr.note}</span>}
           </span>
@@ -306,14 +301,11 @@ function CarriedItem({
 function MergedRow({
   mr,
   project,
-  main,
   teams,
   items,
 }: {
   mr: MergeRequest;
   project: string;
-  /** The main it merged into: its repo's. */
-  main: string;
   teams: Team[];
   items: WorkItem[];
 }) {
@@ -325,7 +317,7 @@ function MergedRow({
         <span className="font-medium">{title.data ?? mr.entry}</span>
         {mr.forgePrNumber > 0 && <span className="text-tx3">PR #{mr.forgePrNumber}</span>}
         <span className="text-[13px] text-tx4">
-          {mr.repo} · merged to {main} · {when(mr.mergedAt)}
+          {mr.repo} · merged to {mr.target} · {when(mr.mergedAt)}
         </span>
       </span>
       {items.map((w) => (

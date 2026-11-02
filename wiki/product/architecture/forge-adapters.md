@@ -25,24 +25,24 @@ Every adapter implements the same small set, so kinds are interchangeable. Forem
 
 | Operation | Used when |
 |---|---|
-| push branch | **Create PR**: Foreman pushes the merge request's branch to the forge (again, as a plain fast-forward, when the lead calls `request_merge` again after merging `main` in) with the forge account's token. **Sync** on a reserved repo pushes its `main` the same way. Agents never push to the forge and never see the token ([Sandboxes and git policy](./sandboxes-and-git.md)) |
-| open PR (title, body, head, base = `main`) → URL, number | **Create PR**: the title and body come from the merge request's wiki entry |
+| push branch | **Create PR**: Foreman pushes the merge request's branch to the forge (again, as a plain fast-forward, when the lead calls `request_merge` again after merging its target in) with the forge account's token. **Sync** on a reserved repo pushes its `main` the same way. Agents never push to the forge and never see the token ([Sandboxes and git policy](./sandboxes-and-git.md)) |
+| open PR (title, body, head, base = the merge request's target) → URL, number | **Create PR**: the title and body come from the merge request's wiki entry |
 | read PR state | polling, below |
 | read check status | after opening and while polling; shown as "checks pass" on review request panels ([Needs you](../features/project-pipeline.md#1-needs-you)), next to Foreman's own run of the project `checks` |
 | comment, close PR | CEO **Dismiss** on a review whose merge request has a PR: the reason is posted on the PR and the PR is closed (the reason is also delivered to the lead) |
 
-For `none` there is no PR and nothing to push: the CEO uses Merge to main, and Dismiss only reaches the lead's session.
+For `none` there is no PR and nothing to push: the CEO uses Merge, and Dismiss only reaches the lead's session.
 
 ### PR state
 
 While a [merge request](../models/merge-request.md) with a PR is open, Foreman polls the PR on the forge every 60 seconds (and when the CEO opens the project's Inbox): no webhooks, so nothing has to reach Foreman from outside. It reads:
 
-- **merged**: the merge request and its work items are marked merged, the review request resolves, the lead is told; Foreman fetches the new `main` from the forge into the repo (`Git.Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. The leads of the other open merge requests on the same repo are told to merge `main` in ([When main moves](../features/pipeline-and-merges.md#when-main-moves)).
-- **mergeability**: when the forge reports the PR as conflicting with `main`, `conflicting` is set (shown as "conflicts with main") and the lead is asked to merge `main` in; cleared when the forge reports it mergeable again.
+- **merged**: the merge request and its work items are marked merged, the review request resolves, the lead is told; Foreman fetches the target that moved from the forge into the repo (`Git.Fetch`: remote-tracking refs only, never the CEO's checkout), where every worktree sees it. The leads of the other open merge requests into the same target of that repo are told to merge it in ([When a target moves](../features/pipeline-and-merges.md#when-a-target-moves)).
+- **mergeability**: when the forge reports the PR as conflicting with its target, `conflicting` is set (shown as "conflicts with <target>") and the lead is asked to merge the target in; cleared when the forge reports it mergeable again.
 - **closed** without merge: the merge request is rejected, the review request resolves, its work items go back to stage 0, the lead is told.
 - **new review comments** and "changes requested" reviews since the last poll: delivered to the lead (typed into its session when idle).
 
-In every repo, with or without a forge, Foreman also reads `main` on the same interval and marks an open merge request merged when merging its branch into `main` would change nothing ([Merge to main](../features/pipeline-and-merges.md#merge-to-main)): the CEO may merge by hand with git, and the forge with any merge method. A merged branch then moves to the new `main`, so pushing it again for a next PR can't be a plain fast-forward: how (a forced push, or a new branch on the forge) is open until [The forge](../../backlog/git-forge.md) is built.
+In every repo, with or without a forge, Foreman also reads each target on the same interval and marks an open merge request merged when merging its branch into its target would change nothing ([Merge to a target](../features/pipeline-and-merges.md#merge-to-a-target)): the CEO may merge by hand with git, and the forge with any merge method. A merged branch then moves to the new target, so pushing it again for a next PR can't be a plain fast-forward: how (a forced push, or a new branch on the forge) is open until [The forge](../../backlog/git-forge.md) is built.
 
 ### Sync (the reserved repos)
 
@@ -50,6 +50,6 @@ The global repo and the project repo never push on their own: Foreman commits to
 
 ## Rules
 
-- **Merge method** is the forge's business: the CEO merges there with whatever method the repo allows. **Conflicts** are the lead's: Foreman reports them and asks the lead to merge `main` in (`merge("main")`) and resolve them; it never resolves them itself; the CEO can also reject the merge request with a reason.
+- **Merge method** is the forge's business: the CEO merges there with whatever method the repo allows. **Conflicts** are the lead's: Foreman reports them and asks the lead to merge the target in (`merge("main")`, say) and resolve them; it never resolves them itself; the CEO can also reject the merge request with a reason.
 - **Tokens:** the token needs to push branches, open, read, comment on and close PRs; the minimal scopes per forge are documented here with each adapter. An expired or revoked token makes the CEO's action fail with a message naming it (on a PR being watched: a **blocked** request on the lead instance), linking to [Settings](../features/settings.md#forge-accounts). The token is set in Settings as host URL + token, checked against the forge on save, and never shown again.
 - **Check status** shown on a merge request is Foreman's own run of the project `checks`, plus the forge's CI statuses alongside when a forge is configured ([Sandboxes and git policy](./sandboxes-and-git.md#checks)).

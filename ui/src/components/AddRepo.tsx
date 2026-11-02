@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { type Project, useClient } from "../api/client";
-import { inside, mainToSend, repoName } from "../app/addProject";
+import { defaultToSend, inside, repoName } from "../app/addProject";
 import { keys, useBranches } from "../app/queries";
 import { RepoPicker } from "./RepoPicker";
 import { Select } from "./Select";
@@ -24,10 +24,10 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
   const [picked, setPicked] = useState<string>();
   // undefined follows the picked folder's name until the CEO edits it.
   const [name, setName] = useState<string>();
-  // An existing repo without a main: the branch the CEO picks as its main.
+  // An existing repo without a main: the branch the CEO picks as its default.
   const [chosen, setChosen] = useState<string>();
   const branches = useBranches(mode === "existing" ? picked : undefined);
-  const main = mainToSend(branches.data, chosen);
+  const defaultBranch = defaultToSend(branches.data, chosen);
   const value = name ?? (mode === "existing" && picked ? repoName(picked) : "");
   const path =
     mode === "existing" ? picked : picked && value.trim() && inside(picked, value.trim());
@@ -39,7 +39,7 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
   const add = useMutation({
     mutationFn: () =>
       mode === "existing"
-        ? client.home.addRepo(project, value.trim(), path ?? "", main)
+        ? client.home.addRepo(project, value.trim(), path ?? "", defaultBranch)
         : client.home.newRepo(project, value.trim(), path ?? ""),
     onSuccess: (p) => {
       queries.invalidateQueries({ queryKey: keys.projects });
@@ -88,19 +88,20 @@ export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Pr
             : `Creates ${path || "<folder>/<name>"} with a README in a first commit, on main.`}
         </span>
       </label>
-      {main !== undefined && branches.data && (
+      {defaultBranch !== undefined && branches.data && (
         <div className="flex flex-col gap-1.5">
-          <span className={label}>Main branch</span>
+          <span className={label}>Default branch</span>
           <Select
-            label="Main branch"
-            value={main}
+            label="Default branch"
+            value={defaultBranch}
             mono
             onChange={setChosen}
             options={branches.data.branches.map((b) => ({ value: b, label: b }))}
           />
           <span className={hint}>
-            This repo has no main branch. Pick its default: agents start their branches from it, and
-            merges go to it. You can change it later in Project settings.
+            This repo has no branch named main. Pick its default: agents start their branches from
+            it, and merges go to it unless the lead names another target. You can change it later in
+            Repos.
           </span>
         </div>
       )}

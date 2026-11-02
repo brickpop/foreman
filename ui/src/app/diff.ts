@@ -2,7 +2,7 @@
 // per file, each line numbered on its side, so a comment can name its line.
 
 /** One line of a file's diff: a hunk header, or a line kept, added or
- * removed, with its number on main's side (old) and the branch's (new). */
+ * removed, with its number on the target's side (old) and the branch's (new). */
 export type DiffLine = {
   kind: "hunk" | "ctx" | "add" | "del" | "meta";
   text: string;

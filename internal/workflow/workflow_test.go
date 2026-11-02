@@ -34,13 +34,46 @@ var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 }}
 
 // config is the home: projects in root/<id>, each with its repos api and web
-// and its project repo beside them. web's main branch is trunk, so every
-// test also checks that each repo's own main is used.
-type config struct{ root string }
+// and its project repo beside them, and the targets made. web's default
+// branch is trunk, so every test also checks that each repo's own is used.
+type config struct {
+	root    string
+	targets *targets
+}
 
 func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
-	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Main: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Main: "trunk"}}}, nil
+	repos := []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
+	for i := range repos {
+		repos[i].Targets = c.targets.made[repos[i].Name]
+	}
+	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: repos}, nil
+}
+
+// targets fakes the home's: each repo's targets, made as branches at from.
+// "taken" is a name the repo has already.
+type targets struct {
+	root string
+	made map[string][]home.Target
+}
+
+func (tg *targets) CreateTarget(ctx context.Context, project, repo, name, from, by string) (home.Project, error) {
+	if repo != "api" && repo != "web" {
+		return home.Project{}, home.ErrNotFound
+	}
+	if name == "taken" {
+		return home.Project{}, fmt.Errorf("%w: %s has a branch taken already", home.ErrExists, repo)
+	}
+	dir := filepath.Join(tg.root, project, repo)
+	commit, err := git.New().Resolve(ctx, dir, from)
+	if err != nil {
+		return home.Project{}, fmt.Errorf("%w: %s has no branch or commit %q", home.ErrInvalid, repo, from)
+	}
+	if err := git.New().CreateBranch(ctx, dir, name, commit); err != nil {
+		return home.Project{}, fmt.Errorf("%w: %s: %v", home.ErrInvalid, name, err)
+	}
+	tg.made[repo] = append(tg.made[repo], home.Target{Name: name, MadeBy: by, From: commit})
+	return config{tg.root, tg}.Project(project)
 }
 
 func (c config) Projects() []home.Project {
@@ -100,13 +133,14 @@ func (t *teams) Stop(_ context.Context, deployment string) error {
 }
 
 type fixture struct {
-	t      *testing.T
-	root   string
-	w      *Workflow
-	m      *messages
-	teams  *teams
-	db     *store.DB
-	events []events.Event
+	t       *testing.T
+	root    string
+	targets *targets
+	w       *Workflow
+	m       *messages
+	teams   *teams
+	db      *store.DB
+	events  []events.Event
 }
 
 // newFixture: project ledger with code repos api and web and the project
@@ -150,7 +184,8 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, root: root, m: m, db: db, teams: &teams{running: map[string]bool{"atlas@ledger": true}}}
-	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
+	f.targets = &targets{root: root, made: map[string][]home.Target{}}
+	f.w = New(Deps{Git: g, Config: config{root, f.targets}, Targets: f.targets, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Reviews: db.Reviews(), ReviewComments: db.ReviewComments(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
@@ -607,17 +642,17 @@ func TestAResumedAgentIsToldWhatItLeft(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft.txt"), "half done\n")
 	f.w.Resumed(ctx, instance("tove"), false)
 	if n := f.lastNotice(); n.ToInstance != "tove@ledger" || n.Body != "From Foreman: your worktrees hold earlier work. "+
-		"Branches with work main hasn't got: wt/tove/LED-44 (api). Changes not committed in web (on wt/tove/LED-44). "+
-		"Resume what is still wanted; new work goes on a new topic, made from main with switch(<topic>). Changes you don't want: discard()." {
+		"Branches with work no target has: wt/tove/LED-44 (api). Changes not committed in web (on wt/tove/LED-44). "+
+		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from). Changes you don't want: discard()." {
 		t.Errorf("tove: %+v", n)
 	}
 	// The lead also hears of its reviews still open.
 	f.ok("mara", "request_merge", integration)
 	f.w.Resumed(ctx, instance("mara"), true)
 	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.Body != "From Foreman: your worktrees hold earlier work. "+
-		"Branches with work main hasn't got: lead/atlas/integration (api). "+
+		"Branches with work no target has: lead/atlas/integration (api). "+
 		"Your reviews still open: lead/atlas/integration (waiting for the CEO). "+
-		"Resume what is still wanted; new work goes on a new topic, made from main with switch(<topic>)." {
+		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from)." {
 		t.Errorf("mara: %+v", n)
 	}
 }
@@ -846,13 +881,13 @@ func TestFromHandoffToMain(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
 	// One merge request, in the one repo with new commits, carrying the hand-off, in the branch's review.
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1): waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1) into main: waiting for the CEO." {
 		t.Fatalf("%q", text)
 	}
 	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-1" {
 		t.Errorf("work item %+v", w)
 	}
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1), refreshed: waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1) into main, refreshed: waiting for the CEO." {
 		t.Errorf("again: %q", text)
 	}
 	p, _ := f.w.Pipeline(ctx, "ledger")
@@ -864,7 +899,7 @@ func TestFromHandoffToMain(t *testing.T) {
 		t.Errorf("review %+v", v)
 	}
 	diffs, err := f.w.ReviewDiff(ctx, "rev-1", false)
-	if err != nil || len(diffs) != 1 || diffs[0].Repo != "api" || diffs[0].Main != "main" || !strings.Contains(diffs[0].Diff, "LED-44.go") ||
+	if err != nil || len(diffs) != 1 || diffs[0].Repo != "api" || diffs[0].Target != "main" || !strings.Contains(diffs[0].Diff, "LED-44.go") ||
 		diffs[0].Head != f.git(f.wt("mara", "api"), "rev-parse", "HEAD") {
 		t.Errorf("diff %+v %v", diffs, err)
 	}
@@ -913,7 +948,7 @@ func TestFromHandoffToMain(t *testing.T) {
 	// Asked again once everything merged: a new review.
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "next.go"), "package n\n")
 	f.ok("mara", "commit", commits("api", "next"))
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-2, api (mr-2): waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-2, api (mr-2) into main: waiting for the CEO." {
 		t.Errorf("next: %q", text)
 	}
 }
@@ -925,7 +960,7 @@ func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "a.go"), "package a\n")
 	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>\n")
 	f.ok("mara", "commit", commits("api", "a", "web", "page"))
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1), web (mr-2): waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1) into main, web (mr-2) into trunk: waiting for the CEO." {
 		t.Fatalf("%q", text)
 	}
 	open, _ := f.w.OpenRequests(ctx)
@@ -953,7 +988,7 @@ func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
 	// web left open: the lead's next request on the branch is the same review.
 	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>2\n")
 	f.ok("mara", "commit", commits("web", "page 2"))
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, web (mr-2), refreshed: waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, web (mr-2) into trunk, refreshed: waiting for the CEO." {
 		t.Errorf("%q", text)
 	}
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "web")); err != nil {
@@ -975,7 +1010,7 @@ func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
 	}
 }
 
-func TestMergeToMainConflicts(t *testing.T) {
+func TestMergeToTargetConflicts(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "the lead's\n")
 	f.ok("mara", "commit", commits("api", "readme"))
@@ -1001,7 +1036,7 @@ func TestMergeToMainConflicts(t *testing.T) {
 	f.ok("mara", "merge", map[string]string{"branch": "main"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "both\n")
 	f.ok("mara", "commit", commits("api", "main merged in"))
-	if text := f.ok("mara", "request_merge", integration); !strings.Contains(text, "api (mr-1), refreshed") {
+	if text := f.ok("mara", "request_merge", integration); !strings.Contains(text, "api (mr-1) into main, refreshed") {
 		t.Errorf("%q", text)
 	}
 	if f.mr("mr-1").Conflicting {
@@ -1510,10 +1545,10 @@ func TestEachRepoMergesIntoItsOwnMain(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("mara", "web"), "page.html"), "<p>\n")
 	f.ok("mara", "commit", commits("web", "a page"))
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, web (mr-1): waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, web (mr-1) into trunk: waiting for the CEO." {
 		t.Fatalf("%q", text)
 	}
-	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); len(diffs) != 1 || diffs[0].Main != "trunk" || !strings.Contains(diffs[0].Diff, "page.html") {
+	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); len(diffs) != 1 || diffs[0].Target != "trunk" || !strings.Contains(diffs[0].Diff, "page.html") {
 		t.Errorf("diff against trunk %+v", diffs)
 	}
 	web := filepath.Join(f.root, "ledger", "web")

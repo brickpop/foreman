@@ -11,15 +11,15 @@ import type * as wiki from "./wiki";
 export interface Repo {
   name: string;
   project: boolean; // the project repo (project/), listed last
-  main: string;
-  branches: Branch[]; // main first, then newest commit first
+  defaultBranch: string;
+  branches: Branch[]; // the default first, then newest commit first
 }
 /**
  * Branch is one branch of a repo.
  */
 export interface Branch {
   name: string;
-  ahead: number /* int */; // commits main doesn't have
+  ahead: number /* int */; // commits the default branch doesn't have
   uncommitted: boolean; // its worktree has changes not committed yet
   agent: string; // whose worktree has it checked out (an agent id); "" for none
 }

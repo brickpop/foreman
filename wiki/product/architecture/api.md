@@ -20,21 +20,22 @@ GET    /api/projects | /api/projects/:id      the record (name, workspace, profi
 POST   /api/projects                          {name, clone?, workspace} → New: the record, the workspace (made if missing) and its project repo at <workspace>/project, with a starter wiki; with clone (a git URL or a local path), its project repo cloned with the CEO's own git; or a project repo a removed project left there taken over (201 made or cloned, 200 taken over; 400 INVALID, with git's message for a failed clone; 409 EXISTS)
 DELETE /api/projects/:id                      ?deleteRepo=true&deleteWorktrees=true → remove the project: its record, session logs, harness folders and history; its workspace stays, its project repo only with deleteRepo, its agents' worktrees only with deleteWorktrees (204; 400 INVALID when not archived; 409 DEPLOYED)
 POST   /api/projects/:id/migrate              {workspace} → legacy: move a project made before workspaces into one, its agents' conversations carried over (400 INVALID, 409 EXISTS, 409 DEPLOYED)
-POST   /api/projects/:id/repos                {name, path, main?, new?} → add an existing code repo at path, on its main branch (main when it has one, else the `main` given, one of its branches), or with new, create an empty one on main at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
+POST   /api/projects/:id/repos                {name, path, defaultBranch?, new?} → add an existing code repo at path, with its default branch (main when it has one, else the `defaultBranch` given, one of its branches), or with new, create an empty one on main at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
 PUT    /api/projects/:id/repos/:repo          {path} → Locate: the repo's new path, which must hold its root commit (400 INVALID)
 PUT    /api/projects/:id/repos/:repo/name     {name} → rename it; agents' worktrees move, open merge requests follow (400 INVALID, 409 EXISTS, 409 DEPLOYED)
-PUT    /api/projects/:id/repos/:repo/main     {main} → its main branch, one it has: agents start from it, merges go to it (400 INVALID)
+PUT    /api/projects/:id/repos/:repo/default  {branch} → its default branch, one it has: agents start from it, merges go to it unless the lead names another target; open merge requests into the old one move to it, a target of that name stops being one (400 INVALID)
+DELETE /api/projects/:id/repos/:repo/targets/:target  stop a target the lead made being one; its branch stays (400 INVALID for the default branch, 404 NOT_FOUND, 409 IN_USE while a merge request into it is open)
 DELETE /api/projects/:id/repos/:repo          remove it from the project; its folder and branches stay (409 DEPLOYED while a team is deployed on the project)
 PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
 PUT    /api/projects/:id/archived             {archived} → archives the project (409 DEPLOYED while a team is deployed on it) or unarchives it
-GET    /api/projects/:id/repos                the code repos, then the project repo, each with its branches (ahead of main, uncommitted changes)
+GET    /api/projects/:id/repos                the code repos, then the project repo, each with its default branch and branches (ahead of the default, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge, markdown, frontmatter, body} (over 1 MB: no text; a .md or .markdown file has its frontmatter apart, as the wiki reader's fields, and body is its text without it)
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next, total} (total: the commits it holds in all), 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
 GET    /api/folders                           ?path= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
 GET    /api/folders/workspace                 ?name= where a project named name would go: {path, folder, folderExists} (the projects folder, ~ expanded; path is the folder itself while name isn't a valid one)
-GET    /api/folders/branches                  ?path= a repo folder's branches, to pick its main branch: {branches, current} (current: its checkout's, "" when detached; 400 INVALID outside $HOME or inside Foreman's home)
+GET    /api/folders/branches                  ?path= a repo folder's branches, to pick its default branch: {branches, current} (current: its checkout's, "" when detached; 400 INVALID outside $HOME or inside Foreman's home)
 
 GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
@@ -65,12 +66,13 @@ GET    /api/activity/latest                   when something last happened on ea
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
 GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404
-GET    /api/reviews/:id/diff                  [?since=1] [{repo, main, head, since, diff}] per repo open in it: against its main, or from the head at the last Request changes
+GET    /api/reviews/:id/diff                  [?since=1] [{repo, target, head, since, diff}] per repo open in it: against its target, or from the head at the last Request changes
 POST   /api/reviews/:id/comments              {repo, path, side, line, commit, snippet, body} (no repo: general): a draft comment; 200 the comment; 400 INVALID; 409 NOT_OPEN
 PUT    /api/reviews/:id/comments/:comment     {body}: edits a draft; 204; 409 SENT
 DELETE /api/reviews/:id/comments/:comment     deletes a draft; 204; 409 SENT
 POST   /api/reviews/:id/changes               {note}: Request changes: the drafts and the note to the lead in one message; 204; 400 INVALID (neither)
-POST   /api/reviews/:id/merge                 {heads: {<repo>: <commit>}}: merges each repo named, at the commit the CEO read, its full hash (Pipeline and merges → Merge to main); 204; 409 NOT_MERGED says, per repo, why one didn't (a conflict: the lead is told to merge main in; the CEO's checkout in the way; the branch moved since that commit), the others merged; 409 NOT_OPEN
+POST   /api/reviews/:id/merge                 {heads: {<repo>: <commit>}}: merges each repo named, at the commit the CEO read, its full hash (Pipeline and merges → Merge to a target); 204; 409 NOT_MERGED says, per repo, why one didn't (a conflict: the lead is told to merge its target in; the CEO's checkout in the way; the branch moved since that commit), the others merged; 409 NOT_OPEN
+PUT    /api/reviews/:id/target                {repo, target}: moves the open merge request of that repo to another of the repo's targets, whose branch git still has; the diff follows, a conflict found before is forgotten, the lead is told; 204; 400 INVALID (not a target of that repo); 409 NOT_OPEN (no open merge request of that repo)
 POST   /api/reviews/:id/dismiss               {note, dropBranches, stopTeam}: stops the team first when asked (an error dismisses nothing), ends it unmerged in every repo open, drops its branches (kept under refs/foreman/dismissed/) when asked, and tells a lead whose team keeps working to stop, with the note if any → {kept: [{repo, branch, why}]}, the branches it couldn't drop (a git error); 400 INVALID to drop the branches of a team left running; 409 NOT_OPEN
 POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)

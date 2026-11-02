@@ -15,7 +15,7 @@ epic: git
 ## Decided (the CEO, 2026-10-21)
 
 - **A merged lead branch is deleted** once fully in main; `lead/<team>/integration`, the lead's default and checked out, is moved to the new main instead, so the next topic starts from it. A branch with anything unmerged stays.
-- **Built with the squash merge (2026-10-21):** every merged lead branch, `integration` or a topic, is moved to the new main when it is still at the merged commit ([Merge to main](../product/features/pipeline-and-merges.md#merge-to-main)): a squash leaves its commits out of main, so it had to. What's left of this bullet is deleting the topic branches that aren't checked out. "Fully in main" is now "merging it would change nothing" (`Git.Merged`), not "its head is in main": after a squash, no branch's head is.
+- **Built with the squash merge (2026-10-21):** every merged lead branch, `integration` or a topic, is moved to the new main when it is still at the merged commit ([Merge to main](../product/features/pipeline-and-merges.md#merge-to-a-target)): a squash leaves its commits out of main, so it had to. What's left of this bullet is deleting the topic branches that aren't checked out. "Fully in main" is now "merging it would change nothing" (`Git.Merged`), not "its head is in main": after a squash, no branch's head is.
 
 - **Idle desks follow the new main (2026-10-22, built):** every home branch with nothing main lacks and nothing uncommitted moves to main after a merge ([Resume, clean desks, discard and backups](./archive/resume-and-clean-desks.md)).
 

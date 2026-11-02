@@ -19,7 +19,7 @@ type Input struct {
 	Project string          // the project's id
 	Sandbox string          // the agent's sandbox, at the same path on the host and in its container
 	Config  home.ProjectConfig
-	Repos   []home.Repo // the project's code repos, each with its main branch
+	Repos   []home.Repo // the project's code repos, each with its targets
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
 	// describes those and no others. Without ask, it describes working alone,
 	// the CEO relaying; without commit, git is read-only and the CEO reviews.
@@ -53,13 +53,16 @@ var teamTools = []teamTool{
 	{"ask", anyone, true, []string{"ask(teammate, request)              Get info or work. Keep going meanwhile."}},
 	{"reply", anyone, true, []string{"reply(request_id, output)           Answer a request. Only `output` is returned."}},
 	{"read_message", anyone, true, []string{"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."}},
-	{"switch", anyone, true, []string{"switch(branch)                      Go to one of your branches (made from each repo's main if new)."}},
+	{"switch", anyone, true, []string{
+		"switch(branch, from)                Go to one of your branches; a new one starts from from, a target",
+		"                                    (each repo's default branch when left out).",
+	}},
 	{"commit", anyone, true, []string{
 		"commit(commits)                     Commit the repos you name, each with its own message:",
 		"                                    [{repo, message}], repo being its folder in your sandbox.",
 	}},
 	{"merge", anyone, true, []string{
-		"merge(branch)                       Merge a branch (the lead's, main, a teammate's) into yours.",
+		"merge(branch)                       Merge a branch (the lead's, a target, a teammate's) into yours.",
 		"                                    On conflicts: resolve the markers, then commit those repos.",
 	}},
 	{"abort_merge", anyone, true, []string{"abort_merge()                       Back out of an unfinished merge."}},
@@ -76,9 +79,14 @@ var teamTools = []teamTool{
 		"                                    For an approval, wait for the answer before that step.",
 	}},
 	{"request_merge", leadOnly, true, []string{
-		"request_merge(branch, entry)        Ask the CEO to merge one of your lead/{team}/* branches into main;",
+		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/{team}/* branches into into,",
+		"                                    a target (each repo's default branch when left out);",
 		"                                    entry: the wiki card that explains the work. Only you can.",
 		"                                    Call it again on the same branch to refresh it.",
+	}},
+	{"create_target", leadOnly, true, []string{
+		"create_target(repo, name, from)     Make a new target in one repo: branch name at from (a commit or",
+		"                                    a branch). Work for it starts there; only the CEO merges into it.",
 	}},
 	{"withdraw_merge", leadOnly, true, []string{
 		"withdraw_merge(branch, reason,      Take back your open request to merge a branch, before the CEO",
@@ -167,7 +175,7 @@ func Compose(in Input) string {
 		s := in.Team.Agents[id]
 		switch {
 		case id == in.Team.Lead && has("request_merge"):
-			line("- %s, %s (lead: integrates, requests merges to main)", s.Name, RoleLabel(s.Role))
+			line("- %s, %s (lead: integrates, requests merges)", s.Name, RoleLabel(s.Role))
 		case id == in.Team.Lead:
 			line("- %s, %s (lead)", s.Name, RoleLabel(s.Role))
 		default:
@@ -231,41 +239,60 @@ func Compose(in Input) string {
 	return b.String()
 }
 
-// mains names the branch the agent's branches are made from: one name when
-// every repo has the same main, else each repo's ("master in api, main in web").
-func mains(repos []home.Repo) string {
+// defaults names the branch the agent's branches are made from: one name when
+// every repo has the same default, else each repo's ("master in api, main in web").
+func defaults(repos []home.Repo) string {
 	var each []string
 	same := true
 	for _, r := range repos {
-		each = append(each, r.Main+" in "+r.Name)
-		same = same && r.Main == repos[0].Main
+		each = append(each, r.Default+" in "+r.Name)
+		same = same && r.Default == repos[0].Default
 	}
 	switch {
 	case len(repos) == 0:
 		return "main"
 	case same:
-		return repos[0].Main
+		return repos[0].Default
 	}
 	return strings.Join(each, ", ")
+}
+
+// targets lists each repo's targets, its default first, when a repo has more
+// than its default (with a leading space, to follow a sentence); "" otherwise.
+func targets(repos []home.Repo) string {
+	var each []string
+	more := false
+	for _, r := range repos {
+		names := []string{r.Default + " (default)"}
+		for _, t := range r.Targets {
+			names = append(names, t.Name)
+		}
+		more = more || len(r.Targets) > 0
+		each = append(each, r.Name+": "+strings.Join(names, ", "))
+	}
+	if !more {
+		return ""
+	}
+	return " Targets, which only the CEO's merges write: " + strings.Join(each, "; ") + "."
 }
 
 func branches(in Input, lead bool, has func(string) bool) string {
 	switching := has("switch")
 	switch {
 	case !switching && lead:
-		return fmt.Sprintf("you work on lead/%s/integration, made for you from %s.", in.Team.Team, mains(in.Repos))
+		return fmt.Sprintf("you work on lead/%s/integration, made for you from %s.", in.Team.Team, defaults(in.Repos))
 	case !switching:
-		return fmt.Sprintf("you work on wt/%s/main, made for you from %s.", in.Agent, mains(in.Repos))
+		return fmt.Sprintf("you work on wt/%s/main, made for you from %s.", in.Agent, defaults(in.Repos))
 	case lead && has("request_merge"):
-		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
-			"Ask for a merge to main with request_merge(branch, entry), one per branch. When told a repo's main moved, merge it in with merge(<its main>), "+
-			"resolve any conflicts and commit(), then call request_merge again.%s %s", in.Team.Team, in.Team.Team, oneTopic(has), fewRequests)
+		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch, from). "+
+			"Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), "+
+			"resolve any conflicts and commit(), then call request_merge again.%s %s%s", in.Team.Team, in.Team.Team, oneTopic(has), fewRequests, targets(in.Repos))
 	case lead:
-		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch). "+
-			"Merge the hand-offs you accept into it with merge(branch). When told a repo's main moved, merge it in with merge(<its main>). "+
-			"Tell the CEO which lead branch is ready for review.%s", in.Team.Team, in.Team.Team, oneTopic(has))
+		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch, from). "+
+			"Merge the hand-offs you accept into it with merge(branch). When told a target moved, merge it in with merge(<that target>). "+
+			"Tell the CEO which lead branch is ready for review.%s%s", in.Team.Team, in.Team.Team, oneTopic(has), targets(in.Repos))
 	default:
-		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch). No push to main.%s", in.Agent, oneCard(has))
+		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch, from). Never push to a target.%s%s", in.Agent, oneCard(has), targets(in.Repos))
 	}
 }
 
@@ -289,7 +316,7 @@ func oneCard(has func(string) bool) string {
 	if !has("merge") {
 		return ""
 	}
-	return " A card's branch starts from main and holds only that card: never merge in another card's branch (an audit's, a proof's). " +
+	return " A card's branch starts from the target the lead names (the default branch unless told) and holds only that card: never merge in another card's branch (an audit's, a proof's). " +
 		"To reuse a test from one, copy it in (git show <branch>:<file>)."
 }
 
@@ -297,8 +324,8 @@ func oneCard(has func(string) bool) string {
 const fewRequests = "Keep at most two merge requests open, on topics that don't overlap, each one topic the CEO can review in one sitting. " +
 	"See them through to their merge before you propose the next. Withdraw a request before you replace it."
 
-// provingTests keeps main's tests passing only when the code is right.
-const provingTests = "Tests bound for main assert correct behaviour only. A test that passes while a bug exists (a proof, a repro) stays on its own branch, " +
+// provingTests keeps a target's tests passing only when the code is right.
+const provingTests = "Tests bound for a target assert correct behaviour only. A test that passes while a bug exists (a proof, a repro) stays on its own branch, " +
 	"and lands with the fix, as the fix's regression test."
 
 // leadReviews and memberReviews keep anything up for review or a decision
@@ -314,12 +341,12 @@ const (
 // start on earlier work, and a lead hands out work on fresh topics.
 func persisting(leadOfTeam bool, has func(string) bool) string {
 	s := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
-		"New work goes on a new topic: switch(<topic>) makes it from main. Earlier work you resume, or commit to its topic before switching."
+		"New work goes on a new topic: switch(<topic>) makes it from the default branch, switch(<topic>, from) from another target. Earlier work you resume, or commit to its topic before switching."
 	if has("discard") {
 		s += " What you don't want: discard()."
 	}
 	if leadOfTeam {
-		s += " Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to."
+		s += " Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to, and the target it starts from when it isn't the default."
 	}
 	return s
 }
@@ -449,7 +476,7 @@ func DefaultJob(role string) string {
 }
 
 // leadMerges ends the lead's default job once request_merge exists.
-const leadMerges = " You are the only member who requests merges to main (request_merge, with the card that explains the work)."
+const leadMerges = " You are the only member who requests merges into a target (request_merge, with the card that explains the work)."
 
 // instruction is the soul's job description, or its role's default
 // (wiki/product/models/agent-soul.md#default-job-descriptions).
@@ -469,7 +496,7 @@ func instruction(s home.Soul, merges bool) string {
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
 		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}",
-		Repos:        []home.Repo{{Name: "{repo}", Main: "{main}"}},
+		Repos:        []home.Repo{{Name: "{repo}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead),
 		Instructions: instructions,

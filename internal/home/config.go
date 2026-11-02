@@ -28,7 +28,6 @@ import (
 type ProjectConfig struct {
 	Description  string   `toml:"description,omitempty" json:"description"`
 	Checks       string   `toml:"checks,omitempty" json:"checks"`
-	MergeToMain  string   `toml:"merge_to_main,omitempty" json:"mergeToMain"`
 	AlwaysAskCEO []string `toml:"always_ask_ceo,omitempty" json:"alwaysAskCeo"`
 	// RecursiveSubmodules also checks out the submodules of submodules in the
 	// agents' worktrees.
@@ -157,17 +156,19 @@ func decode(data []byte, v any, retired ...func(toml.Key) bool) (toml.MetaData, 
 
 // ParseProject parses a project.toml: the project's rules, which travel with
 // its project repo (its name and repos are this machine's, in the database).
-// Defaults are applied (merge_to_main = "ceo", forge none).
+// Defaults are applied (forge none).
 func ParseProject(data []byte) (ProjectConfig, []string) {
 	var c ProjectConfig
 	md, p := decode(data, &c)
-	if md.IsDefined("main") {
-		// Every project.toml before 2026-10-21 has it: say what replaced it.
-		p = slices.DeleteFunc(p, func(s string) bool { return strings.HasPrefix(s, "main: ") })
-		p.add("main: each code repo has its own main branch now (Project settings → Code repos); remove this line")
-	}
-	if c.MergeToMain == "" {
-		c.MergeToMain = "ceo"
+	// Retired keys every project.toml of their time has: say what replaced them.
+	for _, r := range []struct{ key, note string }{
+		{"main", "each code repo has its own default branch now (Repos)"}, // before 2026-10-21
+		{"merge_to_main", "only the CEO merges, always"},                  // before 2026-11-02; it only ever took "ceo"
+	} {
+		if md.IsDefined(r.key) {
+			p = slices.DeleteFunc(p, func(s string) bool { return strings.HasPrefix(s, r.key+": ") })
+			p.add("%s: %s; remove this line", r.key, r.note)
+		}
 	}
 	if c.Forge.Kind == "" {
 		c.Forge.Kind = "none"
@@ -175,9 +176,6 @@ func ParseProject(data []byte) (ProjectConfig, []string) {
 	c.AlwaysAskCEO = normalize(c.AlwaysAskCEO)
 	if strings.ContainsAny(c.Description, "\n") {
 		p.add("description: one line")
-	}
-	if c.MergeToMain != "ceo" {
-		p.add(`merge_to_main: must be "ceo"`)
 	}
 	if !slices.Contains(forgeKinds, c.Forge.Kind) {
 		p.add("forge.kind: %q is not one of %s", c.Forge.Kind, strings.Join(forgeKinds, ", "))

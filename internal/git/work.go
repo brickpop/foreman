@@ -28,6 +28,8 @@ var (
 	ErrBadBranch = errors.New("git: not a valid branch name")
 	// ErrNoMerge means there is no unfinished merge to abort.
 	ErrNoMerge = errors.New("git: no merge in progress")
+	// ErrBranchExists means the repo has a branch of that name already.
+	ErrBranchExists = errors.New("git: the branch exists")
 )
 
 // ConflictsError lists the files of an unfinished merge that still hold
@@ -137,19 +139,19 @@ func (g *CLI) Merging(ctx context.Context, dir string) (bool, error) {
 	return err == nil, nil
 }
 
-// Freshen moves branch up to where branch main is, when it holds nothing main
+// Freshen moves branch up to where branch def is, when it holds nothing def
 // lacks (merging it would change nothing) and the worktree that has it
 // checked out, if one does, holds nothing not committed: an idle desk follows
-// main. moved says it did.
-func (g *CLI) Freshen(ctx context.Context, repo, branch, main string) (moved bool, err error) {
-	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, main) {
+// the default branch. moved says it did.
+func (g *CLI) Freshen(ctx context.Context, repo, branch, def string) (moved bool, err error) {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, def) {
 		return false, ErrBadBranch
 	}
 	defer g.lock(ctx, repo)()
-	return g.freshen(ctx, repo, branch, main)
+	return g.freshen(ctx, repo, branch, def)
 }
 
-func (g *CLI) freshen(ctx context.Context, repo, branch, main string) (bool, error) {
+func (g *CLI) freshen(ctx context.Context, repo, branch, def string) (bool, error) {
 	if !g.HasBranch(ctx, repo, branch) {
 		return false, nil
 	}
@@ -157,11 +159,11 @@ func (g *CLI) freshen(ctx context.Context, repo, branch, main string) (bool, err
 	if err != nil {
 		return false, err
 	}
-	target, err := g.Resolve(ctx, repo, "refs/heads/"+main)
+	target, err := g.Resolve(ctx, repo, "refs/heads/"+def)
 	if err != nil || head == target {
 		return false, err
 	}
-	if merged, err := g.Merged(ctx, repo, main, branch); err != nil || !merged {
+	if merged, err := g.Merged(ctx, repo, def, branch); err != nil || !merged {
 		return false, err
 	}
 	trees, err := g.Worktrees(ctx, repo)
@@ -202,6 +204,20 @@ func (g *CLI) Switch(ctx context.Context, dir, branch, base string) (created boo
 	}
 	_, err = run(ctx, dir, "checkout", "--quiet", "-b", branch, base)
 	return err == nil, err
+}
+
+// CreateBranch makes branch at commit (a hash), without checking it out;
+// one the repo has already is refused (ErrBranchExists).
+func (g *CLI) CreateBranch(ctx context.Context, dir, branch, commit string) error {
+	if !ValidBranch(ctx, branch) {
+		return ErrBadBranch
+	}
+	defer g.lock(ctx, dir)()
+	if g.HasBranch(ctx, dir, branch) {
+		return ErrBranchExists
+	}
+	_, err := run(ctx, dir, "branch", "--no-track", branch, commit)
+	return err
 }
 
 // CommitAll commits everything changed in the worktree on the branch checked

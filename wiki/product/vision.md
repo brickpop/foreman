@@ -14,7 +14,7 @@ Foreman is a self-hosted server and web UI. It lets one person (the **CEO**) run
 - A team is **[deployed](./models/deployment.md)** onto a project, which has one team at most and keeps its goal in its wiki. One team can be deployed on many projects at the same time. Each deployment runs its own sessions.
 - Each agent in a deployment runs as a real **coding harness process** (Claude Code, Codex CLI, Pi, Hermes Agent or a custom command), an [instance](./models/instance.md). It works in its **own git worktree** of each of the project's repos, on its own branch ([Sandboxes and git policy](./architecture/sandboxes-and-git.md)).
 - Agents talk to each other through a message router ([Team tools](./architecture/team-tools.md)). Only the designated output of a request crosses from one sandbox to another.
-- Only the team **lead** can ask for changes to reach `main`, with a **merge request**. The CEO reviews it in Foreman, file by file, with comments back to the lead, and decides: **Merge to main** (Foreman merges locally), **Request changes**, or **Dismiss** with a reason; later, **Create PR** on the project's forge (GitHub, Forgejo or Gitea) to merge there. Nothing reaches a forge unless the CEO asks, and Foreman never merges on its own ([Pipeline and merges](./features/pipeline-and-merges.md)).
+- Only the team **lead** can ask for changes to reach a repo's default branch (or another target, a release branch say), with a **merge request**. The CEO reviews it in Foreman, file by file, with comments back to the lead, and decides: **Merge** (Foreman merges locally), **Request changes**, or **Dismiss** with a reason; later, **Create PR** on the project's forge (GitHub, Forgejo or Gitea) to merge there. Nothing reaches a forge unless the CEO asks, and Foreman never merges on its own ([Pipeline and merges](./features/pipeline-and-merges.md)).
 - Anything that needs the CEO arrives as a typed **[request](./features/requests.md)** (approval, question, review, finding, blocked). It shows in the UI and as a browser [notification](./features/notifications.md).
 - The UI is also a **terminal multiplexer** ([Sessions](./features/sessions.md)). Every agent session's stdin/stdout/stderr is live in the browser, with copy and paste.
 
@@ -22,7 +22,7 @@ Terms are defined in the [Glossary](./glossary.md). The end-to-end scenarios v1 
 
 ## Goals
 
-1. Run several agent teams in parallel on local code, with clear roles and a clear path to `main`.
+1. Run several agent teams in parallel on local code, with clear roles and a clear path to each repo's default branch.
 2. Make the CEO's job small: see what needs a decision, decide, move on.
 3. Keep agents isolated (separate worktrees and containers) while letting them collaborate (through [team tools](./architecture/team-tools.md)).
 4. Reuse teams and agent "souls" across projects without copying them.
@@ -42,10 +42,10 @@ Terms are defined in the [Glossary](./glossary.md). The end-to-end scenarios v1 
 
 | Role | Who | What they can do |
 |---|---|---|
-| **CEO** | The human operator, sole user | Everything. Answers requests, decides merge requests (merge to main, create a PR, or reject), deploys teams, talks to any agent. |
+| **CEO** | The human operator, sole user | Everything. Answers requests, decides merge requests (merge, create a PR, or dismiss), deploys teams, talks to any agent. |
 | **Chief of Staff** | A built-in agent (a harness session owned by Foreman, see [Chief of Staff](./features/chief-of-staff.md)) | Interviews the CEO to define roles and teams, and proposes the team files, which Foreman writes once the CEO confirms them. |
-| **Team lead** | One agent per team | Breaks down goals, delegates, reviews handoffs, integrates on `lead/<team>/*` branches, requests merges to `main`. The CEO's default point of contact for the team. |
-| **Members** | Engineer, Architect, QA, Reviewer, custom | Work in their own worktree branches (`wt/<agent>/<card>`) and hand off to the lead. Cannot publish to `main` or `lead/<team>/*`. |
+| **Team lead** | One agent per team | Breaks down goals, delegates, reviews handoffs, integrates on `lead/<team>/*` branches, requests merges into its targets. The CEO's default point of contact for the team. |
+| **Members** | Engineer, Architect, QA, Reviewer, custom | Work in their own worktree branches (`wt/<agent>/<card>`) and hand off to the lead. Cannot publish to a target or `lead/<team>/*`. |
 
 Roles with default job descriptions (used by the Chief of Staff and the example teams): Team Lead, Architect, Engineer, QA / Tester, Reviewer ([Agent soul](./models/agent-soul.md)).
 

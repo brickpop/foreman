@@ -19,7 +19,7 @@ playbook = [
   { lead = "Turns the goal into cards on the board and assigns them. Members work in their own worktrees" },
   { members = "Build, then hand off to the lead with tests" },
   { qa = "Challenges every handoff. Failures go back to the author" },
-  { lead = "Integrates, then requests the merge to main" },
+  { lead = "Integrates, then requests the merge" },
 ]
 
 [[escalate]]

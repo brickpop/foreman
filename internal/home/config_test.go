@@ -36,7 +36,7 @@ func TestProjectExampleParsesWithDefaults(t *testing.T) {
 	if len(p) > 0 {
 		t.Fatalf("problems: %v", p)
 	}
-	if c.MergeToMain != "ceo" || c.Forge.Kind != "forgejo" || len(c.AlwaysAskCEO) != 1 {
+	if c.Forge.Kind != "forgejo" || len(c.AlwaysAskCEO) != 1 {
 		t.Errorf("parsed %+v", c)
 	}
 	minimal, p := ParseProject(nil)
@@ -52,9 +52,9 @@ func TestProjectProblems(t *testing.T) {
 		"forge url scheme":        {"[forge]\nkind = \"github\"\nurl = \"ftp://x\"\nproject_repo = \"https://x/y\"", "not an http(s) URL"},
 		"its name, the record's":  {`project = "ledger"`, "project: not a field Foreman knows"},
 		"its repos, the record's": {`repos = ["api"]`, "repos: not a field Foreman knows"},
-		"merge by agents":         {"merge_to_main = \"lead\"", "merge_to_main"},
+		"merge_to_main, retired":  {"merge_to_main = \"ceo\"", "merge_to_main: only the CEO merges, always; remove this line"},
 		"unknown field":           {"wiki = \"docs\"", "wiki: not a field Foreman knows"},
-		"main, now per repo":      {"main = \"main\"", "main: each code repo has its own main branch now"},
+		"main, now per repo":      {"main = \"main\"", "main: each code repo has its own default branch now"},
 		"syntax error":            {`checks = `, "line 1"},
 		"multi-line describe":     {"description = \"\"\"a\nb\"\"\"", "one line"},
 	} {
@@ -256,11 +256,12 @@ func TestRosterPutsTheLeadFirstThenTheFileOrder(t *testing.T) {
 	}
 }
 
-// A project.toml from before each repo had its own main says only what
-// replaced the line, not also that it is unknown.
-func TestAnOldMainLineSaysWhatReplacedIt(t *testing.T) {
-	_, p := ParseProject([]byte("main = \"main\"\nmerge_to_main = \"ceo\"\n"))
-	if len(p) != 1 || !strings.Contains(p[0], "Project settings → Code repos") {
-		t.Errorf("problems %v", p)
+// A project.toml from before each repo had its own default, and before
+// merge_to_main was retired, says only what replaced each line, not also that
+// it is unknown; what it holds is ignored.
+func TestRetiredLinesSayWhatReplacedThem(t *testing.T) {
+	c, p := ParseProject([]byte("main = \"main\"\nmerge_to_main = \"lead\"\nchecks = \"go test\"\n"))
+	if len(p) != 2 || !strings.HasPrefix(p[0], "main: ") || !strings.HasPrefix(p[1], "merge_to_main: ") || c.Checks != "go test" {
+		t.Errorf("problems %v, config %+v", p, c)
 	}
 }

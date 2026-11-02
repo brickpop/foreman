@@ -6,11 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/store"
@@ -19,7 +21,7 @@ import (
 // Adding projects and their repos (wiki/product/features/add-project.md). A
 // project is a record in the database and a workspace, with its project repo;
 // code repos are the CEO's, anywhere in their home folder. Foreman creates a
-// repo only new and empty, with a first commit so its main branch exists
+// repo only new and empty, with a first commit so its default branch exists
 // (agents' branches start from it).
 
 var (
@@ -29,6 +31,8 @@ var (
 	ErrExists = errors.New("home: exists")
 	// ErrDeployed means a team is deployed on the project: stop it first.
 	ErrDeployed = errors.New("home: a team is deployed on the project")
+	// ErrInUse means a target can't go: a merge request into it is open.
+	ErrInUse = errors.New("home: a merge request into it is open")
 )
 
 // NewProject creates a project with no repos yet, in workspace (a folder of
@@ -137,9 +141,9 @@ func (h *Home) createProjectRepo(ctx context.Context, project, dir string) error
 
 // AddRepo adds an existing repo to a project, under name: path is its top
 // folder, which agents can use (Home.repoFolder), with a commit, and
-// not in the project already, with main as its main branch (usableRepo). A
+// not in the project already, with def as its default branch (usableRepo). A
 // repo may be in several projects.
-func (h *Home) AddRepo(ctx context.Context, project, name, path, main string) (Project, error) {
+func (h *Home) AddRepo(ctx context.Context, project, name, path, def string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[project]
@@ -149,11 +153,11 @@ func (h *Home) AddRepo(ctx context.Context, project, name, path, main string) (P
 	if err := checkRepoName(p, name); err != nil {
 		return Project{}, err
 	}
-	root, main, err := h.usableRepo(ctx, p, "", path, main)
+	root, def, err := h.usableRepo(ctx, p, "", path, def)
 	if err != nil {
 		return Project{}, err
 	}
-	if err := h.records.AddRepo(ctx, project, store.RepoRecord{Name: name, Path: filepath.Clean(path), RootCommit: root, Main: main}); err != nil {
+	if err := h.records.AddRepo(ctx, project, store.RepoRecord{Name: name, Path: filepath.Clean(path), RootCommit: root, Default: def}); err != nil {
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
@@ -189,9 +193,9 @@ func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project
 		_ = os.RemoveAll(path)
 		return Project{}, err
 	}
-	root, main, err := h.usableRepo(ctx, p, "", path, "main")
+	root, def, err := h.usableRepo(ctx, p, "", path, "main")
 	if err == nil {
-		err = h.recordError(h.records.AddRepo(ctx, project, store.RepoRecord{Name: name, Path: path, RootCommit: root, Main: main}))
+		err = h.recordError(h.records.AddRepo(ctx, project, store.RepoRecord{Name: name, Path: path, RootCommit: root, Default: def}))
 	}
 	if err != nil {
 		_ = os.RemoveAll(path)
@@ -244,9 +248,10 @@ func (h *Home) RemoveRepo(ctx context.Context, project, name string) (Project, e
 	return h.rescan(project)
 }
 
-// SetRepoMain sets the branch a repo's agents start from and its merges go
-// to: one the repo has. Worktrees made before stay on their branches.
-func (h *Home) SetRepoMain(ctx context.Context, project, name, main string) (Project, error) {
+// SetRepoDefault sets the branch a repo's agents start from and its merges
+// go to unless told otherwise: one the repo has. Its open merge requests into
+// the old one go to the new one; worktrees made before stay on their branches.
+func (h *Home) SetRepoDefault(ctx context.Context, project, name, branch string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[project]
@@ -257,10 +262,74 @@ func (h *Home) SetRepoMain(ctx context.Context, project, name, main string) (Pro
 	if i < 0 {
 		return Project{}, ErrNotFound
 	}
-	if !h.git.HasBranch(ctx, p.Repos[i].Path, main) {
-		return Project{}, fmt.Errorf("%w: %s has no branch %q", ErrInvalid, name, main)
+	if !h.git.HasBranch(ctx, p.Repos[i].Path, branch) {
+		return Project{}, fmt.Errorf("%w: %s has no branch %q", ErrInvalid, name, branch)
 	}
-	if err := h.records.SetRepoMain(ctx, project, name, main); err != nil {
+	if err := h.records.SetRepoDefault(ctx, project, name, branch); err != nil {
+		return Project{}, h.recordError(err)
+	}
+	return h.rescan(project)
+}
+
+// CreateTarget makes a new branch name in a code repo at from (a commit or a
+// branch of it) and records it as one of the repo's targets, made by the
+// lead's instance by (wiki/product/features/pipeline-and-merges.md#merge-targets).
+// A name the repo has as a branch, or in an agent's namespace, is refused.
+func (h *Home) CreateTarget(ctx context.Context, project, repo, name, from, by string) (Project, error) {
+	h.mu.Lock()
+	defer h.unlock()
+	p, ok := h.snap.projects[project]
+	if !ok {
+		return Project{}, ErrNotFound
+	}
+	r, ok := p.repo(repo)
+	switch {
+	case !ok:
+		return Project{}, fmt.Errorf("%w: no code repo %q", ErrNotFound, repo)
+	case !r.Ready():
+		return Project{}, fmt.Errorf("%w: %s can't be used: %s", ErrInvalid, repo, r.Problem)
+	case strings.HasPrefix(name, "wt/") || strings.HasPrefix(name, "lead/"):
+		return Project{}, fmt.Errorf("%w: %s is an agent's branch name (wt/*, lead/*)", ErrInvalid, name)
+	case h.git.HasBranch(ctx, r.Path, name):
+		return Project{}, fmt.Errorf("%w: %s has a branch %s already", ErrExists, repo, name)
+	}
+	commit, err := h.git.Resolve(ctx, r.Path, from)
+	if err != nil {
+		return Project{}, fmt.Errorf("%w: %s has no branch or commit %q", ErrInvalid, repo, from)
+	}
+	// Recorded first: a branch made and then not recorded would be left behind.
+	t := store.TargetRecord{Name: name, MadeBy: by, From: commit, CreatedAt: time.Now().UTC()}
+	if err := h.records.AddTarget(ctx, project, repo, t); errors.Is(err, store.ErrExists) {
+		return Project{}, fmt.Errorf("%w: %s has a target %s already", ErrExists, repo, name)
+	} else if err != nil {
+		return Project{}, h.recordError(err)
+	}
+	if err := h.git.CreateBranch(ctx, r.Path, name, commit); err != nil {
+		if rerr := h.records.RemoveTarget(ctx, project, repo, name); rerr != nil {
+			slog.Error("forgetting a target whose branch wasn't made", "project", project, "repo", repo, "target", name, "err", rerr)
+		}
+		return Project{}, fmt.Errorf("%w: %s: %v", ErrInvalid, name, err)
+	}
+	return h.rescan(project)
+}
+
+// RemoveTarget stops one of a repo's other targets being one; its branch
+// stays in git. Refused for the default branch (it can only be changed) and
+// while a merge request into it is open.
+func (h *Home) RemoveTarget(ctx context.Context, project, repo, name string) (Project, error) {
+	h.mu.Lock()
+	defer h.unlock()
+	p, ok := h.snap.projects[project]
+	if !ok {
+		return Project{}, ErrNotFound
+	}
+	if r, ok := p.repo(repo); ok && r.Default == name {
+		return Project{}, fmt.Errorf("%w: %s is %s's default branch: pick another default instead", ErrInvalid, name, repo)
+	}
+	switch err := h.records.RemoveTarget(ctx, project, repo, name); {
+	case errors.Is(err, store.ErrInUse):
+		return Project{}, fmt.Errorf("%w: %s, in %s", ErrInUse, name, repo)
+	case err != nil:
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
@@ -305,9 +374,9 @@ func (h *Home) SetArchived(ctx context.Context, project string, archived bool) (
 
 // usableRepo checks a folder to add as a repo of p (Home.usableFolder)
 // and returns its root commit: a repo without a commit has no branch for
-// agents to start from. main must be a branch it has; "" is main, when it has
-// that branch, else the CEO picks one (RepoBranches).
-func (h *Home) usableRepo(ctx context.Context, p Project, name, path, main string) (string, string, error) {
+// agents to start from, and its default branch: def, a branch it has; for
+// "", main when it has that branch, else the CEO picks one (RepoBranches).
+func (h *Home) usableRepo(ctx context.Context, p Project, name, path, def string) (string, string, error) {
 	real, err := h.usableFolder(p, name, path)
 	if err != nil {
 		return "", "", err
@@ -317,14 +386,14 @@ func (h *Home) usableRepo(ctx context.Context, p Project, name, path, main strin
 		return "", "", fmt.Errorf("%w: %s has no commit yet: commit once, then add it", ErrInvalid, path)
 	}
 	switch {
-	case main == "" && h.git.HasBranch(ctx, real, "main"):
-		main = "main"
-	case main == "":
-		return "", "", fmt.Errorf("%w: %s has no branch main: pick its main branch", ErrInvalid, path)
-	case !h.git.HasBranch(ctx, real, main):
-		return "", "", fmt.Errorf("%w: %s has no branch %q", ErrInvalid, path, main)
+	case def == "" && h.git.HasBranch(ctx, real, "main"):
+		def = "main"
+	case def == "":
+		return "", "", fmt.Errorf("%w: %s has no branch main: pick its default branch", ErrInvalid, path)
+	case !h.git.HasBranch(ctx, real, def):
+		return "", "", fmt.Errorf("%w: %s has no branch %q", ErrInvalid, path, def)
 	}
-	return root, main, nil
+	return root, def, nil
 }
 
 // usableFolder is the real path of a folder agents can use as one of p's

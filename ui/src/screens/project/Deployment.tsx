@@ -24,7 +24,7 @@ import { InFlight } from "./Pipeline";
 // A project's Deployment section (wiki/product/features/project-deployment.md):
 // the team on it, its agents with what they do and the branch
 // each has checked out (and the worktrees earlier teams left); then the work
-// on its way to main, and what merged. Deploy (replacing the team), Reload
+// on its way to its targets, and what merged. Deploy (replacing the team), Reload
 // (its agents left on an older prompt) and Stop.
 export function Deployment() {
   const project = useProject();

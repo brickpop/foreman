@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
-import { agentOf, forgeOf, linkLine, mainOf, when } from "../../app/model";
+import { agentOf, forgeOf, linkLine, targetsOf, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
@@ -35,6 +35,7 @@ import {
   reviewTeam,
   statusLabel,
 } from "../../app/reviews";
+import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { Button, Empty, Loading, SectionLabel, Segmented } from "../../components/ui";
 
@@ -184,10 +185,10 @@ export function Review() {
         {hasSince(v) && (
           <Segmented
             label="Which change"
-            value={since ? "since" : "main"}
+            value={since ? "since" : "target"}
             onChange={(to) => navigate({ search: to === "since" ? { since: true } : {} })}
             options={[
-              { value: "main", label: "Against main" },
+              { value: "target", label: "Against its target" },
               { value: "since", label: "Since your last review" },
             ]}
           />
@@ -198,7 +199,7 @@ export function Review() {
           {repos.map((r) => (
             <div key={r.repo} className="flex flex-col gap-0.5">
               <SectionLabel>
-                {r.repo} → {r.main}
+                {r.repo} → {r.target}
                 {decidedAs(v, r.repo) && ` · ${decidedAs(v, r.repo)}`}
               </SectionLabel>
               {r.files.map((f) => (
@@ -275,7 +276,7 @@ export function Review() {
         <DecisionBar
           review={v}
           lead={lead?.soul.name ?? "the lead"}
-          mainOf={(repo) => mainOf(project, repo)}
+          targetsOf={(repo) => targetsOf(project, repo)}
           forge={forgeOf(project)}
           diffs={diff.data}
           dismissAs={dismissChoices(
@@ -564,7 +565,7 @@ function Composer({
 function DecisionBar({
   review: v,
   lead,
-  mainOf,
+  targetsOf,
   forge,
   diffs,
   dismissAs,
@@ -572,7 +573,8 @@ function DecisionBar({
 }: {
   review: ReviewData;
   lead: string;
-  mainOf: (repo: string) => string;
+  /** Where a repo's merge may go instead: its targets. */
+  targetsOf: (repo: string) => string[];
   forge: string;
   diffs: RepoDiff[] | undefined;
   dismissAs: DismissChoice[];
@@ -606,8 +608,12 @@ function DecisionBar({
     (c, choice: DismissChoice) => c.reviews.dismiss(v.id, dismissRequest(choice, text)),
     failed,
   );
-  const busy = merge.isPending || changes.isPending || dismiss.isPending;
-  const repos = openRepos(v, mainOf);
+  const retarget = useReviewChange(
+    (c, to: { repo: string; target: string }) => c.reviews.retarget(v.id, to.repo, to.target),
+    failed,
+  );
+  const busy = merge.isPending || changes.isPending || dismiss.isPending || retarget.isPending;
+  const repos = openRepos(v);
   const ticked = repos.filter((r) => !unticked.has(r.repo));
   const heads = mergeHeads(
     diffs,
@@ -631,16 +637,29 @@ function DecisionBar({
         {v.mergeRequests
           .filter((m) => m.state === "open")
           .map((m) => (
-            <label key={m.repo} className="flex items-center gap-2 font-mono text-[12.5px]">
-              <input
-                type="checkbox"
-                checked={!unticked.has(m.repo)}
-                onChange={(e) => tick(m.repo, e.target.checked)}
-              />
-              <span className={m.conflicting ? "text-err" : "text-tx2"}>
-                {linkLine(m, forge, mainOf(m.repo))}
-              </span>
-            </label>
+            <span key={m.repo} className="flex items-center gap-2">
+              <label className="flex items-center gap-2 font-mono text-[12.5px]">
+                <input
+                  type="checkbox"
+                  checked={!unticked.has(m.repo)}
+                  onChange={(e) => tick(m.repo, e.target.checked)}
+                />
+                <span className={m.conflicting ? "text-err" : "text-tx2"}>
+                  {linkLine(m, forge)}
+                </span>
+              </label>
+              {targetsOf(m.repo).length > 1 && (
+                <Select
+                  label={`Where ${m.repo} merges`}
+                  value={m.target}
+                  mono
+                  options={targetsOf(m.repo).map((t) => ({ value: t, label: t }))}
+                  onChange={(target) =>
+                    target !== m.target && retarget.mutate({ repo: m.repo, target })
+                  }
+                />
+              )}
+            </span>
           ))}
         <span className="flex-1" />
         <Button
@@ -662,7 +681,7 @@ function DecisionBar({
               onSuccess: () => {
                 toast({
                   title: "Merged",
-                  body: ticked.map((r) => `${r.repo} → ${r.main}`).join(", "),
+                  body: ticked.map((r) => `${r.repo} → ${r.target}`).join(", "),
                   color: "var(--ok)",
                   // To watch the lead pick it up.
                   onOpen: () => navigate(sessionOf(v.lead)),

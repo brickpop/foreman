@@ -38,7 +38,6 @@ export interface Branches {
 export interface ProjectConfig {
   description: string;
   checks: string;
-  mergeToMain: string;
   alwaysAskCeo: string[];
   /**
    * RecursiveSubmodules also checks out the submodules of submodules in the
@@ -164,8 +163,20 @@ export interface Project {
 export interface Repo {
   name: string; // unique in the project
   path: string; // absolute
-  main: string; // the branch agents start from and merges go to
+  defaultBranch: string; // the target agents start from and merges go to unless told otherwise
+  targets: Target[]; // its other targets, oldest first
   problem: string; // why agents can't use it (missing, …); "" when they can
+}
+/**
+ * Target is a branch of a code repo, besides its default, that merges may go
+ * to (wiki/product/features/pipeline-and-merges.md#merge-targets): who made
+ * it (the lead's instance), at which commit and when.
+ */
+export interface Target {
+  name: string;
+  madeBy: string;
+  from: string;
+  createdAt: any /* time.Time */;
 }
 /**
  * Team is a team file.

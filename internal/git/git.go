@@ -149,7 +149,7 @@ func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) 
 	args := []string{"worktree", "add", "--quiet", worktree, branch}
 	if _, err := run(ctx, repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); err != nil {
 		if _, err := run(ctx, repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+base); err != nil {
-			return fmt.Errorf("%s has no branch %q to start %s from (deleted, or another branch is its main: pick it in Project settings → Code repos)", repo, base, branch)
+			return fmt.Errorf("%s has no branch %q to start %s from (deleted, or its default branch is another: pick it in the project's Repos)", repo, base, branch)
 		}
 		args = []string{"worktree", "add", "--quiet", "-b", branch, worktree, base}
 	}

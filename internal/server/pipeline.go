@@ -7,7 +7,7 @@ import (
 	"github.com/brickpop/foreman/internal/workflow"
 )
 
-// Pipeline is a project's work on its way to main (implemented by Workflow);
+// Pipeline is a project's work on its way to its targets (implemented by Workflow);
 // the CEO decides in Reviews.
 type Pipeline interface {
 	Pipeline(ctx context.Context, project string) (workflow.Pipeline, error)

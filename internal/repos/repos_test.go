@@ -25,7 +25,7 @@ func (c config) Project(id string) (home.Project, error) {
 		return home.Project{}, home.ErrNotFound
 	}
 	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "project"), Config: home.ProjectConfig{},
-		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api"), Main: "trunk"}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
+		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api"), Default: "trunk"}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
 }
 
 func (c config) Sandbox(project, agent string) string {
@@ -91,7 +91,7 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 		t.Fatalf("repos %+v", list)
 	}
 	api := list[0]
-	if api.Main != "trunk" || len(api.Branches) != 2 || api.Branches[0].Name != "trunk" {
+	if api.Default != "trunk" || len(api.Branches) != 2 || api.Branches[0].Name != "trunk" {
 		t.Fatalf("api %+v", api)
 	}
 	if x := api.Branches[1]; x.Name != "wt/tove/x" || x.Ahead != 1 || !x.Uncommitted || x.Agent != "tove" {
@@ -187,6 +187,6 @@ type mainIs struct {
 
 func (m mainIs) Project(id string) (home.Project, error) {
 	p, err := m.config.Project(id)
-	p.Repos[0].Main = m.main
+	p.Repos[0].Default = m.main
 	return p, err
 }

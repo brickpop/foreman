@@ -88,11 +88,17 @@ func (f fakeConfig) Browse(path string) (home.Folder, error) {
 	}
 	return home.Folder{Path: path, Entries: []home.FolderEntry{{Name: "app", Path: path + "/app", Repo: true}}}, nil
 }
-func (f fakeConfig) AddRepo(_ context.Context, project, name, path, main string) (home.Project, error) {
-	return f.changed("AddRepo", project, name, path+" main="+main)
+func (f fakeConfig) AddRepo(_ context.Context, project, name, path, def string) (home.Project, error) {
+	return f.changed("AddRepo", project, name, path+" default="+def)
 }
-func (f fakeConfig) SetRepoMain(_ context.Context, project, name, main string) (home.Project, error) {
-	return f.changed("SetRepoMain", project, main, name)
+func (f fakeConfig) SetRepoDefault(_ context.Context, project, name, branch string) (home.Project, error) {
+	return f.changed("SetRepoDefault", project, branch, name)
+}
+func (f fakeConfig) RemoveTarget(_ context.Context, project, repo, name string) (home.Project, error) {
+	if name == "open" {
+		return home.Project{}, fmt.Errorf("%w: open, in %s", home.ErrInUse, repo)
+	}
+	return f.changed("RemoveTarget", project, name, repo)
 }
 
 // RepoBranches lists a repo on master below /home/ceo/dev, as Browse does.
@@ -388,9 +394,10 @@ func TestProjectRoutes(t *testing.T) {
 	}{
 		{http.MethodPost, "/api/projects", `{"name":"aragon","workspace":"/home/ceo/w/aragon"}`, []string{"NewProject", "aragon", " ws=/home/ceo/w/aragon"}},
 		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"/home/ceo/w/ledger"}`, []string{"Migrate", "/home/ceo/w/ledger", ""}},
-		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web main="}},
-		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","main":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web main=master"}},
-		{http.MethodPut, "/api/projects/ledger/repos/web/main", `{"main":"master"}`, []string{"SetRepoMain", "master", "web"}},
+		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default="}},
+		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","defaultBranch":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default=master"}},
+		{http.MethodPut, "/api/projects/ledger/repos/web/default", `{"branch":"master"}`, []string{"SetRepoDefault", "master", "web"}},
+		{http.MethodDelete, "/api/projects/ledger/repos/web/targets/release/2.0", ``, []string{"RemoveTarget", "release/2.0", "web"}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","new":true}`, []string{"NewRepo", "web", "/home/ceo/dev/web"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
@@ -434,6 +441,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPost, "/api/projects", `{"name":"bad"}`, http.StatusBadRequest, `{"code":"INVALID","error":"a repo name is lowercase"}`},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"taken","path":"/x"}`, http.StatusConflict, `{"code":"EXISTS","error":"ledger has a repo taken already"}`},
 		{http.MethodDelete, "/api/projects/ledger/repos/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
+		{http.MethodDelete, "/api/projects/ledger/repos/web/targets/open", ``, http.StatusConflict, `{"code":"IN_USE","error":"open, in web"}`},
 		{http.MethodPost, "/api/projects/nope/repos", `{"name":"x","path":"/x"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPut, "/api/projects/nope/profile", `{"profile":"work"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects", `not json`, http.StatusBadRequest, `"BAD_REQUEST"`},
@@ -443,7 +451,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodDelete, "/api/projects/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
 		{http.MethodGet, "/api/folders?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodGet, "/api/folders/branches?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
-		{http.MethodPut, "/api/projects/ledger/repos/web/main", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
+		{http.MethodPut, "/api/projects/ledger/repos/web/default", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodPut, "/api/projects/ledger/archived", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
 		{http.MethodPut, "/api/projects/nope/archived", `{"archived":true}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects/nope/migrate", `{"workspace":"/w"}`, http.StatusNotFound, `"NOT_FOUND"`},

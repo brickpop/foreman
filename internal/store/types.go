@@ -124,7 +124,7 @@ type ActionRepo struct {
 	MergeRequest string `json:"mergeRequest,omitempty"`
 }
 
-// WorkItem is a member's piece of work on its way to main
+// WorkItem is a member's piece of work on its way to a target
 // (wiki/product/models/work-item.md).
 type WorkItem struct {
 	ID             string `json:"id"`
@@ -138,7 +138,7 @@ type WorkItem struct {
 	MergeRequestID string `json:"mergeRequestId"`
 }
 
-// MergeRequest asks the CEO to merge a branch into a repo's main
+// MergeRequest asks the CEO to merge a branch into one of a repo's targets
 // (wiki/product/models/merge-request.md).
 type MergeRequest struct {
 	ID             string    `json:"id"`
@@ -147,8 +147,9 @@ type MergeRequest struct {
 	AuthorInstance string    `json:"authorInstance"`
 	Repo           string    `json:"repo"` // one of the project's code repos
 	Branch         string    `json:"branch"`
-	Entry          string    `json:"entry"` // the wiki card explaining the work
-	State          string    `json:"state"` // open, merged, rejected or withdrawn
+	Target         string    `json:"target"` // the branch it merges into: its repo's default or another target
+	Entry          string    `json:"entry"`  // the wiki card explaining the work
+	State          string    `json:"state"`  // open, merged, rejected or withdrawn
 	ChecksStatus   string    `json:"checksStatus"`
 	Conflicting    bool      `json:"conflicting"`
 	ForgePRURL     string    `json:"forgePrUrl"`
@@ -161,7 +162,7 @@ type MergeRequest struct {
 	ReviewedHead   string    `json:"reviewedHead"` // the branch head at the CEO's last Request changes
 	// Where the branch stood when it left open (merged, dismissed, withdrawn):
 	// its head, kept under refs/foreman/decided/<id>, and the commit it parted
-	// from main at ("" after a fast-forward), so its review still shows it.
+	// from its target at ("" after a fast-forward), so its review still shows it.
 	Head string `json:"head"`
 	Base string `json:"base"`
 }
@@ -187,7 +188,7 @@ type ReviewComment struct {
 	ReviewID  string    `json:"reviewId"`
 	Repo      string    `json:"repo"`
 	Path      string    `json:"path"`
-	Side      string    `json:"side"` // new (the branch) or old (main); "" for a general one
+	Side      string    `json:"side"` // new (the branch) or old (the target); "" for a general one
 	Line      int       `json:"line"` // on its side, in the commit it was written on
 	Commit    string    `json:"commit"`
 	Snippet   string    `json:"snippet"` // the line's text then

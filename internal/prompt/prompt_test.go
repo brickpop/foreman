@@ -28,12 +28,12 @@ var atlas = home.TeamConfig{
 }
 
 // every team tool, as the finished epic will offer them
-var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate", "request_merge", "withdraw_merge"}
+var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate", "request_merge", "create_target", "withdraw_merge"}
 
 func input(agent string, tools []string) Input {
 	return Input{
 		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/.foreman/sandboxes/ledger/" + agent, Tools: tools,
-		Repos:  []home.Repo{{Name: "api", Main: "main"}},
+		Repos:  []home.Repo{{Name: "api", Default: "main"}},
 		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
 	}
 }
@@ -90,12 +90,13 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 	got := Compose(input("mara", every))
 	for _, want := range []string{
 		"# You are Mara, Team Lead on team Atlas\nCalm, decisive.\n",
-		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges to main", // the role's default job
+		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges into a target", // the role's default job
 		"Branches: lead/atlas/<topic>, as many as you need (lead/atlas/integration exists).",
 		"(read and write: edit, then commit its repo, project)",
-		"- Mara, Team Lead (lead: integrates, requests merges to main)\n",
+		"- Mara, Team Lead (lead: integrates, requests merges)\n",
 		"## Tools (from Foreman)\n",
-		"request_merge(branch, entry)        Ask the CEO to merge one of your lead/atlas/* branches into main;",
+		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/atlas/* branches into into,",
+		"create_target(repo, name, from)     Make a new target in one repo",
 		"The CEO talks to you. Break requests down and delegate with ask().",
 		"Before you request a merge, run: npm test",
 		// so the lead never asks a member for what its mount refuses
@@ -137,7 +138,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	in := input("ilya", nil)
 	in.Team.Playbook = nil
 	in.Config = home.ProjectConfig{}
-	in.Repos = []home.Repo{{Name: "api", Main: "trunk"}}
+	in.Repos = []home.Repo{{Name: "api", Default: "trunk"}}
 	got := Compose(in)
 	for _, absent := range []string{"## Playbook", "## Always escalate", "run:"} {
 		if strings.Contains(got, absent) {
@@ -161,7 +162,7 @@ func TestTodaysTools(t *testing.T) {
 		for _, want := range []string{
 			"Work with them only through the tools below.",
 			"ask(teammate, request)", "reply(request_id, output)", "read_message(id)",
-			"switch(branch)", "commit(commits)", "merge(branch)", "abort_merge()", "discard(repos)", "contribute(kind, title, body)",
+			"switch(branch, from)", "commit(commits)", "merge(branch)", "abort_merge()", "discard(repos)", "contribute(kind, title, body)",
 			"set_submodule(repo, path, ref, url) Pin a submodule",
 			"branch, commit\nand merge only through switch(), commit() and merge().",
 			"Messages arrive in this session as one line",
@@ -180,25 +181,25 @@ func TestTodaysTools(t *testing.T) {
 		}
 	}
 	lead := Compose(input("mara", Offered(true)))
-	if !strings.Contains(lead, "request_merge(branch, entry)") || !strings.Contains(lead, "Ask for a merge to main with request_merge(branch, entry)") ||
+	if !strings.Contains(lead, "request_merge(branch, entry, into)") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from.") || !strings.Contains(lead, "create_target(repo, name, from)") ||
 		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") || !strings.Contains(lead, "reviews()                           Where your reviews stand") ||
 		!strings.Contains(lead, "team()                              Where each teammate stands") ||
 		!strings.Contains(lead, "requests merges") || strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
 		t.Errorf("lead:\n%s", lead)
 	}
 	member := Compose(input("ilya", Offered(false)))
-	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") || strings.Contains(member, "withdraw_merge") || strings.Contains(member, "team()") {
+	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") || strings.Contains(member, "create_target") || strings.Contains(member, "withdraw_merge") || strings.Contains(member, "team()") {
 		t.Errorf("member:\n%s", member)
 	}
 }
 
 // Worktrees outlive a session: every agent with git tools is told to check
-// where it is and start new work from main; the lead, to name the topic it
-// hands out. Without switch there is nothing to say.
+// where it is and start new work from the default branch or another target;
+// the lead, to name the topic it hands out and the target it starts from. Without switch there is nothing to say.
 func TestWorktreesPersist(t *testing.T) {
 	persist := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
-		"New work goes on a new topic: switch(<topic>) makes it from main. Earlier work you resume, or commit to its topic before switching. What you don't want: discard()."
-	handOut := "Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to."
+		"New work goes on a new topic: switch(<topic>) makes it from the default branch, switch(<topic>, from) from another target. Earlier work you resume, or commit to its topic before switching. What you don't want: discard()."
+	handOut := "Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to, and the target it starts from when it isn't the default."
 	lead, member := Compose(input("mara", Offered(true))), Compose(input("ilya", Offered(false)))
 	if !strings.Contains(lead, persist+" "+handOut) {
 		t.Errorf("lead:\n%s", lead)
@@ -274,14 +275,14 @@ func TestTheGoalIsInTheWiki(t *testing.T) {
 	}
 }
 
-// Repos on different main branches are each named; the same one is named once.
-func TestTheMainBranchOfEachRepo(t *testing.T) {
+// Repos on different default branches are each named; the same one is named once.
+func TestTheDefaultBranchOfEachRepo(t *testing.T) {
 	for _, tc := range []struct {
 		repos []home.Repo
 		want  string
 	}{
-		{[]home.Repo{{Name: "api", Main: "main"}, {Name: "web", Main: "main"}}, "made for you from main."},
-		{[]home.Repo{{Name: "poc", Main: "master"}, {Name: "web", Main: "main"}}, "made for you from master in poc, main in web."},
+		{[]home.Repo{{Name: "api", Default: "main"}, {Name: "web", Default: "main"}}, "made for you from main."},
+		{[]home.Repo{{Name: "poc", Default: "master"}, {Name: "web", Default: "main"}}, "made for you from master in poc, main in web."},
 		{nil, "made for you from main."},
 	} {
 		in := input("tove", nil)
@@ -289,6 +290,26 @@ func TestTheMainBranchOfEachRepo(t *testing.T) {
 		if got := Compose(in); !strings.Contains(got, tc.want) {
 			t.Errorf("%v: no %q in\n%s", tc.repos, tc.want, got)
 		}
+	}
+}
+
+// Agents learn each repo's targets, the default first, once a repo has more
+// than its default; with none, nothing is said.
+func TestTargetsAreListed(t *testing.T) {
+	in := input("ilya", Offered(false))
+	in.Repos = []home.Repo{{Name: "api", Default: "main", Targets: []home.Target{{Name: "release/2.0"}, {Name: "hotfix"}}}, {Name: "web", Default: "trunk"}}
+	want := " Targets, which only the CEO's merges write: api: main (default), release/2.0, hotfix; web: trunk (default)."
+	if got := Compose(in); !strings.Contains(got, want) {
+		t.Errorf("no %q in\n%s", want, got)
+	}
+	in.Repos[0].Targets = nil
+	if got := Compose(in); strings.Contains(got, "Targets, which") {
+		t.Errorf("listed with none but defaults:\n%s", got)
+	}
+	lead := input("mara", Offered(true))
+	lead.Repos = []home.Repo{{Name: "api", Default: "main", Targets: []home.Target{{Name: "release/2.0"}}}}
+	if got := Compose(lead); !strings.Contains(got, "Withdraw a request before you replace it. Targets, which only the CEO's merges write: api: main (default), release/2.0.") {
+		t.Errorf("lead:\n%s", got)
 	}
 }
 
@@ -304,7 +325,7 @@ func TestTheLeadsLessons(t *testing.T) {
 		"## The CEO\nThe CEO talks to you. Break requests down and delegate with ask().\nAgree the scope with the CEO before building anything it didn't ask for.\n" + brief,
 		"then call request_merge again. A lead branch holds one topic: merge in only that topic's hand-offs, never another topic's branch. Keep at most two merge requests open,",
 		"Withdraw a request before you replace it.\n",
-		"Tests bound for main assert correct behaviour only. A test that passes while a bug exists (a proof, a repro) stays on its own branch, and lands with the fix, as the fix's regression test.\n",
+		"Tests bound for a target assert correct behaviour only. A test that passes while a bug exists (a proof, a repro) stays on its own branch, and lands with the fix, as the fix's regression test.\n",
 	} {
 		if !strings.Contains(lead, want) {
 			t.Errorf("lead: missing %q in:\n%s", want, lead)
@@ -312,8 +333,8 @@ func TestTheLeadsLessons(t *testing.T) {
 	}
 	for _, want := range []string{
 		"goes in through contribute(): then point to the entry it files, never retype it.\n",
-		"No push to main. A card's branch starts from main and holds only that card: never merge in another card's branch (an audit's, a proof's). To reuse a test from one, copy it in (git show <branch>:<file>).\n",
-		"Tests bound for main assert correct behaviour only.",
+		"Never push to a target. A card's branch starts from the target the lead names (the default branch unless told) and holds only that card: never merge in another card's branch (an audit's, a proof's). To reuse a test from one, copy it in (git show <branch>:<file>).\n",
+		"Tests bound for a target assert correct behaviour only.",
 	} {
 		if !strings.Contains(member, want) {
 			t.Errorf("member: missing %q in:\n%s", want, member)

@@ -11,7 +11,7 @@ order: 3
 What it builds ([Sandboxes and git policy](../../product/architecture/sandboxes-and-git.md); [Building blocks → Git](../../product/architecture/building-blocks.md#8-git-git); [Pipeline and merges](../../product/features/pipeline-and-merges.md)):
 - **work items** from hand-offs, and **integration detection**: an engineer's branch contained in a lead branch (`Git.Contains`);
 - the project **checks**, run in a throwaway container before a hand-off is accepted and on `request_merge`;
-- **local merge**: the CEO's Merge to main (`Git.MergeToMain`), then deleting merged branches under the existing rule (`Git.Prune`, when a deployment stops);
+- **local merge**: the CEO's Merge into a target (`Git.Squash`; merge targets since 2026-11-02, [Merge targets](../archive/merge-targets.md)), then deleting merged branches under the existing rule (`Git.Prune`, when a deployment stops);
 - the **optional forge PR**: the CEO's Create PR pushes the branch and opens it (`Git.Push`, the Forge adapter), and fetching `main` back after a merge there (`Git.Fetch`);
 - **merged detection**: a merge request is merged when `main` contains its branch head, whoever merged it (Foreman, the forge, or the CEO's own git);
 - **Sync** for the reserved repos: on the CEO's click, fetch the forge's `main`, merge it in, then push the global repo's or the project repo's `main`; on a conflict, stop and tell the CEO;
@@ -21,7 +21,7 @@ What it builds ([Sandboxes and git policy](../../product/architecture/sandboxes-
 
 **To decide in this epic:**
 
-- [x] how Merge to main relates to the CEO's own checkout (decided 2026-10-17: [Pipeline and merges → Merge to main](../../product/features/pipeline-and-merges.md#merge-to-main))
+- [x] how Merge to main relates to the CEO's own checkout (decided 2026-10-17: [Pipeline and merges → Merge to main](../../product/features/pipeline-and-merges.md#merge-to-a-target))
 
 **Usable when done:** work items and branches show in Changes → In flight, with their checks; an integrated lead branch can be merged to `main` from Foreman, or sent to the forge as a PR.
 

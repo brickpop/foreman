@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createdBody, inside, mainToSend, projectSlug, repoName } from "./addProject";
+import { createdBody, defaultToSend, inside, projectSlug, repoName } from "./addProject";
 
 describe("repoName", () => {
   it("is the folder's own name", () => {
@@ -45,22 +45,22 @@ describe("createdBody", () => {
   });
 });
 
-describe("mainToSend", () => {
+describe("defaultToSend", () => {
   const poc = { branches: ["feature", "master"], current: "feature" };
   it("sends nothing for a repo with a main: the server takes it", () => {
-    expect(mainToSend({ branches: ["main", "master"], current: "master" })).toBeUndefined();
-    expect(mainToSend({ branches: ["main"], current: "main" }, "main")).toBeUndefined();
+    expect(defaultToSend({ branches: ["main", "master"], current: "master" })).toBeUndefined();
+    expect(defaultToSend({ branches: ["main"], current: "main" }, "main")).toBeUndefined();
   });
   it("sends nothing until the branches have loaded", () => {
-    expect(mainToSend(undefined, "master")).toBeUndefined();
+    expect(defaultToSend(undefined, "master")).toBeUndefined();
   });
   it("defaults to the checkout's branch, else the first", () => {
-    expect(mainToSend(poc)).toBe("feature");
-    expect(mainToSend({ branches: ["dev", "master"], current: "" })).toBe("dev");
+    expect(defaultToSend(poc)).toBe("feature");
+    expect(defaultToSend({ branches: ["dev", "master"], current: "" })).toBe("dev");
   });
   it("takes the CEO's pick, but only one the repo has", () => {
-    expect(mainToSend(poc, "master")).toBe("master");
-    expect(mainToSend(poc, "gone")).toBe("feature");
+    expect(defaultToSend(poc, "master")).toBe("master");
+    expect(defaultToSend(poc, "gone")).toBe("feature");
   });
 });
 

@@ -245,6 +245,23 @@ describe("httpClient", () => {
     expect(calls[0].url).toBe("http://x/api/requests");
   });
 
+  it("sets a repo's default branch, adds a repo with one, and removes a target with slashes in its name", async () => {
+    const calls = stubFetch(200, { id: "ledger" });
+    const client = httpClient("http://x");
+    await client.home.setRepoDefault("ledger", "my api", "trunk");
+    await client.home.addRepo("ledger", "web", "/h/web", "master");
+    await client.home.removeTarget("ledger", "api", "release/2.0 rc");
+    expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
+      ["PUT", "http://x/api/projects/ledger/repos/my%20api/default", { branch: "trunk" }],
+      [
+        "POST",
+        "http://x/api/projects/ledger/repos",
+        { name: "web", path: "/h/web", defaultBranch: "master" },
+      ],
+      ["DELETE", "http://x/api/projects/ledger/repos/api/targets/release/2.0%20rc", undefined],
+    ]);
+  });
+
   it("comments on and decides a review", async () => {
     const calls = stubFetch(204, undefined);
     const c = httpClient("http://x");
@@ -262,12 +279,14 @@ describe("httpClient", () => {
     await c.reviews.deleteComment("rev-1", "com-2");
     await c.reviews.requestChanges("rev-1", "see the comments");
     await c.reviews.merge("rev-1", { api: "a1b2" });
+    await c.reviews.retarget("rev-1", "api", "release/2.0");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["POST", "http://x/api/reviews/rev-1/comments", general],
       ["PUT", "http://x/api/reviews/rev-1/comments/com-2", { body: "Why not?" }],
       ["DELETE", "http://x/api/reviews/rev-1/comments/com-2", undefined],
       ["POST", "http://x/api/reviews/rev-1/changes", { note: "see the comments" }],
       ["POST", "http://x/api/reviews/rev-1/merge", { heads: { api: "a1b2" } }],
+      ["PUT", "http://x/api/reviews/rev-1/target", { repo: "api", target: "release/2.0" }],
     ]);
   });
 

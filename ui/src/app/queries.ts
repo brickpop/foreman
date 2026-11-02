@@ -461,7 +461,7 @@ export function useReview(id: string) {
   });
 }
 
-/** A review's change, repo by repo: against main, or since the CEO's last look. */
+/** A review's change, repo by repo: against its target, or since the CEO's last look. */
 export function useReviewDiff(id: string, since: boolean) {
   const c = useClient();
   return useQuery({

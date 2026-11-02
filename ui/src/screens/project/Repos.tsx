@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { type Project, type Repo, useClient } from "../../api/client";
-import { readable } from "../../app/model";
+import { readable, when } from "../../app/model";
 import { keys, useDeployments, useRepos } from "../../app/queries";
 import { AddRepo } from "../../components/AddRepo";
 import { Confirm, Modal } from "../../components/Overlays";
@@ -15,11 +15,16 @@ import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
 // code repo, wherever it is on disk, each opening its own page (Repo), with
-// what keeps agents from using it; then its project repo. Added, created,
-// located, renamed, removed and given their main branch here, from each
-// card's ⋯ menu; renaming and removing wait until no team is deployed.
+// what keeps agents from using it, and its targets; then its project repo.
+// Added, created, located, renamed, removed and given their default branch
+// here, from each card's ⋯ menu; renaming and removing wait until no team is
+// deployed. A target the lead made is removed from its card.
 
-type Changing = { what: "main" | "rename" | "locate" | "remove"; repo: string };
+type Changing = {
+  what: "default" | "rename" | "locate" | "remove" | "target";
+  repo: string;
+  target?: string;
+};
 
 export function Repos() {
   const project = useProject();
@@ -41,9 +46,9 @@ export function Repos() {
   });
   const readOf = (name: string) => read.data?.find((r) => r.name === name);
   const projectRepo = read.data?.find((r) => r.project);
-  const open = (what: Changing["what"], repo: string) => {
+  const open = (what: Changing["what"], repo: string, target?: string) => {
     if (what === "rename") setRenameTo(repo);
-    setChanging({ what, repo });
+    setChanging({ what, repo, target });
   };
   const target = project.repos.find((r) => r.name === changing?.repo);
   return (
@@ -86,27 +91,28 @@ export function Repos() {
         {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
       </Modal>
       <Modal
-        open={changing?.what === "main"}
+        open={changing?.what === "default"}
         onClose={close}
-        title={`Main branch of ${target ? readable(target.name) : ""}`}
+        title={`Default branch of ${target ? readable(target.name) : ""}`}
       >
         {target && (
           <div className="flex flex-col gap-3">
             <p className="m-0 text-[13.5px] text-tx2">
-              Its agents start from it, and its merges go to it.
+              Its agents start from it, and its merges go to it unless the lead names another
+              target. Open merge requests into the old one move to the new one.
             </p>
             <Select
-              label={`Main branch of ${target.name}`}
-              value={target.main}
+              label={`Default branch of ${target.name}`}
+              value={target.defaultBranch}
               mono
               className="self-start"
               options={(readOf(target.name)?.branches ?? []).map((b) => ({
                 value: b.name,
                 label: b.name,
               }))}
-              onChange={(main) =>
-                main !== target.main &&
-                change.mutate(() => client.home.setRepoMain(project.id, target.name, main), {
+              onChange={(branch) =>
+                branch !== target.defaultBranch &&
+                change.mutate(() => client.home.setRepoDefault(project.id, target.name, branch), {
                   onSuccess: close,
                 })
               }
@@ -177,6 +183,19 @@ export function Repos() {
         }
         onClose={close}
       />
+      <Confirm
+        open={changing?.what === "target"}
+        title={`Stop ${changing?.target ?? ""} being a target of ${changing?.repo ?? ""}?`}
+        body="Nothing merges into it any more. Its branch stays in git, as it is. Refused while a merge request into it is open."
+        action="Remove"
+        onConfirm={() =>
+          changing?.target &&
+          change.mutate(() =>
+            client.home.removeTarget(project.id, changing.repo, changing.target ?? ""),
+          )
+        }
+        onClose={close}
+      />
     </div>
   );
 }
@@ -184,8 +203,8 @@ export function Repos() {
 const count = (r: Repo) =>
   `${r.branches.length} ${r.branches.length === 1 ? "branch" : "branches"}`;
 
-/** A code repo's card: its name as words, its folder, its main branch and
- * branch count, and what keeps agents from using it. */
+/** A code repo's card: its name as words, its folder, its default branch and
+ * branch count, what keeps agents from using it, and its other targets. */
 function RepoCard({
   project,
   repo: r,
@@ -197,9 +216,9 @@ function RepoCard({
   repo: Project["repos"][number];
   read?: Repo;
   deployed: boolean;
-  onChange: (what: Changing["what"], repo: string) => void;
+  onChange: (what: Changing["what"], repo: string, target?: string) => void;
 }) {
-  const noMain = read && !read.branches.some((b) => b.name === r.main);
+  const has = (branch: string) => !read || read.branches.some((b) => b.name === branch);
   return (
     <Frame
       project={project}
@@ -215,13 +234,36 @@ function RepoCard({
         <span className="text-[13px] text-err">{r.problem}</span>
       ) : (
         <span className="text-[12.5px] text-tx3">
-          <span className="font-mono">{r.main}</span>
+          <span className="font-mono">{r.defaultBranch}</span> (default)
           {read && ` · ${count(read)}`}
         </span>
       )}
-      {noMain && (
+      {!has(r.defaultBranch) && (
         <span className="text-[13px] text-err">
-          No branch {r.main}: pick its main branch, or agents can't start.
+          No branch {r.defaultBranch}: pick its default branch, or agents can't start.
+        </span>
+      )}
+      {r.targets.length > 0 && (
+        <span className="relative z-10 flex flex-wrap items-center gap-1.5 text-[12.5px] text-tx4">
+          Targets
+          {r.targets.map((t) => (
+            <span
+              key={t.name}
+              title={`Made by ${t.madeBy.split("@")[0]} at ${t.from.slice(0, 7)}, ${when(t.createdAt)}${has(t.name) ? "" : ". Its branch is gone: remove it, or make it again"}`}
+              className={`flex items-center gap-1 rounded-[5px] bg-raised py-px pr-0.5 pl-1.5 font-mono text-[11.5px] ${has(t.name) ? "text-tx3" : "text-err"}`}
+            >
+              {t.name}
+              {!has(t.name) && " (gone)"}
+              <button
+                type="button"
+                aria-label={`Remove target ${t.name}`}
+                onClick={() => onChange("target", r.name, t.name)}
+                className="grid size-4 place-items-center rounded text-tx4 hover:bg-hover hover:text-tx"
+              >
+                ×
+              </button>
+            </span>
+          ))}
         </span>
       )}
     </Frame>
@@ -309,8 +351,8 @@ function RepoMenu({
               Locate…
             </Menu.Item>
           ) : (
-            <Menu.Item className={item} onSelect={() => onChange("main", repo)}>
-              Main branch…
+            <Menu.Item className={item} onSelect={() => onChange("default", repo)}>
+              Default branch…
             </Menu.Item>
           )}
           <Menu.Item className={item} disabled={deployed} onSelect={() => onChange("rename", repo)}>

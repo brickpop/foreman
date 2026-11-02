@@ -219,11 +219,11 @@ func TestPrepareRefusals(t *testing.T) {
 	}
 
 	master := codeRepo(t, "master")
-	if err := g.Prepare(ctx, master, filepath.Join(t.TempDir(), "x"), "wt/mara/main", "main"); err == nil || !strings.Contains(err.Error(), "pick it in Project settings → Code repos") {
-		t.Errorf("a repo without main: %v", err)
+	if err := g.Prepare(ctx, master, filepath.Join(t.TempDir(), "x"), "wt/mara/main", "main"); err == nil || !strings.Contains(err.Error(), "pick it in the project's Repos") {
+		t.Errorf("a repo without its default branch: %v", err)
 	}
 	if err := g.Prepare(ctx, master, filepath.Join(t.TempDir(), "x"), "wt/mara/main", "master"); err != nil {
-		t.Errorf("with its own main branch named: %v", err)
+		t.Errorf("with its own default branch named: %v", err)
 	}
 
 	empty := repo(t)

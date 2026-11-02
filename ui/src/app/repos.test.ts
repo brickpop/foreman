@@ -64,7 +64,7 @@ describe("worktrees", () => {
     {
       name: "api",
       project: false,
-      main: "main",
+      defaultBranch: "main",
       branches: [
         branch("main"),
         branch("wt/tove/LED-44", { agent: "tove", ahead: 2, uncommitted: true }),
@@ -75,10 +75,10 @@ describe("worktrees", () => {
     {
       name: "web",
       project: false,
-      main: "trunk",
+      defaultBranch: "trunk",
       branches: [branch("trunk"), branch("wt/tove/LED-44", { agent: "tove" })],
     },
-    { name: "project", project: true, main: "main", branches: [branch("main")] },
+    { name: "project", project: true, defaultBranch: "main", branches: [branch("main")] },
   ] as Repo[];
 
   it("gives each agent its checked-out branch per repo", () => {

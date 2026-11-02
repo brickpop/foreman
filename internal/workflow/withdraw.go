@@ -157,9 +157,9 @@ func (w *Workflow) dropDrafts(ctx context.Context, reviewID string) int {
 }
 
 // supersede withdraws the other open reviews of a merged merge request's
-// lead whose every open merge request main now holds (git.Merged): what the
+// lead whose every open merge request its target now holds (git.Merged): what the
 // CEO merged holds all of them (the CEO, 2026-10-22: merge one, the others
-// it contains go). One main lacks something of stays open.
+// it contains go). One a target lacks something of stays open.
 func (w *Workflow) supersede(ctx context.Context, merged store.MergeRequest) {
 	open, err := w.MergeRequests.Open(ctx)
 	if err != nil {
@@ -184,7 +184,7 @@ func (w *Workflow) supersede(ctx context.Context, merged store.MergeRequest) {
 	}
 	for _, id := range ids {
 		v, err := w.openReview(ctx, id)
-		if err != nil || !w.heldByMain(ctx, v) {
+		if err != nil || !w.heldByTargets(ctx, v) {
 			continue
 		}
 		lead := v.MergeRequests[len(v.MergeRequests)-1]
@@ -195,18 +195,18 @@ func (w *Workflow) supersede(ctx context.Context, merged store.MergeRequest) {
 	}
 }
 
-// heldByMain says whether main holds every open merge request of a review:
-// merging any of them would change nothing.
-func (w *Workflow) heldByMain(ctx context.Context, v Review) bool {
+// heldByTargets says whether each open merge request of a review is held by
+// its target: merging any of them would change nothing.
+func (w *Workflow) heldByTargets(ctx context.Context, v Review) bool {
 	for _, mr := range v.MergeRequests {
 		if mr.State != store.MergeOpen {
 			continue
 		}
-		main, dir, err := w.repoOf(mr)
+		target, dir, err := w.repoOf(mr)
 		if err != nil {
 			return false
 		}
-		if held, err := w.Git.Merged(ctx, dir, main, mr.Branch); err != nil || !held {
+		if held, err := w.Git.Merged(ctx, dir, target, mr.Branch); err != nil || !held {
 			return false
 		}
 	}

@@ -83,9 +83,9 @@ export interface Withdrawn {
  */
 export interface RepoDiff {
   repo: string;
-  main: string;
+  target: string; // the branch it merges into
   head: string; // the branch's head the diff was made at
-  since: string; // with since: the head it starts from ("" for against main)
+  since: string; // with since: the head it starts from ("" for against its target)
   diff: string;
   /**
    * Gone: a decided repo whose change can't be shown (not recorded, or

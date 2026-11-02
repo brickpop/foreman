@@ -3,11 +3,10 @@ import { Agent } from "../screens/Agent";
 import { ChiefOfStaff } from "../screens/ChiefOfStaff";
 import { Dashboard } from "../screens/Dashboard";
 import { Project, ProjectHome } from "../screens/Project";
-import { Activity } from "../screens/project/Activity";
 import { Board } from "../screens/project/Board";
-import { Deployment } from "../screens/project/Deployment";
 import { Inbox } from "../screens/project/Inbox";
 import { ProjectSettings } from "../screens/project/ProjectSettings";
+import { ProjectTeam } from "../screens/project/ProjectTeam";
 import { Repo } from "../screens/project/Repo";
 import { Repos } from "../screens/project/Repos";
 import { Review } from "../screens/project/Review";
@@ -17,7 +16,7 @@ import { Settings, SettingsFrame } from "../screens/Settings";
 import { Team } from "../screens/Team";
 import { cosSearch } from "./chiefOfStaff";
 import { type TeamTab, teamTabs } from "./model";
-import { type DeploymentView, deploymentViews } from "./project";
+import { type TeamView, teamViews } from "./project";
 import { Shell } from "./Shell";
 import { settingsTab } from "./settings";
 
@@ -75,8 +74,9 @@ const reposRoute = createRoute({ ...section("repos"), component: Repos });
 
 const repoRoute = createRoute({
   ...section("repos/$repo"),
-  // branch: the one read; path: the file open (none: the README); history:
-  // the branch's history instead of its files.
+  // branch: the one read; path: the file open, or a folder ending in "/" (its
+  // page: a link to it); none: the README; history: the branch's history
+  // instead of its files.
   validateSearch: (
     s: Record<string, unknown>,
   ): { branch?: string; path?: string; history?: true } => ({
@@ -87,15 +87,35 @@ const repoRoute = createRoute({
   component: Repo,
 });
 
-const deployment = createRoute({
-  ...section("deployment"),
+// The team on the project: its agents, its activity, its work in flight and
+// merged (the CEO, 2026-11-03: Deployment and Activity were two sections).
+const teamView = (v: unknown) =>
+  teamViews.some((t) => t.view === v) ? (v as TeamView) : undefined;
+const teamSection = createRoute({
+  ...section("team"),
   // No view in the URL: the page picks one from whether there are agents.
-  validateSearch: (s: Record<string, unknown>): { view?: DeploymentView } => ({
-    view: deploymentViews.some((v) => v.view === s.view) ? (s.view as DeploymentView) : undefined,
-  }),
-  component: Deployment,
+  validateSearch: (s: Record<string, unknown>): { view?: TeamView } => ({ view: teamView(s.view) }),
+  component: ProjectTeam,
 });
-const activity = createRoute({ ...section("activity"), component: Activity });
+// The old sections' links open their view of it.
+const oldDeployment = createRoute({
+  ...section("deployment"),
+  validateSearch: (s: Record<string, unknown>): { view?: TeamView } => ({ view: teamView(s.view) }),
+  beforeLoad: ({ params, search }) => {
+    throw redirect({ to: "/projects/$project/team", params, search, replace: true });
+  },
+});
+const oldActivity = createRoute({
+  ...section("activity"),
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/projects/$project/team",
+      params,
+      search: { view: "activity" },
+      replace: true,
+    });
+  },
+});
 const projectSettings = createRoute({ ...section("settings"), component: ProjectSettings });
 
 // Settings: its tabs, then the teams' and their agents' pages, which live
@@ -185,8 +205,9 @@ export const router = createRouter({
       board,
       reposRoute,
       repoRoute,
-      deployment,
-      activity,
+      teamSection,
+      oldDeployment,
+      oldActivity,
       projectSettings,
     ]),
     chiefOfStaff,

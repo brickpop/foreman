@@ -47,7 +47,7 @@ No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side,
 | H3 | 15.5px / 600, anchor target (new: the prototype rendered no H3) |
 | Paragraph | 15.5px / 1.65 / `--tx2`, with inline emphasis, code and links |
 | List item | `–` bullet in `--tx4` in an 18px gutter |
-| Link to another entry | Opens it in the reader (`--accTx`), resolved by the engine ([Wiki engine → Rendering](../architecture/wiki-engine.md#rendering)). External links open in a new tab |
+| Link to another entry | Opens it in the reader (`--accTx`), resolved by the engine ([Wiki engine → Rendering](../architecture/wiki-engine.md#rendering)); a path written percent-encoded (`my%20plan.md`) names the file as it is named (`my plan.md`; the CEO, 2026-11-03). External links open in a new tab |
 | Link to an entry not written yet | `--tx3`, dotted underline, titled "Not written yet"; still opens (and falls back to `index.md`) |
 | Link above the wiki (e.g. into a code repo) | Text, `--tx3` with a dotted underline, titled `<href> is outside the wiki`: never followed |
 | Link to a file the wiki carries | An image opens in a new tab; any other file (a PDF, a spreadsheet) is text like a link above the wiki, titled `Foreman doesn't show <path>`: Foreman serves the wiki's images only |

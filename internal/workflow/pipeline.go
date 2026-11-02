@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/store"
 )
 
@@ -71,7 +72,7 @@ func (t tool) handed(ctx context.Context, branch string) {
 }
 
 // integrate marks "integrated" every handed work item whose branch head one
-// of the lead's lead/<team>/* branches contains, in every repo that has the
+// of the lead's lead/<project>/<team>/* branches contains, in every repo that has the
 // branch. Called after the lead's merge and commit.
 func (t tool) integrate(ctx context.Context) {
 	items, err := t.w.WorkItems.ForDeployment(ctx, t.c.Deployment.ID)
@@ -95,7 +96,7 @@ func (t tool) integrate(ctx context.Context) {
 // contained reports whether a lead branch contains branch in every repo that
 // has it (and there is at least one).
 func (t tool) contained(ctx context.Context, branch string) (bool, error) {
-	prefix := "lead/" + t.c.Team.ID + "/"
+	prefix := git.BranchPrefix(t.project.ID, "", t.c.Team.ID, true)
 	found := false
 	for _, r := range t.worktrees() {
 		if !t.w.Git.HasBranch(ctx, r.dir, branch) {

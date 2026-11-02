@@ -13,7 +13,12 @@ import (
 // Agents deploys teams and lists their instances (implemented by the
 // instance manager).
 type Agents interface {
-	Deploy(ctx context.Context, team, project string) (store.Deployment, error)
+	// Deploy deploys team on project; fresh starts every agent on a new
+	// conversation instead of continuing its last one there.
+	Deploy(ctx context.Context, team, project string, fresh bool) (store.Deployment, error)
+	// Continuing lists the team's agents that would continue an earlier
+	// conversation on project when deployed there.
+	Continuing(ctx context.Context, team, project string) ([]string, error)
 	Stop(ctx context.Context, deployment string) error
 	List(ctx context.Context) ([]store.Instance, error)
 	// DeploymentsIn lists the deployments with status (active or stopped).
@@ -31,6 +36,7 @@ type Agents interface {
 type deployRequest struct {
 	Team    string `json:"team"`
 	Project string `json:"project"`
+	Fresh   bool   `json:"fresh"`
 }
 
 func agentRoutes(mux *http.ServeMux, a Agents) {
@@ -92,17 +98,33 @@ func agentRoutes(mux *http.ServeMux, a Agents) {
 		}
 		writeJSON(w, http.StatusOK, list)
 	})
+	mux.HandleFunc("GET /api/deployments/continuing", func(w http.ResponseWriter, r *http.Request) {
+		team, project := r.URL.Query().Get("team"), r.URL.Query().Get("project")
+		if team == "" || project == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?team=&project=")
+			return
+		}
+		agents, err := a.Continuing(r.Context(), team, project)
+		switch {
+		case errors.Is(err, instances.ErrInvalid):
+			writeError(w, http.StatusBadRequest, "INVALID", err.Error())
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		default:
+			writeJSON(w, http.StatusOK, map[string][]string{"agents": append([]string{}, agents...)})
+		}
+	})
 	mux.HandleFunc("POST /api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		var req deployRequest
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {team, project}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {team, project, fresh}")
 			return
 		}
 		if req.Team == "" || req.Project == "" {
 			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "team and project are required")
 			return
 		}
-		dep, err := a.Deploy(r.Context(), req.Team, req.Project)
+		dep, err := a.Deploy(r.Context(), req.Team, req.Project, req.Fresh)
 		switch {
 		case errors.Is(err, store.ErrActive):
 			writeError(w, http.StatusConflict, "ALREADY_DEPLOYED", "This team is already deployed on this project")

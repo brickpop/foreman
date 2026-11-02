@@ -3,7 +3,6 @@ import type { Deployment, Instance } from "../api/client";
 import { replacingLine, sessionsEnd } from "./model";
 import {
   deploymentOn,
-  deploymentView,
   latestFirst,
   latestStopped,
   projectHome,
@@ -11,6 +10,7 @@ import {
   sections,
   sessionOf,
   teamOn,
+  teamView,
 } from "./project";
 
 const inst = (id: string, deploymentId: string) => ({ id, deploymentId }) as Instance;
@@ -20,11 +20,10 @@ describe("a project's page", () => {
     expect(sections.map((s) => s.label)).toEqual([
       "Session",
       "Inbox",
-      "Wiki",
-      "Board",
       "Repos",
-      "Deployment",
-      "Activity",
+      "Board",
+      "Wiki",
+      "Team",
       "Settings",
     ]);
   });
@@ -111,17 +110,18 @@ describe("the projects, latest first", () => {
   });
 });
 
-describe("deploymentView", () => {
+describe("teamView", () => {
   it("opens on Agents while there are agents, else In flight", () => {
-    expect(deploymentView(undefined, true)).toBe("agents");
-    expect(deploymentView(undefined, false)).toBe("inflight");
+    expect(teamView(undefined, true)).toBe("agents");
+    expect(teamView(undefined, false)).toBe("inflight");
   });
 
   it("keeps the view asked for, and ignores an unknown one", () => {
-    expect(deploymentView("merged", true)).toBe("merged");
-    expect(deploymentView("agents", false)).toBe("agents");
+    expect(teamView("merged", true)).toBe("merged");
+    expect(teamView("agents", false)).toBe("agents");
+    expect(teamView("activity", false)).toBe("activity");
     for (const asked of ["Merged", "", 3, ["merged"]]) {
-      expect(deploymentView(asked, true)).toBe("agents");
+      expect(teamView(asked, true)).toBe("agents");
     }
   });
 });

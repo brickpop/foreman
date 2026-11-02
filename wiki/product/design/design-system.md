@@ -115,7 +115,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 
 - Page padding: one rule everywhere, **24px sides**, 24px top (20px on the Wiki and a review's header) and 48px bottom, `24px 24px 48px` (the CEO, 2026-10-31: compact and consistent; 48px sides until then). Width caps belong to text meant to be read, not to padding: the wiki entry and a project's description 780px, the Inbox, Team deployments and Members 920px, Settings and Playbook 760px, the Dashboard 1080px ([Project page → Layout](../features/project-page.md#layout)). Under 760px the Dashboard's sides are 16px.
 - Max widths: Dashboard 1080px; Team Deployments and Members, the Inbox 920px; Settings 760px; Project settings' left column 520px; Playbook 760px; File 860px; the wiki article and a project's description 780px; `wiki.toml` panel 620px.
-- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between the Deployment section's parts; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
+- Vertical gaps: 40px between Dashboard sections; 36px between Settings sections and between the Team section's parts; 28 / 24 / 20px elsewhere. List gaps 10px; inline gaps 6–14px.
 - Row padding: list rows `14px 4px` or `16px 6px`; table-like rows `12px 16px`; settings rows `14px 0` or `12px 0` with a bottom border.
 
 ## Surfaces
@@ -171,7 +171,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--line2` border (`--err` on hover), `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |
 | **Ghost** | Transparent, transparent border, `--tx3` | "Open session" on the Dashboard approval request panels |
-| **Segmented** | On: `--accSoft`, `--accTx`, 500 (the CEO, 2026-11-02: the one chosen stands out). Off: transparent, `--tx3` | Board switcher, Deployment's views, a review's change, Theme |
+| **Segmented** | On: `--accSoft`, `--accTx`, 500 (the CEO, 2026-11-02: the one chosen stands out). Off: transparent, `--tx3` | Board switcher, the Team section's views, a review's change, Theme |
 | **Option** | On: `--accSoft` background, `--acc` border. Off: transparent, `--line2` | Harness, prompt switcher, Deploy dialog choices |
 | **Select** (`components/Select.tsx`, the one dropdown; the CEO, 2026-10-18) | A trigger like an input (`--panel`, 1px `--line2`, radius 7, 13px, the chosen label and a `▾`; `--acc` border while open), opening a menu like the Board's (`--panel`, `--line2`, radius 8, `--shadow`, at least the trigger's width, at most 360px tall, scrolling): one row per choice, `✓` beside the chosen one, a detail on the right in `--tx4`. Arrow keys and typing a letter move through it | The repo picker, a project's profile, a new profile's harness, the Podman machine's memory and CPUs. No native `<select>` |
 | **Icon close** | Transparent, no border, `--tx3`, 16–18px `×` | Drawers, side sheet |

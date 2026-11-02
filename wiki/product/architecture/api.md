@@ -30,7 +30,8 @@ PUT    /api/projects/:id/profile              {profile} → the profile its agen
 PUT    /api/projects/:id/archived             {archived} → archives the project (409 DEPLOYED while a team is deployed on it) or unarchives it
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its default branch and branches (ahead of the default, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
-GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge, markdown, frontmatter, body} (over 1 MB: no text; a .md or .markdown file has its frontmatter apart, as the wiki reader's fields, and body is its text without it)
+GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge, markdown, frontmatter, body, links, headings} (over 1 MB: no text; a .md or .markdown file has its frontmatter apart, as the wiki reader's fields, body is its text without it, links its internal links resolved against the commit ({raw, to, anchor, exists, folder, image, outside}: relative from its folder, root-absolute from the nearest wiki.toml above it, else the repo root) and headings their ids)
+GET    /api/projects/:id/repos/:repo/image    ?ref=&path= an image file at a ref (the wiki's image types, up to 10 MB; a symlink never), under the wiki images' headers; 404 for anything else
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next, total} (total: the commits it holds in all), 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
 GET    /api/folders                           ?path= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
@@ -45,7 +46,8 @@ DELETE /api/cos                              stops it (the CEO left the page); t
 POST   /api/cos/proposal                     {id}: writes proposal id, the one on screen; one commit → the team; 409 STALE (replaced, or none), 409 CONFLICT (the team changed since: the CoS is asked again), 400 INVALID
 
 GET    /api/deployments[?status=stopped]      the active deployments, or the stopped ones (400 for another status)
-POST   /api/deployments                       {team, project}; replaces the team on the project, if another (stopped as by DELETE); 201 the deployment; 409 ALREADY_DEPLOYED (this pair is active), NOT_READY; 400 CANT_DEPLOY
+GET    /api/deployments/continuing?team=&project=  {agents}: the team's agents whose first start there would continue an earlier conversation (Deploy's Start fresh); 400 INVALID for an unknown team or a project without a usable profile
+POST   /api/deployments                       {team, project, fresh}; fresh (default false) starts every agent on a new conversation instead of continuing its last one there; replaces the team on the project, if another (stopped as by DELETE); 201 the deployment; 409 ALREADY_DEPLOYED (this pair is active), NOT_READY; 400 CANT_DEPLOY
 DELETE /api/deployments/:id                   stop
 GET    /api/instances                         the instances of the active deployments, with their status and activity line (doing)
 GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness
@@ -107,8 +109,8 @@ GET    /api/events                            SSE: requests, status, file change
 ```
 
 
-A project's Activity section pages its team's traffic with `/api/activity?deployment=` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
-Its Repos section reads its repos read-only with `/api/projects/:id/repos…` ([Repos](../features/repos.md)); its Deployment section lists the agents' worktrees from the same list, each branch naming the `agent` that has it checked out ([Project deployment](../features/project-deployment.md)).
+A project's Team section's Activity view pages its team's traffic with `/api/activity?deployment=` and lists its older sessions with `/api/deployments?status=stopped` ([Project activity](../features/project-activity.md)).
+Its Repos section reads its repos read-only with `/api/projects/:id/repos…` ([Repos](../features/repos.md)); its Team section lists the agents' worktrees from the same list, each branch naming the `agent` that has it checked out ([Project team](../features/project-team.md)).
 The project routes answer with the project as it is now; a refusal is 400 INVALID, 409 EXISTS or 409 DEPLOYED with the reason. Removing a project deletes its history too ([Add a project → Removing a project](../features/add-project.md#removing-a-project)).
 Resource ids: project = its name (unique in any case); team = team id; instance = `agent@project` (one team per project at a time; agent ids are unique within a team only, so the agent behind an instance is found through its deployment's team, see [Team definition](../models/team-definition.md#schema)); deployment = `team@project`.
 
@@ -128,7 +130,7 @@ Resource ids: project = its name (unique in any case); team = team id; instance 
 | 404 `NOT_FOUND` | Unknown project, team, instance, entry…, or an endpoint the server doesn't have (never the web app's page) |
 | 409 `VERSION_CONFLICT` | Guarded write against a stale version |
 | 409 `ALREADY_DEPLOYED` | Deploying a team to a project it's already on |
-| 400 `CANT_DEPLOY` | A deploy that can't go ahead: the team or the project has problems (a code repo missing or changed is one), or the same team is deployed on another project that shares a repo |
+| 400 `CANT_DEPLOY` | A deploy that can't go ahead: the team or the project has problems (a code repo missing or changed is one) |
 | 409 `NOT_READY` | Deploying or waking an agent before Podman runs and the instances are restored ([First run](../features/first-run.md)) |
 | 500 `SERVER_ERROR` | Anything unexpected (logged with details server-side) |
 

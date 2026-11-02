@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 )
@@ -26,10 +27,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	if err != nil {
 		return
 	}
-	prefix := "wt/" + inst.AgentID + "/"
-	if lead {
-		prefix = "lead/" + team + "/"
-	}
+	prefix := git.BranchPrefix(projectID, inst.AgentID, team, lead)
 	unmerged := map[string][]string{} // branch → its repos
 	var uncommitted []string
 	for _, r := range worktreesIn(project, inst.SandboxPath) {

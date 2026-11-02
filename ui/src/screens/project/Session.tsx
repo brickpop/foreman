@@ -35,6 +35,7 @@ import {
 } from "../../app/sessions";
 import { DeployDialog } from "../../components/DeployDialog";
 import { PromptIcon } from "../../components/icons";
+import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
 import { Button, CopyButton, Dot, Empty, LeadTag, Loading } from "../../components/ui";
@@ -249,6 +250,8 @@ function AgentTabs({
           </>
         )}
       </div>
+      {/* Only while some agent runs on an older prompt: the Team header always has it. */}
+      {roster.some((i) => i.behind) && <ReloadButton instances={roster} variant="small" />}
       <span ref={controlsSlot} className="flex shrink-0" />
     </nav>
   );

@@ -27,4 +27,4 @@ epic: workflow
 
 ## Left
 
-- A redeploy that continues conversations must not continue another team's: noted on [Continue conversations on redeploy](../continue-conversations-on-redeploy.md). Today every new deployment starts fresh, so nothing leaks yet.
+- A redeploy that continues conversations must not continue another team's: noted on [Continue conversations on redeploy](./continue-conversations-on-redeploy.md). Today every new deployment starts fresh, so nothing leaks yet.

@@ -84,25 +84,27 @@ describe("Changes", () => {
   it("writes a merge request's link line", () => {
     const mr = {
       repo: "web",
-      branch: "lead/atlas/integration",
+      branch: "lead/ledger/atlas/integration",
       target: "main",
       checksStatus: "pass",
     } as MergeRequest;
-    expect(linkLine(mr, "forgejo")).toBe("web · lead/atlas/integration → main · checks pass");
+    expect(linkLine(mr, "forgejo")).toBe(
+      "web · lead/ledger/atlas/integration → main · checks pass",
+    );
     expect(linkLine({ ...mr, forgePrNumber: 128 }, "forgejo")).toBe(
-      "PR #128 on Forgejo · web · lead/atlas/integration → main · checks pass",
+      "PR #128 on Forgejo · web · lead/ledger/atlas/integration → main · checks pass",
     );
     expect(linkLine({ ...mr, conflicting: true }, "none")).toBe(
-      "web · lead/atlas/integration → main · conflicts with main",
+      "web · lead/ledger/atlas/integration → main · conflicts with main",
     );
     expect(linkLine({ ...mr, checksStatus: "" }, "none")).toBe(
-      "web · lead/atlas/integration → main",
+      "web · lead/ledger/atlas/integration → main",
     );
     expect(linkLine({ ...mr, checksStatus: "running", target: "develop" }, "none")).toBe(
-      "web · lead/atlas/integration → develop · checks running",
+      "web · lead/ledger/atlas/integration → develop · checks running",
     );
     expect(linkLine({ ...mr, conflicting: true, target: "develop" }, "none")).toBe(
-      "web · lead/atlas/integration → develop · conflicts with develop",
+      "web · lead/ledger/atlas/integration → develop · conflicts with develop",
     );
   });
 });

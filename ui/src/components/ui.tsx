@@ -24,7 +24,7 @@ const buttonSizes: Partial<Record<keyof typeof buttonVariants, string>> = {
   tiny: "rounded-[5px] px-2 py-0.5 text-xs",
 };
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof buttonVariants;
 };
 

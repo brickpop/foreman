@@ -16,18 +16,18 @@ Acceptance:
 - [ ] `foreman` serves the UI on `localhost:8888`, and `~/.foreman/config/` exists as a git repo (the global repo). A second `foreman` only prints the first one's URL.
 - [ ] The [Add a project](./features/add-project.md) dialog creates the project repo `~/workspace/foreman/ledger/project/` (`git init`, `project.toml`, a starter wiki) and adds `~/dev/ledger-api` to the project's record by its path. Nothing is cloned, and nothing is written in `~/dev/ledger-api` but its `.git`.
 - [ ] The [Chief of Staff](./features/chief-of-staff.md) "Create a team" flow drafts a team from the purpose and shows it in the preview beside its terminal, one tab per member; the CEO's **Create Atlas** writes `~/.foreman/config/teams/atlas.toml`, one commit in the global repo, and Atlas appears on the Dashboard and in Settings → Teams within 1 s. A draft that breaks the team file's invariants (a name already used) is never shown.
-- [ ] [Deploying](./features/deploy-team.md) Atlas to ledger creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/atlas/integration` for the lead, `wt/<agent>/main` for members), and every instance reaches `running` or `idle`.
+- [ ] [Deploying](./features/deploy-team.md) Atlas to ledger creates one [deployment](./models/deployment.md), one [instance](./models/instance.md) per member, one git worktree per instance and code repo (on `lead/ledger/atlas/integration` for the lead, `wt/<project>/<agent>/main` for members), and every instance reaches `running` or `idle`.
 
 ## 2. Delegate through the lead
 
-In ledger's Session, open Mara's tab and type to her: "Add idempotency keys to POST /settle". Mara asks Tove, and Tove builds in `wt/tove/LED-44`. Tove hands off to Mara, who integrates. The board card moves.
+In ledger's Session, open Mara's tab and type to her: "Add idempotency keys to POST /settle". Mara asks Tove, and Tove builds in `wt/ledger/tove/LED-44`. Tove hands off to Mara, who integrates. The board card moves.
 
 Acceptance:
 - [ ] Text typed in Mara's terminal reaches Mara's harness stdin.
 - [ ] Mara's `ask(tove, …)` appears as a [team message](./models/team-message.md), in the project's [Activity](./features/project-activity.md) (who calls whom, and the exchange).
-- [ ] Tove's `commit(…)` lands on `wt/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
+- [ ] Tove's `commit(…)` lands on `wt/ledger/tove/LED-44` in Tove's worktree, authored as Tove; no other agent's worktree and not the CEO's checkout change.
 - [ ] Inside Tove's container, `git status`, `diff` and `log` work, and `git commit`, `checkout` and `merge` fail (the repo's `.git` is read-only).
-- [ ] Tove's `handoff(mara, wt/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Deployment](./features/project-deployment.md) section, under In flight.
+- [ ] Tove's `handoff(mara, wt/ledger/tove/LED-44, …)` creates a [work item](./models/work-item.md) at stage 1 (no request: handoffs never need the CEO), visible in the project's [Deployment](./features/project-team.md) section, under In flight.
 - [ ] Tove's `contribute(finding, …)` writes a note in `~/workspace/foreman/ledger/project/wiki/inbox/` with Tove as author, and Mara receives `⇄ Tove contributed: …`.
 - [ ] When the lead updates the card's `status` in the wiki, the [Board](./features/board.md) shows it in the new column within 1 s.
 
@@ -51,7 +51,7 @@ Acceptance:
 
 ## 5. Merge review
 
-Mara calls `request_merge("lead/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO reviews it in Foreman and merges to main, requests changes with comments, or dismisses it with a reason; or creates a PR on Forgejo and merges there.
+Mara calls `request_merge("lead/ledger/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO reviews it in Foreman and merges to main, requests changes with comments, or dismisses it with a reason; or creates a PR on Forgejo and merges there.
 
 Acceptance:
 - [ ] `request_merge` from the lead runs the project checks and creates a [merge request](./models/merge-request.md) for each repo with new commits, titled from the entry and carrying every integrated work item (they leave "In flight" and are listed under it). Nothing is pushed to the forge.
@@ -63,7 +63,7 @@ Acceptance:
 - [ ] On a repo without a forge, Create PR is not offered.
 - [ ] Dismiss (the work isn't wanted) keeps the team working (its lead told to stop, with an optional note), or stops it, keeping or dropping the branches (dropped ones recoverable under `refs/foreman/dismissed/`; never under a team left running); closes the PR if there is one; its work items leave In flight.
 - [ ] A non-lead calling `request_merge` is refused; so is an entry that doesn't exist in the wiki.
-- [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<own team>/*` is refused.
+- [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<project>/<own team>/*` is refused.
 - [ ] When one merge request is merged, the lead of every other open one on the same repo gets a "main moved" line asking it to merge `main` in with `merge("main")`; after that, `request_merge` on the same branch refreshes the existing merge request (checks rerun, its PR pushed again if it has one) instead of creating a new one.
 
 ## 6. Challenge team finding

@@ -325,3 +325,30 @@ func TestCreateBranch(t *testing.T) {
 		t.Error("main was moved")
 	}
 }
+
+// An agent's branches carry its project, so one team on two projects that
+// share a repo never shares a branch.
+func TestBranchNames(t *testing.T) {
+	for _, tc := range []struct {
+		project, agent, team string
+		lead                 bool
+		prefix, home         string
+	}{
+		{"ledger", "tove", "atlas", false, "wt/ledger/tove/", "wt/ledger/tove/main"},
+		{"ledger", "mara", "atlas", true, "lead/ledger/atlas/", "lead/ledger/atlas/integration"},
+		{"suite", "mara", "atlas", true, "lead/suite/atlas/", "lead/suite/atlas/integration"},
+	} {
+		if got := BranchPrefix(tc.project, tc.agent, tc.team, tc.lead); got != tc.prefix {
+			t.Errorf("prefix %+v: %q", tc, got)
+		}
+		if got := HomeBranch(tc.project, tc.agent, tc.team, tc.lead); got != tc.home || !IsHomeBranch(got) {
+			t.Errorf("home %+v: %q", tc, got)
+		}
+	}
+	// The old names, a topic, a part missing or another kind aren't anyone's home.
+	for _, b := range []string{"wt/tove/main", "lead/atlas/integration", "wt/ledger/tove/LED-44", "wt//tove/main", "wt/ledger//main", "lead/ledger/atlas/main", "wt/ledger/tove/integration", "release/ledger/x/main", "wt/ledger/tove/main/x"} {
+		if IsHomeBranch(b) {
+			t.Errorf("%s taken for a home branch", b)
+		}
+	}
+}

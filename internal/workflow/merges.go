@@ -40,7 +40,7 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 	if !t.c.Lead {
 		return teamtools.Refusal("not_lead", "only the lead requests merges: hand your work to the lead")
 	}
-	prefix := "lead/" + t.c.Team.ID + "/"
+	prefix := git.BranchPrefix(t.project.ID, "", t.c.Team.ID, true)
 	if !strings.HasPrefix(branch, prefix) || !git.ValidBranch(ctx, branch) {
 		return teamtools.Refusal("branch_not_allowed", "you request merges of your own lead branches only, %s<topic>", prefix)
 	}
@@ -284,7 +284,7 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, target, di
 	}
 	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: %s was merged into %s in %s, as one commit. %s", mr.Branch, target, mr.Repo, next))
 	if p, err := w.Config.Project(mr.ProjectID); err == nil && p.Default(mr.Repo) == target {
-		w.freshenDesks(ctx, dir, target)
+		w.freshenDesks(ctx, mr.ProjectID, dir, target)
 	}
 	w.supersede(ctx, mr)
 	open, err := w.MergeRequests.Open(ctx)
@@ -298,12 +298,13 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, target, di
 	}
 }
 
-// freshenDesks brings the repo's idle desks up to its new default branch,
-// def: every agent's home branch holding nothing def lacks, with nothing
+// freshenDesks brings the project's idle desks in the repo up to its new
+// default branch, def: every agent's home branch there (another project
+// sharing the repo has its own default) holding nothing def lacks, with nothing
 // uncommitted where it is checked out (git.Freshen). A desk with work stays
 // as it is.
-func (w *Workflow) freshenDesks(ctx context.Context, dir, def string) {
-	for _, prefix := range []string{"wt/", "lead/"} {
+func (w *Workflow) freshenDesks(ctx context.Context, project, dir, def string) {
+	for _, prefix := range []string{"wt/" + project + "/", "lead/" + project + "/"} {
 		branches, err := w.Git.Branches(ctx, dir, prefix)
 		if err != nil {
 			slog.Info("listing the idle desks", "repo", dir, "err", err)

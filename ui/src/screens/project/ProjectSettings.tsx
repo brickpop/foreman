@@ -18,7 +18,7 @@ import { Button, GroupCard } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Settings section (wiki/product/features/project-settings.md):
-// its configuration. The team on it is its Deployment section.
+// its configuration. The team on it is its Team section.
 
 export function ProjectSettings() {
   return <Configuration project={useProject()} />;
@@ -154,7 +154,7 @@ function Configuration({ project }: { project: Project }) {
             ],
             [
               "Enforced by Foreman",
-              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Deployment → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges.",
+              "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Team → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges.",
             ],
           ].map(([title, body]) => (
             <div key={title} className="flex flex-col gap-0.5">

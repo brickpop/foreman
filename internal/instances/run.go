@@ -114,7 +114,7 @@ func (m *Manager) start(id string, r *run) {
 		if !m.current(id, r) {
 			return false // stopped meanwhile: the stop set its status
 		}
-		inst.Status, inst.StartedAt, inst.StopReason = Running, time.Now(), ""
+		inst.Status, inst.StartedAt, inst.StopReason, inst.Fresh = Running, time.Now(), "", false
 		return true
 	})
 	go m.watch(id, r)

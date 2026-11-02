@@ -6,7 +6,7 @@ tags: [feature, ui, teams, runtime]
 
 # Deploy a team
 
-A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project, creating a [deployment](../models/deployment.md). A project has one team at most: deploying another one **replaces** the team there (the CEO, 2026-10-31). Opened from the [Team page](./team-page.md) and a Dashboard team card (team preset), the Dashboard header (nothing preset), or a project's [Session](./sessions.md) with no team and its [Deployment](./project-deployment.md) section (project preset, and the team that worked on the project last chosen at first, still changeable, when none is there now).
+A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project, creating a [deployment](../models/deployment.md). A project has one team at most: deploying another one **replaces** the team there (the CEO, 2026-10-31). Opened from the [Team page](./team-page.md) and a Dashboard team card (team preset), the Dashboard header (nothing preset), or a project's [Session](./sessions.md) with no team and its [Deployment](./project-team.md) section (project preset, and the team that worked on the project last chosen at first, still changeable, when none is there now).
 
 ## Content
 
@@ -14,7 +14,7 @@ A modal ([App shell](./app-shell.md#overlays)) that assigns a team to a project,
 - **Team** option group, only without a team preset.
 - **Project** option group. A project where the selected team is already deployed is disabled and labelled `<project> (already there)`; one with another team on it carries that team's name (`<project> · <Team>`, the name in `--tx4`).
 - **Replacing**: when the project chosen has another team, an attention box (`--attnSoft`, `--attnLine`, `--attnTx`) says so before Deploy: `Replaces <Team> on <project>: <n> sessions end. Worktrees and branches are kept.`
-- **Earlier conversations**: when the team's agents already have conversations on the chosen project (it worked there before), a checkbox, off by default: `Start fresh: the agents don't continue their earlier conversations here (kept on disk).` Unchecked, each agent continues its last conversation on the project (the CEO, 2026-11-02). Not shown when there are none.
+- **Earlier conversations**: when the team's agents already have conversations on the chosen project (it worked there before), a checkbox, off by default: `Start fresh: the agents don't continue their earlier conversations here (kept on disk).` Unchecked, each agent continues its last conversation on the project (the CEO, 2026-11-02). Not shown when there are none (`GET /api/deployments/continuing`). Built 2026-11-03.
 - Buttons: `Cancel`, and primary **`Deploy`**, disabled until team and project are set and the pair is new.
 
 ## Effect

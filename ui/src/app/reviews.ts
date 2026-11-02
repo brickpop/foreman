@@ -208,6 +208,14 @@ export function drafts(comments: ReviewComment[]): number {
   return comments.filter((c) => c.state === "draft").length;
 }
 
+/** What Merge asks first while drafts wait: a merge closes the review, and
+ * they go with it (the CEO, 2026-11-03). */
+export function lostDrafts(n: number): string {
+  return n === 1
+    ? "1 draft comment won't be sent and will be lost. Merge anyway?"
+    : `${n} draft comments won't be sent and will be lost. Merge anyway?`;
+}
+
 /**
  * The comment a click on a diff line starts: on the branch's side for a line
  * kept or added, the target's for a removed one (only against it: since the last

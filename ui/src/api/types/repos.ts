@@ -39,6 +39,11 @@ export interface File {
   markdown: boolean;
   frontmatter: wiki.Field[];
   body: string;
+  /**
+   * Its body's links, resolved, and its headings' ids (Markdown only).
+   */
+  links: Link[];
+  headings: wiki.Heading[];
 }
 /**
  * LogPage is a page of a ref's history, newest first; Next is the skip of the
@@ -48,4 +53,19 @@ export interface LogPage {
   commits: git.Commit[];
   next: number /* int */;
   total: number /* int */; // how many commits the history holds in all
+}
+/**
+ * Link is one link of a Markdown file's body, resolved against the commit, so
+ * the browser looks it up and never works the rules out itself. Raw is the
+ * lookup key: the href exactly as written. To is a path in the repo ("" for
+ * its root); Outside is a link out of the repo, shown as text.
+ */
+export interface Link {
+  raw: string;
+  to: string;
+  anchor: string; // the fragment without '#'
+  exists: boolean; // the commit has it
+  folder: boolean; // a folder: opened as its page
+  image: boolean; // a file served by …/image
+  outside: boolean; // climbs out of the repo
 }

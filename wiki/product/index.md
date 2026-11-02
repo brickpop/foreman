@@ -38,9 +38,9 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Wiki reader](./features/wiki-reader.md) (Wiki)
   - [Board](./features/board.md)
   - [Repos](./features/repos.md)
-  - [Project deployment](./features/project-deployment.md) (Deployment)
+  - [Project team](./features/project-team.md) (Team: agents, activity, in flight, merged)
   - [Project pipeline](./features/project-pipeline.md)
-  - [Project activity](./features/project-activity.md) (Activity)
+  - [Project activity](./features/project-activity.md) (Team → Activity)
   - [Project settings](./features/project-settings.md) (Settings)
   - [Add a project](./features/add-project.md)
 - Teams and agents

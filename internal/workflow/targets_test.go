@@ -78,21 +78,21 @@ func TestWorkLandsOnItsTarget(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	api := filepath.Join(f.root, "ledger", "api")
-	desk := f.git(api, "rev-parse", "wt/tove/main")
+	desk := f.git(api, "rev-parse", "wt/ledger/tove/main")
 
-	text := f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
-	if text != "Switched api, web to lead/atlas/fix. New in api (from release/1.0), web (from trunk)." {
+	text := f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
+	if text != "Switched api, web to lead/ledger/atlas/fix. New in api (from release/1.0), web (from trunk)." {
 		t.Errorf("switch: %q", text)
 	}
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "fix.go"), "package fix\n")
 	f.ok("mara", "commit", commits("api", "the fix"))
 	// Another lead branch, into main, open meanwhile.
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/other"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/other"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "other.go"), "package other\n")
 	f.ok("mara", "commit", commits("api", "other"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/other", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/other", "entry": "backlog/led-44.md"})
 
-	fix := map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"}
+	fix := map[string]string{"branch": "lead/ledger/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"}
 	if text := f.ok("mara", "request_merge", fix); text != "Review rev-2, api (mr-2) into release/1.0: waiting for the CEO." {
 		t.Fatalf("request: %q", text)
 	}
@@ -114,7 +114,7 @@ func TestWorkLandsOnItsTarget(t *testing.T) {
 	if out, err := runGit(api, "show", "main:fix.go"); err == nil {
 		t.Errorf("main got the fix too: %q", out)
 	}
-	if at := f.git(api, "rev-parse", "wt/tove/main"); at != desk {
+	if at := f.git(api, "rev-parse", "wt/ledger/tove/main"); at != desk {
 		t.Error("an idle desk followed a target other than the default")
 	}
 	if f.mr("mr-2").State != store.MergeMerged || f.mr("mr-1").State != store.MergeOpen {
@@ -124,7 +124,7 @@ func TestWorkLandsOnItsTarget(t *testing.T) {
 		if strings.Contains(m.Body, "release/1.0 moved") {
 			t.Errorf("told a merge request into main that release/1.0 moved: %q", m.Body)
 		}
-		if strings.Contains(m.Body, "was merged into") && !strings.Contains(m.Body, "lead/atlas/fix was merged into release/1.0 in api") {
+		if strings.Contains(m.Body, "was merged into") && !strings.Contains(m.Body, "lead/ledger/atlas/fix was merged into release/1.0 in api") {
 			t.Errorf("notice %q", m.Body)
 		}
 	}
@@ -136,12 +136,12 @@ func TestWorkLandsOnItsTarget(t *testing.T) {
 func TestIntoMustBeATargetOfEveryRepoWithNewCommits(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
 	for _, r := range []string{"api", "web"} {
 		writeFile(t, filepath.Join(f.wt("mara", r), "fix.go"), "package fix\n")
 	}
 	f.ok("mara", "commit", commits("api", "fix", "web", "fix"))
-	fix := map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"}
+	fix := map[string]string{"branch": "lead/ledger/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"}
 	if text := f.refused("mara", "request_merge", fix, "no_such_target"); !strings.Contains(text, "in web, which has no target release/1.0") {
 		t.Errorf("%q", text)
 	}
@@ -185,7 +185,7 @@ func TestRetargetReview(t *testing.T) {
 		repo, target string
 		want         error
 	}{
-		"not a target":         {"api", "wt/tove/main", ErrInvalid},
+		"not a target":         {"api", "wt/ledger/tove/main", ErrInvalid},
 		"another repo's":       {"web", "release/1.0", ErrNotOpen},
 		"a repo of no request": {"docs", "main", ErrNotOpen},
 	} {
@@ -199,7 +199,7 @@ func TestRetargetReview(t *testing.T) {
 	if mr := f.mr("mr-1"); mr.Target != "release/1.0" || mr.Conflicting || mr.Note != "" {
 		t.Errorf("merge request %+v", mr)
 	}
-	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || !strings.Contains(n.Body, "the CEO changed where lead/atlas/integration merges in api: into release/1.0, no longer main") {
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || !strings.Contains(n.Body, "the CEO changed where lead/ledger/atlas/integration merges in api: into release/1.0, no longer main") {
 		t.Errorf("notice %+v", n)
 	}
 	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); diffs[0].Target != "release/1.0" || !strings.Contains(diffs[0].Diff, "LED-44.go") {
@@ -219,17 +219,17 @@ func TestRetargetReview(t *testing.T) {
 func TestSwitchFromATarget(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.refused("tove", "switch", map[string]string{"branch": "wt/tove/x", "from": "nope"}, "no_such_target")
-	f.refused("tove", "switch", map[string]string{"branch": "wt/tove/x", "from": "wt/tove/main"}, "no_such_target")
-	text := f.ok("tove", "switch", map[string]string{"branch": "wt/tove/x", "from": "release/1.0"})
+	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "nope"}, "no_such_target")
+	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "wt/ledger/tove/main"}, "no_such_target")
+	text := f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "release/1.0"})
 	if !strings.Contains(text, "New in api (from release/1.0), web (from trunk).") {
 		t.Errorf("%q", text)
 	}
 	if _, err := runGit(f.wt("tove", "api"), "show", "HEAD:NEWS"); err == nil {
 		t.Error("started from main, not the release")
 	}
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/main"})
-	if text := f.ok("tove", "switch", map[string]string{"branch": "wt/tove/x", "from": "release/1.0"}); !strings.Contains(text, "It existed already, so from (release/1.0) changed nothing.") {
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/main"})
+	if text := f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "release/1.0"}); !strings.Contains(text, "It existed already, so from (release/1.0) changed nothing.") {
 		t.Errorf("again: %q", text)
 	}
 }
@@ -239,8 +239,8 @@ func TestSwitchFromATarget(t *testing.T) {
 func TestWorkInAnyTargetIsNotNew(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/x", "from": "release/1.0"})
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/x", "summary": "nothing"}, "nothing_new")
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "release/1.0"})
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/x", "summary": "nothing"}, "nothing_new")
 }
 
 // A dismissed review's branch still checked out goes back to the default
@@ -249,10 +249,10 @@ func TestDroppedBranchGoesToTheDefault(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	api := filepath.Join(f.root, "ledger", "api")
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "fix.go"), "package fix\n")
 	f.ok("mara", "commit", commits("api", "the fix"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"})
 	if _, err := f.w.DismissReview(ctx, "rev-1", Dismiss{DropBranches: true, StopTeam: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -280,17 +280,17 @@ func TestTargetsTool(t *testing.T) {
 func TestIntoMovesTheWholeReview(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
 	for _, r := range []string{"api", "web"} {
 		writeFile(t, filepath.Join(f.wt("mara", r), "fix.go"), "package fix\n")
 	}
 	f.ok("mara", "commit", commits("api", "fix", "web", "fix"))
-	fix := map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md"}
+	fix := map[string]string{"branch": "lead/ledger/atlas/fix", "entry": "backlog/led-44.md"}
 	f.ok("mara", "request_merge", fix) // api into main, web into trunk
 	// web's work reaches trunk outside Foreman: nothing new there any more,
 	// but its merge request is still open.
 	web := filepath.Join(f.root, "ledger", "web")
-	f.git(web, "update-ref", "refs/heads/trunk", "lead/atlas/fix")
+	f.git(web, "update-ref", "refs/heads/trunk", "lead/ledger/atlas/fix")
 	fix["into"] = "release/1.0"
 	if text := f.refused("mara", "request_merge", fix, "no_such_target"); !strings.Contains(text, "in web, which has no target release/1.0") {
 		t.Errorf("%q", text)
@@ -305,12 +305,12 @@ func TestIntoMovesTheWholeReview(t *testing.T) {
 func TestIntoATargetThatHoldsItIsMerged(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "fix.go"), "package fix\n")
 	f.ok("mara", "commit", commits("api", "fix"))
-	fix := map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md"}
+	fix := map[string]string{"branch": "lead/ledger/atlas/fix", "entry": "backlog/led-44.md"}
 	f.ok("mara", "request_merge", fix) // into main
-	f.git(filepath.Join(f.root, "ledger", "api"), "update-ref", "refs/heads/release/1.0", "lead/atlas/fix")
+	f.git(filepath.Join(f.root, "ledger", "api"), "update-ref", "refs/heads/release/1.0", "lead/ledger/atlas/fix")
 	fix["into"] = "release/1.0"
 	if text := f.ok("mara", "request_merge", fix); !strings.Contains(text, "api (mr-1) into release/1.0, which holds all of it already: counted as merged") || !strings.HasSuffix(text, ": nothing left for the CEO.") {
 		t.Errorf("%q", text)
@@ -330,7 +330,7 @@ func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
 	f.release()
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
-	head := f.git(filepath.Join(f.root, "ledger", "api"), "rev-parse", "lead/atlas/integration")
+	head := f.git(filepath.Join(f.root, "ledger", "api"), "rev-parse", "lead/ledger/atlas/integration")
 	for _, side := range []string{"old", "new"} {
 		if _, err := f.w.AddComment(ctx, "rev-1", store.ReviewComment{Repo: "api", Path: "LED-44.go", Side: side, Line: 1, Commit: head, Body: side}); err != nil {
 			t.Fatal(err)
@@ -359,10 +359,10 @@ func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
 func TestTargetGoneUnderAnOpenReview(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/fix", "from": "release/1.0"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "fix.go"), "package fix\n")
 	f.ok("mara", "commit", commits("api", "the fix"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/fix", "entry": "backlog/led-44.md", "into": "release/1.0"})
 	f.git(filepath.Join(f.root, "ledger", "api"), "branch", "-D", "release/1.0")
 	diffs, err := f.w.ReviewDiff(ctx, "rev-1", false)
 	if err != nil || len(diffs) != 1 || !diffs[0].TargetGone || diffs[0].Head != "" || diffs[0].Diff != "" {

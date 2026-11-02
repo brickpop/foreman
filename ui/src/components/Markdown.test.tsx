@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Entry } from "../api/client";
-import { Markdown } from "./Markdown";
+import { Markdown, type ResolvedLink } from "./Markdown";
 
 // As the server sends it: the body as on disk, with the engine's lookup tables.
 const entry = (body: string, tables: Partial<Entry> = {}): Entry => ({
@@ -17,7 +17,9 @@ const entry = (body: string, tables: Partial<Entry> = {}): Entry => ({
   ...tables,
 });
 
-const link = (raw: string, more: Partial<Entry["links"][number]>) => ({
+// Fits a wiki entry's links and a repo file's (folder).
+type AnyLink = Entry["links"][number] & { folder?: boolean };
+const link = (raw: string, more: Partial<AnyLink>): AnyLink => ({
   raw,
   to: "",
   anchor: "",
@@ -30,7 +32,15 @@ const link = (raw: string, more: Partial<Entry["links"][number]>) => ({
 
 const html = (e: Entry) =>
   renderToStaticMarkup(
-    <Markdown entry={e} onOpen={() => {}} onTick={() => {}} imageUrl={(p) => `/img/${p}`} />,
+    <Markdown
+      body={e.body}
+      links={e.links}
+      headings={e.headings}
+      checkboxes={e.checkboxes}
+      onOpen={() => {}}
+      onTick={() => {}}
+      imageUrl={(p) => `/img/${p}`}
+    />,
   );
 
 describe("Markdown", () => {
@@ -141,21 +151,63 @@ describe("Markdown", () => {
   });
 });
 
-import { FileMarkdown } from "./Markdown";
+// A repo's file: its links resolved against the branch, nothing to tick.
+describe("Markdown, for a repo file", () => {
+  const repo = (body: string, links: ResolvedLink[]) =>
+    renderToStaticMarkup(
+      <Markdown
+        body={body}
+        links={links}
+        headings={[]}
+        onOpen={() => {}}
+        imageUrl={(p) => `/img/${p}`}
+        scope="repo"
+      />,
+    );
 
-describe("FileMarkdown (a repo file)", () => {
-  const out = (text: string) => renderToStaticMarkup(<FileMarkdown text={text} />);
-  it("links the web in a new tab, keeps relative links as text, loads no image", () => {
-    const got = out(
-      "[site](https://x.dev) [doc](docs/a.md) ![logo](https://t.dev/p.png) <b>raw</b> [js](javascript:alert(1))",
+  it("links the repo's files and folders, marks a missing one, keeps an escape as text", () => {
+    const got = repo(
+      "[doc](./a.md) [dir](sub/) [gone](./b.md) [out](../../x.md) [site](https://x.dev) [js](javascript:alert(1))",
+      [
+        link("./a.md", { to: "docs/a.md", exists: true }),
+        link("sub/", { to: "docs/sub", exists: true, folder: true }),
+        link("./b.md", { to: "docs/b.md" }),
+        link("../../x.md", { outside: true }),
+      ],
+    );
+    expect(got).toContain('<a href="docs/a.md">doc</a>');
+    expect(got).toContain('<a href="docs/sub">dir</a>');
+    expect(got).toContain(
+      '<a href="docs/b.md" class="unwritten" title="Not on this branch">gone</a>',
+    );
+    expect(got).toContain(
+      '<span class="outside" title="../../x.md is outside the repo">out</span>',
     );
     expect(got).toContain(
       '<a href="https://x.dev" target="_blank" rel="noopener noreferrer">site</a>',
     );
-    expect(got).toContain('<span class="outside">doc</span>');
-    expect(got).toContain('<span class="outside">[logo]</span>');
-    expect(got).not.toContain("<img");
-    expect(got).not.toContain("<b>");
     expect(got).not.toContain("javascript:");
+  });
+
+  it("finds a link the renderer re-encoded (a name with a space)", () => {
+    const got = repo("[spaced](<my file.md>)", [
+      link("my file.md", { to: "docs/my file.md", exists: true }),
+    ]);
+    expect(got).toContain(">spaced</a>");
+    expect(got).not.toContain("unwritten");
+    expect(got).not.toContain("_blank");
+  });
+
+  it("loads the repo's own images only, and never an image elsewhere", () => {
+    const got = repo("![logo](../logo.png) ![far](https://t.dev/p.png) ![gone](x.png)", [
+      link("../logo.png", { to: "logo.png", exists: true, image: true }),
+      link("x.png", { to: "docs/x.png" }),
+    ]);
+    expect(got).toContain('<img src="/img/logo.png" alt="logo" loading="lazy"/>');
+    expect(got.match(/<img/g)).toHaveLength(1);
+  });
+
+  it("leaves a task item as text: a repo file isn't ticked here", () => {
+    expect(repo("- [ ] todo", [])).toContain('disabled=""');
   });
 });

@@ -48,7 +48,7 @@ Own the UI.
 Project: ledger
 Goal: the "Current goal" line at the top of /home/ceo/workspace/ledger/project/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
 Your sandbox: /home/ceo/workspace/ledger/agents/tove (your own git worktree of each code repo)
-Branches: you work on wt/tove/main, made for you from main.
+Branches: you work on wt/ledger/tove/main, made for you from main.
 Project repo: /home/ceo/workspace/ledger/project (the project's one shared checkout, the same for every agent)
 Knowledge base: /home/ceo/workspace/ledger/project/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
@@ -91,11 +91,11 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 	for _, want := range []string{
 		"# You are Mara, Team Lead on team Atlas\nCalm, decisive.\n",
 		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges into a target", // the role's default job
-		"Branches: lead/atlas/<topic>, as many as you need (lead/atlas/integration exists).",
+		"Branches: lead/ledger/atlas/<topic>, as many as you need (lead/ledger/atlas/integration exists).",
 		"(read and write: edit, then commit its repo, project)",
 		"- Mara, Team Lead (lead: integrates, requests merges)\n",
 		"## Tools (from Foreman)\n",
-		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/atlas/* branches into into,",
+		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/ledger/atlas/* branches into into,",
 		"create_target(repo, name, from)     Make a new target in one repo",
 		"The CEO talks to you. Break requests down and delegate with ask().",
 		"Before you request a merge, run: npm test",
@@ -119,7 +119,7 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 	if !strings.Contains(member, "handoff(teammate, branch, summary)") || strings.Contains(member, "request_merge(") {
 		t.Errorf("member tools:\n%s", member)
 	}
-	if !strings.Contains(member, "Branches: wt/ilya/<card> only;") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") {
+	if !strings.Contains(member, "Branches: wt/ledger/ilya/<card> only;") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") {
 		t.Errorf("member branches or wiki access:\n%s", member)
 	}
 	lead := Compose(input("mara", nil))
@@ -128,7 +128,7 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 			t.Errorf("an epic 1 prompt mentions %q:\n%s", absent, lead)
 		}
 	}
-	if !strings.Contains(lead, "Branches: you work on lead/atlas/integration, made for you from main.") || !strings.Contains(lead, "(read and write)") ||
+	if !strings.Contains(lead, "Branches: you work on lead/ledger/atlas/integration, made for you from main.") || !strings.Contains(lead, "(read and write)") ||
 		!strings.Contains(lead, "Your teammates can't write it: ask them for content, never to write wiki files.") {
 		t.Errorf("epic 1 lead:\n%s", lead)
 	}

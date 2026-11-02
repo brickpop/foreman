@@ -27,9 +27,10 @@ type Session struct {
 	// Login is the folder of the profile it runs on, on the host: the
 	// harness's login, shared by every instance on it (internal/profiles).
 	Login string
-	// Continue: a restart within the deployment, which picks up the
-	// instance's conversation of this deployment if the harness kept one.
-	// False: the deployment's first start, always fresh.
+	// Continue picks up the agent's last conversation on the project since its
+	// last fresh start, if the harness kept one: a restart, a wake, or a
+	// redeploy of the same team. False: a fresh start (Start fresh, another
+	// team or harness), which never continues what was there before.
 	Continue bool
 	// Opener is the first message of a session that starts fresh (not one
 	// that continues a conversation), typed in as if by the CEO; the session

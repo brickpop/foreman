@@ -32,7 +32,7 @@ type Activity interface {
 // activityPage is how many items a page of activity holds (the CEO, 2026-10-17).
 const activityPage = 50
 
-// activityRoutes serve a project's Activity section: one deployment's
+// activityRoutes serve the Activity view of a project's Team section: one deployment's
 // traffic, the team on the project or an older session.
 func activityRoutes(mux *http.ServeMux, act Activity) {
 	// When something last happened on each project: the UI orders them by it.

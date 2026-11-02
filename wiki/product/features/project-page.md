@@ -10,22 +10,21 @@ The place where the CEO works: a project, its team at work, and everything about
 
 ## Sections
 
-The page has no header of its own: its sections are listed in the [sidebar](./app-shell.md#sidebar), under the project open, so the main area holds one row of tabs at most (the agent tabs, on Session). In order:
+The page has no header of its own: its sections are listed in the [sidebar](./app-shell.md#sidebar), under the project open, so the main area holds one row of tabs at most (the agent tabs, on Session). In order (the CEO, 2026-11-03: the code before the knowledge):
 
 | Section | Path | What |
 |---|---|---|
 | **Session** | `session?agent=` | The team's terminals, an agent at a time ([Sessions](./sessions.md)) |
 | **Inbox** | `inbox`, `inbox/<review>?since=1` | What waits on the CEO there, reviews first; a review opens inside it ([Reviews](./reviews.md)) |
-| **Wiki** | `wiki?entry=` | The project's description, then its wiki ([Wiki reader](./wiki-reader.md)) |
-| **Board** | `board` | Kanban boards over the wiki ([Board](./board.md)) |
 | **Repos** | `repos`, `repos/<repo>?branch=` | The repos, added and managed; each opens its page, its branches, files and history graph ([Repos](./repos.md)) |
-| **Deployment** | `deployment` | The team, its agents and their worktrees, the work in flight and merged; Deploy and Stop ([Project deployment](./project-deployment.md)) |
-| **Activity** | `activity` | The team's messages and git actions, with the map of who calls whom ([Project activity](./project-activity.md)) |
+| **Board** | `board` | Kanban boards over the wiki ([Board](./board.md)) |
+| **Wiki** | `wiki?entry=` | The project's description, then its wiki ([Wiki reader](./wiki-reader.md)) |
+| **Team** | `team?view=` | The team at work: its agents and their worktrees, its messages and git actions, the work in flight and merged; Deploy and Stop ([Project team](./project-team.md)). Deployment and Activity until 2026-11-03: `/deployment` and `/activity` redirect here |
 | **Settings** | `settings` | The project's configuration ([Project settings](./project-settings.md)) |
 
 Each path is under `/projects/<project>/`, and each section is its own route, so the URL is the view: Back, a reload and a shared link show the same section. **`/projects/<project>`** opens **Session** while a team is on the project, **Wiki** otherwise (the URL is replaced, so Back doesn't return to it). Switching projects starts each section fresh.
 
-The names: **Inbox** (was Reviews, which also took the project's other requests from Overview), **Wiki** (was Overview), **Repos** (was Repositories), **Deployment** (replaced Worktrees). **Board** keeps its name: it is wikiview's `board`, one word for one board or several (the CEO, 2026-10-31).
+The names: **Inbox** (was Reviews, which also took the project's other requests from Overview), **Wiki** (was Overview), **Repos** (was Repositories), **Team** (replaced Deployment, which replaced Worktrees, and Activity). **Board** keeps its name: it is wikiview's `board`, one word for one board or several (the CEO, 2026-10-31).
 
 ## Layout
 

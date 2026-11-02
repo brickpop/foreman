@@ -24,7 +24,7 @@ func (f *fixture) instance(agent, status string) store.Instance {
 // instances, aren't listed.
 func TestTeamTellsTheLeadWhereItsTeammatesStand(t *testing.T) {
 	f := newFixture(t)
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/led-44"})
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/led-44"})
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "draft.go"), "package api\n")
 	tove := f.instance("tove", "running")
 	tove.Doing = &store.Doing{Line: "Editing draft.go", At: f.w.Now().Add(-3 * time.Minute)}
@@ -37,7 +37,7 @@ func TestTeamTellsTheLeadWhereItsTeammatesStand(t *testing.T) {
 	text := f.ok("mara", "team", map[string]string{})
 	want := "Your teammates now:\n\n" +
 		"Tove, Engineer: running, last report 3m ago.\n" +
-		"  api on wt/tove/led-44, uncommitted changes · web on wt/tove/led-44\n" +
+		"  api on wt/ledger/tove/led-44, uncommitted changes · web on wt/ledger/tove/led-44\n" +
 		"Ivo, Engineer: asleep."
 	if text != want {
 		t.Errorf("got\n%s\nwant\n%s", text, want)
@@ -64,7 +64,7 @@ func TestTeamStatesAndMerges(t *testing.T) {
 
 	want := "Your teammates now:\n\n" +
 		"Tove, Engineer: idle.\n" +
-		"  api on wt/tove/main · web on wt/tove/main, merge under way\n" +
+		"  api on wt/ledger/tove/main · web on wt/ledger/tove/main, merge under way\n" +
 		"Ivo, Engineer: stopped (it exited twice in a row (code 1))."
 	if text := f.ok("mara", "team", map[string]string{}); text != want {
 		t.Errorf("got\n%s\nwant\n%s", text, want)

@@ -37,18 +37,18 @@ func TestSetSubmoduleAddsThenTeammatesGetIt(t *testing.T) {
 	f.w.Actions = kept
 	url, v1, v2 := f.dependency()
 	text := f.ok("tove", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v1", "url": url})
-	if !strings.HasPrefix(text, "Committed in api (wt/tove/main, ") || !strings.HasSuffix(text, "): Add submodule lib/forge-std at v1 ("+url+").") {
+	if !strings.HasPrefix(text, "Committed in api (wt/ledger/tove/main, ") || !strings.HasSuffix(text, "): Add submodule lib/forge-std at v1 ("+url+").") {
 		t.Errorf("%q", text)
 	}
 	if got := f.git(f.wt("tove", "api"), "rev-parse", "HEAD:lib/forge-std"); got != v1 {
 		t.Errorf("pinned %s, want v1", got)
 	}
-	if a := kept.kept[len(kept.kept)-1]; a.Tool != "set_submodule" || a.Branch != "wt/tove/main" || len(a.Repos) != 1 ||
+	if a := kept.kept[len(kept.kept)-1]; a.Tool != "set_submodule" || a.Branch != "wt/ledger/tove/main" || len(a.Repos) != 1 ||
 		a.Repos[0].Repo != "api" || a.Repos[0].Commit == "" || !strings.HasPrefix(a.Repos[0].Message, "Add submodule lib/forge-std") {
 		t.Errorf("action %+v", a)
 	}
 	// The lead merges it in: the submodule comes filled.
-	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
+	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/main"})
 	if got := f.read(filepath.Join(f.wt("mara", "api"), "lib/forge-std/Test.sol")); got != "v1\n" {
 		t.Errorf("the lead's lib/forge-std holds %q", got)
 	}
@@ -67,9 +67,9 @@ func TestChangesInASubmoduleBlockWhatNeedsCommittedWork(t *testing.T) {
 	f.ok("tove", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v1", "url": url})
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "lib/forge-std/Test.sol"), "patched\n")
 	for tool, args := range map[string]map[string]string{
-		"switch":  {"branch": "wt/tove/LED-44"},
+		"switch":  {"branch": "wt/ledger/tove/LED-44"},
 		"merge":   {"branch": "main"},
-		"handoff": {"teammate": "mara", "branch": "wt/tove/main", "summary": "done"},
+		"handoff": {"teammate": "mara", "branch": "wt/ledger/tove/main", "summary": "done"},
 	} {
 		if text := f.refused("tove", tool, args, "submodule_changed"); !strings.Contains(text, "api/lib/forge-std") {
 			t.Errorf("%s: %q", tool, text)
@@ -85,7 +85,7 @@ func TestChangesInASubmoduleBlockWhatNeedsCommittedWork(t *testing.T) {
 	if got := f.read(filepath.Join(f.wt("tove", "api"), "lib/forge-std/Test.sol")); got != "v1\n" {
 		t.Errorf("the edit stayed: %q", got)
 	}
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/LED-44"})
 }
 
 // A branch without the submodule doesn't keep its folder, and the way back
@@ -94,7 +94,7 @@ func TestSwitchingFollowsTheBranchsSubmodules(t *testing.T) {
 	f := newFixture(t)
 	url, _, _ := f.dependency()
 	f.ok("tove", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v1", "url": url})
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"}) // from main: no submodule
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/LED-44"}) // from main: no submodule
 	if _, err := os.Stat(filepath.Join(f.wt("tove", "api"), "lib/forge-std")); !os.IsNotExist(err) {
 		t.Errorf("lib/forge-std is still there: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestSwitchingFollowsTheBranchsSubmodules(t *testing.T) {
 	if files := f.git(f.wt("tove", "api"), "show", "--name-only", "--format=", "HEAD"); files != "cal.go" {
 		t.Errorf("committed %q", files)
 	}
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/main"})
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/main"})
 	if got := f.read(filepath.Join(f.wt("tove", "api"), "lib/forge-std/Test.sol")); got != "v1\n" {
 		t.Errorf("back home, lib/forge-std holds %q", got)
 	}
@@ -113,11 +113,11 @@ func TestASubmoduleConflictIsSettledThenCommitted(t *testing.T) {
 	f := newFixture(t)
 	url, _, v2 := f.dependency()
 	f.ok("mara", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v1", "url": url})
-	f.ok("tove", "merge", map[string]string{"branch": "lead/atlas/integration"})
+	f.ok("tove", "merge", map[string]string{"branch": "lead/ledger/atlas/integration"})
 	// From v1, each side moves the pin its own way: neither descends from the other.
 	f.ok("tove", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v2"})
 	f.ok("mara", "set_submodule", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": "v0"})
-	text := f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
+	text := f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/main"})
 	if !strings.Contains(text, "Conflicts in api (lib/forge-std)") || !strings.Contains(text, "set_submodule") {
 		t.Fatalf("%q", text)
 	}

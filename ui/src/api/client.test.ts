@@ -28,8 +28,15 @@ describe("httpClient", () => {
     expect(JSON.parse(calls[0].body ?? "")).toEqual({
       team: "atlas",
       project: "ledger",
+      fresh: false,
     });
     expect(calls[0].headers).toEqual({ "Content-Type": "application/json" });
+  });
+
+  it("asks which agents would continue, escaping the query", async () => {
+    const calls = stubFetch(200, { agents: ["mara"] });
+    expect(await httpClient("http://x").agents.continuing("a&b", "ledger")).toEqual(["mara"]);
+    expect(calls[0].url).toBe("http://x/api/deployments/continuing?team=a%26b&project=ledger");
   });
 
   it("stops with DELETE, escaping the id", async () => {
@@ -236,6 +243,9 @@ describe("httpClient", () => {
     ]);
     expect(c.wiki.imageUrl("ledger", "img/d?.png")).toBe(
       "http://x/api/wiki/ledger/image/img/d%3F.png",
+    );
+    expect(c.repos.imageUrl("ledger", "api", "wt/tove/x", "img/a b.png")).toBe(
+      "http://x/api/projects/ledger/repos/api/image?ref=wt%2Ftove%2Fx&path=img%2Fa+b.png",
     );
   });
 

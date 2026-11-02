@@ -181,6 +181,8 @@ func (b Browser) File(ctx context.Context, project, repo, ref, path string) (Fil
 		if f.Markdown = markdown.MatchString(path); f.Markdown {
 			fm, body := parse.Frontmatter(f.Text)
 			f.Frontmatter, f.Body = wiki.Fields(fm, nil), body
+			t := &trees{ctx: ctx, git: b.Git, dir: dir, commit: commit, read: map[string][]git.TreeEntry{}}
+			f.Links, f.Headings = t.links(path, body), wiki.Headings(body)
 		}
 	}
 	return f, nil

@@ -23,7 +23,7 @@ import { Button, Empty, Loading, NotBuilt, Panel } from "../../components/ui";
 
 // A project's pipeline (wiki/product/features/project-pipeline.md): what needs
 // the CEO, in its Inbox (a review opens its page there); the work moving
-// towards its targets, and what recently merged, in its Deployment section.
+// towards its targets, and what recently merged, in its Team section.
 
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
@@ -35,7 +35,7 @@ export function sourceLabel(r: Request): string {
 const stageLabels = ["in worktree", "handed to lead", "lead reviewing", "integrated"];
 
 // The work on its way to its targets, and what merged in the last 7 days: the
-// Deployment section's In flight and Merged views. Each branch links to its
+// Team section's In flight and Merged views. Each branch links to its
 // code in Repos.
 function usePipelineOf(project: Project) {
   const pipeline = usePipeline(project.id);

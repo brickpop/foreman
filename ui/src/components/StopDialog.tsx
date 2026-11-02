@@ -10,7 +10,7 @@ import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
 // Stopping a deployment, after a confirmation (wiki/product/features/team-page.md):
-// from the Team page and the project's Deployment section. Mount it only while open, so each
+// from the Team page and the project's Team section. Mount it only while open, so each
 // opening starts without the last one's error.
 
 export function StopDialog({
@@ -38,8 +38,7 @@ export function StopDialog({
         title: `${teamName} stopped on ${readable(d.projectId)}`,
         body: "Worktrees are kept. Other deployments keep running.",
         color: "var(--tx4)",
-        onOpen: () =>
-          navigate({ to: "/projects/$project/deployment", params: { project: d.projectId } }),
+        onOpen: () => navigate({ to: "/projects/$project/team", params: { project: d.projectId } }),
       });
     },
   });

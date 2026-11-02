@@ -27,6 +27,7 @@ import {
   isOpen,
   keptLines,
   lineKey,
+  lostDrafts,
   lostNote,
   mergeHeads,
   mergeLabel,
@@ -35,6 +36,7 @@ import {
   reviewTeam,
   statusLabel,
 } from "../../app/reviews";
+import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import {
@@ -577,7 +579,7 @@ function Composer({
       />
       <span className="flex justify-end gap-2">
         {onCancel && <Button onClick={onCancel}>Cancel</Button>}
-        <Button type="submit" variant="raised" disabled={!body.trim()}>
+        <Button type="submit" variant="primary" disabled={!body.trim()}>
           {initial ? "Save" : "Add to the draft"}
         </Button>
       </span>
@@ -608,7 +610,7 @@ function DecisionBar({
   failed: (e: Error) => void;
 }) {
   const navigate = useNavigate();
-  // A decision made, the Inbox's next one is the next thing to do.
+  // Merged or dismissed, the Inbox's next one is the next thing to do.
   const back = () => navigate({ to: "/projects/$project/inbox", params: { project: v.projectId } });
   const toast = useToast();
   const queries = useQueryClient();
@@ -653,6 +655,32 @@ function DecisionBar({
     else next.add(repo);
     setUnticked(next);
   };
+  const [confirming, setConfirming] = useState(false);
+  const mergeNow = () =>
+    heads &&
+    merge.mutate(heads, {
+      onSuccess: () => {
+        toast({
+          title: "Merged",
+          body: ticked.map((r) => `${r.repo} → ${r.target}`).join(", "),
+          color: "var(--ok)",
+          // To watch the lead pick it up.
+          onOpen: () => navigate(sessionOf(v.lead)),
+        });
+        back();
+      },
+    });
+  const mergeButton = (
+    <Button
+      variant={draft > 0 ? "secondary" : "primary"}
+      disabled={busy || ticked.length === 0 || !heads}
+      onClick={() => (draft > 0 ? setConfirming(true) : mergeNow())}
+    >
+      {ticked.length > 0 ? mergeLabel(ticked) : "Merge"}
+    </Button>
+  );
+  // One repo open: nothing to pick, so no checkbox.
+  const several = v.mergeRequests.filter((m) => m.state === "open").length > 1;
   return (
     <footer className="flex shrink-0 flex-col gap-3 border-t border-line bg-side px-6 py-3">
       {v.status === "changes-requested" && (
@@ -665,16 +693,24 @@ function DecisionBar({
           .filter((m) => m.state === "open")
           .map((m) => (
             <span key={m.repo} className="flex items-center gap-2">
-              <label className="flex items-center gap-2 font-mono text-[12.5px]">
-                <input
-                  type="checkbox"
-                  checked={!unticked.has(m.repo)}
-                  onChange={(e) => tick(m.repo, e.target.checked)}
-                />
-                <span className={m.conflicting ? "text-err" : "text-tx2"}>
+              {several ? (
+                <label className="flex items-center gap-2 font-mono text-[12.5px]">
+                  <input
+                    type="checkbox"
+                    checked={!unticked.has(m.repo)}
+                    onChange={(e) => tick(m.repo, e.target.checked)}
+                  />
+                  <span className={m.conflicting ? "text-err" : "text-tx2"}>
+                    {linkLine(m, forge)}
+                  </span>
+                </label>
+              ) : (
+                <span
+                  className={`font-mono text-[12.5px] ${m.conflicting ? "text-err" : "text-tx2"}`}
+                >
                   {linkLine(m, forge)}
                 </span>
-              </label>
+              )}
               {targetsOf(m.repo).length > 1 && (
                 <Select
                   label={`Where ${m.repo} merges`}
@@ -696,31 +732,25 @@ function DecisionBar({
         >
           Dismiss
         </Button>
-        <Button disabled={busy} onClick={() => setForm(form === "changes" ? "" : "changes")}>
+        {/* With drafts, sending them is the next step: Request changes leads, last. */}
+        {draft > 0 && mergeButton}
+        <Button
+          variant={draft > 0 ? "primary" : "secondary"}
+          disabled={busy}
+          onClick={() => setForm(form === "changes" ? "" : "changes")}
+        >
           Request changes{draft > 0 && ` (${draft})`}
         </Button>
-        <Button
-          variant="primary"
-          disabled={busy || ticked.length === 0 || !heads}
-          onClick={() =>
-            heads &&
-            merge.mutate(heads, {
-              onSuccess: () => {
-                toast({
-                  title: "Merged",
-                  body: ticked.map((r) => `${r.repo} → ${r.target}`).join(", "),
-                  color: "var(--ok)",
-                  // To watch the lead pick it up.
-                  onOpen: () => navigate(sessionOf(v.lead)),
-                });
-                back();
-              },
-            })
-          }
-        >
-          {ticked.length > 0 ? mergeLabel(ticked) : "Merge"}
-        </Button>
+        {draft === 0 && mergeButton}
       </div>
+      <Confirm
+        open={confirming}
+        title="Merge without sending the drafts?"
+        body={lostDrafts(draft)}
+        action="Merge anyway"
+        onConfirm={mergeNow}
+        onClose={() => setConfirming(false)}
+      />
       {form && (
         <form
           className="flex flex-col gap-2"
@@ -730,7 +760,8 @@ function DecisionBar({
               changes.mutate(text.trim(), {
                 onSuccess: () => {
                   done();
-                  back();
+                  // To watch the lead pick the changes up (the CEO, 2026-11-03).
+                  navigate(sessionOf(v.lead));
                 },
               });
             else

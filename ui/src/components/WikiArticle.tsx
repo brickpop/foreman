@@ -29,8 +29,11 @@ export function WikiArticle({
       <div className={`wiki ${size === "sheet" ? "sheet" : ""}`}>
         {title && <h1>{title}</h1>}
         <Markdown
-          entry={entry}
-          onOpen={onOpen}
+          body={entry.body}
+          links={entry.links}
+          headings={entry.headings}
+          checkboxes={entry.checkboxes}
+          onOpen={(link) => onOpen(link.to)}
           onTick={onTick}
           imageUrl={(path) => client.wiki.imageUrl(project, path)}
         />

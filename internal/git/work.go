@@ -46,21 +46,32 @@ func ValidBranch(ctx context.Context, name string) bool {
 	return err == nil && !strings.HasPrefix(name, "-")
 }
 
-// HomeBranch is where an agent's worktree starts and idles: wt/<agent>/main
-// for a member, lead/<team>/integration for the lead
-// (wiki/product/architecture/sandboxes-and-git.md#branches).
-func HomeBranch(agent, team string, lead bool) string {
+// BranchPrefix is what an agent's branches on a project start with:
+// wt/<project>/<agent>/ for a member, lead/<project>/<team>/ for the lead
+// (wiki/product/architecture/sandboxes-and-git.md#branches). The project is
+// in it, so one team can work on two projects that share a repo (the CEO,
+// 2026-11-03).
+func BranchPrefix(project, agent, team string, lead bool) string {
 	if lead {
-		return "lead/" + team + "/integration"
+		return "lead/" + project + "/" + team + "/"
 	}
-	return "wt/" + agent + "/main"
+	return "wt/" + project + "/" + agent + "/"
+}
+
+// HomeBranch is where an agent's worktree starts and idles: main under its
+// prefix for a member, integration for the lead.
+func HomeBranch(project, agent, team string, lead bool) string {
+	if lead {
+		return BranchPrefix(project, agent, team, lead) + "integration"
+	}
+	return BranchPrefix(project, agent, team, lead) + "main"
 }
 
 // IsHomeBranch reports whether branch is some agent's HomeBranch.
 func IsHomeBranch(branch string) bool {
 	parts := strings.Split(branch, "/")
-	return len(parts) == 3 && parts[1] != "" &&
-		(parts[0] == "wt" && parts[2] == "main" || parts[0] == "lead" && parts[2] == "integration")
+	return len(parts) == 4 && parts[1] != "" && parts[2] != "" &&
+		(parts[0] == "wt" && parts[3] == "main" || parts[0] == "lead" && parts[3] == "integration")
 }
 
 // HasBranch reports whether the repo of dir has the branch.
@@ -81,7 +92,7 @@ func (g *CLI) Ahead(ctx context.Context, dir, branch, base string) (int, error) 
 }
 
 // Branches lists the repo's branches whose names start with prefix
-// (lead/atlas/), sorted.
+// (lead/ledger/atlas/), sorted.
 func (g *CLI) Branches(ctx context.Context, dir, prefix string) ([]string, error) {
 	out, err := run(ctx, dir, "for-each-ref", "--format=%(refname:short)", "refs/heads/"+prefix)
 	if err != nil {

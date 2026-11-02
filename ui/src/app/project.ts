@@ -7,11 +7,10 @@ import type { Deployment, Instance } from "../api/client";
 export const sections = [
   { path: "session", label: "Session" },
   { path: "inbox", label: "Inbox" },
-  { path: "wiki", label: "Wiki" },
-  { path: "board", label: "Board" },
   { path: "repos", label: "Repos" },
-  { path: "deployment", label: "Deployment" },
-  { path: "activity", label: "Activity" },
+  { path: "board", label: "Board" },
+  { path: "wiki", label: "Wiki" },
+  { path: "team", label: "Team" },
   { path: "settings", label: "Settings" },
 ] as const;
 
@@ -41,7 +40,7 @@ export function reviewOf(project: string, review: string) {
 }
 
 /** The project's deployment: the running one, else the one that stopped last.
- * Its team's agents are the ones a `wt/<agent>` branch or a card's assignee
+ * Its team's agents are the ones a `wt/<project>/<agent>` branch or a card's assignee
  * names: one team works on a project at a time, and a later team's agent of
  * the same id takes over what the earlier one left. */
 export function deploymentOn(
@@ -75,17 +74,18 @@ export function latestFirst<T extends { id: string }>(
   return [...projects].sort((a, b) => at(b) - at(a) || a.id.localeCompare(b.id));
 }
 
-export type DeploymentView = "agents" | "inflight" | "merged";
-export const deploymentViews: { view: DeploymentView; label: string }[] = [
+export type TeamView = "agents" | "activity" | "inflight" | "merged";
+export const teamViews: { view: TeamView; label: string }[] = [
   { view: "agents", label: "Agents" },
+  { view: "activity", label: "Activity" },
   { view: "inflight", label: "In flight" },
   { view: "merged", label: "Merged" },
 ];
 
-/** The Deployment section's view: the one in the URL, else Agents while there
+/** The Team section's view: the one in the URL, else Agents while there
  * are agents to show (the team's, or an earlier team's worktrees), else In
  * flight. */
-export function deploymentView(asked: unknown, agents: boolean): DeploymentView {
-  const known = deploymentViews.find((v) => v.view === asked)?.view;
+export function teamView(asked: unknown, agents: boolean): TeamView {
+  const known = teamViews.find((v) => v.view === asked)?.view;
   return known ?? (agents ? "agents" : "inflight");
 }

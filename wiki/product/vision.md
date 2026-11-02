@@ -44,8 +44,8 @@ Terms are defined in the [Glossary](./glossary.md). The end-to-end scenarios v1 
 |---|---|---|
 | **CEO** | The human operator, sole user | Everything. Answers requests, decides merge requests (merge, create a PR, or dismiss), deploys teams, talks to any agent. |
 | **Chief of Staff** | A built-in agent (a harness session owned by Foreman, see [Chief of Staff](./features/chief-of-staff.md)) | Interviews the CEO to define roles and teams, and proposes the team files, which Foreman writes once the CEO confirms them. |
-| **Team lead** | One agent per team | Breaks down goals, delegates, reviews handoffs, integrates on `lead/<team>/*` branches, requests merges into its targets. The CEO's default point of contact for the team. |
-| **Members** | Engineer, Architect, QA, Reviewer, custom | Work in their own worktree branches (`wt/<agent>/<card>`) and hand off to the lead. Cannot publish to a target or `lead/<team>/*`. |
+| **Team lead** | One agent per team | Breaks down goals, delegates, reviews handoffs, integrates on `lead/<project>/<team>/*` branches, requests merges into its targets. The CEO's default point of contact for the team. |
+| **Members** | Engineer, Architect, QA, Reviewer, custom | Work in their own worktree branches (`wt/<project>/<agent>/<card>`) and hand off to the lead. Cannot publish to a target or `lead/<project>/<team>/*`. |
 
 Roles with default job descriptions (used by the Chief of Staff and the example teams): Team Lead, Architect, Engineer, QA / Tester, Reviewer ([Agent soul](./models/agent-soul.md)).
 

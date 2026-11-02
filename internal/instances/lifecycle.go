@@ -2,18 +2,20 @@ package instances
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
 	"sync"
 
+	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 )
 
 // Deploy deploys team on project and starts its lead; the other
 // members sleep until woken. A project has one team at most: another team
 // deployed on it is stopped first, as by Stop.
-func (m *Manager) Deploy(ctx context.Context, teamID, projectID string) (store.Deployment, error) {
+func (m *Manager) Deploy(ctx context.Context, teamID, projectID string, fresh bool) (store.Deployment, error) {
 	if err := m.blocked(); err != nil {
 		return store.Deployment{}, err
 	}
@@ -27,6 +29,11 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID string) (store.D
 	if err := m.replace(ctx, teamID, projectID); err != nil {
 		return store.Deployment{}, err
 	}
+	// Read before the new rows replace the old ones.
+	continuing, err := m.continuing(ctx, team, projectID, on.harness)
+	if err != nil {
+		return store.Deployment{}, err
+	}
 	dep, err := m.Deployments.Deploy(ctx, teamID, projectID)
 	if err != nil {
 		return store.Deployment{}, err
@@ -36,6 +43,7 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID string) (store.D
 		inst := store.Instance{
 			ID: agent + "@" + projectID, DeploymentID: dep.ID, AgentID: agent, Status: Asleep,
 			SandboxPath: project.Sandbox(agent), Harness: on.harness, Profile: on.profile,
+			Fresh: fresh || !slices.Contains(continuing, agent),
 		}
 		if err := m.Instances.Put(ctx, inst); err != nil { // a new instance: nothing to change yet
 			return dep, err
@@ -46,6 +54,50 @@ func (m *Manager) Deploy(ctx context.Context, teamID, projectID string) (store.D
 	}
 	m.startQueued()
 	return dep, nil
+}
+
+// Continuing lists the team's agents whose first start on project would pick
+// up an earlier conversation, unless deployed fresh: what Deploy's Start fresh
+// is offered for.
+func (m *Manager) Continuing(ctx context.Context, teamID, projectID string) ([]string, error) {
+	team, err := m.Config.Team(teamID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: team %s: %v", ErrInvalid, teamID, err)
+	}
+	p, _, err := m.Profile(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: project %s's profile: %v", ErrInvalid, projectID, err)
+	}
+	return m.continuing(ctx, team, projectID, p.Harness)
+}
+
+// continuing: an agent's harness folder on a project outlives deployments, so
+// its last conversation there continues when the agent's latest instance on
+// the project (the folder's last user) was of this team, on this harness, and
+// started. Agent ids are unique within a team only: another team's agent of
+// the same id never picks it up.
+func (m *Manager) continuing(ctx context.Context, team home.Team, projectID, harnessName string) ([]string, error) {
+	var agents []string
+	for _, agent := range team.Config.Roster() {
+		last, err := m.Instances.Get(ctx, agent+"@"+projectID)
+		if errors.Is(err, store.ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if last.Fresh || last.Harness != harnessName {
+			continue
+		}
+		dep, err := m.Deployments.Get(ctx, last.DeploymentID)
+		if err != nil {
+			return nil, err
+		}
+		if dep.TeamID == team.ID {
+			agents = append(agents, agent)
+		}
+	}
+	return agents, nil
 }
 
 // replace stops every other team's active deployment on project.

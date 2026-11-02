@@ -147,7 +147,7 @@ func object(props string, required ...string) json.RawMessage {
 
 var definitions = []agentlink.Tool{
 	{Name: "switch", Description: "Switch your worktrees, in every repo, to one of your branches. A new one is made from from, a target, in every repo that has it, and from the repo's default branch where it hasn't or when from is left out. Commit first: a switch never carries changes along.",
-		InputSchema: object(`"branch":{"type":"string","description":"One of your branches: wt/<you>/<topic> for a member, lead/<team>/<topic> for the lead"},`+
+		InputSchema: object(`"branch":{"type":"string","description":"One of your branches: wt/<project>/<you>/<topic> for a member, lead/<project>/<team>/<topic> for the lead"},`+
 			`"from":{"type":"string","description":"Only for a new branch whose work lands on a target other than the default: that target, e.g. release/2.0"}`, "branch")},
 	{Name: "commit", Description: "Commit everything you changed in each repo you name, on the branch checked out there, with that repo's message (git is read-only for you); repos you don't name are left as they are. After a merge with conflicts, committing a repo concludes its merge once no conflict markers are left.",
 		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
@@ -166,14 +166,14 @@ var definitions = []agentlink.Tool{
 			`"url":{"type":"string","description":"Only to add a new submodule: its https URL"}`, "repo", "path", "ref")},
 	{Name: "handoff", Description: "Pass finished, committed work on a branch of yours to a teammate (usually the lead): they get your summary and the branch, and Foreman records the hand-off. Commit first. Your part ends.",
 		InputSchema: object(`"teammate":{"type":"string","description":"A teammate's name or id"},`+
-			`"branch":{"type":"string","description":"wt/<you>/<topic>"},`+
+			`"branch":{"type":"string","description":"wt/<project>/<you>/<topic>"},`+
 			`"summary":{"type":"string","description":"The outcome: what was done, decisions, what is left open, how it was checked"}`, "teammate", "branch", "summary")},
 	{Name: "contribute", Description: "Add a finding, a proposal or a note to the project's knowledge base without writing it yourself: Foreman files it in the wiki's inbox and tells the lead.",
 		InputSchema: object(`"kind":{"type":"string","enum":["finding","proposal","note"]},`+
 			`"title":{"type":"string","description":"A short title"},`+
 			`"body":{"type":"string","description":"The contribution, in Markdown"}`, "kind", "title", "body")},
 	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into into, a target, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Every one of those repos must have that target. Commit first. Call it again on the same branch to refresh it (after merging its target in, say).",
-		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>"},`+
+		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"},`+
 			`"into":{"type":"string","description":"The target it merges into, the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "entry")},
 	{Name: "create_target", Description: "Make a new target in one repo: a new branch name at from, one of its targets or an older commit of one (work the CEO merged). Work for it starts there with switch(branch, from), and lands there with request_merge(branch, entry, into); only the CEO merges into it. A target across repos is one call per repo.",
@@ -181,7 +181,7 @@ var definitions = []agentlink.Tool{
 			`"name":{"type":"string","description":"The new branch, e.g. release/2.0: not one the repo has, nor wt/* or lead/*"},`+
 			`"from":{"type":"string","description":"One of the repo's targets, e.g. main, or a commit (its hash) one holds"}`, "repo", "name", "from")},
 	{Name: "withdraw_merge", Description: "Withdraw your open request to merge a lead branch, in every repo, before the CEO decides it: the work is superseded by another of your branches, or no longer wanted. The branch stays. The CEO's draft comments on it are lost.",
-		InputSchema: object(`"branch":{"type":"string","description":"lead/<team>/<topic>, with a review open"},`+
+		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>, with a review open"},`+
 			`"reason":{"type":"string","description":"Why, for the CEO"},`+
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
 	{Name: "targets", Description: "Each repo's targets: the branches only the CEO's merges write, where work starts from (switch from) and lands (request_merge into). The default branch first; for the others, who made them and at which commit. Read-only.",
@@ -334,13 +334,11 @@ func (t tool) author() git.Author {
 	return git.Author{Name: t.c.Name(), Email: t.c.Instance.AgentID + "@foreman.invalid"}
 }
 
-// own says whether branch is one of the caller's: wt/<agent>/<topic> for a
-// member, lead/<team>/<topic> for the lead.
+// own says whether branch is one of the caller's on its project:
+// wt/<project>/<agent>/<topic> for a member, lead/<project>/<team>/<topic> for
+// the lead.
 func (t tool) own(branch string) (string, bool) {
-	prefix := "wt/" + t.c.Instance.AgentID + "/"
-	if t.c.Lead {
-		prefix = "lead/" + t.c.Team.ID + "/"
-	}
+	prefix := git.BranchPrefix(t.project.ID, t.c.Instance.AgentID, t.c.Team.ID, t.c.Lead)
 	topic, ok := strings.CutPrefix(branch, prefix)
 	return prefix + "<topic>", ok && topic != ""
 }

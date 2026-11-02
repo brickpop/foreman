@@ -1,7 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
-import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import type { RepoBranch, Repo as RepoInfo } from "../../api/client";
+import { type RepoBranch, type Repo as RepoInfo, useClient } from "../../api/client";
 import { withoutTitle } from "../../app/frontmatter";
 import { readable, targetsOf, when } from "../../app/model";
 import {
@@ -17,6 +17,7 @@ import {
   bytes,
   crumbs,
   folderOf,
+  folderPage,
   type GraphRow,
   graph,
   matching,
@@ -25,7 +26,7 @@ import {
 } from "../../app/repos";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Frontmatter } from "../../components/Frontmatter";
-import { FileMarkdown } from "../../components/Markdown";
+import { Markdown, type ResolvedLink } from "../../components/Markdown";
 import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
 import { useProject } from "../Project";
 
@@ -37,6 +38,8 @@ import { useProject } from "../Project";
 // a link (an agent's worktree, on Deployment) opens them.
 
 type At = { repo: string; branch: string };
+/** Opens a link of a rendered file: its file, or its folder's page. */
+type Open = (link: ResolvedLink) => void;
 
 export function Repo() {
   const project = useProject();
@@ -50,6 +53,12 @@ export function Repo() {
   // Each is a step Back returns from (the CEO, 2026-11-02): another branch, a
   // file, the history.
   const go = (next: typeof search) => navigate({ search: (s) => ({ ...s, ...next }) });
+  // A link in a rendered file: its file, or its folder's page, at its anchor.
+  const open = (l: ResolvedLink) =>
+    navigate({
+      search: (s) => ({ ...s, path: l.folder ? (l.to ? `${l.to}/` : undefined) : l.to }),
+      hash: l.anchor || undefined,
+    });
   return (
     <div className="flex h-full min-h-[420px] flex-col gap-3 px-6 pt-6 pb-6">
       <div className="flex items-center gap-3">
@@ -100,10 +109,17 @@ export function Repo() {
                 onPick={(path) => go({ path })}
               />
               <div className="min-h-0 min-w-0 overflow-auto">
-                {search.path ? (
-                  <FileView project={project.id} at={at} path={search.path} />
+                {search.path?.endsWith("/") ? (
+                  <FolderView
+                    project={project.id}
+                    at={at}
+                    path={search.path.slice(0, -1)}
+                    onOpen={open}
+                  />
+                ) : search.path ? (
+                  <FileView project={project.id} at={at} path={search.path} onOpen={open} />
                 ) : (
-                  <Readme project={project.id} at={at} />
+                  <Readme project={project.id} at={at} onOpen={open} />
                 )}
               </div>
             </div>
@@ -205,7 +221,8 @@ function BranchItem({
   onClick: () => void;
 }) {
   const teams = useTeams().data ?? [];
-  const deployment = useDeploymentOn(useProject().id)?.id;
+  const project = useProject();
+  const deployment = useDeploymentOn(project.id)?.id;
   // The branch shown is in view when the list opens, however far down.
   const self = useRef<HTMLButtonElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the list opens
@@ -214,7 +231,7 @@ function BranchItem({
   }, []);
   const detail = [
     b.name === defaultBranch ? "default branch" : targets.includes(b.name) && "target",
-    branchOwner(b.name, teams, deployment),
+    branchOwner(b.name, project.id, teams, deployment),
     b.ahead > 0 && `${b.ahead} ahead of ${defaultBranch}`,
   ].filter(Boolean);
   return (
@@ -408,18 +425,84 @@ function Folder({
 
 /** What shows before a file is picked: the root's README (or index.md), else
  * a word to pick one. */
-function Readme({ project, at }: { project: string; at: At }) {
+function Readme({ project, at, onOpen }: { project: string; at: At; onOpen: Open }) {
   // The tree's own root read: cached, nothing new asked.
   const root = useRepoTree(project, at.repo, at.branch, "");
   const readme = root.data && readmeOf(root.data);
   if (root.isPending) return <Loading rows={6} />;
   if (!readme) return <Empty>Pick a file on the left to read it.</Empty>;
-  return <FileView project={project} at={at} path={readme} />;
+  return <FileView project={project} at={at} path={readme} onOpen={onOpen} />;
 }
 
-function FileView({ project, at, path }: { project: string; at: At; path: string }) {
+/** A folder a link opened: its index.md, else its README, else what it holds. */
+function FolderView({
+  project,
+  at,
+  path,
+  onOpen,
+}: {
+  project: string;
+  at: At;
+  path: string;
+  onOpen: Open;
+}) {
+  const tree = useRepoTree(project, at.repo, at.branch, path);
+  if (tree.isPending) return <Loading rows={6} />;
+  if (tree.isError) return <p className="m-0 text-[13px] text-err">{tree.error.message}</p>;
+  const page = folderPage(tree.data);
+  if (page) return <FileView project={project} at={at} path={`${path}/${page}`} onOpen={onOpen} />;
+  return (
+    <div className="flex flex-col gap-2.5">
+      <p className="m-0 text-[13px] text-tx3">
+        <span className="font-mono text-tx2">{path}/</span> has no index.md or README. It holds:
+      </p>
+      <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-[12.5px]">
+        {tree.data.map((e) => (
+          <li key={e.name}>
+            <button
+              type="button"
+              className="text-accTx hover:underline"
+              onClick={() => onOpen(entryLink(`${path}/${e.name}`, e.kind === "dir"))}
+            >
+              {e.kind === "dir" ? `${e.name}/` : e.name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** A link to something the tree lists: there, as the server would resolve it. */
+const entryLink = (to: string, folder: boolean): ResolvedLink => ({
+  raw: "",
+  to,
+  anchor: "",
+  exists: true,
+  folder,
+  image: false,
+  outside: false,
+});
+
+function FileView({
+  project,
+  at,
+  path,
+  onOpen,
+}: {
+  project: string;
+  at: At;
+  path: string;
+  onOpen: Open;
+}) {
+  const client = useClient();
   const file = useRepoFile(project, at.repo, at.branch, path);
   const [source, setSource] = useState(false);
+  // A link's #anchor: its heading, once the file is drawn.
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  useEffect(() => {
+    if (hash && file.data && !source) document.getElementById(hash)?.scrollIntoView();
+  }, [hash, file.data, source]);
   if (file.isPending) return <Loading rows={8} />;
   if (file.isError) return <p className="m-0 text-[13px] text-err">{file.error.message}</p>;
   const f = file.data;
@@ -457,7 +540,14 @@ function FileView({ project, at, path }: { project: string; at: At; path: string
           <Panel className="px-6 py-5">
             <div className="wiki">
               {title && <h1>{title}</h1>}
-              <FileMarkdown text={f.body} />
+              <Markdown
+                body={f.body}
+                links={f.links ?? []}
+                headings={f.headings ?? []}
+                onOpen={onOpen}
+                imageUrl={(p) => client.repos.imageUrl(project, at.repo, at.branch, p)}
+                scope="repo"
+              />
             </div>
           </Panel>
         </div>

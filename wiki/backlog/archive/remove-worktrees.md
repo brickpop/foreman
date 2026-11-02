@@ -8,7 +8,7 @@ epic: git
 
 # Remove a stopped deployment's worktrees
 
-**Retired (the CEO, 2026-11-02):** built differently, as Deployment's **Clean up** ([Project deployment → Earlier teams](../../product/features/project-deployment.md#earlier-teams), done in [More touches](./ui-touches.md)). It removes only what is safe: a worktree holding changes not committed is kept and listed, rather than backed up and removed as below, and it also removes the `wt/` branches a target holds.
+**Retired (the CEO, 2026-11-02):** built differently, as Deployment's **Clean up** ([Project deployment → Earlier teams](../../product/features/project-team.md#earlier-teams), done in [More touches](./ui-touches.md)). It removes only what is safe: a worktree holding changes not committed is kept and listed, rather than backed up and removed as below, and it also removes the `wt/` branches a target holds.
 
 **Why:** Stop keeps a deployment's worktrees, so a redeploy resumes where it left off ([Sandboxes and git policy → Branches](../../product/architecture/sandboxes-and-git.md#branches)). Nothing removes them today: an idle worktree keeps its branch checked out (it can't be deleted), and its changes not committed sit where only the project's Deployment section flags them (the CEO, 2026-10-22: an explicit action, never a side effect of Stop or Close).
 

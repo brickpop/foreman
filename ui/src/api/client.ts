@@ -19,7 +19,13 @@ import type {
 } from "./types/home";
 import type { Draft } from "./types/messaging";
 import type { Profile } from "./types/profiles";
-import type { LogPage, Repo, Branch as RepoBranch, File as RepoFile } from "./types/repos";
+import type {
+  LogPage,
+  Repo,
+  Branch as RepoBranch,
+  File as RepoFile,
+  Link as RepoLink,
+} from "./types/repos";
 import type { ImageStatus, Maintenance } from "./types/runner";
 import type { MachineSize, Step as SetupStep } from "./types/setup";
 import type {
@@ -90,6 +96,7 @@ export type {
   RepoBranch,
   RepoDiff,
   RepoFile,
+  RepoLink,
   Request,
   Review,
   ReviewComment,
@@ -176,7 +183,10 @@ export interface AgentsArea {
   stoppedDeployments(): Promise<Deployment[]>;
   /** An instance's session prompt, exactly as composed for its harness. */
   prompt(instance: string): Promise<string>;
-  deploy(team: string, project: string): Promise<Deployment>;
+  /** Deploys team on project; fresh starts every agent on a new conversation. */
+  deploy(team: string, project: string, fresh?: boolean): Promise<Deployment>;
+  /** The team's agents that would continue an earlier conversation on project. */
+  continuing(team: string, project: string): Promise<string[]>;
   stop(deployment: string): Promise<void>;
   /** Starts an asleep instance; any other is left as it is. */
   wake(instance: string): Promise<void>;
@@ -348,6 +358,8 @@ export interface ReposArea {
   /** A folder at a ref ("" is the root). */
   tree(project: string, repo: string, ref: string, path: string): Promise<TreeEntry[]>;
   file(project: string, repo: string, ref: string, path: string): Promise<RepoFile>;
+  /** Where an image of the repo at a ref loads from (an <img> src). */
+  imageUrl(project: string, repo: string, ref: string, path: string): string;
   /** A page of a ref's history, or with all every branch's, newest first;
    * skip is the previous page's next. */
   log(project: string, repo: string, ref: string, skip?: number, all?: boolean): Promise<LogPage>;
@@ -488,10 +500,16 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       stoppedDeployments: () => getJSON("/api/deployments?status=stopped"),
       prompt: async (instance) =>
         (await getJSON<{ prompt: string }>(`/api/instances/${id(instance)}/prompt`)).prompt,
-      deploy: async (team, project) =>
+      deploy: async (team, project, fresh = false) =>
         (
-          await request("POST", "/api/deployments", { team, project })
+          await request("POST", "/api/deployments", { team, project, fresh })
         ).json() as Promise<Deployment>,
+      continuing: async (team, project) =>
+        (
+          await getJSON<{ agents: string[] }>(
+            `/api/deployments/continuing?${new URLSearchParams({ team, project })}`,
+          )
+        ).agents,
       stop: (deployment) => send("DELETE", `/api/deployments/${id(deployment)}`),
       wake: (instance) => send("POST", `/api/instances/${id(instance)}/wake`),
       restart: (instance) => send("POST", `/api/instances/${id(instance)}/restart`),
@@ -592,6 +610,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         getJSON(
           `/api/projects/${id(project)}/repos/${id(repo)}/file?${new URLSearchParams({ ref, path })}`,
         ),
+      imageUrl: (project, repo, ref, path) =>
+        `${origin}/api/projects/${id(project)}/repos/${id(repo)}/image?${new URLSearchParams({ ref, path })}`,
       log: (project, repo, ref, skip = 0, all = false) => {
         const q = new URLSearchParams({ ref, skip: String(skip) });
         if (all) q.set("all", "1");

@@ -168,8 +168,8 @@ func snapshot(dir string, idx *index.Index) *watched {
 	}
 	for _, e := range idx.Entries {
 		for _, l := range e.Links {
-			if !strings.HasSuffix(l.Target, ".md") && idx.FileExists(l.Target) && !slices.Contains(s.files, l.Target) {
-				s.files = append(s.files, l.Target)
+			if t := Decoded(l.Target); !strings.HasSuffix(t, ".md") && idx.FileExists(t) && !slices.Contains(s.files, t) {
+				s.files = append(s.files, t)
 			}
 		}
 	}

@@ -73,14 +73,20 @@ func wikiRoutes(mux *http.ServeMux, wk Wiki) {
 			writeWiki(w, nil, err)
 			return
 		}
-		// Declared, never sniffed: the browser takes it for what the extension says.
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Content-Type", contentType)
-		if contentType == "image/svg+xml" {
-			w.Header().Set("Content-Security-Policy", svgPolicy)
-		}
+		imageHeaders(w, contentType)
 		http.ServeFile(w, r, file)
 	})
+}
+
+// imageHeaders are an image's, wherever it comes from (the wiki, a repo):
+// declared, never sniffed, so the browser takes it for what the extension
+// says; an SVG may draw and nothing else.
+func imageHeaders(w http.ResponseWriter, contentType string) {
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Type", contentType)
+	if contentType == "image/svg+xml" {
+		w.Header().Set("Content-Security-Policy", svgPolicy)
+	}
 }
 
 func writeWiki(w http.ResponseWriter, v any, err error) {

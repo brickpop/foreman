@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// A project's Activity section (wiki/product/features/project-activity.md): the
+// The Activity view of a project's Team section (wiki/product/features/project-activity.md): the
 // team traffic of a deployment, messages and git actions together,
 // newest first, a page at a time.
 

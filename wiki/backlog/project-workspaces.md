@@ -28,7 +28,7 @@ epic: install-first-run
 - **Bounds: anywhere in `$HOME`, never inside `~/.foreman`**, for workspaces and code repos alike. This **replaces the start-folder bound** (2026-10-20, [Add a project → Picking repos](../product/features/add-project.md#picking-repos)): the folder browser opens at the folder Foreman was started from, as a convenience, and can go up to `$HOME`.
 - **The harness's own files leave the sandbox**: `.harness/` (the private config, conversation transcripts, account record, the login's mount point) moves to `~/.foreman/harness/<project>/<agent>/`, which stays readable only by the CEO (0700), whereas a workspace isn't (`ConfigDir` in each adapter).
 - **Existing projects: offered a migration**, per project, while nothing is deployed on it: the project repo and every sandbox (stopped deployments' worktrees too) move into the workspace, `git worktree repair` in each code repo, `.harness/` to its new place, and **each agent's conversations carried over**: Claude Code and Pi file a conversation under its working folder's path, so each adapter renames its own folder to the new path, and agents continue where they were.
-- **Removing a project** keeps the workspace (the CEO's files), and offers to clean up the agents' worktrees (on a project kept, Deployment's [Clean up](../product/features/project-deployment.md#earlier-teams) does it, only what is safe).
+- **Removing a project** keeps the workspace (the CEO's files), and offers to clean up the agents' worktrees (on a project kept, the Team section's [Clean up](../product/features/project-team.md#earlier-teams) does it, only what is safe).
 
 ## To keep in mind (told to the CEO)
 

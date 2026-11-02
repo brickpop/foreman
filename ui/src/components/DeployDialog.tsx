@@ -6,6 +6,7 @@ import { harnessLabel, readable, replacingLine } from "../app/model";
 import { sessionOf } from "../app/project";
 import {
   keys,
+  useContinuing,
   useDeployments,
   useInstances,
   useProfiles,
@@ -22,7 +23,7 @@ import { Button } from "./ui";
 // project has one team at most: another one there is replaced, and the dialog
 // says so first.
 // Opened with a team preset (Team page, Dashboard), a project preset (its
-// Session and Deployment sections), or neither (Dashboard). The project's
+// Session and Team sections), or neither (Dashboard). The project's
 // profile, not connected, is connected from here.
 
 const option = (on: boolean, disabled = false) =>
@@ -81,8 +82,13 @@ export function DeployDialog({
   const teamName = team && nameOf(team);
   const replaced = project && !already(project) ? on(project) : undefined;
   const ending = (instances.data ?? []).filter((i) => i.deploymentId === replaced?.id).length;
+  // Agents that worked here before continue their conversations, unless the
+  // CEO starts fresh; offered only when there are some.
+  const continuing = useContinuing(team, project).data ?? [];
+  const [fresh, setFresh] = useState(false);
   const deploy = useMutation({
-    mutationFn: () => client.agents.deploy(team ?? "", project ?? ""),
+    mutationFn: () =>
+      client.agents.deploy(team ?? "", project ?? "", fresh && continuing.length > 0),
     onSuccess: async (d) => {
       // Its agents loaded first: until then the Session section doesn't know
       // the team, and would offer to deploy one.
@@ -159,6 +165,20 @@ export function DeployDialog({
           <p className="m-0 rounded-lg border border-attnLine bg-attnSoft px-3 py-2.5 text-[13px] text-attnTx">
             {replacingLine(nameOf(replaced.teamId), replaced.projectId, ending)}
           </p>
+        )}
+        {project && !already(project) && continuing.length > 0 && (
+          <label className="flex items-start gap-2 text-[13px] text-tx2">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={fresh}
+              onChange={(e) => setFresh(e.target.checked)}
+            />
+            <span>
+              Start fresh: the agents don’t continue their earlier conversations here (kept on
+              disk).
+            </span>
+          </label>
         )}
         {chosen?.archived && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">

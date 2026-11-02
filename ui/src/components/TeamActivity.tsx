@@ -7,7 +7,7 @@ import { useDraft, useInstances, useSettings } from "../app/queries";
 import { CodeText } from "./CodeText";
 import { Dot } from "./ui";
 
-// A team's activity, the parts of a project's Activity section
+// A team's activity, the parts of a project's Team section's Activity view
 // (wiki/product/features/project-activity.md): the map of who calls whom,
 // which filters, and the rows: one per thread, which opens into a chat, and
 // one per git action.

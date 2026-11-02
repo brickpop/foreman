@@ -24,7 +24,7 @@ type fakeAgents struct {
 	restarted []string
 }
 
-func (f *fakeAgents) Deploy(_ context.Context, team, project string) (store.Deployment, error) {
+func (f *fakeAgents) Deploy(_ context.Context, team, project string, fresh bool) (store.Deployment, error) {
 	switch project {
 	case "busy":
 		return store.Deployment{}, store.ErrActive
@@ -33,8 +33,18 @@ func (f *fakeAgents) Deploy(_ context.Context, team, project string) (store.Depl
 	case "early":
 		return store.Deployment{}, fmt.Errorf("%w: podman isn't running", instances.ErrNotReady)
 	}
-	f.deployed = append(f.deployed, deployRequest{team, project})
+	f.deployed = append(f.deployed, deployRequest{team, project, fresh})
 	return store.Deployment{ID: team + "@" + project, Status: store.DeploymentActive}, nil
+}
+
+func (f *fakeAgents) Continuing(_ context.Context, team, project string) ([]string, error) {
+	switch {
+	case team == "nope":
+		return nil, fmt.Errorf("%w: team nope: no such team", instances.ErrInvalid)
+	case project == "ledger":
+		return []string{"mara", "tove"}, nil
+	}
+	return nil, nil
 }
 
 func (f *fakeAgents) Stop(_ context.Context, id string) error {
@@ -79,8 +89,11 @@ func TestDeployAndStop(t *testing.T) {
 	w := send(h, "POST", "/api/deployments", `{"team":"atlas","project":"ledger"}`)
 	var dep map[string]any
 	_ = json.Unmarshal(w.Body.Bytes(), &dep)
-	if w.Code != http.StatusCreated || dep["id"] != "atlas@ledger" || len(a.deployed) != 1 || a.deployed[0] != (deployRequest{"atlas", "ledger"}) {
+	if w.Code != http.StatusCreated || dep["id"] != "atlas@ledger" || len(a.deployed) != 1 || a.deployed[0] != (deployRequest{"atlas", "ledger", false}) {
 		t.Errorf("deploy: %d %s %+v", w.Code, w.Body, a.deployed)
+	}
+	if w := send(h, "POST", "/api/deployments", `{"team":"orion","project":"ledger","fresh":true}`); w.Code != http.StatusCreated || a.deployed[1] != (deployRequest{"orion", "ledger", true}) {
+		t.Errorf("deploy fresh: %d %+v", w.Code, a.deployed)
 	}
 	if w := send(h, "DELETE", "/api/deployments/atlas@ledger", ""); w.Code != http.StatusNoContent || len(a.stopped) != 1 {
 		t.Errorf("stop: %d %+v", w.Code, a.stopped)
@@ -101,6 +114,8 @@ func TestDeployErrors(t *testing.T) {
 		{"POST", "/api/deployments", `{"team":"atlas","project":"early"}`, 409, "NOT_READY"},
 		{"POST", "/api/instances/early@ledger/wake", ``, 409, "NOT_READY"},
 		{"DELETE", "/api/deployments/nope@x", ``, 404, "NOT_FOUND"},
+		{"GET", "/api/deployments/continuing?team=atlas", ``, 400, "BAD_REQUEST"},
+		{"GET", "/api/deployments/continuing?team=nope&project=ledger", ``, 400, "INVALID"},
 	} {
 		w := send(h, tc.method, tc.path, tc.body)
 		var body map[string]string
@@ -240,5 +255,19 @@ func TestRestart(t *testing.T) {
 	}
 	if w := send(h, "POST", "/api/instances/nobody@ledger/restart", ""); w.Code != http.StatusNotFound {
 		t.Errorf("unknown instance: %d", w.Code)
+	}
+}
+
+func TestContinuing(t *testing.T) {
+	h := withAgents(&fakeAgents{})
+	for _, tc := range []struct{ query, want string }{
+		{"team=atlas&project=ledger", `{"agents":["mara","tove"]}`},
+		// None is an empty list, never null: the dialog reads its length.
+		{"team=atlas&project=fresh", `{"agents":[]}`},
+	} {
+		w := get(t, h, "/api/deployments/continuing?"+tc.query)
+		if w.Code != http.StatusOK || strings.TrimSpace(w.Body.String()) != tc.want {
+			t.Errorf("%s: %d %s", tc.query, w.Code, w.Body)
+		}
 	}
 }

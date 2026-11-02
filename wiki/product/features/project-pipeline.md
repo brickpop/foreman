@@ -9,7 +9,7 @@ tags: [feature, ui, requests, pipeline]
 What needs the CEO on a project, the work moving towards its [targets](./pipeline-and-merges.md#merge-targets), and what recently merged. These were the **Changes** tab until 2026-10-17, when the CEO split them by what they are ([Repositories card](../../backlog/archive/project-code-tab.md)):
 
 - **Needs you** is in the project's [Inbox](./reviews.md#the-inbox), after its reviews, only when something waits; the Inbox's sidebar badge counts both (the CEO, 2026-10-31; above the wiki on Overview until then).
-- **In flight** and **Merged** are in the project's [Deployment](./project-deployment.md) section, under its agents (on Repositories from 2026-10-17 to 2026-10-21, then Worktrees until 2026-10-31).
+- **In flight** and **Merged** are in the project's [Team](./project-team.md) section, under its agents (on Repositories from 2026-10-17 to 2026-10-21, then Worktrees until 2026-10-31).
 
 Each section keeps the project sections' 24px sides, with 36px between sections.
 

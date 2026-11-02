@@ -518,6 +518,18 @@ export function useSetup() {
   });
 }
 
+/** The team's agents that would continue an earlier conversation on
+ * project (Deploy's Start fresh). Under the deployments' key: a stop or a
+ * deploy changes it. */
+export function useContinuing(team?: string, project?: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.deployments, "continuing", team, project],
+    queryFn: () => c.agents.continuing(team ?? "", project ?? ""),
+    enabled: !!team && !!project,
+  });
+}
+
 /** The stopped deployments: a project's older sessions. Under the
  * deployments' key, so a stop refreshes them. */
 export function useStoppedDeployments() {
@@ -552,7 +564,7 @@ export function useLatestActivity(): Record<string, string> | undefined {
 }
 
 /** A deployment's team traffic a page at a time, newest first (a project's
- * Activity section). */
+ * Team section's Activity view). */
 export function useActivity(deployment: string, enabled = true) {
   const c = useClient();
   return useInfiniteQuery({

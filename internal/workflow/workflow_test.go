@@ -170,7 +170,7 @@ func newFixture(t *testing.T) *fixture {
 			t.Fatal(err)
 		}
 	}
-	for agent, branch := range map[string]string{"mara": "lead/atlas/integration", "tove": "wt/tove/main"} {
+	for agent, branch := range map[string]string{"mara": "lead/ledger/atlas/integration", "tove": "wt/ledger/tove/main"} {
 		for _, r := range []string{"api", "web"} {
 			if err := g.Prepare(ctx, filepath.Join(root, "ledger", r), filepath.Join(root, "ledger", ".sandboxes", agent, r), branch, mainOf(r)); err != nil {
 				t.Fatal(err)
@@ -267,38 +267,43 @@ func (f *fixture) refused(agent, tool string, args any, code string) string {
 
 func TestSwitchInEveryRepo(t *testing.T) {
 	f := newFixture(t)
-	text := f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
-	if text != "Switched api, web to wt/tove/LED-44. New in api (from main), web (from trunk)." {
+	text := f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/LED-44"})
+	if text != "Switched api, web to wt/ledger/tove/LED-44. New in api (from main), web (from trunk)." {
 		t.Errorf("%q", text)
 	}
 	for _, r := range []string{"api", "web"} {
-		if b := f.git(f.wt("tove", r), "branch", "--show-current"); b != "wt/tove/LED-44" {
+		if b := f.git(f.wt("tove", r), "branch", "--show-current"); b != "wt/ledger/tove/LED-44" {
 			t.Errorf("%s on %q", r, b)
 		}
 	}
-	if text := f.ok("tove", "switch", map[string]string{"branch": "wt/tove/main"}); strings.Contains(text, "New") {
+	if text := f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/main"}); strings.Contains(text, "New") {
 		t.Errorf("back home: %q", text)
 	}
-	if text := f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/settlement"}); !strings.Contains(text, "New in api (from main), web (from trunk)") {
+	if text := f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/settlement"}); !strings.Contains(text, "New in api (from main), web (from trunk)") {
 		t.Errorf("lead: %q", text)
 	}
 }
 
 func TestSwitchRefusals(t *testing.T) {
 	f := newFixture(t)
-	f.refused("tove", "switch", map[string]string{"branch": "wt/mara/x"}, "branch_not_allowed")
-	f.refused("tove", "switch", map[string]string{"branch": "lead/atlas/x"}, "branch_not_allowed")
+	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/mara/x"}, "branch_not_allowed")
+	f.refused("tove", "switch", map[string]string{"branch": "lead/ledger/atlas/x"}, "branch_not_allowed")
 	f.refused("tove", "switch", map[string]string{"branch": "main"}, "branch_not_allowed")
-	f.refused("tove", "switch", map[string]string{"branch": "wt/tove/"}, "bad_branch")
-	f.refused("tove", "switch", map[string]string{"branch": "wt/tove/a b"}, "bad_branch")
-	f.refused("mara", "switch", map[string]string{"branch": "wt/mara/x"}, "branch_not_allowed")
-	f.refused("mara", "switch", map[string]string{"branch": "lead/other/x"}, "branch_not_allowed")
+	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/"}, "bad_branch")
+	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/a b"}, "bad_branch")
+	f.refused("mara", "switch", map[string]string{"branch": "wt/ledger/mara/x"}, "branch_not_allowed")
+	f.refused("mara", "switch", map[string]string{"branch": "lead/ledger/other/x"}, "branch_not_allowed")
+	// Another project's branches, and the names from before branches carried one.
+	f.refused("tove", "switch", map[string]string{"branch": "wt/suite/tove/x"}, "branch_not_allowed")
+	f.refused("mara", "switch", map[string]string{"branch": "lead/suite/atlas/x"}, "branch_not_allowed")
+	f.refused("tove", "switch", map[string]string{"branch": "wt/tove/x"}, "branch_not_allowed")
+	f.refused("mara", "switch", map[string]string{"branch": "lead/atlas/x"}, "branch_not_allowed")
 	// Changes in one repo stop the switch in all of them: it never stops halfway.
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft"), "x\n")
-	if text := f.refused("tove", "switch", map[string]string{"branch": "wt/tove/x"}, "uncommitted_changes"); !strings.Contains(text, "web") || strings.Contains(text, "api") {
+	if text := f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x"}, "uncommitted_changes"); !strings.Contains(text, "web") || strings.Contains(text, "api") {
 		t.Errorf("%q", text)
 	}
-	if b := f.git(f.wt("tove", "api"), "branch", "--show-current"); b != "wt/tove/main" {
+	if b := f.git(f.wt("tove", "api"), "branch", "--show-current"); b != "wt/ledger/tove/main" {
 		t.Errorf("api switched anyway, to %q", b)
 	}
 }
@@ -313,7 +318,7 @@ func TestCommitTheReposNamedAsTheAgent(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft.ts"), "x\n")
 	text := f.ok("tove", "commit", commits("api", "cal v0"))
-	if !strings.HasPrefix(text, "Committed api (wt/tove/main, ") || strings.Contains(text, "web") {
+	if !strings.HasPrefix(text, "Committed api (wt/ledger/tove/main, ") || strings.Contains(text, "web") {
 		t.Errorf("%q", text)
 	}
 	if who := f.git(f.wt("tove", "api"), "log", "-1", "--format=%an <%ae>|%s"); who != "Tove <tove@foreman.invalid>|cal v0" {
@@ -329,7 +334,7 @@ func TestCommitTheReposNamedAsTheAgent(t *testing.T) {
 	// Two repos, two messages; one with nothing new is said, not refused.
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v1\n")
 	text = f.ok("tove", "commit", commits("api", "cal v1", "web", "the draft"))
-	if !strings.Contains(text, "api (wt/tove/main, ") || !strings.Contains(text, "web (wt/tove/main, ") {
+	if !strings.Contains(text, "api (wt/ledger/tove/main, ") || !strings.Contains(text, "web (wt/ledger/tove/main, ") {
 		t.Errorf("%q", text)
 	}
 	if api, web := f.git(f.wt("tove", "api"), "log", "-1", "--format=%s"), f.git(f.wt("tove", "web"), "log", "-1", "--format=%s"); api != "cal v1" || web != "the draft" {
@@ -421,9 +426,9 @@ func TestMergeATeammatesBranch(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
 	f.ok("tove", "commit", commits("api", "cal"))
-	f.refused("mara", "merge", map[string]string{"branch": "wt/tove/nope"}, "branch_not_found")
+	f.refused("mara", "merge", map[string]string{"branch": "wt/ledger/tove/nope"}, "branch_not_found")
 	f.refused("mara", "merge", map[string]string{"branch": "-x"}, "bad_branch")
-	if text := f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"}); text != "Merged wt/tove/main into api, web." {
+	if text := f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/main"}); text != "Merged wt/ledger/tove/main into api, web." {
 		t.Errorf("%q", text)
 	}
 	if _, err := os.Stat(filepath.Join(f.wt("mara", "api"), "cal.go")); err != nil {
@@ -439,32 +444,32 @@ func TestMergeWithConflictsThenCommit(t *testing.T) {
 	f.ok("tove", "commit", commits("api", "tove's readme"))
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
 	f.ok("mara", "commit", commits("api", "mara's readme"))
-	text := f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
-	if text != "Merged wt/tove/main into web. Conflicts in api (README): resolve the markers (a submodule: pick its commit with set_submodule), then commit those repos to finish the merge, or abort_merge() to back out." {
+	text := f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/main"})
+	if text != "Merged wt/ledger/tove/main into web. Conflicts in api (README): resolve the markers (a submodule: pick its commit with set_submodule), then commit those repos to finish the merge, or abort_merge() to back out." {
 		t.Errorf("%q", text)
 	}
 	if text := f.refused("mara", "commit", commits("api", "merged"), "conflicts_left"); !strings.Contains(text, "api/README") {
 		t.Errorf("%q", text)
 	}
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "both\n")
-	if text := f.ok("mara", "commit", commits("api", "merged")); !strings.Contains(text, "api (lead/atlas/integration") {
+	if text := f.ok("mara", "commit", commits("api", "merged")); !strings.Contains(text, "api (lead/ledger/atlas/integration") {
 		t.Errorf("%q", text)
 	}
 }
 
 func TestHandoffNamesACommittedBranch(t *testing.T) {
 	f := newFixture(t)
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "done"}, "nothing_new")
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/LED-44"})
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/LED-44", "summary": "done"}, "nothing_new")
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
 	// Pending work is refused, never committed for the agent: commit() is the one way.
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "done"}, "uncommitted_changes")
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/LED-44", "summary": "done"}, "uncommitted_changes")
 	if len(f.m.sent) != 0 {
 		t.Fatalf("a refusal sent %v", f.m.sent)
 	}
 	f.ok("tove", "commit", commits("api", "cal v0"))
-	text := f.ok("tove", "handoff", map[string]string{"teammate": "Mara", "branch": "wt/tove/LED-44", "summary": "cal v0: all 6 samples match"})
-	if text != "msg-1: wt/tove/LED-44 handed to Mara. Your part ends here." {
+	text := f.ok("tove", "handoff", map[string]string{"teammate": "Mara", "branch": "wt/ledger/tove/LED-44", "summary": "cal v0: all 6 samples match"})
+	if text != "msg-1: wt/ledger/tove/LED-44 handed to Mara. Your part ends here." {
 		t.Errorf("%q", text)
 	}
 	if subject := f.git(f.wt("tove", "api"), "log", "-1", "--format=%s"); subject != "cal v0" {
@@ -474,7 +479,7 @@ func TestHandoffNamesACommittedBranch(t *testing.T) {
 		t.Fatalf("sent %v", f.m.sent)
 	}
 	msg := f.m.sent[0]
-	if msg.Kind != "handoff" || msg.ToInstance != "mara@ledger" || msg.FromInstance != "tove@ledger" || msg.ArtifactRef != "wt/tove/LED-44" || msg.Body != "cal v0: all 6 samples match" {
+	if msg.Kind != "handoff" || msg.ToInstance != "mara@ledger" || msg.FromInstance != "tove@ledger" || msg.ArtifactRef != "wt/ledger/tove/LED-44" || msg.Body != "cal v0: all 6 samples match" {
 		t.Errorf("message %+v", msg)
 	}
 }
@@ -482,17 +487,17 @@ func TestHandoffNamesACommittedBranch(t *testing.T) {
 func TestHandoffRefusals(t *testing.T) {
 	f := newFixture(t)
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "draft"), "x\n")
-	f.refused("tove", "handoff", map[string]string{"teammate": "rhea", "branch": "wt/tove/main", "summary": "x"}, "unknown_teammate")
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ivo/main", "summary": "x"}, "branch_not_allowed")
+	f.refused("tove", "handoff", map[string]string{"teammate": "rhea", "branch": "wt/ledger/tove/main", "summary": "x"}, "unknown_teammate")
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/ivo/main", "summary": "x"}, "branch_not_allowed")
 	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "main", "summary": "x"}, "branch_not_allowed")
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/main", "summary": ""}, "empty")
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/main", "summary": ""}, "empty")
 	// No refusal commits anything.
 	if status := f.git(f.wt("tove", "api"), "status", "--porcelain"); !strings.Contains(status, "draft") {
 		t.Errorf("a refused hand-off committed: %q", status)
 	}
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/main", "summary": "x"}, "uncommitted_changes")
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/main", "summary": "x"}, "uncommitted_changes")
 	os.Remove(filepath.Join(f.wt("tove", "api"), "draft"))
-	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/never", "summary": "x"}, "branch_not_found")
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/never", "summary": "x"}, "branch_not_found")
 	if len(f.m.sent) != 0 {
 		t.Errorf("a refusal sent %v", f.m.sent)
 	}
@@ -575,7 +580,7 @@ func TestAbortMerge(t *testing.T) {
 	f.ok("tove", "commit", commits("api", "tove's readme"))
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
 	f.ok("mara", "commit", commits("api", "mara's readme"))
-	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/main"})
+	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/main"})
 	if text := f.ok("mara", "abort_merge", nil); text != "Merge aborted in api: your branch is as it was before it." {
 		t.Errorf("%q", text)
 	}
@@ -622,7 +627,7 @@ func TestDiscard(t *testing.T) {
 	f.git(web, "checkout", "--", ".")
 	writeFile(t, filepath.Join(web, "README"), "tove\n")
 	f.ok("tove", "commit", commits("web", "tove's readme"))
-	f.call("tove", "merge", map[string]string{"branch": "lead/atlas/integration"})
+	f.call("tove", "merge", map[string]string{"branch": "lead/ledger/atlas/integration"})
 	writeFile(t, filepath.Join(api, "more.go"), "package more\n")
 	f.refused("tove", "discard", nil, "merge_under_way")
 	if _, err := os.Stat(filepath.Join(api, "more.go")); err != nil {
@@ -647,7 +652,7 @@ func TestAResumedAgentIsToldWhatItLeft(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft.txt"), "half done\n")
 	f.w.Resumed(ctx, instance("tove"), false)
 	if n := f.lastNotice(); n.ToInstance != "tove@ledger" || n.Body != "From Foreman: your worktrees hold earlier work. "+
-		"Branches with work no target has: wt/tove/LED-44 (api). Changes not committed in web (on wt/tove/LED-44). "+
+		"Branches with work no target has: wt/ledger/tove/LED-44 (api). Changes not committed in web (on wt/ledger/tove/LED-44). "+
 		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from). Changes you don't want: discard()." {
 		t.Errorf("tove: %+v", n)
 	}
@@ -655,8 +660,8 @@ func TestAResumedAgentIsToldWhatItLeft(t *testing.T) {
 	f.ok("mara", "request_merge", integration)
 	f.w.Resumed(ctx, instance("mara"), true)
 	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.Body != "From Foreman: your worktrees hold earlier work. "+
-		"Branches with work no target has: lead/atlas/integration (api). "+
-		"Your reviews still open: lead/atlas/integration (waiting for the CEO). "+
+		"Branches with work no target has: lead/ledger/atlas/integration (api). "+
+		"Your reviews still open: lead/ledger/atlas/integration (waiting for the CEO). "+
 		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from)." {
 		t.Errorf("mara: %+v", n)
 	}
@@ -677,16 +682,16 @@ func TestGitToolsAreKeptAsActions(t *testing.T) {
 	f := newFixture(t)
 	kept := &actions{}
 	f.w.Actions = kept
-	f.ok("tove", "switch", map[string]string{"branch": "wt/tove/LED-44"})
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/LED-44"})
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal\n")
 	f.ok("tove", "commit", commits("api", "cal v0"))
 	f.refused("tove", "switch", map[string]string{"branch": "main"}, "branch_not_allowed")
-	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "done"})
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/LED-44", "summary": "done"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "README"), "mara\n")
 	f.ok("mara", "commit", commits("api", "mara's readme"))
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "README"), "tove\n")
 	f.ok("tove", "commit", commits("api", "tove's readme"))
-	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
+	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/LED-44"})
 	f.ok("mara", "abort_merge", nil)
 
 	var tools []string
@@ -697,20 +702,20 @@ func TestGitToolsAreKeptAsActions(t *testing.T) {
 		t.Fatalf("kept %v", tools)
 	}
 	sw, commit, refused, merge, abort := kept.kept[0], kept.kept[1], kept.kept[2], kept.kept[5], kept.kept[6]
-	if sw.Instance != "tove@ledger" || sw.DeploymentID != "atlas@ledger" || sw.Branch != "wt/tove/LED-44" || len(sw.Repos) != 2 || !sw.Repos[0].Created {
+	if sw.Instance != "tove@ledger" || sw.DeploymentID != "atlas@ledger" || sw.Branch != "wt/ledger/tove/LED-44" || len(sw.Repos) != 2 || !sw.Repos[0].Created {
 		t.Errorf("switch %+v", sw)
 	}
-	if len(commit.Repos) != 1 || commit.Repos[0].Message != "cal v0" || commit.Repos[0].Repo != "api" || commit.Repos[0].Branch != "wt/tove/LED-44" || len(commit.Repos[0].Commit) != 40 {
+	if len(commit.Repos) != 1 || commit.Repos[0].Message != "cal v0" || commit.Repos[0].Repo != "api" || commit.Repos[0].Branch != "wt/ledger/tove/LED-44" || len(commit.Repos[0].Commit) != 40 {
 		t.Errorf("commit %+v", commit)
 	}
 	if !strings.HasPrefix(refused.Error, "branch_not_allowed:") || len(refused.Repos) != 0 {
 		t.Errorf("refused %+v", refused)
 	}
-	if merge.Branch != "wt/tove/LED-44" || merge.Error != "" || len(merge.Repos) != 2 {
+	if merge.Branch != "wt/ledger/tove/LED-44" || merge.Error != "" || len(merge.Repos) != 2 {
 		t.Fatalf("merge %+v", merge)
 	}
 	for _, r := range merge.Repos {
-		if r.Branch != "lead/atlas/integration" || (r.Repo == "api") != (len(r.Conflicts) == 1) {
+		if r.Branch != "lead/ledger/atlas/integration" || (r.Repo == "api") != (len(r.Conflicts) == 1) {
 			t.Errorf("merge in %+v", r)
 		}
 	}
@@ -735,7 +740,7 @@ func (f *fixture) handOff(branch string, repos ...string) {
 	f.ok("tove", "switch", map[string]string{"branch": branch})
 	var each []string
 	for _, r := range repos {
-		writeFile(f.t, filepath.Join(f.wt("tove", r), branch[len("wt/tove/"):]+".go"), fmt.Sprintf("package x // %d\n", len(f.m.sent)))
+		writeFile(f.t, filepath.Join(f.wt("tove", r), branch[len("wt/ledger/tove/"):]+".go"), fmt.Sprintf("package x // %d\n", len(f.m.sent)))
 		each = append(each, r, "work on "+branch)
 	}
 	f.ok("tove", "commit", commits(each...))
@@ -744,8 +749,8 @@ func (f *fixture) handOff(branch string, repos ...string) {
 
 func TestWorkItemsFollowHandoffDeliveryAndIntegration(t *testing.T) {
 	f := newFixture(t)
-	f.handOff("wt/tove/LED-44", "api", "web")
-	w := f.item("wt/tove/LED-44")
+	f.handOff("wt/ledger/tove/LED-44", "api", "web")
+	w := f.item("wt/ledger/tove/LED-44")
 	if w.ID != "wi-1" || w.Stage != store.StageHanded || w.AuthorInstance != "tove@ledger" {
 		t.Fatalf("after the hand-off: %+v", w)
 	}
@@ -754,48 +759,48 @@ func TestWorkItemsFollowHandoffDeliveryAndIntegration(t *testing.T) {
 	}
 
 	// Delivered into mara's session: she's reviewing it. Other deliveries move nothing.
-	delivered := store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "handoff", ArtifactRef: "wt/tove/LED-44", State: store.MessageDelivered}
-	f.w.Delivered(ctx, store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "handoff", ArtifactRef: "wt/tove/LED-44", State: store.MessageQueued})
-	f.w.Delivered(ctx, store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "ask", ArtifactRef: "wt/tove/LED-44", State: store.MessageDelivered})
-	if f.item("wt/tove/LED-44").Stage != store.StageHanded {
+	delivered := store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "handoff", ArtifactRef: "wt/ledger/tove/LED-44", State: store.MessageDelivered}
+	f.w.Delivered(ctx, store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "handoff", ArtifactRef: "wt/ledger/tove/LED-44", State: store.MessageQueued})
+	f.w.Delivered(ctx, store.TeamMessage{DeploymentID: "atlas@ledger", Kind: "ask", ArtifactRef: "wt/ledger/tove/LED-44", State: store.MessageDelivered})
+	if f.item("wt/ledger/tove/LED-44").Stage != store.StageHanded {
 		t.Error("a queued hand-off, or an ask, moved the work item")
 	}
 	f.w.Delivered(ctx, delivered)
-	if f.item("wt/tove/LED-44").Stage != store.StageReviewing {
+	if f.item("wt/ledger/tove/LED-44").Stage != store.StageReviewing {
 		t.Error("the delivery didn't move it to reviewing")
 	}
 
 	// Tove's own merges never integrate: only the lead's.
 	f.ok("tove", "merge", map[string]string{"branch": "main"})
-	if f.item("wt/tove/LED-44").Stage != store.StageReviewing {
+	if f.item("wt/ledger/tove/LED-44").Stage != store.StageReviewing {
 		t.Error("a member's merge integrated it")
 	}
 	// Merged into the lead branch in one repo only: not yet.
-	f.git(f.wt("mara", "api"), "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "api only", "wt/tove/LED-44")
+	f.git(f.wt("mara", "api"), "-c", "user.name=t", "-c", "user.email=t@t", "merge", "-q", "--no-ff", "-m", "api only", "wt/ledger/tove/LED-44")
 	f.ok("mara", "merge", map[string]string{"branch": "main"}) // any merge of hers checks
-	if f.item("wt/tove/LED-44").Stage != store.StageReviewing {
+	if f.item("wt/ledger/tove/LED-44").Stage != store.StageReviewing {
 		t.Error("integrated with web still missing")
 	}
-	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
-	if got := f.item("wt/tove/LED-44"); got.Stage != store.StageIntegrated {
+	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/LED-44"})
+	if got := f.item("wt/ledger/tove/LED-44"); got.Stage != store.StageIntegrated {
 		t.Errorf("after the lead's merge: %+v", got)
 	}
 
 	// A new hand-off of the same branch (after a change request) brings it back.
-	f.handOff("wt/tove/LED-44", "api")
-	if got := f.item("wt/tove/LED-44"); got.ID != "wi-1" || got.Stage != store.StageHanded {
+	f.handOff("wt/ledger/tove/LED-44", "api")
+	if got := f.item("wt/ledger/tove/LED-44"); got.ID != "wi-1" || got.Stage != store.StageHanded {
 		t.Errorf("handed again: %+v", got)
 	}
 }
 
 func TestIntegrationIsPerBranchAndInAnyLeadBranch(t *testing.T) {
 	f := newFixture(t)
-	f.handOff("wt/tove/a", "api")
-	f.handOff("wt/tove/b", "web")
+	f.handOff("wt/ledger/tove/a", "api")
+	f.handOff("wt/ledger/tove/b", "web")
 	// Mara merges b into another lead branch of hers: b is integrated, a isn't.
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/settlement"})
-	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/b"})
-	if a, b := f.item("wt/tove/a"), f.item("wt/tove/b"); a.Stage != store.StageHanded || b.Stage != store.StageIntegrated {
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/settlement"})
+	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/b"})
+	if a, b := f.item("wt/ledger/tove/a"), f.item("wt/ledger/tove/b"); a.Stage != store.StageHanded || b.Stage != store.StageIntegrated {
 		t.Errorf("a %+v, b %+v", a, b)
 	}
 	// The pipeline lists the project's work items.
@@ -817,11 +822,11 @@ func (f *fixture) lastNotice() store.TeamMessage {
 	return store.TeamMessage{}
 }
 
-// integrated: tove's wt/tove/LED-44 (api only) handed off and merged by mara.
+// integrated: tove's wt/ledger/tove/LED-44 (api only) handed off and merged by mara.
 func (f *fixture) integrated() {
 	f.t.Helper()
-	f.handOff("wt/tove/LED-44", "api")
-	f.ok("mara", "merge", map[string]string{"branch": "wt/tove/LED-44"})
+	f.handOff("wt/ledger/tove/LED-44", "api")
+	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/LED-44"})
 }
 
 func TestRequestMergeRefusals(t *testing.T) {
@@ -829,15 +834,15 @@ func TestRequestMergeRefusals(t *testing.T) {
 	req := func(branch, entry string) map[string]string {
 		return map[string]string{"branch": branch, "entry": entry}
 	}
-	f.refused("tove", "request_merge", req("wt/tove/main", "backlog/led-44.md"), "not_lead")
-	f.refused("mara", "request_merge", req("wt/tove/main", "backlog/led-44.md"), "branch_not_allowed")
-	f.refused("mara", "request_merge", req("lead/orion/x", "backlog/led-44.md"), "branch_not_allowed")
-	f.refused("mara", "request_merge", req("lead/atlas/integration", ""), "entry_not_found")
-	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/nope.md"), "entry_not_found")
-	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/led-44.md"), "nothing_to_merge")
-	f.refused("mara", "request_merge", req("lead/atlas/none", "backlog/led-44.md"), "branch_not_found")
+	f.refused("tove", "request_merge", req("wt/ledger/tove/main", "backlog/led-44.md"), "not_lead")
+	f.refused("mara", "request_merge", req("wt/ledger/tove/main", "backlog/led-44.md"), "branch_not_allowed")
+	f.refused("mara", "request_merge", req("lead/ledger/orion/x", "backlog/led-44.md"), "branch_not_allowed")
+	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", ""), "entry_not_found")
+	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", "backlog/nope.md"), "entry_not_found")
+	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", "backlog/led-44.md"), "nothing_to_merge")
+	f.refused("mara", "request_merge", req("lead/ledger/atlas/none", "backlog/led-44.md"), "branch_not_found")
 	writeFile(t, filepath.Join(f.wt("mara", "web"), "wip"), "x\n")
-	f.refused("mara", "request_merge", req("lead/atlas/integration", "backlog/led-44.md"), "uncommitted_changes")
+	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", "backlog/led-44.md"), "uncommitted_changes")
 }
 
 // mr is a merge request as kept.
@@ -880,7 +885,7 @@ func (f *fixture) shown(id string, repos ...string) map[string]string {
 	return heads
 }
 
-var integration = map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/led-44.md"}
+var integration = map[string]string{"branch": "lead/ledger/atlas/integration", "entry": "backlog/led-44.md"}
 
 func TestFromHandoffToMain(t *testing.T) {
 	f := newFixture(t)
@@ -889,7 +894,7 @@ func TestFromHandoffToMain(t *testing.T) {
 	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1) into main: waiting for the CEO." {
 		t.Fatalf("%q", text)
 	}
-	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-1" {
+	if w := f.item("wt/ledger/tove/LED-44"); w.MergeRequestID != "mr-1" {
 		t.Errorf("work item %+v", w)
 	}
 	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1) into main, refreshed: waiting for the CEO." {
@@ -900,7 +905,7 @@ func TestFromHandoffToMain(t *testing.T) {
 		t.Fatalf("pipeline %+v", p.MergeRequests)
 	}
 	v := f.review("rev-1")
-	if v.Status != ReviewNeedsYou || v.Title != "Export invoices" || v.Lead != "mara@ledger" || v.Branch != "lead/atlas/integration" || len(v.MergeRequests) != 1 {
+	if v.Status != ReviewNeedsYou || v.Title != "Export invoices" || v.Lead != "mara@ledger" || v.Branch != "lead/ledger/atlas/integration" || len(v.MergeRequests) != 1 {
 		t.Errorf("review %+v", v)
 	}
 	diffs, err := f.w.ReviewDiff(ctx, "rev-1", false)
@@ -938,7 +943,7 @@ func TestFromHandoffToMain(t *testing.T) {
 	if v := f.review("rev-1"); v.Status != ReviewMerged {
 		t.Errorf("status %q", v.Status)
 	}
-	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" || n.Body != "From Foreman: lead/atlas/integration was merged into main in api, as one commit. lead/atlas/integration now starts from main." {
+	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" || n.Body != "From Foreman: lead/ledger/atlas/integration was merged into main in api, as one commit. lead/ledger/atlas/integration now starts from main." {
 		t.Errorf("notice %+v", n)
 	}
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); !errors.Is(err, ErrNotOpen) {
@@ -1070,11 +1075,11 @@ func TestDismissKeepingTheBranches(t *testing.T) {
 		t.Errorf("merge request %+v", mr)
 	}
 	// The work item stays with the dismissed merge request: it leaves In flight with it.
-	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-1" || w.Stage != store.StageIntegrated {
+	if w := f.item("wt/ledger/tove/LED-44"); w.MergeRequestID != "mr-1" || w.Stage != store.StageIntegrated {
 		t.Errorf("work item %+v", w)
 	}
 	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.FromInstance != "foreman" ||
-		n.Body != "From Foreman: the CEO dismissed the review of lead/atlas/integration without merging (api). Stop work on it, and don't request it again. The CEO's note: not this quarter" {
+		n.Body != "From Foreman: the CEO dismissed the review of lead/ledger/atlas/integration without merging (api). Stop work on it, and don't request it again. The CEO's note: not this quarter" {
 		t.Errorf("notice %+v", n)
 	}
 	if v := f.review("rev-1"); v.Status != ReviewDismissed {
@@ -1091,7 +1096,7 @@ func TestDismissKeepingTheBranches(t *testing.T) {
 	if text := f.ok("mara", "request_merge", integration); !strings.HasPrefix(text, "Review rev-2, api (mr-2)") {
 		t.Errorf("%q", text)
 	}
-	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "mr-2" {
+	if w := f.item("wt/ledger/tove/LED-44"); w.MergeRequestID != "mr-2" {
 		t.Errorf("work item %+v", w)
 	}
 }
@@ -1101,7 +1106,7 @@ func TestDismissDroppingTheBranches(t *testing.T) {
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
 	api, lead, member := filepath.Join(f.root, "ledger", "api"), f.wt("mara", "api"), f.wt("tove", "api")
-	leadHead, memberHead := f.git(lead, "rev-parse", "HEAD"), f.git(api, "rev-parse", "wt/tove/LED-44")
+	leadHead, memberHead := f.git(lead, "rev-parse", "HEAD"), f.git(api, "rev-parse", "wt/ledger/tove/LED-44")
 	sent := len(f.m.sent)
 	dismissed, err := f.w.DismissReview(ctx, "rev-1", Dismiss{Note: "nobody hears this", DropBranches: true, StopTeam: true})
 	if err != nil || dismissed.Kept == nil || len(dismissed.Kept) != 0 {
@@ -1125,16 +1130,16 @@ func TestDismissDroppingTheBranches(t *testing.T) {
 		t.Error("the work is still in the lead's worktree")
 	}
 	// Tove's branch: gone, or at main when still checked out.
-	if f.git(member, "branch", "--show-current") == "wt/tove/LED-44" {
+	if f.git(member, "branch", "--show-current") == "wt/ledger/tove/LED-44" {
 		if f.git(member, "rev-parse", "HEAD") != f.git(api, "rev-parse", "main") {
 			t.Error("tove's branch still holds the work")
 		}
-	} else if out := f.git(api, "branch", "--list", "wt/tove/LED-44"); out != "" {
+	} else if out := f.git(api, "branch", "--list", "wt/ledger/tove/LED-44"); out != "" {
 		t.Errorf("tove's branch is still there: %q", out)
 	}
 	// Each kept aside, out of the branch list.
-	if f.git(api, "rev-parse", dismissedRef+"rev-1/lead/atlas/integration") != leadHead ||
-		f.git(api, "rev-parse", dismissedRef+"rev-1/wt/tove/LED-44") != memberHead {
+	if f.git(api, "rev-parse", dismissedRef+"rev-1/lead/ledger/atlas/integration") != leadHead ||
+		f.git(api, "rev-parse", dismissedRef+"rev-1/wt/ledger/tove/LED-44") != memberHead {
 		t.Error("no backups")
 	}
 }
@@ -1202,7 +1207,7 @@ func TestDismissDropsABranchWithChangesNotCommitted(t *testing.T) {
 	if f.git(lead, "rev-parse", "HEAD") != f.git(api, "rev-parse", "main") || f.git(lead, "status", "--porcelain") != "" {
 		t.Error("the lead's worktree isn't clean at main")
 	}
-	saved := dismissedRef + "rev-1/lead/atlas/integration@uncommitted"
+	saved := dismissedRef + "rev-1/lead/ledger/atlas/integration@uncommitted"
 	if f.git(api, "rev-parse", saved+"^") != head || f.git(api, "show", saved+":LED-44.go") != "package cal // the lead's, uncommitted" {
 		t.Error("the change not committed isn't kept")
 	}
@@ -1212,7 +1217,7 @@ func TestDismissDropsABranchWithChangesNotCommitted(t *testing.T) {
 func TestOldBackupsArePruned(t *testing.T) {
 	f := newFixture(t)
 	api := filepath.Join(f.root, "ledger", "api")
-	old := "refs/foreman/dismissed/2026-09-01T00-00-00Z/rev-0/lead/atlas/x"
+	old := "refs/foreman/dismissed/2026-09-01T00-00-00Z/rev-0/lead/ledger/atlas/x"
 	recent := "refs/foreman/discarded/2026-10-01T00-00-00Z/tove/api"
 	f.git(api, "update-ref", old, "main")
 	f.git(api, "update-ref", recent, "main")
@@ -1225,17 +1230,22 @@ func TestOldBackupsArePruned(t *testing.T) {
 // After a merge, idle desks follow the new main; one with work stays.
 func TestAMergeBringsIdleDesksUpToMain(t *testing.T) {
 	f := newFixture(t)
-	f.integrated() // tove now on wt/tove/LED-44: wt/tove/main idles, not checked out
+	f.integrated() // tove now on wt/ledger/tove/LED-44: wt/ledger/tove/main idles, not checked out
 	api := filepath.Join(f.root, "ledger", "api")
 	f.ok("mara", "request_merge", integration)
-	before := f.git(api, "rev-parse", "wt/tove/main")
+	before := f.git(api, "rev-parse", "wt/ledger/tove/main")
+	// Another project sharing the repo has its own default branch: its desks stay.
+	f.git(api, "branch", "wt/suite/tove/main", before)
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
 		t.Fatal(err)
 	}
-	if main := f.git(api, "rev-parse", "main"); main == before || f.git(api, "rev-parse", "wt/tove/main") != main {
+	if main := f.git(api, "rev-parse", "main"); main == before || f.git(api, "rev-parse", "wt/ledger/tove/main") != main {
 		t.Error("tove's idle desk didn't follow main")
 	}
-	if f.git(f.wt("tove", "api"), "branch", "--show-current") != "wt/tove/LED-44" {
+	if f.git(api, "rev-parse", "wt/suite/tove/main") != before {
+		t.Error("another project's desk followed this project's main")
+	}
+	if f.git(f.wt("tove", "api"), "branch", "--show-current") != "wt/ledger/tove/LED-44" {
 		t.Error("tove's work moved")
 	}
 }
@@ -1249,8 +1259,8 @@ func TestAHandOffAfterADismissalIsNewWork(t *testing.T) {
 	}
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "more.go"), "package cal\n")
 	f.ok("tove", "commit", commits("api", "more"))
-	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/LED-44", "summary": "again"})
-	if w := f.item("wt/tove/LED-44"); w.MergeRequestID != "" || w.Stage != store.StageHanded {
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/LED-44", "summary": "again"})
+	if w := f.item("wt/ledger/tove/LED-44"); w.MergeRequestID != "" || w.Stage != store.StageHanded {
 		t.Errorf("work item %+v", w)
 	}
 }
@@ -1305,7 +1315,7 @@ func TestRequestChangesSendsTheDraftAndWaitsOnTheLead(t *testing.T) {
 		t.Fatal(err)
 	}
 	if news := f.m.sent[sent:]; len(news) != 1 || news[0].FromInstance != "ceo" || news[0].ToInstance != "mara@ledger" ||
-		news[0].Body != "From the CEO: changes requested on lead/atlas/integration (backlog/led-44.md).\n\nNearly there.\n\n"+
+		news[0].Body != "From the CEO: changes requested on lead/ledger/atlas/integration (backlog/led-44.md).\n\nNearly there.\n\n"+
 			"- api calc.go:5 `func Two() int { return 3 }`: Two is 2\n\n- api calc.go:3 `func One() int { return 1 }`: One is fine\n\n- Add a test\n\n"+
 			"Fix them, commit(), then call request_merge again on the same branch." {
 		t.Errorf("message %+v", news)
@@ -1440,14 +1450,14 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
-	f.ok("mara", "switch", map[string]string{"branch": "lead/atlas/second"})
+	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/second"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
 	f.ok("mara", "commit", commits("api", "second"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/atlas/second", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/second", "entry": "backlog/led-44.md"})
 	// The CEO squashes the first by hand, in their own checkout, as a forge
 	// would: its commits never reach main.
 	api := filepath.Join(f.root, "ledger", "api")
-	f.git(api, "merge", "-q", "--squash", "lead/atlas/integration")
+	f.git(api, "merge", "-q", "--squash", "lead/ledger/atlas/integration")
 	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "by hand")
 	sent := len(f.m.sent)
 	f.w.Reconcile(ctx)
@@ -1458,11 +1468,11 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 		t.Errorf("the other one moved: %+v", mr)
 	}
 	// Its lead is told it's merged, and the other open one's that main moved.
-	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/atlas/integration was merged into main in api, as one commit. lead/atlas/integration now starts from main.") || !strings.Contains(news[1].Body, "main moved in api (lead/atlas/integration was merged). Merge it into lead/atlas/second") {
+	if news := f.m.sent[sent:]; len(news) != 2 || !strings.Contains(news[0].Body, "lead/ledger/atlas/integration was merged into main in api, as one commit. lead/ledger/atlas/integration now starts from main.") || !strings.Contains(news[1].Body, "main moved in api (lead/ledger/atlas/integration was merged). Merge it into lead/ledger/atlas/second") {
 		t.Errorf("notices %+v", news)
 	}
 	// Not checked out anywhere, it moved too.
-	if f.git(api, "rev-parse", "lead/atlas/integration") != f.git(api, "rev-parse", "main") {
+	if f.git(api, "rev-parse", "lead/ledger/atlas/integration") != f.git(api, "rev-parse", "main") {
 		t.Error("the merged branch didn't move to main")
 	}
 	f.w.Reconcile(ctx)
@@ -1477,7 +1487,7 @@ func TestRequestMergeIsKeptAsAnAction(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
-	f.refused("mara", "request_merge", map[string]string{"branch": "lead/atlas/integration", "entry": "backlog/nope.md"}, "entry_not_found")
+	f.refused("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/integration", "entry": "backlog/nope.md"}, "entry_not_found")
 	list, err := f.db.Actions().List(ctx, "atlas@ledger")
 	if err != nil {
 		t.Fatal(err)
@@ -1491,7 +1501,7 @@ func TestRequestMergeIsKeptAsAnAction(t *testing.T) {
 	if len(mine) != 2 {
 		t.Fatalf("actions %+v", mine)
 	}
-	if a := mine[0]; a.Instance != "mara@ledger" || a.Branch != "lead/atlas/integration" || len(a.Repos) != 1 || a.Repos[0].Repo != "api" || a.Repos[0].MergeRequest != "mr-1" {
+	if a := mine[0]; a.Instance != "mara@ledger" || a.Branch != "lead/ledger/atlas/integration" || len(a.Repos) != 1 || a.Repos[0].Repo != "api" || a.Repos[0].MergeRequest != "mr-1" {
 		t.Errorf("action %+v", a)
 	}
 	if a := mine[1]; !strings.Contains(a.Error, "entry_not_found") && !strings.Contains(a.Error, "no wiki entry") {
@@ -1510,7 +1520,7 @@ func TestReviewRequests(t *testing.T) {
 		t.Fatalf("open %+v", open)
 	}
 	if r := open[0]; r.Kind != "review" || r.ReviewID != "rev-1" || r.InstanceID != "mara@ledger" || r.ProjectID != "ledger" ||
-		r.Source != "agent" || r.Summary != "Merge lead/atlas/integration: Export invoices." {
+		r.Source != "agent" || r.Summary != "Merge lead/ledger/atlas/integration: Export invoices." {
 		t.Errorf("review %+v", r)
 	}
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {
@@ -1530,12 +1540,12 @@ func TestReviewRequests(t *testing.T) {
 	}
 
 	// One whose request couldn't be saved gets it at the next reconcile, once.
-	rev, err := f.db.Reviews().Save(ctx, store.Review{ProjectID: "ledger", Branch: "lead/atlas/second"})
+	rev, err := f.db.Reviews().Save(ctx, store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/second"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger", AuthorInstance: "mara@ledger",
-		Repo: "api", Branch: "lead/atlas/second", Entry: "backlog/led-44.md", ReviewID: rev.ID}); err != nil {
+		Repo: "api", Branch: "lead/ledger/atlas/second", Entry: "backlog/led-44.md", ReviewID: rev.ID}); err != nil {
 		t.Fatal(err)
 	}
 	f.w.Reconcile(ctx)
@@ -1563,11 +1573,11 @@ func TestEachRepoMergesIntoItsOwnMain(t *testing.T) {
 	if subject := f.git(web, "log", "-1", "--format=%s", "trunk"); subject != "Export invoices" {
 		t.Errorf("trunk's head %q", subject)
 	}
-	if n := f.lastNotice(); !strings.Contains(n.Body, "lead/atlas/integration was merged into trunk in web, as one commit. lead/atlas/integration now starts from trunk.") {
+	if n := f.lastNotice(); !strings.Contains(n.Body, "lead/ledger/atlas/integration was merged into trunk in web, as one commit. lead/ledger/atlas/integration now starts from trunk.") {
 		t.Errorf("notice %+v", n)
 	}
 	// A teammate's hand-off is new against web's trunk, not a main it hasn't.
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "style.css"), "p {}\n")
 	f.ok("tove", "commit", commits("web", "style"))
-	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/tove/main", "summary": "style"})
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/main", "summary": "style"})
 }

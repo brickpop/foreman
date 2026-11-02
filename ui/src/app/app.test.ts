@@ -437,8 +437,11 @@ describe("reloadOf", () => {
     );
   });
 
-  it("offers nothing when nobody is behind", () => {
-    expect(reloadOf([inst("mara@ledger", "running")]).behind).toEqual([]);
+  it("offers nothing when nobody is behind, and says so", () => {
+    const r = reloadOf([inst("mara@ledger", "running")]);
+    expect(r.behind).toEqual([]);
+    // Busy or not: there is nothing to wait for.
+    expect(reloadLine(r, teams)).toBe("Every agent runs on the current prompt.");
   });
 });
 

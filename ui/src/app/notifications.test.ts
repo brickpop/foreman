@@ -67,7 +67,7 @@ describe("noticeFor", () => {
           data: {
             review: {
               id: "rev-3",
-              branch: "lead/atlas/small",
+              branch: "lead/ledger/atlas/small",
               withdrawnReason: "all of it is in big",
             },
             deploymentId: "atlas@ledger",
@@ -80,7 +80,7 @@ describe("noticeFor", () => {
         instances,
       );
     expect(withdrawn("lead", 0)).toEqual({
-      title: "Mara withdrew lead/atlas/small",
+      title: "Mara withdrew lead/ledger/atlas/small",
       body: "all of it is in big.",
       instance: "mara@ledger",
       deployment: "atlas@ledger",
@@ -88,7 +88,7 @@ describe("noticeFor", () => {
       color: "var(--tx4)",
     });
     expect(withdrawn("foreman", 1)).toMatchObject({
-      title: "Foreman withdrew lead/atlas/small",
+      title: "Foreman withdrew lead/ledger/atlas/small",
       body: "all of it is in big. Your draft comment on it is lost.",
       color: "var(--err)",
     });

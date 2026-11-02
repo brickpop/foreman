@@ -252,3 +252,36 @@ func TestImage(t *testing.T) {
 		}
 	}
 }
+
+// A link written percent-encoded names the file as it is named on disk: an
+// entry, a file and an image, which is then served.
+func TestEncodedLinks(t *testing.T) {
+	w, _ := fixture(t, map[string]string{
+		"index.md":      "[plan](my%20plan.md) [data](two%20words.csv) ![pic](a%20b.png) [bad](x%zz.md)\n",
+		"my plan.md":    note("# Plan\n"),
+		"two words.csv": "a,b\n",
+		"a b.png":       "png",
+	})
+	e, err := w.Entry("p", "index.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]Link{}
+	for _, l := range e.Links {
+		got[l.Raw] = l
+	}
+	for raw, want := range map[string]Link{
+		"my%20plan.md":    {To: "my plan.md", Exists: true},
+		"two%20words.csv": {To: "two words.csv", File: true},
+		"a%20b.png":       {To: "a b.png", File: true, Image: true},
+		"x%zz.md":         {To: "x%zz.md"}, // not valid encoding: as written
+	} {
+		want.Raw = raw
+		if got[raw] != want {
+			t.Errorf("%s: %+v, want %+v", raw, got[raw], want)
+		}
+	}
+	if _, ct, err := w.Image("p", "a b.png"); err != nil || ct != "image/png" {
+		t.Errorf("the encoded image isn't served: %q %v", ct, err)
+	}
+}

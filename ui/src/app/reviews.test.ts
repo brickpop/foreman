@@ -11,6 +11,7 @@ import {
   hasSince,
   keptLines,
   lineKey,
+  lostDrafts,
   lostNote,
   mergeHeads,
   mergeLabel,
@@ -216,11 +217,11 @@ describe("Dismiss", () => {
     expect(
       keptLines({
         kept: [
-          { repo: "api", branch: "lead/atlas/x", why: "changes in the way" },
-          { repo: "web", branch: "wt/tove/y", why: "busy" },
+          { repo: "api", branch: "lead/ledger/atlas/x", why: "changes in the way" },
+          { repo: "web", branch: "wt/ledger/tove/y", why: "busy" },
         ],
       }),
-    ).toBe("lead/atlas/x in api: changes in the way.\nwt/tove/y in web: busy.");
+    ).toBe("lead/ledger/atlas/x in api: changes in the way.\nwt/ledger/tove/y in web: busy.");
   });
 });
 
@@ -265,5 +266,12 @@ describe("mergeHeads", () => {
     expect(mergeHeads(diffs, ["api", "gone"])).toBeUndefined();
     // Its target deleted: no head until the CEO moves it to another target.
     expect(mergeHeads(diffs, ["api", "cli"])).toBeUndefined();
+  });
+});
+
+describe("lostDrafts", () => {
+  it("counts what a merge would lose, one or several", () => {
+    expect(lostDrafts(1)).toBe("1 draft comment won't be sent and will be lost. Merge anyway?");
+    expect(lostDrafts(3)).toBe("3 draft comments won't be sent and will be lost. Merge anyway?");
   });
 });

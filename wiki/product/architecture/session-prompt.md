@@ -139,7 +139,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 - `{sandbox}` is the agent's sandbox, absolute (`<workspace>/agents/<agent>`), at the same path on the host and in its container. The prompt names no project folder: a project has none, its code repos live anywhere ([Project config](../models/project-config.md#the-project-record)).
 - Playbook steps resolve their `who` ([Team definition](../models/team-definition.md#playbook-and-escalation)): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → `CEO`, a role name (`qa`) → the name(s) of the member(s) with that role, an agent id → that agent's name. Anything else is shown as written (and flagged on the [Team page](../features/team-page.md)).
 - Gates come from `always_ask_ceo`, checks from `checks` in `project.toml`.
-- The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (`lead/<team>/*` for the lead; `wt/<agent>/main` and `wt/<agent>/<topic>` for members).
+- The branch names follow [Sandboxes and git policy](./sandboxes-and-git.md) (`lead/<project>/<team>/*` for the lead; `wt/<project>/<agent>/main` and `wt/<project>/<agent>/<topic>` for members).
 
 ## Talking to the CEO
 

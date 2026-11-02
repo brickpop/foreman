@@ -52,10 +52,10 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **State:**
   - **Debounce window:** for up to ~200 ms after an edit, an entry's body is read fresh while its links, headings and checkbox lines come from the previous index, so they may disagree until the rebuild (wikiview has the same window).
   - **A broken wiki reads as none:** a wiki whose `wiki.toml` can't be read (caught mid-write, say) is served as "no wiki" until its next change.
-  - **Re-encoded links:** a link whose href react-markdown re-encodes (spaces, some Unicode) misses its lookup in the entry's link table and is treated as an external link.
+  - **Percent-encoded links, in the engine:** Foreman decodes a link's path (`my%20plan.md` names `my plan.md`, `wiki.Decoded`, the CEO, 2026-11-03), and the renderer looks an href up decoded too (it re-encodes `<my plan.md>`); the engine doesn't, so `wiki check` reports such a link broken, and backlinks, orphans and `unresolved` miss it.
   - **Image symlink race:** the image route resolves symlinks and checks the result is inside the wiki before serving it; an agent with write access could swap a symlink in between. Theoretical: the window is microseconds and the lead's container already holds the wiki.
 - **Why:** each is rare or short-lived, and fixing it now costs more than it saves.
-- **Fix:** the window: rebuild before reading when a change is pending (Foreman's own writes already rebuild before answering). Re-encoded links: look links up by their decoded form too (upstream in wikiview first, since its renderer has the same gap). The symlink race: open the file, then check the opened file's real path (`os.File` plus `/proc` or `F_GETPATH`), if it ever matters.
+- **Fix:** the window: rebuild before reading when a change is pending (Foreman's own writes already rebuild before answering). Percent-encoded links: the engine decodes link targets (upstream), then `wiki.Decoded` goes; wikiview's renderer has the re-encoding gap too. The symlink race: open the file, then check the opened file's real path (`os.File` plus `/proc` or `F_GETPATH`), if it ever matters.
 
 ## Snapshots: a pending line wrap, and mirrored emulator state
 
@@ -84,16 +84,15 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
   - **A workspace inside an enclosing git repo** (`~/workspace` a repo itself) is refused only when that repo is a code repo of some project; otherwise git run there on the host (the Direct engine) sees the enclosing repo. In a container it isn't mounted.
   - **The workspace is typed, not browsed** in New project and in the move offer: the folder browser lists repos to add, not a place for a new folder.
 - **Why:** the card landed the layout; the dialog and the clean-up have cards of their own.
-- **Fix:** the folder browser picks the workspace in [Restructure the New project dialog](./backlog/new-project-dialog.md). Deployment's [Clean up](./product/features/project-deployment.md#earlier-teams) (2026-11-02) cleans a live project's earlier teams' worktrees; a removed project's kept worktrees still have no action in Foreman: the CEO deletes the folders, and `git worktree prune` in each repo forgets them.
+- **Fix:** the folder browser picks the workspace in [Restructure the New project dialog](./backlog/new-project-dialog.md). Deployment's [Clean up](./product/features/project-team.md#earlier-teams) (2026-11-02) cleans a live project's earlier teams' worktrees; a removed project's kept worktrees still have no action in Foreman: the CEO deletes the folders, and `git worktree prune` in each repo forgets them.
 
 ## Projects as records: known edges
 
 - **State** (from [Projects as records](./backlog/archive/projects-as-records.md), 2026-10-20):
-  - **A stopped deployment holds its repos:** the refusal of the same team on two projects sharing a repo counts stopped deployments too, since their worktrees stay. Nothing in the UI removes a stopped deployment's sandboxes yet, so that team can never be deployed on the other project.
   - **Locate to a clone:** Locate accepts any folder holding the repo's root commit, so a fresh clone passes; the agents' worktrees still point at the old `.git`, `git worktree repair` can't relink them to another repo, and the next start fails with git's "already exists".
   - **Every start rescans:** each start calls `Checked`, which rescans every project's repos (a few `git` calls each), not only the one starting.
 - **Why:** each is rare, cheap or temporary next to what the card had to land.
-- **Fix:** a stopped deployment's sandboxes removed with it (or on demand), and the refusal then counting active ones only; Locate refusing a folder whose `.git` isn't the one the worktrees name when worktrees exist (or recreating them); `Checked` rescanning only the project starting.
+- **Fix:** Locate refusing a folder whose `.git` isn't the one the worktrees name when worktrees exist (or recreating them); `Checked` rescanning only the project starting.
 
 ## One team per project: known edges
 
@@ -106,7 +105,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 
 ## Reload's busy check is the UI's
 
-- **State:** the Deployment header's `Reload` ([Team definition → Reload](./product/models/team-definition.md#reload)) is disabled while an agent is busy, judged in the UI from the statuses it last got; it then calls `POST /api/instances/:id/restart` for each agent behind, which restarts whatever it is told to.
+- **State:** `Reload` (`ReloadButton`: the project's Team header, the Team page's deployments, the Session) ([Team definition → Reload](./product/models/team-definition.md#reload)) is disabled while an agent is busy, judged in the UI from the statuses it last got; it then calls `POST /api/instances/:id/restart` for each agent behind, which restarts whatever it is told to.
 - **Why:** the same shape as Project settings' `Restart them`, and the window is short: statuses arrive as events within a moment.
 - **Impact:** an agent that starts a turn between the last status the page got and the click (a message delivered to it) is restarted mid-turn: that turn's unfinished part is lost, its conversation kept. Two tabs clicking at once restart an agent twice.
 - **Fix:** a `POST /api/deployments/:id/reload` that checks the statuses on the server and restarts the agents behind in one step, refusing with `409 BUSY`; when a mid-turn restart is seen in use, or with the approval pane's **Reload now?** ([The lead proposes changes to its own team](./backlog/lead-proposes-team.md)).

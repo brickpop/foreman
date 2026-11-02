@@ -3,18 +3,27 @@ import { agentOf } from "./model";
 
 // The Repos section's model (wiki/product/features/repos.md).
 
-/** Whose branch it is, by Foreman's names: wt/<agent>/… is that agent's in
- * the project's deployment (team@project, deploymentOn), lead/<team>/… that
- * team's lead's; anything else is nobody's in particular. */
+/** Whose branch it is, by Foreman's names: wt/<project>/<agent>/… is that
+ * agent's in the project's deployment (team@project, deploymentOn),
+ * lead/<project>/<team>/… that team's lead's; anything else is nobody's in
+ * particular (the names from before branches carried the project too).
+ * Another project's, in a repo they share, is named agent@project
+ * (its instance id): this project's deployment doesn't say whose it is there. */
 export function branchOwner(
   branch: string,
+  project: string,
   teams: Team[],
   deployment: string | undefined,
 ): string | undefined {
-  const [kind, who] = branch.split("/");
-  if (kind === "wt" && who) return agentOf(teams, deployment ?? "", who)?.soul.name ?? who;
-  if (kind === "lead" && who) {
+  const [kind, on, who, topic] = branch.split("/");
+  if (!on || !who || !topic) return undefined;
+  if (kind === "wt") {
+    if (on !== project) return `${who}@${on}`;
+    return agentOf(teams, deployment ?? "", who)?.soul.name ?? who;
+  }
+  if (kind === "lead") {
     const team = teams.find((t) => t.id === who);
+    if (on !== project) return `${team?.config.lead ?? who}@${on}`;
     return team ? (team.config.agents[team.config.lead]?.name ?? team.config.lead) : who;
   }
   return undefined;
@@ -89,6 +98,16 @@ export function readmeOf(entries: { name: string; kind: string }[]): string | un
   return (
     files.find((n) => /^readme(\.(md|markdown|txt))?$/i.test(n)) ??
     files.find((n) => /^index\.(md|markdown)$/i.test(n))
+  );
+}
+
+/** The page a folder a link opened shows (the CEO, 2026-11-03): its
+ * index.md, else its README; none, and the folder lists what it holds. */
+export function folderPage(entries: { name: string; kind: string }[]): string | undefined {
+  const files = entries.filter((e) => e.kind === "file").map((e) => e.name);
+  return (
+    files.find((n) => /^index\.(md|markdown)$/i.test(n)) ??
+    files.find((n) => /^readme(\.(md|markdown|txt))?$/i.test(n))
   );
 }
 

@@ -1,42 +1,60 @@
 import { type ReactNode, useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { Entry } from "../api/client";
+import type { Entry, RepoLink } from "../api/client";
 import { remarkCallout } from "../app/callout";
 
-// An entry's Markdown, rendered in the browser the way wikiview does it (its
-// ui/src/markdown/Markdown.tsx, v0.13.0, adapted). The engine's rules arrive
-// as data and are applied by lookup, never re-derived: a link resolves by its
-// href in entry.links, a heading takes its id from entry.headings, a checkbox
-// its file line from entry.checkboxes. Matched by source line, which a
-// re-render can't throw off. Raw HTML stays off: agents write these files.
+// Markdown, rendered in the browser the way wikiview does it (its
+// ui/src/markdown/Markdown.tsx, v0.13.0, adapted): a wiki entry, or a repo's
+// file. The server's rules arrive as data and are applied by lookup, never
+// re-derived: a link resolves by its href in links, a heading takes its id
+// from headings, a checkbox its file line from checkboxes. Matched by source
+// line, which a re-render can't throw off. Raw HTML stays off: agents write
+// these files.
+
+/** A link as the server resolved it: a wiki entry's, or a repo file's. */
+export type ResolvedLink = Omit<Entry["links"][number], "file"> &
+  Partial<Pick<Entry["links"][number], "file"> & Pick<RepoLink, "folder">>;
 
 /** The source line react-markdown gives every node it renders. */
 const lineOf = (props: unknown): number =>
   (props as { node?: { position?: { start?: { line?: number } } } }).node?.position?.start?.line ??
   -1;
 
+/** The href as written: the renderer percent-encodes some (`<my file.md>`). */
+const decoded = (href: string) => {
+  try {
+    return decodeURI(href);
+  } catch {
+    return href;
+  }
+};
+
 export function Markdown({
-  entry,
+  body,
+  links: resolved,
+  headings: ids,
+  checkboxes: ticks = [],
   onOpen,
   onTick,
   imageUrl,
+  scope = "wiki",
 }: {
-  entry: Entry;
-  onOpen: (path: string) => void;
-  onTick: (line: number, done: boolean) => void;
+  body: string;
+  links: ResolvedLink[];
+  headings: Entry["headings"];
+  /** Tickable ones (a wiki entry's); none for a read-only file. */
+  checkboxes?: Entry["checkboxes"];
+  onOpen: (link: ResolvedLink) => void;
+  onTick?: (line: number, done: boolean) => void;
   imageUrl: (path: string) => string;
+  /** What the links stay inside, for their titles. */
+  scope?: "wiki" | "repo";
 }) {
-  const links = useMemo(() => new Map(entry.links.map((l) => [l.raw, l])), [entry.links]);
-  const headings = useMemo(
-    () => new Map(entry.headings.map((h) => [h.bodyLine, h.id])),
-    [entry.headings],
-  );
-  const boxes = useMemo(
-    () => new Map(entry.checkboxes.map((c) => [c.bodyLine, c])),
-    [entry.checkboxes],
-  );
-
+  const links = useMemo(() => new Map(resolved.map((l) => [l.raw, l])), [resolved]);
+  const lookup = (href: string) => links.get(href) ?? links.get(decoded(href));
+  const headings = useMemo(() => new Map(ids.map((h) => [h.bodyLine, h.id])), [ids]);
+  const boxes = useMemo(() => new Map(ticks.map((c) => [c.bodyLine, c])), [ticks]);
   const heading = (level: 1 | 2 | 3 | 4 | 5 | 6) =>
     function Heading({ children, ...props }: { children?: ReactNode }) {
       const Tag = `h${level}` as const;
@@ -45,11 +63,11 @@ export function Markdown({
 
   const components: Components = {
     a({ href, children }) {
-      const link = href ? links.get(href) : undefined;
-      // Above the wiki: nothing here serves it, so it isn't a link.
+      const link = href ? lookup(href) : undefined;
+      // Out of the wiki or the repo: nothing here serves it, so it isn't a link.
       if (link?.outside) {
         return (
-          <span className="outside" title={`${href} is outside the wiki`}>
+          <span className="outside" title={`${href} is outside the ${scope}`}>
             {children}
           </span>
         );
@@ -74,10 +92,12 @@ export function Markdown({
           <a
             href={link.to}
             className={link.exists ? undefined : "unwritten"}
-            title={link.exists ? undefined : "Not written yet"}
+            title={
+              link.exists ? undefined : scope === "wiki" ? "Not written yet" : "Not on this branch"
+            }
             onClick={(e) => {
               e.preventDefault();
-              onOpen(link.to);
+              onOpen(link);
             }}
           >
             {children}
@@ -97,7 +117,7 @@ export function Markdown({
     // Only the wiki's own images load: an image elsewhere would have the
     // browser call whatever address an agent wrote, so it shows as a link.
     img({ src, alt }) {
-      const link = typeof src === "string" ? links.get(src) : undefined;
+      const link = typeof src === "string" ? lookup(src) : undefined;
       if (link?.image) return <img src={imageUrl(link.to)} alt={alt ?? ""} loading="lazy" />;
       if (typeof src === "string" && !link) {
         return (
@@ -130,7 +150,7 @@ export function Markdown({
     // remark-gfm gives the <input> no position, so the item carries the line.
     li({ children, ...props }) {
       const box = boxes.get(lineOf(props));
-      if (!box) return <li>{children}</li>;
+      if (!box || !onTick) return <li>{children}</li>;
       return (
         <li>
           <input
@@ -153,7 +173,7 @@ export function Markdown({
 
   return (
     <ReactMarkdown remarkPlugins={[remarkGfm, remarkCallout]} components={components}>
-      {entry.body}
+      {body}
     </ReactMarkdown>
   );
 }
@@ -162,33 +182,4 @@ export function Markdown({
 function withoutRenderedCheckbox(children: ReactNode): ReactNode {
   if (!Array.isArray(children)) return children;
   return children.filter((c) => !(c && typeof c === "object" && "type" in c && c.type === "input"));
-}
-
-/** A repo file's Markdown (a README), on the Repos section: rendered, and
- * inert. Raw HTML stays off; a web link opens in a new tab, a relative one is
- * text (nothing here serves it); an image shows its text, never loaded, since
- * agents write these files and a remote image would call out. */
-export function FileMarkdown({ text }: { text: string }) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        a({ href, children }) {
-          if (href && /^https?:\/\//.test(href)) {
-            return (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            );
-          }
-          return <span className="outside">{children}</span>;
-        },
-        img({ alt }) {
-          return <span className="outside">{alt ? `[${alt}]` : "[image]"}</span>;
-        },
-      }}
-    >
-      {text}
-    </ReactMarkdown>
-  );
 }

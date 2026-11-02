@@ -458,7 +458,7 @@ CEO answers in the UI ──▶ Workflow.Resolve ──▶ the open tool call re
 Member ── switch(branch), then commit(commits) ──▶ Workflow: Git.Switch, Git.Commit in its worktrees
 Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pending work), policy check, work item (one repo: nothing to fetch)
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
-Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
+Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<project>/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
 Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Dashboard
 CEO, on a review: Merge ──▶ Workflow ──▶ Git.Squash  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Request changes, Dismiss ──▶ delivered to the lead
 (after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch

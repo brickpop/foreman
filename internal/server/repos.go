@@ -18,6 +18,8 @@ type Repos interface {
 	Tree(ctx context.Context, project, repo, ref, path string) ([]git.TreeEntry, error)
 	File(ctx context.Context, project, repo, ref, path string) (repos.File, error)
 	Log(ctx context.Context, project, repo, ref string, all bool, skip int) (repos.LogPage, error)
+	// Image is an image file at ref, with its content type.
+	Image(ctx context.Context, project, repo, ref, path string) ([]byte, string, error)
 }
 
 func repoRoutes(mux *http.ServeMux, rs Repos) {
@@ -34,6 +36,16 @@ func repoRoutes(mux *http.ServeMux, rs Repos) {
 		q := r.URL.Query()
 		f, err := rs.File(r.Context(), r.PathValue("id"), r.PathValue("repo"), q.Get("ref"), q.Get("path"))
 		writeRead(w, f, err)
+	})
+	mux.HandleFunc("GET /api/projects/{id}/repos/{repo}/image", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		content, contentType, err := rs.Image(r.Context(), r.PathValue("id"), r.PathValue("repo"), q.Get("ref"), q.Get("path"))
+		if err != nil {
+			writeRead(w, nil, err)
+			return
+		}
+		imageHeaders(w, contentType)
+		_, _ = w.Write(content)
 	})
 	mux.HandleFunc("GET /api/projects/{id}/repos/{repo}/log", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()

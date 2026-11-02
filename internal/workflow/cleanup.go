@@ -28,13 +28,13 @@ type Cleaned struct {
 }
 
 // CleanUp removes, on a project, what the agents of earlier teams left
-// (wiki/product/features/project-deployment.md#earlier-teams): only what is
+// (wiki/product/features/project-team.md#earlier-teams): only what is
 // safe. A worktree goes when it holds nothing not committed (git refuses
-// otherwise) and no merge is under way; a wt/<agent>/* branch goes when a
-// target of its repo holds all of it and nothing has it checked out, its head
-// kept under refs/foreman/cleaned/ for a while. An agent running on any
-// project is left alone, as a repo may be in several. Everything else is
-// kept, and listed with why.
+// otherwise) and no merge is under way; a wt/<project>/<agent>/* branch goes
+// when a target of its repo holds all of it and nothing has it checked out,
+// its head kept under refs/foreman/cleaned/ for a while. An agent running on
+// this project is left alone; one running on another is not, as its branches
+// there carry that project. Everything else is kept, and listed with why.
 func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, error) {
 	p, err := w.Config.Project(projectID)
 	if err != nil {
@@ -47,7 +47,9 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 			return Cleanup{}, err
 		}
 		for _, i := range list {
-			running[i.AgentID] = true
+			if strings.HasSuffix(i.DeploymentID, "@"+p.ID) {
+				running[i.AgentID] = true
+			}
 		}
 	}
 	var out Cleanup
@@ -83,7 +85,7 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 			}
 		}
 		for _, agent := range slices.Sorted(maps.Keys(agents)) {
-			branches, err := w.Git.Branches(ctx, r.Path, "wt/"+agent+"/")
+			branches, err := w.Git.Branches(ctx, r.Path, git.BranchPrefix(p.ID, agent, "", false))
 			if err != nil {
 				return out, err
 			}

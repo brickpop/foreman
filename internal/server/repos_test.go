@@ -62,6 +62,36 @@ func (f *fakeRepos) Log(_ context.Context, project, repo, ref string, all bool, 
 	return repos.LogPage{Commits: []git.Commit{}, Next: 0}, nil
 }
 
+func (f *fakeRepos) Image(_ context.Context, project, repo, ref, path string) ([]byte, string, error) {
+	if err := f.check(project, repo, ref); err != nil {
+		return nil, "", err
+	}
+	switch path {
+	case "logo.png":
+		return []byte("png"), "image/png", nil
+	case "logo.svg":
+		return []byte("<svg/>"), "image/svg+xml", nil
+	}
+	return nil, "", git.ErrNoPath
+}
+
+// A repo's image is served as the wiki's are: its type declared, never
+// sniffed, an SVG unable to run anything.
+func TestRepoImages(t *testing.T) {
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Repos: &fakeRepos{}, UI: builtUI})
+	w := send(h, "GET", "/api/projects/ledger/repos/api/image?ref=trunk&path=logo.png", "")
+	if w.Code != http.StatusOK || w.Body.String() != "png" || w.Header().Get("Content-Type") != "image/png" ||
+		w.Header().Get("X-Content-Type-Options") != "nosniff" || w.Header().Get("Content-Security-Policy") != "" {
+		t.Errorf("png: %d %q %v", w.Code, w.Body, w.Header())
+	}
+	if w := send(h, "GET", "/api/projects/ledger/repos/api/image?ref=trunk&path=logo.svg", ""); w.Header().Get("Content-Security-Policy") != svgPolicy {
+		t.Errorf("svg: %v", w.Header())
+	}
+	if w := send(h, "GET", "/api/projects/ledger/repos/api/image?ref=trunk&path=README.md", ""); w.Code != http.StatusNotFound {
+		t.Errorf("not an image: %d", w.Code)
+	}
+}
+
 func TestRepoReads(t *testing.T) {
 	f := &fakeRepos{}
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Repos: f, UI: builtUI})

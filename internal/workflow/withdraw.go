@@ -9,6 +9,7 @@ import (
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
+	"github.com/brickpop/foreman/internal/git"
 
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
@@ -25,7 +26,7 @@ func (t tool) withdrawMerge(ctx context.Context, branch, reason, by string) agen
 	if !t.c.Lead {
 		return teamtools.Refusal("not_lead", "only the lead withdraws its requests to merge")
 	}
-	prefix := "lead/" + t.c.Team.ID + "/"
+	prefix := git.BranchPrefix(t.project.ID, "", t.c.Team.ID, true)
 	for _, b := range []string{branch, by} {
 		if b != "" && !strings.HasPrefix(b, prefix) {
 			return teamtools.Refusal("branch_not_allowed", "you withdraw, and supersede with, your own lead branches only, %s<topic>", prefix)

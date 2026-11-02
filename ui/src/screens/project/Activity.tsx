@@ -18,7 +18,7 @@ import { ActionRow, CallMap, FilterStrip, namesOf, ThreadRow } from "../../compo
 import { Button, Empty, Loading, Panel, SectionTitle } from "../../components/ui";
 import { useProject } from "../Project";
 
-// A project's Activity section (wiki/product/features/project-activity.md):
+// The Team section's Activity view (wiki/product/features/project-activity.md):
 // its team's messages and git actions as one timeline, newest first, 50 at a
 // time, with the map of who calls whom beside it, filtering it; the stopped
 // deployments' timelines below, in Older sessions.
@@ -36,7 +36,7 @@ export function Activity() {
   const [filter, setFilter] = useState<Filter>(null);
   const name = namesOf(teams, d?.id ?? "");
   return (
-    <div className="flex flex-col gap-8 px-6 pt-6 pb-12">
+    <div className="flex flex-col gap-8">
       {d ? (
         <div className="flex items-start gap-6 max-[1100px]:flex-col-reverse">
           <section className="flex min-w-0 flex-1 flex-col gap-2.5">
@@ -57,7 +57,7 @@ export function Activity() {
           />
         </div>
       ) : (
-        <Empty>No team is on {readable(project)}. Deploy one from its Deployment section.</Empty>
+        <Empty>No team is on {readable(project)}.</Empty>
       )}
       {stopped.length > 0 && <OlderSessions deployments={stopped} teams={teams} />}
     </div>

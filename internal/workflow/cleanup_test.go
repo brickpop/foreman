@@ -25,7 +25,7 @@ func TestCleanUpRemovesOnlyWhatIsSafe(t *testing.T) {
 	if err := git.New().Commit(ctx, api, "fix", "LED-1"); err != nil {
 		t.Fatal(err)
 	}
-	f.git(api, "branch", "wt/tove/led-1", "HEAD")
+	f.git(api, "branch", "wt/ledger/tove/led-1", "HEAD")
 	f.git(api, "reset", "-q", "--hard", "HEAD~1")
 
 	got, err := f.w.CleanUp(ctx, "ledger")
@@ -39,13 +39,13 @@ func TestCleanUpRemovesOnlyWhatIsSafe(t *testing.T) {
 		}
 		return out
 	}
-	if want := []string{"tove api branch wt/tove/main", "tove api worktree wt/tove/main"}; !reflect.DeepEqual(line(got.Removed), want) {
+	if want := []string{"tove api branch wt/ledger/tove/main", "tove api worktree wt/ledger/tove/main"}; !reflect.DeepEqual(line(got.Removed), want) {
 		t.Errorf("removed %q\nwant    %q", line(got.Removed), want)
 	}
 	if want := []string{
-		"tove api branch wt/tove/led-1 no target holds all of it",
-		"tove web branch wt/tove/main it is checked out",
-		"tove web worktree wt/tove/main it holds changes not committed",
+		"tove api branch wt/ledger/tove/led-1 no target holds all of it",
+		"tove web branch wt/ledger/tove/main it is checked out",
+		"tove web worktree wt/ledger/tove/main it holds changes not committed",
 	}; !reflect.DeepEqual(line(got.Kept), want) {
 		t.Errorf("kept %q\nwant %q", line(got.Kept), want)
 	}
@@ -60,10 +60,35 @@ func TestCleanUpRemovesOnlyWhatIsSafe(t *testing.T) {
 			t.Errorf("the running lead's %s worktree: %v", r, err)
 		}
 	}
-	if !strings.Contains(f.git(api, "for-each-ref", "refs/foreman/cleaned/"), "wt/tove/main") {
+	if !strings.Contains(f.git(api, "for-each-ref", "refs/foreman/cleaned/"), "wt/ledger/tove/main") {
 		t.Error("the dropped branch's head wasn't kept aside")
 	}
-	if strings.Contains(f.git(api, "branch", "--list", "wt/tove/*"), "main") {
-		t.Error("wt/tove/main is still in api")
+	if strings.Contains(f.git(api, "branch", "--list", "wt/ledger/tove/*"), "main") {
+		t.Error("wt/ledger/tove/main is still in api")
+	}
+}
+
+// An agent running on another project doesn't hold what it left here: its
+// branches here carry this project, so they're this project's to clean.
+func TestCleanUpIgnoresAgentsRunningElsewhere(t *testing.T) {
+	f := newFixture(t)
+	f.teams.instances = []store.Instance{{ID: "mara@suite", AgentID: "mara", DeploymentID: "atlas@suite"}}
+	got, err := f.w.CleanUp(ctx, "ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed := 0
+	for _, c := range got.Removed {
+		if c.Agent == "mara" && c.What == "worktree" {
+			removed++
+		}
+	}
+	if removed != 2 {
+		t.Errorf("mara's worktrees here: removed %d of 2\n%+v", removed, got)
+	}
+	for _, r := range []string{"api", "web"} {
+		if _, err := os.Stat(f.wt("mara", r)); !os.IsNotExist(err) {
+			t.Errorf("mara's %s worktree is still there: %v", r, err)
+		}
 	}
 }

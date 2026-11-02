@@ -29,6 +29,7 @@ export function reloadOf(instances: Instance[]): { behind: Instance[]; busy?: In
 /** What Reload would do, or why it waits. */
 export function reloadLine(reload: ReturnType<typeof reloadOf>, teams: Team[]): string {
   const n = reload.behind.length;
+  if (n === 0) return "Every agent runs on the current prompt.";
   const runs = n === 1 ? "1 agent runs" : `${n} agents run`;
   if (!reload.busy) {
     return `${runs} on an older prompt: Reload restarts ${n === 1 ? "it" : "them"} on the new one, continuing ${n === 1 ? "its conversation" : "their conversations"}.`;

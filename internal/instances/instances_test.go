@@ -200,7 +200,7 @@ func (f *fixture) output(id, want string) string {
 // the wiki, not a message). A member sleeps, with no sandbox, until woken.
 func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 	f := newFixture(t, `echo "opener: [$1]"; `+keepsRunning, 12)
-	dep, err := f.m.Deploy(ctx, "atlas", "ledger")
+	dep, err := f.m.Deploy(ctx, "atlas", "ledger", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,10 +230,10 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 			t.Errorf("%s: %+v", id, inst)
 		}
 	}
-	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api")); b != "lead/atlas/integration" {
+	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api")); b != "lead/ledger/atlas/integration" {
 		t.Errorf("the lead's branch %q", b)
 	}
-	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/tove/main" {
+	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/ledger/tove/main" {
 		t.Errorf("a member's branch %q", b)
 	}
 	prompt, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
@@ -253,7 +253,7 @@ func TestWake(t *testing.T) {
 	if err := f.m.Wake(ctx, "nobody@ledger"); err == nil {
 		t.Error("woke an instance that doesn't exist")
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -278,16 +278,16 @@ func TestWake(t *testing.T) {
 
 func TestDeployRefusals(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.m.Deploy(ctx, "nope", "ledger"); !errors.Is(err, ErrInvalid) {
+	if _, err := f.m.Deploy(ctx, "nope", "ledger", false); !errors.Is(err, ErrInvalid) {
 		t.Errorf("unknown team: %v", err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "nope"); !errors.Is(err, ErrInvalid) {
+	if _, err := f.m.Deploy(ctx, "atlas", "nope", false); !errors.Is(err, ErrInvalid) {
 		t.Errorf("unknown project: %v", err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, store.ErrActive) {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); !errors.Is(err, store.ErrActive) {
 		t.Errorf("deployed twice: %v", err)
 	}
 	// The project's profile decides what its agents run on: one that doesn't
@@ -299,18 +299,18 @@ func TestDeployRefusals(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.useProfile("ledger", "nope")
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no such profile: nope") {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no such profile: nope") {
 		t.Errorf("an unknown profile: %v", err)
 	}
 	if _, err := f.profiles.Create("other", "codex"); err != nil {
 		t.Fatal(err)
 	}
 	f.useProfile("ledger", "other")
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); err == nil || !strings.Contains(err.Error(), `harness "codex" isn't supported yet`) {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); err == nil || !strings.Contains(err.Error(), `harness "codex" isn't supported yet`) {
 		t.Errorf("an unsupported harness: %v", err)
 	}
 	f.m.Adapters["codex"] = needsLogin{f.deps.Adapters["claude-code"].(fake.Adapter)}
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "profile other isn't connected yet") {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "profile other isn't connected yet") {
 		t.Errorf("a profile without a login: %v", err)
 	}
 	if _, err := f.db.Deployments().Get(ctx, "orion@ledger"); err == nil {
@@ -319,7 +319,7 @@ func TestDeployRefusals(t *testing.T) {
 	// Logged in: the profile's folder is the one checked, and the one the
 	// session is given; its agents run on its harness.
 	write(t, filepath.Join(f.profiles.Dir("other"), "login"), "", 0o600)
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	if nora := f.waitStatus("nora@ledger", Running); nora.Harness != "codex" {
@@ -349,11 +349,11 @@ func TestDeployReplacesTheTeamOnTheProject(t *testing.T) {
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("nora@ledger", Running)
@@ -384,18 +384,18 @@ func TestDeployReplacesTheTeamOnTheProject(t *testing.T) {
 	if stopped != 1 || created != 1 {
 		t.Errorf("events: %d atlas stops, %d orion deploys after it", stopped, created)
 	}
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); !errors.Is(err, store.ErrActive) {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); !errors.Is(err, store.ErrActive) {
 		t.Errorf("orion twice on ledger: %v", err)
 	}
 	// A refused deploy replaces nothing.
-	if _, err := f.m.Deploy(ctx, "nope", "ledger"); !errors.Is(err, ErrInvalid) {
+	if _, err := f.m.Deploy(ctx, "nope", "ledger", false); !errors.Is(err, ErrInvalid) {
 		t.Errorf("an unknown team: %v", err)
 	}
 	if d, _ := f.db.Deployments().Get(ctx, "orion@ledger"); d.Status != store.DeploymentActive {
 		t.Errorf("orion after a refused deploy: %+v", d)
 	}
 	// Atlas comes back, replacing orion in turn, on its old row.
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -434,7 +434,7 @@ func TestStopWhileStarting(t *testing.T) {
 		return open(id)
 	}
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	<-opening
@@ -455,7 +455,7 @@ func TestStopWhileStarting(t *testing.T) {
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "orion", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "orion", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("nora@ledger", Running)
@@ -466,7 +466,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 	if active, err := f.m.Active(ctx, "atlas@ledger"); err != nil || active {
 		t.Errorf("active before any deploy: %v %v", active, err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	if active, err := f.m.Active(ctx, "atlas@ledger"); err != nil || !active {
@@ -495,7 +495,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 		t.Error("stopping removed the worktree")
 	}
 	// Redeploying starts again, fresh.
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -504,7 +504,7 @@ func TestStopKeepsTheWorktrees(t *testing.T) {
 // Beyond max_sessions, instances wait their turn.
 func TestTheConcurrencyLimitQueues(t *testing.T) {
 	f := newFixture(t, `read line; exit 1`, 1)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -526,7 +526,7 @@ func TestTheConcurrencyLimitQueues(t *testing.T) {
 // queued, which would warn the CEO about slots for nothing.
 func TestAFreeSlotNeverShowsQueued(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -546,7 +546,7 @@ func TestAFreeSlotNeverShowsQueued(t *testing.T) {
 // Raising the limit starts who waited, without anything else happening.
 func TestARaisedLimitStartsTheQueued(t *testing.T) {
 	f := newFixture(t, keepsRunning, 1)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -577,7 +577,7 @@ func TestACrashRestartsOnceThenStops(t *testing.T) {
 		started = append(started, fmt.Sprintf("%s lead=%v", inst.ID, lead))
 	}
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	inst := f.waitStatus("mara@ledger", Stopped)
@@ -674,7 +674,7 @@ func TestListShowsActiveDeploymentsOnly(t *testing.T) {
 	if list, err := f.m.List(ctx); err != nil || len(list) != 0 {
 		t.Errorf("empty: %v %v", list, err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := f.m.List(ctx); len(list) != 2 || list[0].ID != "mara@ledger" {
@@ -691,7 +691,7 @@ func TestDeploymentsIn(t *testing.T) {
 	if list, err := f.m.DeploymentsIn(ctx, store.DeploymentActive); err != nil || len(list) != 0 {
 		t.Errorf("none yet: %v %v", list, err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := f.m.DeploymentsIn(ctx, store.DeploymentActive); len(list) != 1 || list[0].ID != "atlas@ledger" {
@@ -712,7 +712,7 @@ func TestDeploymentsIn(t *testing.T) {
 // The prompt shown is the one the harness got.
 func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.m.Wake(ctx, "tove@ledger")
@@ -738,7 +738,7 @@ func TestTheCEOsInstructionsReachTheHarness(t *testing.T) {
 	if _, err := f.hm.SaveSettings(ctx, s.Settings, s.Version); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	_ = f.m.Wake(ctx, "tove@ledger")
@@ -762,7 +762,7 @@ func TestHooksBecomeStatuses(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -802,7 +802,7 @@ func TestHooksBecomeActivityLines(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsLine{f.deps.Adapters["claude-code"].(fake.Adapter)}}
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -851,7 +851,7 @@ func TestHooksBecomeActivityLines(t *testing.T) {
 	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -866,7 +866,7 @@ func TestTheHarnessGetsTheAgentLink(t *testing.T) {
 	f.deps.Agent = AgentLink{Host: "/bin/foreman-agent", Path: "/opt/foreman/foreman-agent", URL: "http://h:8889",
 		Token: func(id string) string { return "token-of-" + id }}
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -930,7 +930,7 @@ func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	g := &failingSync{Git: f.deps.Git}
 	f.deps.Git = g
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -950,14 +950,14 @@ func TestRedeployWhileTheStoppedRunIsStillStarting(t *testing.T) {
 	f.deps.Git = slow
 	f.m = New(f.deps)
 	t.Cleanup(func() { closeOnce(slow.release) })
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	<-slow.entered
 	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -989,7 +989,7 @@ func TestDeployAProjectWithoutRepos(t *testing.T) {
 	if _, err := f.hm.RemoveRepo(ctx, "ledger", "ledger-api"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1008,7 +1008,7 @@ func TestDeployRefusesAnArchivedProject(t *testing.T) {
 	if _, err := f.hm.SetArchived(ctx, "ledger", true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "ledger is archived") {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "ledger is archived") {
 		t.Errorf("%v", err)
 	}
 	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
@@ -1017,7 +1017,7 @@ func TestDeployRefusesAnArchivedProject(t *testing.T) {
 	if _, err := f.hm.SetArchived(ctx, "ledger", false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Errorf("unarchived: %v", err)
 	}
 }
@@ -1026,7 +1026,7 @@ func TestDeployRefusesAnArchivedProject(t *testing.T) {
 // until the CEO's Start (or work) wakes it, picking up its conversation.
 func TestACleanExitSleepsAndStartResumes(t *testing.T) {
 	f := newFixture(t, `echo "[$1]" >> "$FOREMAN_PROMPT_FILE.openers"; read line; exit 0`, 12)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1050,7 +1050,7 @@ func TestACleanExitSleepsAndStartResumes(t *testing.T) {
 // one restart back; a stopped deployment's instances don't.
 func TestStartAgainAfterTwoCrashes(t *testing.T) {
 	f := newFixture(t, `sleep 0.2; exit 3`, 12)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Stopped)
@@ -1127,14 +1127,14 @@ func TestDeployAndWakeWaitForTheEngine(t *testing.T) {
 		}
 		return nil
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrNotReady) || !strings.Contains(err.Error(), "podman isn't running") {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); !errors.Is(err, ErrNotReady) || !strings.Contains(err.Error(), "podman isn't running") {
 		t.Fatalf("deploy: %v", err)
 	}
 	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
 		t.Fatalf("deployed anyway: %+v", deps)
 	}
 	blocked.Store(false)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1157,7 +1157,7 @@ func TestDeployAndWakeWaitForTheEngine(t *testing.T) {
 // starts after it; on the next run, work wakes them as usual.
 func TestShutdownPutsEveryAgentToSleep(t *testing.T) {
 	f := newFixture(t, keepsRunning, 1)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1183,7 +1183,7 @@ func TestShutdownPutsEveryAgentToSleep(t *testing.T) {
 	if err := f.m.Wake(ctx, "tove@ledger"); !errors.Is(err, ErrNotReady) {
 		t.Errorf("woken while stopping: %v", err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrNotReady) {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); !errors.Is(err, ErrNotReady) {
 		t.Errorf("deployed while stopping: %v", err)
 	}
 	time.Sleep(100 * time.Millisecond) // nothing starts on its own
@@ -1213,7 +1213,7 @@ func TestShutdownWhileStarting(t *testing.T) {
 	f.deps.Git = slow
 	f.m = New(f.deps)
 	t.Cleanup(func() { closeOnce(slow.release) })
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	<-slow.entered
@@ -1270,7 +1270,7 @@ func TestShutdownKeepsWhatItCouldntStop(t *testing.T) {
 	})
 	f.deps.Runner = u
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1327,7 +1327,7 @@ func TestRestartTakesTheProfileAsItIsNow(t *testing.T) {
 	base := f.deps.Adapters["claude-code"].(fake.Adapter)
 	f.m.Adapters["claude-code"] = recording{base, &mu, &sessions}
 	f.m.Adapters["codex"] = recording{base, &mu, &sessions}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	if mara := f.waitStatus("mara@ledger", Running); mara.Profile != "default" || mara.Harness != "claude-code" {
@@ -1377,6 +1377,100 @@ func TestRestartTakesTheProfileAsItIsNow(t *testing.T) {
 	}
 }
 
+// A redeploy continues each agent's last conversation on the project, as a
+// restart does, unless deployed fresh. Only an agent that started counts,
+// and only when the folder's last user was the same team: another team's
+// agent of the same id starts fresh, and so does the first team after it.
+func TestRedeployContinues(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	var mu sync.Mutex
+	var sessions []harness.Session
+	launches := func(id string) []harness.Session {
+		mu.Lock()
+		defer mu.Unlock()
+		var of []harness.Session
+		for _, s := range sessions {
+			if s.Instance == id {
+				of = append(of, s)
+			}
+		}
+		return of
+	}
+	f.m.Adapters["claude-code"] = recording{f.deps.Adapters["claude-code"].(fake.Adapter), &mu, &sessions}
+	continuing := func(team string, want ...string) {
+		t.Helper()
+		got, err := f.m.Continuing(ctx, team, "ledger")
+		if err != nil || !slices.Equal(got, want) {
+			t.Errorf("%s continuing: %v %v, want %v", team, got, err, want)
+		}
+	}
+	deploy := func(team string, fresh bool) {
+		t.Helper()
+		if _, err := f.m.Deploy(ctx, team, "ledger", fresh); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stop := func(team string) {
+		t.Helper()
+		if err := f.m.Stop(ctx, team+"@ledger"); err != nil {
+			t.Fatal(err)
+		}
+		f.waitStatus("mara@ledger", Stopped)
+	}
+	// The last launch of id continued (or not), and it is the n-th.
+	started := func(id string, n int, cont bool) {
+		t.Helper()
+		f.waitStatus(id, Running)
+		got := launches(id)
+		if len(got) != n || got[n-1].Continue != cont {
+			t.Errorf("%s: %d launches, last %+v; want %d, continuing %v", id, len(got), got[len(got)-1], n, cont)
+		}
+	}
+
+	continuing("atlas") // never deployed
+	deploy("atlas", false)
+	started("mara@ledger", 1, false)
+	stop("atlas")
+	// Tove slept the whole deployment: nothing of hers to continue.
+	continuing("atlas", "mara")
+	deploy("atlas", false)
+	started("mara@ledger", 2, true)
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	started("tove@ledger", 1, false)
+	stop("atlas")
+
+	continuing("atlas", "mara", "tove")
+	deploy("atlas", true) // Start fresh
+	started("mara@ledger", 3, false)
+	// A restart after it continues the fresh conversation.
+	if err := f.m.Restart(ctx, "mara@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(5 * time.Second); len(launches("mara@ledger")) < 4 && time.Now().Before(deadline); {
+		time.Sleep(10 * time.Millisecond)
+	}
+	started("mara@ledger", 4, true)
+	stop("atlas")
+
+	// Another team whose lead is also mara: the same harness folder.
+	write(t, f.hm.Path("config", "teams", "orion.toml"),
+		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
+		t.Fatal(err)
+	}
+	continuing("orion")
+	deploy("orion", false)
+	started("mara@ledger", 5, false)
+	stop("orion")
+	// Orion's mara used the folder last; tove slept since Start fresh, so
+	// she is still to start fresh.
+	continuing("atlas")
+	deploy("atlas", false)
+	started("mara@ledger", 6, false)
+}
+
 // specs is the Direct engine, keeping what each start was asked.
 type specs struct {
 	direct.Runner
@@ -1418,7 +1512,7 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(f.hm.Sandbox("ledger", "mara"), "project"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1457,7 +1551,7 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 // the agents' work in them.
 func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1474,17 +1568,17 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Nothing reloaded the home: the start checks the repos itself.
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "is missing") {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "is missing") {
 		t.Fatalf("deploying with a missing repo: %v", err)
 	}
 	if _, err := f.hm.LocateRepo(ctx, "ledger", "ledger-api", moved); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
-	if b := f.branch(worktree); b != "lead/atlas/integration" {
+	if b := f.branch(worktree); b != "lead/ledger/atlas/integration" {
 		t.Errorf("the relinked worktree's branch %q", b)
 	}
 	if data, _ := os.ReadFile(filepath.Join(worktree, "work.txt")); string(data) != "mara's\n" {
@@ -1492,9 +1586,10 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 	}
 }
 
-// One team can't work on two projects that share a repo, stopped or not:
-// its branches and worktrees would collide there. Another team can.
-func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
+// The same team on two projects that share a repo, at once: its branches
+// carry the project, so each agent works on its own (the CEO, 2026-11-03).
+// Stopped on one, it starts again on the other all the same.
+func TestATeamWorksOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	if _, _, err := f.hm.NewProject(ctx, "suite", "", filepath.Join(f.root, "workspace", "suite")); err != nil {
 		t.Fatal(err)
@@ -1507,15 +1602,31 @@ func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	for _, p := range []string{"ledger", "suite"} {
+		if _, err := f.m.Deploy(ctx, "atlas", p, false); err != nil {
+			t.Fatalf("atlas on %s: %v", p, err)
+		}
+	}
+	ledger, suite := f.waitStatus("mara@ledger", Running), f.waitStatus("mara@suite", Running)
+	if b := f.branch(filepath.Join(ledger.SandboxPath, "ledger-api")); b != "lead/ledger/atlas/integration" {
+		t.Errorf("on ledger: %q", b)
+	}
+	if b := f.branch(filepath.Join(suite.SandboxPath, "api")); b != "lead/suite/atlas/integration" {
+		t.Errorf("on suite: %q", b)
+	}
+	// Stopped on ledger, its worktrees stay; on suite, its agents start anyway.
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
 		t.Fatal(err)
 	}
-	_ = f.m.Stop(ctx, "atlas@ledger")
-	_, err := f.m.Deploy(ctx, "atlas", "suite")
-	if !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "team atlas also works on ledger, which shares the repo api") {
-		t.Errorf("atlas on a second project of the repo: %v", err)
+	if err := f.m.Wake(ctx, "tove@suite"); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := f.m.Deploy(ctx, "orion", "suite"); err != nil {
+	tove := f.waitStatus("tove@suite", Running)
+	if b := f.branch(filepath.Join(tove.SandboxPath, "api")); b != "wt/suite/tove/main" {
+		t.Errorf("tove on suite: %q", b)
+	}
+	// atlas replaced on suite: another team's agents get their own branches there.
+	if _, err := f.m.Deploy(ctx, "orion", "suite", false); err != nil {
 		t.Errorf("another team: %v", err)
 	}
 	f.waitStatus("nora@suite", Running)
@@ -1526,7 +1637,7 @@ func TestATeamCantWorkOnTwoProjectsSharingARepo(t *testing.T) {
 func TestAGoneProjectStopsAfterARecheck(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	f.m.Recheck = 100 * time.Millisecond
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1574,7 +1685,7 @@ func TestAQuietAgentIsFlaggedStuck(t *testing.T) {
 	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
 	f.deps.Requests = f.db.Requests()
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1683,7 +1794,7 @@ func TestAFailedStartSaysWhy(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	api := filepath.Join(f.root, "dev", "ledger-api")
 	gitRun(t, "-C", api, "branch", "-m", "main", "master")
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	inst := f.waitStatus("mara@ledger", Stopped)
@@ -1719,7 +1830,7 @@ func crowded(t *testing.T, script string) *fixture {
 	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
 	f.deps.Agent.Path = "/opt/foreman/foreman-agent"
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1863,7 +1974,7 @@ func TestASleepThatCantStopLeavesTheAgentAwake(t *testing.T) {
 	})
 	f.deps.Runner = u
 	f.m = New(f.deps)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1887,7 +1998,7 @@ func TestASleepThatCantStopLeavesTheAgentAwake(t *testing.T) {
 // until they start again; asleep ones get it at their wake anyway.
 func TestAChangeLeavesLiveAgentsBehindUntilTheyStartAgain(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger"); err != nil {
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
@@ -1950,13 +2061,23 @@ func TestAChangeLeavesLiveAgentsBehindUntilTheyStartAgain(t *testing.T) {
 		t.Errorf("not behind after the instructions changed: %v", got)
 	}
 
-	// A run from before the hash was kept has nothing to compare: never behind.
-	inst := f.status("mara@ledger")
-	inst.PromptHash = ""
-	if err := f.db.Instances().Put(ctx, inst); err != nil {
+	// On the prompt as composed now: caught up. With no hash (a run from
+	// before it was kept): behind, so Reload puts it on the current prompt.
+	text, err := f.m.Prompt(ctx, "mara@ledger")
+	if err != nil {
 		t.Fatal(err)
 	}
-	if got := behind(); got["mara@ledger"] {
-		t.Errorf("a run with no hash is behind: %v", got)
+	for _, tc := range []struct {
+		hash   string
+		behind bool
+	}{{promptHash(text), false}, {"", true}} {
+		inst := f.status("mara@ledger")
+		inst.PromptHash = tc.hash
+		if err := f.db.Instances().Put(ctx, inst); err != nil {
+			t.Fatal(err)
+		}
+		if got := behind(); got["mara@ledger"] != tc.behind {
+			t.Errorf("hash %q: behind %v, want %v", tc.hash, got["mara@ledger"], tc.behind)
+		}
 	}
 }

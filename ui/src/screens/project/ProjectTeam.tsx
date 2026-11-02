@@ -1,9 +1,8 @@
-import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
-import { type Cleaned, type Instance, type Team, useClient } from "../../api/client";
+import type { Cleaned, Instance, Team } from "../../api/client";
 import { agentOf, readable, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
-import { deploymentView, deploymentViews, latestStopped, sessionOf } from "../../app/project";
+import { latestStopped, sessionOf, teamView, teamViews } from "../../app/project";
 import {
   useCleanUp,
   useDeployments,
@@ -15,8 +14,9 @@ import {
 import { type Worktree, worktrees } from "../../app/repos";
 import { rosterOrder } from "../../app/sessions";
 import { DeployDialog } from "../../components/DeployDialog";
-import { ReloadIcon, StopIcon } from "../../components/icons";
+import { StopIcon } from "../../components/icons";
 import { Confirm } from "../../components/Overlays";
+import { ReloadButton } from "../../components/ReloadButton";
 import { StopDialog } from "../../components/StopDialog";
 import { useToast } from "../../components/Toasts";
 import {
@@ -30,14 +30,15 @@ import {
   Segmented,
 } from "../../components/ui";
 import { useProject } from "../Project";
+import { Activity } from "./Activity";
 import { InFlight, Merged } from "./Pipeline";
 
-// A project's Deployment section (wiki/product/features/project-deployment.md):
+// A project's Team section (wiki/product/features/project-team.md):
 // the team on it, its agents with what they do and the branch
 // each has checked out (and the worktrees earlier teams left); then the work
-// on its way to its targets, and what merged. Deploy (replacing the team), Reload
+// on its way to its targets, and what merged; the team's activity between. Deploy (replacing the team), Reload
 // (its agents left on an older prompt) and Stop.
-export function Deployment() {
+export function ProjectTeam() {
   const project = useProject();
   const repos = useRepos(project.id);
   const teams = useTeams();
@@ -54,18 +55,10 @@ export function Deployment() {
   const left = trees.filter((w) => !roster.some((i) => i.agentId === w.agent));
   // Named as the team that stopped last there has them: the one that left them, usually.
   const earlier = latestStopped(project.id, stopped);
-  const search = useSearch({ from: "/projects/$project/deployment" });
-  const navigate = useNavigate({ from: "/projects/$project/deployment" });
-  const view = deploymentView(search.view, roster.length + left.length > 0);
-  const client = useClient();
-  const toast = useToast();
+  const search = useSearch({ from: "/projects/$project/team" });
+  const navigate = useNavigate({ from: "/projects/$project/team" });
+  const view = teamView(search.view, roster.length + left.length > 0);
   const reload = reloadOf(roster);
-  // Each restart continues its agent's conversation, on the prompt as it is now.
-  const restart = useMutation({
-    mutationFn: () => Promise.all(reload.behind.map((i) => client.agents.restart(i.id))),
-    onError: (e: Error) =>
-      toast({ title: "Agents not reloaded", body: e.message, color: "var(--err)" }),
-  });
   return (
     <div className="flex flex-col gap-8 px-6 pt-6 pb-12">
       <section className="flex flex-col gap-2.5">
@@ -87,16 +80,7 @@ export function Deployment() {
           <Button onClick={() => setDeploy(true)}>
             {d ? "Deploy another team" : "Deploy a team"}
           </Button>
-          {reload.behind.length > 0 && (
-            <Button
-              className="inline-flex items-center gap-1.5"
-              disabled={!!reload.busy || restart.isPending}
-              onClick={() => restart.mutate()}
-            >
-              <ReloadIcon />
-              Reload
-            </Button>
-          )}
+          {d && <ReloadButton instances={roster} />}
           {d && (
             <Button
               variant="danger"
@@ -116,7 +100,7 @@ export function Deployment() {
         label="Show"
         value={view}
         onChange={(v) => navigate({ search: { view: v } })}
-        options={deploymentViews.map((v) => ({ value: v.view, label: v.label }))}
+        options={teamViews.map((v) => ({ value: v.view, label: v.label }))}
       />
       {view === "agents" && (
         <>
@@ -153,6 +137,7 @@ export function Deployment() {
           )}
         </>
       )}
+      {view === "activity" && <Activity />}
       {view === "inflight" && <InFlight project={project} />}
       {view === "merged" && (
         <div className="flex flex-col gap-3">
@@ -253,7 +238,7 @@ function AgentRow({
 
 /** The worktrees earlier teams' agents left, kept by their Stop so a redeploy
  * resumes them. Clean up removes only what is safe (a worktree with nothing
- * uncommitted, a wt/ branch a target holds) and lists what it kept, with why. */
+ * uncommitted, a wt/<project>/ branch a target holds) and lists what it kept, with why. */
 function EarlierTeams({
   project,
   left,
@@ -329,7 +314,7 @@ function EarlierTeams({
         open={asking}
         onClose={() => setAsking(false)}
         title="Clean up what earlier teams left?"
-        body="Removes their worktrees that hold nothing uncommitted, and their wt/ branches a target already holds (kept aside a while, recoverable by hand). Everything else stays, and is listed with why."
+        body="Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches here a target already holds (kept aside a while, recoverable by hand). Everything else stays, and is listed with why."
         action="Clean up"
         onConfirm={run}
       />

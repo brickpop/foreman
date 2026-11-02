@@ -515,7 +515,8 @@ func changesMessage(v Review, note string, comments []Comment) string {
 // each at the head the CEO read (heads: repo → commit), into its target;
 // the others stay open in the review. A repo that can't be merged (a
 // conflict, the CEO's local changes, a branch that moved since) stops
-// nothing else; the error names it.
+// nothing else; the error names it. Once nothing is open in it, its draft
+// comments are dropped.
 func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]string) error {
 	v, err := w.openReview(ctx, id)
 	if err != nil {
@@ -540,6 +541,11 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 		if err := w.mergeToTarget(ctx, mr, heads[mr.Repo]); err != nil {
 			failed = append(failed, fmt.Errorf("%s: %w", mr.Repo, err))
 		}
+	}
+	// Merged in every repo, the review is closed: its drafts can't be sent any
+	// more (the CEO, 2026-11-03: Merge warns that they're lost).
+	if _, err := w.openReview(ctx, id); errors.Is(err, ErrNotOpen) {
+		w.dropDrafts(ctx, id)
 	}
 	return errors.Join(failed...)
 }

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
 )
 
@@ -42,8 +43,9 @@ const (
 // teamTool is a team tool as the prompt knows it: who gets it, who of them
 // needs a code repo for it (a project may have none: a research team works
 // only on the wiki), whether it exists yet (the Messaging and hand-offs epic
-// brings them in steps), and its lines in the Tools section ({team}: the
-// team's id; wiki/product/architecture/session-prompt.md#template).
+// brings them in steps), and its lines in the Tools section ({lead}: what the
+// lead's branches start with, lead/<project>/<team>/;
+// wiki/product/architecture/session-prompt.md#template).
 type teamTool struct {
 	name  string
 	role  role
@@ -84,7 +86,7 @@ var teamTools = []teamTool{
 		"                                    For an approval, wait for the answer before that step.",
 	}},
 	{"request_merge", leadOnly, anyone, true, []string{
-		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/{team}/* branches into into,",
+		"request_merge(branch, entry, into)  Ask the CEO to merge one of your {lead}* branches into into,",
 		"                                    a target (each repo's default branch when left out);",
 		"                                    entry: the wiki card that explains the work. Only you can.",
 		"                                    Call it again on the same branch to refresh it.",
@@ -285,21 +287,25 @@ func defaults(repos []home.Repo) string {
 
 func branches(in Input, lead bool, has func(string) bool) string {
 	switching := has("switch")
+	// Their names carry the project: the same team may work on another
+	// project sharing a repo.
+	mine := git.BranchPrefix(in.Project, in.Agent, in.Team.Team, false)
+	ours := git.BranchPrefix(in.Project, in.Agent, in.Team.Team, true)
 	switch {
 	case !switching && lead:
-		return fmt.Sprintf("you work on lead/%s/integration, made for you from %s.", in.Team.Team, defaults(in.Repos))
+		return fmt.Sprintf("you work on %s, made for you from %s.", git.HomeBranch(in.Project, in.Agent, in.Team.Team, true), defaults(in.Repos))
 	case !switching:
-		return fmt.Sprintf("you work on wt/%s/main, made for you from %s.", in.Agent, defaults(in.Repos))
+		return fmt.Sprintf("you work on %s, made for you from %s.", git.HomeBranch(in.Project, in.Agent, in.Team.Team, false), defaults(in.Repos))
 	case lead && has("request_merge"):
-		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch, from). "+
+		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
 			"Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), "+
-			"resolve any conflicts and commit(), then call request_merge again.%s %s", in.Team.Team, in.Team.Team, oneTopic(has), fewRequests)
+			"resolve any conflicts and commit(), then call request_merge again.%s %s", ours, ours, oneTopic(has), fewRequests)
 	case lead:
-		return fmt.Sprintf("lead/%s/<topic>, as many as you need (lead/%s/integration exists). Switch to one (or make it) with switch(branch, from). "+
+		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
 			"Merge the hand-offs you accept into it with merge(branch). When told a target moved, merge it in with merge(<that target>). "+
-			"Tell the CEO which lead branch is ready for review.%s", in.Team.Team, in.Team.Team, oneTopic(has))
+			"Tell the CEO which lead branch is ready for review.%s", ours, ours, oneTopic(has))
 	default:
-		return fmt.Sprintf("wt/%s/<card> only; switch to one (or make it) with switch(branch, from). Never push to a target.%s", in.Agent, oneCard(has))
+		return fmt.Sprintf("%s<card> only; switch to one (or make it) with switch(branch, from). Never push to a target.%s", mine, oneCard(has))
 	}
 }
 
@@ -395,7 +401,7 @@ func tools(in Input, lead bool, has func(string) bool) string {
 	for _, t := range teamTools {
 		if has(t.name) {
 			for _, row := range t.rows {
-				rows = append(rows, strings.ReplaceAll(row, "{team}", in.Team.Team))
+				rows = append(rows, strings.ReplaceAll(row, "{lead}", git.BranchPrefix(in.Project, in.Agent, in.Team.Team, true)))
 			}
 		}
 	}

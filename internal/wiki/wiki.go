@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -196,6 +197,10 @@ var images = map[string]string{
 	".svg":  "image/svg+xml",
 }
 
+// ImageType is the content type of a file the readers show inline, by its
+// name's extension; "" for anything else.
+func ImageType(name string) string { return images[strings.ToLower(path.Ext(name))] }
+
 // Image finds an image of the project's wiki: its file on disk and its
 // content type. Only an image an entry links to is served, and only one
 // inside the wiki once symlinks are followed, so the route can't become a
@@ -206,9 +211,9 @@ func (w *Wikis) Image(project, p string) (file, contentType string, err error) {
 		return "", "", err
 	}
 	target := "/" + strings.TrimPrefix(p, "/")
-	contentType = images[strings.ToLower(path.Ext(target))]
+	contentType = ImageType(target)
 	linked := slices.ContainsFunc(idx.Entries, func(e *index.Entry) bool {
-		return slices.ContainsFunc(e.Links, func(l index.Link) bool { return l.Target == target })
+		return slices.ContainsFunc(e.Links, func(l index.Link) bool { return Decoded(l.Target) == target })
 	})
 	if contentType == "" || !linked {
 		return "", "", fmt.Errorf("%w: %s", ErrNotFound, p)
@@ -227,24 +232,51 @@ func (w *Wikis) Image(project, p string) (file, contentType string, err error) {
 	return file, contentType, nil
 }
 
+// Decoded is a link's path as the file is named: written percent-encoded, as
+// on GitHub (`my%20file.md`), it names `my file.md` (the CEO, 2026-11-03). A
+// path that isn't valid encoding is taken as written.
+func Decoded(p string) string {
+	if d, err := url.PathUnescape(p); err == nil {
+		return d
+	}
+	return p
+}
+
 func links(idx *index.Index, e *index.Entry) []Link {
 	out := make([]Link, 0, len(e.Links)+len(e.Outside))
 	for _, l := range e.Links {
-		_, err := idx.Resolve(l.Target)
+		target := Decoded(l.Target)
+		_, err := idx.Resolve(target)
 		// Not an entry and not named like one: a file the wiki carries. A
 		// missing .md is an entry not written yet, not a file.
-		file := err != nil && !strings.HasSuffix(l.Target, ".md") && idx.FileExists(l.Target)
+		file := err != nil && !strings.HasSuffix(target, ".md") && idx.FileExists(target)
 		out = append(out, Link{
 			Raw:    l.Raw,
-			To:     rel(l.Target),
+			To:     rel(target),
 			Anchor: l.Anchor,
 			Exists: err == nil,
 			File:   file,
-			Image:  file && images[strings.ToLower(path.Ext(l.Target))] != "",
+			Image:  file && ImageType(target) != "",
 		})
 	}
 	for _, l := range e.Outside {
 		out = append(out, Link{Raw: l.Raw, Outside: true})
+	}
+	return out
+}
+
+// Headings are the ids a Markdown body's headings take, by the engine's rule:
+// for a file outside the wiki (a repo's), read from its body alone.
+func Headings(body string) []Heading {
+	hs := parse.Headings(body)
+	texts := make([]string, len(hs))
+	for i, h := range hs {
+		texts[i] = h.Text
+	}
+	ids := headingIDs(texts)
+	out := make([]Heading, len(hs))
+	for i, h := range hs {
+		out[i] = Heading{ID: ids[i], BodyLine: h.Line}
 	}
 	return out
 }

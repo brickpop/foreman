@@ -42,6 +42,7 @@ packages:
     type_mappings:
       git.Commit: "git.Commit"
       wiki.Field: "wiki.Field"
+      wiki.Heading: "wiki.Heading"
     frontmatter: |
       import type * as git from "./git";
       import type * as wiki from "./wiki";

@@ -35,6 +35,9 @@ type Instance struct {
 	// PromptHash is the hash of the session prompt its current run started
 	// with; "" for a run from before it was kept.
 	PromptHash string `json:"-"`
+	// Fresh: its next start begins a new conversation rather than continuing
+	// its last one on the project; set at deploy, cleared once it starts.
+	Fresh bool `json:"-"`
 	// Behind says its run started on an older prompt than its team, project
 	// and settings compose now: the instance manager works it out on each
 	// list, never stored.

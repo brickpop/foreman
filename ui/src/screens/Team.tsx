@@ -6,6 +6,7 @@ import { readable, roleLabel, roster, type TeamTab, teamTab } from "../app/model
 import { useDeployments, useHomeFolder, useInstances, useRequests, useTeams } from "../app/queries";
 import { DeployDialog } from "../components/DeployDialog";
 import { StopIcon } from "../components/icons";
+import { ReloadButton } from "../components/ReloadButton";
 import { StopDialog } from "../components/StopDialog";
 import { TeamPlaybook } from "../components/TeamPlaybook";
 import { Button, Dot, Empty, Loading, Panel } from "../components/ui";
@@ -96,7 +97,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
           ).length;
           return (
             // The whole card opens the deployment's sessions: their link
-            // stretches over it, and the project name and Stop sit above it.
+            // stretches over it, and the project name, Reload and Stop sit above it.
             <Panel
               key={d.id}
               className="relative hover:border-line3 has-[[data-card]:focus-visible]:outline-2 has-[[data-card]:focus-visible]:outline-acc"
@@ -120,6 +121,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                     {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
                   </Link>
                 </div>
+                <ReloadButton instances={sessions(d)} />
                 <Button
                   variant="danger"
                   className="relative z-10 inline-flex items-center gap-1.5"

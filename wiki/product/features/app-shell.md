@@ -14,7 +14,7 @@ A two-column grid: sidebar **220px**, main area `minmax(0, 1fr)`, full viewport 
 
 **One breakpoint** (basic responsiveness): under ~760px the sidebar collapses behind a menu button at the top left and opens as an overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)).
 
-Screens: [Dashboard](./dashboard.md); a [Project](./project-page.md), with its sections [Session](./sessions.md), [Inbox](./reviews.md#the-inbox) (a review's page inside it), [Wiki](./wiki-reader.md), [Board](./board.md), [Repos](./repos.md), [Deployment](./project-deployment.md), [Activity](./project-activity.md) and [Settings](./project-settings.md); [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on the Dashboard (or the last screen, see [UI state](../models/ui-state.md)). Sessions and Reviews left the nav on 2026-10-31: the work happens inside a project (the CEO).
+Screens: [Dashboard](./dashboard.md); a [Project](./project-page.md), with its sections [Session](./sessions.md), [Inbox](./reviews.md#the-inbox) (a review's page inside it), [Repos](./repos.md), [Board](./board.md), [Wiki](./wiki-reader.md), [Team](./project-team.md) (with its [Activity](./project-activity.md)) and [Settings](./project-settings.md); [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on the Dashboard (or the last screen, see [UI state](../models/ui-state.md)). Sessions and Reviews left the nav on 2026-10-31: the work happens inside a project (the CEO).
 
 ## Sidebar
 
@@ -51,7 +51,7 @@ In-app mirrors of [notifications](./notifications.md), shown regardless of brows
 | Instance done | `<Name> is done on <project>` | the handoff summary, e.g. `Idempotency keys handed off to Mara.` | `--info` |
 | New request | `<Name> needs you on <project>` | the request summary | `--attn` |
 | Deployed | `<Team> deployed to <project>` | `<N> new sessions starting.` (opens the lead's session) | `--ok` |
-| Stopped | `<Team> stopped on <project>` | `Worktrees are kept. Other deployments keep running.` (opens the project's Deployment) | `--tx4` |
+| Stopped | `<Team> stopped on <project>` | `Worktrees are kept. Other deployments keep running.` (opens the project's Team) | `--tx4` |
 | Project created | `<id> created` | `Made its project repo at <path>, with project.toml and a starter wiki.`, `Cloned its project repo into <path>.`, or `Took over the project repo left at <path>, as it was.` | `--ok` |
 | Project removed | `<id> removed` | none | `--tx4` |
 | Stopped by Foreman (its project is gone) | `Foreman stopped <Team> on <project>` | the reason, e.g. `ledger is gone: all its code repos are missing` (opens the Dashboard) | `--err` |

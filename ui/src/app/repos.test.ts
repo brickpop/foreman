@@ -6,6 +6,7 @@ import {
   bytes,
   crumbs,
   folderOf,
+  folderPage,
   graph,
   matching,
   readmeOf,
@@ -25,20 +26,33 @@ const atlas = {
 describe("the Repos section's model", () => {
   it("names whose branch it is", () => {
     const on = "atlas@ledger";
-    expect(branchOwner("wt/tove/LED-44", [atlas], on)).toBe("Tove");
-    expect(branchOwner("lead/atlas/integration", [atlas], on)).toBe("Mara");
-    expect(branchOwner("wt/gone/x", [atlas], on)).toBe("gone"); // a soul since removed
-    expect(branchOwner("main", [atlas], on)).toBeUndefined();
-    expect(branchOwner("feature/x", [atlas], on)).toBeUndefined();
+    const owner = (b: string, teams: Team[], d: string | undefined) =>
+      branchOwner(b, "ledger", teams, d);
+    expect(owner("wt/ledger/tove/LED-44", [atlas], on)).toBe("Tove");
+    expect(owner("wt/ledger/tove/a/b", [atlas], on)).toBe("Tove"); // a topic with a slash
+    expect(owner("lead/ledger/atlas/integration", [atlas], on)).toBe("Mara");
+    expect(owner("wt/ledger/gone/x", [atlas], on)).toBe("gone"); // a soul since removed
+    expect(owner("lead/ledger/gone/x", [atlas], on)).toBe("gone"); // a team since removed
+    expect(owner("main", [atlas], on)).toBeUndefined();
+    expect(owner("feature/x", [atlas], on)).toBeUndefined();
+    expect(owner("wt/ledger/tove", [atlas], on)).toBeUndefined(); // no topic
+    expect(owner("wt//tove/x", [atlas], on)).toBeUndefined();
+    // The names from before branches carried the project: nobody's in particular.
+    expect(owner("wt/tove/LED-44", [atlas], on)).toBeUndefined();
+    expect(owner("lead/atlas/integration", [atlas], on)).toBeUndefined();
+    // Another project's, in a repo they share: its instance id.
+    expect(owner("wt/suite/tove/x", [atlas], on)).toBe("tove@suite");
+    expect(owner("lead/suite/atlas/integration", [atlas], on)).toBe("mara@suite");
+    expect(owner("lead/suite/gone/integration", [atlas], on)).toBe("gone@suite");
     // Never a team on the project: the id as it is.
-    expect(branchOwner("wt/tove/LED-44", [atlas], undefined)).toBe("tove");
+    expect(owner("wt/ledger/tove/LED-44", [atlas], undefined)).toBe("tove");
     // The team on the project names it, even when another team has a tove too.
     const orion = {
       id: "orion",
       config: { lead: "tove", agents: { tove: { name: "QA" } } },
     } as unknown as Team;
-    expect(branchOwner("wt/tove/LED-44", [atlas, orion], "orion@ledger")).toBe("QA");
-    expect(branchOwner("lead/atlas/integration", [atlas, orion], "orion@ledger")).toBe("Mara");
+    expect(owner("wt/ledger/tove/LED-44", [atlas, orion], "orion@ledger")).toBe("QA");
+    expect(owner("lead/ledger/atlas/integration", [atlas, orion], "orion@ledger")).toBe("Mara");
   });
 
   it("breaks a path into crumbs and finds its folder", () => {
@@ -201,6 +215,22 @@ describe("readmeOf", () => {
   it("opens nothing without one, and never a folder or a near name", () => {
     expect(readmeOf([{ name: "README.md", kind: "dir" }, file("readme-old.md")])).toBeUndefined();
     expect(readmeOf([])).toBeUndefined();
+  });
+});
+
+describe("folderPage", () => {
+  const file = (name: string) => ({ name, kind: "file" });
+
+  // The other way round from the root's: a folder a link names is a wiki's
+  // section, fronted by its index.md.
+  it("opens index.md first, then the README, whatever their case", () => {
+    expect(folderPage([file("README.md"), file("Index.MD")])).toBe("Index.MD");
+    expect(folderPage([file("a.md"), file("readme")])).toBe("readme");
+  });
+
+  it("opens nothing without one, and never a folder or a near name", () => {
+    expect(folderPage([{ name: "index.md", kind: "dir" }, file("index-old.md")])).toBeUndefined();
+    expect(folderPage([])).toBeUndefined();
   });
 });
 

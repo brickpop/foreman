@@ -1,6 +1,8 @@
 package podman
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"slices"
 	"testing"
@@ -36,6 +38,13 @@ func TestCreateSpec(t *testing.T) {
 		cs := (&Runner{selinux: selinux}).createSpec(spec)
 		if cs.Name != "foreman-mara-ledger" || !cs.Terminal || !cs.Stdin || cs.WorkDir != spec.Dir || cs.Userns != imageUser {
 			t.Errorf("spec %+v", cs)
+		}
+		// Podman's init, not the agent, is PID 1, so orphans are reaped.
+		if !cs.Init {
+			t.Error("no init")
+		}
+		if b, err := json.Marshal(cs); err != nil || !bytes.Contains(b, []byte(`"init":true`)) {
+			t.Errorf("the create payload asks for no init: %s, %v", b, err)
 		}
 		wantEnv := map[string]string{"TERM": "xterm-256color", "CLAUDE_CONFIG_DIR": "/home/node/.claude", "A": "b=c"}
 		if !reflect.DeepEqual(cs.Env, wantEnv) {
@@ -81,14 +90,35 @@ func TestMachineBounds(t *testing.T) {
 // top's rows, its command line whole or split at its spaces: PID 1 and the
 // zombies are left out.
 func TestOthers(t *testing.T) {
+	// Under podman's init, PID 1 is the init and its first child the
+	// container's command (the harness): neither counts. An orphan the agent
+	// left, reparented to PID 1, still does.
 	got := others([][]string{
-		{"1", "S", "claude --continue"},
-		{"7", "S", "/opt/foreman/foreman-agent", "mcp"},
-		{"9", "Z", "[sh]"},
-		{"12", "R", "npm run dev"},
+		{"1", "0", "S", "/run/podman-init", "--", "claude", "--continue"},
+		{"2", "1", "S", "claude --continue"},
+		{"7", "2", "S", "/opt/foreman/foreman-agent", "mcp"},
+		{"9", "2", "Z", "[sh]"},
+		{"12", "1", "R", "npm run dev"},
 		{"13"},
 	})
 	if want := []string{"/opt/foreman/foreman-agent mcp", "npm run dev"}; !slices.Equal(got, want) {
-		t.Errorf("others = %q, want %q", got, want)
+		t.Errorf("with an init: others = %q, want %q", got, want)
+	}
+	// A container made before the init: PID 1 is the harness itself, and
+	// every child of it counts.
+	got = others([][]string{
+		{"1", "0", "S", "claude --continue"},
+		{"7", "1", "S", "/opt/foreman/foreman-agent", "mcp"},
+		{"12", "1", "R", "npm run dev"},
+	})
+	if want := []string{"/opt/foreman/foreman-agent mcp", "npm run dev"}; !slices.Equal(got, want) {
+		t.Errorf("without an init: others = %q, want %q", got, want)
+	}
+}
+
+// A short or unreadable row is skipped, never a panic.
+func TestOthersSkipsBadRows(t *testing.T) {
+	if got := others([][]string{{}, {"x", "1", "S", "a"}, {"5", "1", "S"}}); len(got) != 0 {
+		t.Errorf("others = %q, want none", got)
 	}
 }

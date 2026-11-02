@@ -33,8 +33,9 @@ type Process interface {
 	// Wait blocks until the process exits and returns its exit code.
 	Wait() (exitCode int, err error)
 	// Processes are the command lines of what else runs in the session
-	// besides its main process (not the zombies): the helpers it keeps, and
-	// anything it started and left running. An idle agent sleeps only when
+	// besides its main process, and in a container the init above it (not the
+	// zombies): the helpers it keeps, and anything it started and left running,
+	// orphans included. An idle agent sleeps only when
 	// nothing but its helpers is left (wiki/product/architecture/agent-runtime.md#idle-agents-sleep).
 	Processes(ctx context.Context) ([]string, error)
 }

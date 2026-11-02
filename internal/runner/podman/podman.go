@@ -14,6 +14,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -205,7 +206,7 @@ func (r *Runner) createSpec(spec runner.Spec) createSpec {
 	return createSpec{
 		Name: containerName(spec.Name), Image: spec.Image, Command: spec.Command,
 		Terminal: true, Stdin: true, WorkDir: spec.Dir,
-		Labels: labels, Mounts: mounts, Env: env, Userns: imageUser,
+		Labels: labels, Mounts: mounts, Env: env, Userns: imageUser, Init: true,
 	}
 }
 
@@ -280,8 +281,8 @@ func (p *process) Wait() (int, error) {
 	return p.exitCode, p.waitErr
 }
 
-// Processes are the container's processes but its first (the harness),
-// zombies left out.
+// Processes are the container's processes but its command (the harness) and
+// podman's init above it, zombies left out.
 func (p *process) Processes(ctx context.Context) ([]string, error) {
 	rows, err := p.c.top(ctx, p.id)
 	if err != nil {
@@ -290,15 +291,52 @@ func (p *process) Processes(ctx context.Context) ([]string, error) {
 	return others(rows), nil
 }
 
-// others reads top's rows (pid, state, command line, which Podman may split
-// at its spaces): the command lines of all but PID 1 and the zombies.
+// others reads top's rows (pid, ppid, state, command line, which Podman may
+// split at its spaces) and returns the command lines of the live processes
+// other than the container's own: PID 1, and, when PID 1 is podman's init, the
+// container's command, its first child (the lowest pid whose parent is 1).
+// Any other child of PID 1 still counts: an orphan the agent left, such as a
+// dev server, is reparented to PID 1 and keeps it awake. In a container made
+// before the init, PID 1 is the command itself, and all its children count.
 func others(rows [][]string) []string {
-	var list []string
+	type proc struct {
+		pid   int
+		ppid  string
+		state string
+		args  string
+	}
+	var procs []proc
+	command := -1 // the container's command under the init, if any
+	init := false
 	for _, r := range rows {
-		if len(r) < 3 || r[0] == "1" || strings.HasPrefix(r[1], "Z") {
+		if len(r) < 4 {
 			continue
 		}
-		list = append(list, strings.Join(r[2:], " "))
+		pid, err := strconv.Atoi(r[0])
+		if err != nil {
+			continue
+		}
+		pr := proc{pid, r[1], r[2], strings.Join(r[3:], " ")}
+		if pid == 1 {
+			init = isInit(pr.args)
+		} else if pr.ppid == "1" && (command < 0 || pid < command) {
+			command = pid
+		}
+		procs = append(procs, pr)
+	}
+	var list []string
+	for _, pr := range procs {
+		if pr.pid == 1 || init && pr.pid == command || strings.HasPrefix(pr.state, "Z") {
+			continue
+		}
+		list = append(list, pr.args)
 	}
 	return list
+}
+
+// isInit reports whether a command line is podman's init, which podman always
+// mounts at /run/podman-init (its define.ContainerInitPath).
+func isInit(args string) bool {
+	exe, _, _ := strings.Cut(args, " ")
+	return exe == "/run/podman-init"
 }

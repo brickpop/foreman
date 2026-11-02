@@ -333,8 +333,9 @@ func TestOpenThenConnect(t *testing.T) {
 	}
 }
 
-// Processes lists what runs besides PID 1, live ones only: here PID 1 (cat)
-// never reaps the finished `true`, which stays a zombie.
+// Processes lists what runs besides the container's command and its init, live
+// ones only: here the command (cat, after the shell's exec) never reaps the
+// finished `true`, which stays a zombie.
 func TestProcessesAreTheOthersAlive(t *testing.T) {
 	r := engine(t)
 	p := start(t, r, runner.Spec{Command: sh(`sleep 300 & true & echo ready; exec cat`)})
@@ -348,4 +349,52 @@ func TestProcessesAreTheOthersAlive(t *testing.T) {
 	if len(list) != 1 || list[0] != "sleep 300" {
 		t.Errorf("processes %q", list)
 	}
+}
+
+// The agent's command is not PID 1: podman's init is, and it reaps the
+// orphans a command leaves behind. Without it, orphans stay zombies until the
+// container runs out of processes and every fork fails. Without an init, PID 1
+// would be the shell after `exec sleep 3`, which never reaps, and the orphaned
+// `sleep 0.1` would show as Z.
+func TestOrphansAreReaped(t *testing.T) {
+	r := engine(t)
+	p := start(t, r, runner.Spec{
+		Name:    fmt.Sprintf("test-init-%d", time.Now().UnixNano()),
+		Command: sh(`(sleep 0.1 &); (sleep 1; ps -o stat,comm; echo ps-done) & exec sleep 3`),
+	})
+	out := collect(p)
+	out.waitFor(t, "ps-done")
+	out.mu.Lock()
+	defer out.mu.Unlock()
+	text := out.buf.String()
+	header, sleeping := false, false
+	for _, line := range strings.Split(text, "\n") {
+		f := strings.Fields(line)
+		switch {
+		case len(f) < 2:
+		case f[0] == "STAT":
+			header = true
+		case f[1] == "sleep":
+			sleeping = true // the `exec sleep 3` itself: ps listed processes
+		}
+		if len(f) > 0 && strings.HasPrefix(f[0], "Z") {
+			t.Errorf("a zombie was left: %q", line)
+		}
+	}
+	if !header || !sleeping {
+		t.Errorf("ps listed nothing to check (header %v, a sleep row %v):\n%s", header, sleeping, text)
+	}
+}
+
+// Under the init, the harness still owns the terminal: a resize reaches it as
+// SIGWINCH, which is how a TUI learns to redraw.
+func TestResizeReachesTheCommandUnderTheInit(t *testing.T) {
+	r := engine(t)
+	p := start(t, r, runner.Spec{Command: sh(`trap 'echo winched' WINCH; echo ready; while true; do sleep 0.1; done`)})
+	out := collect(p)
+	out.waitFor(t, "ready")
+	if err := p.Resize(runner.Size{Cols: 90, Rows: 20}); err != nil {
+		t.Fatal(err)
+	}
+	out.waitFor(t, "winched")
 }

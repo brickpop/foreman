@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -184,9 +185,17 @@ func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, def string) e
 	return err
 }
 
+// diffCmd starts a `git diff` whose output is the same whatever the repo's or
+// the CEO's config says, as the review screen reads it: the config may have
+// been written by an agent. No external diff or textconv program runs (either
+// would run any command on the host), no colors, `a/` and `b/` prefixes,
+// blank context lines kept, submodules as one line, and a moved file always
+// reads as one rename, not a deletion and an addition.
+var diffCmd = []string{"-c", "diff.suppressBlankEmpty=false", "diff", "--no-ext-diff", "--no-textconv",
+	"--no-color", "--src-prefix=a/", "--dst-prefix=b/", "--submodule=short", "--find-renames"}
+
 // Diff is what the commit head changes against branch target since they
-// parted, as a unified diff. A moved file always reads as one rename, not a
-// deletion and an addition, whatever the CEO's git config says.
+// parted, as a unified diff.
 func (g *CLI) Diff(ctx context.Context, dir, target, head string) (string, error) {
 	if !ValidBranch(ctx, target) {
 		return "", ErrBadBranch
@@ -194,7 +203,7 @@ func (g *CLI) Diff(ctx context.Context, dir, target, head string) (string, error
 	if !hash.MatchString(head) {
 		return "", ErrNoRef
 	}
-	return run(ctx, dir, "diff", "--find-renames", "refs/heads/"+target+"..."+head)
+	return run(ctx, dir, append(slices.Clone(diffCmd), "refs/heads/"+target+"..."+head)...)
 }
 
 // hash is a commit's id as git prints it, in full or abbreviated.
@@ -202,12 +211,15 @@ var hash = regexp.MustCompile(`^[0-9a-f]{4,64}$`)
 
 // Compare is what changed from one commit to another (both hashes), as a
 // unified diff with that many lines of context around each change; only in paths when any are
-// named. Unlike Diff it compares the two commits themselves, not since they
-// parted. Renames read as Diff's do.
+// named, each as itself (a `*` in one is no pattern). Unlike Diff it compares
+// the two commits themselves, not since they parted.
 func (g *CLI) Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error) {
 	if !hash.MatchString(from) || !hash.MatchString(to) || lines < 0 {
 		return "", ErrNoRef
 	}
-	args := append([]string{"diff", "--find-renames", "--unified=" + strconv.Itoa(lines), from, to, "--"}, paths...)
+	args := append(slices.Clone(diffCmd), "--unified="+strconv.Itoa(lines), from, to, "--")
+	for _, p := range paths {
+		args = append(args, ":(literal)"+p)
+	}
 	return run(ctx, dir, args...)
 }

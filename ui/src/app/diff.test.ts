@@ -91,6 +91,41 @@ describe("diffFiles", () => {
     expect(files[2].lines[1]).toEqual({ kind: "del", text: "-bye", old: 1 });
   });
 
+  it("reads the paths git quotes, and those with ' b/' in them", () => {
+    // As git prints them: quoted C-style, non-ASCII as octal UTF-8 bytes
+    // (`String.raw`: each backslash is one git printed).
+    const quoted = [
+      String.raw`diff --git "a/back\\slash.txt" "b/back\\slash.txt"`,
+      "deleted file mode 100644",
+      "index 975fbec..0000000",
+      String.raw`--- "a/back\\slash.txt"`,
+      "+++ /dev/null",
+      "@@ -1 +0,0 @@",
+      "-y",
+      String.raw`diff --git "a/na\303\257ve \"q\".txt" "b/na\303\257ve \"q\".txt"`,
+      "index 587be6b..62d8fe9 100644",
+      `${String.raw`--- "a/na\303\257ve \"q\".txt"`}\t`,
+      `${String.raw`+++ "b/na\303\257ve \"q\".txt"`}\t`,
+      "@@ -1 +1 @@",
+      "-x",
+      "+X",
+      String.raw`diff --git a/old.txt "b/tab\t\303\251t\303\251.txt"`,
+      "similarity index 100%",
+      "rename from old.txt",
+      String.raw`rename to "tab\t\303\251t\303\251.txt"`,
+      "diff --git a/docs b/a b/c.md b/docs b/a b/c.md",
+      "new file mode 100644",
+      "index 0000000..e69de29",
+      "",
+    ].join("\n");
+    expect(diffFiles(quoted).map((f) => [f.path, f.from, f.change])).toEqual([
+      ["back\\slash.txt", undefined, "deleted"],
+      ['na\u00EFve "q".txt', undefined, ""],
+      ["tab\t\u00E9t\u00E9.txt", "old.txt", "renamed"],
+      ["docs b/a b/c.md", undefined, "new"], // an empty file: no +++ to read it from
+    ]);
+  });
+
   it("has no files for no changes", () => {
     expect(diffFiles("")).toEqual([]);
   });

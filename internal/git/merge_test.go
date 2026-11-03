@@ -276,22 +276,44 @@ func TestDiff(t *testing.T) {
 	}
 }
 
-func TestDiffShowsAMoveAsARename(t *testing.T) {
+func TestDiffIgnoresAHostileConfig(t *testing.T) {
 	g, dir := mergeFixture(t)
-	// The CEO's config turning detection off doesn't split a move in two.
-	mustRun(t, dir, "config", "diff.renames", "false")
+	change(t, g, dir, "blank.txt", "a\n\nb\n", Author{})
 	from := mustRun(t, dir, "rev-parse", "main")
-	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
+	mustRun(t, dir, "checkout", "-q", "-B", "lead/atlas/x", "main")
 	mustRun(t, dir, "mv", "README", "docs.md")
+	write(t, filepath.Join(dir, "blank.txt"), "a\n\nB\n")
+	mustRun(t, dir, "add", "blank.txt")
 	mustRun(t, dir, "commit", "-q", "-m", "move")
 	to := mustRun(t, dir, "rev-parse", "HEAD")
 	mustRun(t, dir, "checkout", "-q", "main")
-	want := "similarity index 100%\nrename from README\nrename to docs.md\n"
-	if diff, err := g.Diff(ctx, dir, "main", to); err != nil || !strings.Contains(diff, want) {
+
+	// A config an agent could have written: programs for git to run, and
+	// settings that change what the review screen reads.
+	ran := filepath.Join(t.TempDir(), "ran")
+	script := filepath.Join(t.TempDir(), "evil.sh")
+	write(t, script, "#!/bin/sh\ntouch "+ran+"\necho evil\n")
+	if err := os.Chmod(script, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range [][2]string{{"diff.external", script}, {"diff.ev.textconv", script},
+		{"diff.noprefix", "true"}, {"color.diff", "always"}, {"diff.suppressBlankEmpty", "true"},
+		{"diff.renames", "false"}} {
+		mustRun(t, dir, "config", kv[0], kv[1])
+	}
+	write(t, filepath.Join(dir, mustRun(t, dir, "rev-parse", "--git-path", "info/attributes")), "* diff=ev\n")
+
+	want := "diff --git a/blank.txt b/blank.txt\nindex a1a53b5..9c1e21d 100644\n--- a/blank.txt\n+++ b/blank.txt\n" +
+		"@@ -1,3 +1,3 @@\n a\n \n-b\n+B\n" +
+		"diff --git a/README b/docs.md\nsimilarity index 100%\nrename from README\nrename to docs.md\n"
+	if diff, err := g.Diff(ctx, dir, "main", to); err != nil || diff != want {
 		t.Errorf("diff %q %v", diff, err)
 	}
-	if diff, err := g.Compare(ctx, dir, from, to, 3); err != nil || !strings.Contains(diff, want) {
+	if diff, err := g.Compare(ctx, dir, from, to, 3); err != nil || diff != want {
 		t.Errorf("compare %q %v", diff, err)
+	}
+	if _, err := os.Stat(ran); err == nil {
+		t.Error("the config's program ran")
 	}
 }
 
@@ -306,6 +328,10 @@ func TestCompareTwoCommits(t *testing.T) {
 	// Only the paths named.
 	if diff, err := g.Compare(ctx, dir, from, to, 3, "elsewhere.go"); err != nil || diff != "" {
 		t.Errorf("another path %q %v", diff, err)
+	}
+	// A path is itself, never a pattern that names others.
+	if diff, err := g.Compare(ctx, dir, from, to, 3, "*.go"); err != nil || diff != "" {
+		t.Errorf("a pattern %q %v", diff, err)
 	}
 	for _, bad := range [][2]string{{"main", to}, {from, "--output=x"}, {from, ""}} {
 		if _, err := g.Compare(ctx, dir, bad[0], bad[1], 0); !errors.Is(err, ErrNoRef) {

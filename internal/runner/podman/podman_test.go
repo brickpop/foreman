@@ -2,10 +2,18 @@ package podman
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/brickpop/foreman/internal/runner"
 )
@@ -90,9 +98,9 @@ func TestMachineBounds(t *testing.T) {
 // top's rows, its command line whole or split at its spaces: PID 1 and the
 // zombies are left out.
 func TestOthers(t *testing.T) {
-	// Under podman's init, PID 1 is the init and its first child the
-	// container's command (the harness): neither counts. An orphan the agent
-	// left, reparented to PID 1, still does.
+	// PID 1 is podman's init and its first child the container's command
+	// (the harness): neither counts. An orphan the agent left, reparented to
+	// PID 1, still does.
 	got := others([][]string{
 		{"1", "0", "S", "/run/podman-init", "--", "claude", "--continue"},
 		{"2", "1", "S", "claude --continue"},
@@ -102,17 +110,7 @@ func TestOthers(t *testing.T) {
 		{"13"},
 	})
 	if want := []string{"/opt/foreman/foreman-agent mcp", "npm run dev"}; !slices.Equal(got, want) {
-		t.Errorf("with an init: others = %q, want %q", got, want)
-	}
-	// A container made before the init: PID 1 is the harness itself, and
-	// every child of it counts.
-	got = others([][]string{
-		{"1", "0", "S", "claude --continue"},
-		{"7", "1", "S", "/opt/foreman/foreman-agent", "mcp"},
-		{"12", "1", "R", "npm run dev"},
-	})
-	if want := []string{"/opt/foreman/foreman-agent mcp", "npm run dev"}; !slices.Equal(got, want) {
-		t.Errorf("without an init: others = %q, want %q", got, want)
+		t.Errorf("others = %q, want %q", got, want)
 	}
 }
 
@@ -120,5 +118,90 @@ func TestOthers(t *testing.T) {
 func TestOthersSkipsBadRows(t *testing.T) {
 	if got := others([][]string{{}, {"x", "1", "S", "a"}, {"5", "1", "S"}}); len(got) != 0 {
 		t.Errorf("others = %q, want none", got)
+	}
+}
+
+// fakePodman serves Podman's API on a Unix socket with handle and returns an
+// engine connected to it.
+func fakePodman(t *testing.T, handle http.HandlerFunc) *Runner {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "pod") // short: a socket path has a length limit
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	l, err := net.Listen("unix", filepath.Join(dir, "s"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := &http.Server{Handler: handle}
+	go srv.Serve(l)
+	t.Cleanup(func() { srv.Close() })
+	return &Runner{c: newClient(filepath.Join(dir, "s"))}
+}
+
+// checkAPI answers a check's calls: no earlier check container unless left
+// names one, and a container x that runs `true`. Each call is recorded as
+// "METHOD /path" in calls; remove, when set, answers the DELETEs.
+func checkAPI(left string, calls chan<- string, remove http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		path := strings.TrimPrefix(req.URL.Path, apiPrefix)
+		calls <- req.Method + " " + path
+		switch {
+		case req.Method == "GET" && path == "/containers/json":
+			if left == "" {
+				fmt.Fprint(w, `[]`)
+			} else {
+				fmt.Fprintf(w, `[{"Id":%q}]`, left)
+			}
+		case path == "/containers/create":
+			fmt.Fprint(w, `{"Id":"x"}`)
+		case strings.HasSuffix(path, "/start"):
+			w.WriteHeader(http.StatusNoContent)
+		case strings.HasSuffix(path, "/wait"):
+			fmt.Fprint(w, `0`)
+		case req.Method == "DELETE" && remove != nil:
+			remove(w, req)
+		}
+	}
+}
+
+// A container an earlier check left is removed before the check runs, and
+// the check's own container after it.
+func TestCheckInitClearsEarlierChecks(t *testing.T) {
+	calls := make(chan string, 20)
+	r := fakePodman(t, checkAPI("old", calls, nil))
+	if err := r.CheckInit(context.Background(), "img"); err != nil {
+		t.Fatal(err)
+	}
+	close(calls)
+	var got []string
+	for c := range calls {
+		got = append(got, c)
+	}
+	want := []string{"GET /containers/json", "DELETE /containers/old", "POST /containers/create",
+		"POST /containers/x/start", "POST /containers/x/wait", "DELETE /containers/x"}
+	if !slices.Equal(got, want) {
+		t.Errorf("calls %q\nwant  %q", got, want)
+	}
+}
+
+// A Podman that hangs on the remove doesn't hold the check: the remove has
+// its own limit, even when the check's context has none.
+func TestCheckInitRemoveHasItsOwnLimit(t *testing.T) {
+	defer func(d time.Duration) { removeTimeout = d }(removeTimeout)
+	removeTimeout = 50 * time.Millisecond
+	hang := make(chan struct{})
+	defer close(hang)
+	r := fakePodman(t, checkAPI("", make(chan string, 20), func(http.ResponseWriter, *http.Request) { <-hang }))
+	done := make(chan error, 1)
+	go func() { done <- r.CheckInit(context.Background(), "img") }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("a failed remove failed the check: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the check hung on the remove")
 	}
 }

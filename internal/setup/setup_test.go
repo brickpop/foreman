@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/home"
@@ -24,7 +26,12 @@ type engine struct {
 	mu                 sync.Mutex
 	installed, running bool
 	machineStopped     bool
-	starts             int // Connects asked to start
+	starts             int      // Connects asked to start
+	initErr            error    // what CheckInit returns
+	initChecks         []string // the images CheckInit ran on
+	// gates[i], when there is one, holds the i-th CheckInit until the test
+	// sends the error it returns.
+	gates []chan error
 }
 
 func (e *engine) set(f func(e *engine)) { e.mu.Lock(); f(e); e.mu.Unlock() }
@@ -52,6 +59,23 @@ func (e *engine) Connect(_ context.Context, start bool) error {
 
 func (e *engine) CreateMachine(context.Context, int, int) error { return nil }
 
+func (e *engine) CheckInit(_ context.Context, image string) error {
+	e.mu.Lock()
+	var gate chan error
+	if n := len(e.initChecks); n < len(e.gates) {
+		gate = e.gates[n]
+	}
+	e.initChecks = append(e.initChecks, image)
+	err := e.initErr
+	e.mu.Unlock()
+	if gate != nil {
+		err = <-gate
+	}
+	return err
+}
+
+func (e *engine) checks() int { e.mu.Lock(); defer e.mu.Unlock(); return len(e.initChecks) }
+
 type images struct {
 	mu     sync.Mutex
 	state  string
@@ -69,7 +93,8 @@ func (im *images) Refresh(context.Context) error { return nil }
 func (im *images) Status(context.Context) []runner.ImageStatus {
 	im.mu.Lock()
 	defer im.mu.Unlock()
-	return []runner.ImageStatus{{Name: "harness", State: im.state}}
+	ref := map[string]string{"ready": "img"}[im.state]
+	return []runner.ImageStatus{{Name: "harness", Ref: ref, State: im.state}}
 }
 
 type config struct {
@@ -331,4 +356,258 @@ func stateOf(steps []Step, kind string) string {
 		}
 	}
 	return "missing"
+}
+
+// initStep waits until the init check has settled (it runs in the background
+// after the image build) and returns the init row.
+func (r *rig) initStep(t *testing.T) Step {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); time.Now().Before(deadline); time.Sleep(time.Millisecond) {
+		for _, s := range r.Steps(ctx) {
+			if s.Kind == "init" && s.State != "todo" && s.State != "working" {
+				return s
+			}
+		}
+	}
+	t.Fatal("the init check never settled")
+	return Step{}
+}
+
+// started waits until the init check has started n times.
+func (r *rig) started(t *testing.T, n int) {
+	t.Helper()
+	for deadline := time.Now().Add(2 * time.Second); r.engine.checks() < n; time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the init check started %d times, want %d", r.engine.checks(), n)
+		}
+	}
+}
+
+// release lets a held init check return err and waits until checkInit has
+// settled its result: its last publish. Call it while nothing else publishes
+// (every check the test started has reached CheckInit).
+func (r *rig) release(t *testing.T, gate chan<- error, err error) {
+	t.Helper()
+	before := r.published.Load()
+	gate <- err
+	for deadline := time.Now().Add(2 * time.Second); r.published.Load() == before; time.Sleep(time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the init check never settled")
+		}
+	}
+}
+
+// The init check runs once Podman answers and the agent image is built, on
+// that image, and its result is cached: neither Steps nor the periodic check
+// runs it again.
+func TestInitCheckPasses(t *testing.T) {
+	r := newRig(t, &engine{installed: true, running: true})
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "todo" {
+		t.Errorf("before the check: %+v", s)
+	}
+	r.check(ctx, true)
+	r.built(t)
+	if s := r.initStep(t); s.State != "done" || s.Detail != "" {
+		t.Errorf("passed: %+v", s)
+	}
+	for range 3 {
+		r.Steps(ctx)
+		r.check(ctx, false)
+	}
+	r.engine.mu.Lock()
+	defer r.engine.mu.Unlock()
+	if !reflect.DeepEqual(r.engine.initChecks, []string{"img"}) {
+		t.Errorf("checks %q, want one on the agent image", r.engine.initChecks)
+	}
+}
+
+// The checklist reads top-down: the row waits on the agent image, so it comes
+// right after the last image row.
+func TestInitStepFollowsTheImages(t *testing.T) {
+	r := newRig(t, &engine{installed: true, running: true})
+	r.Images = twoImages{}
+	got := kinds(r.Steps(ctx))
+	want := []string{"podman done", "running working", "image todo", "image todo", "init todo"}
+	if len(got) < len(want) || !slices.Equal(got[:len(want)], want) {
+		t.Errorf("steps %v\nwant  %v, then the rest", got, want)
+	}
+}
+
+// twoImages is two agent images, neither built yet.
+type twoImages struct{}
+
+func (twoImages) Ensure(context.Context, string) (string, error) { return "", errors.New("not built") }
+func (twoImages) Refresh(context.Context) error                  { return nil }
+func (twoImages) Status(context.Context) []runner.ImageStatus {
+	return []runner.ImageStatus{{Name: "harness", State: "missing"}, {Name: "other", State: "missing"}}
+}
+
+// While the throwaway container runs, the row is working.
+func TestInitCheckWorking(t *testing.T) {
+	gate := make(chan error)
+	r := newRig(t, &engine{installed: true, running: true, gates: []chan error{gate}})
+	r.check(ctx, true)
+	r.built(t)
+	r.started(t, 1)
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "working" {
+		t.Errorf("while it runs: %+v", s)
+	}
+	r.release(t, gate, nil)
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "done" {
+		t.Errorf("after: %+v", s)
+	}
+}
+
+// A failed check keeps its result, with Podman's own words in the log, until
+// Podman comes back: the periodic check never runs it again. Podman's return
+// checks again, which is how a fix (catatonit installed) is picked up.
+func TestInitCheckFailsUntilPodmanComesBack(t *testing.T) {
+	podmanSaid := "crun: container-init binary not found on the host: stat /usr/libexec/podman/catatonit: no such file or directory"
+	r := newRig(t, &engine{installed: true, running: true, initErr: errors.New(podmanSaid)})
+	r.check(ctx, true)
+	r.built(t)
+	if s := r.initStep(t); s.State != "failed" || s.Log != podmanSaid || strings.Contains(s.Detail, podmanSaid) {
+		t.Fatalf("failed: %+v", s)
+	}
+	r.engine.set(func(e *engine) { e.initErr = nil })
+	r.check(ctx, false)
+	if stepOf(r.Steps(ctx), "init").State != "failed" || r.engine.checks() != 1 {
+		t.Fatal("the periodic check ran the init check again")
+	}
+	r.engine.set(func(e *engine) { e.running = false })
+	r.check(ctx, false)
+	r.engine.set(func(e *engine) { e.running = true })
+	r.check(ctx, false)
+	r.built(t)
+	r.started(t, 2)
+	if s := r.initStep(t); s.State != "done" {
+		t.Errorf("back: %+v", s)
+	}
+}
+
+// While Podman is away the row is todo, never a ✓ under a Podman running row
+// that isn't done; a check still running then drops its result.
+func TestInitCheckResetsWhenPodmanStops(t *testing.T) {
+	gate := make(chan error)
+	r := newRig(t, &engine{installed: true, running: true, gates: []chan error{nil, gate}})
+	r.check(ctx, true)
+	r.built(t)
+	if s := r.initStep(t); s.State != "done" {
+		t.Fatalf("passed: %+v", s)
+	}
+	r.engine.set(func(e *engine) { e.running = false })
+	r.check(ctx, false)
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "todo" {
+		t.Errorf("Podman stopped: %+v", s)
+	}
+
+	r.engine.set(func(e *engine) { e.running = true })
+	r.check(ctx, false)
+	r.built(t)
+	r.started(t, 2)
+	r.engine.set(func(e *engine) { e.running = false })
+	r.check(ctx, false)
+	r.release(t, gate, nil)
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "todo" {
+		t.Errorf("a check that ended after Podman stopped: %+v", s)
+	}
+}
+
+// A check that outlived a Podman cycle never overwrites the newer one's
+// result, whichever ends first.
+func TestAnOutlivedCheckIsDropped(t *testing.T) {
+	a, b := make(chan error), make(chan error)
+	r := newRig(t, &engine{installed: true, running: true, gates: []chan error{a, b}})
+	r.check(ctx, true)
+	r.built(t)
+	r.started(t, 1)
+	r.engine.set(func(e *engine) { e.running = false })
+	r.check(ctx, false)
+	r.engine.set(func(e *engine) { e.running = true })
+	r.check(ctx, false)
+	r.built(t)
+	r.started(t, 2)
+	r.release(t, a, errors.New("podman went away"))
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "working" {
+		t.Errorf("the outlived check ended: %+v", s)
+	}
+	r.release(t, b, nil)
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "done" {
+		t.Errorf("the newer check passed: %+v", s)
+	}
+}
+
+// What the failed row says: the catatonit fix only when Podman says its init
+// is missing, and only on Linux (on macOS the init lives in the Podman
+// machine); any other failure says agents can't start, never to install what
+// may well be there. Podman's error is in the log, never the detail.
+func TestInitStep(t *testing.T) {
+	missing := "container-init binary not found on the host"
+	fix := "Agents can't start: Podman can't find catatonit, the small program every agent runs under. " +
+		"Install it (sudo dnf install catatonit, or your distribution's package), then restart Foreman."
+	general := "Podman can't start a test container, so agents can't start either. Its error is below."
+	for _, c := range []struct {
+		state, podmanErr, goos string
+		want                   Step
+	}{
+		{"", "", "linux", Step{Kind: "init", State: "todo", Detail: "Waits for the steps above"}},
+		{"working", "", "linux", Step{Kind: "init", State: "working", Detail: "Starting a test container"}},
+		{"done", "", "darwin", Step{Kind: "init", State: "done"}},
+		{"failed", missing, "linux", Step{Kind: "init", State: "failed", Detail: fix, Log: missing}},
+		{"failed", missing, "darwin", Step{Kind: "init", State: "failed", Detail: general, Log: missing}},
+		{"failed", "context deadline exceeded", "linux", Step{Kind: "init", State: "failed", Detail: general, Log: "context deadline exceeded"}},
+	} {
+		if got := initStep(c.state, c.podmanErr, c.goos); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s %q on %s: %+v\nwant %+v", c.state, c.podmanErr, c.goos, got, c.want)
+		}
+	}
+}
+
+func TestMissingInit(t *testing.T) {
+	for podmanSaid, want := range map[string]bool{
+		"container-init binary not found on the host: stat /usr/libexec/podman/catatonit: no such file or directory": true,
+		"container init binary not found":     true,
+		"context deadline exceeded":           false,
+		"the check's container exited with 1": false,
+		"podman isn't running":                false,
+		"":                                    false,
+	} {
+		if got := missingInit(podmanSaid); got != want {
+			t.Errorf("missingInit(%q) = %v, want %v", podmanSaid, got, want)
+		}
+	}
+}
+
+// No agent image yet (its build failed): nothing to check on.
+func TestNoInitCheckWithoutTheImage(t *testing.T) {
+	r := newRig(t, &engine{installed: true, running: true})
+	failed := failedImages{ensured: make(chan struct{}, 1)}
+	r.Images = failed
+	r.check(ctx, true)
+	<-failed.ensured
+	r.check(ctx, false)
+	if s := stepOf(r.Steps(ctx), "init"); s.State != "todo" || r.engine.checks() != 0 {
+		t.Errorf("without an image: %+v, %d checks", s, r.engine.checks())
+	}
+}
+
+// failedImages is an agent image whose build fails.
+type failedImages struct{ ensured chan struct{} }
+
+func (im failedImages) Ensure(context.Context, string) (string, error) {
+	im.ensured <- struct{}{}
+	return "", errors.New("build failed")
+}
+func (failedImages) Refresh(context.Context) error { return nil }
+func (failedImages) Status(context.Context) []runner.ImageStatus {
+	return []runner.ImageStatus{{Name: "harness", State: "failed"}}
+}
+
+func stepOf(steps []Step, kind string) Step {
+	for _, s := range steps {
+		if s.Kind == kind {
+			return s
+		}
+	}
+	return Step{Kind: kind, State: "missing"}
 }

@@ -16,6 +16,8 @@ export function stepTitle(s: SetupStep): string {
       return "Podman machine";
     case "running":
       return "Podman running";
+    case "init":
+      return "Podman can start agents";
     case "image":
       return "Agent image";
     case "profile":

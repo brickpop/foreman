@@ -15,8 +15,8 @@ A new home works out of the box: `foreman`, with no folder and no question, make
 - **The watcher** (the setup block, `internal/setup`) reaches Podman at launch, then checks every 3 seconds, and at once after the CEO's Start or a machine creation ([The Podman service](../architecture/session-runner.md#the-podman-service)).
   - At launch it starts a stopped macOS machine, as Foreman always has. Later checks never do, so a machine the CEO stopped stays stopped until they press **Start**.
   - On Linux it starts the rootless service whenever nothing answers.
-- **The first time Podman answers**, Foreman restores the instances of active deployments (re-attaching their containers, [Agent runtime](../architecture/agent-runtime.md#restarts)); once that is done and agents may start, it delivers the messages that waited, waking asleep recipients. It then builds the agent image in the background, so the first deploy doesn't wait minutes for it.
-- **Each later return** of Podman delivers what waited meanwhile and checks the image again.
+- **The first time Podman answers**, Foreman restores the instances of active deployments (re-attaching their containers, [Agent runtime](../architecture/agent-runtime.md#restarts)); once that is done and agents may start, it delivers the messages that waited, waking asleep recipients. It then builds the agent image in the background, so the first deploy doesn't wait minutes for it, and runs the init check on it (below).
+- **Each later return** of Podman delivers what waited meanwhile, checks the image again and runs the init check again.
 - **Until then, deploying and waking an agent refuse** with `409 NOT_READY` ("agents can't start yet: podman isn't running: see the setup checklist on the Dashboard"). Messages for a sleeping agent wait.
 - **The Direct engine** needs none of this: it is ready at once, with no Podman or image steps.
 
@@ -32,9 +32,19 @@ Header: `Setup · N of M done`, then one panel, one row per step. Each row has a
 | **Podman machine** | Podman engine, macOS | `Create the Podman machine, where agents run` | the machine form (below); working while it is created, with Podman's output |
 | **Podman running** | Podman engine | waits for the steps above; `The Podman machine is stopped (Start)`; a connection failure shows the error | **Start** when the machine is stopped. While the instances are restored it is working (`Restoring the agents`). |
 | **Agent image** | Podman engine | `Builds once Podman runs`; working: `Building the agent image (a few minutes, once)` with the build output | failed: a link to Settings → [Maintenance](./settings.md#maintenance) (Rebuild) |
+| **Podman can start agents** | Podman engine | `Waits for the steps above`; working: `Starting a test container`; failed, with Podman's error in the output box: on Linux, when Podman can't find its init, `Agents can't start: Podman can't find catatonit, the small program every agent runs under. Install it (sudo dnf install catatonit, or your distribution's package), then restart Foreman.`; any other failure, `Podman can't start a test container, so agents can't start either. Its error is below.` | none: the init check below |
 | **The `<profile>` profile connected** | each profile the projects use (`default` while there is no project) | `Not connected yet: its agents can't start`; for one that doesn't exist, the step fails: `No such profile: create it under Settings → Agents → Profiles, or pick another in the project's settings` | **Connect**: the login terminal ([Settings → Profiles](./settings.md#profiles)); for one that doesn't exist, a link to Profiles |
 | **A team** | always | `Create a team` | **Create a team**: the [Chief of Staff](./chief-of-staff.md)'s create-team flow |
 | **A project** | always | `Add a project` | **`New project`** opens the [New project](./add-project.md#the-dialog) dialog |
+
+## The init check
+
+Every agent runs under Podman's init (catatonit), which reaps the processes an agent leaves behind ([Agent runtime](../architecture/agent-runtime.md)). Where the distribution packages catatonit apart from Podman, no agent can start without it. The **Podman can start agents** row finds that out before the first deploy:
+
+- After the agent image is built, Foreman runs one throwaway container on it with an init, as agents run (command `true`, label `foreman.check=init`), then removes it, with its own 10-second limit so a hung Podman can't hold the check. It first removes any `foreman.check=init` container an earlier check left (Foreman killed mid-check, a create cancelled in flight). It runs again each time Podman answers again, never per `GET /api/setup`: the row shows the cached result.
+- One check runs at a time, with a one-minute limit, except across a Podman cycle: if Podman goes away and comes back while a check runs, a new one starts and only the latest check's result is kept. A failure shows Podman's error in the row's output; the catatonit fix shows only on Linux, when that error says the init binary wasn't found (`container-init binary not found`): a timeout or a lost connection has nothing to do with it, and on macOS the init lives in the Podman machine, where advice for the host would be wrong. `init_path` in `containers.conf`, for another init, is in the README.
+- Until the agent image is built, and when its build failed, the row stays todo (`Waits for the steps above`).
+- While Podman is away the row is todo too (`Waits for the steps above`): its result is dropped, and Podman's return runs the check again.
 
 ## The Podman machine (macOS)
 

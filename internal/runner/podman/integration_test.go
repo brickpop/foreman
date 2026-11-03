@@ -398,3 +398,30 @@ func TestResizeReachesTheCommandUnderTheInit(t *testing.T) {
 	}
 	out.waitFor(t, "winched")
 }
+
+// The setup checklist's init check passes on a host with catatonit, removes
+// the check container an earlier check left (here one created, never
+// started) and leaves none of its own; a missing image fails with Podman's
+// error.
+func TestCheckInit(t *testing.T) {
+	r := engine(t)
+	if _, err := r.c.create(ctx, createSpec{Image: testImage, Command: []string{"true"},
+		Labels: map[string]string{checkLabel: "init"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.CheckInit(ctx, testImage); err != nil {
+		t.Fatal(err)
+	}
+	filters, _ := json.Marshal(map[string][]string{"label": {checkLabel + "=init"}})
+	var left []listed
+	q := url.Values{"all": {"true"}, "filters": {string(filters)}}
+	if err := r.c.call(ctx, "GET", "/containers/json", q, nil, &left); err != nil {
+		t.Fatal(err)
+	}
+	if len(left) != 0 {
+		t.Errorf("%d check containers left", len(left))
+	}
+	if err := r.CheckInit(ctx, "localhost/foreman/no-such-image:none"); err == nil {
+		t.Error("a missing image passed")
+	}
+}

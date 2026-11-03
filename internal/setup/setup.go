@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +26,9 @@ type Engine interface {
 	// Connect reaches Podman; start also starts a stopped machine (macOS).
 	Connect(ctx context.Context, start bool) error
 	CreateMachine(ctx context.Context, cpus, memory int) error
+	// CheckInit runs a throwaway container on image with an init, as agents
+	// run, and returns Podman's error when it can't.
+	CheckInit(ctx context.Context, image string) error
 }
 
 // Config is the home's teams and projects.
@@ -65,6 +69,12 @@ type Setup struct {
 	mu    sync.Mutex
 	ready bool         // Ready ran
 	last  podman.State // what the last check saw, to publish changes
+	// The init check's cached result: "" (not run yet), "working", "done"
+	// or "failed", with Podman's error. initGen counts the checks started and
+	// Podman's departures: a check stores its result only while it is still
+	// the latest, so one that outlived Podman going away is dropped.
+	initState, initErr string
+	initGen            int
 }
 
 // New returns the setup block; Run starts watching.
@@ -77,8 +87,9 @@ func New(d Deps) *Setup {
 
 // Run keeps the engine connected until ctx ends: at once (starting a stopped
 // macOS machine, as Foreman's launch always has), then every Every, or sooner
-// when poked. The first time the engine answers, it runs Ready and builds the
-// agent image in the background.
+// when poked. The first time the engine answers, it runs Ready; each time it
+// answers again, it builds the agent image and checks Podman can start agents
+// on it, in the background.
 func (s *Setup) Run(ctx context.Context) {
 	start := true
 	for {
@@ -104,6 +115,12 @@ func (s *Setup) check(ctx context.Context, start bool) {
 	changed := state.Installed != s.last.Installed || state.Machine != s.last.Machine ||
 		state.Running != s.last.Running || state.Error != s.last.Error
 	connected := err == nil && !s.last.Running
+	if s.last.Running && !state.Running {
+		// Podman went away: what the init check found no longer holds, and
+		// a check still running then drops its result.
+		s.initState, s.initErr = "", ""
+		s.initGen++
+	}
 	s.last = state
 	s.mu.Unlock()
 	if changed {
@@ -147,11 +164,50 @@ func (s *Setup) connected(ctx context.Context) {
 	}
 }
 
-// build makes sure the agent image exists, so the first deploy doesn't wait.
+// build makes sure the agent image exists, so the first deploy doesn't wait,
+// then checks that Podman can start an agent on it.
 func (s *Setup) build(ctx context.Context) {
 	s.changed()
-	if _, err := s.Images.Ensure(ctx, ""); err != nil {
+	ref, err := s.Images.Ensure(ctx, "")
+	s.changed()
+	if err != nil {
 		slog.Error("building the agent image", "err", err)
+		return
+	}
+	s.checkInit(ctx, ref)
+}
+
+// initTimeout bounds the init check: a throwaway container that runs `true`.
+const initTimeout = time.Minute
+
+// checkInit runs a throwaway container with an init, as agents run, and
+// caches the result for the init step. While one runs, no other starts,
+// unless Podman went away and came back meanwhile: the new one is then the
+// latest, and only its result is kept.
+func (s *Setup) checkInit(ctx context.Context, image string) {
+	s.mu.Lock()
+	if s.initState == "working" {
+		s.mu.Unlock()
+		return
+	}
+	s.initState, s.initErr = "working", ""
+	s.initGen++
+	gen := s.initGen
+	s.mu.Unlock()
+	s.changed()
+	ctx, cancel := context.WithTimeout(ctx, initTimeout)
+	err := s.Engine.CheckInit(ctx, image)
+	cancel()
+	s.mu.Lock()
+	if s.initGen == gen { // else Podman went away, or a newer check started
+		s.initState = "done"
+		if err != nil {
+			s.initState, s.initErr = "failed", err.Error()
+		}
+	}
+	s.mu.Unlock()
+	if err != nil {
+		slog.Error("podman can't start a container with an init", "err", err)
 	}
 	s.changed()
 }
@@ -224,6 +280,12 @@ func (s *Setup) Steps(ctx context.Context) []Step {
 	}
 	for _, im := range s.Images.Status(ctx) {
 		steps = append(steps, imageStep(im))
+	}
+	if s.Deps.Engine != nil { // the init check runs on the image: after its rows
+		s.mu.Lock()
+		state, podmanErr := s.initState, s.initErr
+		s.mu.Unlock()
+		steps = append(steps, initStep(state, podmanErr, runtime.GOOS))
 	}
 	teams, projects := s.Config.Teams(), s.Config.Projects()
 	for _, p := range s.Profiles() {
@@ -299,4 +361,32 @@ func imageStep(im runner.ImageStatus) Step {
 		step.State, step.Detail = "todo", "Builds once Podman runs"
 	}
 	return step
+}
+
+// initStep is the row for the init check's cached result (Steps never runs
+// it). The catatonit fix is for Linux only: on macOS the init lives in the
+// Podman machine, where dnf advice from the host would be wrong.
+func initStep(state, podmanErr, goos string) Step {
+	step := Step{Kind: "init", State: "done"}
+	switch state {
+	case "":
+		step.State, step.Detail = "todo", "Waits for the steps above"
+	case "working":
+		step.State, step.Detail = "working", "Starting a test container"
+	case "failed":
+		step.State, step.Log = "failed", podmanErr
+		step.Detail = "Podman can't start a test container, so agents can't start either. Its error is below."
+		if goos == "linux" && missingInit(podmanErr) {
+			step.Detail = "Agents can't start: Podman can't find catatonit, the small program every agent runs under. " +
+				"Install it (sudo dnf install catatonit, or your distribution's package), then restart Foreman."
+		}
+	}
+	return step
+}
+
+// missingInit reports whether Podman's error says its init binary (catatonit)
+// isn't on the host. Podman words it "container-init binary not found on the
+// host"; matching from "init" also takes the spelling without the hyphen.
+func missingInit(podmanErr string) bool {
+	return strings.Contains(podmanErr, "init binary not found")
 }

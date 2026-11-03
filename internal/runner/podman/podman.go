@@ -7,11 +7,14 @@ package podman
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -24,6 +27,9 @@ import (
 
 // managedLabel marks every container Foreman creates, so List finds them.
 const managedLabel = "foreman.managed"
+
+// checkLabel marks a throwaway container Foreman runs to check Podman.
+const checkLabel = "foreman.check"
 
 // imageUser is the user of Foreman's agent image (images/Containerfile: the
 // node image's uid 1000). keep-id maps it to the CEO's user, so files agents
@@ -130,6 +136,76 @@ func (r *Runner) Start(ctx context.Context, spec runner.Spec) (runner.Process, e
 	}
 	_ = p.Resize(size)
 	return p, nil
+}
+
+// CheckInit runs a throwaway container on image under podman's init, as
+// agents run, and returns Podman's error when it can't: a host without the
+// init binary (catatonit) fails with "container-init binary not found". The
+// container is labelled foreman.check=init, never managed: List never sees
+// it. A check container an earlier check left (Foreman killed mid-check, a
+// cancelled create) is removed first.
+func (r *Runner) CheckInit(ctx context.Context, image string) error {
+	c, err := r.client()
+	if err != nil {
+		return err
+	}
+	if err := clearChecks(ctx, c); err != nil {
+		return err
+	}
+	id, err := r.startCheck(ctx, c, createSpec{Image: image, Command: []string{"true"},
+		Labels: map[string]string{checkLabel: "init"}, Userns: imageUser, Init: true})
+	if id != "" {
+		defer func() {
+			// Its own limit: ctx may be over, and a hung Podman mustn't
+			// hold the check (and every later one) forever.
+			rm, cancel := context.WithTimeout(context.WithoutCancel(ctx), removeTimeout)
+			defer cancel()
+			_ = c.remove(rm, id)
+		}()
+	}
+	if err != nil {
+		return err
+	}
+	code, err := c.wait(ctx, id)
+	if err != nil {
+		return err
+	}
+	if code != 0 {
+		return fmt.Errorf("the check's container exited with %d", code)
+	}
+	return nil
+}
+
+// removeTimeout bounds removing a check's container once the check is over.
+var removeTimeout = 10 * time.Second
+
+// clearChecks removes every check container, whatever its state.
+func clearChecks(ctx context.Context, c *client) error {
+	filters, _ := json.Marshal(map[string][]string{"label": {checkLabel + "=init"}})
+	var left []listed
+	q := url.Values{"all": {"true"}, "filters": {string(filters)}}
+	if err := c.call(ctx, "GET", "/containers/json", q, nil, &left); err != nil {
+		return err
+	}
+	for _, l := range left {
+		var api *apiError
+		if err := c.remove(ctx, l.ID); err != nil && !(errors.As(err, &api) && api.Status == http.StatusNotFound) {
+			return fmt.Errorf("removing an earlier check's container: %w", err)
+		}
+	}
+	return nil
+}
+
+// startCheck creates and starts a check's container, one start at a time
+// like Start, and returns its id once created, to remove it.
+func (r *Runner) startCheck(ctx context.Context, c *client, cs createSpec) (string, error) {
+	r.starting.Lock()
+	defer r.starting.Unlock()
+	id, err := c.create(ctx, cs)
+	if err != nil {
+		return "", err
+	}
+	return id, c.start(ctx, id)
 }
 
 // clearStale removes a stopped container left with this name (its process
@@ -293,11 +369,10 @@ func (p *process) Processes(ctx context.Context) ([]string, error) {
 
 // others reads top's rows (pid, ppid, state, command line, which Podman may
 // split at its spaces) and returns the command lines of the live processes
-// other than the container's own: PID 1, and, when PID 1 is podman's init, the
-// container's command, its first child (the lowest pid whose parent is 1).
-// Any other child of PID 1 still counts: an orphan the agent left, such as a
-// dev server, is reparented to PID 1 and keeps it awake. In a container made
-// before the init, PID 1 is the command itself, and all its children count.
+// other than the container's own: PID 1 (podman's init) and the container's
+// command, its first child (the lowest pid whose parent is 1). Any other child
+// of PID 1 still counts: an orphan the agent left, such as a dev server, is
+// reparented to PID 1 and keeps it awake.
 func others(rows [][]string) []string {
 	type proc struct {
 		pid   int
@@ -306,8 +381,7 @@ func others(rows [][]string) []string {
 		args  string
 	}
 	var procs []proc
-	command := -1 // the container's command under the init, if any
-	init := false
+	command := -1 // the container's command, the init's first child
 	for _, r := range rows {
 		if len(r) < 4 {
 			continue
@@ -317,26 +391,17 @@ func others(rows [][]string) []string {
 			continue
 		}
 		pr := proc{pid, r[1], r[2], strings.Join(r[3:], " ")}
-		if pid == 1 {
-			init = isInit(pr.args)
-		} else if pr.ppid == "1" && (command < 0 || pid < command) {
+		if pid != 1 && pr.ppid == "1" && (command < 0 || pid < command) {
 			command = pid
 		}
 		procs = append(procs, pr)
 	}
 	var list []string
 	for _, pr := range procs {
-		if pr.pid == 1 || init && pr.pid == command || strings.HasPrefix(pr.state, "Z") {
+		if pr.pid == 1 || pr.pid == command || strings.HasPrefix(pr.state, "Z") {
 			continue
 		}
 		list = append(list, pr.args)
 	}
 	return list
-}
-
-// isInit reports whether a command line is podman's init, which podman always
-// mounts at /run/podman-init (its define.ContainerInitPath).
-func isInit(args string) bool {
-	exe, _, _ := strings.Cut(args, " ")
-	return exe == "/run/podman-init"
 }

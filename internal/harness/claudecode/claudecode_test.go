@@ -388,3 +388,23 @@ func TestMoveConversationsRefuses(t *testing.T) {
 		t.Error("the folder stayed moved")
 	}
 }
+
+// What it asks, for the CEO's request: every question with its choices, or
+// a permission's message; nothing for anything else.
+func TestAsks(t *testing.T) {
+	a := Adapter{}
+	for _, tc := range []struct{ event, payload, want string }{
+		{"PreToolUse", `{"tool_name":"AskUserQuestion","tool_input":{"questions":[` +
+			`{"question":"Which database?","header":"DB","options":[{"label":"Postgres","description":"…"},{"label":"SQLite"}],"multiSelect":false},` +
+			`{"question":"Seed it?"}]}}`, "Which database? (Postgres / SQLite) · Seed it?"},
+		{"PreToolUse", `{"tool_name":"AskUserQuestion"}`, ""},
+		{"PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"ls"}}`, ""},
+		{"Notification", `{"notification_type":"permission_prompt","message":"Claude needs your permission to use Bash"}`, "Claude needs your permission to use Bash"},
+		{"Notification", `{"notification_type":"idle_prompt","message":"Claude is waiting for your input"}`, ""},
+		{"PreToolUse", `not json`, ""},
+	} {
+		if got := a.Asks(tc.event, []byte(tc.payload)); got != tc.want {
+			t.Errorf("%s %s: %q, want %q", tc.event, tc.payload, got, tc.want)
+		}
+	}
+}

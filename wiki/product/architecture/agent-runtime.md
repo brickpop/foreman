@@ -18,7 +18,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 4. **Run**: status follows harness signals and team-message activity:
    - `running`: producing output / working a turn
    - `idle`: waiting at its prompt with nothing to do
-   - `awaiting`: has an open [request](../models/request.md) to the CEO
+   - `awaiting`: its harness waits on the CEO, at its own question or permission dialog (a card tells the CEO: [Requests](../features/requests.md)). An open `escalate` request doesn't change the status: messages keep flowing, and the agent's rows show it waits on the CEO from the request
    - `done`: handed off, nothing assigned
 5. **Crash / exit / rate limit**: Foreman marks the instance `stopped` and raises a **blocked** request ([Requests](../features/requests.md)).
 6. **Stop deployment**: terminate the processes (containers) and keep worktrees on disk; `Git.Prune` deletes the agents' `wt/*` branches already merged into a target ([Branches](./sandboxes-and-git.md#branches)). Other deployments of the same team are not affected.
@@ -49,8 +49,8 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 | `running` | harness idle signal ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)) | `idle`, or `done` if it handed off and has nothing assigned |
 | `idle` / `done` | CEO input, team message or reply delivered | `running` |
 | `idle` | another instance waits for a slot; quiet a minute, with nothing else running ([Idle agents make room](#idle-agents-make-room)) | `asleep` |
-| any live | `escalate(approval)` or blocking `escalate(question)` | `awaiting` |
-| `awaiting` | request resolved | `running` |
+| `running` / `idle` | harness waiting signal (its own question or permission dialog) | `awaiting` + a question card (source harness) |
+| `awaiting` | harness busy or idle again (answered in its session) | `running` / `idle`; the card resolves |
 | any live | process exit, crash, rate limit, no output for N min (default 20, see below), sandbox or git error (a merge conflict from `merge` is not one: it goes back to the agent, who resolves it and commits) | `stopped` + blocked request; a crash first gets one automatic restart (see below) |
 | `stopped` | CEO picks Retry (or, later, Switch profile) | `starting` |
 | any | deployment stopped | `stopped` (no request) |

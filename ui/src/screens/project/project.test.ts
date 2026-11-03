@@ -69,15 +69,21 @@ describe("Changes", () => {
   it("names each request's source", () => {
     const r = (kind: string, source = "agent") => ({ kind, source }) as Request;
     expect(
-      [r("approval"), r("question"), r("finding"), r("review"), r("blocked", "foreman")].map(
-        sourceLabel,
-      ),
+      [
+        r("approval"),
+        r("question"),
+        r("finding"),
+        r("review"),
+        r("blocked", "foreman"),
+        r("question", "harness"),
+      ].map(sourceLabel),
     ).toEqual([
       "escalate(approval)",
       "escalate(question)",
       "escalate(finding)",
       "request_merge()",
       "raised by Foreman",
+      "waiting in its session",
     ]);
   });
 

@@ -24,6 +24,7 @@ type run struct {
 	doing     *store.Doing   // what its harness last said it is doing (Hook)
 	heard     time.Time      // its last activity: a hook, or its start (CheckStuck)
 	stuck     *store.Request // its open stuck card
+	waiting   *store.Request // its open card for the harness waiting on the user (waiting.go)
 	idleSince time.Time      // when it went idle; zero unless idle (MakeRoom)
 }
 
@@ -176,10 +177,11 @@ func (m *Manager) watch(id string, r *run) {
 	<-r.term.Done()
 	ctx := context.Background()
 	m.mu.Lock()
-	ending, stuck := r.ending, r.stuck
-	r.stuck = nil
+	ending, stuck, waiting := r.ending, r.stuck, r.waiting
+	r.stuck, r.waiting = nil, nil
 	m.mu.Unlock()
-	m.resolveStuck(ctx, stuck, "its run ended")
+	m.resolveCard(ctx, stuck, "its run ended")
+	m.resolveCard(ctx, waiting, "its run ended")
 	released := m.release(id, r)
 	switch {
 	case ending == endSleep && released:

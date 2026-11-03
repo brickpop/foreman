@@ -185,6 +185,46 @@ func (Adapter) Interpret(event string, payload []byte) harness.Activity {
 	return harness.Unknown
 }
 
+// Asks is its AskUserQuestion's questions, each with its choices, or a
+// permission prompt's message.
+func (Adapter) Asks(event string, payload []byte) string {
+	var p struct {
+		ToolName  string `json:"tool_name"`
+		ToolInput struct {
+			Questions []struct {
+				Question string `json:"question"`
+				Options  []struct {
+					Label string `json:"label"`
+				} `json:"options"`
+			} `json:"questions"`
+		} `json:"tool_input"`
+		NotificationType string `json:"notification_type"`
+		Message          string `json:"message"`
+	}
+	if json.Unmarshal(payload, &p) != nil {
+		return ""
+	}
+	switch {
+	case event == "PreToolUse" && p.ToolName == "AskUserQuestion":
+		var asks []string
+		for _, q := range p.ToolInput.Questions {
+			var labels []string
+			for _, o := range q.Options {
+				labels = append(labels, o.Label)
+			}
+			if len(labels) > 0 {
+				asks = append(asks, fmt.Sprintf("%s (%s)", q.Question, strings.Join(labels, " / ")))
+			} else {
+				asks = append(asks, q.Question)
+			}
+		}
+		return strings.Join(asks, " · ")
+	case event == "Notification" && p.NotificationType == "permission_prompt":
+		return p.Message
+	}
+	return ""
+}
+
 // Describe reads the same hooks for the CEO: the message it took, the tool it
 // is about to run, its question, the end of its turn. A tool's result says
 // nothing new (the line stays on the tool until the next one).

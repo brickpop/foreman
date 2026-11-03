@@ -376,3 +376,12 @@ func TestDeliveredHearsWhatWasTypedIn(t *testing.T) {
 		t.Errorf("heard %+v", msg)
 	}
 }
+
+// The CEO's answer to a request names it, so the lead knows what it answers.
+func TestTheCEOsAnswerNamesItsRequest(t *testing.T) {
+	got := Notice(atlas, []store.TeamMessage{{Ref: "msg-3", FromInstance: "ceo", Kind: "answer", InReplyTo: "req-7", Body: "On your approval: Approve"}})
+	want := `Message msg-3 from the CEO (answer to req-7): On your approval: Approve Read it with read_message("msg-3"), then go on with what you asked it for.`
+	if got != want {
+		t.Errorf("%q", got)
+	}
+}

@@ -1722,13 +1722,13 @@ func TestAQuietAgentIsFlaggedStuck(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
-	open := func() []store.Request {
+	open := func() []store.Request { // the stuck cards (waiting raises its own)
 		t.Helper()
 		list, err := f.db.Requests().Open(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		return list
+		return slices.DeleteFunc(list, func(r store.Request) bool { return r.Kind != "blocked" })
 	}
 	after := func(d time.Duration) { f.m.CheckStuck(ctx, time.Now().Add(d)) }
 
@@ -2112,5 +2112,119 @@ func TestAChangeLeavesLiveAgentsBehindUntilTheyStartAgain(t *testing.T) {
 		if got := behind(); got["mara@ledger"] != tc.behind {
 			t.Errorf("hash %q: behind %v, want %v", tc.hash, got["mara@ledger"], tc.behind)
 		}
+	}
+}
+
+// asksPayload is eventIsActivity whose waiting events ask their payload.
+type asksPayload struct{ eventIsActivity }
+
+func (asksPayload) Asks(_ string, payload []byte) string { return string(payload) }
+
+// A harness waiting on the user raises one card, whatever the hooks repeat,
+// and its next activity, or its end, resolves it.
+func TestAWaitingHarnessRaisesACard(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": asksPayload{eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}}
+	f.deps.Requests = f.db.Requests()
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	open := func() []store.Request {
+		t.Helper()
+		list, err := f.db.Requests().Open(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return list
+	}
+
+	f.m.Hook("mara@ledger", "waiting", []byte("Overwrite migrations? (Yes / No)"))
+	f.m.Hook("mara@ledger", "waiting", []byte("Overwrite migrations? (Yes / No)"))
+	f.m.Hook("mara@ledger", "", nil) // says nothing: it still waits
+	list := open()
+	if len(list) != 1 {
+		t.Fatalf("cards %+v", list)
+	}
+	if r := list[0]; r.Kind != "question" || r.Source != "harness" || r.InstanceID != "mara@ledger" || r.DeploymentID != "atlas@ledger" ||
+		r.ProjectID != "ledger" || r.Summary != "Overwrite migrations? (Yes / No)" || len(r.Options) != 0 {
+		t.Errorf("card %+v", r)
+	}
+	if s := f.status("mara@ledger"); s.Status != Awaiting {
+		t.Errorf("status %s", s.Status)
+	}
+	// Answered in its terminal: it works again.
+	f.m.Hook("mara@ledger", "busy", nil)
+	if list := open(); len(list) != 0 {
+		t.Errorf("still open once busy: %+v", list)
+	}
+
+	// Nothing said of what it asks: who waits; at its prompt again resolves it too.
+	f.m.Hook("mara@ledger", "waiting", nil)
+	if list := open(); len(list) != 1 || list[0].Summary != "Mara is waiting for your input." {
+		t.Fatalf("cards %+v", list)
+	}
+	f.m.Hook("mara@ledger", "idle", nil)
+	if list := open(); len(list) != 0 {
+		t.Errorf("still open once idle: %+v", list)
+	}
+
+	// Its run ending resolves it.
+	f.m.Hook("mara@ledger", "waiting", nil)
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Stopped)
+	deadline := time.Now().Add(5 * time.Second)
+	for len(open()) != 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if list := open(); len(list) != 0 {
+		t.Errorf("still open after the stop: %+v", list)
+	}
+}
+
+// After a restart, an agent still waiting in its re-attached session keeps
+// its card (its next activity resolves it); one whose session is gone loses it.
+func TestRestoreKeepsTheCardOfAnAgentStillWaiting(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": asksPayload{eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}}
+	f.deps.Requests = f.db.Requests()
+	dep, err := f.db.Deployments().Deploy(ctx, "atlas", "ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cards := map[string]store.Request{}
+	for _, agent := range []string{"mara", "tove"} {
+		_ = f.db.Instances().Put(ctx, store.Instance{ID: agent + "@ledger", DeploymentID: dep.ID, AgentID: agent, Status: Awaiting,
+			Harness: "claude-code", SandboxPath: f.hm.Sandbox("ledger", agent), StartedAt: time.Now().Add(-time.Hour)})
+		card, err := f.db.Requests().Save(ctx, store.Request{Kind: "question", Source: "harness", DeploymentID: dep.ID, InstanceID: agent + "@ledger", Summary: "Which?"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		cards[agent] = card
+	}
+	survivor, err := (direct.Runner{}).Start(ctx, runner.Spec{Command: []string{"/bin/sh", "-c", "cat"},
+		Labels: map[string]string{"foreman.instance": "mara@ledger", HomeLabel: f.hm.Root()}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = survivor.Stop(time.Second) })
+	f.deps.Runner = listing{listed: []runner.Process{survivor}}
+	f.m = New(f.deps)
+	if err := f.m.Restore(ctx); err != nil {
+		t.Fatal(err)
+	}
+	list, err := f.db.Requests().Open(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].ID != cards["mara"].ID {
+		t.Fatalf("open after Restore: %+v", list)
+	}
+	f.m.Hook("mara@ledger", "busy", nil)
+	if list, _ := f.db.Requests().Open(ctx); len(list) != 0 {
+		t.Errorf("the kept card didn't resolve on activity: %+v", list)
 	}
 }

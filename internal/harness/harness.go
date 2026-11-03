@@ -95,6 +95,10 @@ type Adapter interface {
 	// Describe says, for the CEO, what a hook event shows it doing ("Bash: go
 	// test ./...", "Finished its turn"); "" when the event says nothing new.
 	Describe(event string, payload []byte) string
+	// Asks is what an event that has it wait for the user asks, for the CEO
+	// (the question and its choices, a permission's message); "" when it
+	// doesn't say (wiki/product/architecture/protocol.md#waiting-for-the-ceo).
+	Asks(event string, payload []byte) string
 	// Login is how to run the harness's own login (Settings → Agents → Profiles →
 	// Connect) into the login folder dir, in a terminal the CEO types into.
 	Login(dir string) (Launch, error)

@@ -18,9 +18,9 @@ Table `team_messages`.
 | `deployment_id` | String → Deployment | yes | | | Team messaging is scoped to a deployment |
 | `from_instance` | String → Instance | yes | | same deployment, or `foreman` / `ceo` | `foreman` and `ceo` for the notices Foreman originates and the CEO's answers ([Protocol → Deliveries Foreman originates](../architecture/protocol.md#deliveries-foreman-originates)) |
 | `to_instance` | String → Instance | yes | | same deployment | |
-| `kind` | String | yes | | enum: `ask`, `reply`, `handoff`, `contribute`, `notice` | One per team tool that sends a message (`contribute`: the notice to the lead, its artifact the inbox entry); `notice`: from Foreman or the CEO. The PRD also listed `review`, but no tool produces it: a lead's review comments are an `ask` to the author |
+| `kind` | String | yes | | enum: `ask`, `reply`, `handoff`, `contribute`, `notice`, `answer` | One per team tool that sends a message (`contribute`: the notice to the lead, its artifact the inbox entry); `notice`: from Foreman or the CEO; `answer`: the CEO's answer to the lead's [request](./request.md), from `ceo`. The PRD also listed `review`, but no tool produces it: a lead's review comments are an `ask` to the author |
 | `ref` | String | yes | | `msg-N` | Every message's id within its deployment, monotonically increasing **per deployment** (the PRD; the prototype used one global counter). `read_message` reads a message by it, and `reply` answers an ask by it (decided 2026-10-15: one id per message, where the PRD's `req-N` numbered asks only). The same `msg-41` can exist in two deployments, so the UI always shows it with its deployment |
-| `in_reply_to` | String | | | an ask's `ref` | A reply's ask |
+| `in_reply_to` | String | | | an ask's `ref`, a request's id | A reply's ask; an answer's request |
 | `body` | String | yes | | | For a reply, **only** the designated `output` |
 | `artifact_ref` | String | | | a branch name or a wiki path | Optional artifact reference from `reply`, `handoff` or `contribute` |
 | `created_at` | Timestamp | yes | now | | |

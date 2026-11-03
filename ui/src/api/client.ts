@@ -591,9 +591,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     requests: {
       list: () => getJSON("/api/requests"),
-      // Answering comes with escalate (the Workflow epic): today's requests are
-      // reviews, decided on their review page.
-      resolve: notBuilt("answering requests"),
+      // An agent's escalation; a review is decided on its page, a stuck agent restarted.
+      resolve: (request, answer) =>
+        send("POST", `/api/requests/${id(request)}/resolve`, { answer }),
     },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {

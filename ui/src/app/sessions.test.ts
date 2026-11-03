@@ -16,6 +16,7 @@ import {
   sessionAgent,
   stepAgent,
   stoppedLine,
+  waitingOnYou,
   withDoing,
 } from "./sessions";
 
@@ -52,6 +53,17 @@ describe("Sessions", () => {
     // A resolved request, or one of another deployment, is no dot.
     const resolved = { status: "resolved", deploymentId: "atlas@ledger" } as Request;
     expect(activeDeployments(all, [atlas], [resolved])[0].needsYou).toBe(false);
+  });
+
+  it("marks the agents an open request waits on the CEO for, and no other", () => {
+    const req = (instanceId: string, status = "open") => ({ instanceId, status }) as Request;
+    const waiting = waitingOnYou([
+      req("mara@ledger"),
+      req("tove@ledger", "resolved"),
+      req("ilya@ledger", "expired"),
+      req(""), // Foreman's own, about no agent
+    ]);
+    expect([...waiting]).toEqual(["mara@ledger"]);
   });
 
   it("shows a team's liveliest agent as its status", () => {

@@ -91,8 +91,8 @@ type TeamMessage struct {
 	Ref          string    `json:"ref"`          // msg-N, per deployment
 	FromInstance string    `json:"fromInstance"` // an instance, or foreman / ceo
 	ToInstance   string    `json:"toInstance"`
-	Kind         string    `json:"kind"`      // ask, reply, handoff, contribute or notice
-	InReplyTo    string    `json:"inReplyTo"` // a reply's ask
+	Kind         string    `json:"kind"`      // ask, reply, handoff, contribute, notice or answer (the CEO's, to a request)
+	InReplyTo    string    `json:"inReplyTo"` // a reply's ask; an answer's request
 	Body         string    `json:"body"`
 	ArtifactRef  string    `json:"artifactRef"` // a branch or a wiki path
 	State        string    `json:"state"`       // queued, delivered, expired or failed

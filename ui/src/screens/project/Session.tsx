@@ -32,6 +32,7 @@ import {
   sessionAgent,
   stepAgent,
   stoppedLine,
+  waitingOnYou,
 } from "../../app/sessions";
 import { DeployDialog } from "../../components/DeployDialog";
 import { PromptIcon } from "../../components/icons";
@@ -129,6 +130,7 @@ export function Session() {
         <AgentTabs
           roster={roster}
           team={team}
+          waiting={waitingOnYou(requests.data ?? [])}
           shown={instance}
           onClick={pick}
           controlsSlot={setControls}
@@ -199,12 +201,15 @@ function AgentBranch({ shown }: { shown: Instance }) {
 function AgentTabs({
   roster,
   team,
+  waiting,
   shown,
   onClick,
   controlsSlot,
 }: {
   roster: Instance[];
   team?: Team;
+  /** The agents waiting on the CEO's answer. */
+  waiting: Set<string>;
   shown: Instance;
   onClick: (id: string) => void;
   controlsSlot: (el: HTMLElement | null) => void;
@@ -231,6 +236,7 @@ function AgentTabs({
         <Dot status={i.status} size={8} title={i.status} />
         {soul?.name ?? i.agentId}
         {i.agentId === team?.config.lead && <LeadTag name={soul?.name ?? i.agentId} />}
+        {waiting.has(i.id) && <Dot title="Waiting on you" />}
       </button>
     );
   };

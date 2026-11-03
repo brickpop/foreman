@@ -28,7 +28,7 @@ A strip (`--side`, padding `0 12px`) whose tabs scroll horizontally only. Pickin
 2. A 1×20px `--line2` divider and the label **`Direct`** (12px `--tx4`).
 3. The other members, in roster order.
 
-Each tab: the agent's 8px status dot (titled with the status), the name (500). The agent shown is underlined (inset 2px bottom, `--acc`) and `--tx`, the others `--tx3`. **Its branch shows in the header**, right after `<team> · <project>` (Mono 11.5px `--tx4`; the CEO, 2026-10-25, moved out of the tab 2026-10-27): one per agent, since `switch` moves all its code repos together; should its repos ever differ, each branch, comma-separated. It comes from the project's repos (`GET /api/projects/:id/repos`, each branch with the agent that has it checked out), refreshed by every git action (`team.action`); none shows before the agent's first start makes its worktrees.
+Each tab: the agent's 8px status dot (titled with the status), the name (500), then a needs-you dot (`Waiting on you`) while a request of the agent is open (an escalation, or its harness waiting). The agent shown is underlined (inset 2px bottom, `--acc`) and `--tx`, the others `--tx3`. **Its branch shows in the header**, right after `<team> · <project>` (Mono 11.5px `--tx4`; the CEO, 2026-10-25, moved out of the tab 2026-10-27): one per agent, since `switch` moves all its code repos together; should its repos ever differ, each branch, comma-separated. It comes from the project's repos (`GET /api/projects/:id/repos`, each branch with the agent that has it checked out), refreshed by every git action (`team.action`); none shows before the agent's first start makes its worktrees.
 
 At the strip's right end, always visible: the shown agent's harness label (12.5px `--tx4`; its role was there too until the CEO dropped it as redundant, 2026-11-02: the lead has its tag, the members' roles are on the [Team page](./team-page.md)), then icon buttons (28px square, radius 6, `--tx3`, `--hover` behind on hover, each labelled for screen readers and in a tooltip): **Copy** (two sheets: copies the whole buffer, scrollback included, as plain text; a tick for 1.4 s) and **Line** (a `>_` prompt: toggles the line input; `--accSoft` / `--accTx` while open). An agent with no session has neither. Before them, only while some agent of the team runs on an older prompt, **Reload** (small; [Team definition → Reload](../models/team-definition.md#reload)), the Team header's button (the CEO, 2026-11-03).
 
@@ -58,7 +58,7 @@ The agent shown fills the section under its tabs. The team's messages and git ac
 
 | Situation | Placeholder |
 |---|---|
-| Instance is `awaiting` | `Reply to <Name>…` |
+| Instance is `awaiting` (its harness asks) | `Reply to <Name>…` |
 | Lead | `Tell <Name> what you need. They’ll delegate.` |
 | Other member | `Direct instruction to <Name>…` |
 
@@ -66,5 +66,5 @@ The agent shown fills the section under its tabs. The team's messages and git ac
 
 - Typing to the **lead** is a request; the lead delegates through [Team tools](../architecture/team-tools.md) (`ask`, `handoff`).
 - Typing to a **member** is a direct instruction. It goes raw to the member's terminal; Foreman posts nothing to the lead. The member tells the lead itself when the instruction matters to the team, as its [session prompt](../architecture/session-prompt.md#talking-to-the-ceo) asks.
-- Typing to an `awaiting` instance answers its open request ([Requests](./requests.md)).
+- Typing to an `awaiting` instance answers its harness's dialog, and the card it raised resolves with the harness's next activity ([Requests](./requests.md)). An `escalate` request is answered on its card (Dashboard, Inbox), never by typing.
 

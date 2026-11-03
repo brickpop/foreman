@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -58,11 +59,35 @@ func (fakeRequests) OpenRequests(context.Context) ([]store.Request, error) {
 	return []store.Request{{ID: "req-1", Kind: "review", ReviewID: "rev-1"}}, nil
 }
 
+// Answer: req-2 is open, req-3 answered already; "?" is no answer.
+func (fakeRequests) Answer(_ context.Context, id, answer string) (store.Request, error) {
+	switch {
+	case answer == "?":
+		return store.Request{}, fmt.Errorf("%w: write an answer", workflow.ErrInvalid)
+	case id != "req-2":
+		return store.Request{}, workflow.ErrAnswered
+	}
+	return store.Request{ID: id, Status: store.RequestResolved, Answer: answer}, nil
+}
+
 func TestRequests(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Requests: fakeRequests{}, UI: builtUI})
 	var list []store.Request
 	decodeBody(t, get(t, h, "/api/requests"), &list)
 	if len(list) != 1 || list[0].ReviewID != "rev-1" {
 		t.Errorf("requests %+v", list)
+	}
+	var answered store.Request
+	decodeBody(t, send(h, "POST", "/api/requests/req-2/resolve", `{"answer":"Approve"}`), &answered)
+	if answered.Answer != "Approve" || answered.Status != store.RequestResolved {
+		t.Errorf("answered %+v", answered)
+	}
+	for body, code := range map[string]int{`{"answer":"?"}`: http.StatusBadRequest, `{"answer":`: http.StatusBadRequest} {
+		if w := send(h, "POST", "/api/requests/req-2/resolve", body); w.Code != code {
+			t.Errorf("%s: %d", body, w.Code)
+		}
+	}
+	if w := send(h, "POST", "/api/requests/req-3/resolve", `{"answer":"Approve"}`); w.Code != http.StatusConflict {
+		t.Errorf("answered already: %d", w.Code)
 	}
 }

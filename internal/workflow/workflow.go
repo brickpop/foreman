@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/brickpop/foreman/internal/agentlink"
@@ -34,6 +35,8 @@ type Git interface {
 	Clean(ctx context.Context, dir string) (bool, error)
 	Branch(ctx context.Context, dir string) (string, error)
 	HasBranch(ctx context.Context, dir, branch string) bool
+	HasRemoteBranch(ctx context.Context, dir, branch string) bool
+	FetchRemotes(ctx context.Context, dir string) ([]git.RemoteChange, error)
 	Switch(ctx context.Context, dir, branch, base string) (bool, error)
 	CommitAll(ctx context.Context, dir, message string, by git.Author) (string, error)
 	CommitAs(ctx context.Context, dir, message string, by git.Author, files ...string) error
@@ -122,7 +125,10 @@ type Deps struct {
 }
 
 // Workflow serves its team tools.
-type Workflow struct{ Deps }
+type Workflow struct {
+	Deps
+	answering sync.Mutex // the CEO's answers to requests, one at a time
+}
 
 // New returns the Workflow block.
 func New(d Deps) *Workflow {
@@ -153,7 +159,7 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
 			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; project for the project repo (the lead only)"},`+
 			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
-	{Name: "merge", Description: "Merge a branch (a target, the lead's, a teammate's) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
+	{Name: "merge", Description: "Merge a branch (a target, the lead's, a teammate's, or a remote's that fetch() brought, e.g. origin/main) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
 	{Name: "discard", Description: "Throw away what you changed and didn't commit, in each repo you name (all of them if none): its files go back to the branch as committed, new files removed (ignored ones stay). Foreman keeps a copy. After a merge, abort_merge() first.",
 		InputSchema: object(`"repos":{"type":"array","items":{"type":"string"},"description":"Your repos' folders, e.g. api; all of them when left out"}`)},
@@ -172,6 +178,11 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"kind":{"type":"string","enum":["finding","proposal","note"]},`+
 			`"title":{"type":"string","description":"A short title"},`+
 			`"body":{"type":"string","description":"The contribution, in Markdown"}`, "kind", "title", "body")},
+	{Name: "escalate", Description: "Ask the CEO: an approval (a project gate, e.g. a new dependency), a question only they can answer, or a finding. It returns at once with the request's id; the answer arrives in your session as a message. For an approval (or a question with wait), wait for it before that step, and keep working on anything else.",
+		InputSchema: object(`"kind":{"type":"string","enum":["approval","question","finding"]},`+
+			`"summary":{"type":"string","description":"What you need from the CEO, complete enough to answer alone"},`+
+			`"options":{"type":"array","items":{"type":"string"},"description":"Answers to pick from, the first the one you suggest; the CEO may also write their own. An approval without them gets Approve and Deny"},`+
+			`"wait":{"type":"boolean","description":"A question only: you can't go on with that step without the answer"}`, "kind", "summary")},
 	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into into, a target, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Every one of those repos must have that target. Commit first. Call it again on the same branch to refresh it (after merging its target in, say).",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"},`+
@@ -184,6 +195,8 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>, with a review open"},`+
 			`"reason":{"type":"string","description":"Why, for the CEO"},`+
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
+	{Name: "fetch", Description: "Fetch every remote of each repo: what was pushed upstream shows as its remote's branches (origin/main), which you merge in with merge(\"origin/main\"). Your branches and the targets don't move.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "targets", Description: "Each repo's targets: the branches only the CEO's merges write, where work starts from (switch from) and lands (request_merge into). The default branch first; for the others, who made them and at which commit. Read-only.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
@@ -215,6 +228,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		From     string   `json:"from"`
 		Into     string   `json:"into"`
 		Name     string   `json:"name"`
+		Options  []string `json:"options"`
+		Wait     bool     `json:"wait"`
 		Commits  []struct {
 			Repo    string `json:"repo"`
 			Message string `json:"message"`
@@ -256,6 +271,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "create_target":
 		act.Branch = strings.TrimSpace(a.Name)
 		res = t.createTarget(ctx, strings.TrimSpace(a.Repo), act.Branch, strings.TrimSpace(a.From))
+	case "fetch":
+		res = t.fetch(ctx)
 	case "targets":
 		return t.targets() // read-only: not an action
 	case "reviews":
@@ -265,10 +282,12 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "withdraw_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.withdrawMerge(ctx, act.Branch, strings.TrimSpace(a.Reason), strings.TrimSpace(a.By))
+	case "escalate":
+		return t.escalate(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Summary), a.Options, a.Wait) // a request, not an action
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
-	// The git tools, request_merge, create_target and withdraw_merge are kept as actions, refusals included (a hand-off and a
+	// The git tools (fetch too), request_merge, create_target and withdraw_merge are kept as actions, refusals included (a hand-off and a
 	// contribution are messages already).
 	if res.Error {
 		act.Error = res.Text
@@ -565,11 +584,20 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 	if !git.ValidBranch(ctx, branch) {
 		return teamtools.Refusal("bad_branch", "%q isn't a valid branch name", branch)
 	}
+	// A local branch, else the remote-tracking one a fetch() made (origin/main),
+	// named in full so git never guesses between the two.
 	var repos []repo
+	refs := map[string]string{}
 	for _, r := range t.worktrees() {
-		if t.w.Git.HasBranch(ctx, r.dir, branch) {
-			repos = append(repos, r)
+		switch {
+		case t.w.Git.HasBranch(ctx, r.dir, branch):
+			refs[r.dir] = "refs/heads/" + branch
+		case t.w.Git.HasRemoteBranch(ctx, r.dir, branch):
+			refs[r.dir] = "refs/remotes/" + branch
+		default:
+			continue
 		}
+		repos = append(repos, r)
 	}
 	if len(repos) == 0 {
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
@@ -579,7 +607,7 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 	}
 	var merged, conflicted []string
 	for _, r := range repos {
-		files, err := t.w.Git.Merge(ctx, r.dir, branch, t.author())
+		files, err := t.w.Git.Merge(ctx, r.dir, refs[r.dir], t.author())
 		if err != nil {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		}

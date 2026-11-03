@@ -58,6 +58,9 @@ func (Adapter) Interpret(event string, _ []byte) harness.Activity {
 	return harness.Unknown
 }
 
+// Asks: the fake harness never waits for the user.
+func (Adapter) Asks(string, []byte) string { return "" }
+
 // Describe names the same hooks as Claude Code's adapter does.
 func (Adapter) Describe(event string, _ []byte) string {
 	return map[string]string{

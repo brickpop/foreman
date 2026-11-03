@@ -101,7 +101,7 @@ func TestNoCodeRepoNoGitTools(t *testing.T) {
 		workflow.New(workflow.Deps{Config: config{}}),
 	}}
 	for id, want := range map[string][]string{
-		"mara@ledger": {"ask", "reply", "read_message", "commit", "contribute", "team"},
+		"mara@ledger": {"ask", "reply", "read_message", "commit", "contribute", "escalate", "team"},
 		"tove@ledger": {"ask", "reply", "read_message", "contribute"},
 	} {
 		var names []string
@@ -183,5 +183,18 @@ func TestTeammate(t *testing.T) {
 	}
 	if c.LeadInstance() != "mara@ledger" || c.Name() != "Tove" {
 		t.Errorf("lead %q, name %q", c.LeadInstance(), c.Name())
+	}
+}
+
+// The lead's tools are refused to a member that calls them anyway.
+func TestAMemberCantCallTheLeadsTools(t *testing.T) {
+	db := newStore(t)
+	r := &teamtools.Router{Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}, Blocks: []teamtools.Block{
+		workflow.New(workflow.Deps{Config: config{}}),
+	}}
+	for _, tool := range []string{"escalate", "fetch", "request_merge"} {
+		if res := r.Call(ctx, "tove@ledger", tool, json.RawMessage(`{"kind":"approval","summary":"x"}`)); !res.Error || !strings.HasPrefix(res.Text, "unknown_tool") {
+			t.Errorf("%s served to a member: %+v", tool, res)
+		}
 	}
 }

@@ -237,9 +237,12 @@ func run(args []string, stdout io.Writer) error {
 		// A host process: no mount, no host alias.
 		agent.Path, agent.URL = agentHost, "http://127.0.0.1:"+agentPort
 	}
-	// Messaging hears every status change and stop from the manager itself,
-	// never through the bus, which drops a subscriber that falls behind.
+	// Messaging and Workflow hear every status change and stop from the
+	// manager itself, never through the bus, which drops a subscriber that
+	// falls behind. Workflow needs the manager (to stop a closed review's
+	// team), and the manager tells Workflow of each fresh session: set below.
 	var messenger *messaging.Messenger
+	var flow *workflow.Workflow
 	var checklist *setup.Setup
 	publish := func(e events.Event) {
 		bus.Publish(e)
@@ -249,14 +252,12 @@ func run(args []string, stdout io.Writer) error {
 		case store.Deployment:
 			if e.Type == "deployment.stopped" {
 				messenger.DeploymentStopped(d.ID)
+				flow.DeploymentStopped(context.Background(), d.ID) // its agents' requests expire
 			}
 		}
 	}
 	login := profileLogins{store: profileStore, adapters: adapters, images: engineImages, terms: newSessions(engineRunner, openLog),
 		project: h.Project}
-	// Workflow needs the manager (to stop a closed review's team), and the
-	// manager tells Workflow of each fresh session: set below.
-	var flow *workflow.Workflow
 	manager = instances.New(instances.Deps{
 		Home: h.Root(), Runner: engineRunner, Images: engineImages, Git: gitCLI, Config: h,
 		Deployments: state.Deployments(), Instances: state.Instances(), Adapters: adapters, Profile: login.Of,

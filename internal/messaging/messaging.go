@@ -378,6 +378,8 @@ func Notice(team home.Team, msgs []store.TeamMessage) string {
 			return fmt.Sprintf("%s Read it with read_message(%q); answer with reply(%q, output).", head, msg.Ref, msg.Ref)
 		case "reply":
 			return fmt.Sprintf("%s Read it with read_message(%q), then resume the task that asked for it.", head, msg.Ref)
+		case "answer":
+			return fmt.Sprintf("%s Read it with read_message(%q), then go on with what you asked it for.", head, msg.Ref)
 		default:
 			return fmt.Sprintf("%s Read it with read_message(%q).", head, msg.Ref)
 		}
@@ -393,6 +395,8 @@ func kindText(msg store.TeamMessage) string {
 	switch {
 	case msg.Kind == "reply":
 		return "reply to " + msg.InReplyTo
+	case msg.Kind == "answer":
+		return "answer to " + msg.InReplyTo
 	case msg.Kind == "handoff" && msg.ArtifactRef != "":
 		return "handoff of " + msg.ArtifactRef
 	case msg.Kind == "contribute":

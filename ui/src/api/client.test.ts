@@ -351,10 +351,20 @@ describe("httpClient", () => {
     ]);
   });
 
+  it("answers a request with the CEO's text", async () => {
+    const calls = stubFetch(200, {});
+    await httpClient("http://x").requests.resolve("req/1", "Approve, but pin 2.x");
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/requests/req%2F1/resolve",
+      method: "POST",
+      body: JSON.stringify({ answer: "Approve, but pin 2.x" }),
+    });
+  });
+
   it("refuses the areas the server doesn't serve yet, without asking it", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");
-    for (const call of [() => c.requests.resolve("req-1", "yes")]) {
+    for (const call of [() => c.forge.accounts()]) {
       const e = await call().catch((e: unknown) => e);
       expect(isNotBuilt(e)).toBe(true);
     }

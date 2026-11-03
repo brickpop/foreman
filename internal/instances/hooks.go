@@ -32,7 +32,14 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 		return
 	}
 	m.heardFrom(ctx, id, r)
-	if status, ok := activityStatus[adapter.Interpret(event, payload)]; ok {
+	activity := adapter.Interpret(event, payload)
+	switch activity {
+	case harness.Waiting:
+		m.raiseWaiting(ctx, id, r, adapter.Asks(event, payload))
+	case harness.Busy, harness.Idle:
+		m.answeredInSession(ctx, r)
+	}
+	if status, ok := activityStatus[activity]; ok {
 		_ = m.change(ctx, id, func(inst *store.Instance) bool {
 			m.mu.Lock()
 			defer m.mu.Unlock()

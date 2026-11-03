@@ -15,6 +15,7 @@ import (
 const (
 	RequestOpen     = "open"
 	RequestResolved = "resolved"
+	RequestExpired  = "expired" // its deployment stopped before the CEO answered
 )
 
 // Requests is the requests table.

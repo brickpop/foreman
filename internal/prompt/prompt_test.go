@@ -166,7 +166,6 @@ func TestTodaysTools(t *testing.T) {
 			"set_submodule(repo, path, ref, url) Pin a submodule",
 			"branch, commit\nand merge only through switch(), commit() and merge().",
 			"Messages arrive in this session as one line",
-			"resume the task\nthat asked for it.\n",
 			"A reply (or a handoff) is its outcome: the result, the decisions you took",
 			"A reply ends its ask: don't answer a reply,",
 		} {
@@ -174,7 +173,7 @@ func TestTodaysTools(t *testing.T) {
 				t.Errorf("%s: missing %q in:\n%s", agent, want, got)
 			}
 		}
-		for _, absent := range []string{"## Git\n", "escalate(", "approval", "the CEO relays", "made for you"} {
+		for _, absent := range []string{"## Git\n", "the CEO relays", "made for you"} {
 			if strings.Contains(got, absent) {
 				t.Errorf("%s: mentions %q, which isn't built:\n%s", agent, absent, got)
 			}
@@ -184,11 +183,21 @@ func TestTodaysTools(t *testing.T) {
 	if !strings.Contains(lead, "request_merge(branch, entry, into)") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from.") || !strings.Contains(lead, "create_target(repo, name, from)") ||
 		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") || !strings.Contains(lead, "reviews()                           Where your reviews stand") ||
 		!strings.Contains(lead, "team()                              Where each teammate stands") ||
+		!strings.Contains(lead, "fetch()                             Fetch the repos' remotes") ||
 		!strings.Contains(lead, "requests merges") || strings.Contains(lead, "Tell the CEO which lead branch is ready for review.") || strings.Contains(lead, "handoff(") {
 		t.Errorf("lead:\n%s", lead)
 	}
+	// Only the lead escalates: a member takes the gates to it.
+	if !strings.Contains(lead, "escalate(kind, summary, options)    Ask the CEO.") || !strings.Contains(lead, "after an approval, wait for the CEO's answer, then resume.") ||
+		!strings.Contains(lead, "## Always escalate to the CEO\n- new dependency") {
+		t.Errorf("lead escalate:\n%s", lead)
+	}
 	member := Compose(input("ilya", Offered(false, true)))
-	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") || strings.Contains(member, "create_target") || strings.Contains(member, "withdraw_merge") || strings.Contains(member, "team()") {
+	if strings.Contains(member, "escalate(") || strings.Contains(member, "approval") || !strings.Contains(member, "resume the task\nthat asked for it.\n") ||
+		!strings.Contains(member, "## Always take to your lead first, for the CEO\n- new dependency") {
+		t.Errorf("member escalate:\n%s", member)
+	}
+	if !strings.Contains(member, "handoff(teammate, branch, summary)") || !strings.Contains(member, "Before any handoff, run: npm test") || !strings.Contains(member, "(read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file)") || strings.Contains(member, "request_merge") || strings.Contains(member, "create_target") || strings.Contains(member, "withdraw_merge") || strings.Contains(member, "team()") || strings.Contains(member, "fetch()") {
 		t.Errorf("member:\n%s", member)
 	}
 }
@@ -216,17 +225,17 @@ func TestWorktreesPersist(t *testing.T) {
 // the lead; a tool not built yet goes to nobody.
 func TestOfferedFollowsTheRole(t *testing.T) {
 	lead, member := Offered(true, true), Offered(false, true)
-	for _, name := range []string{"handoff", "escalate"} {
+	for _, name := range []string{"handoff"} {
 		if slices.Contains(lead, name) {
 			t.Errorf("the lead gets %s: %v", name, lead)
 		}
 	}
-	for _, name := range []string{"request_merge", "withdraw_merge", "reviews", "escalate"} {
+	for _, name := range []string{"request_merge", "withdraw_merge", "reviews", "escalate", "fetch"} {
 		if slices.Contains(member, name) {
 			t.Errorf("a member gets %s: %v", name, member)
 		}
 	}
-	for _, name := range []string{"ask", "commit", "discard", "request_merge", "withdraw_merge", "reviews"} {
+	for _, name := range []string{"ask", "commit", "discard", "escalate", "fetch", "request_merge", "withdraw_merge", "reviews"} {
 		if !slices.Contains(lead, name) {
 			t.Errorf("the lead lacks %s: %v", name, lead)
 		}
@@ -303,7 +312,7 @@ func TestAProjectWithNoCodeRepo(t *testing.T) {
 		// From the assignment on: a built-in role's job text is the team's to choose
 		full := Compose(in)
 		got := full[strings.Index(full, "## This assignment"):]
-		for _, gone := range []string{"Branches:", "worktree", "## Git", "switch(", "handoff(", "request_merge(", "targets(", "Tests bound for a target"} {
+		for _, gone := range []string{"Branches:", "worktree", "## Git", "switch(", "handoff(", "request_merge(", "targets(", "fetch(", "Tests bound for a target"} {
 			if strings.Contains(got, gone) {
 				t.Errorf("%s: %q in\n%s", agent, gone, got)
 			}

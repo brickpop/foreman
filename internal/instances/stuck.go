@@ -17,18 +17,19 @@ func (m *Manager) heardFrom(ctx context.Context, id string, r *run) {
 	stuck := r.stuck
 	r.stuck = nil
 	m.mu.Unlock()
-	m.resolveStuck(ctx, stuck, "active again")
+	m.resolveCard(ctx, stuck, "active again")
 }
 
-// resolveStuck resolves a stuck card, if there is one, with why.
-func (m *Manager) resolveStuck(ctx context.Context, card *store.Request, why string) {
-	if card == nil {
+// resolveCard resolves a card about the run (stuck, waiting), if there is
+// one, with why. One still being saved (no id yet) is left to its raiser.
+func (m *Manager) resolveCard(ctx context.Context, card *store.Request, why string) {
+	if card == nil || card.ID == "" {
 		return
 	}
 	r := *card
 	r.Status, r.Answer, r.ResolvedAt = store.RequestResolved, why, time.Now().UTC()
 	if _, err := m.Requests.Save(ctx, r); err != nil {
-		slog.Warn("resolving a stuck card", "instance", r.InstanceID, "err", err)
+		slog.Warn("resolving a card", "instance", r.InstanceID, "err", err)
 		return
 	}
 	m.publish("request.resolved", r)
@@ -76,7 +77,7 @@ func (m *Manager) CheckStuck(ctx context.Context, now time.Time) {
 		}
 		m.mu.Unlock()
 		if !kept {
-			m.resolveStuck(ctx, &card, "active again")
+			m.resolveCard(ctx, &card, "active again")
 		}
 	}
 }
@@ -104,7 +105,7 @@ func (m *Manager) resolveOldStuck(ctx context.Context) {
 	}
 	for _, r := range open {
 		if r.Kind == "blocked" && r.Source == "foreman" && r.InstanceID != "" {
-			m.resolveStuck(ctx, &r, "Foreman restarted")
+			m.resolveCard(ctx, &r, "Foreman restarted")
 		}
 	}
 }

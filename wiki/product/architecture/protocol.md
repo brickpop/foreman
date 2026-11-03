@@ -14,7 +14,7 @@ Three actors, and every interaction enters through exactly one channel:
 
 | Actor | Channel | Struct | Received by |
 |---|---|---|---|
-| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `request_merge`, `withdraw_merge`, `reviews`) |
+| Agent | A team-tool call: harness → `foreman-agent mcp` → agent port | [`ToolCall`](#envelopes) | Agent link → **Messaging** (`ask`, `reply`) or **Workflow** (`switch`, `commit`, `merge`, `abort_merge`, `handoff`, `contribute`, `escalate`, `fetch`, `request_merge`, `withdraw_merge`, `reviews`) |
 | Agent | A harness hook: `foreman-agent hook <event>` → agent port | [`HookEvent`](#envelopes) | Agent link → **Instance manager** (status), which tells Messaging and Workflow through events |
 | CEO | Keystrokes in a terminal pane | raw bytes | Web server → **Terminal** `Input` (no Foreman logic) |
 | CEO | Line input (`POST /api/instances/:id/input`) | [`CEOInput`](#envelopes) | Web server → **Terminal** `Input`, as the same bytes typing would produce |
@@ -33,7 +33,7 @@ type ToolCall struct {
     CallID     string          // the MCP call id; the result is matched to it
     Instance   string          // "mara@ledger": from the token, never from the payload
     Deployment string          // the instance's deployment: from the token too
-    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "request_merge" | "withdraw_merge" | "reviews"
+    Tool       string          // "ask" | "reply" | "switch" | "commit" | "merge" | "abort_merge" | "discard" | "set_submodule" | "handoff" | "contribute" | "escalate" | "fetch" | "request_merge" | "withdraw_merge" | "reviews"
     Args       json.RawMessage // the tool's args struct, below
     At         time.Time
 }
@@ -76,16 +76,18 @@ The harness adapter's `Interpret` maps each harness's hooks to the normalised `E
 | `waiting` | It waits **for the user**: a permission dialog, a multiple-choice question, or a question it asked in plain text before stopping | `Notification` | `awaiting`, with a request on the Dashboard ([Waiting for the CEO](#waiting-for-the-ceo)) |
 | `ended` | The harness is exiting | `SessionEnd` | (the Terminal's exit sets `stopped`) |
 
-`awaiting` means a request of the instance blocks it: an open `escalate(approval)`, or a `waiting` hook. `idle` and `waiting` must never be confused: an instance merely idle after finishing raises nothing ([Harness adapters → Idle and waiting detection](./harness-adapters.md#idle-and-waiting-detection)).
+`awaiting` means its harness waits for the user (a `waiting` hook): typing into it would answer its dialog, so nothing is delivered meanwhile. An open `escalate(approval)` doesn't make the lead `awaiting`: it keeps its status, and its messages (the CEO, 2026-11-04); its session tab shows that it waits on the CEO ([Sessions](../features/sessions.md)). `idle` and `waiting` must never be confused: an instance merely idle after finishing raises nothing ([Harness adapters → Idle and waiting detection](./harness-adapters.md#idle-and-waiting-detection)).
 
 ### Waiting for the CEO
 
-Whenever the harness reports it is waiting for the user, Workflow raises a request on the Dashboard, as if the agent had escalated:
+Whenever the harness reports it is waiting for the user, any agent, lead or member, the instance manager raises a request on the Dashboard and the project's Inbox (`internal/instances/waiting.go`):
 
-- **Kind:** `approval` when the harness exposes choices (a permission dialog, a multiple-choice question), with those choices as `Options`; otherwise `question`. `Source: harness` (the panel reads "waiting in its session").
-- **Content:** the question text and the choices, when the harness's hook payload carries them; otherwise "<Name> is waiting for your input" and an `Open session` action.
-- **Answer:** the CEO's choice or text is typed into the session through the harness adapter's `Deliver` (the instance is waiting, so it is not queued). Answering in the terminal directly works too: the next `busy` hook resolves the request.
-- The instance is `awaiting` while the request is open.
+- **Kind:** `question`, `Source: harness` (the panel reads "waiting in its session"), no options.
+- **Content:** what the harness says it asks (its adapter's `Asks`): Claude Code's `AskUserQuestion` questions, each with its choices (`Which database? (Postgres / SQLite)`), or a permission prompt's message; Pi's dialog title. Otherwise `<Name> is waiting for your input.`
+- **One per wait:** the hooks that repeat it raise no second.
+- **Answer:** in the session, where the panel's **Open session** leads. Its next activity (`busy` or `idle`) resolves the request (`answered in its session`), as does its run ending. Typing the CEO's pick into the dialog from the panel is not built: it needs each harness's dialog keys checked live ([Waiting in its session](../../backlog/harness-waiting-requests.md)).
+- After a Foreman restart, an agent still `awaiting` in its re-attached session keeps its request; any other's resolves (`Foreman restarted`).
+- The instance is `awaiting` while it waits.
 
 ## Text into a session: deliveries and markers
 
@@ -113,7 +115,8 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `set_submodule` | anyone | until the submodule is fetched and committed (seconds; longer for a large first fetch) | Workflow (+ Git) |
 | `handoff` | members (the lead has no `wt/` branch to hand off) | no: returns once the branch is checked; checks run after | Workflow (+ Messaging for the delivery) |
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
-| `escalate` | lead only | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
+| `escalate` | lead only | no: returns the request id at once; for an `approval` (or a `question` with `wait: true`) the lead waits for the answer before that step | Workflow |
+| `fetch` | lead only | until every remote is fetched (seconds; at most 2 min a repo) | Workflow (+ Git) |
 | `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
 | `withdraw_merge` | the lead only | no | Workflow |
 | `reviews` | the lead only | no | Workflow |
@@ -186,7 +189,7 @@ type MergeResult struct { Repos []RepoMerge }
 type RepoMerge   struct { Repo string; Merged bool; Conflicts []string } // files left with conflict markers
 ```
 
-- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone); only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and commits those repos, which finishes the merge (it refuses while markers are left), or backs out with `abort_merge`. Agents never rebase: branches are shared from their first commit (a teammate may already have merged one), and integration detection and the forge's PRs follow commits, which a rebase would replace (decided 2026-10-16).
+- Effect: Workflow asks Git to merge `Branch` into the branch checked out in each of the caller's worktrees whose repo has it. Any branch of the repo may be merged in (reading is open to everyone), and a remote-tracking one the lead's [`fetch`](#fetch) brought (`origin/main`) where the repo has no local branch of that name: it is named to git in full (`refs/remotes/origin/main`), never left to git's guess. Only the caller's own worktrees change. On a conflict the markers stay in the files: the agent resolves them and commits those repos, which finishes the merge (it refuses while markers are left), or backs out with `abort_merge`. Agents never rebase: branches are shared from their first commit (a teammate may already have merged one), and integration detection and the forge's PRs follow commits, which a rebase would replace (decided 2026-10-16).
 - Nothing is delivered; a merge into a lead branch may let Workflow detect an integration ([Work items and merge requests](#work-items-and-merge-requests)).
 - Errors: `branch_not_found` (in none of the caller's repos), `submodule_changed` (files changed in a submodule, which no commit records: restore them, or `set_submodule`), `uncommitted_changes` (commit first, so a merge never mixes with unsaved work), `git_error`.
 - After it, the submodules follow the branch ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)); a submodule that can't be updated is said in the result, the merge stands. A submodule conflict has no markers: `set_submodule` settles it.
@@ -250,25 +253,23 @@ type ContributeResult struct { Path string }                            // "<wor
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter. A body is at most 32,000 characters: it becomes a file, not a line in the lead's conversation, so a whole design record fits (the CEO, 2026-10-19; messages keep 8,000). Limits count characters, not bytes. A taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in <workspace>/project/wiki/inbox/<file>.` The lead decides what becomes of it.
 - Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the project's Activity shows the title.
-- Errors: `bad_kind`, `too_long`. A member is never offered it ([Team tools](./team-tools.md#tools)).
+- Errors: `bad_kind`, `empty` (no summary), `too_long`, `bad_option` (an empty, multi-line or repeated option). A member is never offered it ([Team tools](./team-tools.md#tools)).
 
 ### `escalate`
 
 ```go
 type EscalateArgs struct {
     Kind    string   // "approval" | "question" | "finding"
-    Summary string
-    Options []string // optional; the first is the primary action
-    Wait    bool     // question only: block like an approval
+    Summary string   // at most 2,000 characters
+    Options []string // optional, at most 6 distinct one-line labels of 80; the first is the primary action. An approval without them gets Approve, Deny
+    Wait    bool     // question only: the lead can't go on with that step without the answer
 }
-type EscalateResult struct {
-    RequestID string // the request on the Dashboard; the answer comes as a delivery
-}
+// The result is text: "Raised req-N for the CEO." and what to do meanwhile.
 ```
 
-- Effect: Workflow creates a [request](#requests) (`source: agent`), deduplicated against open ones. Markers: `⚠ Mara escalated (approval): <summary>`.
-- `approval`, or `question` with `Wait`: the call returns at once, telling the agent to wait for the answer before that step (the CEO's decision, 2026-10-15: no blocking call, [Team tools → Waiting on approval](./team-tools.md#waiting-on-approval)). The instance is `awaiting` until the CEO answers; the answer arrives as a delivery: `From the CEO, on <request>: <answer>. Resume where you paused.`
-- `question` without `Wait`, and `finding`: the call returns at once; the answer arrives as a delivery: `From the CEO, on <request>: <answer>.`
+- Effect: Workflow creates a [request](#requests) (`source: agent`, `request.created`), unless the same one is open: same agent, kind and summary (case and spacing aside) raised in the last 10 minutes, whose id it returns (`The CEO has it already, as req-N: it's still open.`).
+- `approval`, or `question` with `Wait`: the call returns at once, telling the lead to wait for the answer before that step and work on anything else meanwhile (the CEO's decision, 2026-10-15: no blocking call, [Team tools → Waiting on approval](./team-tools.md#waiting-on-approval)). `question` without `Wait`, and `finding`: the call returns at once, telling it to keep working.
+- **The answer** (`POST /api/requests/{id}/resolve`, an option or the CEO's own text, at most 8,000 characters) resolves the request and comes back as a [message](#messages) from the CEO, kind `answer`: `Message msg-N from the CEO (answer to req-N): On your approval "<summary>": <answer> Read it with read_message("msg-N"), then go on with what you asked it for.` A finding is answered the same way, with the lead's options: one team works on a project at a time, so its lead is who acts on it (the CEO, 2026-11-04). Answered once: a second answer is refused (`NOT_OPEN`). When the deployment stops first, its open requests **expire** (`status: expired`), with nothing delivered.
 - Errors: `bad_kind`, `too_long`.
 
 ### `request_merge`
@@ -293,6 +294,12 @@ type CreateTargetArgs struct { Repo string; Name string; From string } // repo: 
 - Effect (lead only; the CEO, 2026-11-02): the home makes branch `Name` in that code repo at `From` (resolved to its commit, which one of the repo's targets must hold: a target starts only from work the CEO merged), without checking it out anywhere, and records it as one of the repo's [targets](../features/pipeline-and-merges.md#merge-targets): who made it (the lead's instance), at which commit, when. It is a target at once. The record is kept first, so a branch git refuses to make leaves no record behind. The text says `release/2.0 is a target of api now, at <commit>. Start work for it with switch(<topic>, "release/2.0"); ask for its merges with request_merge(<branch>, <entry>, "release/2.0").`
 - Nothing is delivered; no marker. Kept as a [team action](#team-actions), refusals included.
 - Errors: `not_lead`, `bad_branch` (not a valid branch name), `no_from` (no `From`), `no_repo` (not one of the project's code repos), `target_exists` (the repo has a branch or a target of that name, its default included), `bad_target` (in an agents' namespace, `wt/*` or `lead/*`; a `From` the repo hasn't, or no target holds; a repo agents can't use now).
+
+### `fetch`
+
+- Effect (the lead only; the CEO, 2026-11-04): Git fetches every remote of each code repo, in the CEO's repo (the worktrees share its refs), on the host and with the CEO's own credentials (their credential helper, keychain or SSH agent): only the CEO writes a repo's `.git/config`, so an agent can't point a remote elsewhere. `git fetch --all --prune --no-tags --no-recurse-submodules --no-write-fetch-head`: it moves only the remote-tracking branches (`origin/*`), pruning those deleted upstream; never a target, a local branch, a tag or a submodule (their URLs are the agents', fetched only by `set_submodule`, without credentials). It never waits on a prompt (no terminal, `GIT_TERMINAL_PROMPT=0`, no askpass), and a remote has 2 minutes.
+- The text, a line per repo: `api: origin/main 1a2b3c4..5d6e7f8, origin/feat/y new, origin/feat/x gone upstream`, `web: up to date` or `web: no remote`; when something moved, how to merge it in (`merge("origin/main")`).
+- A repo that fails leaves the others fetched; the call then fails (`fetch_failed`) with every repo's line, the failed one with git's message. Kept as a [team action](#team-actions).
 
 ### `targets`
 
@@ -410,36 +417,33 @@ type Request struct {
     Instance    string   // who raised it, or who it is about (blocked)
     Summary     string
     Options     []string // first = primary
-    MergeRequest string  // review only
-    CallID      string   // approval (or question with wait): the open tool call to answer
+    Review      string   // review only
     Status      string   // "open" | "resolved" | "expired"
-    Answer      string
+    Answer      string   // an option, or the CEO's own text
     CreatedAt, ResolvedAt time.Time
 }
-
-type Answer struct { Request string; Choice string; Text string } // an option, or free text (approval, question)
 ```
 
 Lifecycle:
 
 ```
-  open ──── CEO answers (Resolve) ─────────────────▶ resolved
-    │ ──── its merge request leaves open (review) ────▶ resolved
-    │ ──── the instance restarts fine (blocked) ─────▶ resolved
-    └──── deployment stopped / instance gone ───────▶ expired
+  open ──── CEO answers (an escalation) ────────────▶ resolved
+    │ ──── its review has nothing open (review) ──────▶ resolved
+    │ ──── the agent is active again (blocked) ───────▶ resolved
+    │ ──── its session works again or ends (harness) ─▶ resolved
+    └──── deployment stopped (an escalation) ─────────▶ expired
 ```
 
 How the answer travels back:
 
 | Kind | On `Resolve` |
 |---|---|
-| `approval`, `question` with `wait` | The open tool call (`CallID`) returns the answer; if it already returned `Pending`, a delivery carries it |
-| `question`, `finding` | A delivery to the raiser (`From the CEO, on <request>: …`); a finding's action may also deliver to another team's lead |
+| `approval`, `question`, `finding` (an escalation) | A message from the CEO to the lead, kind `answer` ([`escalate`](#escalate)) |
 | `review` | No answer: the decisions are `ReviewAction`s on its review. Request changes resolves it (the drafts go to the lead in one delivery); so does the review having nothing left open |
 | `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch profile (later) |
-| `source: harness` (approval or question) | Typed into the session with the harness adapter's `Deliver`; also resolved by the next `busy` hook if the CEO answered in the terminal |
+| `source: harness` (a question) | Not answered here: the CEO answers in the session, and its next activity resolves it ([Waiting for the CEO](#waiting-for-the-ceo)) |
 
-**Dedup:** a new request with the same instance, kind and normalised summary as an `open` one created within 10 minutes isn't created; the open one is returned (its `RequestID` is the tool result). Details: [Request](../models/request.md#invariants).
+**Dedup:** a new request with the same instance, kind and normalised summary as an `open` one created within 10 minutes isn't created; the open one is returned (its id is in the tool's result). Details: [Request](../models/request.md#invariants).
 
 ## Work items and merge requests
 

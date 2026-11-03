@@ -53,6 +53,15 @@ export function activeDeployments(
     .sort((a, b) => a.project.localeCompare(b.project) || a.team.localeCompare(b.team));
 }
 
+/** The agents something open waits on the CEO for (an escalation, a review):
+ * each tab's needs-you mark. Their status stays their harness's: an agent
+ * waiting on an answer still gets its messages (wiki/product/features/requests.md). */
+export function waitingOnYou(requests: Request[]): Set<string> {
+  return new Set(
+    requests.filter((r) => r.status === "open" && r.instanceId).map((r) => r.instanceId),
+  );
+}
+
 /** The instances with one's activity line replaced: an instance.doing event,
  * pushed at every step of its work, so never refetched for. */
 export function withDoing(

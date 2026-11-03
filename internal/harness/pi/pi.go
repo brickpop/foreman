@@ -134,6 +134,17 @@ func (Adapter) Interpret(event string, _ []byte) harness.Activity {
 	return harness.Unknown
 }
 
+// Asks is a dialog's title (ui_prompt_start).
+func (Adapter) Asks(event string, payload []byte) string {
+	var p struct {
+		Title string `json:"title"`
+	}
+	if event != "ui_prompt_start" || json.Unmarshal(payload, &p) != nil {
+		return ""
+	}
+	return strings.TrimSpace(p.Title)
+}
+
 // Describe reads the same events for the CEO.
 func (Adapter) Describe(event string, payload []byte) string {
 	var p struct {

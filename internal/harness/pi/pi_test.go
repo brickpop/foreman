@@ -361,3 +361,14 @@ func TestMoveConversations(t *testing.T) {
 		t.Error("the conversations didn't move")
 	}
 }
+
+// A dialog's title is what it asks; nothing else asks.
+func TestAsks(t *testing.T) {
+	a := Adapter{}
+	if got := a.Asks("ui_prompt_start", []byte(`{"title":" Overwrite migrations? "}`)); got != "Overwrite migrations?" {
+		t.Errorf("%q", got)
+	}
+	if a.Asks("tool_call", []byte(`{"title":"x"}`)) != "" || a.Asks("ui_prompt_start", []byte(`nope`)) != "" {
+		t.Error("asked anyway")
+	}
+}

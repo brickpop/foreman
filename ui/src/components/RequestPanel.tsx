@@ -38,7 +38,10 @@ export function RequestPanel({
 }: Props) {
   const onProject = variant === "project";
   const [answer, setAnswer] = useState("");
-  const freeText = r.kind === "approval" || r.kind === "question";
+  // An agent's escalation takes a typed answer; one waiting in its own session is answered there.
+  const freeText =
+    r.source === "agent" &&
+    (r.kind === "approval" || r.kind === "question" || r.kind === "finding");
   // On the Dashboard the whole card opens the session of who raised it; its controls keep
   // their own action, and selecting text opens nothing.
   const opens = !onProject && r.instanceId !== "";

@@ -428,6 +428,8 @@ func TestMergeATeammatesBranch(t *testing.T) {
 	f.ok("tove", "commit", commits("api", "cal"))
 	f.refused("mara", "merge", map[string]string{"branch": "wt/ledger/tove/nope"}, "branch_not_found")
 	f.refused("mara", "merge", map[string]string{"branch": "-x"}, "bad_branch")
+	// A tag of the same name, on older work, is never what gets merged.
+	f.git(filepath.Join(f.root, "ledger", "api"), "tag", "wt/ledger/tove/main", "main")
 	if text := f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/main"}); text != "Merged wt/ledger/tove/main into api, web." {
 		t.Errorf("%q", text)
 	}

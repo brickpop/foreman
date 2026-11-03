@@ -28,6 +28,7 @@ import { Button, Empty, Loading, NotBuilt, Panel } from "../../components/ui";
 /** Where a request came from, as the panel's header says it. */
 export function sourceLabel(r: Request): string {
   if (r.kind === "blocked") return "raised by Foreman";
+  if (r.source === "harness") return "waiting in its session";
   if (r.kind === "review") return "request_merge()";
   return `escalate(${r.kind})`;
 }

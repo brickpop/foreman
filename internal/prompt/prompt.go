@@ -81,9 +81,14 @@ var teamTools = []teamTool{
 	// The lead hands nothing off: it works only on lead branches.
 	{"handoff", membersOnly, anyone, true, []string{"handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends."}},
 	{"contribute", anyone, nobody, true, []string{"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."}},
-	{"escalate", anyone, nobody, false, []string{
+	// Members take what needs the CEO to their lead, who decides what reaches them.
+	{"escalate", leadOnly, nobody, true, []string{
 		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
 		"                                    For an approval, wait for the answer before that step.",
+	}},
+	{"fetch", leadOnly, anyone, true, []string{
+		"fetch()                             Fetch the repos' remotes: what was pushed upstream shows as",
+		"                                    origin/*, to merge in with merge(\"origin/main\"). Targets don't move.",
 	}},
 	{"request_merge", leadOnly, anyone, true, []string{
 		"request_merge(branch, entry, into)  Ask the CEO to merge one of your {lead}* branches into into,",
@@ -240,7 +245,11 @@ func Compose(in Input) string {
 	}
 	if len(in.Config.AlwaysAskCEO) > 0 {
 		line("")
-		line("## Always escalate to the CEO")
+		if !lead && has("ask") {
+			line("## Always take to your lead first, for the CEO") // it has no escalate
+		} else {
+			line("## Always escalate to the CEO")
+		}
 		for _, gate := range in.Config.AlwaysAskCEO {
 			line("- %s", gate)
 		}

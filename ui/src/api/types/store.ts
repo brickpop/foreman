@@ -96,8 +96,8 @@ export interface TeamMessage {
   ref: string; // msg-N, per deployment
   fromInstance: string; // an instance, or foreman / ceo
   toInstance: string;
-  kind: string; // ask, reply, handoff, contribute or notice
-  inReplyTo: string; // a reply's ask
+  kind: string; // ask, reply, handoff, contribute, notice or answer (the CEO's, to a request)
+  inReplyTo: string; // a reply's ask; an answer's request
   body: string;
   artifactRef: string; // a branch or a wiki path
   state: string; // queued, delivered, expired or failed

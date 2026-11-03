@@ -113,7 +113,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `set_submodule` | anyone | until the submodule is fetched and committed (seconds; longer for a large first fetch) | Workflow (+ Git) |
 | `handoff` | members (the lead has no `wt/` branch to hand off) | no: returns once the branch is checked; checks run after | Workflow (+ Messaging for the delivery) |
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
-| `escalate` | anyone | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
+| `escalate` | lead only | `approval`: yes, until answered · `question`: only with `wait: true` · `finding`: no | Workflow |
 | `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
 | `withdraw_merge` | the lead only | no | Workflow |
 | `reviews` | the lead only | no | Workflow |
@@ -250,7 +250,7 @@ type ContributeResult struct { Path string }                            // "<wor
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter. A body is at most 32,000 characters: it becomes a file, not a line in the lead's conversation, so a whole design record fits (the CEO, 2026-10-19; messages keep 8,000). Limits count characters, not bytes. A taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in <workspace>/project/wiki/inbox/<file>.` The lead decides what becomes of it.
 - Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the project's Activity shows the title.
-- Errors: `bad_kind`, `too_long`.
+- Errors: `bad_kind`, `too_long`. A member is never offered it ([Team tools](./team-tools.md#tools)).
 
 ### `escalate`
 
@@ -262,9 +262,7 @@ type EscalateArgs struct {
     Wait    bool     // question only: block like an approval
 }
 type EscalateResult struct {
-    RequestID string // the request on the Dashboard
-    Answer    string // set when the call blocked until the CEO answered
-    Pending   bool   // the call stopped blocking before an answer (see below)
+    RequestID string // the request on the Dashboard; the answer comes as a delivery
 }
 ```
 

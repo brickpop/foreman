@@ -45,7 +45,7 @@ One adapter per harness kind. Each declares:
 | resume | Whether and how a previous harness session can be resumed ([Agent runtime](./agent-runtime.md#restarts)) |
 | auth | How credentials are passed into the container ([Session runner → Credentials](./session-runner.md#credentials)): which config directory variable the harness honours, where its credentials file lives, which API-key variables it reads |
 | detection | How to read its version (`<cmd> --version`, run inside the harness image), shown in [Settings](../features/settings.md) as "found · version" or "not set" |
-| permission mode | Inside the container the harness runs without its own permission prompts (e.g. Claude Code `--dangerously-skip-permissions`, as `pclaude` does): the container is the boundary, and anything that needs the CEO goes through `escalate` and the project gates |
+| permission mode | Inside the container the harness runs without its own permission prompts (e.g. Claude Code `--dangerously-skip-permissions`, as `pclaude` does): the container is the boundary, and anything that needs the CEO goes through the lead's `escalate` (a member asks its lead) and the project gates |
 | rate-limit pattern | How a rate-limit exit or message is recognised, to raise a blocked request with the right options |
 
 Adapter configs are built into Foreman for the known harnesses. `custom` gets a minimal adapter, and a custom command must meet a minimal documented contract: it reads its MCP config from the path in `FOREMAN_MCP_CONFIG` (to reach the team tools), takes its prompt on stdin, and runs in a terminal. Its idle detection is silence-based.

@@ -85,8 +85,8 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **20. A direct instruction.** In ledger's Session, the CEO clicks Ilya's tab (or opens it in a second browser tab, to keep Mara's beside it): his current screen, his role and branch beside his name. The CEO types "Use the decimal library already in the repo."
 - *Under the hood:* a second Terminal `Attach` (snapshot + live); keystrokes raw to Ilya's terminal. Ilya's prompt tells him to inform the lead if relevant, which he does with `ask`/`reply` like any message.
 
-**21. An approval.** Ilya wants a new dependency, a project gate: he calls `escalate(approval, "Add decimal.js?", ["Approve", "Deny"])`. Dashboard shows the request, the browser notifies. The CEO clicks **Approve**; Ilya continues.
-- *Under the hood:* Agent link → Workflow: a request; **the tool call stays open**, so Ilya is paused; Event bus → Dashboard and notification. `Resolve` returns "Approve" as the tool's result and Ilya resumes.
+**21. An approval.** Ilya wants a new dependency, a project gate: he asks Mara, who calls `escalate(approval, "Add decimal.js?", ["Approve", "Deny"])`. Dashboard shows the request, the browser notifies. The CEO clicks **Approve**; Mara replies to Ilya, who continues.
+- *Under the hood:* Agent link → Workflow: a request; the call returns at once, telling Mara to wait for the answer, and she is `awaiting`; Event bus → Dashboard and notification. `Resolve` delivers "Approve" into Mara's session as one line.
 
 **22. The harness itself waits.** Pi stops at its own question ("Overwrite migrations? 1/2"). Dashboard shows "Rhea is waiting in her session" with the choices; the CEO picks one, and it is typed into the session.
 - *Under the hood:* the harness's hook → `foreman-agent hook` → Agent link → Instance manager; the Harness adapter's `Interpret` says *waiting for the user* (not just idle) → Workflow raises the request; the answer goes through `Deliver`.
@@ -94,7 +94,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **23. A crash.** Ilya's harness hits its rate limit and exits. Dashboard: a **blocked** request, "Retry now · Retry in 30 min · Switch profile" (another account or harness for Ilya: later, [Profiles per agent](../backlog/profiles-per-agent.md)).
 - *Under the hood:* Terminal `Done` → Instance manager → Harness adapter `Diagnose(exit code, last output)` → Workflow raises the blocked request; **Retry** makes the Instance manager start the instance again (same worktrees, same private config).
 
-**24. A second team.** The CEO deploys **Vesper** (a challenge team) on `ledger` too. Kestrel finds a race and calls `escalate(finding, …, ["Atlas fixes it now", "Add to backlog", "Not an issue"])`. The CEO picks "Atlas fixes it now".
+**24. A second team.** The CEO deploys **Vesper** (a challenge team) on `ledger` too. Kestrel finds a race and tells Vesper's lead, who calls `escalate(finding, …, ["Atlas fixes it now", "Add to backlog", "Not an issue"])`. The CEO picks "Atlas fixes it now".
 - *Under the hood:* two deployments on one project: separate instances, worktrees, lead branches (`lead/ledger/vesper/*`) and message channels (Messaging never crosses deployments). Workflow turns the answer into a delivery to Atlas's lead, Mara.
 
 **25. Hire.** Team Atlas → **Hire** → the Chief of Staff page, already asked to hire for Atlas → its questions → the preview, Arden's tab marked new → **Save Atlas**. Arden appears in the team and starts on every Atlas deployment.

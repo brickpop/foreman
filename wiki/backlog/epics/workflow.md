@@ -8,7 +8,7 @@ order: 4
 
 **Goal:** everything that needs the CEO reaches them, and their answers flow back. Requests (approval, question, waiting in its session, blocked, finding) on the Dashboard and Changes with notifications; `request_merge` runs the checks and raises the review; the CEO merges to main, creates a PR on the forge, or rejects; merges are noticed and other leads are told to merge `main` in.
 
-**Progress:** `request_merge`, Merge to main and Reject landed with the [Git epic](./git.md); requests from `escalate`, notifications and the rest are still to do.
+**Progress:** `request_merge`, Merge to main and Reject landed with the [Git epic](./git.md); still to do: [Escalate](../escalate.md), then [Waiting in its session](../harness-waiting-requests.md), notifications and the rest.
 
 **Usable when done:** the full loop from a goal to a merge into `main`, with approvals, crashes and findings handled from the UI.
 

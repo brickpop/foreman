@@ -42,12 +42,12 @@ Acceptance:
 
 ## 4. Approval gate
 
-Ilya wants a new dependency. An approval request appears on the Dashboard and in the project's Inbox, with a notification. The CEO approves and Ilya resumes.
+Ilya wants a new dependency. He asks Mara, his lead, who escalates it: an approval request appears on the Dashboard and in the project's Inbox, with a notification. The CEO approves, Mara tells Ilya, and Ilya resumes.
 
 Acceptance:
-- [ ] Ilya's `escalate(approval, …)` creates an open approval [request](./models/request.md); Ilya's instance becomes `awaiting`.
+- [ ] Mara's `escalate(approval, …)` creates an open approval [request](./models/request.md); Mara's instance becomes `awaiting`. Ilya has no `escalate`.
 - [ ] The request shows on [Dashboard](./features/dashboard.md) and in ledger's [Inbox](./features/reviews.md#the-inbox), under [Needs you](./features/project-pipeline.md#1-needs-you); a toast and (if permitted) a browser [notification](./features/notifications.md) fire.
-- [ ] Picking "Approve" resolves the request, delivers the answer to Ilya's paused tool call, and Ilya's instance leaves `awaiting`.
+- [ ] Picking "Approve" resolves the request, delivers the answer into Mara's session, and Mara's instance leaves `awaiting`.
 
 ## 5. Merge review
 
@@ -68,10 +68,10 @@ Acceptance:
 
 ## 6. Challenge team finding
 
-Vesper, deployed on ledger, finds a race. Kestrel escalates a finding, and the CEO picks "Atlas fixes it now", which notifies Mara.
+Vesper, deployed on ledger, finds a race. Kestrel tells Vesper's lead, who escalates a finding, and the CEO picks "Atlas fixes it now", which notifies Mara.
 
 Acceptance:
-- [ ] Kestrel's `escalate(finding, …)` creates a finding request on ledger.
+- [ ] Vesper's lead's `escalate(finding, …)` creates a finding request on ledger.
 - [ ] Choosing "Atlas fixes it now" resolves it and delivers a message into Mara's (Atlas lead on ledger) session.
 - [ ] "Add to backlog" and "Not an issue" resolve it without notifying Atlas.
 

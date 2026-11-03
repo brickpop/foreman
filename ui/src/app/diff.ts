@@ -10,9 +10,11 @@ export type DiffLine = {
   new?: number;
 };
 
-/** One file of a diff: its path, how it changed, and its numbered lines. */
+/** One file of a diff: its path, how it changed, and its numbered lines. A
+ * renamed file has its path on the target in `from`; a pure rename, no lines. */
 export type FileDiff = {
   path: string;
+  from?: string;
   change: "" | "new" | "deleted" | "renamed";
   lines: DiffLine[];
   added: number;
@@ -33,7 +35,8 @@ export function diffFiles(diff: string): FileDiff[] {
   let next = 0;
   for (const line of diff.split("\n")) {
     if (line.startsWith("diff --git ")) {
-      // `diff --git a/<old> b/<new>`: the new path, until `+++` says better.
+      // `diff --git a/<old> b/<new>`: the new path, until `rename to` or
+      // `+++` says better (a path with " b/" in it reads wrong here).
       const at = line.lastIndexOf(" b/");
       file = {
         path: at >= 0 ? line.slice(at + 3) : line.slice(11),
@@ -50,7 +53,10 @@ export function diffFiles(diff: string): FileDiff[] {
     if (header && !line.startsWith("@@") && !line.startsWith("Binary files")) {
       if (line.startsWith("new file mode")) file.change = "new";
       else if (line.startsWith("deleted file mode")) file.change = "deleted";
-      else if (line.startsWith("rename from")) file.change = "renamed";
+      else if (line.startsWith("rename from ")) {
+        file.change = "renamed";
+        file.from = line.slice(12);
+      } else if (line.startsWith("rename to ")) file.path = line.slice(10);
       else if (line.startsWith("+++ b/")) file.path = line.slice(6);
       continue;
     }

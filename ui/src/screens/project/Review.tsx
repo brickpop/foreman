@@ -221,7 +221,7 @@ export function Review() {
                 <button
                   key={f.path}
                   type="button"
-                  title={f.path}
+                  title={f.from ? `${f.from} → ${f.path}` : f.path}
                   onClick={() => {
                     const id = fileId(r.repo, f.path);
                     fold(id, false);
@@ -389,6 +389,7 @@ const FileBox = memo(function FileBox({
       >
         <span className="w-3 text-tx3">{folded ? "▸" : "▾"}</span>
         <span className="text-tx4">{repo}</span>
+        {f.from && <span className="text-tx3">{f.from} →</span>}
         <span className="font-medium text-tx">{f.path}</span>
         {f.change && <span className="text-tx4">{f.change}</span>}
         {why && <span className="font-sans text-[12px] text-tx4">{why}</span>}
@@ -406,6 +407,12 @@ const FileBox = memo(function FileBox({
             containIntrinsicSize: `auto ${f.lines.length * 20 + 8}px`,
           }}
         >
+          {/* A pure rename, an empty new file, a mode change: nothing to number. */}
+          {f.lines.length === 0 && (
+            <p className="px-3.5 py-1 font-sans text-tx4">
+              {f.change === "renamed" ? "Moved, its content unchanged." : "No lines changed."}
+            </p>
+          )}
           {f.lines.map((line, i) => {
             const key = diffKey(repo, f.path, line);
             const start = comments.open ? commentAt(repo, f.path, line, head, since) : undefined;

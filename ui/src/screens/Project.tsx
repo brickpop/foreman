@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useParams } from "@tanstack/react-router";
+import { useEffect } from "react";
 import type { Project as ProjectData } from "../api/client";
-import { projectHome } from "../app/project";
+import { projectHome, windowTitle } from "../app/project";
 import { useInstances, useProjects } from "../app/queries";
 import { Loading } from "../components/ui";
 
@@ -10,6 +11,13 @@ import { Loading } from "../components/ui";
 export function Project() {
   const { project: id } = useParams({ from: "/projects/$project" });
   const projects = useProjects();
+  // The window says which project it is; any other page is just Foreman.
+  useEffect(() => {
+    document.title = windowTitle(id);
+    return () => {
+      document.title = windowTitle();
+    };
+  }, [id]);
   if (projects.isPending) return <Loading rows={5} className="m-6" />;
   if (!projects.data?.some((p) => p.id === id))
     return <p className="p-6 text-tx3">No project {id}.</p>;

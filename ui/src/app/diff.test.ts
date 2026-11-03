@@ -30,13 +30,23 @@ const diff = [
   "+++ /dev/null",
   "@@ -1 +0,0 @@",
   "-bye",
-  "diff --git a/old name.txt b/new name.txt",
-  "similarity index 90%",
+  "diff --git a/old name.txt b/to b/new name.txt",
+  "similarity index 100%",
   "rename from old name.txt",
-  "rename to new name.txt",
+  "rename to to b/new name.txt",
   "diff --git a/logo.png b/logo.png",
   "index 5555555..6666666 100644",
   "Binary files a/logo.png and b/logo.png differ",
+  "diff --git a/lib/a.ts b/src/a.ts",
+  "similarity index 80%",
+  "rename from lib/a.ts",
+  "rename to src/a.ts",
+  "index 7777777..8888888 100644",
+  "--- a/lib/a.ts",
+  "+++ b/src/a.ts",
+  "@@ -1 +1 @@",
+  "-x",
+  "+y",
   "",
 ].join("\n");
 
@@ -44,13 +54,17 @@ describe("diffFiles", () => {
   const files = diffFiles(diff);
 
   it("splits a diff per file, its headers turned into the path and the change", () => {
-    expect(files.map((f) => [f.path, f.change, f.added, f.removed])).toEqual([
-      ["src/app.ts", "", 2, 1],
-      ["docs/new.md", "new", 1, 0],
-      ["gone.txt", "deleted", 0, 1],
-      ["new name.txt", "renamed", 0, 0], // a pure rename has no hunks; its path has a space
-      ["logo.png", "", 0, 0],
+    expect(files.map((f) => [f.path, f.from, f.change, f.added, f.removed])).toEqual([
+      ["src/app.ts", undefined, "", 2, 1],
+      ["docs/new.md", undefined, "new", 1, 0],
+      ["gone.txt", undefined, "deleted", 0, 1],
+      // A pure rename: no hunks, and paths with spaces and a " b/" that
+      // `diff --git` alone can't tell apart.
+      ["to b/new name.txt", "old name.txt", "renamed", 0, 0],
+      ["logo.png", undefined, "", 0, 0],
+      ["src/a.ts", "lib/a.ts", "renamed", 1, 1],
     ]);
+    expect(files[3].lines).toEqual([]);
     expect(files[4].lines).toEqual([
       { kind: "meta", text: "Binary files a/logo.png and b/logo.png differ" },
     ]);

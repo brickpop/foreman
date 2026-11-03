@@ -276,6 +276,25 @@ func TestDiff(t *testing.T) {
 	}
 }
 
+func TestDiffShowsAMoveAsARename(t *testing.T) {
+	g, dir := mergeFixture(t)
+	// The CEO's config turning detection off doesn't split a move in two.
+	mustRun(t, dir, "config", "diff.renames", "false")
+	from := mustRun(t, dir, "rev-parse", "main")
+	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
+	mustRun(t, dir, "mv", "README", "docs.md")
+	mustRun(t, dir, "commit", "-q", "-m", "move")
+	to := mustRun(t, dir, "rev-parse", "HEAD")
+	mustRun(t, dir, "checkout", "-q", "main")
+	want := "similarity index 100%\nrename from README\nrename to docs.md\n"
+	if diff, err := g.Diff(ctx, dir, "main", to); err != nil || !strings.Contains(diff, want) {
+		t.Errorf("diff %q %v", diff, err)
+	}
+	if diff, err := g.Compare(ctx, dir, from, to, 3); err != nil || !strings.Contains(diff, want) {
+		t.Errorf("compare %q %v", diff, err)
+	}
+}
+
 func TestCompareTwoCommits(t *testing.T) {
 	g, dir := mergeFixture(t)
 	from := mustRun(t, dir, "rev-parse", "main")

@@ -11,11 +11,17 @@ import {
   sessionOf,
   teamOn,
   teamView,
+  windowTitle,
 } from "./project";
 
 const inst = (id: string, deploymentId: string) => ({ id, deploymentId }) as Instance;
 
 describe("a project's page", () => {
+  it("names the project in the window's title", () => {
+    expect(windowTitle("evm-ecosystem")).toBe("Evm ecosystem · Foreman");
+    expect(windowTitle(undefined)).toBe("Foreman");
+  });
+
   it("lists its sections in the CEO's order", () => {
     expect(sections.map((s) => s.label)).toEqual([
       "Session",

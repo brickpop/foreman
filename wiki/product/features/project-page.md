@@ -8,6 +8,8 @@ tags: [feature, ui]
 
 The place where the CEO works: a project, its team at work, and everything about it, one click apart (the CEO, 2026-10-31: with Dashboard, Sessions and Reviews in the nav, then the projects, then the teams, moving between a session's reviews, board and settings was a maze). A project has one team at most ([Deployment](../models/deployment.md#invariants)), so its page is also that team's.
 
+The window's title names the project, first so a narrow tab still shows it: `<Project> · Foreman` (its readable name; the CEO, 2026-11-04). Every other page is `Foreman`.
+
 ## Sections
 
 The page has no header of its own: its sections are listed in the [sidebar](./app-shell.md#sidebar), under the project open, so the main area holds one row of tabs at most (the agent tabs, on Session). In order (the CEO, 2026-11-03: the code before the knowledge):

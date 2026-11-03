@@ -1,4 +1,10 @@
 import type { Deployment, Instance } from "../api/client";
+import { readable } from "./model";
+
+/** The window's title: the project shown first, so a narrow tab still says it. */
+export function windowTitle(project?: string): string {
+  return project ? `${readable(project)} · Foreman` : "Foreman";
+}
 
 // A project's page (wiki/product/features/project-page.md): its sections,
 // listed in the sidebar under the project open, where the project opens, and

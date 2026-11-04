@@ -167,6 +167,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 |---|---|---|
 | **Primary** | `--acc` background, no border (or 1px `--acc`), `--accInk`, 600 13px, radius 7, padding `7–8px 13–14px` | The main action of a view: Deploy, Add project, New team, Deploy to a project, Send to X, the first request option |
 | **Secondary** (outline) | Transparent, 1px `--line2`, `--tx2` (or `--tx`), 500 13px, radius 7, padding `6–8px 12–14px` | Cancel, Hire, Deploy a team, Refine with Chief of Staff, the stepper |
+| **Accent outline** | Transparent, 1px `--acc`, `--accTx`, 600 13px, radius 7; `--accSoft` on hover | A view's main action when it shouldn't outshine the content: Add a repo (with the repo icon, padding `8px 16px`; the CEO, 2026-11-04) |
 | **Raised** | `--raised`, 1px `--line2`, `--tx` | The Files toggle while open (Wiki), a review comment's `Add to the draft` / `Save` |
 | **Muted outline** | Outline with `--tx3` | `wiki.toml` |
 | **Danger** | Transparent, 1px `--line2` border (`--err` on hover), `--err` text, 500 13px, radius 7 | Destructive actions: Stop deployment, Dismiss a review. Always behind a confirmation |

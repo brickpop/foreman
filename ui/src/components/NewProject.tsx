@@ -1,18 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { type Project, type Suggestion, useClient } from "../api/client";
+import { type Suggestion, useClient } from "../api/client";
 import { createdBody, projectSlug } from "../app/addProject";
 import { readable } from "../app/model";
 import { keys } from "../app/queries";
-import { AddRepo } from "./AddRepo";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
 import { Button, Segmented } from "./ui";
 
 // The New project dialog (wiki/product/features/add-project.md): a name, its
-// workspace and its project repo (New, or Cloned with the CEO's own git), then
-// its code repos.
+// workspace and its project repo (New, or Cloned with the CEO's own git). Once
+// created, the project's Repos page opens, to add its code repos.
 
 const label = "text-[13px] font-medium text-tx4";
 const field =
@@ -20,23 +19,14 @@ const field =
 const hint = "text-[12.5px] text-tx4";
 
 export function NewProject({ onClose }: { onClose: () => void }) {
-  const [project, setProject] = useState<Project>();
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={project ? `Repos of ${readable(project.id)}` : "New project"}
-    >
-      {project ? (
-        <Repos project={project} onClose={onClose} />
-      ) : (
-        <Create onCreated={setProject} onClose={onClose} />
-      )}
+    <Modal open onClose={onClose} title="New project">
+      <Create onClose={onClose} />
     </Modal>
   );
 }
 
-function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClose: () => void }) {
+function Create({ onClose }: { onClose: () => void }) {
   const client = useClient();
   const queries = useQueryClient();
   const navigate = useNavigate();
@@ -60,13 +50,13 @@ function Create({ onCreated, onClose }: { onCreated: (p: Project) => void; onClo
       client.home.newProject(id, workspace.trim(), source === "clone" ? clone.trim() : undefined),
     onSuccess: ({ project: p, created }) => {
       queries.invalidateQueries({ queryKey: keys.projects });
-      navigate({ to: "/projects/$project", params: { project: p.id } });
+      onClose();
+      navigate({ to: "/projects/$project/repos", params: { project: p.id } });
       toast({
         title: `${readable(p.id)} created`,
         body: createdBody(created, source === "clone", p.path),
         color: "var(--ok)",
       });
-      onCreated(p);
     },
   });
   const ready = id && workspace.trim() && (source === "new" || clone.trim());
@@ -150,21 +140,4 @@ function workspaceHint(workspace: string, s: Suggestion | undefined): string {
     return `${what} ${s.folder} doesn't exist yet: it is created with the project.`;
   }
   return what;
-}
-
-function Repos({ project, onClose }: { project: Project; onClose: () => void }) {
-  const [repos, setRepos] = useState(project.repos.map((r) => r.name));
-  return (
-    <div className="flex flex-col gap-4">
-      <p className="m-0 text-[13.5px] text-tx2">
-        {repos.length === 0
-          ? "Add the code repos agents work on, here or later on its Repos page. With none, they work in its wiki only (research, say)."
-          : `Added: ${repos.join(", ")}. Add another, or finish.`}
-      </p>
-      <AddRepo project={project.id} onAdded={(p) => setRepos(p.repos.map((r) => r.name))} />
-      <div className="flex justify-end border-t border-line pt-4">
-        <Button onClick={onClose}>Done</Button>
-      </div>
-    </div>
-  );
 }

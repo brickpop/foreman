@@ -158,12 +158,15 @@ export interface HomeArea {
   renameRepo(project: string, name: string, newName: string): Promise<Project>;
   removeRepo(project: string, name: string): Promise<Project>;
   /** A folder for picking repos, inside the CEO's home folder; none: the
-   * folder Foreman was started in. */
-  folders(path?: string): Promise<Folder>;
+   * folder Foreman was started in. With a project, which of its repos the
+   * folder already is. */
+  folders(path?: string, project?: string): Promise<Folder>;
   /** A repo folder's branches, to pick its default branch. */
   branches(path: string): Promise<Branches>;
   /** Sets the profile a project's agents run on, from their next start. */
   setProfile(project: string, profile: string): Promise<Project>;
+  /** Gives a project its display name ("": shown by its id). Its id stays. */
+  setName(project: string, name: string): Promise<Project>;
   /** Archives a project (refused while a team is deployed on it), or unarchives it. */
   setArchived(project: string, archived: boolean): Promise<Project>;
   /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
@@ -265,8 +268,6 @@ export interface MessagesArea {
   /** A page of a deployment's team traffic, messages and git actions
    * together, newest first; before is the previous page's next. */
   activity(deployment: string, before?: string): Promise<ActivityPage>;
-  /** When something last happened on each project, by id. */
-  latestActivity(): Promise<Record<string, string>>;
 }
 
 export type Pipeline = { workItems: WorkItem[]; mergeRequests: MergeRequest[] };
@@ -471,11 +472,20 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("DELETE", `/api/projects/${id(project)}/repos/${id(name)}`)
         ).json() as Promise<Project>,
-      folders: (path) => getJSON(`/api/folders${path ? `?${new URLSearchParams({ path })}` : ""}`),
+      folders: (path, project) => {
+        const q = new URLSearchParams();
+        if (path) q.set("path", path);
+        if (project) q.set("project", project);
+        return getJSON(`/api/folders${q.size ? `?${q}` : ""}`);
+      },
       branches: (path) => getJSON(`/api/folders/branches?${new URLSearchParams({ path })}`),
       setProfile: async (project, profile) =>
         (
           await request("PUT", `/api/projects/${id(project)}/profile`, { profile })
+        ).json() as Promise<Project>,
+      setName: async (project, name) =>
+        (
+          await request("PUT", `/api/projects/${id(project)}/name`, { name })
         ).json() as Promise<Project>,
       setArchived: async (project, archived) =>
         (
@@ -625,7 +635,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         if (before) q.set("before", before);
         return getJSON(`/api/activity?${q}`);
       },
-      latestActivity: () => getJSON("/api/activity/latest"),
     },
     chiefOfStaff: {
       start: async (opener) => (await request("POST", "/api/cos", { opener })).json(),

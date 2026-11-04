@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/store"
@@ -158,10 +157,6 @@ func TestDeploymentsAreListed(t *testing.T) {
 // pages records what each Page was asked.
 type pages struct{ asked [][]string }
 
-func (p *pages) Latest(context.Context) (map[string]time.Time, error) {
-	return map[string]time.Time{"ledger": time.Date(2026, 11, 1, 9, 0, 0, 0, time.UTC)}, nil
-}
-
 func (p *pages) Page(_ context.Context, deployment, before string, limit int) (store.ActivityPage, error) {
 	if before == "bad" {
 		return store.ActivityPage{}, store.ErrBadCursor
@@ -184,11 +179,6 @@ func TestActivity(t *testing.T) {
 	want := [][]string{{"atlas@ledger", "", "50"}, {"atlas@relay", "c2", "50"}}
 	if !slices.EqualFunc(p.asked, want, slices.Equal) {
 		t.Errorf("asked %v, want %v", p.asked, want)
-	}
-	var latest map[string]string
-	decodeBody(t, get(t, h, "/api/activity/latest"), &latest)
-	if latest["ledger"] != "2026-11-01T09:00:00Z" || len(latest) != 1 {
-		t.Errorf("latest %v", latest)
 	}
 	// A project no longer names it: its one team's deployment does.
 	for _, path := range []string{"/api/activity", "/api/activity?project=ledger", "/api/activity?deployment=atlas@ledger&before=bad"} {

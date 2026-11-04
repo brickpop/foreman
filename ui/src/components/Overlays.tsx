@@ -38,7 +38,15 @@ export function Modal({
             style={{ width: `min(${width}px, 100%)` }}
             className="max-h-[calc(100dvh-40px)] overflow-y-auto rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
           >
-            <Dialog.Title className="mb-4 text-xl font-semibold">{title}</Dialog.Title>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <Dialog.Title className="m-0 min-w-0 text-xl font-semibold">{title}</Dialog.Title>
+              <Dialog.Close
+                aria-label="Close"
+                className="-mt-1 -mr-2 grid size-8 shrink-0 place-items-center rounded-md text-[20px] text-tx3 hover:bg-hover hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"
+              >
+                ×
+              </Dialog.Close>
+            </div>
             {children}
           </Dialog.Content>
         </Dialog.Overlay>

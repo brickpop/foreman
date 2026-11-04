@@ -1,6 +1,7 @@
 package home
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -22,7 +23,10 @@ var ErrNotFound = errors.New("home: not found")
 // Project is a project of this machine: its record (its name, its repos, its
 // profile, whether it is archived) and its project repo's project.toml.
 type Project struct {
-	ID   string `json:"id"`
+	ID string `json:"id"`
+	// Name is how it shows (the CEO's, any words); "" shows it by its id, made
+	// readable. The id stays: ids, branches and folders are built from it.
+	Name string `json:"name"`
 	Path string `json:"path"` // its project repo, <workspace>/project
 	// Workspace is its folder (the CEO's): the project repo and the agents'
 	// sandboxes. "" for a project made before workspaces, still in Foreman's
@@ -38,6 +42,9 @@ type Project struct {
 	agents    string        // its agents' sandboxes, one folder each (Sandbox)
 	harness   string        // its agents' harness folders, one each (HarnessDir); "" for legacy
 }
+
+// Shown is how the project reads: its display name, else its id made readable.
+func (p Project) Shown() string { return cmp.Or(p.Name, readable(p.ID)) }
 
 // Repo is one of a project's code repos, anywhere on disk.
 type Repo struct {
@@ -337,7 +344,7 @@ func (h *Home) scan(prev snapshot) snapshot {
 
 // project is a record with its project.toml read and its repos checked.
 func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
-	p := Project{ID: r.ID, Workspace: r.Workspace, Profile: r.Profile, Archived: r.Archived, Repos: []Repo{}}
+	p := Project{ID: r.ID, Name: r.Name, Workspace: r.Workspace, Profile: r.Profile, Archived: r.Archived, Repos: []Repo{}}
 	p.Path, p.agents, p.harness = h.layout(r.ID, r.Workspace)
 	if p.Profile == "" {
 		p.Profile = profiles.Default
@@ -511,7 +518,7 @@ func diff(old, cur snapshot) []Change {
 		o, inOld := old.projects[id]
 		c, inCur := cur.projects[id]
 		switch {
-		case inOld != inCur || !reflect.DeepEqual(o.Repos, c.Repos) || o.Profile != c.Profile || o.Archived != c.Archived:
+		case inOld != inCur || !reflect.DeepEqual(o.Repos, c.Repos) || o.Profile != c.Profile || o.Archived != c.Archived || o.Name != c.Name:
 			projectsChanged = true
 			if inOld && inCur && o.Version != c.Version {
 				changes = append(changes, Change{Kind: "project", ID: id, Version: c.Version, Problems: c.Problems})

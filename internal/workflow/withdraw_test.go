@@ -18,12 +18,12 @@ func (f *fixture) smallAndBig() {
 	f.handOff("wt/ledger/tove/a", "api", "web")
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/small"})
 	f.ok("mara", "merge", map[string]string{"branch": "wt/ledger/tove/a"})
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/small", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/small", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/big"})
 	f.ok("mara", "merge", map[string]string{"branch": "lead/ledger/atlas/small"})
 	writeFile(f.t, filepath.Join(f.wt("mara", "api"), "big.go"), "package big\n")
 	f.ok("mara", "commit", commits("api", "more"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/big", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/big", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
 	if f.item("wt/ledger/tove/a").MergeRequestID != "mr-1" {
 		f.t.Fatalf("set up: %+v", f.item("wt/ledger/tove/a"))
 	}
@@ -47,7 +47,7 @@ func TestWithdrawRefusals(t *testing.T) {
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/other"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "other.go"), "package other\n")
 	f.ok("mara", "commit", commits("api", "other"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/other", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/other", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
 	w := func(branch, reason, by string) map[string]string {
 		return map[string]string{"branch": branch, "reason": reason, "superseded_by": by}
 	}
@@ -235,8 +235,8 @@ func TestAMergeOutsideForemanWithdrawsTheReviewsItHolds(t *testing.T) {
 	f.ok("mara", "merge", map[string]string{"branch": "lead/ledger/atlas/small"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "big.go"), "package big\n")
 	f.ok("mara", "commit", commits("api", "more"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/big", "entry": "backlog/led-44.md"})
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/small", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/big", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/small", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
 	api := filepath.Join(f.root, "ledger", "api")
 	f.git(api, "merge", "-q", "--squash", "lead/ledger/atlas/big")
 	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "by hand")

@@ -198,16 +198,20 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("sets a project's profile, scaffolds its project repo and archives it", async () => {
+  it("sets a project's profile and name, scaffolds its project repo and archives it", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
     await client.home.setProfile("my project", "work");
     await client.home.scaffold("my project");
     await client.home.setArchived("my project", true);
+    await client.home.setName("my project", "Ledger · EUR");
+    await client.home.setName("my project", "");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["PUT", "http://x/api/projects/my%20project/profile", { profile: "work" }],
       ["POST", "http://x/api/projects/my%20project/scaffold", undefined],
       ["PUT", "http://x/api/projects/my%20project/archived", { archived: true }],
+      ["PUT", "http://x/api/projects/my%20project/name", { name: "Ledger · EUR" }],
+      ["PUT", "http://x/api/projects/my%20project/name", { name: "" }],
     ]);
   });
 
@@ -219,6 +223,9 @@ describe("httpClient", () => {
     await client.home.migrate("my project", "/home/ceo/w/p");
     await client.home.removeProject("a", { deleteRepo: false, deleteWorktrees: false });
     await client.home.removeProject("b", { deleteRepo: true, deleteWorktrees: true });
+    await client.home.folders();
+    await client.home.folders("/home/ceo/My Repos", "cal");
+    await client.home.folders(undefined, "cal");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       [
         "POST",
@@ -229,6 +236,9 @@ describe("httpClient", () => {
       ["POST", "http://x/api/projects/my%20project/migrate", { workspace: "/home/ceo/w/p" }],
       ["DELETE", "http://x/api/projects/a", undefined],
       ["DELETE", "http://x/api/projects/b?deleteRepo=true&deleteWorktrees=true", undefined],
+      ["GET", "http://x/api/folders", undefined],
+      ["GET", "http://x/api/folders?path=%2Fhome%2Fceo%2FMy+Repos&project=cal", undefined],
+      ["GET", "http://x/api/folders?project=cal", undefined],
     ]);
   });
 

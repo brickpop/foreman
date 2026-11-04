@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
@@ -24,6 +25,7 @@ import (
 	"github.com/brickpop/foreman/internal/runner/direct"
 	"github.com/brickpop/foreman/internal/sessionlog"
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/teamtools"
 	"github.com/brickpop/foreman/internal/terminal"
 )
 
@@ -2226,5 +2228,24 @@ func TestRestoreKeepsTheCardOfAnAgentStillWaiting(t *testing.T) {
 	f.m.Hook("mara@ledger", "busy", nil)
 	if list, _ := f.db.Requests().Open(ctx); len(list) != 0 {
 		t.Errorf("the kept card didn't resolve on activity: %+v", list)
+	}
+}
+
+// A harness's long question is a card's short title, the whole of it its
+// body; a short one is the title alone.
+func TestHeadline(t *testing.T) {
+	long := strings.Repeat("é", teamtools.MaxTitle+5)
+	for asks, want := range map[string][2]string{
+		"":                         {"", ""},
+		"  Overwrite? (Yes / No) ": {"Overwrite? (Yes / No)", ""},
+		"Which DB?\nPostgres has…": {"Which DB?", "Which DB?\nPostgres has…"},
+		long:                       {strings.Repeat("é", teamtools.MaxTitle-1) + "…", long},
+	} {
+		if title, body := headline(asks); title != want[0] || body != want[1] {
+			t.Errorf("%q: %q, %q", asks, title, body)
+		}
+	}
+	if title, _ := headline(long); utf8.RuneCountInString(title) != teamtools.MaxTitle {
+		t.Errorf("cut to %d characters", utf8.RuneCountInString(title))
 	}
 }

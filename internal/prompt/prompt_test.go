@@ -95,7 +95,7 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"(read and write: edit, then commit its repo, project)",
 		"- Mara, Team Lead (lead: integrates, requests merges)\n",
 		"## Tools (from Foreman)\n",
-		"request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/ledger/atlas/* branches into into,",
+		"request_merge(branch, title, body, entry, into)\n                                    Ask the CEO to merge one of your lead/ledger/atlas/* branches into into,",
 		"create_target(repo, name, from)     Make a new target in one repo",
 		"The CEO talks to you. Break requests down and delegate with ask().",
 		"Before you request a merge, run: npm test",
@@ -180,7 +180,7 @@ func TestTodaysTools(t *testing.T) {
 		}
 	}
 	lead := Compose(input("mara", Offered(true, true)))
-	if !strings.Contains(lead, "request_merge(branch, entry, into)") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from.") || !strings.Contains(lead, "create_target(repo, name, from)") ||
+	if !strings.Contains(lead, "request_merge(branch, title, body, entry, into)\n") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, title, body, entry, into), one per branch, into the target its work started from.") || !strings.Contains(lead, "create_target(repo, name, from)") ||
 		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") || !strings.Contains(lead, "reviews()                           Where your reviews stand") ||
 		!strings.Contains(lead, "team()                              Where each teammate stands") ||
 		!strings.Contains(lead, "fetch()                             Fetch the repos' remotes") ||
@@ -188,7 +188,7 @@ func TestTodaysTools(t *testing.T) {
 		t.Errorf("lead:\n%s", lead)
 	}
 	// Only the lead escalates: a member takes the gates to it.
-	if !strings.Contains(lead, "escalate(kind, summary, options)    Ask the CEO.") || !strings.Contains(lead, "after an approval, wait for the CEO's answer, then resume.") ||
+	if !strings.Contains(lead, "escalate(kind, title, body, options)\n"+strings.Repeat(" ", 36)+"Ask the CEO.") || !strings.Contains(lead, "after an approval, wait for the CEO's answer, then resume.") ||
 		!strings.Contains(lead, "## Always escalate to the CEO\n- new dependency") {
 		t.Errorf("lead escalate:\n%s", lead)
 	}

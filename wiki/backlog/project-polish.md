@@ -21,7 +21,7 @@ epic: workflow
 
 ## Steps
 
-- [x] server: `GET /api/activity/latest` (each project's last activity); tests
+- [x] server: `GET /api/activity/latest` (each project's last activity); tests. Removed 2026-11-04: projects sort by name ([Project display name](./archive/project-display-name.md))
 - [x] server: a merge request's `head` and `base` recorded when it leaves open; the review diff of a decided repo from them; tests
 - [x] UI: projects ordered at load (sidebar, Dashboard); tests
 - [x] UI: sidebar toggle on the open project

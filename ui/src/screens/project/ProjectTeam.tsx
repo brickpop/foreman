@@ -1,7 +1,7 @@
 import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Cleaned, Instance, Team } from "../../api/client";
-import { agentOf, readable, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
+import { agentOf, projectName, reloadLine, reloadOf, roleLabel, when } from "../../app/model";
 import { latestStopped, sessionOf, teamView, teamViews } from "../../app/project";
 import {
   useCleanUp,
@@ -123,8 +123,8 @@ export function ProjectTeam() {
           )}
           {!d && repos.isSuccess && (
             <Empty>
-              No team is on {readable(project.id)}. Deploy one and each member gets its own worktree
-              of the project's repos.
+              No team is on {projectName([project], project.id)}. Deploy one and each member gets
+              its own worktree of the project's repos.
             </Empty>
           )}
           {left.length > 0 && (

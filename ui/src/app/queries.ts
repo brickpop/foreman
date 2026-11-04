@@ -22,6 +22,7 @@ import {
 } from "../api/client";
 import type { Event } from "../api/types/events";
 import { useToast } from "../components/Toasts";
+import { projectName } from "./model";
 import { deploymentOn } from "./project";
 import { type SerialSaver, serialSaver } from "./serialSave";
 import { withDoing } from "./sessions";
@@ -68,6 +69,12 @@ export function useBranches(path: string | undefined) {
 export function useProjects() {
   const c = useClient();
   return useQuery({ queryKey: keys.projects, queryFn: () => c.home.projects() });
+}
+
+/** A project's shown name by its id (projectName), from the projects read. */
+export function useProjectName(): (id: string) => string {
+  const projects = useProjects().data;
+  return (id) => projectName(projects, id);
 }
 
 /** Where a project's repo is on disk, for showing paths: <workspace>/project
@@ -452,6 +459,11 @@ export function useReviews() {
   return useQuery({ queryKey: reviewsKey, queryFn: () => c.reviews.list() });
 }
 
+/** A review's title, as its lead gave it; undefined until the reviews load. */
+export function useReviewTitle(id: string) {
+  return useReviews().data?.find((r) => r.id === id)?.title;
+}
+
 /** One review, with its comments where they are now. */
 export function useReview(id: string) {
   const c = useClient();
@@ -547,20 +559,6 @@ export function useDeploymentOn(project: string) {
   const active = useDeployments().data ?? [];
   const stopped = useStoppedDeployments().data ?? [];
   return deploymentOn(project, active, stopped);
-}
-
-/** When something last happened on each project, as the page loaded: the
- * projects' order, kept while the CEO works so nothing reshuffles. */
-export function useLatestActivity(): Record<string, string> | undefined {
-  const c = useClient();
-  const q = useQuery({
-    queryKey: ["latest-activity"],
-    queryFn: () => c.messages.latestActivity(),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
-  const first = useRef<Record<string, string>>(undefined);
-  if (q.data && !first.current) first.current = q.data;
-  return first.current;
 }
 
 /** A deployment's team traffic a page at a time, newest first (a project's

@@ -12,14 +12,15 @@ The project's **Settings** section ([Project page](./project-page.md)): its conf
 
 Padding `24px 24px 48px`. One column, at most 760px wide, of four [cards](../design/design-system.md#surfaces), 24px apart (the CEO, 2026-11-02: grouped, it was "pure non-structure"). Each card is titled in its header band (600 14px), its blocks one under another with a `--line` between them, each block's title a small label (13px 500 `--tx4`):
 
-1. **General**: Workspace, then Profile.
+1. **General**: Name, Workspace, then Profile.
 2. **Rules**, `project.toml` after the title (12.5px `--tx4`, as Settings says where each card is kept): What comes to you, Merges, then the file itself ("The file").
 3. **How it works**, **collapsed** at first (a `›` in its header turns down when open; the CEO: reference text, out of the way): Where things live, then How work flows.
 4. **Danger zone**, its border and title in `--err`: Archive, then Remove.
 
 The blocks:
 
-- **"Workspace"** (first; the CEO, 2026-10-28): the workspace's path (Mono 13px `--tx2`, selectable) and **`Copy`**, then "Its project repo, and in agents/ each agent's worktrees: look at and run their code there. Editing while an agent works turns into its uncommitted changes." ([Project config → The workspace](../models/project-config.md#the-workspace)).
+- **"Name"** (the CEO, 2026-11-04): the project's [display name](../models/project-config.md#the-project-record) in a field (13.5px, placeholder its readable id, at most 80 characters); once changed, **`Cancel`** and **`Save`** (Enter too); a name another project shows already says "Another project shows as <name> already: pick another name." (`--err`) with Save off, as the server refuses it. "How it shows everywhere; empty, it shows as <Readable id>. Its id, <id>, stays: its folder, its agents' branches and its links are built from it." A refusal is a toast "Name not saved" with the reason.
+- **"Workspace"** (the CEO, 2026-10-28): the workspace's path (Mono 13px `--tx2`, selectable) and **`Copy`**, then "Its project repo, and in agents/ each agent's worktrees: look at and run their code there. Editing while an agent works turns into its uncommitted changes." ([Project config → The workspace](../models/project-config.md#the-workspace)).
   For a project made before workspaces, **"Move into a workspace"** instead (legacy): "This project lives in Foreman's home. Moved into a folder of yours, its project repo and its agents' worktrees are where you can find them and run their code. Uncommitted work and conversations come along. Stop the teams on it first.", a path field pre-filled `<projects folder>/<project>`, and **`Move`** (`Moving…` while it runs; `POST /api/projects/:id/migrate`). Done, the toast "<project> moved" ("Into <workspace>."); a refusal is a toast "Project not moved" with the reason.
 - **"Where things live"**: the project's files, explained (Mono 13px / 1.7 `<pre>`), with the real paths and this project's name:
 

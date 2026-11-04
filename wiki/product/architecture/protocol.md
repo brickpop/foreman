@@ -83,7 +83,7 @@ The harness adapter's `Interpret` maps each harness's hooks to the normalised `E
 Whenever the harness reports it is waiting for the user, any agent, lead or member, the instance manager raises a request on the Dashboard and the project's Inbox (`internal/instances/waiting.go`):
 
 - **Kind:** `question`, `Source: harness` (the panel reads "waiting in its session"), no options.
-- **Content:** what the harness says it asks (its adapter's `Asks`): Claude Code's `AskUserQuestion` questions, each with its choices (`Which database? (Postgres / SQLite)`), or a permission prompt's message; Pi's dialog title. Otherwise `<Name> is waiting for your input.`
+- **Content:** what the harness says it asks (its adapter's `Asks`): Claude Code's `AskUserQuestion` questions, each with its choices (`Which database? (Postgres / SQLite)`), or a permission prompt's message; Pi's dialog title. Otherwise `<Name> is waiting for your input.` Its first line is the title, cut to 120 characters with `…`; when it had more lines or was cut, the whole text is the body.
 - **One per wait:** the hooks that repeat it raise no second.
 - **Answer:** in the session, where the panel's **Open session** leads. Its next activity (`busy` or `idle`) resolves the request (`answered in its session`), as does its run ending. Typing the CEO's pick into the dialog from the panel is not built: it needs each harness's dialog keys checked live ([Waiting in its session](../../backlog/harness-waiting-requests.md)).
 - After a Foreman restart, an agent still `awaiting` in its re-attached session keeps its request; any other's resolves (`Foreman restarted`).
@@ -253,36 +253,37 @@ type ContributeResult struct { Path string }                            // "<wor
 - Effect: Workflow writes a new entry `project/wiki/inbox/<yyyy-mm-dd>-<agent>-<slug>.md` into the live project repo, the slug made from `Title`. Its frontmatter: `type: note`, `kind`, `author` (the caller's agent id, from its token, never from the arguments) and `deployment`; its body is `# <Title>`, then `Body`. A title is one line (at most 120 characters), so nothing in it can reach the frontmatter. A body is at most 32,000 characters: it becomes a file, not a line in the lead's conversation, so a whole design record fits (the CEO, 2026-10-19; messages keep 8,000). Limits count characters, not bytes. A taken file name gets `-2`, `-3`. The commit holds only that file, authored as the agent, so the lead's unfinished edits in the same checkout stay out of it. Agents without write access to the knowledge base contribute only this way: there is no writable folder for them ([Sandboxes and git policy](./sandboxes-and-git.md#project-knowledge-base)).
 - Delivered to the caller's lead: `Message msg-44 from Tove (contribution): <title>, in <workspace>/project/wiki/inbox/<file>.` The lead decides what becomes of it.
 - Markers: `Tove → Mara · contribute · msg-44`, like every other kind; the project's Activity shows the title.
-- Errors: `bad_kind`, `empty` (no summary), `too_long`, `bad_option` (an empty, multi-line or repeated option). A member is never offered it ([Team tools](./team-tools.md#tools)).
+- Errors: `bad_kind`, `empty` (no title or no body), `too_long`.
 
 ### `escalate`
 
 ```go
 type EscalateArgs struct {
     Kind    string   // "approval" | "question" | "finding"
-    Summary string   // at most 2,000 characters
+    Title   string   // required: one line, at most 120 characters; what the CEO reads first
+    Body    string   // optional: the detail (context, what was tried, the trade-offs), at most 8,000 characters
     Options []string // optional, at most 6 distinct one-line labels of 80; the first is the primary action. An approval without them gets Approve, Deny
     Wait    bool     // question only: the lead can't go on with that step without the answer
 }
 // The result is text: "Raised req-N for the CEO." and what to do meanwhile.
 ```
 
-- Effect: Workflow creates a [request](#requests) (`source: agent`, `request.created`), unless the same one is open: same agent, kind and summary (case and spacing aside) raised in the last 10 minutes, whose id it returns (`The CEO has it already, as req-N: it's still open.`).
+- Effect: Workflow creates a [request](#requests) (`source: agent`, `request.created`), its title the request's summary, its body the request's body, unless the same one is open: same agent, kind, title and body (case and spacing aside) raised in the last 10 minutes, whose id it returns (`The CEO has it already, as req-N: it's still open.`).
 - `approval`, or `question` with `Wait`: the call returns at once, telling the lead to wait for the answer before that step and work on anything else meanwhile (the CEO's decision, 2026-10-15: no blocking call, [Team tools → Waiting on approval](./team-tools.md#waiting-on-approval)). `question` without `Wait`, and `finding`: the call returns at once, telling it to keep working.
 - **The answer** (`POST /api/requests/{id}/resolve`, an option or the CEO's own text, at most 8,000 characters) resolves the request and comes back as a [message](#messages) from the CEO, kind `answer`: `Message msg-N from the CEO (answer to req-N): On your approval "<summary>": <answer> Read it with read_message("msg-N"), then go on with what you asked it for.` A finding is answered the same way, with the lead's options: one team works on a project at a time, so its lead is who acts on it (the CEO, 2026-11-04). Answered once: a second answer is refused (`NOT_OPEN`). When the deployment stops first, its open requests **expire** (`status: expired`), with nothing delivered.
-- Errors: `bad_kind`, `too_long`.
+- Errors: `bad_kind`, `empty` (no title), `too_long` (a title over 120 characters or over one line, whose refusal says to put the rest in `Body`; a body over 8,000; over 6 options, or one over 80), `bad_option` (an empty, multi-line or repeated option). A member is never offered it ([Team tools](./team-tools.md#tools)).
 
 ### `request_merge`
 
 ```go
-type RequestMergeArgs   struct { Branch string; Entry string; Into string } // branch: lead/<project>/<own team>/<topic>; entry: a wiki path, e.g. "backlog/LED-44.md"; into: a target, e.g. "release/2.0"
+type RequestMergeArgs   struct { Branch string; Title string; Body string; Entry string; Into string } // branch: lead/<project>/<own team>/<topic>; title: what it brings, one line of at most 120 characters (required); body: what the CEO should know to review it, at most 8,000 (optional); entry: a wiki path, e.g. "backlog/LED-44.md"; into: a target, e.g. "release/2.0"
 type RequestMergeResult struct { Review string; MergeRequests []string; Refreshed bool; Checks string } // the branch's review; one merge request per repo with new commits; refreshed: open ones on this branch were updated
 ```
 
-- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<project>/<team>/*`) and that `Entry` exists in the project's wiki, runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which merging the branch into its target would change something, all in the branch's open [review](../models/review.md) (or a new one), and raises its **review** request unless one is open. The target is `Into`; without it, a refreshed merge request keeps its own and a new one goes to its repo's default branch ([Merge targets](../features/pipeline-and-merges.md#merge-targets)). With it, every merge request the review has open moves to it too, even one whose repo has nothing new: a review never splits between targets unasked. One moved to a target that holds all of its branch already is merged there and then, as when Foreman notices a merge outside it (the CEO, 2026-11-02: the review never shows it open for a merge that changes nothing), and the text says `api (mr-1) into release/2.0, which holds all of it already: counted as merged`; when nothing is left open it ends `: nothing left for the CEO.` Every repo is checked before anything is made, so a refusal makes nothing. Nothing is pushed anywhere: the CEO reviews it, then merges, requests changes or closes it ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)). The tool's text says `Review rev-1, api (mr-1) into main, web (mr-2) into trunk: waiting for the CEO.`, with `, refreshed` after each one it refreshed.
+- Effect: Workflow checks `Branch` against the policy (only the caller's own `lead/<project>/<team>/*`) and that `Entry` exists in the project's wiki, runs the checks, then creates (or refreshes) a [merge request](#work-items-and-merge-requests) for each repo in which merging the branch into its target would change something, all in the branch's open [review](../models/review.md) (or a new one), and raises its **review** request unless one is open. The review takes `Title` and `Body`, the lead's own name for the work and what to know about it, apart from the card (the CEO, 2026-11-04: the title is the agent's to set, explicitly); a refresh replaces both, so the CEO reads what the lead says now (a body left out leaves none). The target is `Into`; without it, a refreshed merge request keeps its own and a new one goes to its repo's default branch ([Merge targets](../features/pipeline-and-merges.md#merge-targets)). With it, every merge request the review has open moves to it too, even one whose repo has nothing new: a review never splits between targets unasked. One moved to a target that holds all of its branch already is merged there and then, as when Foreman notices a merge outside it (the CEO, 2026-11-02: the review never shows it open for a merge that changes nothing), and the text says `api (mr-1) into release/2.0, which holds all of it already: counted as merged`; when nothing is left open it ends `: nothing left for the CEO.` Every repo is checked before anything is made, so a refusal makes nothing. Nothing is pushed anywhere: the CEO reviews it, then merges, requests changes or closes it ([Pipeline and merges](../features/pipeline-and-merges.md#review-and-merge)). The tool's text says `Review rev-1, api (mr-1) into main, web (mr-2) into trunk: waiting for the CEO.`, with `, refreshed` after each one it refreshed.
 - Delivered to the lead when done: `From Foreman: merge requested for lead/ledger/atlas/settlement-v2 in ledger-api.`, or `From Foreman: checks fail on lead/ledger/atlas/settlement-v2: <first line>. No merge was requested.`
 - Markers: `Mara · request_merge · lead/ledger/atlas/settlement-v2`, then the outcome.
-- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `branch_not_found`, `nothing_to_merge` (merging it would change nothing in its target, in any repo), `no_such_target` (a repo with new commits, or one the review has open, hasn't `Into` as a target: the text names those repos), `target_missing` (the target's branch is gone from git), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
+- Errors (returned at once): `not_lead` (never seen in practice: the tool isn't offered to members), `branch_not_allowed`, `empty` (no title), `too_long` (a title over 120 characters or over one line, whose refusal says to put the rest in `Body`; a body over 8,000), `branch_not_found`, `nothing_to_merge` (merging it would change nothing in its target, in any repo), `no_such_target` (a repo with new commits, or one the review has open, hasn't `Into` as a target: the text names those repos), `target_missing` (the target's branch is gone from git), `entry_not_found`, `submodule_changed` (as for `merge`), `uncommitted_changes` (commit first).
 - Phasing (2026-10-17): built without the checks (`git-checks`), with its review request; kept as a team action for the project's Activity; the result names the merge requests, and the CEO decides on the review's page, in the project's Inbox. `Into` since 2026-11-02.
 
 ### `create_target`
@@ -320,7 +321,7 @@ type WithdrawMergeArgs struct { Branch, Reason, SupersededBy string } // branch,
 
 ### `reviews`
 
-- Effect: the caller's [reviews](../models/review.md) on its project (its deployment's: not another team's), open or decided in the last 7 days, newest first, as text: per review `rev-2 lead/ledger/atlas/big: <entry title> (<entry>)`; then each repo with its target and state, `api → main: changes requested · web → trunk: conflicts` (`waiting for the CEO`, `changes requested`, `conflicts`, `merged`, `dismissed (the CEO's note: …)`, `withdrawn`); `Withdrawn: <reason>, superseded by rev-N.` when it was; and while changes are requested, `The CEO's note: …` and the comments sent with the last Request changes, each as the lead's message shows it (on its line now, ` (changed since)` once outdated), line comments first. Built from what the review page reads (`workflow.Review`), so the two agree. `You have no review open, and none decided in the last 7 days.` when there is none.
+- Effect: the caller's [reviews](../models/review.md) on its project (its deployment's: not another team's), open or decided in the last 7 days, newest first, as text: per review `rev-2 lead/ledger/atlas/big: <title> (<entry>)`; then each repo with its target and state, `api → main: changes requested · web → trunk: conflicts` (`waiting for the CEO`, `changes requested`, `conflicts`, `merged`, `dismissed (the CEO's note: …)`, `withdrawn`); `Withdrawn: <reason>, superseded by rev-N.` when it was; and while changes are requested, `The CEO's note: …` and the comments sent with the last Request changes, each as the lead's message shows it (on its line now, ` (changed since)` once outdated), line comments first. Built from what the review page reads (`workflow.Review`), so the two agree. `You have no review open, and none decided in the last 7 days.` when there is none.
 - Read-only: not a [team action](#team-actions).
 - Errors: `not_lead` (never seen in practice).
 
@@ -415,7 +416,8 @@ type Request struct {
     Project     string
     Deployment  string
     Instance    string   // who raised it, or who it is about (blocked)
-    Summary     string
+    Summary     string   // its title: one line
+    Body        string   // the rest, when it needs more; "" for none
     Options     []string // first = primary
     Review      string   // review only
     Status      string   // "open" | "resolved" | "expired"
@@ -443,7 +445,7 @@ How the answer travels back:
 | `blocked` | An action on the instance through the Instance manager: restart now, restart later, switch profile (later) |
 | `source: harness` (a question) | Not answered here: the CEO answers in the session, and its next activity resolves it ([Waiting for the CEO](#waiting-for-the-ceo)) |
 
-**Dedup:** a new request with the same instance, kind and normalised summary as an `open` one created within 10 minutes isn't created; the open one is returned (its id is in the tool's result). Details: [Request](../models/request.md#invariants).
+**Dedup:** a new request with the same instance, kind and normalised summary and body as an `open` one created within 10 minutes isn't created; the open one is returned (its id is in the tool's result). Details: [Request](../models/request.md#invariants).
 
 ## Work items and merge requests
 

@@ -60,11 +60,13 @@ type Config interface {
 	RemoveTarget(ctx context.Context, project, repo, name string) (home.Project, error)
 	// Browse lists a folder for picking repos and workspaces, inside the
 	// CEO's home folder ("" is the folder Foreman was started from).
-	Browse(path string) (home.Folder, error)
+	Browse(path, project string) (home.Folder, error)
 	// RepoBranches lists a folder's branches, to pick a repo's default branch.
 	RepoBranches(ctx context.Context, path string) (home.Branches, error)
 	// SetProfile names the profile the project's agents run on.
 	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
+	// SetName gives the project its display name ("": shown by its id).
+	SetName(ctx context.Context, project, name string) (home.Project, error)
 	// SetArchived archives the project, or unarchives it.
 	SetArchived(ctx context.Context, project string, archived bool) (home.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
@@ -135,7 +137,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("GET /api/folders", func(w http.ResponseWriter, r *http.Request) {
-		f, err := c.Browse(r.URL.Query().Get("path"))
+		f, err := c.Browse(r.URL.Query().Get("path"), r.URL.Query().Get("project"))
 		writeProject(w, f, err)
 	})
 	mux.HandleFunc("POST /api/projects/{id}/repos", func(w http.ResponseWriter, r *http.Request) {
@@ -206,6 +208,17 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			return
 		}
 		p, err := c.SetProfile(r.Context(), r.PathValue("id"), req.Profile)
+		writeProject(w, p, err)
+	})
+	mux.HandleFunc("PUT /api/projects/{id}/name", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Name *string `json:"name"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil || req.Name == nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name}")
+			return
+		}
+		p, err := c.SetName(r.Context(), r.PathValue("id"), *req.Name)
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/archived", func(w http.ResponseWriter, r *http.Request) {

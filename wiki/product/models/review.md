@@ -17,6 +17,8 @@ Table `reviews`.
 | `id` | String | yes | | unique, `rev-<n>` | |
 | `project_id` | String | yes | | | The project |
 | `branch` | String | yes | | | The lead branch `lead/<project>/<team>/<topic>` |
+| `title` | String | yes | | one line, ≤ 120 characters | The lead's name for the work, from `request_merge`; its last call's. How the review is named everywhere (the Inbox, its page, the pipeline, the lead's `reviews()`, its request) |
+| `body` | String | | `''` | ≤ 8,000 characters | What the CEO should know to review it, from the same call; shown folded under the title on its page |
 | `created_at` | Timestamp | yes | now | | |
 | `changes_requested_at` | Timestamp | | | | Set by Request changes; cleared by the lead's next `request_merge` |
 | `changes_note` | String | | `''` | | The CEO's note with the last Request changes, for the lead's `reviews()` |

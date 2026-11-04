@@ -5,12 +5,11 @@ import { Chevron } from "../components/icons";
 import { NewProject } from "../components/NewProject";
 import { Toasts, useToast } from "../components/Toasts";
 import { CountBadge, Dot } from "../components/ui";
-import { readable } from "./model";
+import { byName, projectName } from "./model";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
-import { latestFirst, reviewOf, sections, sessionOf } from "./project";
+import { reviewOf, sections, sessionOf } from "./project";
 import {
   useInstances,
-  useLatestActivity,
   useLiveEvents,
   usePreferences,
   useProjects,
@@ -73,6 +72,8 @@ export function Shell() {
 
 export type SidebarProject = {
   id: string;
+  /** How it shows (projectName). */
+  name: string;
   /** What waits on the CEO there: its open requests, reviews included (its
    * Inbox's count). */
   inbox: number;
@@ -101,6 +102,7 @@ export function sidebarModel(
     const status = deploymentStatus(on);
     return {
       id: p.id,
+      name: projectName([p], p.id),
       inbox: open.filter((r) => r.projectId === p.id).length,
       ...(on.length > 0 && busy.includes(status) && { busy: status }),
     };
@@ -131,9 +133,8 @@ function Sidebar({
   const instances = useInstances();
   const requests = useRequests();
   usePreferences(); // the theme
-  const latest = useLatestActivity();
   const model = sidebarModel(
-    latestFirst(projects.data ?? [], latest),
+    byName(projects.data ?? []),
     instances.data ?? [],
     requests.data ?? [],
   );
@@ -199,7 +200,7 @@ function ProjectRow({ project }: { project: SidebarProject }) {
           }}
           className={`${rowItem} text-left font-medium !text-tx`}
         >
-          {readable(project.id)}
+          {project.name}
           <span className="flex items-center gap-2">
             {!open && project.inbox > 0 && <Dot title="Needs you" />}
             <Chevron open={open} />
@@ -207,7 +208,7 @@ function ProjectRow({ project }: { project: SidebarProject }) {
         </button>
       ) : (
         <Link to="/projects/$project" params={{ project: project.id }} className={rowItem}>
-          {readable(project.id)}
+          {project.name}
           {project.inbox > 0 && <Dot title="Needs you" />}
         </Link>
       )}
@@ -268,10 +269,11 @@ function LiveEvents() {
   const navigate = useNavigate();
   const teams = useTeams();
   const instances = useInstances();
+  const projects = useProjects();
   const settings = useSettings();
   usePreferences(); // the theme
   useLiveEvents((e) => {
-    const n = noticeFor(e, teams.data ?? [], instances.data ?? []);
+    const n = noticeFor(e, teams.data ?? [], instances.data ?? [], projects.data ?? []);
     if (!n) return;
     // A review opens its page; otherwise who it is about, and with no
     // instance (Foreman itself) the request waits on the Dashboard.

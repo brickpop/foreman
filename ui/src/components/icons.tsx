@@ -92,9 +92,9 @@ export function PromptIcon() {
 }
 
 /** A folder, its flap raised when open: a file tree's folder row. */
-export function FolderIcon({ open }: { open: boolean }) {
+export function FolderIcon({ open, size = "size-3.5" }: { open: boolean; size?: string }) {
   return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 shrink-0">
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
       {open ? (
         <path
           d="M2 12.5V4a1 1 0 0 1 1-1h3l1.5 1.5H12a1 1 0 0 1 1 1V7M2 12.5L4 7h10.5l-2 5.5z"
@@ -118,6 +118,32 @@ export function FileIcon() {
         d="M4 1.5h5.5L12.5 4.5V14a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V2a.5.5 0 0 1 .5-.5zM9.5 1.5v3h3"
         {...line}
       />
+    </svg>
+  );
+}
+
+/** A branch forking off: a git repo (the folder browser's repo rows). */
+export function RepoIcon({ size = "size-3.5" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <circle cx="5" cy="3.5" r="1.5" {...line} />
+      <circle cx="5" cy="12.5" r="1.5" {...line} />
+      <circle cx="11" cy="5.5" r="1.5" {...line} />
+      <path d="M5 5v6M11 7c0 2.5-6 2-6 4" {...line} />
+    </svg>
+  );
+}
+
+/** A folder with a mark inside: one of Foreman's own (the projects folder, a
+ * workspace), in the folder browser. */
+export function ForemanFolderIcon({ size = "size-3.5" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <path
+        d="M2 12V4a1 1 0 0 1 1-1h3l1.5 1.5H13a1 1 0 0 1 1 1V12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"
+        {...line}
+      />
+      <rect x="6.5" y="7" width="3" height="3" rx="0.5" fill="currentColor" />
     </svg>
   );
 }

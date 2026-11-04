@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createdBody, defaultToSend, inside, projectSlug, repoName } from "./addProject";
+import {
+  createdBody,
+  defaultToSend,
+  folderCrumbs,
+  inside,
+  projectSlug,
+  repoName,
+} from "./addProject";
 
 describe("repoName", () => {
   it("is the folder's own name", () => {
@@ -78,5 +85,37 @@ describe("projectSlug", () => {
     const long = projectSlug(`${"a".repeat(62)} b`);
     expect(long).toBe("a".repeat(62));
     expect(projectSlug("x".repeat(80))).toHaveLength(63);
+  });
+});
+
+describe("folderCrumbs", () => {
+  it("starts at the home folder, nothing above it", () => {
+    expect(folderCrumbs("/Users/ana/dev/app", "/Users/ana")).toEqual([
+      { name: "ana", path: "/Users/ana" },
+      { name: "dev", path: "/Users/ana/dev" },
+      { name: "app", path: "/Users/ana/dev/app" },
+    ]);
+    expect(folderCrumbs("/Users/ana", "/Users/ana/")).toEqual([
+      { name: "ana", path: "/Users/ana" },
+    ]);
+  });
+  it("doesn't take a sibling sharing the home folder's prefix for inside it", () => {
+    expect(folderCrumbs("/Users/anabel/x", "/Users/ana")).toEqual([
+      { name: "x", path: "/Users/anabel/x" },
+    ]);
+  });
+  it("keeps names with spaces and dots whole", () => {
+    expect(folderCrumbs("/home/u/My Repos/v1.2", "/home/u").map((c) => c.name)).toEqual([
+      "u",
+      "My Repos",
+      "v1.2",
+    ]);
+  });
+  it("works with / as home", () => {
+    expect(folderCrumbs("/srv/a", "/")).toEqual([
+      { name: "/", path: "/" },
+      { name: "srv", path: "/srv" },
+      { name: "a", path: "/srv/a" },
+    ]);
   });
 });

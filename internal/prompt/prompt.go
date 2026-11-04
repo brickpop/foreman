@@ -83,7 +83,9 @@ var teamTools = []teamTool{
 	{"contribute", anyone, nobody, true, []string{"contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note."}},
 	// Members take what needs the CEO to their lead, who decides what reaches them.
 	{"escalate", leadOnly, nobody, true, []string{
-		"escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.",
+		"escalate(kind, title, body, options)",
+		"                                    Ask the CEO. kind: approval | question | finding. A short",
+		"                                    one-line title; the detail, if any, in body.",
 		"                                    For an approval, wait for the answer before that step.",
 	}},
 	{"fetch", leadOnly, anyone, true, []string{
@@ -91,8 +93,10 @@ var teamTools = []teamTool{
 		"                                    origin/*, to merge in with merge(\"origin/main\"). Targets don't move.",
 	}},
 	{"request_merge", leadOnly, anyone, true, []string{
-		"request_merge(branch, entry, into)  Ask the CEO to merge one of your {lead}* branches into into,",
-		"                                    a target (each repo's default branch when left out);",
+		"request_merge(branch, title, body, entry, into)",
+		"                                    Ask the CEO to merge one of your {lead}* branches into into,",
+		"                                    a target (each repo's default branch when left out). title: what it",
+		"                                    brings, one short line; body, if any: what to know to review it;",
 		"                                    entry: the wiki card that explains the work. Only you can.",
 		"                                    Call it again on the same branch to refresh it.",
 	}},
@@ -307,7 +311,7 @@ func branches(in Input, lead bool, has func(string) bool) string {
 		return fmt.Sprintf("you work on %s, made for you from %s.", git.HomeBranch(in.Project, in.Agent, in.Team.Team, false), defaults(in.Repos))
 	case lead && has("request_merge"):
 		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
-			"Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), "+
+			"Ask for a merge with request_merge(branch, title, body, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), "+
 			"resolve any conflicts and commit(), then call request_merge again.%s %s", ours, ours, oneTopic(has), fewRequests)
 	case lead:
 		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+

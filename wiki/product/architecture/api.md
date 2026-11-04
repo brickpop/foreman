@@ -27,6 +27,7 @@ PUT    /api/projects/:id/repos/:repo/default  {branch} → its default branch, o
 DELETE /api/projects/:id/repos/:repo/targets/:target  stop a target the lead made being one; its branch stays (400 INVALID for the default branch, 404 NOT_FOUND, 409 IN_USE while a merge request into it is open)
 DELETE /api/projects/:id/repos/:repo          remove it from the project; its folder and branches stay (409 DEPLOYED while a team is deployed on the project)
 PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
+PUT    /api/projects/:id/name                 {name} → its display name, any words, one line, at most 80 characters ("" shows its id readable); the id stays; allowed while a team is deployed (400 INVALID, 409 EXISTS when another project shows as that already)
 PUT    /api/projects/:id/archived             {archived} → archives the project (409 DEPLOYED while a team is deployed on it) or unarchives it
 GET    /api/projects/:id/repos                the code repos, then the project repo, each with its default branch and branches (ahead of the default, uncommitted changes)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
@@ -34,7 +35,7 @@ GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path
 GET    /api/projects/:id/repos/:repo/image    ?ref=&path= an image file at a ref (the wiki's image types, up to 10 MB; a symlink never), under the wiki images' headers; 404 for anything else
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next, total} (total: the commits it holds in all), 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
 GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
-GET    /api/folders                           ?path= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, parent, entries: [{name, path, repo}]} (400 INVALID outside it)
+GET    /api/folders                           ?path=&project= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, home, repo, added?, foreman?, entries: [{name, path, repo, foreman?}]}; foreman: what Foreman's own folder it is (the projects folder, a workspace); added: with a project, its repo this folder already is, by real path (400 INVALID outside $HOME, 404 for an unknown project)
 GET    /api/folders/workspace                 ?name= where a project named name would go: {path, folder, folderExists} (the projects folder, ~ expanded; path is the folder itself while name isn't a valid one)
 GET    /api/folders/branches                  ?path= a repo folder's branches, to pick its default branch: {branches, current} (current: its checkout's, "" when detached; 400 INVALID outside $HOME or inside Foreman's home)
 
@@ -64,7 +65,6 @@ GET    /api/requests                          the open requests (today: review r
 POST   /api/requests/:id/resolve              {answer}
 GET    /api/messages?deployment=              message log
 GET    /api/activity?deployment=              [&before=<cursor>] a page of a deployment's team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; 400 BAD_REQUEST without a deployment or for a bad cursor
-GET    /api/activity/latest                   when something last happened on each project, {<project>: <time>}: a team message or action, a request, a merge request, a deploy or stop, else its creation (the projects' order)
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
 POST   /api/projects/:id/cleanup                removes what agents running nowhere left on the project, only what is safe → {removed, kept} ([Project deployment → Earlier teams](../features/project-deployment.md#earlier-teams))
 GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)

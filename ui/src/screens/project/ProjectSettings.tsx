@@ -2,13 +2,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import { forgeLabel, harnessLabel, onOtherProfile, readable } from "../../app/model";
+import {
+  forgeLabel,
+  harnessLabel,
+  nameTakenBy,
+  onOtherProfile,
+  projectName,
+  readable,
+} from "../../app/model";
 import {
   keys,
   useDeployments,
   useHomeFolder,
   useInstances,
   useProfiles,
+  useProjects,
   useTeams,
 } from "../../app/queries";
 import { Confirm } from "../../components/Overlays";
@@ -55,6 +63,7 @@ function Configuration({ project }: { project: Project }) {
   return (
     <section className="flex max-w-[760px] flex-col gap-6 px-6 pt-6 pb-12">
       <GroupCard title="General">
+        <ProjectNameField project={project} />
         <Workspace project={project} />
         <ProfileChoice project={project} />
       </GroupCard>
@@ -190,7 +199,11 @@ function Workspace({ project }: { project: Project }) {
     mutationFn: () => client.home.migrate(project.id, target.trim()),
     onSuccess: (p) => {
       queries.invalidateQueries({ queryKey: keys.projects });
-      toast({ title: `${readable(p.id)} moved`, body: `Into ${p.workspace}.`, color: "var(--ok)" });
+      toast({
+        title: `${projectName([p], p.id)} moved`,
+        body: `Into ${p.workspace}.`,
+        color: "var(--ok)",
+      });
     },
     onError: (e: Error) =>
       toast({ title: "Project not moved", body: e.message, color: "var(--err)" }),
@@ -242,6 +255,67 @@ function Workspace({ project }: { project: Project }) {
 
 /** The profile this project's agents run on, a harness and its login. Kept in
  * Foreman's records, never project.toml, which the lead can write. */
+/** The project's display name: any words, how it shows everywhere; empty, it
+ * shows by its id. Its id stays (folders, branches, URLs are built from it). */
+function ProjectNameField({ project }: { project: Project }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  const projects = useProjects().data ?? [];
+  const [draft, setDraft] = useState<string>();
+  const value = draft ?? project.name;
+  const taken = nameTakenBy(projects, project.id, value);
+  const save = useMutation({
+    mutationFn: () => client.home.setName(project.id, value.trim()),
+    onSuccess: () => {
+      setDraft(undefined);
+      queries.invalidateQueries({ queryKey: keys.projects });
+    },
+    onError: (e: Error) => toast({ title: "Name not saved", body: e.message, color: "var(--err)" }),
+  });
+  const changed = value.trim() !== project.name;
+  return (
+    <Block title="Name">
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (changed && !taken && !save.isPending) save.mutate();
+        }}
+      >
+        <input
+          value={value}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={readable(project.id)}
+          aria-label="Project name"
+          maxLength={80}
+          className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-3 py-1.5 text-[13.5px] text-tx"
+        />
+        {changed && (
+          <>
+            <Button type="button" variant="small" onClick={() => setDraft(undefined)}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="small" disabled={save.isPending || !!taken}>
+              Save
+            </Button>
+          </>
+        )}
+      </form>
+      {changed && taken && (
+        <span className="text-[13px] text-err">
+          Another project shows as {taken} already: pick another name.
+        </span>
+      )}
+      <span className="text-[13.5px] text-tx2">
+        How it shows everywhere; empty, it shows as {readable(project.id)}. Its id,{" "}
+        <span className="font-mono text-[12.5px]">{project.id}</span>, stays: its folder, its
+        agents' branches and its links are built from it.
+      </span>
+    </Block>
+  );
+}
+
 function ProfileChoice({ project }: { project: Project }) {
   const client = useClient();
   const queries = useQueryClient();
@@ -343,8 +417,8 @@ function ArchiveProject({ project }: { project: Project }) {
       </span>
       <Confirm
         open={confirming}
-        title={`Stop ${names.join(", ")} and archive ${readable(project.id)}?`}
-        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${readable(project.id)}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${readable(project.id)} is archived.`}
+        title={`Stop ${names.join(", ")} and archive ${projectName([project], project.id)}?`}
+        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${projectName([project], project.id)}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${projectName([project], project.id)} is archived.`}
         action="Stop and archive"
         onConfirm={() => archive.mutate()}
         onClose={() => setConfirming(false)}
@@ -368,7 +442,11 @@ function RemoveProject({ project }: { project: Project }) {
     onSuccess: () => {
       queries.invalidateQueries({ queryKey: keys.projects });
       navigate({ to: "/" });
-      toast({ title: `${readable(project.id)} removed`, body: "", color: "var(--tx4)" });
+      toast({
+        title: `${projectName([project], project.id)} removed`,
+        body: "",
+        color: "var(--tx4)",
+      });
     },
     onError: (e: Error) =>
       toast({ title: "Project not removed", body: e.message, color: "var(--err)" }),
@@ -395,7 +473,7 @@ function RemoveProject({ project }: { project: Project }) {
       </span>
       <Confirm
         open={open}
-        title={`Remove ${readable(project.id)}?`}
+        title={`Remove ${projectName([project], project.id)}?`}
         body="Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its workspace, your code repos and their branches stay."
         action="Remove"
         onConfirm={() => remove.mutate()}

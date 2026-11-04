@@ -50,3 +50,21 @@ export function defaultToSend(b: Branches | undefined, chosen?: string): string 
   if (chosen && b.branches.includes(chosen)) return chosen;
   return b.branches.includes(b.current) ? b.current : b.branches[0];
 }
+
+/** The folder browser's breadcrumbs: from the home folder (named as itself)
+ * down to path, each with the path it opens; nothing above home. A path
+ * outside home (never served) is just itself. */
+export function folderCrumbs(path: string, home: string): { name: string; path: string }[] {
+  const root = home.replace(/\/+$/, "") || "/";
+  const name = (p: string) => p.split("/").filter(Boolean).pop() ?? "/";
+  if (path !== root && !path.startsWith(root === "/" ? "/" : `${root}/`)) {
+    return [{ name: name(path), path }];
+  }
+  const crumbs = [{ name: name(root), path: root }];
+  let at = root;
+  for (const part of path.slice(root.length).split("/").filter(Boolean)) {
+    at = at === "/" ? `/${part}` : `${at}/${part}`;
+    crumbs.push({ name: part, path: at });
+  }
+  return crumbs;
+}

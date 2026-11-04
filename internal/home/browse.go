@@ -10,11 +10,14 @@ import (
 )
 
 // Folder is one folder of the repo browser (wiki/product/features/add-project.md#picking-repos):
-// its subfolders, the git repos among them marked.
+// whether it is a git repo, and its subfolders, the git repos among them marked.
 type Folder struct {
-	Path    string        `json:"path"`             // a real path
-	Parent  string        `json:"parent,omitempty"` // "" at the top: the browser never goes above the CEO's home folder
-	Entries []FolderEntry `json:"entries"`          // its subfolders by name, hidden ones left out
+	Path    string        `json:"path"`              // a real path
+	Home    string        `json:"home"`              // the CEO's home folder (real path): the browser never goes above it
+	Repo    bool          `json:"repo"`              // a git repo's top folder: one that can be added
+	Added   string        `json:"added,omitempty"`   // the project's repo this folder is already, when browsed for a project
+	Foreman string        `json:"foreman,omitempty"` // Foreman's own folder (reserved): what it is; nothing is added there
+	Entries []FolderEntry `json:"entries"`           // its subfolders by name, hidden ones left out
 }
 
 // FolderEntry is a subfolder in the browser.
@@ -22,12 +25,25 @@ type FolderEntry struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Repo bool   `json:"repo"` // a git repo's top folder (its own .git folder): one that can be added
+	// Foreman's own folder (the projects folder, a project's workspace): what
+	// it is. Not opened: its repos (project repos, worktrees) aren't code repos.
+	Foreman string `json:"foreman,omitempty"`
 }
 
 // Browse lists a folder for the repo browser: path, or Start when empty. It
 // must be inside the CEO's home folder, and each subfolder listed usable
-// (Home.usable): a symlink leading out, or Foreman's home, is left out.
-func (h *Home) Browse(path string) (Folder, error) {
+// (Home.usable): a symlink leading out, or Foreman's home, is left out. For a
+// project ("" for none), it says which of its repos the folder already is,
+// by real path, as AddRepo refuses it.
+func (h *Home) Browse(path, project string) (Folder, error) {
+	var repos []Repo
+	if project != "" {
+		p, err := h.Project(project)
+		if err != nil {
+			return Folder{}, err
+		}
+		repos = p.Repos
+	}
 	if path == "" {
 		path = h.start
 	}
@@ -45,9 +61,14 @@ func (h *Home) Browse(path string) (Folder, error) {
 	if err != nil {
 		return Folder{}, fmt.Errorf("%w: %s can't be read: %s", ErrInvalid, path, err.Error())
 	}
-	f := Folder{Path: real, Entries: []FolderEntry{}}
-	if real != h.allowed {
-		f.Parent = filepath.Dir(real)
+	h.mu.Lock()
+	reserved := h.reserved()
+	h.mu.Unlock()
+	f := Folder{Path: real, Home: h.allowed, Repo: topOfRepo(real), Foreman: reserved[real], Entries: []FolderEntry{}}
+	for _, r := range repos {
+		if other, err := filepath.EvalSymlinks(r.Path); err == nil && other == real {
+			f.Added = r.Name
+		}
 	}
 	for _, e := range entries {
 		if strings.HasPrefix(e.Name(), ".") {
@@ -61,10 +82,39 @@ func (h *Home) Browse(path string) (Folder, error) {
 		if info, err := os.Stat(child); err != nil || !info.IsDir() {
 			continue
 		}
-		f.Entries = append(f.Entries, FolderEntry{Name: e.Name(), Path: filepath.Join(real, e.Name()), Repo: topOfRepo(child)})
+		f.Entries = append(f.Entries, FolderEntry{Name: e.Name(), Path: filepath.Join(real, e.Name()), Repo: topOfRepo(child), Foreman: reserved[child]})
 	}
 	sort.Slice(f.Entries, func(i, j int) bool { return strings.ToLower(f.Entries[i].Name) < strings.ToLower(f.Entries[j].Name) })
 	return f, nil
+}
+
+// reserved maps Foreman's own folders, by real path, to what each is: the
+// projects folder, and each project's workspace. Called with h.mu held.
+func (h *Home) reserved() map[string]string {
+	m := map[string]string{}
+	if folder, err := expandHome(h.snap.settings.Settings.ProjectsFolder); err == nil {
+		if real, err := filepath.EvalSymlinks(folder); err == nil {
+			m[real] = "Foreman's projects folder"
+		}
+	}
+	for _, p := range h.snap.projects {
+		if real, err := filepath.EvalSymlinks(p.Workspace); p.Workspace != "" && err == nil {
+			m[real] = p.Shown() + "'s workspace"
+		}
+	}
+	return m
+}
+
+// outsideForemans refuses a code repo's folder (real) in one of Foreman's own
+// (Home.reserved): the browser never opens them, and a pasted or scripted
+// path is refused the same. Called with h.mu held.
+func (h *Home) outsideForemans(real string) error {
+	for folder, what := range h.reserved() {
+		if inside(real, folder) {
+			return fmt.Errorf("%w: %s is in %s, Foreman's own: no code repo goes there", ErrInvalid, real, what)
+		}
+	}
+	return nil
 }
 
 // Branches are a repo's branches before it is added, to pick its main branch

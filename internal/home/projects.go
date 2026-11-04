@@ -1,6 +1,7 @@
 package home
 
 import (
+	"cmp"
 	"context"
 	"embed"
 	"errors"
@@ -13,6 +14,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/store"
@@ -51,6 +54,9 @@ func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p
 	}
 	if existing, ok := h.projectNamed(name); ok {
 		return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
+	}
+	if other, ok := h.shownAs(name, readable(name)); ok {
+		return Project{}, false, fmt.Errorf("%w: project %s shows as %s already: pick another name, or rename it first", ErrExists, other, readable(name))
 	}
 	ws, err := h.checkWorkspace(name, workspace)
 	if err != nil {
@@ -117,6 +123,18 @@ func canTakeOver(dir, clone string) error {
 }
 
 // projectNamed finds a project named name in any case. Called with h.mu held.
+// shownAs finds the project, other than id, that shows as shown (its
+// display name, else its id made readable), in any case: two projects never
+// read the same (the CEO, 2026-11-04).
+func (h *Home) shownAs(id, shown string) (string, bool) {
+	for _, p := range h.snap.projects {
+		if p.ID != id && strings.EqualFold(p.Shown(), shown) {
+			return p.ID, true
+		}
+	}
+	return "", false
+}
+
 func (h *Home) projectNamed(name string) (string, bool) {
 	for id := range h.snap.projects {
 		if strings.EqualFold(id, name) {
@@ -187,6 +205,9 @@ func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project
 		return Project{}, fmt.Errorf("%w: %s must be a new folder in an existing one", ErrInvalid, path)
 	}
 	if err := h.usable(path, filepath.Join(parent, filepath.Base(path))); err != nil {
+		return Project{}, err
+	}
+	if err := h.outsideForemans(filepath.Join(parent, filepath.Base(path))); err != nil {
 		return Project{}, err
 	}
 	if err := h.createRepo(ctx, path, "main"); err != nil {
@@ -428,6 +449,34 @@ func (h *Home) SetArchived(ctx context.Context, project string, archived bool) (
 	return h.rescan(project)
 }
 
+// maxProjectName is the most characters a project's display name has.
+const maxProjectName = 80
+
+// SetName gives a project its display name, any words (trimmed), "" to show
+// it by its id again. Only how it shows changes, so a team may be deployed.
+func (h *Home) SetName(ctx context.Context, project, name string) (Project, error) {
+	name = strings.TrimSpace(name)
+	if utf8.RuneCountInString(name) > maxProjectName {
+		return Project{}, fmt.Errorf("%w: a project's name has at most %d characters", ErrInvalid, maxProjectName)
+	}
+	if strings.ContainsFunc(name, unicode.IsControl) {
+		return Project{}, fmt.Errorf("%w: a project's name is one line of text", ErrInvalid)
+	}
+	h.mu.Lock()
+	defer h.unlock()
+	if _, ok := h.snap.projects[project]; !ok {
+		return Project{}, ErrNotFound
+	}
+	shown := cmp.Or(name, readable(project))
+	if other, ok := h.shownAs(project, shown); ok {
+		return Project{}, fmt.Errorf("%w: project %s shows as %s already", ErrExists, other, shown)
+	}
+	if err := h.records.SetName(ctx, project, name); err != nil {
+		return Project{}, h.recordError(err)
+	}
+	return h.rescan(project)
+}
+
 // usableRepo checks a folder to add as a repo of p (Home.usableFolder)
 // and returns its root commit: a repo without a commit has no branch for
 // agents to start from, and its default branch: def, a branch it has; for
@@ -463,6 +512,9 @@ func (h *Home) usableFolder(p Project, name, path string) (string, error) {
 		return "", fmt.Errorf("%w: %s", ErrInvalid, err.Error())
 	}
 	if err := h.usable(path, real); err != nil {
+		return "", err
+	}
+	if err := h.outsideForemans(real); err != nil {
 		return "", err
 	}
 	for _, r := range p.Repos {
@@ -583,6 +635,18 @@ const nameRules = "letters, digits, dots, hyphens and underscores, starting with
 // folder, named as it is.
 func validName(name string) bool {
 	return nameRule.MatchString(name) && !strings.Contains(name, "..")
+}
+
+// readable is a project's id as people read it, as the UI shows it:
+// hyphens and underscores as spaces, the first letter capital (my-portfolio
+// is "My portfolio").
+func readable(id string) string {
+	words := strings.TrimSpace(strings.Join(strings.FieldsFunc(id, func(r rune) bool { return r == '-' || r == '_' }), " "))
+	if words == "" {
+		return ""
+	}
+	r, size := utf8.DecodeRuneInString(words)
+	return string(unicode.ToUpper(r)) + words[size:]
 }
 
 // validProjectName is the rule for a new project's name: a slug, since it is

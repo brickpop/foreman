@@ -57,12 +57,16 @@ set_submodule(repo, path, ref, url) Pin a submodule (e.g. lib/forge-std) to a br
                                     url adds a new one. Switch and merge keep submodules in step.
 handoff(teammate, branch, summary)  Pass finished, committed work on. Your part ends. (members only)
 contribute(kind, title, body)       Add to the knowledge base without writing it. kind: finding | proposal | note.
-escalate(kind, summary, options)    Ask the CEO. kind: approval | question | finding.
+escalate(kind, title, body, options)
+                                    Ask the CEO. kind: approval | question | finding. A short
+                                    one-line title; the detail, if any, in body.
                                     For an approval, wait for the answer before that step. (lead only)
 fetch()                             Fetch the repos' remotes: what was pushed upstream shows as
                                     origin/*, to merge in with merge("origin/main"). Targets don't move. (lead only)
-request_merge(branch, entry, into)  Ask the CEO to merge one of your lead/{team}/* branches into into,
-                                    a target (each repo's default branch when left out);
+request_merge(branch, title, body, entry, into)
+                                    Ask the CEO to merge one of your lead/{team}/* branches into into,
+                                    a target (each repo's default branch when left out). title: what it
+                                    brings, one short line; body, if any: what to know to review it;
                                     entry: the wiki card that explains the work. Only you can.
                                     Call it again on the same branch to refresh it. (lead only)
 create_target(repo, name, from)     Make a new target in one repo: branch name at from (a target, or
@@ -129,7 +133,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 
 | Placeholder | Lead | Member |
 |---|---|---|
-| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch, from). Ask for a merge with request_merge(branch, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), resolve any conflicts and commit(), then call request_merge again. A lead branch holds one topic: merge in only that topic's hand-offs, never another topic's branch. Keep at most two merge requests open, on topics that don't overlap, each one topic the CEO can review in one sitting. See them through to their merge before you propose the next. Withdraw a request before you replace it.` (the one-topic sentence only with `merge`) | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch, from). Never push to a target. A card's branch starts from the target the lead names (the default branch unless told) and holds only that card: never merge in another card's branch (an audit's, a proof's). To reuse a test from one, copy it in (git show <branch>:<file>).` (the last two sentences only with `merge`) |
+| `{branches}` | `lead/{team}/<topic>, as many as you need (lead/{team}/integration exists). Switch to one (or make it) with switch(branch, from). Ask for a merge with request_merge(branch, title, body, entry, into), one per branch, into the target its work started from. When told a target moved, merge it in with merge(<that target>), resolve any conflicts and commit(), then call request_merge again. A lead branch holds one topic: merge in only that topic's hand-offs, never another topic's branch. Keep at most two merge requests open, on topics that don't overlap, each one topic the CEO can review in one sitting. See them through to their merge before you propose the next. Withdraw a request before you replace it.` (the one-topic sentence only with `merge`) | `wt/{agent}/<card> only; switch to one (or make it) with switch(branch, from). Never push to a target. A card's branch starts from the target the lead names (the default branch unless told) and holds only that card: never merge in another card's branch (an audit's, a proof's). To reuse a test from one, copy it in (git show <branch>:<file>).` (the last two sentences only with `merge`) |
 | `{worktrees persist}` (with `switch`; else left out) | `Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). New work goes on a new topic: switch(<topic>) makes it from the default branch, switch(<topic>, from) from another target. Earlier work you resume, or commit to its topic before switching. What you don't want: discard(). Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to, and the target it starts from when it isn't the default.` (the last sentence only with teammates) | the same, without the last sentence. A deployment resumes ([Sandboxes and git policy → Branches](./sandboxes-and-git.md#branches)); what an agent's worktrees hold comes as a notice when its session starts fresh ([Protocol → Deliveries Foreman originates](./protocol.md#deliveries-foreman-originates)) |
 | `{wiki access}` | `read and write: edit, then commit its repo, project` | `read only, by design, not a fault: add to it with contribute(), also when a card or a teammate says to write a wiki file` |
 | `{teammates and the wiki}` | `Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.` Left out for a lead alone. | (none) |

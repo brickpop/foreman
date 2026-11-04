@@ -34,7 +34,7 @@ func TestBrowse(t *testing.T) {
 	startedIn(t, h, dev)
 	real, _ := filepath.EvalSymlinks(dev)
 
-	top, err := h.Browse("")
+	top, err := h.Browse("", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,20 +42,26 @@ func TestBrowse(t *testing.T) {
 	for _, e := range top.Entries {
 		got = append(got, e.Name+map[bool]string{true: " (repo)"}[e.Repo])
 	}
-	if top.Path != real || top.Parent != realHome || strings.Join(got, ", ") != "app (repo), link-to-app (repo), Notes" {
-		t.Errorf("top: %s, parent %q, %v", top.Path, top.Parent, got)
+	if top.Path != real || top.Home != realHome || top.Repo || strings.Join(got, ", ") != "app (repo), link-to-app (repo), Notes" {
+		t.Errorf("top: %s, home %q, repo %v, %v", top.Path, top.Home, top.Repo, got)
 	}
-	notes, err := h.Browse(filepath.Join(dev, "Notes"))
-	if err != nil || notes.Parent != real || len(notes.Entries) != 0 {
+	notes, err := h.Browse(filepath.Join(dev, "Notes"), "")
+	if err != nil || notes.Path != filepath.Join(real, "Notes") || notes.Repo || len(notes.Entries) != 0 {
 		t.Errorf("a subfolder: %+v %v", notes, err)
 	}
+	// A repo's top folder is one to add, and through a symlink too.
+	for _, path := range []string{filepath.Join(dev, "app"), filepath.Join(dev, "link-to-app")} {
+		if app, err := h.Browse(path, ""); err != nil || !app.Repo || app.Path != filepath.Join(real, "app") {
+			t.Errorf("%s: %+v %v", path, app, err)
+		}
+	}
 	// Up to the home folder, and no higher.
-	up, err := h.Browse(home)
-	if err != nil || up.Path != realHome || up.Parent != "" {
+	up, err := h.Browse(home, "")
+	if err != nil || up.Path != realHome || up.Home != realHome {
 		t.Errorf("the home folder: %+v %v", up, err)
 	}
 	for _, path := range []string{filepath.Dir(home), filepath.Join(dev, "out"), "dev", filepath.Join(dev, "readme.txt"), filepath.Join(dev, "nope")} {
-		if _, err := h.Browse(path); !errors.Is(err, ErrInvalid) {
+		if _, err := h.Browse(path, ""); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%s: %v", path, err)
 		}
 	}
@@ -89,5 +95,108 @@ func TestTheHomeFolderBoundsAddingRepos(t *testing.T) {
 	startedIn(t, h, t.TempDir())
 	if real, _ := filepath.EvalSymlinks(home); h.Start() != real {
 		t.Errorf("started outside the home folder: start %s", h.Start())
+	}
+}
+
+// Browsed for a project, a folder says which of its repos it is already,
+// by real path: a repo added through a symlink is still that folder.
+func TestBrowseSaysWhatTheProjectHasAdded(t *testing.T) {
+	h := loaded(t, nil)
+	home := os.Getenv("HOME")
+	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+		t.Fatal(err)
+	}
+	app := codeRepo(t, filepath.Join(home, "dev", "app"))
+	other := codeRepo(t, filepath.Join(home, "dev", "other"))
+	link := filepath.Join(home, "dev", "link-to-app")
+	if err := os.Symlink(app, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.AddRepo(ctx, "ledger", "api", link, ""); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range map[string]string{app: "api", link: "api", other: ""} {
+		if f, err := h.Browse(path, "ledger"); err != nil || f.Added != want {
+			t.Errorf("%s: added %q, %v", path, f.Added, err)
+		}
+	}
+	if f, _ := h.Browse(app, ""); f.Added != "" {
+		t.Errorf("for no project: %q", f.Added)
+	}
+	if _, err := h.Browse(app, "nope"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("an unknown project: %v", err)
+	}
+}
+
+// Foreman's own folders show for what they are: the projects folder and each
+// workspace (the project repo in it is a git repo, never a code repo).
+func TestBrowseMarksForemansFolders(t *testing.T) {
+	h := loaded(t, nil)
+	home := os.Getenv("HOME")
+	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, "workspace", "notes"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	marks := func(path string) string {
+		f, err := h.Browse(path, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, e := range f.Entries {
+			got = append(got, e.Name+"="+e.Foreman)
+		}
+		return f.Foreman + " | " + strings.Join(got, ", ")
+	}
+	if got := marks(filepath.Join(home, "workspace")); got != " | foreman=Foreman's projects folder, notes=" {
+		t.Errorf("above the projects folder: %q", got)
+	}
+	if got := marks(filepath.Join(home, "workspace", "foreman")); got != "Foreman's projects folder | ledger=Ledger's workspace" {
+		t.Errorf("the projects folder: %q", got)
+	}
+	// Through a symlink, the same folder.
+	if err := os.Symlink(workspace("ledger"), filepath.Join(home, "ws")); err != nil {
+		t.Fatal(err)
+	}
+	if f, err := h.Browse(filepath.Join(home, "ws"), ""); err != nil || f.Foreman != "Ledger's workspace" {
+		t.Errorf("a workspace through a symlink: %+v %v", f, err)
+	}
+}
+
+// No code repo goes in Foreman's own folders, whichever way it comes (added,
+// created, located; through a symlink too): the server refuses what the
+// browser never offers.
+func TestNoCodeRepoInForemansFolders(t *testing.T) {
+	h := loaded(t, nil)
+	home := os.Getenv("HOME")
+	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+		t.Fatal(err)
+	}
+	projectRepo := filepath.Join(workspace("ledger"), "project")
+	stray := codeRepo(t, filepath.Join(home, "workspace", "foreman", "stray"))
+	if err := os.Symlink(projectRepo, filepath.Join(home, "link")); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{projectRepo, stray, filepath.Join(home, "link")} {
+		if _, err := h.AddRepo(ctx, "ledger", "x", path, ""); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "Foreman's own") {
+			t.Errorf("added %s: %v", path, err)
+		}
+	}
+	for _, path := range []string{filepath.Join(workspace("ledger"), "fresh"), filepath.Join(home, "workspace", "foreman", "fresh")} {
+		if _, err := h.NewRepo(ctx, "ledger", "fresh", path); !errors.Is(err, ErrInvalid) || exists(path) {
+			t.Errorf("created %s: %v", path, err)
+		}
+	}
+	api := codeRepo(t, filepath.Join(home, "dev", "api"))
+	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
+		t.Fatalf("a repo of the CEO's: %v", err)
+	}
+	if _, err := h.LocateRepo(ctx, "ledger", "api", projectRepo); !errors.Is(err, ErrInvalid) {
+		t.Errorf("located in a workspace: %v", err)
+	}
+	if _, err := h.NewRepo(ctx, "ledger", "web", filepath.Join(home, "dev", "web")); err != nil {
+		t.Errorf("a new repo of the CEO's: %v", err)
 	}
 }

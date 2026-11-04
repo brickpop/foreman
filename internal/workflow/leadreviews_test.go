@@ -33,7 +33,7 @@ func TestReviewsTellTheLeadWhereItsReviewsStand(t *testing.T) {
 	if err := f.w.RequestChanges(ctx, "rev-2", "first note"); err != nil {
 		t.Fatal(err)
 	}
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/big", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/big", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
 	if _, err := f.w.AddComment(ctx, "rev-2", store.ReviewComment{Body: "Add a test"}); err != nil {
 		t.Fatal(err)
 	}
@@ -61,12 +61,12 @@ func TestReviewsTellTheLeadWhereItsReviewsStand(t *testing.T) {
 
 	text := f.ok("mara", "reviews", map[string]string{})
 	want := "Your reviews, open or decided in the last 7 days, newest first:\n\n" +
-		"rev-2 lead/ledger/atlas/big: Export invoices (backlog/led-44.md)\n" +
+		"rev-2 lead/ledger/atlas/big: Invoices as CSV (backlog/led-44.md)\n" +
 		"  api → main: changes requested · web → trunk: conflicts\n" +
 		"  The CEO's note: Nearly there.\n" +
 		"  - api big.go:1 (changed since) `package big`: Name it bigger\n" +
 		"  - Add a test\n\n" +
-		"rev-1 lead/ledger/atlas/small: Export invoices (backlog/led-44.md)\n" +
+		"rev-1 lead/ledger/atlas/small: Invoices as CSV (backlog/led-44.md)\n" +
 		"  api → main: dismissed (the CEO's note: not now) · web → trunk: dismissed (the CEO's note: not now)"
 	if text != want {
 		t.Errorf("got\n%s\nwant\n%s", text, want)
@@ -124,8 +124,8 @@ func TestReviewsListOnlyTheLeadsRecentOnes(t *testing.T) {
 	}
 	for _, want := range []string{
 		"lead/ledger/atlas/still-open", // open, however old
-		"rev-1 lead/ledger/atlas/small: Export invoices (backlog/led-44.md)\n  api → main: withdrawn · web → trunk: withdrawn\n  Withdrawn: all of it is in big, superseded by rev-2.",
-		"rev-2 lead/ledger/atlas/big: Export invoices (backlog/led-44.md)\n  api → main: waiting for the CEO · web → trunk: waiting for the CEO",
+		"rev-1 lead/ledger/atlas/small: Invoices as CSV (backlog/led-44.md)\n  api → main: withdrawn · web → trunk: withdrawn\n  Withdrawn: all of it is in big, superseded by rev-2.",
+		"rev-2 lead/ledger/atlas/big: Invoices as CSV (backlog/led-44.md)\n  api → main: waiting for the CEO · web → trunk: waiting for the CEO",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("missing %q in:\n%s", want, text)

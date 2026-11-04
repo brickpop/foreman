@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tansta
 import { useEffect, useRef, useState } from "react";
 import { type RepoBranch, type Repo as RepoInfo, useClient } from "../../api/client";
 import { withoutTitle } from "../../app/frontmatter";
-import { readable, targetsOf, when } from "../../app/model";
+import { projectName, readable, targetsOf, when } from "../../app/model";
 import {
   useDeploymentOn,
   useRepoFile,
@@ -80,7 +80,7 @@ export function Repo() {
       {repos.isPending && <Loading rows={6} />}
       {repos.data && !repo && (
         <Empty>
-          {readable(project.id)} has no repo {name}.
+          {projectName([project], project.id)} has no repo {name}.
         </Empty>
       )}
       {repo && at && (

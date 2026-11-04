@@ -3,7 +3,7 @@ import type { Instance, Project, Request, Team } from "../api/client";
 import { keys, staleKeys } from "./queries";
 import { sidebarModel } from "./Shell";
 
-const project = (id: string) => ({ id }) as Project;
+const project = (id: string, name = "") => ({ id, name }) as Project;
 const team = (id: string, name: string) => ({ id, config: { name } }) as Team;
 const instance = (deploymentId: string, status: string) => ({ deploymentId, status }) as Instance;
 const request = (projectId: string, status = "open", kind = "question") =>
@@ -22,9 +22,9 @@ describe("sidebarModel", () => {
       ],
     );
     expect(m.projects).toEqual([
-      { id: "ledger", inbox: 2 },
-      { id: "relay", inbox: 0 },
-      { id: "harbor", inbox: 0 },
+      { id: "ledger", name: "Ledger", inbox: 2 },
+      { id: "relay", name: "Relay", inbox: 0 },
+      { id: "harbor", name: "Harbor", inbox: 0 },
     ]);
   });
 
@@ -38,11 +38,16 @@ describe("sidebarModel", () => {
       [],
       [request("harbor")],
     );
-    expect(m.projects).toEqual([{ id: "ledger", inbox: 0 }]);
+    expect(m.projects).toEqual([{ id: "ledger", name: "Ledger", inbox: 0 }]);
     expect(m.archived).toEqual([
-      { id: "relay", inbox: 0 },
-      { id: "harbor", inbox: 1 },
+      { id: "relay", name: "Relay", inbox: 0 },
+      { id: "harbor", name: "Harbor", inbox: 1 },
     ]);
+  });
+
+  it("shows a project by the name the CEO gave it, else by its id made readable", () => {
+    const m = sidebarModel([project("ledger", "Ledger · EUR"), project("big-ledger")], [], []);
+    expect(m.projects.map((p) => p.name)).toEqual(["Ledger · EUR", "Big ledger"]);
   });
 
   it("marks a project's Session while its team is busy, not at rest", () => {
@@ -482,7 +487,22 @@ describe("statusColor", () => {
   });
 });
 
-import { readable } from "./model";
+import { projectName, readable } from "./model";
+
+describe("projectName", () => {
+  const projects = [
+    { id: "ledger", name: "Ledger · EUR" },
+    { id: "big-ledger", name: "" },
+  ];
+  it("is the CEO's name for it, else its id made readable", () => {
+    expect(projectName(projects, "ledger")).toBe("Ledger · EUR");
+    expect(projectName(projects, "big-ledger")).toBe("Big ledger");
+  });
+  it("reads an id it doesn't know, or before the projects are read", () => {
+    expect(projectName(projects, "relay")).toBe("Relay");
+    expect(projectName(undefined, "ledger")).toBe("Ledger");
+  });
+});
 
 describe("readable", () => {
   it("reads a slug as words, only the first capital", () => {
@@ -506,5 +526,45 @@ describe("saysLead", () => {
     for (const name of ["Mara", "Pleadra", "Misleader", "", "Le ad"]) {
       expect(saysLead(name), name).toBe(false);
     }
+  });
+});
+
+import { byName } from "./model";
+
+describe("byName", () => {
+  const p = (id: string, name = "") => ({ id, name });
+  it("sorts by the name shown, as people sort words", () => {
+    const sorted = byName([
+      p("zeta", "Alpha"),
+      p("ledger-10"),
+      p("beta"),
+      p("ledger-2"),
+      p("x", "árbol"),
+    ]);
+    expect(sorted.map((x) => x.id)).toEqual(["zeta", "x", "beta", "ledger-2", "ledger-10"]);
+  });
+  it("leaves the list it was given as it was", () => {
+    const list = [p("b"), p("a")];
+    byName(list);
+    expect(list.map((x) => x.id)).toEqual(["b", "a"]);
+  });
+});
+
+import { nameTakenBy } from "./model";
+
+describe("nameTakenBy", () => {
+  const projects = [
+    { id: "ledger", name: "Ledger · EUR" },
+    { id: "big-ledger", name: "" },
+  ];
+  it("names the other project already reading so, in any case", () => {
+    expect(nameTakenBy(projects, "relay", " ledger · eur ")).toBe("Ledger · EUR");
+    expect(nameTakenBy(projects, "relay", "BIG LEDGER")).toBe("Big ledger");
+    expect(nameTakenBy(projects, "relay", "Ledger")).toBeUndefined(); // ledger shows as its name
+  });
+  it("reads an empty name as the project's own id, and never clashes with itself", () => {
+    expect(nameTakenBy(projects, "big-ledger", "")).toBeUndefined();
+    expect(nameTakenBy(projects, "ledger", "Ledger · eur")).toBeUndefined();
+    expect(nameTakenBy([...projects, { id: "x", name: "Ledger" }], "ledger", "")).toBe("Ledger");
   });
 });

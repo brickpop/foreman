@@ -2,9 +2,9 @@ import { useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { isConflict, type Soul, type Team } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { readable, roleLabel } from "../app/model";
+import { roleLabel } from "../app/model";
 import { sessionOf } from "../app/project";
-import { useInstances, usePrompt, useSaveSoul, useTeams } from "../app/queries";
+import { useInstances, useProjectName, usePrompt, useSaveSoul, useTeams } from "../app/queries";
 import { useToast } from "../components/Toasts";
 import { Button, Dot, Loading } from "../components/ui";
 import { Crumbs } from "./Settings";
@@ -38,6 +38,7 @@ export function Agent() {
 }
 
 function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
+  const projectNameOf = useProjectName();
   const navigate = useNavigate();
   const instances = useInstances();
   const openChiefOfStaff = useOpenChiefOfStaff();
@@ -141,7 +142,7 @@ function Editor({ team, id, saved }: { team: Team; id: string; saved: Soul }) {
             >
               <Dot status={i.status} size={8} />
               <span className="whitespace-nowrap font-semibold">
-                {readable(i.id.split("@")[1])}
+                {projectNameOf(i.id.split("@")[1])}
               </span>
               <span className="truncate text-[13.5px] text-tx2">{i.task}</span>
               <Button variant="small" onClick={() => navigate(sessionOf(i.id))}>
@@ -249,6 +250,7 @@ function Section({
 }
 
 function PromptView({ team, id }: { team: Team; id: string }) {
+  const projectNameOf = useProjectName();
   const instances = useInstances();
   const running = (instances.data ?? []).filter((i) => i.id.startsWith(`${id}@`));
   const [chosen, setChosen] = useState<string>();
@@ -271,7 +273,7 @@ function PromptView({ team, id }: { team: Team; id: string }) {
               onClick={() => setChosen(i.id)}
               className={option(i.id === instance)}
             >
-              on {readable(i.id.split("@")[1])}
+              on {projectNameOf(i.id.split("@")[1])}
             </button>
           ))}
         </div>

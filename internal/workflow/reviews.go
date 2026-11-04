@@ -40,8 +40,8 @@ var (
 type Review struct {
 	store.Review  `tstype:",extends"`
 	Status        string               `json:"status"`
-	Entry         string               `json:"entry"` // the wiki entry its latest request named
-	Title         string               `json:"title"` // that entry's title
+	Entry         string               `json:"entry"`      // the wiki entry its latest request named
+	EntryTitle    string               `json:"entryTitle"` // that entry's title
 	DeploymentID  string               `json:"deploymentId"`
 	Lead          string               `json:"lead"` // the instance that asked
 	UpdatedAt     time.Time            `json:"updatedAt"`
@@ -178,7 +178,7 @@ func (w *Workflow) view(ctx context.Context, r store.Review) (Review, error) {
 		}
 	}
 	if len(mrs) > 0 {
-		v.Title = w.titleOf(mrs[len(mrs)-1])
+		v.EntryTitle = w.titleOf(mrs[len(mrs)-1])
 	}
 	return v, nil
 }

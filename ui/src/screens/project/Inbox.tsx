@@ -69,7 +69,7 @@ function ReviewRow({ review: v, teams }: { review: Review; teams: Team[] }) {
       className="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-line px-4 py-3 text-tx last:border-b-0 hover:bg-hover"
     >
       <span className="flex min-w-0 flex-col">
-        <span className="truncate font-medium">{v.title || v.entry || v.branch}</span>
+        <span className="truncate font-medium">{v.title || v.branch}</span>
         <span className="truncate text-[12.5px] text-tx3">
           {lead?.soul.name ?? v.lead} · {repos} · <span className="font-mono">{v.branch}</span>
         </span>

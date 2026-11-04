@@ -238,7 +238,7 @@ export function sessionsEnd(n: number): string {
 /** The Deploy dialog's warning when another team is on the project: it is
  * replaced, as by Stop (a project has one team at most). */
 export function replacingLine(team: string, project: string, sessions: number): string {
-  return `Replaces ${team} on ${readable(project)}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
+  return `Replaces ${team} on ${project}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
 }
 
 const forgeLabels: Record<string, string> = {
@@ -352,6 +352,39 @@ export function teamTab(asked: unknown, deployed: boolean): TeamTab {
 export function readable(name: string): string {
   const words = name.replace(/[-_]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** The projects by the name they show (projectName), as people sort words:
+ * case and accents aside, numbers by value (ledger 2 before ledger 10). */
+export function byName<T extends { id: string; name: string }>(projects: T[]): T[] {
+  const name = (p: T) => p.name || readable(p.id);
+  return [...projects].sort((a, b) =>
+    name(a).localeCompare(name(b), undefined, { sensitivity: "base", numeric: true }),
+  );
+}
+
+/** The other project already showing as what project would show as with
+ * name (its readable id when empty), in any case, which the server refuses:
+ * two projects never read the same. Undefined when it is free. */
+export function nameTakenBy(
+  projects: readonly { id: string; name: string }[],
+  project: string,
+  name: string,
+): string | undefined {
+  const shown = (name.trim() || readable(project)).toLowerCase();
+  const other = projects.find(
+    (p) => p.id !== project && projectName([p], p.id).toLowerCase() === shown,
+  );
+  return other && projectName([other], other.id);
+}
+
+/** How a project shows: the name the CEO gave it, else its id made readable
+ * (an id not among projects, too: a stale row, the list not read yet). */
+export function projectName(
+  projects: readonly { id: string; name: string }[] | undefined,
+  id: string,
+): string {
+  return projects?.find((p) => p.id === id)?.name || readable(id);
 }
 
 /** Whether an agent's name already says it leads ("Lead", "Tech lead"),

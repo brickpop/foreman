@@ -3,7 +3,6 @@ import type { Deployment, Instance } from "../api/client";
 import { replacingLine, sessionsEnd } from "./model";
 import {
   deploymentOn,
-  latestFirst,
   latestStopped,
   projectHome,
   reviewOf,
@@ -18,7 +17,7 @@ const inst = (id: string, deploymentId: string) => ({ id, deploymentId }) as Ins
 
 describe("a project's page", () => {
   it("names the project in the window's title", () => {
-    expect(windowTitle("evm-ecosystem")).toBe("Evm ecosystem · Foreman");
+    expect(windowTitle("Evm ecosystem")).toBe("Evm ecosystem · Foreman");
     expect(windowTitle(undefined)).toBe("Foreman");
   });
 
@@ -84,35 +83,11 @@ describe("a project's page", () => {
 
 describe("deploying onto a project with a team", () => {
   it("says the team there is replaced, and what ends", () => {
-    expect(replacingLine("Atlas", "big-ledger", 3)).toBe(
+    expect(replacingLine("Atlas", "Big ledger", 3)).toBe(
       "Replaces Atlas on Big ledger: 3 sessions end. Worktrees and branches are kept.",
     );
     expect(sessionsEnd(1)).toBe("1 session ends");
     expect(sessionsEnd(0)).toBe("0 sessions end");
-  });
-});
-
-describe("the projects, latest first", () => {
-  const p = (...ids: string[]) => ids.map((id) => ({ id }));
-  it("orders by last activity, by time rather than text", () => {
-    const latest = {
-      ledger: "2026-11-01T09:00:00Z",
-      relay: "2026-11-01T09:00:00.5Z", // half a second later, though it sorts lower as text
-      quiet: "2025-01-01T00:00:00Z",
-    };
-    expect(latestFirst(p("ledger", "quiet", "relay"), latest).map((x) => x.id)).toEqual([
-      "relay",
-      "ledger",
-      "quiet",
-    ]);
-  });
-  it("puts a project added since the page loaded first, and ties by name", () => {
-    const latest = { b: "2026-11-01T09:00:00Z", a: "2026-11-01T09:00:00Z" };
-    expect(latestFirst(p("a", "b", "new"), latest).map((x) => x.id)).toEqual(["new", "a", "b"]);
-  });
-  it("leaves the order as it is until the times are in", () => {
-    const list = p("b", "a");
-    expect(latestFirst(list, undefined)).toBe(list);
   });
 });
 

@@ -218,7 +218,7 @@ func (g *CLI) Switch(ctx context.Context, dir, branch, base string) (created boo
 	if !g.HasBranch(ctx, dir, base) {
 		return false, fmt.Errorf("no branch %q to start %s from", base, branch)
 	}
-	_, err = run(ctx, dir, "checkout", "--quiet", "-b", branch, base)
+	_, err = run(ctx, dir, "checkout", "--quiet", "-b", branch, "refs/heads/"+base)
 	return err == nil, err
 }
 

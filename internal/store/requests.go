@@ -34,7 +34,7 @@ func (db *DB) Requests() Requests { return requests{db.sql} }
 
 type requests struct{ db *sql.DB }
 
-const requestColumns = "seq, kind, project_id, deployment_id, instance_id, summary, options, source, status, answer, created_at, resolved_at, review_id, links"
+const requestColumns = "seq, kind, project_id, deployment_id, instance_id, summary, body, options, source, status, answer, created_at, resolved_at, review_id, links"
 
 func (s requests) Save(ctx context.Context, r Request) (Request, error) {
 	if r.Status == "" {
@@ -57,10 +57,10 @@ func (s requests) Save(ctx context.Context, r Request) (Request, error) {
 	if err != nil {
 		return r, err
 	}
-	values := []any{r.Kind, nullText(r.ProjectID), nullText(r.DeploymentID), nullText(r.InstanceID), r.Summary, string(options), r.Source,
+	values := []any{r.Kind, nullText(r.ProjectID), nullText(r.DeploymentID), nullText(r.InstanceID), r.Summary, r.Body, string(options), r.Source,
 		r.Status, nullText(r.Answer), timeText(r.CreatedAt), timeText(r.ResolvedAt), nullText(r.ReviewID), string(links)}
 	if r.ID == "" {
-		res, err := s.db.ExecContext(ctx, "INSERT INTO requests (kind, project_id, deployment_id, instance_id, summary, options, source, status, answer, created_at, resolved_at, review_id, links) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
+		res, err := s.db.ExecContext(ctx, "INSERT INTO requests (kind, project_id, deployment_id, instance_id, summary, body, options, source, status, answer, created_at, resolved_at, review_id, links) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
 		if err != nil {
 			return r, err
 		}
@@ -72,7 +72,7 @@ func (s requests) Save(ctx context.Context, r Request) (Request, error) {
 	if err != nil || !strings.HasPrefix(r.ID, "req-") {
 		return r, errors.Join(ErrNotFound, fmt.Errorf("no request %q", r.ID))
 	}
-	res, err := s.db.ExecContext(ctx, "UPDATE requests SET kind = ?, project_id = ?, deployment_id = ?, instance_id = ?, summary = ?, options = ?, source = ?, status = ?, answer = ?, created_at = ?, resolved_at = ?, review_id = ?, links = ? WHERE seq = ?", append(values, seq)...)
+	res, err := s.db.ExecContext(ctx, "UPDATE requests SET kind = ?, project_id = ?, deployment_id = ?, instance_id = ?, summary = ?, body = ?, options = ?, source = ?, status = ?, answer = ?, created_at = ?, resolved_at = ?, review_id = ?, links = ? WHERE seq = ?", append(values, seq)...)
 	return r, touched(res, err)
 }
 
@@ -103,7 +103,7 @@ func (s requests) query(ctx context.Context, where string, args ...any) ([]Reque
 		var seq int64
 		var project, deployment, instance, answer, created, resolved, review sql.NullString
 		var options, links string
-		if err := rows.Scan(&seq, &r.Kind, &project, &deployment, &instance, &r.Summary, &options, &r.Source, &r.Status, &answer, &created, &resolved, &review, &links); err != nil {
+		if err := rows.Scan(&seq, &r.Kind, &project, &deployment, &instance, &r.Summary, &r.Body, &options, &r.Source, &r.Status, &answer, &created, &resolved, &review, &links); err != nil {
 			return nil, err
 		}
 		r.ID = "req-" + strconv.FormatInt(seq, 10)

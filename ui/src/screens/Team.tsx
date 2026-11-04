@@ -2,8 +2,15 @@ import { Link, useParams, useSearch } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Team as TeamData } from "../api/client";
 import { useOpenChiefOfStaff } from "../app/chiefOfStaff";
-import { readable, roleLabel, roster, type TeamTab, teamTab } from "../app/model";
-import { useDeployments, useHomeFolder, useInstances, useRequests, useTeams } from "../app/queries";
+import { roleLabel, roster, type TeamTab, teamTab } from "../app/model";
+import {
+  useDeployments,
+  useHomeFolder,
+  useInstances,
+  useProjectName,
+  useRequests,
+  useTeams,
+} from "../app/queries";
 import { DeployDialog } from "../components/DeployDialog";
 import { StopIcon } from "../components/icons";
 import { ReloadButton } from "../components/ReloadButton";
@@ -81,6 +88,7 @@ export function Team() {
 }
 
 function Deployments({ team, deployments }: { team: TeamData; deployments: Deployment[] }) {
+  const projectNameOf = useProjectName();
   const instances = useInstances();
   const requests = useRequests();
   const [stopping, setStopping] = useState<Deployment>();
@@ -109,13 +117,13 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
                     params={{ project: d.projectId }}
                     className="relative z-10 text-[15px] font-semibold text-tx hover:underline"
                   >
-                    {readable(d.projectId)}
+                    {projectNameOf(d.projectId)}
                   </Link>
                   <Link
                     to="/projects/$project/session"
                     params={{ project: d.projectId }}
                     data-card
-                    aria-label={`Open the sessions of ${team.config.name} on ${readable(d.projectId)}`}
+                    aria-label={`Open the sessions of ${team.config.name} on ${projectNameOf(d.projectId)}`}
                     className="text-[13px] text-tx4 outline-none after:absolute after:inset-0"
                   >
                     {working} working{waiting > 0 && ` · ${waiting} waiting on you`}
@@ -147,6 +155,7 @@ function Deployments({ team, deployments }: { team: TeamData; deployments: Deplo
 }
 
 function Members({ team, deployments }: { team: TeamData; deployments: Deployment[] }) {
+  const projectNameOf = useProjectName();
   const instances = useInstances();
   const ids = roster(team.config);
   return (
@@ -174,7 +183,7 @@ function Members({ team, deployments }: { team: TeamData; deployments: Deploymen
                 return (
                   <span key={d.id} className="flex items-center gap-1.5 text-[13px] text-tx3">
                     <Dot status={inst?.status ?? "stopped"} />
-                    {readable(d.projectId)}
+                    {projectNameOf(d.projectId)}
                   </span>
                 );
               })}

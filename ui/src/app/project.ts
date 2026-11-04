@@ -1,9 +1,8 @@
 import type { Deployment, Instance } from "../api/client";
-import { readable } from "./model";
 
-/** The window's title: the project shown first, so a narrow tab still says it. */
+/** The window's title: the project shown first (its shown name), so a narrow tab still says it. */
 export function windowTitle(project?: string): string {
-  return project ? `${readable(project)} · Foreman` : "Foreman";
+  return project ? `${project} · Foreman` : "Foreman";
 }
 
 // A project's page (wiki/product/features/project-page.md): its sections,
@@ -66,18 +65,6 @@ export function latestStopped(project: string, stopped: Deployment[]): Deploymen
       (a, d) => (!a || Date.parse(d.stoppedAt) > Date.parse(a.stoppedAt) ? d : a),
       undefined,
     );
-}
-
-/** The projects latest first: by when something last happened on each, as of
- * the page's load (the CEO, 2026-11-01). One added since comes first; with no
- * times yet, the order is left as it is. */
-export function latestFirst<T extends { id: string }>(
-  projects: T[],
-  latest: Record<string, string> | undefined,
-): T[] {
-  if (!latest) return projects;
-  const at = (p: T) => (p.id in latest ? Date.parse(latest[p.id]) : Number.POSITIVE_INFINITY);
-  return [...projects].sort((a, b) => at(b) - at(a) || a.id.localeCompare(b.id));
 }
 
 export type TeamView = "agents" | "activity" | "inflight" | "merged";

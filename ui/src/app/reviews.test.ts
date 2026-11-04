@@ -161,8 +161,8 @@ describe("Dismiss", () => {
   const v = { deploymentId: "atlas@ledger" } as Review;
   const teams = [{ id: "atlas", config: { name: "Atlas" } }] as Team[];
   const atlas = [{ id: "atlas@ledger" }] as Deployment[];
-  const running = dismissChoices({ name: "Atlas", live: true }, "ledger");
-  const stopped = dismissChoices({ name: "Atlas", live: false }, "ledger");
+  const running = dismissChoices({ name: "Atlas", live: true }, "Ledger");
+  const stopped = dismissChoices({ name: "Atlas", live: false }, "Ledger");
   const shape = (c: (typeof running)[number]) => [c.value, c.stopTeam, c.dropBranches, c.tells];
 
   it("knows the review's team by name, and whether it still runs", () => {

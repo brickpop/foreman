@@ -69,7 +69,8 @@ export interface Request {
   projectId: string;
   deploymentId: string; // "" with no instance
   instanceId: string; // who raised it, or who it is about; "" when Foreman raised it about no instance
-  summary: string;
+  summary: string; // its title: one line
+  body: string; // the rest, when it needs more; "" for none
   options: string[]; // the first is the primary action
   source: string; // agent, harness or foreman
   status: string; // open, resolved or expired
@@ -190,6 +191,8 @@ export interface Review {
   id: string;
   projectId: string;
   branch: string;
+  title: string; // the lead's, one line
+  body: string; // what the CEO should know about the work; "" for none
   createdAt: string /* RFC 3339 */;
   changesRequestedAt: string /* RFC 3339 */; // zero unless it waits on the lead
   changesNote: string; // the CEO's note with the last Request changes

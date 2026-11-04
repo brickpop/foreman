@@ -7,7 +7,7 @@ import {
   type Team,
   type WorkItem,
 } from "../../api/client";
-import { agentOf, readable, when } from "../../app/model";
+import { agentOf, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   useAnswer,
@@ -15,6 +15,7 @@ import {
   useInstances,
   usePipeline,
   useRepos,
+  useReviewTitle,
   useTeams,
 } from "../../app/queries";
 import { reposWith } from "../../app/repos";
@@ -124,8 +125,8 @@ export function ProjectRequest({
   const agent = agentOf(teams, r.deploymentId, r.instanceId);
   const openSession = () => navigate(sessionOf(r.instanceId));
   const context = agent
-    ? `${agent.team.config.name} on ${readable(project.id)}`
-    : `on ${readable(project.id)}`;
+    ? `${agent.team.config.name} on ${projectName([project], project.id)}`
+    : `on ${projectName([project], project.id)}`;
   const who = agent?.soul.name;
   return (
     <RequestPanel
@@ -215,13 +216,13 @@ function MergeRow({
 }) {
   const navigate = useNavigate();
   const lead = agentOf(teams, mr.deploymentId, mr.authorInstance);
-  const title = useEntryTitle(project, mr.entry);
+  const title = useReviewTitle(mr.reviewId);
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
       <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3">
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium">
-            {title.data ?? mr.entry}
+            {title || mr.branch}
             {mr.forgePrNumber > 0 && <span className="text-tx3"> PR #{mr.forgePrNumber}</span>}
           </span>
           <span className="truncate text-[12.5px] text-tx3">
@@ -289,12 +290,12 @@ function MergedRow({
   teams: Team[];
   items: WorkItem[];
 }) {
-  const title = useEntryTitle(project, mr.entry);
+  const title = useReviewTitle(mr.reviewId);
   return (
     <div className="flex flex-col gap-1.5">
       <span className="flex items-center gap-2">
         <span className="text-ok">✓</span>
-        <span className="font-medium">{title.data ?? mr.entry}</span>
+        <span className="font-medium">{title || mr.branch}</span>
         {mr.forgePrNumber > 0 && <span className="text-tx3">PR #{mr.forgePrNumber}</span>}
         <span className="text-[13px] text-tx4">
           {mr.repo} · merged to {mr.target} · {when(mr.mergedAt)}

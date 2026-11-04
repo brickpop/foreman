@@ -3,11 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { type Project, type Repo, useClient } from "../../api/client";
-import { readable, when } from "../../app/model";
+import { projectName, readable, when } from "../../app/model";
 import { keys, useDeployments, useRepos } from "../../app/queries";
 import { AddRepo } from "../../components/AddRepo";
+import { FolderBrowser, useFolderBrowser } from "../../components/FolderBrowser";
+import { RepoIcon } from "../../components/icons";
 import { Confirm, Modal } from "../../components/Overlays";
-import { RepoPicker } from "../../components/RepoPicker";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { Button, Card, cover, Loading } from "../../components/ui";
@@ -79,14 +80,19 @@ export function Repos() {
       </div>
       {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
       <span>
-        <Button variant="small" onClick={() => setAdding(true)}>
+        <Button
+          variant="outline"
+          className="inline-flex items-center gap-2 !px-4 !py-2"
+          onClick={() => setAdding(true)}
+        >
+          <RepoIcon size="size-4" />
           Add a repo
         </Button>
       </span>
       <Modal
         open={adding}
         onClose={() => setAdding(false)}
-        title={`Add a repo to ${readable(project.id)}`}
+        title={`Add a repo to ${projectName([project], project.id)}`}
       >
         {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
       </Modal>
@@ -162,8 +168,10 @@ export function Repos() {
             Pick its folder now. It must be the same repo: Foreman checks they share a commit.
           </p>
           {changing?.what === "locate" && (
-            <RepoPicker
-              pick="repo"
+            <Locate
+              project={project.id}
+              repo={changing.repo}
+              pending={change.isPending}
               onPick={(path) =>
                 change.mutate(() => client.home.locateRepo(project.id, changing.repo, path), {
                   onSuccess: close,
@@ -175,7 +183,7 @@ export function Repos() {
       </Modal>
       <Confirm
         open={changing?.what === "remove"}
-        title={`Remove ${changing?.repo ?? ""} from ${readable(project.id)}?`}
+        title={`Remove ${changing?.repo ?? ""} from ${projectName([project], project.id)}?`}
         body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
         action="Remove"
         onConfirm={() =>
@@ -196,6 +204,40 @@ export function Repos() {
         }
         onClose={close}
       />
+    </div>
+  );
+}
+
+/** Locate's browser: its button takes the folder shown, once it is a git repo
+ * and not another of the project's repos. */
+function Locate({
+  project,
+  repo,
+  pending,
+  onPick,
+}: {
+  project: string;
+  repo: string;
+  pending: boolean;
+  onPick: (path: string) => void;
+}) {
+  const browser = useFolderBrowser(project);
+  const f = browser.folder;
+  const other = f?.added && f.added !== repo ? f.added : undefined;
+  return (
+    <div className="flex flex-col gap-3">
+      <FolderBrowser browser={browser} />
+      <div className="flex items-center justify-end gap-3">
+        {f && !f.repo && <span className="text-[12.5px] text-tx4">Open the repo's folder.</span>}
+        {other && <span className="text-[12.5px] text-tx4">That's {other}'s folder.</span>}
+        <Button
+          variant="primary"
+          disabled={!f?.repo || !!other || pending}
+          onClick={() => f && onPick(f.path)}
+        >
+          Locate here
+        </Button>
+      </div>
     </div>
   );
 }

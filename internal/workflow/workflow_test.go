@@ -550,7 +550,7 @@ func TestContributeRefusals(t *testing.T) {
 	f.refused("tove", "contribute", map[string]string{"kind": "rant", "title": "x", "body": "x"}, "bad_kind")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "", "body": "x"}, "empty")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "a\n---\nauthor: mara", "body": "x"}, "too_long")
-	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": strings.Repeat("x", maxTitle+1), "body": "x"}, "too_long")
+	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": strings.Repeat("x", teamtools.MaxTitle+1), "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "x", "body": strings.Repeat("x", teamtools.MaxContribution+1)}, "too_long")
 	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "project", "wiki", "inbox")); len(entries) != 0 {
 		t.Errorf("a refusal filed %d notes", len(entries))
@@ -561,7 +561,7 @@ func TestContributeRefusals(t *testing.T) {
 // count characters, so a title of arrows is as long as one of letters.
 func TestContributeFitsADesignRecord(t *testing.T) {
 	f := newFixture(t)
-	f.ok("tove", "contribute", map[string]string{"kind": "proposal", "title": strings.Repeat("→", maxTitle), "body": strings.Repeat("é", teamtools.MaxContribution)})
+	f.ok("tove", "contribute", map[string]string{"kind": "proposal", "title": strings.Repeat("→", teamtools.MaxTitle), "body": strings.Repeat("é", teamtools.MaxContribution)})
 }
 
 func TestSlug(t *testing.T) {
@@ -834,12 +834,20 @@ func (f *fixture) integrated() {
 func TestRequestMergeRefusals(t *testing.T) {
 	f := newFixture(t)
 	req := func(branch, entry string) map[string]string {
-		return map[string]string{"branch": branch, "entry": entry}
+		return map[string]string{"branch": branch, "title": "Invoices as CSV", "entry": entry}
 	}
 	f.refused("tove", "request_merge", req("wt/ledger/tove/main", "backlog/led-44.md"), "not_lead")
 	f.refused("mara", "request_merge", req("wt/ledger/tove/main", "backlog/led-44.md"), "branch_not_allowed")
 	f.refused("mara", "request_merge", req("lead/ledger/orion/x", "backlog/led-44.md"), "branch_not_allowed")
 	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", ""), "entry_not_found")
+	// A title is one short line; the rest is the body's.
+	titled := func(title, body string) map[string]string {
+		return map[string]string{"branch": "lead/ledger/atlas/integration", "title": title, "body": body, "entry": "backlog/led-44.md"}
+	}
+	f.refused("mara", "request_merge", titled("  ", ""), "empty")
+	f.refused("mara", "request_merge", titled("Invoices\nas CSV", ""), "too_long")
+	f.refused("mara", "request_merge", titled(strings.Repeat("é", teamtools.MaxTitle+1), ""), "too_long")
+	f.refused("mara", "request_merge", titled("Invoices as CSV", strings.Repeat("x", teamtools.MaxBody+1)), "too_long")
 	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", "backlog/nope.md"), "entry_not_found")
 	f.refused("mara", "request_merge", req("lead/ledger/atlas/integration", "backlog/led-44.md"), "nothing_to_merge")
 	f.refused("mara", "request_merge", req("lead/ledger/atlas/none", "backlog/led-44.md"), "branch_not_found")
@@ -887,7 +895,7 @@ func (f *fixture) shown(id string, repos ...string) map[string]string {
 	return heads
 }
 
-var integration = map[string]string{"branch": "lead/ledger/atlas/integration", "entry": "backlog/led-44.md"}
+var integration = map[string]string{"branch": "lead/ledger/atlas/integration", "title": "Invoices as CSV", "entry": "backlog/led-44.md"}
 
 func TestFromHandoffToMain(t *testing.T) {
 	f := newFixture(t)
@@ -899,15 +907,27 @@ func TestFromHandoffToMain(t *testing.T) {
 	if w := f.item("wt/ledger/tove/LED-44"); w.MergeRequestID != "mr-1" {
 		t.Errorf("work item %+v", w)
 	}
-	if text := f.ok("mara", "request_merge", integration); text != "Review rev-1, api (mr-1) into main, refreshed: waiting for the CEO." {
+	if v := f.review("rev-1"); v.Title != "Invoices as CSV" || v.Body != "" {
+		t.Errorf("title %q, body %q", v.Title, v.Body)
+	}
+	// A refresh takes the new title and body: the CEO reads what the lead says now.
+	again := map[string]string{"branch": integration["branch"], "title": "Invoices as CSV and JSON", "body": "JSON too.\n\nRead export.go first.", "entry": integration["entry"]}
+	if text := f.ok("mara", "request_merge", again); text != "Review rev-1, api (mr-1) into main, refreshed: waiting for the CEO." {
 		t.Errorf("again: %q", text)
+	}
+	if v := f.review("rev-1"); v.Title != "Invoices as CSV and JSON" || v.Body != "JSON too.\n\nRead export.go first." {
+		t.Errorf("refreshed: title %q, body %q", v.Title, v.Body)
+	}
+	f.ok("mara", "request_merge", integration) // and no body leaves none
+	if v := f.review("rev-1"); v.Title != "Invoices as CSV" || v.Body != "" {
+		t.Errorf("back: title %q, body %q", v.Title, v.Body)
 	}
 	p, _ := f.w.Pipeline(ctx, "ledger")
 	if len(p.MergeRequests) != 1 || p.MergeRequests[0].Entry != "backlog/led-44.md" || p.MergeRequests[0].ReviewID != "rev-1" {
 		t.Fatalf("pipeline %+v", p.MergeRequests)
 	}
 	v := f.review("rev-1")
-	if v.Status != ReviewNeedsYou || v.Title != "Export invoices" || v.Lead != "mara@ledger" || v.Branch != "lead/ledger/atlas/integration" || len(v.MergeRequests) != 1 {
+	if v.Status != ReviewNeedsYou || v.Title != "Invoices as CSV" || v.EntryTitle != "Export invoices" || v.Lead != "mara@ledger" || v.Branch != "lead/ledger/atlas/integration" || len(v.MergeRequests) != 1 {
 		t.Errorf("review %+v", v)
 	}
 	diffs, err := f.w.ReviewDiff(ctx, "rev-1", false)
@@ -1017,7 +1037,7 @@ func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
 		t.Errorf("status %q", v.Status)
 	}
 	list, err := f.w.ListReviews(ctx)
-	if err != nil || len(list) != 1 || list[0].Comments != nil || list[0].Title != "Export invoices" {
+	if err != nil || len(list) != 1 || list[0].Comments != nil || list[0].Title != "Invoices as CSV" {
 		t.Errorf("list %+v %v", list, err)
 	}
 }
@@ -1455,7 +1475,7 @@ func TestMergesOutsideForemanAreNoticedAndMainMovedIsTold(t *testing.T) {
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/second"})
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "second.go"), "package s\n")
 	f.ok("mara", "commit", commits("api", "second"))
-	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/second", "entry": "backlog/led-44.md"})
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/second", "title": "Invoices as CSV", "entry": "backlog/led-44.md"})
 	// The CEO squashes the first by hand, in their own checkout, as a forge
 	// would: its commits never reach main.
 	api := filepath.Join(f.root, "ledger", "api")
@@ -1489,7 +1509,7 @@ func TestRequestMergeIsKeptAsAnAction(t *testing.T) {
 	f := newFixture(t)
 	f.integrated()
 	f.ok("mara", "request_merge", integration)
-	f.refused("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/integration", "entry": "backlog/nope.md"}, "entry_not_found")
+	f.refused("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/integration", "title": "Invoices as CSV", "entry": "backlog/nope.md"}, "entry_not_found")
 	list, err := f.db.Actions().List(ctx, "atlas@ledger")
 	if err != nil {
 		t.Fatal(err)
@@ -1522,7 +1542,7 @@ func TestReviewRequests(t *testing.T) {
 		t.Fatalf("open %+v", open)
 	}
 	if r := open[0]; r.Kind != "review" || r.ReviewID != "rev-1" || r.InstanceID != "mara@ledger" || r.ProjectID != "ledger" ||
-		r.Source != "agent" || r.Summary != "Merge lead/ledger/atlas/integration: Export invoices." {
+		r.Source != "agent" || r.Summary != "Merge lead/ledger/atlas/integration: Invoices as CSV" {
 		t.Errorf("review %+v", r)
 	}
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api")); err != nil {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Instance, Request, Team } from "../api/client";
+import type { Instance, Project, Request, Team } from "../api/client";
 import { type Notice, noticeFor, notifiesBrowser, permission } from "./notifications";
 
 const team = {
@@ -30,6 +30,13 @@ describe("noticeFor", () => {
       instance: "tove@ledger",
       deployment: "atlas@ledger",
     });
+  });
+
+  it("names the project as the CEO named it", () => {
+    const projects = [{ id: "ledger", name: "Ledger · EUR" }] as Project[];
+    expect(noticeFor(request({}), [team], instances, projects)?.title).toBe(
+      "Tove needs you on Ledger · EUR",
+    );
   });
 
   it("names the agent as its own team has it, when another team shares the id", () => {

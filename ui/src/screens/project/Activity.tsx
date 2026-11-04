@@ -2,13 +2,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import type { Deployment, Instance, Team } from "../../api/client";
 import { type Filter, pageEntries, shows } from "../../app/activity";
-import { readable, when } from "../../app/model";
+import { when } from "../../app/model";
 import { sessionOf } from "../../app/project";
 import {
   useActivity,
   useDeployments,
   useInstances,
   useMessages,
+  useProjectName,
   useStoppedDeployments,
   useTeams,
 } from "../../app/queries";
@@ -27,6 +28,7 @@ const teamName = (teams: Team[], d: Deployment) =>
   teams.find((t) => t.id === d.teamId)?.config.name ?? d.teamId;
 
 export function Activity() {
+  const projectNameOf = useProjectName();
   const project = useProject().id;
   const navigate = useNavigate();
   const teams = useTeams().data ?? [];
@@ -57,7 +59,7 @@ export function Activity() {
           />
         </div>
       ) : (
-        <Empty>No team is on {readable(project)}.</Empty>
+        <Empty>No team is on {projectNameOf(project)}.</Empty>
       )}
       {stopped.length > 0 && <OlderSessions deployments={stopped} teams={teams} />}
     </div>

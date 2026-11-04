@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
-import { agentOf, forgeOf, linkLine, targetsOf, when } from "../../app/model";
+import { agentOf, forgeOf, linkLine, projectName, targetsOf, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
@@ -43,6 +43,7 @@ import {
   Button,
   CopyButton,
   Empty,
+  FoldedText,
   Loading,
   SectionLabel,
   SectionTitle,
@@ -156,7 +157,7 @@ export function Review() {
             ←
           </Link>
           <h1 className="min-w-0 text-[22px] font-semibold tracking-[-0.02em]">
-            {v.title || v.entry || v.branch}
+            {v.title || v.branch}
           </h1>
         </div>
         <p className="flex flex-wrap items-center gap-2 text-[14px] text-tx3">
@@ -176,9 +177,19 @@ export function Review() {
               label="Copy the branch name"
               className="-my-1 ml-0.5 size-6 align-middle"
             />{" "}
-            · {statusLabel(v.status)} · {when(v.updatedAt)}
+            · {statusLabel(v.status)} · {when(v.updatedAt)} · card{" "}
+            <Link
+              to="/projects/$project/wiki"
+              params={{ project: v.projectId }}
+              search={{ entry: v.entry }}
+              title={v.entry}
+              className="text-tx2 hover:text-tx"
+            >
+              {v.entryTitle || v.entry}
+            </Link>
           </span>
         </p>
+        <FoldedText text={v.body} />
         {v.withdrawnReason && (
           <p className="text-[14px] text-tx3">
             Withdrawn: {v.withdrawnReason}.
@@ -310,7 +321,7 @@ export function Review() {
           diffs={diff.data}
           dismissAs={dismissChoices(
             reviewTeam(v, deployments.data ?? [], teams.data ?? []),
-            v.projectId,
+            projectName(projects.data, v.projectId),
           )}
           failed={failed}
         />

@@ -1020,3 +1020,97 @@ func TestTargets(t *testing.T) {
 		t.Errorf("after its branch went: %v", p.Targets("app"))
 	}
 }
+
+// A project's name is only how it shows: any words, while a team runs too,
+// kept across a restart; "" shows it by its id again.
+func TestSetName(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+		t.Fatal(err)
+	}
+	h.deployed = func(context.Context, string) bool { return true }
+	var changes []Change
+	h.notify = func(c Change) { changes = append(changes, c) }
+	if p, err := h.SetName(ctx, "ledger", "  Ledger · v2 (EUR) "); err != nil || p.Name != "Ledger · v2 (EUR)" || p.ID != "ledger" {
+		t.Errorf("%+v %v", p, err)
+	}
+	if len(changes) != 1 || changes[0].Kind != "projects" {
+		t.Errorf("changes %+v", changes)
+	}
+	reload(t, h)
+	if p, _ := h.Project("ledger"); p.Name != "Ledger · v2 (EUR)" || !exists(p.Path) || p.Workspace != workspace("ledger") {
+		t.Errorf("after a restart: %+v", p)
+	}
+	for _, bad := range []string{strings.Repeat("é", maxProjectName+1), "two\nlines", "tab\there"} {
+		if _, err := h.SetName(ctx, "ledger", bad); !errors.Is(err, ErrInvalid) {
+			t.Errorf("%q: %v", bad, err)
+		}
+	}
+	if p, err := h.SetName(ctx, "ledger", strings.Repeat("é", maxProjectName)); err != nil || p.Name == "" {
+		t.Errorf("at the limit, in characters not bytes: %v", err)
+	}
+	if p, err := h.SetName(ctx, "ledger", " "); err != nil || p.Name != "" {
+		t.Errorf("cleared: %+v %v", p, err)
+	}
+	if _, err := h.SetName(ctx, "nope", "x"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("no such project: %v", err)
+	}
+}
+
+// Two projects never read the same, in any case: a display name taken by
+// another's (or by another's id made readable) is refused, and so is a new
+// project whose id reads as another's name.
+func TestProjectNamesAreUnique(t *testing.T) {
+	h := loaded(t, nil)
+	for _, id := range []string{"ledger", "big-ledger"} {
+		if _, _, err := h.NewProject(ctx, id, "", workspace(id)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := h.SetName(ctx, "big-ledger", "Ledger"); !errors.Is(err, ErrExists) {
+		t.Errorf("another's id, made readable: %v", err)
+	}
+	if _, err := h.SetName(ctx, "big-ledger", "big LEDGER"); err != nil {
+		t.Errorf("its own readable id, in another case: %v", err)
+	}
+	if _, err := h.SetName(ctx, "ledger", "Ledger · EUR"); err != nil {
+		t.Fatal(err)
+	}
+	// Ledger is free now: ledger shows as Ledger · EUR.
+	if p, err := h.SetName(ctx, "big-ledger", "Ledger"); err != nil || p.Name != "Ledger" {
+		t.Errorf("a name freed: %+v %v", p, err)
+	}
+	if _, err := h.SetName(ctx, "ledger", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "big-ledger shows as Ledger already") {
+		t.Errorf("back to its id, which reads as another's name: %v", err)
+	}
+	if _, _, err := h.NewProject(ctx, "ledger-eur", "", workspace("ledger-eur")); err != nil {
+		t.Errorf("an id reading differently: %v", err)
+	}
+	if _, err := h.SetName(ctx, "ledger-eur", "ledger · eur"); !errors.Is(err, ErrExists) {
+		t.Errorf("another's display name, in another case: %v", err)
+	}
+	if _, err := h.SetName(ctx, "ledger", "Big ledger"); err != nil {
+		t.Errorf("big-ledger's readable id, no longer shown: %v", err)
+	}
+	if _, _, err := h.NewProject(ctx, "big-ledger-2", "", workspace("big-ledger-2")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.SetName(ctx, "big-ledger", ""); !errors.Is(err, ErrExists) {
+		t.Errorf("cleared to an id that reads as ledger's name: %v", err)
+	}
+	if _, err := h.SetName(ctx, "ledger", "Old ledger"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := h.NewProject(ctx, "old-ledger", "", workspace("old-ledger")); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "ledger shows as Old ledger already") {
+		t.Errorf("a new project reading as another's name: %v", err)
+	}
+}
+
+// The server reads ids as the UI does (app.test.ts, readable).
+func TestReadable(t *testing.T) {
+	for id, want := range map[string]string{"my-portfolio": "My portfolio", "api": "Api", "my__data--set_": "My data set", "Ledger.v2": "Ledger.v2", "": ""} {
+		if got := readable(id); got != want {
+			t.Errorf("%q: %q, want %q", id, got, want)
+		}
+	}
+}

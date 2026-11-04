@@ -24,7 +24,6 @@ import (
 var escalations = []string{"approval", "question", "finding"}
 
 const (
-	maxSummary = 2000 // a request panel's text
 	maxOptions = 6
 	maxOption  = 80 // a button's label
 	// dedupWindow: the same request again within it is the one already open.
@@ -34,14 +33,18 @@ const (
 // approvalOptions are an approval's when the lead names none.
 var approvalOptions = []string{"Approve", "Deny"}
 
-func (t tool) escalate(ctx context.Context, kind, summary string, options []string, wait bool) agentlink.Result {
+// A title the CEO reads in a list, a body when it needs more (the CEO,
+// 2026-11-04: a whole question in one line was unreadable).
+func (t tool) escalate(ctx context.Context, kind, title, body string, options []string, wait bool) agentlink.Result {
 	switch {
 	case !slices.Contains(escalations, kind):
 		return teamtools.Refusal("bad_kind", "kind is approval, question or finding")
-	case summary == "":
-		return teamtools.Refusal("empty", "say what you need from the CEO in summary")
-	case teamtools.TooLong(summary, maxSummary):
-		return teamtools.Refusal("too_long", "a summary is at most %d characters; put the detail in a wiki entry and name it", maxSummary)
+	case title == "":
+		return teamtools.Refusal("empty", "say what you need from the CEO in title")
+	case teamtools.BadTitle(title):
+		return teamtools.Refusal("too_long", "a title is one line of at most %d characters: put the rest in body", teamtools.MaxTitle)
+	case teamtools.TooLong(body, teamtools.MaxBody):
+		return teamtools.Refusal("too_long", "a body is at most %d characters: put the long parts in a wiki entry or a branch, and name it", teamtools.MaxBody)
 	case len(options) > maxOptions:
 		return teamtools.Refusal("too_long", "at most %d options", maxOptions)
 	}
@@ -62,7 +65,7 @@ func (t tool) escalate(ctx context.Context, kind, summary string, options []stri
 		opts = approvalOptions
 	}
 	r, fresh, err := t.w.raise(ctx, store.Request{Kind: kind, ProjectID: t.c.Deployment.ProjectID, DeploymentID: t.c.Deployment.ID,
-		InstanceID: t.c.Instance.ID, Source: "agent", Summary: summary, Options: opts})
+		InstanceID: t.c.Instance.ID, Source: "agent", Summary: title, Body: body, Options: opts})
 	if err != nil {
 		return teamtools.Refusal("internal", "%v", err)
 	}
@@ -77,7 +80,7 @@ func (t tool) escalate(ctx context.Context, kind, summary string, options []stri
 }
 
 // raise saves a request, unless the same one is open already: same agent,
-// kind and summary (in case and spacing alike), raised within the window.
+// kind, title and body (in case and spacing alike), raised within the window.
 // fresh says whether it is a new one.
 func (w *Workflow) raise(ctx context.Context, r store.Request) (store.Request, bool, error) {
 	open, err := w.Requests.Open(ctx)
@@ -85,7 +88,7 @@ func (w *Workflow) raise(ctx context.Context, r store.Request) (store.Request, b
 		return r, false, err
 	}
 	for _, o := range open {
-		if o.InstanceID == r.InstanceID && o.Kind == r.Kind && sameText(o.Summary, r.Summary) && time.Since(o.CreatedAt) < dedupWindow {
+		if o.InstanceID == r.InstanceID && o.Kind == r.Kind && sameText(o.Summary, r.Summary) && sameText(o.Body, r.Body) && time.Since(o.CreatedAt) < dedupWindow {
 			return o, false, nil
 		}
 	}

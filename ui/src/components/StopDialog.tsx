@@ -2,8 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { Deployment } from "../api/client";
 import { useClient } from "../api/client";
-import { readable, sessionsEnd } from "../app/model";
-import { keys, useInstances } from "../app/queries";
+import { sessionsEnd } from "../app/model";
+import { keys, useInstances, useProjectName } from "../app/queries";
 import { StopIcon } from "./icons";
 import { Modal } from "./Overlays";
 import { useToast } from "./Toasts";
@@ -22,6 +22,7 @@ export function StopDialog({
   teamName: string;
   onClose: () => void;
 }) {
+  const projectNameOf = useProjectName();
   const client = useClient();
   const queries = useQueryClient();
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export function StopDialog({
       queries.invalidateQueries({ queryKey: keys.deployments });
       onClose();
       toast({
-        title: `${teamName} stopped on ${readable(d.projectId)}`,
+        title: `${teamName} stopped on ${projectNameOf(d.projectId)}`,
         body: "Worktrees are kept. Other deployments keep running.",
         color: "var(--tx4)",
         onOpen: () => navigate({ to: "/projects/$project/team", params: { project: d.projectId } }),
@@ -43,7 +44,7 @@ export function StopDialog({
     },
   });
   return (
-    <Modal open onClose={onClose} title={`Stop ${teamName} on ${readable(d.projectId)}?`}>
+    <Modal open onClose={onClose} title={`Stop ${teamName} on ${projectNameOf(d.projectId)}?`}>
       <div className="flex flex-col gap-4">
         <p className="m-0 text-tx2">{sessionsEnd(sessions)}. Worktrees and branches are kept.</p>
         {stop.error && <p className="m-0 text-[13px] text-err">{stop.error.message}</p>}

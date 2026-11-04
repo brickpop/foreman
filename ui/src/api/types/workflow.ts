@@ -52,7 +52,7 @@ export const ReviewWithdrawn = "withdrawn"; // the lead, or Foreman, took it bac
 export interface Review extends store.Review {
   status: string;
   entry: string; // the wiki entry its latest request named
-  title: string; // that entry's title
+  entryTitle: string; // that entry's title
   deploymentId: string;
   lead: string; // the instance that asked
   updatedAt: string /* RFC 3339 */;

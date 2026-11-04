@@ -57,6 +57,15 @@ var _ agentlink.Tools = (*Router)(nil)
 // or a wiki entry, named.
 const MaxBody = 8000
 
+// MaxTitle caps a title (a contribution's, a request's, a merge request's):
+// one line a list shows whole. The rest goes in a body.
+const MaxTitle = 120
+
+// BadTitle says whether a title isn't one line of at most MaxTitle characters.
+func BadTitle(title string) bool {
+	return TooLong(title, MaxTitle) || strings.ContainsAny(title, "\r\n")
+}
+
 // MaxContribution caps a contribution's body: it becomes a wiki file, not a
 // terminal line, so a whole design record fits.
 const MaxContribution = 32000

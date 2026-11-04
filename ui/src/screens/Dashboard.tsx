@@ -3,18 +3,18 @@ import { type ReactNode, useState } from "react";
 import type { Project, Request, Team } from "../api/client";
 import {
   agentOf,
+  byName,
   greeting,
   inbox,
   type ProjectRow,
   projectRows,
-  readable,
   workingSummary,
 } from "../app/model";
-import { latestFirst, sessionOf } from "../app/project";
+import { sessionOf } from "../app/project";
 import {
   useAnswer,
   useInstances,
-  useLatestActivity,
+  useProjectName,
   useProjects,
   useRequests,
   useSetup,
@@ -48,9 +48,8 @@ export function Dashboard() {
   const [deploy, setDeploy] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const asks = inbox(requests.data ?? []);
-  const latest = useLatestActivity();
   const rows = projectRows(
-    latestFirst(projects.data ?? [], latest),
+    byName(projects.data ?? []),
     teams.data ?? [],
     instances.data ?? [],
     requests.data ?? [],
@@ -114,6 +113,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 const stateColor = { "needs you": "var(--attn)", "on track": "var(--ok)", idle: "var(--tx4)" };
 
 function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
+  const projectNameOf = useProjectName();
   const repos = project?.repos ?? [];
   return (
     <Card
@@ -125,7 +125,7 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
             params={{ project: row.id }}
             className={`min-w-0 flex-1 truncate text-[15px] font-semibold ${cover}`}
           >
-            {readable(row.id)}
+            {projectNameOf(row.id)}
           </Link>
           <StatusPill color={stateColor[row.state]}>{row.state}</StatusPill>
         </>
@@ -155,10 +155,11 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
 }
 
 function DashboardRequest({ request: r, teams }: { request: Request; teams: Team[] }) {
+  const projectNameOf = useProjectName();
   const navigate = useNavigate();
   const answer = useAnswer();
   const agent = agentOf(teams, r.deploymentId, r.instanceId);
-  const where = `on ${readable(r.projectId)}`;
+  const where = `on ${projectNameOf(r.projectId)}`;
   const context = agent ? `${agent.team.config.name} ${where}` : where;
   const openSession = () => navigate(sessionOf(r.instanceId));
   return (

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { harnessLabel, readable, replacingLine } from "../app/model";
+import { byName, harnessLabel, projectName, replacingLine } from "../app/model";
 import { sessionOf } from "../app/project";
 import {
   keys,
@@ -10,6 +10,7 @@ import {
   useDeployments,
   useInstances,
   useProfiles,
+  useProjectName,
   useProjects,
   useSetup,
   useTeams,
@@ -51,6 +52,7 @@ export function DeployDialog({
   initialTeam?: string;
   project?: string;
 }) {
+  const projectNameOf = useProjectName();
   const client = useClient();
   const queries = useQueryClient();
   const navigate = useNavigate();
@@ -114,7 +116,7 @@ export function DeployDialog({
       onClose();
       navigate(sessionOf(lead));
       toast({
-        title: `${t?.config.name ?? d.teamId} deployed to ${readable(d.projectId)}`,
+        title: `${t?.config.name ?? d.teamId} deployed to ${projectNameOf(d.projectId)}`,
         body: `${members} new sessions starting.`,
         color: "var(--ok)",
         onOpen: () => navigate(sessionOf(lead)),
@@ -150,7 +152,7 @@ export function DeployDialog({
           </Group>
         )}
         <Group label="Project">
-          {(projects.data ?? []).map((p) => {
+          {byName(projects.data ?? []).map((p) => {
             const there = already(p.id);
             return (
               <button
@@ -165,10 +167,10 @@ export function DeployDialog({
                 }}
               >
                 {there
-                  ? `${readable(p.id)} (already there)`
+                  ? `${projectName([p], p.id)} (already there)`
                   : p.archived
-                    ? `${readable(p.id)} (archived)`
-                    : readable(p.id)}
+                    ? `${projectName([p], p.id)} (archived)`
+                    : projectName([p], p.id)}
                 {on(p.id) && !there && (
                   <span className="text-tx4"> · {nameOf(on(p.id)?.teamId ?? "")}</span>
                 )}
@@ -178,7 +180,7 @@ export function DeployDialog({
         </Group>
         {replaced && team && (
           <p className="m-0 rounded-lg border border-attnLine bg-attnSoft px-3 py-2.5 text-[13px] text-attnTx">
-            {replacingLine(nameOf(replaced.teamId), replaced.projectId, ending)}
+            {replacingLine(nameOf(replaced.teamId), projectNameOf(replaced.projectId), ending)}
           </p>
         )}
         {project && !already(project) && continuing.length > 0 && (

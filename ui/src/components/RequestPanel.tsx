@@ -1,6 +1,6 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
-import { Button, KindChip } from "./ui";
+import { Button, FoldedText, KindChip } from "./ui";
 
 // One request to the CEO, but a review (decided on its page). The Dashboard and
 // a project's Inbox (Needs you) use this same panel, so they can't drift; the
@@ -82,6 +82,7 @@ export function RequestPanel({
       <p className={`leading-[1.5] text-pretty ${onProject ? "text-[15.5px]" : "text-base"}`}>
         {r.summary}
       </p>
+      <FoldedText text={r.body} />
       {children}
       <div className="flex flex-wrap items-center gap-2">
         {r.options.map((option, i) => (

@@ -710,11 +710,11 @@ func TestRequests(t *testing.T) {
 	if err != nil || r.ID != "req-1" || r.Status != RequestOpen || r.CreatedAt.IsZero() {
 		t.Fatalf("saved %+v %v", r, err)
 	}
-	if _, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", Summary: "other", Source: "agent", ReviewID: "rev-2"}); err != nil {
+	if _, err := reqs.Save(ctx, Request{Kind: "review", ProjectID: "ledger", Summary: "other", Body: "Line one.\n\nLine two.", Source: "agent", ReviewID: "rev-2"}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := reqs.ForReview(ctx, "rev-1")
-	if err != nil || got.ID != "req-1" || got.Options == nil || len(got.Links) != 1 || got.Links[0].Label != "branch" {
+	if err != nil || got.ID != "req-1" || got.Body != "" || got.Options == nil || len(got.Links) != 1 || got.Links[0].Label != "branch" {
 		t.Errorf("for rev-1: %+v %v", got, err)
 	}
 	r.Status, r.Answer, r.ResolvedAt = RequestResolved, "merged", time.Now().UTC()
@@ -724,7 +724,7 @@ func TestRequests(t *testing.T) {
 	if _, err := reqs.ForReview(ctx, "rev-1"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("a resolved review is not open: %v", err)
 	}
-	if open, _ := reqs.Open(ctx); len(open) != 1 || open[0].ID != "req-2" {
+	if open, _ := reqs.Open(ctx); len(open) != 1 || open[0].ID != "req-2" || open[0].Body != "Line one.\n\nLine two." {
 		t.Errorf("open %+v", open)
 	}
 	if _, err := reqs.Save(ctx, Request{ID: "req-9", Kind: "review", Summary: "x", Source: "agent"}); !errors.Is(err, ErrNotFound) {

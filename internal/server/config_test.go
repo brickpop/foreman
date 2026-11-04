@@ -79,14 +79,18 @@ func (f fakeConfig) SuggestWorkspace(name string) (home.Suggestion, error) {
 
 // Browse lists /home/ceo/dev (the start folder) and below; anything else is
 // outside it.
-func (f fakeConfig) Browse(path string) (home.Folder, error) {
+func (f fakeConfig) Browse(path, project string) (home.Folder, error) {
 	if path == "" {
 		path = "/home/ceo/dev"
 	}
 	if !strings.HasPrefix(path, "/home/ceo/dev") {
 		return home.Folder{}, fmt.Errorf("%w: %s is outside /home/ceo/dev", home.ErrInvalid, path)
 	}
-	return home.Folder{Path: path, Entries: []home.FolderEntry{{Name: "app", Path: path + "/app", Repo: true}}}, nil
+	folder := home.Folder{Path: path, Entries: []home.FolderEntry{{Name: "app", Path: path + "/app", Repo: true}}}
+	if project == "ledger" && path == "/home/ceo/dev/app" {
+		folder.Added = "api"
+	}
+	return folder, nil
 }
 func (f fakeConfig) AddRepo(_ context.Context, project, name, path, def string) (home.Project, error) {
 	return f.changed("AddRepo", project, name, path+" default="+def)
@@ -119,6 +123,9 @@ func (f fakeConfig) RemoveRepo(_ context.Context, project, name string) (home.Pr
 }
 func (f fakeConfig) SetProfile(_ context.Context, project, profile string) (home.Project, error) {
 	return f.changed("SetProfile", project, profile, "")
+}
+func (f fakeConfig) SetName(_ context.Context, project, name string) (home.Project, error) {
+	return f.changed("SetName", project, name, "")
 }
 func (f fakeConfig) SetArchived(_ context.Context, project string, archived bool) (home.Project, error) {
 	return f.changed("SetArchived", project, fmt.Sprint(archived), "")
@@ -402,6 +409,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
+		{http.MethodPut, "/api/projects/ledger/name", `{"name":"Ledger v2"}`, []string{"SetName", "Ledger v2", ""}},
+		{http.MethodPut, "/api/projects/ledger/name", `{"name":""}`, []string{"SetName", "", ""}},
 		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":true}`, []string{"SetArchived", "true", ""}},
 		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":false}`, []string{"SetArchived", "false", ""}},
 		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git","workspace":"/w"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git ws=/w"}},
@@ -453,6 +462,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodGet, "/api/folders/branches?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodPut, "/api/projects/ledger/archived", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
+		{http.MethodPut, "/api/projects/ledger/name", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`},     // never a missing field read as clearing it
+		{http.MethodPut, "/api/projects/nope/name", `{"name":"x"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPut, "/api/projects/nope/archived", `{"archived":true}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects/nope/migrate", `{"workspace":"/w"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"busy"}`, http.StatusConflict, `"DEPLOYED"`},
@@ -488,6 +499,10 @@ func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
 		if f.Path != want || len(f.Entries) != 1 || !f.Entries[0].Repo {
 			t.Errorf("%s: %+v", path, f)
 		}
+	}
+	var added home.Folder
+	if decodeBody(t, get(t, h, "/api/folders?path=/home/ceo/dev/app&project=ledger"), &added); added.Added != "api" {
+		t.Errorf("for a project: %+v", added)
 	}
 	var s home.Suggestion
 	decodeBody(t, get(t, h, "/api/folders/workspace?name=books"), &s)

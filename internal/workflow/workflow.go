@@ -180,14 +180,17 @@ var definitions = []agentlink.Tool{
 			`"body":{"type":"string","description":"The contribution, in Markdown"}`, "kind", "title", "body")},
 	{Name: "escalate", Description: "Ask the CEO: an approval (a project gate, e.g. a new dependency), a question only they can answer, or a finding. It returns at once with the request's id; the answer arrives in your session as a message. For an approval (or a question with wait), wait for it before that step, and keep working on anything else.",
 		InputSchema: object(`"kind":{"type":"string","enum":["approval","question","finding"]},`+
-			`"summary":{"type":"string","description":"What you need from the CEO, complete enough to answer alone"},`+
+			`"title":{"type":"string","description":"What you need from the CEO, in one short line (at most 120 characters), e.g. Add decimal.js for money?"},`+
+			`"body":{"type":"string","description":"Optional: what the CEO needs to answer, in Markdown: the context, what you weighed, what you suggest and why. Name wiki entries or branches for the long parts"},`+
 			`"options":{"type":"array","items":{"type":"string"},"description":"Answers to pick from, the first the one you suggest; the CEO may also write their own. An approval without them gets Approve and Deny"},`+
-			`"wait":{"type":"boolean","description":"A question only: you can't go on with that step without the answer"}`, "kind", "summary")},
-	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into into, a target, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Every one of those repos must have that target. Commit first. Call it again on the same branch to refresh it (after merging its target in, say).",
+			`"wait":{"type":"boolean","description":"A question only: you can't go on with that step without the answer"}`, "kind", "title")},
+	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into into, a target, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Every one of those repos must have that target. Commit first. Call it again on the same branch to refresh it (after merging its target in, say): the title and body you give then replace the earlier ones.",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>"},`+
+			`"title":{"type":"string","description":"What the merge brings, in one short line (at most 120 characters), e.g. Export invoices as CSV"},`+
+			`"body":{"type":"string","description":"Optional: what the CEO should know to review it, in Markdown: what changed and why, what to look at first, what was left out"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"},`+
-			`"into":{"type":"string","description":"The target it merges into, the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "entry")},
-	{Name: "create_target", Description: "Make a new target in one repo: a new branch name at from, one of its targets or an older commit of one (work the CEO merged). Work for it starts there with switch(branch, from), and lands there with request_merge(branch, entry, into); only the CEO merges into it. A target across repos is one call per repo.",
+			`"into":{"type":"string","description":"The target it merges into, the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "title", "entry")},
+	{Name: "create_target", Description: "Make a new target in one repo: a new branch name at from, one of its targets or an older commit of one (work the CEO merged). Work for it starts there with switch(branch, from), and lands there with request_merge(branch, title, body, entry, into); only the CEO merges into it. A target across repos is one call per repo.",
 		InputSchema: object(`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api"},`+
 			`"name":{"type":"string","description":"The new branch, e.g. release/2.0: not one the repo has, nor wt/* or lead/*"},`+
 			`"from":{"type":"string","description":"One of the repo's targets, e.g. main, or a commit (its hash) one holds"}`, "repo", "name", "from")},
@@ -267,7 +270,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		return t.handoff(ctx, a.Teammate, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Summary))
 	case "request_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
-		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Entry), strings.TrimSpace(a.Into))
+		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Title), strings.TrimSpace(a.Body), strings.TrimSpace(a.Entry), strings.TrimSpace(a.Into))
 	case "create_target":
 		act.Branch = strings.TrimSpace(a.Name)
 		res = t.createTarget(ctx, strings.TrimSpace(a.Repo), act.Branch, strings.TrimSpace(a.From))
@@ -283,7 +286,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.withdrawMerge(ctx, act.Branch, strings.TrimSpace(a.Reason), strings.TrimSpace(a.By))
 	case "escalate":
-		return t.escalate(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Summary), a.Options, a.Wait) // a request, not an action
+		return t.escalate(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body), a.Options, a.Wait) // a request, not an action
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
@@ -671,9 +674,6 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 	return agentlink.Result{Text: fmt.Sprintf("%s: %s handed to %s. Your part ends here.", msg.Ref, branch, name)}
 }
 
-// maxTitle caps a contribution's title.
-const maxTitle = 120
-
 var kinds = []string{"finding", "proposal", "note"}
 
 func (t tool) contribute(ctx context.Context, kind, title, body string) agentlink.Result {
@@ -682,8 +682,8 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 		return teamtools.Refusal("bad_kind", "kind is finding, proposal or note")
 	case title == "" || body == "":
 		return teamtools.Refusal("empty", "give a title and a body")
-	case teamtools.TooLong(title, maxTitle) || strings.ContainsAny(title, "\r\n"):
-		return teamtools.Refusal("too_long", "a title is one line of at most %d characters", maxTitle)
+	case teamtools.BadTitle(title):
+		return teamtools.Refusal("too_long", "a title is one line of at most %d characters", teamtools.MaxTitle)
 	case teamtools.TooLong(body, teamtools.MaxContribution):
 		return teamtools.Refusal("too_long", "a body is at most %d characters: split it into separate contributions, one subject each", teamtools.MaxContribution)
 	}

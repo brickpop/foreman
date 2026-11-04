@@ -29,6 +29,8 @@ type Projects interface {
 	SetProfile(ctx context.Context, id, profile string) error
 	// SetArchived archives a project, or unarchives it.
 	SetArchived(ctx context.Context, id string, archived bool) error
+	// SetName sets the project's display name ("": shown by its id).
+	SetName(ctx context.Context, id, name string) error
 	// AddRepo adds a repo to the project, with r.Default as its default
 	// target. ErrExists if the project has that name or that path already.
 	AddRepo(ctx context.Context, project string, r RepoRecord) error
@@ -62,6 +64,7 @@ type Projects interface {
 // ProjectRecord is a project as the database keeps it.
 type ProjectRecord struct {
 	ID        string
+	Name      string // its display name; "" shows it by its id
 	Profile   string
 	Archived  bool
 	Workspace string // "": in Foreman's home, made before workspaces
@@ -98,7 +101,7 @@ func (db *DB) Projects() Projects { return projects{db.sql} }
 type projects struct{ db *sql.DB }
 
 func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
-	rows, err := p.db.QueryContext(ctx, "SELECT id, profile, archived, workspace, created_at FROM projects ORDER BY id")
+	rows, err := p.db.QueryContext(ctx, "SELECT id, name, profile, archived, workspace, created_at FROM projects ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +110,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var r ProjectRecord
 		var created sql.NullString
-		if err := rows.Scan(&r.ID, &r.Profile, &r.Archived, &r.Workspace, &created); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Profile, &r.Archived, &r.Workspace, &created); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -163,6 +166,10 @@ func (p projects) SetWorkspace(ctx context.Context, id, workspace string) error 
 
 func (p projects) SetArchived(ctx context.Context, id string, archived bool) error {
 	return touched(p.db.ExecContext(ctx, "UPDATE projects SET archived = ? WHERE id = ?", archived, id))
+}
+
+func (p projects) SetName(ctx context.Context, id, name string) error {
+	return touched(p.db.ExecContext(ctx, "UPDATE projects SET name = ? WHERE id = ?", name, id))
 }
 
 func (p projects) AddRepo(ctx context.Context, project string, r RepoRecord) error {

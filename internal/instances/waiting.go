@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/brickpop/foreman/internal/store"
+	"github.com/brickpop/foreman/internal/teamtools"
 )
 
 // An agent can stop at its harness's own question or permission dialog
@@ -58,12 +60,27 @@ func (m *Manager) saveWaiting(ctx context.Context, id, asks string) (store.Reque
 	if err != nil {
 		return store.Request{}, err
 	}
-	summary := asks
+	summary, body := headline(asks)
 	if summary == "" {
 		summary = fmt.Sprintf("%s is waiting for your input.", m.agentName(dep, inst.AgentID))
 	}
 	return m.Requests.Save(ctx, store.Request{Kind: "question", Source: "harness",
-		ProjectID: dep.ProjectID, DeploymentID: dep.ID, InstanceID: id, Summary: summary})
+		ProjectID: dep.ProjectID, DeploymentID: dep.ID, InstanceID: id, Summary: summary, Body: body})
+}
+
+// headline is what a harness asks as a request's title, cut to one short
+// line; the whole of it is the body when it didn't fit, so nothing is lost.
+func headline(asks string) (title, body string) {
+	asks = strings.TrimSpace(asks)
+	first, _, more := strings.Cut(asks, "\n")
+	title = strings.TrimSpace(first)
+	if r := []rune(title); len(r) > teamtools.MaxTitle {
+		title, more = strings.TrimSpace(string(r[:teamtools.MaxTitle-1]))+"…", true
+	}
+	if more {
+		body = asks
+	}
+	return title, body
 }
 
 // answeredInSession resolves the run's waiting card: the harness works, or

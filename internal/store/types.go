@@ -66,10 +66,11 @@ type Request struct {
 	ProjectID    string    `json:"projectId"`
 	DeploymentID string    `json:"deploymentId"` // "" with no instance
 	InstanceID   string    `json:"instanceId"`   // who raised it, or who it is about; "" when Foreman raised it about no instance
-	Summary      string    `json:"summary"`
-	Options      []string  `json:"options"` // the first is the primary action
-	Source       string    `json:"source"`  // agent, harness or foreman
-	Status       string    `json:"status"`  // open, resolved or expired
+	Summary      string    `json:"summary"`      // its title: one line
+	Body         string    `json:"body"`         // the rest, when it needs more; "" for none
+	Options      []string  `json:"options"`      // the first is the primary action
+	Source       string    `json:"source"`       // agent, harness or foreman
+	Status       string    `json:"status"`       // open, resolved or expired
 	Answer       string    `json:"answer"`
 	CreatedAt    time.Time `json:"createdAt"`
 	ResolvedAt   time.Time `json:"resolvedAt"`
@@ -176,6 +177,8 @@ type Review struct {
 	ID                 string    `json:"id"`
 	ProjectID          string    `json:"projectId"`
 	Branch             string    `json:"branch"`
+	Title              string    `json:"title"` // the lead's, one line
+	Body               string    `json:"body"`  // what the CEO should know about the work; "" for none
 	CreatedAt          time.Time `json:"createdAt"`
 	ChangesRequestedAt time.Time `json:"changesRequestedAt"` // zero unless it waits on the lead
 	ChangesNote        string    `json:"changesNote"`        // the CEO's note with the last Request changes

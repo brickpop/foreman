@@ -36,13 +36,21 @@ var (
 	ErrBranchMoved = git.ErrMoved
 )
 
-func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agentlink.Result {
+func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into string) agentlink.Result {
 	if !t.c.Lead {
 		return teamtools.Refusal("not_lead", "only the lead requests merges: hand your work to the lead")
 	}
 	prefix := git.BranchPrefix(t.project.ID, "", t.c.Team.ID, true)
 	if !strings.HasPrefix(branch, prefix) || !git.ValidBranch(ctx, branch) {
 		return teamtools.Refusal("branch_not_allowed", "you request merges of your own lead branches only, %s<topic>", prefix)
+	}
+	switch {
+	case title == "":
+		return teamtools.Refusal("empty", "give the merge a title: what it brings, in one short line")
+	case teamtools.BadTitle(title):
+		return teamtools.Refusal("too_long", "a title is one line of at most %d characters: put the rest in body", teamtools.MaxTitle)
+	case teamtools.TooLong(body, teamtools.MaxBody):
+		return teamtools.Refusal("too_long", "a body is at most %d characters: put the long parts in the wiki entry", teamtools.MaxBody)
 	}
 	if entry == "" {
 		return teamtools.Refusal("entry_not_found", "name the wiki entry that explains the work, usually its task card")
@@ -114,18 +122,22 @@ func (t tool) requestMerge(ctx context.Context, branch, entry, into string) agen
 		return teamtools.Refusal("nothing_to_merge", "%s changes nothing in its target, in any repo", branch)
 	}
 	// The branch's open review takes every repo's merge request; with none
-	// open, a new review.
+	// open, a new review. Either way it takes this call's title and body.
 	reviewID, err := t.w.MergeRequests.OpenReview(ctx, t.project.ID, branch)
 	if err != nil {
 		return teamtools.Refusal("internal", "%v", err)
 	}
-	if reviewID == "" {
-		review, err := t.w.Reviews.Save(ctx, store.Review{ProjectID: t.project.ID, Branch: branch})
-		if err != nil {
+	review := store.Review{ProjectID: t.project.ID, Branch: branch}
+	if reviewID != "" {
+		if review, err = t.w.Reviews.Get(ctx, reviewID); err != nil {
 			return teamtools.Refusal("internal", "%v", err)
 		}
-		reviewID = review.ID
 	}
+	review.Title, review.Body = title, body
+	if review, err = t.w.Reviews.Save(ctx, review); err != nil {
+		return teamtools.Refusal("internal", "%v", err)
+	}
+	reviewID = review.ID
 	var made []string
 	waiting := false
 	for _, q := range requests {
@@ -430,7 +442,7 @@ func (w *Workflow) review(ctx context.Context, reviewID string) {
 	latest := open[len(open)-1]
 	req, err := w.Requests.Save(ctx, store.Request{Kind: "review", ProjectID: r.ProjectID, DeploymentID: latest.DeploymentID,
 		InstanceID: latest.AuthorInstance, Source: "agent", ReviewID: reviewID,
-		Summary: fmt.Sprintf("Merge %s: %s.", r.Branch, w.titleOf(latest))})
+		Summary: fmt.Sprintf("Merge %s: %s", r.Branch, r.Title)})
 	if err != nil {
 		slog.Warn("raising a review", "review", reviewID, "err", err)
 		return
@@ -531,13 +543,13 @@ func (t tool) createTarget(ctx context.Context, repo, name, from string) agentli
 		}
 	}
 	t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: repo, Branch: name, Created: true})
-	return agentlink.Result{Text: fmt.Sprintf("%s is a target of %s now, at %s. Start work for it with switch(<topic>, %q); ask for its merges with request_merge(<branch>, <entry>, %q).", name, repo, at, name, name)}
+	return agentlink.Result{Text: fmt.Sprintf("%s is a target of %s now, at %s. Start work for it with switch(<topic>, %q); ask for its merges with request_merge(<branch>, <title>, <body>, <entry>, %q).", name, repo, at, name, name)}
 }
 
 // targets lists each code repo's targets, the default first, with who made
 // the others and at which commit. Read-only.
 func (t tool) targets() agentlink.Result {
-	lines := []string{"Targets, the branches only the CEO's merges write. Start work for one with switch(<topic>, <target>); ask for its merge with request_merge(<branch>, <entry>, <target>)."}
+	lines := []string{"Targets, the branches only the CEO's merges write. Start work for one with switch(<topic>, <target>); ask for its merge with request_merge(<branch>, <title>, <body>, <entry>, <target>)."}
 	for _, r := range t.project.Repos {
 		var each []string
 		for _, tg := range r.Targets {

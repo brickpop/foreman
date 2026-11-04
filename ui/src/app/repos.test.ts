@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Repo, RepoBranch, Team } from "../api/client";
 import {
-  branchOf,
+  branchesOf,
   branchOwner,
+  branchPlaces,
   bytes,
   crumbs,
   folderOf,
   folderPage,
   graph,
   matching,
+  placeLine,
   readmeOf,
   reposWith,
   shownAt,
@@ -105,16 +107,43 @@ describe("worktrees", () => {
   });
 
   it("gives the branch an agent is on, once however many repos it spans", () => {
-    expect(branchOf(repos, "tove")).toBe("wt/tove/LED-44");
-    expect(branchOf(repos, "mara")).toBe("lead/atlas/integration");
-    expect(branchOf(repos, "ines")).toBe(""); // a branch but no worktree
-    expect(branchOf([], "tove")).toBe("");
+    expect(branchesOf(repos, "mara")).toEqual(["lead/atlas/integration"]);
+    expect(branchesOf(repos, "ines")).toEqual([]); // a branch but no worktree
+    expect(branchesOf([], "tove")).toEqual([]);
     // Repos on different branches (never through switch): each one, in the repos' order.
     const split = [
       repos[0],
       { ...repos[1], branches: [branch("wt/tove/other", { agent: "tove" })] },
     ];
-    expect(branchOf(split, "tove")).toBe("wt/tove/LED-44, wt/tove/other");
+    expect(branchesOf(split, "tove")).toEqual(["wt/tove/LED-44", "wt/tove/other"]);
+  });
+
+  it("lists where a branch is, the repos with work on it first", () => {
+    // api has its commits (and changes); web has it level with trunk.
+    expect(branchPlaces(repos, "wt/tove/LED-44")).toEqual([
+      { repo: "api", ahead: 2, uncommitted: true },
+      { repo: "web", ahead: 0, uncommitted: false },
+    ]);
+    // Only uncommitted changes in web count as work too, and put it first.
+    const busyWeb = repos.map((r) => ({
+      ...r,
+      branches: r.branches.map((b) =>
+        b.agent === "tove" ? { ...b, ahead: 0, uncommitted: r.name === "web" } : b,
+      ),
+    }));
+    expect(branchPlaces(busyWeb, "wt/tove/LED-44").map((p) => p.repo)).toEqual(["web", "api"]);
+    // Never the project repo, and nowhere for a branch no repo has.
+    expect(branchPlaces(repos, "main").map((p) => p.repo)).toEqual(["api"]);
+    expect(branchPlaces(repos, "nope")).toEqual([]);
+  });
+
+  it("says what each repo holds on the branch", () => {
+    expect(placeLine({ repo: "api", ahead: 2, uncommitted: true })).toBe(
+      "2 commits · uncommitted changes",
+    );
+    expect(placeLine({ repo: "api", ahead: 1, uncommitted: false })).toBe("1 commit");
+    expect(placeLine({ repo: "api", ahead: 0, uncommitted: true })).toBe("uncommitted changes");
+    expect(placeLine({ repo: "api", ahead: 0, uncommitted: false })).toBe("nothing new");
   });
 
   it("finds where a branch is read, repos with commits on it first", () => {

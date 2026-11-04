@@ -17,7 +17,7 @@ epic: terminal-multiplexer
 - Settings → System → Projects folder: Save and Discard only once edited, as the instructions;
 - Settings → Instructions for every agent: Save and Discard appear only once the text differs; a failed save keeps the text; once saved, the field shows it (no flash of the old text) and follows a change on disk while not edited;
 - Deploy a team: an archived project reads `<id> (archived)`, Deploy stays disabled while it is chosen, and the row's Unarchive sends `setArchived(id, false)` then enables Deploy;
-- the repo picker: an Existing repo's name follows the picked folder until edited, a New empty repo's path is the picked folder plus its name, and the browser offers no `..` at `$HOME` (`parent` empty).
+- the repo picker (`AddRepo`): a repo folder's name follows it until edited, a plain folder's new repo is that folder plus the name typed, a name typed for one kind of folder is dropped on the other; a pasted path refused leaves the browser where it was.
 
 - [ ] the dependencies and the vitest environment; the tech stack entry
 - [ ] the tests above

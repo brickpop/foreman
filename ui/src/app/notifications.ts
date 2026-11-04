@@ -1,8 +1,8 @@
-import type { Deployment, Instance, Request, Team } from "../api/client";
+import type { Deployment, Instance, Project, Request, Team } from "../api/client";
 import type { Event } from "../api/types/events";
 import type { Notifications } from "../api/types/home";
 import type { Withdrawn } from "../api/types/workflow";
-import { agentOf, readable } from "./model";
+import { agentOf, projectName } from "./model";
 
 // What the CEO hears about (wiki/product/features/notifications.md): one
 // notice per event worth it, shown as a toast always and as a browser
@@ -23,14 +23,19 @@ export type Notice = {
 };
 
 /** The notice an event deserves, or none. */
-export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notice | undefined {
+export function noticeFor(
+  e: Event,
+  teams: Team[],
+  instances: Instance[],
+  projects: Project[] = [],
+): Notice | undefined {
   const name = (deployment: string, instance: string) =>
     agentOf(teams, deployment, instance)?.soul.name ?? "Foreman";
-  const project = (instance: string) => readable(instance.split("@")[1] ?? "");
+  const project = (instance: string) => projectName(projects, instance.split("@")[1] ?? "");
   if (e.type === "request.created") {
     const r = e.data as Request;
     const who = name(r.deploymentId, r.instanceId);
-    const where = r.projectId ? ` on ${readable(r.projectId)}` : "";
+    const where = r.projectId ? ` on ${projectName(projects, r.projectId)}` : "";
     const base = { body: r.summary, instance: r.instanceId, deployment: r.deploymentId };
     if (r.kind === "review") {
       return {
@@ -92,7 +97,7 @@ export function noticeFor(e: Event, teams: Team[], instances: Instance[]): Notic
     const d = e.data as Deployment;
     if (!d.stopReason) return undefined;
     return {
-      title: `Foreman stopped ${teams.find((t) => t.id === d.teamId)?.config.name ?? d.teamId} on ${readable(d.projectId)}`,
+      title: `Foreman stopped ${teams.find((t) => t.id === d.teamId)?.config.name ?? d.teamId} on ${projectName(projects, d.projectId)}`,
       body: d.stopReason,
       instance: "",
       deployment: d.id,

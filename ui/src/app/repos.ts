@@ -1,5 +1,5 @@
 import type { Repo, RepoBranch, Team } from "../api/client";
-import { agentOf } from "./model";
+import { agentOf, plural } from "./model";
 
 // The Repos section's model (wiki/product/features/repos.md).
 
@@ -65,11 +65,25 @@ export function worktrees(repos: Repo[]): Worktree[] {
 }
 
 /** The branch an agent has checked out: one, since `switch` moves all its
- * repos together; each different one, should they ever differ. "" with no
+ * repos together; each different one, should they ever differ. None with no
  * worktree yet. */
-export function branchOf(repos: Repo[], agent: string): string {
+export function branchesOf(repos: Repo[], agent: string): string[] {
   const w = worktrees(repos).find((w) => w.agent === agent);
-  return [...new Set(w?.branches.map((b) => b.branch.name))].join(", ");
+  return [...new Set(w?.branches.map((b) => b.branch.name))];
+}
+
+export type BranchPlace = { repo: string; ahead: number; uncommitted: boolean };
+
+/** Each code repo that has a branch, for the Session's branch menu: those
+ * where it holds work (commits beyond the default branch, or changes not
+ * committed) first, then the rest, each in the repos' order. */
+export function branchPlaces(repos: Repo[], branch: string): BranchPlace[] {
+  const places = repos.flatMap((r) => {
+    const b = !r.project && r.branches.find((x) => x.name === branch);
+    return b ? [{ repo: r.name, ahead: b.ahead, uncommitted: b.uncommitted }] : [];
+  });
+  const work = (p: BranchPlace) => p.ahead > 0 || p.uncommitted;
+  return [...places.filter(work), ...places.filter((p) => !work(p))];
 }
 
 /** The repos that have a branch, those with commits beyond their main first:
@@ -168,4 +182,10 @@ export function graph(commits: { hash: string; parents: string[] }[]): GraphRow[
     const used = [lane, ...top.flat(), ...bottom.flat()];
     return { lane, top, bottom, width: Math.max(...used) + 1 };
   });
+}
+
+/** What a repo holds on a branch, for its row in the branch menu. */
+export function placeLine(p: BranchPlace): string {
+  const work = [p.ahead > 0 && plural(p.ahead, "commit"), p.uncommitted && "uncommitted changes"];
+  return work.filter(Boolean).join(" · ") || "nothing new";
 }

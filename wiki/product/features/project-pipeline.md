@@ -43,7 +43,7 @@ Label "In flight" with the subtitle `worktree → lead → target`. One panel li
 
 **Open merge requests** ([Merge request](../models/merge-request.md)), after the work items:
 
-- The entry's title (with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <target>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<target>` is where that merge request goes: the repo's default branch unless the lead named another target, here and on every Merge button.
+- Its review's title (the lead's; with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <target>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<target>` is where that merge request goes: the repo's default branch unless the lead named another target, here and on every Merge button.
 - The stage chip `merge requested` (or `PR open`), **`Review`** (opens its [review](./reviews.md)), and **`Open PR ↗`** (once a PR exists) or **`Session`**.
 - Under it, a compact line per work item it carries (indented 16px): the board card title, the branch (Mono `--tx4`), the author's name (`--tx4`).
 
@@ -53,4 +53,4 @@ Entries of a stopped [deployment](../models/deployment.md) stay listed with a `s
 
 ## 3. Merged
 
-Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), the entry's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and the target it merged into; local time, with the date when not today); under each, its work items as the same compact lines.
+Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), its review's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and the target it merged into; local time, with the date when not today); under each, its work items as the same compact lines.

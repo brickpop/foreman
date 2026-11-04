@@ -3,20 +3,21 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Instance, type Team, useClient } from "../../api/client";
-import { agentOf, harnessLabel, readable, slotsTaken } from "../../app/model";
+import { agentOf, harnessLabel, slotsTaken } from "../../app/model";
 import { latestStopped } from "../../app/project";
 import {
   keys,
   useDraft,
   useHarnesses,
   useInstances,
+  useProjectName,
   useRepos,
   useRequests,
   useSettings,
   useStoppedDeployments,
   useTeams,
 } from "../../app/queries";
-import { branchOf } from "../../app/repos";
+import { branchesOf, branchPlaces } from "../../app/repos";
 import {
   activeDeployments,
   agentStep,
@@ -34,6 +35,7 @@ import {
   stoppedLine,
   waitingOnYou,
 } from "../../app/sessions";
+import { BranchMenu } from "../../components/BranchMenu";
 import { DeployDialog } from "../../components/DeployDialog";
 import { PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
@@ -50,6 +52,7 @@ import { Button, CopyButton, Dot, Empty, LeadTag, Loading } from "../../componen
 const lastAgent = new Map<string, string>();
 
 export function Session() {
+  const projectNameOf = useProjectName();
   const { project } = useParams({ from: "/projects/$project" });
   const search = useSearch({ from: "/projects/$project/session" });
   const navigate = useNavigate({ from: "/projects/$project/session" });
@@ -114,15 +117,19 @@ export function Session() {
       <div className="flex items-center gap-2.5 border-b border-line px-4 py-2.5">
         <Dot status={d.status} title={d.status} />
         <h1 className="m-0 truncate text-[15px] font-semibold">
-          <Link
-            to="/settings/teams/$team"
-            params={{ team: d.id.split("@")[0] }}
-            className="hover:underline"
-          >
-            {d.team}
-          </Link>{" "}
-          <span className="font-normal text-tx3">· {readable(project)}</span>
+          {projectNameOf(project)}{" "}
+          <span className="font-normal text-tx3">
+            ·{" "}
+            <Link
+              to="/projects/$project/team"
+              params={{ project }}
+              className="hover:text-tx hover:underline"
+            >
+              {d.team}
+            </Link>
+          </span>
         </h1>
+        {instance && <span className="text-tx4">·</span>}
         {instance && <AgentBranch key={instance.id} shown={instance} />}
         {d.needsYou && <Dot title="Needs you" />}
       </div>
@@ -152,13 +159,14 @@ export function Session() {
 
 /** No team on the project: deploy one, the last one here preset. */
 function NoTeam({ project }: { project: string }) {
+  const projectNameOf = useProjectName();
   const [deploy, setDeploy] = useState(false);
   const stopped = useStoppedDeployments().data ?? [];
   return (
     <div className="px-6 pt-6 pb-12">
       <Empty>
         <span className="flex flex-col items-center gap-3">
-          No team is on {readable(project)}, so there are no sessions. Deploy one.
+          No team is on {projectNameOf(project)}, so there are no sessions. Deploy one.
           <Button variant="primary" onClick={() => setDeploy(true)}>
             Deploy a team
           </Button>
@@ -177,10 +185,12 @@ function NoTeam({ project }: { project: string }) {
   );
 }
 
-/** The branch of the agent shown, in the header beside its project. */
+/** The branch of the agent shown, in the header after its team: a menu of
+ * the repos that have it. */
 function AgentBranch({ shown }: { shown: Instance }) {
   const repos = useRepos(shown.id.split("@")[1]);
-  const branch = branchOf(repos.data ?? [], shown.agentId);
+  const branches = branchesOf(repos.data ?? [], shown.agentId);
+  const branch = branches.join(", ");
   // A worktree is made when its agent starts: one not seen yet is looked for
   // again as the agent's status moves (git actions refresh the rest).
   const hasSession = !["asleep", "stopped", "queued"].includes(shown.status);
@@ -188,9 +198,17 @@ function AgentBranch({ shown }: { shown: Instance }) {
   useEffect(() => {
     if (!branch && hasSession && repos.isSuccess) repos.refetch();
   }, [shown.status]);
+  // One per branch: its repos differ only should one be moved outside Foreman.
   return branch ? (
-    <span className="truncate font-mono text-[11.5px] text-tx4" title={branch}>
-      {branch}
+    <span className="flex min-w-0 items-center gap-1.5">
+      {branches.map((b) => (
+        <BranchMenu
+          key={b}
+          project={shown.id.split("@")[1]}
+          branch={b}
+          places={branchPlaces(repos.data ?? [], b)}
+        />
+      ))}
     </span>
   ) : null;
 }

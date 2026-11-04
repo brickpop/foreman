@@ -5,11 +5,14 @@
 
 /**
  * Folder is one folder of the repo browser (wiki/product/features/add-project.md#picking-repos):
- * its subfolders, the git repos among them marked.
+ * whether it is a git repo, and its subfolders, the git repos among them marked.
  */
 export interface Folder {
   path: string; // a real path
-  parent?: string; // "" at the top: the browser never goes above the CEO's home folder
+  home: string; // the CEO's home folder (real path): the browser never goes above it
+  repo: boolean; // a git repo's top folder: one that can be added
+  added?: string; // the project's repo this folder is already, when browsed for a project
+  foreman?: string; // Foreman's own folder (reserved): what it is; nothing is added there
   entries: FolderEntry[]; // its subfolders by name, hidden ones left out
 }
 /**
@@ -19,6 +22,11 @@ export interface FolderEntry {
   name: string;
   path: string;
   repo: boolean; // a git repo's top folder (its own .git folder): one that can be added
+  /**
+   * Foreman's own folder (the projects folder, a project's workspace): what
+   * it is. Not opened: its repos (project repos, worktrees) aren't code repos.
+   */
+  foreman?: string;
 }
 /**
  * Branches are a repo's branches before it is added, to pick its main branch
@@ -142,6 +150,11 @@ export interface Notifications {
  */
 export interface Project {
   id: string;
+  /**
+   * Name is how it shows (the CEO's, any words); "" shows it by its id, made
+   * readable. The id stays: ids, branches and folders are built from it.
+   */
+  name: string;
   path: string; // its project repo, <workspace>/project
   /**
    * Workspace is its folder (the CEO's): the project repo and the agents'

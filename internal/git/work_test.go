@@ -38,6 +38,8 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 func TestSwitchCreatesFromMainThenComesBack(t *testing.T) {
 	r, wts := worktrees(t, "tove")
 	g := New()
+	// A tag of the CEO's named main, left behind: never taken for the branch.
+	gitOut(t, r, "tag", "main")
 	// main moves after the home branch was made: a new branch starts from it.
 	write(t, filepath.Join(r, "NEWS"), "v2\n")
 	if err := g.Commit(ctx, r, "news", "NEWS"); err != nil {

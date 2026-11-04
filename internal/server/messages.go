@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/store"
@@ -26,7 +25,6 @@ type Messages interface {
 // by the state store).
 type Activity interface {
 	Page(ctx context.Context, deployment, before string, limit int) (store.ActivityPage, error)
-	Latest(ctx context.Context) (map[string]time.Time, error)
 }
 
 // activityPage is how many items a page of activity holds (the CEO, 2026-10-17).
@@ -35,15 +33,6 @@ const activityPage = 50
 // activityRoutes serve the Activity view of a project's Team section: one deployment's
 // traffic, the team on the project or an older session.
 func activityRoutes(mux *http.ServeMux, act Activity) {
-	// When something last happened on each project: the UI orders them by it.
-	mux.HandleFunc("GET /api/activity/latest", func(w http.ResponseWriter, r *http.Request) {
-		latest, err := act.Latest(r.Context())
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
-			return
-		}
-		writeJSON(w, http.StatusOK, latest)
-	})
 	mux.HandleFunc("GET /api/activity", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		deployment := q.Get("deployment")

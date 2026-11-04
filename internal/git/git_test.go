@@ -133,7 +133,7 @@ func codeRepo(t *testing.T, branch string) string {
 
 func branchOf(t *testing.T, dir string) string {
 	t.Helper()
-	out, err := run(ctx, dir, "rev-parse", "--abbrev-ref", "HEAD")
+	out, err := run(ctx, dir, "branch", "--show-current")
 	if err != nil {
 		t.Fatal(err)
 	}

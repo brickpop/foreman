@@ -13,9 +13,10 @@ import (
 
 // Request statuses (wiki/product/models/request.md).
 const (
-	RequestOpen     = "open"
-	RequestResolved = "resolved"
-	RequestExpired  = "expired" // its deployment stopped before the CEO answered
+	RequestOpen      = "open"
+	RequestResolved  = "resolved"
+	RequestExpired   = "expired"   // its deployment stopped before the CEO answered
+	RequestDismissed = "dismissed" // the CEO closed it without an answer
 )
 
 // Requests is the requests table.
@@ -27,6 +28,10 @@ type Requests interface {
 	Open(ctx context.Context) ([]Request, error)
 	// ForReview returns a review's open review request: ErrNotFound if none.
 	ForReview(ctx context.Context, reviewID string) (Request, error)
+	// Settle ends an open request (resolved, expired or dismissed), with its
+	// answer, and returns it; ErrNotFound when it isn't open (any more), so
+	// two ways of ending one never both win.
+	Settle(ctx context.Context, id, status, answer string) (Request, error)
 }
 
 // Requests returns the requests table.
@@ -74,6 +79,23 @@ func (s requests) Save(ctx context.Context, r Request) (Request, error) {
 	}
 	res, err := s.db.ExecContext(ctx, "UPDATE requests SET kind = ?, project_id = ?, deployment_id = ?, instance_id = ?, summary = ?, body = ?, options = ?, source = ?, status = ?, answer = ?, created_at = ?, resolved_at = ?, review_id = ?, links = ? WHERE seq = ?", append(values, seq)...)
 	return r, touched(res, err)
+}
+
+func (s requests) Settle(ctx context.Context, id, status, answer string) (Request, error) {
+	seq, err := seqOf(id, "req-", "request")
+	if err != nil {
+		return Request{}, err
+	}
+	res, err := s.db.ExecContext(ctx, "UPDATE requests SET status = ?, answer = ?, resolved_at = ? WHERE seq = ? AND status = ?",
+		status, answer, timeText(time.Now().UTC()), seq, RequestOpen)
+	if err := touched(res, err); err != nil {
+		return Request{}, err
+	}
+	list, err := s.query(ctx, "WHERE seq = ?", seq)
+	if err != nil || len(list) == 0 {
+		return Request{}, errors.Join(err, ErrNotFound)
+	}
+	return list[0], nil
 }
 
 func (s requests) Open(ctx context.Context) ([]Request, error) {

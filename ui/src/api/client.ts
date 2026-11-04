@@ -261,6 +261,8 @@ export interface ForgeArea {
 export interface RequestsArea {
   list(): Promise<Request[]>;
   resolve(id: string, answer: string): Promise<void>;
+  /** Closes it unanswered; an agent's escalation tells its lead so. */
+  dismiss(id: string): Promise<void>;
 }
 
 export interface MessagesArea {
@@ -604,6 +606,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       // An agent's escalation; a review is decided on its page, a stuck agent restarted.
       resolve: (request, answer) =>
         send("POST", `/api/requests/${id(request)}/resolve`, { answer }),
+      dismiss: (request) => send("POST", `/api/requests/${id(request)}/dismiss`),
     },
     // The areas below wait on their server side: each screen says "Not built yet".
     forge: {

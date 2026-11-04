@@ -11,6 +11,7 @@ import { agentOf, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   useAnswer,
+  useDismiss,
   useEntryTitle,
   useInstances,
   usePipeline,
@@ -122,6 +123,7 @@ export function ProjectRequest({
 }) {
   const navigate = useNavigate();
   const answer = useAnswer();
+  const dismiss = useDismiss();
   const agent = agentOf(teams, r.deploymentId, r.instanceId);
   const openSession = () => navigate(sessionOf(r.instanceId));
   const context = agent
@@ -135,8 +137,9 @@ export function ProjectRequest({
       source={sourceLabel(r)}
       who={who}
       context={context}
-      onAnswer={(text) => answer.mutate({ request: r, answer: text })}
-      answering={answer.isPending}
+      onAnswer={(text) => answer.mutateAsync({ request: r, answer: text })}
+      onDismiss={() => dismiss.mutate(r)}
+      answering={answer.isPending || dismiss.isPending}
       onOpenSession={openSession}
     />
   );

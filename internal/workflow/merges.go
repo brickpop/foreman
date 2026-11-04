@@ -467,8 +467,7 @@ func (w *Workflow) resolveReview(ctx context.Context, reviewID, answer string) {
 	if err != nil {
 		return
 	}
-	r.Status, r.Answer, r.ResolvedAt = store.RequestResolved, answer, time.Now().UTC()
-	if r, err = w.Requests.Save(ctx, r); err != nil {
+	if r, err = w.Requests.Settle(ctx, r.ID, store.RequestResolved, answer); err != nil {
 		slog.Warn("resolving a review", "review", reviewID, "err", err)
 		return
 	}

@@ -322,6 +322,29 @@ a {
   color: var(--tx);
   font-weight: 600;
 }
+/* An agent's text under a title (components/FoldedText.tsx): smaller still,
+   and folded to about six lines, fading out. */
+.wiki.compact {
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.wiki.compact ul,
+.wiki.compact ol {
+  font-size: 14px;
+  line-height: 1.55;
+}
+.wiki.compact h1,
+.wiki.compact h2,
+.wiki.compact h3 {
+  margin: 4px 0 0;
+  font-size: 14.5px;
+}
+.wiki.folded {
+  max-height: 9.3em;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, black 70%, transparent);
+}
 .wiki.sheet {
   gap: 12px;
   font-size: 14.5px;

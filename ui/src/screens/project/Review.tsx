@@ -36,6 +36,7 @@ import {
   reviewTeam,
   statusLabel,
 } from "../../app/reviews";
+import { FoldedText } from "../../components/FoldedText";
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
@@ -43,7 +44,6 @@ import {
   Button,
   CopyButton,
   Empty,
-  FoldedText,
   Loading,
   SectionLabel,
   SectionTitle,

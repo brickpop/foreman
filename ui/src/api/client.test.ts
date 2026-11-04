@@ -371,6 +371,15 @@ describe("httpClient", () => {
     });
   });
 
+  it("dismisses a request, with nothing to send", async () => {
+    const calls = stubFetch(200, {});
+    await httpClient("http://x").requests.dismiss("req/1");
+    expect(calls[0]).toMatchObject({
+      url: "http://x/api/requests/req%2F1/dismiss",
+      method: "POST",
+    });
+  });
+
   it("refuses the areas the server doesn't serve yet, without asking it", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");

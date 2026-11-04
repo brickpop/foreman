@@ -45,7 +45,7 @@ A container runs only for an agent that has work (the CEO's decision, 2026-10-15
 | — | deployment created / agent hired | the lead on deploy: `queued` if no slot, else `starting`; every other member, and a hire, `asleep` |
 | `asleep` | woken: the CEO's Start, or (epic 2) a delivery to it | `queued` if no slot, else `starting` |
 | `queued` | a slot frees | `starting` |
-| `starting` | sandbox ready and harness spawned | `running` or `idle` |
+| `starting` | sandbox ready and harness spawned; a hook heard meanwhile (its `SessionStart` can beat the spawn returning) already sets the status it reports | `running` or `idle` |
 | `running` | harness idle signal ([Harness adapters](./harness-adapters.md#idle-and-waiting-detection)) | `idle`, or `done` if it handed off and has nothing assigned |
 | `idle` / `done` | CEO input, team message or reply delivered | `running` |
 | `idle` | another instance waits for a slot; quiet a minute, with nothing else running ([Idle agents make room](#idle-agents-make-room)) | `asleep` |

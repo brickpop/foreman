@@ -270,7 +270,7 @@ type EscalateArgs struct {
 
 - Effect: Workflow creates a [request](#requests) (`source: agent`, `request.created`), its title the request's summary, its body the request's body, unless the same one is open: same agent, kind, title and body (case and spacing aside) raised in the last 10 minutes, whose id it returns (`The CEO has it already, as req-N: it's still open.`).
 - `approval`, or `question` with `Wait`: the call returns at once, telling the lead to wait for the answer before that step and work on anything else meanwhile (the CEO's decision, 2026-10-15: no blocking call, [Team tools → Waiting on approval](./team-tools.md#waiting-on-approval)). `question` without `Wait`, and `finding`: the call returns at once, telling it to keep working.
-- **The answer** (`POST /api/requests/{id}/resolve`, an option or the CEO's own text, at most 8,000 characters) resolves the request and comes back as a [message](#messages) from the CEO, kind `answer`: `Message msg-N from the CEO (answer to req-N): On your approval "<summary>": <answer> Read it with read_message("msg-N"), then go on with what you asked it for.` A finding is answered the same way, with the lead's options: one team works on a project at a time, so its lead is who acts on it (the CEO, 2026-11-04). Answered once: a second answer is refused (`NOT_OPEN`). When the deployment stops first, its open requests **expire** (`status: expired`), with nothing delivered.
+- **The answer** (`POST /api/requests/{id}/resolve`, an option or the CEO's own text, at most 8,000 characters) resolves the request and comes back as a [message](#messages) from the CEO, kind `answer`: `Message msg-N from the CEO (answer to req-N): On your approval "<summary>": <answer> Read it with read_message("msg-N"), then go on with what you asked it for.` A finding is answered the same way, with the lead's options: one team works on a project at a time, so its lead is who acts on it (the CEO, 2026-11-04). Answered once: a second answer is refused (`NOT_OPEN`). The message is kept before the request resolves: one that can't be is an error and the request stays open. When the deployment stops first, its open requests **expire** (`status: expired`), with nothing delivered. The CEO can also **dismiss** it (`POST /api/requests/{id}/dismiss`): the lead gets an `answer` message saying so, without an answer.
 - Errors: `bad_kind`, `empty` (no title), `too_long` (a title over 120 characters or over one line, whose refusal says to put the rest in `Body`; a body over 8,000; over 6 options, or one over 80), `bad_option` (an empty, multi-line or repeated option). A member is never offered it ([Team tools](./team-tools.md#tools)).
 
 ### `request_merge`
@@ -433,7 +433,8 @@ Lifecycle:
     │ ──── its review has nothing open (review) ──────▶ resolved
     │ ──── the agent is active again (blocked) ───────▶ resolved
     │ ──── its session works again or ends (harness) ─▶ resolved
-    └──── deployment stopped (an escalation) ─────────▶ expired
+    │ ──── deployment stopped (an escalation) ─────────▶ expired
+    └──── CEO dismisses it (any but a review) ────────▶ dismissed
 ```
 
 How the answer travels back:

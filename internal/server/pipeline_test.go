@@ -70,6 +70,17 @@ func (fakeRequests) Answer(_ context.Context, id, answer string) (store.Request,
 	return store.Request{ID: id, Status: store.RequestResolved, Answer: answer}, nil
 }
 
+// Dismiss: req-2 is open, req-1 a review, anything else closed already.
+func (fakeRequests) Dismiss(_ context.Context, id string) (store.Request, error) {
+	switch id {
+	case "req-2":
+		return store.Request{ID: id, Status: store.RequestDismissed}, nil
+	case "req-1":
+		return store.Request{}, fmt.Errorf("%w: a review is decided on its page", workflow.ErrInvalid)
+	}
+	return store.Request{}, workflow.ErrAnswered
+}
+
 func TestRequests(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Requests: fakeRequests{}, UI: builtUI})
 	var list []store.Request
@@ -89,5 +100,15 @@ func TestRequests(t *testing.T) {
 	}
 	if w := send(h, "POST", "/api/requests/req-3/resolve", `{"answer":"Approve"}`); w.Code != http.StatusConflict {
 		t.Errorf("answered already: %d", w.Code)
+	}
+	var dismissed store.Request
+	decodeBody(t, send(h, "POST", "/api/requests/req-2/dismiss", ""), &dismissed)
+	if dismissed.Status != store.RequestDismissed {
+		t.Errorf("dismissed %+v", dismissed)
+	}
+	for id, code := range map[string]int{"req-1": http.StatusBadRequest, "req-3": http.StatusConflict} {
+		if w := send(h, "POST", "/api/requests/"+id+"/dismiss", ""); w.Code != code {
+			t.Errorf("dismiss %s: %d", id, w.Code)
+		}
 	}
 }

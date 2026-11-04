@@ -142,15 +142,52 @@ func (w *Workflow) Answer(ctx context.Context, id, answer string) (store.Request
 		w.expire(ctx, r)
 		return store.Request{}, ErrAnswered
 	}
-	r.Status, r.Answer, r.ResolvedAt = store.RequestResolved, answer, time.Now().UTC()
-	if r, err = w.Requests.Save(ctx, r); err != nil {
+	// The answer is kept first: one that can't be is an error the CEO sees,
+	// with the request still open, never a request resolved that nobody hears.
+	if _, err := w.Messages.Send(ctx, store.TeamMessage{DeploymentID: r.DeploymentID, FromInstance: "ceo", ToInstance: r.InstanceID,
+		Kind: "answer", InReplyTo: r.ID, Body: fmt.Sprintf("On your %s %q: %s", r.Kind, r.Summary, answer)}); err != nil {
+		return store.Request{}, fmt.Errorf("the answer couldn't be kept: %w", err)
+	}
+	if r, err = w.Requests.Settle(ctx, r.ID, store.RequestResolved, answer); err != nil {
 		return r, err
 	}
 	w.publishRequest("request.resolved", r)
-	if _, err := w.Messages.Send(ctx, store.TeamMessage{DeploymentID: r.DeploymentID, FromInstance: "ceo", ToInstance: r.InstanceID,
-		Kind: "answer", InReplyTo: r.ID, Body: fmt.Sprintf("On your %s %q: %s", r.Kind, r.Summary, answer)}); err != nil {
-		slog.Warn("delivering an answer", "request", r.ID, "err", err)
+	return r, nil
+}
+
+// Dismiss is the CEO closing a request without an answer: any but a review
+// (decided on its page). The lead of an escalation is told, as for an
+// answer, so nothing waits on it (the CEO, 2026-11-04); a harness's or
+// Foreman's own card just closes: the agent has nothing to hear.
+func (w *Workflow) Dismiss(ctx context.Context, id string) (store.Request, error) {
+	w.answering.Lock()
+	defer w.answering.Unlock()
+	open, err := w.Requests.Open(ctx)
+	if err != nil {
+		return store.Request{}, err
 	}
+	i := slices.IndexFunc(open, func(r store.Request) bool { return r.ID == id })
+	if i < 0 {
+		return store.Request{}, ErrAnswered
+	}
+	r := open[i]
+	if r.Kind == "review" {
+		return store.Request{}, fmt.Errorf("%w: a review is decided on its page", ErrInvalid)
+	}
+	if slices.Contains(escalations, r.Kind) && r.Source == "agent" {
+		if active, err := w.Teams.Active(ctx, r.DeploymentID); err != nil {
+			return store.Request{}, err
+		} else if active {
+			if _, err := w.Messages.Send(ctx, store.TeamMessage{DeploymentID: r.DeploymentID, FromInstance: "ceo", ToInstance: r.InstanceID,
+				Kind: "answer", InReplyTo: r.ID, Body: fmt.Sprintf("On your %s %q: the CEO dismissed it, without an answer.", r.Kind, r.Summary)}); err != nil {
+				return store.Request{}, fmt.Errorf("the lead couldn't be told: %w", err)
+			}
+		}
+	}
+	if r, err = w.Requests.Settle(ctx, r.ID, store.RequestDismissed, ""); err != nil {
+		return r, err
+	}
+	w.publishRequest("request.resolved", r)
 	return r, nil
 }
 
@@ -170,8 +207,7 @@ func (w *Workflow) DeploymentStopped(ctx context.Context, deployment string) {
 }
 
 func (w *Workflow) expire(ctx context.Context, r store.Request) {
-	r.Status, r.ResolvedAt = store.RequestExpired, time.Now().UTC()
-	saved, err := w.Requests.Save(ctx, r)
+	saved, err := w.Requests.Settle(ctx, r.ID, store.RequestExpired, "")
 	if err != nil {
 		slog.Warn("expiring a request", "request", r.ID, "err", err)
 		return

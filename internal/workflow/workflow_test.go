@@ -103,11 +103,15 @@ func (e entries) Entry(_, path string) (wiki.Entry, error) {
 type messages struct {
 	mu   sync.Mutex
 	sent []store.TeamMessage
+	fail error // a message that can't be kept
 }
 
 func (m *messages) Send(_ context.Context, msg store.TeamMessage) (store.TeamMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.fail != nil {
+		return msg, m.fail
+	}
 	m.sent = append(m.sent, msg)
 	msg.Ref = "msg-" + string(rune('0'+len(m.sent)))
 	return msg, nil

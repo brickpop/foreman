@@ -833,6 +833,32 @@ func TestHooksBecomeStatuses(t *testing.T) {
 	}
 }
 
+// A harness that reports it is at its prompt while Foreman is still starting
+// it (before its run is marked running) is heard: it is idle, not left running
+// until a turn nobody starts, with its messages waiting.
+func TestAHookWhileStartingIsKept(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	f.deps.Adapters = map[string]harness.Adapter{"claude-code": eventIsActivity{f.deps.Adapters["claude-code"].(fake.Adapter)}}
+	open := f.deps.OpenLog
+	f.deps.OpenLog = func(id string) (terminal.Log, error) {
+		if id == "mara@ledger" {
+			f.m.Hook(id, "idle", nil) // its process runs; the start isn't done
+		}
+		return open(id)
+	}
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for f.status("mara@ledger").StartedAt.IsZero() && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if s := f.status("mara@ledger"); s.StartedAt.IsZero() || s.Status != Idle {
+		t.Errorf("after its start: %s (started %v)", s.Status, s.StartedAt)
+	}
+}
+
 // eventIsLine describes a hook event by its name.
 type eventIsLine struct{ fake.Adapter }
 
@@ -2171,6 +2197,24 @@ func TestAWaitingHarnessRaisesACard(t *testing.T) {
 	if list := open(); len(list) != 0 {
 		t.Errorf("still open once idle: %+v", list)
 	}
+
+	// Dismissed by the CEO: the same wait raises no second card; its end
+	// leaves the dismissal be, and the next wait raises a fresh one.
+	f.m.Hook("mara@ledger", "waiting", nil)
+	card := open()[0]
+	if _, err := f.db.Requests().Settle(ctx, card.ID, store.RequestDismissed, ""); err != nil {
+		t.Fatal(err)
+	}
+	f.m.Hook("mara@ledger", "waiting", nil)
+	if list := open(); len(list) != 0 {
+		t.Errorf("raised again while the same wait: %+v", list)
+	}
+	f.m.Hook("mara@ledger", "busy", nil)
+	f.m.Hook("mara@ledger", "waiting", nil)
+	if list := open(); len(list) != 1 || list[0].ID == card.ID {
+		t.Fatalf("the next wait: %+v", list)
+	}
+	f.m.Hook("mara@ledger", "idle", nil)
 
 	// Its run ending resolves it.
 	f.m.Hook("mara@ledger", "waiting", nil)

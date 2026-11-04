@@ -275,6 +275,18 @@ export function useAnswer() {
   });
 }
 
+/** Dismisses a request, unanswered; the list refetches. A failure shows as a toast. */
+export function useDismiss() {
+  const c = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (request: Request) => c.requests.dismiss(request.id),
+    onError: (e: Error) => toast({ title: "Not dismissed", body: e.message, color: "var(--err)" }),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.requests }),
+  });
+}
+
 export function useMessages(deployment: string) {
   const c = useClient();
   return useQuery({

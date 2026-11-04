@@ -112,6 +112,13 @@ func TestTheCEOsAnswerReachesTheLead(t *testing.T) {
 	if _, err := f.w.Answer(ctx, "req-1", " "); !errors.Is(err, ErrInvalid) {
 		t.Errorf("no answer: %v", err)
 	}
+	// An answer that can't be kept is an error, and the request stays open
+	// for the CEO to answer again: never resolved with nobody told.
+	f.m.fail = errors.New("disk full")
+	if _, err := f.w.Answer(ctx, "req-1", "Approve"); err == nil || len(f.open()) != 1 {
+		t.Errorf("a lost answer: %v, open %d", err, len(f.open()))
+	}
+	f.m.fail = nil
 	r, err := f.w.Answer(ctx, "req-1", " Approve, but pin 2.x ")
 	if err != nil {
 		t.Fatal(err)
@@ -174,5 +181,65 @@ func TestARequestExpiresWithItsDeployment(t *testing.T) {
 	}
 	if len(f.m.sent) != 0 {
 		t.Errorf("sent %+v", f.m.sent)
+	}
+}
+
+// The CEO dismisses a request without answering it: an escalation's lead is
+// told, so nothing waits on it; a harness's or Foreman's card just closes; a
+// review is decided on its page; and a dismissed request stays dismissed.
+func TestTheCEODismissesARequest(t *testing.T) {
+	f := newFixture(t)
+	f.ok("mara", "escalate", map[string]any{"kind": "approval", "title": "Add decimal.js?"})
+	waiting, err := f.db.Requests().Save(ctx, store.Request{Kind: "question", Source: "harness", DeploymentID: "atlas@ledger", InstanceID: "tove@ledger", Summary: "Overwrite?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	review, err := f.db.Requests().Save(ctx, store.Request{Kind: "review", Source: "agent", DeploymentID: "atlas@ledger", ReviewID: "rev-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := f.w.Dismiss(ctx, "req-1")
+	if err != nil || r.Status != store.RequestDismissed || r.Answer != "" || r.ResolvedAt.IsZero() {
+		t.Fatalf("dismissed %+v %v", r, err)
+	}
+	if len(f.m.sent) != 1 {
+		t.Fatalf("sent %+v", f.m.sent)
+	}
+	if msg := f.m.sent[0]; msg.ToInstance != "mara@ledger" || msg.Kind != "answer" || msg.InReplyTo != "req-1" ||
+		msg.Body != `On your approval "Add decimal.js?": the CEO dismissed it, without an answer.` {
+		t.Errorf("message %+v", msg)
+	}
+	if r, err := f.w.Dismiss(ctx, waiting.ID); err != nil || r.Status != store.RequestDismissed || len(f.m.sent) != 1 {
+		t.Errorf("a harness's card: %+v %v, sent %d", r, err, len(f.m.sent))
+	}
+	if _, err := f.w.Dismiss(ctx, review.ID); !errors.Is(err, ErrInvalid) {
+		t.Errorf("a review: %v", err)
+	}
+	// Closed once: neither a second dismissal nor an answer reaches anyone.
+	if _, err := f.w.Dismiss(ctx, "req-1"); !errors.Is(err, ErrAnswered) {
+		t.Errorf("dismissed twice: %v", err)
+	}
+	if _, err := f.w.Answer(ctx, "req-1", "Approve"); !errors.Is(err, ErrAnswered) || len(f.m.sent) != 1 {
+		t.Errorf("answered after: %v, sent %d", err, len(f.m.sent))
+	}
+	if open := f.open(); len(open) != 1 || open[0].ID != review.ID {
+		t.Errorf("open %+v", open)
+	}
+}
+
+// A stopped team's lead has nobody to tell: the request is dismissed, and
+// nothing is sent. A lead that can't be told keeps its request open.
+func TestDismissingWithNobodyToTell(t *testing.T) {
+	f := newFixture(t)
+	f.ok("mara", "escalate", map[string]any{"kind": "finding", "title": "A race"})
+	f.ok("mara", "escalate", map[string]any{"kind": "question", "title": "EUR or USD?"})
+	f.m.fail = errors.New("disk full")
+	if _, err := f.w.Dismiss(ctx, "req-1"); err == nil || len(f.open()) != 2 {
+		t.Errorf("dismissed without telling the lead: %v", err)
+	}
+	f.m.fail = nil
+	f.teams.running["atlas@ledger"] = false
+	if r, err := f.w.Dismiss(ctx, "req-2"); err != nil || r.Status != store.RequestDismissed || len(f.m.sent) != 0 {
+		t.Errorf("a stopped team's: %+v %v, sent %d", r, err, len(f.m.sent))
 	}
 }

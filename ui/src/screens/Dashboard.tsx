@@ -13,6 +13,7 @@ import {
 import { sessionOf } from "../app/project";
 import {
   useAnswer,
+  useDismiss,
   useInstances,
   useProjectName,
   useProjects,
@@ -158,6 +159,7 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
   const projectNameOf = useProjectName();
   const navigate = useNavigate();
   const answer = useAnswer();
+  const dismiss = useDismiss();
   const agent = agentOf(teams, r.deploymentId, r.instanceId);
   const where = `on ${projectNameOf(r.projectId)}`;
   const context = agent ? `${agent.team.config.name} ${where}` : where;
@@ -167,8 +169,9 @@ function DashboardRequest({ request: r, teams }: { request: Request; teams: Team
       request={r}
       who={agent?.soul.name}
       context={context}
-      onAnswer={(text) => answer.mutate({ request: r, answer: text })}
-      answering={answer.isPending}
+      onAnswer={(text) => answer.mutateAsync({ request: r, answer: text })}
+      onDismiss={() => dismiss.mutate(r)}
+      answering={answer.isPending || dismiss.isPending}
       onOpenSession={openSession}
     />
   );

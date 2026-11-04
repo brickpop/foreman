@@ -73,7 +73,7 @@ export interface Request {
   body: string; // the rest, when it needs more; "" for none
   options: string[]; // the first is the primary action
   source: string; // agent, harness or foreman
-  status: string; // open, resolved or expired
+  status: string; // open, resolved, expired or dismissed
   answer: string;
   createdAt: string /* RFC 3339 */;
   resolvedAt: string /* RFC 3339 */;

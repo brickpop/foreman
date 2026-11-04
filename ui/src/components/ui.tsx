@@ -410,34 +410,3 @@ export function CopyButton({
     </button>
   );
 }
-
-/** Past this a text starts folded, so one long text can't push the rest away. */
-const foldedLines = 6;
-const foldedChars = 480;
-
-/** An agent's own text under its title (a request's body, a review's): plain
- * text, its line breaks kept, folded when long. Nothing when there is none. */
-export function FoldedText({ text }: { text: string }) {
-  const long = text.length > foldedChars || text.split("\n").length > foldedLines;
-  const [open, setOpen] = useState(false);
-  if (!text.trim()) return null;
-  return (
-    <div className="flex flex-col items-start gap-1">
-      <p
-        className={`whitespace-pre-wrap break-words text-[14px] leading-[1.55] text-tx2 ${long ? (open ? "max-h-[50vh] self-stretch overflow-auto" : "line-clamp-6") : ""}`}
-      >
-        {text}
-      </p>
-      {long && (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => setOpen(!open)}
-          className="text-[13px] text-tx3 hover:text-accTx"
-        >
-          {open ? "Show less" : "Show all"}
-        </button>
-      )}
-    </div>
-  );
-}

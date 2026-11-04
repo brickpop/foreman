@@ -63,6 +63,7 @@ PUT    /api/instances/:id/countdown       {paused}: pauses or resumes the countd
 
 GET    /api/requests                          the open requests (today: review requests, one per review; Request → Phasing)
 POST   /api/requests/:id/resolve              {answer}
+POST   /api/requests/:id/dismiss              closes it unanswered, telling the lead of an escalation (200 the request; 409 NOT_OPEN; 400 INVALID for a review)
 GET    /api/messages?deployment=              message log
 GET    /api/activity?deployment=              [&before=<cursor>] a page of a deployment's team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; 400 BAD_REQUEST without a deployment or for a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)

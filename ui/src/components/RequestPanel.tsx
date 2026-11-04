@@ -1,6 +1,7 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
-import { Button, FoldedText, KindChip } from "./ui";
+import { FoldedText } from "./FoldedText";
+import { Button, KindChip } from "./ui";
 
 // One request to the CEO, but a review (decided on its page). The Dashboard and
 // a project's Inbox (Needs you) use this same panel, so they can't drift; the
@@ -13,7 +14,10 @@ type Props = {
   who?: string;
   /** `<Team> on <project>`. */
   context: string;
-  onAnswer: (answer: string) => void;
+  /** Settles once the answer is kept: a typed one stays in its field until then. */
+  onAnswer: (answer: string) => Promise<unknown>;
+  /** Closes it unanswered (wiki/product/features/requests.md#dismissing). */
+  onDismiss: () => void;
   /** An answer is on its way: the options wait. */
   answering?: boolean;
   onOpenSession: () => void;
@@ -30,6 +34,7 @@ export function RequestPanel({
   who,
   context,
   onAnswer,
+  onDismiss,
   answering = false,
   onOpenSession,
   variant = "dashboard",
@@ -78,6 +83,16 @@ export function RequestPanel({
         ) : (
           <KindChip kind={r.kind} />
         )}
+        <button
+          type="button"
+          aria-label="Dismiss"
+          title="Dismiss: close it unanswered"
+          disabled={answering}
+          onClick={onDismiss}
+          className="-my-1 -mr-2 grid size-7 shrink-0 place-items-center rounded-md text-[18px] text-tx4 hover:bg-hover hover:text-tx focus-visible:outline-2 focus-visible:outline-acc disabled:opacity-50"
+        >
+          ×
+        </button>
       </header>
       <p className={`leading-[1.5] text-pretty ${onProject ? "text-[15.5px]" : "text-base"}`}>
         {r.summary}
@@ -91,7 +106,7 @@ export function RequestPanel({
             variant={i === 0 ? "primary" : "secondary"}
             disabled={answering}
             className={`${i === 1 ? "!text-tx" : ""} ${onProject ? "" : "!text-[13.5px]"}`}
-            onClick={() => onAnswer(option)}
+            onClick={() => onAnswer(option).catch(() => {})}
           >
             {option}
           </Button>
@@ -110,8 +125,11 @@ export function RequestPanel({
           onSubmit={(e) => {
             e.preventDefault();
             if (!answer.trim() || answering) return;
-            onAnswer(answer.trim());
-            setAnswer("");
+            // Kept until it reaches the agent: on a failure (a toast says why) it can be sent again.
+            onAnswer(answer.trim()).then(
+              () => setAnswer(""),
+              () => {},
+            );
           }}
         >
           <input
@@ -121,6 +139,9 @@ export function RequestPanel({
             aria-label={`Answer ${who ?? r.instanceId}`}
             className="min-w-[180px] flex-1 rounded-[7px] border border-line2 bg-term px-3 py-[7px] text-tx placeholder:text-tx4 focus-visible:outline-2 focus-visible:outline-acc"
           />
+          <Button type="submit" variant="secondary" disabled={answering || !answer.trim()}>
+            Send
+          </Button>
         </form>
       )}
     </article>

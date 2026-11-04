@@ -2,6 +2,7 @@ package instances
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -26,10 +27,12 @@ func (m *Manager) resolveCard(ctx context.Context, card *store.Request, why stri
 	if card == nil || card.ID == "" {
 		return
 	}
-	r := *card
-	r.Status, r.Answer, r.ResolvedAt = store.RequestResolved, why, time.Now().UTC()
-	if _, err := m.Requests.Save(ctx, r); err != nil {
-		slog.Warn("resolving a card", "instance", r.InstanceID, "err", err)
+	// The CEO may have dismissed it already: that stays.
+	r, err := m.Requests.Settle(ctx, card.ID, store.RequestResolved, why)
+	if errors.Is(err, store.ErrNotFound) {
+		return
+	} else if err != nil {
+		slog.Warn("resolving a card", "instance", card.InstanceID, "err", err)
 		return
 	}
 	m.publish("request.resolved", r)

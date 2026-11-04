@@ -15,8 +15,11 @@ var activityStatus = map[harness.Activity]string{harness.Busy: Running, harness.
 
 // Hook takes one of an instance's harness hook events: what it says the
 // harness is doing becomes the instance's status (running, idle, awaiting)
-// and its activity line. Before the instance runs, or once its run is
-// ending, the event changes nothing.
+// and its activity line. Before the instance starts, or once its run is
+// ending, the event changes nothing. While it starts it does: a harness may
+// say it is at its prompt before Foreman is done starting it, and that must
+// not be lost (found 2026-11-04: the fake harness's first idle was, so its
+// messages waited for a turn nobody started).
 func (m *Manager) Hook(id, event string, payload []byte) {
 	ctx := context.Background()
 	inst, err := m.Instances.Get(ctx, id)
@@ -28,7 +31,7 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 	r := m.runs[id]
 	live := r != nil && m.current(id, r)
 	m.mu.Unlock()
-	if adapter == nil || !live || !runsNow(inst.Status) {
+	if adapter == nil || !live || !hearsHooks(inst.Status) {
 		return
 	}
 	m.heardFrom(ctx, id, r)
@@ -43,7 +46,7 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 		_ = m.change(ctx, id, func(inst *store.Instance) bool {
 			m.mu.Lock()
 			defer m.mu.Unlock()
-			if !m.current(id, r) || !runsNow(inst.Status) || inst.Status == status {
+			if !m.current(id, r) || !hearsHooks(inst.Status) || inst.Status == status {
 				return false
 			}
 			inst.Status = status
@@ -64,6 +67,10 @@ func (m *Manager) Hook(id, event string, payload []byte) {
 func runsNow(status string) bool {
 	return status == Running || status == Idle || status == Awaiting
 }
+
+// hearsHooks reports whether a hook may set the status: a run under way, or
+// one starting, whose harness can report before the start is done.
+func hearsHooks(status string) bool { return runsNow(status) || status == Starting }
 
 // DoingChange is the instance.doing event's data.
 type DoingChange struct {

@@ -70,7 +70,7 @@ type Request struct {
 	Body         string    `json:"body"`         // the rest, when it needs more; "" for none
 	Options      []string  `json:"options"`      // the first is the primary action
 	Source       string    `json:"source"`       // agent, harness or foreman
-	Status       string    `json:"status"`       // open, resolved or expired
+	Status       string    `json:"status"`       // open, resolved, expired or dismissed
 	Answer       string    `json:"answer"`
 	CreatedAt    time.Time `json:"createdAt"`
 	ResolvedAt   time.Time `json:"resolvedAt"`

@@ -541,6 +541,20 @@ func TestMessageRules(t *testing.T) {
 	}
 }
 
+// Every kind a message is sent with is kept, the CEO's answer to an
+// escalation included: its CHECK once left it out, and every answer was lost
+// (found 2026-11-04).
+func TestEveryMessageKindIsKept(t *testing.T) {
+	db := open(t)
+	deployTwo(t, db)
+	for _, kind := range []string{"ask", "reply", "handoff", "contribute", "notice", "answer"} {
+		msg, err := db.Messages().Add(ctx, TeamMessage{DeploymentID: "atlas@ledger", FromInstance: "ceo", ToInstance: "b", Kind: kind, Body: "x"})
+		if err != nil || msg.Kind != kind {
+			t.Errorf("%s: %+v %v", kind, msg, err)
+		}
+	}
+}
+
 func TestActions(t *testing.T) {
 	db := open(t)
 	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
@@ -1365,4 +1379,30 @@ func targetNames(r RepoRecord) string {
 		names = append(names, t.Name)
 	}
 	return strings.Join(names, ",")
+}
+
+// Settle ends an open request once: whichever way comes second (the CEO's
+// dismissal, then the agent moving on) finds it closed, and changes nothing.
+func TestSettleEndsAnOpenRequestOnce(t *testing.T) {
+	db := open(t)
+	reqs := db.Requests()
+	r, err := reqs.Save(ctx, Request{Kind: "question", Source: "harness", Summary: "Overwrite?"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := reqs.Settle(ctx, r.ID, RequestDismissed, "")
+	if err != nil || got.Status != RequestDismissed || got.ResolvedAt.IsZero() || got.Summary != "Overwrite?" {
+		t.Fatalf("settled %+v %v", got, err)
+	}
+	if _, err := reqs.Settle(ctx, r.ID, RequestResolved, "answered in its session"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("settled twice: %v", err)
+	}
+	if open, _ := reqs.Open(ctx); len(open) != 0 {
+		t.Errorf("open %+v", open)
+	}
+	for _, id := range []string{"req-9", "rev-1", ""} {
+		if _, err := reqs.Settle(ctx, id, RequestResolved, ""); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%q: %v", id, err)
+		}
+	}
 }

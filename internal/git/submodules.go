@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 )
 
 // Submodules in the agents' worktrees
@@ -69,11 +70,14 @@ func (g *CLI) SyncSubmodules(ctx context.Context, dir string, recursive bool) er
 // .gitmodules, so nothing is written to the repo's .git/config, and always as
 // a checkout: a .gitmodules can ask for a merge, a rebase or none.
 //
-// One submodule at a time, so each finds its own way: an SSH URL is tried
-// over https (a public repo answers without credentials), and failing that
-// the submodule comes from the CEO's own checkout of the repo, locally: what
-// the CEO fetched, which agents can already read (the repo's .git is mounted
-// in their containers), so no credential is lent (the CEO, 2026-10-30).
+// One submodule at a time, so each finds its own way. First the CEO's own
+// checkout of the repo, when it holds the pinned commit: local, so nothing
+// is downloaded, and only what the CEO fetched, which agents can already read
+// (the repo's .git is mounted in their containers), so no credential is lent
+// (the CEO, 2026-10-30; first since 2026-11-04: every worktree keeps its own
+// submodule data, so downloading was every agent's, every repo's). Else the
+// network, the pinned commit only (shallow, the CEO, 2026-11-04): an SSH URL
+// is tried over https, where a public repo answers without credentials.
 func (g *CLI) update(ctx context.Context, dir string, recursive bool, paths ...string) error {
 	urls, err := submoduleURLs(ctx, dir)
 	if err != nil || len(urls) == 0 {
@@ -94,37 +98,47 @@ func (g *CLI) update(ctx context.Context, dir string, recursive bool, paths ...s
 			continue
 		}
 		name := byPath[path]
-		err := g.updateOne(ctx, dir, recursive, name, httpsOf(urls[name]), path)
-		if err == nil {
-			continue
-		}
-		if copy := ceoCopy(ctx, dir, name); copy == "" {
-			err = fmt.Errorf("%w; not in the CEO's checkout either (git submodule update --init %s there fills it)", err, path)
-		} else if local := g.updateOne(ctx, dir, false, name, copy, path, "-c", "protocol.file.allow=always"); local == nil {
+		copy := ceoCopy(ctx, dir, name)
+		// Only a copy holding the commit is tried: one that fails halfway
+		// would leave the submodule fetching from it, never the network.
+		if copy != "" && hasCommit(ctx, copy, strings.Fields(info)[1]) {
 			// Never recursive with file allowed: a nested .gitmodules could
 			// name any repo on the machine. Its nested ones go the usual way.
-			if recursive {
-				if err := g.update(ctx, filepath.Join(dir, path), true); err != nil {
-					errs = append(errs, fmt.Errorf("%s: %w", path, err))
-				}
+			local := g.updateOne(ctx, dir, false, false, name, copy, path, "-c", "protocol.file.allow=always")
+			if local == nil && recursive {
+				local = g.update(ctx, filepath.Join(dir, path), true)
+			}
+			if local != nil {
+				errs = append(errs, fmt.Errorf("%s: from the CEO's checkout: %w", path, local))
 			}
 			continue
-		} else {
-			err = fmt.Errorf("%w; from the CEO's checkout: %v (a git fetch there may bring the commit)", err, local)
+		}
+		err := g.updateOne(ctx, dir, recursive, true, name, httpsOf(urls[name]), path)
+		switch {
+		case err == nil:
+			continue
+		case copy == "":
+			err = fmt.Errorf("%w; not in the CEO's checkout either (git submodule update --init %s there fills it)", err, path)
+		default:
+			err = fmt.Errorf("%w; nor in the CEO's checkout (a git fetch there may bring the commit)", err)
 		}
 		errs = append(errs, fmt.Errorf("%s: %w", path, err))
 	}
 	return errors.Join(errs...)
 }
 
-// updateOne checks the submodule at path out, from url (extra: more git
-// config, put after fetch's own so it wins).
-func (g *CLI) updateOne(ctx context.Context, dir string, recursive bool, name, url, path string, extra ...string) error {
+// updateOne checks the submodule at path out, from url; shallow fetches
+// only the commit it needs (extra: more git config, put after fetch's own
+// so it wins).
+func (g *CLI) updateOne(ctx context.Context, dir string, recursive, shallow bool, name, url, path string, extra ...string) error {
 	args := slices.Clone(extra)
 	if name != "" {
 		args = append(args, "-c", "submodule."+name+".url="+url, "-c", "submodule."+name+".update=checkout")
 	}
 	args = append(args, "submodule", "update", "--init", "--quiet")
+	if shallow {
+		args = append(args, "--depth", "1")
+	}
 	if recursive {
 		args = append(args, "--recursive")
 	}
@@ -159,6 +173,12 @@ func ceoCopy(ctx context.Context, dir, name string) string {
 		return ""
 	}
 	return copy
+}
+
+// hasCommit says whether the repo at dir holds commit.
+func hasCommit(ctx context.Context, dir, commit string) bool {
+	_, err := run(ctx, dir, "cat-file", "-e", commit+"^{commit}")
+	return err == nil
 }
 
 // submoduleNames are the submodules .gitmodules names, by path.
@@ -516,12 +536,17 @@ func (g *CLI) fetch(ctx context.Context, dir string, args ...string) (string, er
 	for _, p := range g.protocols() {
 		config = append(config, "-c", "protocol."+p+".allow=always")
 	}
+	// A remote that never answers fails rather than hold an agent's start.
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	cmd := command(ctx, dir, append(config, args...)...)
+	// A session of its own has no terminal for ssh to ask anything on.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Env = slices.DeleteFunc(cmd.Env, func(kv string) bool {
 		name, _, _ := strings.Cut(kv, "=")
 		return slices.Contains([]string{"HOME", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK", "GIT_ASKPASS", "SSH_ASKPASS", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"}, name)
 	})
-	cmd.Env = append(cmd.Env, "HOME="+home, "XDG_CONFIG_HOME="+home, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(cmd.Env, "HOME="+home, "XDG_CONFIG_HOME="+home, "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0", "SSH_ASKPASS_REQUIRE=never", "GCM_INTERACTIVE=never")
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	if err := cmd.Run(); err != nil {

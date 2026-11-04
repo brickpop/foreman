@@ -64,6 +64,18 @@ export function StopIcon() {
   );
 }
 
+/** A filled triangle: Start (an asleep or stopped agent's session). */
+export function PlayIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5 shrink-0">
+      <path
+        d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.4-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 /** A circling arrow: Reload (a deployment's agents restart on their new prompt). */
 export function ReloadIcon() {
   return (

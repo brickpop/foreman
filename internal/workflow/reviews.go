@@ -331,7 +331,7 @@ func (w *Workflow) AddComment(ctx context.Context, reviewID string, c store.Revi
 	if err != nil {
 		return c, err
 	}
-	c = store.ReviewComment{ReviewID: reviewID, Repo: c.Repo, Path: c.Path, Side: c.Side, Line: c.Line, Commit: c.Commit, Snippet: c.Snippet, Body: strings.TrimSpace(c.Body)}
+	c = store.ReviewComment{ReviewID: reviewID, Repo: c.Repo, Path: c.Path, Side: c.Side, Line: c.Line, Commit: c.Commit, Snippet: teamtools.Cut(c.Snippet, maxSnippet), Body: strings.TrimSpace(c.Body)}
 	if err := validComment(v, c); err != nil {
 		return c, err
 	}
@@ -358,11 +358,14 @@ func validComment(v Review, c store.ReviewComment) error {
 		return fmt.Errorf("%w: %s isn't open in this review", ErrInvalid, c.Repo)
 	case c.Path == "" || c.Line < 1 || (c.Side != "new" && c.Side != "old") || c.Commit == "":
 		return fmt.Errorf("%w: a line comment names its file, side (new or old), line and the commit it was read at", ErrInvalid)
-	case len(c.Snippet) > 500:
-		return fmt.Errorf("%w: the line's text is at most 500 characters", ErrInvalid)
 	}
 	return nil
 }
+
+// maxSnippet is the most of a commented line kept with its comment, only to
+// show where it was: a long line (minified code, a long string) is cut, never
+// a reason to refuse the comment.
+const maxSnippet = 500
 
 // EditComment rewrites a draft comment's text.
 func (w *Workflow) EditComment(ctx context.Context, reviewID, id, body string) (store.ReviewComment, error) {

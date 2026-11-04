@@ -73,6 +73,14 @@ const MaxContribution = 32000
 // TooLong says whether s is over max characters (not bytes: "→" is one).
 func TooLong(s string, limit int) bool { return utf8.RuneCountInString(s) > limit }
 
+// Cut is s at most limit characters long, ending in "…" when it was cut.
+func Cut(s string, limit int) string {
+	if r := []rune(s); len(r) > limit {
+		return strings.TrimSpace(string(r[:limit-1])) + "…"
+	}
+	return s
+}
+
 // Refusal is a tool error the agent reads: a code, then what to do.
 func Refusal(code, format string, a ...any) agentlink.Result {
 	return agentlink.Result{Text: code + ": " + fmt.Sprintf(format, a...), Error: true}

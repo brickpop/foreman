@@ -22,6 +22,8 @@ const buttonVariants = {
 // Every other variant has the standard size.
 const buttonSizes: Partial<Record<keyof typeof buttonVariants, string>> = {
   small: "rounded-[6px] px-2.5 py-1 text-[12.5px]",
+  // A view's main action, with its icon before the label.
+  outline: "inline-flex items-center gap-2 rounded-[7px] px-4 py-2 text-[13px]",
   tiny: "rounded-[5px] px-2 py-0.5 text-xs",
 };
 

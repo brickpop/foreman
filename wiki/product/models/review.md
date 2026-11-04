@@ -37,7 +37,7 @@ Table `review_comments`.
 | `side` | String | | | enum: `new`, `old` | `new`: a line of the branch (kept or added); `old`: a line the target had and the branch removed |
 | `line` | Integer | | | > 0 | Its number on that side, when written |
 | `commit_sha` | String | | | a commit hash | The branch head it was read at |
-| `snippet` | String | | | ≤ 500 characters | The line's text, quoted in the message to the lead |
+| `snippet` | String | | | ≤ 500 characters | The line's text, quoted in the message to the lead. A longer line is cut, ending in `…`, never refused: it only shows where the comment was (the CEO, 2026-11-04, after a 3-word comment on a long line was refused) |
 | `target` | String | | | | The target its repo merged into when it was written (since 2026-11-02): a comment on the old side is outdated once its repo goes to another |
 | `body` | String | yes | | ≤ the team tools' message limit | |
 | `state` | String | yes | `draft` | enum: `draft`, `sent` | |

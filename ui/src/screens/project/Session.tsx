@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Instance, type Team, useClient } from "../../api/client";
-import { agentOf, harnessLabel, slotsTaken } from "../../app/model";
+import { agentOf, harnessLabel, plural, slotsTaken } from "../../app/model";
 import { latestStopped } from "../../app/project";
 import {
   keys,
@@ -37,11 +37,12 @@ import {
 } from "../../app/sessions";
 import { BranchMenu } from "../../components/BranchMenu";
 import { DeployDialog } from "../../components/DeployDialog";
-import { PromptIcon } from "../../components/icons";
+import { PlayIcon, PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
 import { Button, CopyButton, Dot, Empty, LeadTag, Loading } from "../../components/ui";
+import { useProject } from "../Project";
 
 // A project's Session section (wiki/product/features/sessions.md): the team
 // on the project, its agent tabs and the chosen agent's terminal. The rest of
@@ -401,7 +402,8 @@ function AgentSession({
             reason={instance.stopReason}
           />
         ) : (
-          <div className="flex min-h-0 flex-1">
+          <div className="flex min-h-0 flex-1 flex-col">
+            {instance.status === "starting" && <Starting name={name} />}
             <div className="min-h-0 min-w-0 flex-1 px-4 py-3">
               <Terminal instance={instance.id} newline={newline} ref={terminal} />
             </div>
@@ -547,10 +549,26 @@ function Asleep({
           ? stoppedLine(name, reason)
           : `${name} is asleep: no session runs until there's work for them.`}
       </p>
-      <Button disabled={wake.isPending} onClick={() => wake.mutate()}>
+      <Button variant="outline" disabled={wake.isPending} onClick={() => wake.mutate()}>
+        <PlayIcon />
         {stopped ? `Start ${name} again` : `Start ${name}`}
       </Button>
     </div>
+  );
+}
+
+/** Over a starting agent's terminal, which stays (its harness may show something before it
+ * reports in): Foreman prepares a worktree per code repo first, one at a time, its submodules
+ * included, which a first start may take minutes over. */
+function Starting({ name }: { name: string }) {
+  const repos = useProject().repos.length;
+  return (
+    <p className="m-0 flex items-center gap-2.5 border-b border-line px-4 py-2.5 text-[13px] text-tx3">
+      <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-acc border-t-transparent" />
+      Starting {name}:{" "}
+      {repos > 0 ? `its worktrees in ${plural(repos, "code repo")}, submodules too, then ` : ""}its
+      session. A first start can take a few minutes.
+    </p>
   );
 }
 

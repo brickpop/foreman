@@ -74,16 +74,19 @@ export function branchesOf(repos: Repo[], agent: string): string[] {
 
 export type BranchPlace = { repo: string; ahead: number; uncommitted: boolean };
 
-/** Each code repo that has a branch, for the Session's branch menu: those
- * where it holds work (commits beyond the default branch, or changes not
- * committed) first, then the rest, each in the repos' order. */
-export function branchPlaces(repos: Repo[], branch: string): BranchPlace[] {
+/** Each code repo that has a branch, for the Session's branch menu, in two
+ * groups: those where it holds work (commits beyond the default branch, or
+ * changes not committed), and the rest; each in the repos' order. */
+export function branchPlaces(
+  repos: Repo[],
+  branch: string,
+): { changed: BranchPlace[]; unchanged: BranchPlace[] } {
   const places = repos.flatMap((r) => {
     const b = !r.project && r.branches.find((x) => x.name === branch);
     return b ? [{ repo: r.name, ahead: b.ahead, uncommitted: b.uncommitted }] : [];
   });
   const work = (p: BranchPlace) => p.ahead > 0 || p.uncommitted;
-  return [...places.filter(work), ...places.filter((p) => !work(p))];
+  return { changed: places.filter(work), unchanged: places.filter((p) => !work(p)) };
 }
 
 /** The repos that have a branch, those with commits beyond their main first:

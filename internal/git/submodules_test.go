@@ -681,3 +681,53 @@ func TestFetchesGoWithoutTheCEOsCredentials(t *testing.T) {
 		t.Errorf("pinned %s", got)
 	}
 }
+
+// A submodule comes from the CEO's checkout when it holds the pinned commit:
+// nothing downloaded, and its whole history there.
+func TestASubmoduleComesFromTheCEOsCheckoutFirst(t *testing.T) {
+	r, _, v1, _, wts := withSubmodule(t, "tove")
+	wt := wts["tove"]
+	if err := New().SyncSubmodules(ctx, wt, false); err != nil {
+		t.Fatal(err)
+	}
+	dep := filepath.Join(wt, "lib/dep")
+	if head := gitOut(t, dep, "rev-parse", "HEAD"); head != v1 {
+		t.Errorf("lib/dep on %s, want v1", head)
+	}
+	copy, err := filepath.EvalSymlinks(filepath.Join(r, ".git/modules/lib/dep"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if from := gitOut(t, dep, "remote", "get-url", "origin"); from != copy {
+		t.Errorf("lib/dep came from %s, not the CEO's checkout %s", from, copy)
+	}
+}
+
+// A commit the CEO's checkout lacks comes from the network, that commit only:
+// even one that isn't its branch's tip.
+func TestASubmoduleTheCEOLacksIsFetchedShallow(t *testing.T) {
+	_, libDir, _, _, wts := withSubmodule(t, "tove")
+	wt := wts["tove"]
+	commit := func(text string) string {
+		write(t, filepath.Join(libDir, "lib.sol"), text)
+		if err := New().Commit(ctx, libDir, text, "lib.sol"); err != nil {
+			t.Fatal(err)
+		}
+		return gitOut(t, libDir, "rev-parse", "HEAD")
+	}
+	v3 := commit("v3\n")
+	commit("v4\n")
+	// The agent pins v3, which the CEO never fetched.
+	gitOut(t, wt, "update-index", "--cacheinfo", "160000,"+v3+",lib/dep")
+	gitOut(t, wt, "-c", "user.name=Tove", "-c", "user.email=tove@x", "commit", "--quiet", "-m", "lib at v3")
+	if err := local().SyncSubmodules(ctx, wt, false); err != nil {
+		t.Fatal(err)
+	}
+	dep := filepath.Join(wt, "lib/dep")
+	if head := gitOut(t, dep, "rev-parse", "HEAD"); head != v3 {
+		t.Errorf("lib/dep on %s, want v3", head)
+	}
+	if shallow := gitOut(t, dep, "rev-parse", "--is-shallow-repository"); shallow != "true" {
+		t.Error("lib/dep was fetched with its whole history")
+	}
+}

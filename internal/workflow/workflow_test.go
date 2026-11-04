@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/events"
@@ -1602,4 +1603,22 @@ func TestEachRepoMergesIntoItsOwnMain(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "style.css"), "p {}\n")
 	f.ok("tove", "commit", commits("web", "style"))
 	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/main", "summary": "style"})
+}
+
+// A comment on a very long line (minified code, a long string) is taken: the
+// line's text it keeps, only to show where it was, is cut.
+func TestACommentOnALongLineKeepsItsStart(t *testing.T) {
+	f := newFixture(t)
+	long := strings.Repeat("é", maxSnippet+100)
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "min.js"), long+"\n")
+	f.ok("mara", "commit", commits("api", "min"))
+	f.ok("mara", "request_merge", integration)
+	head := f.git(f.wt("mara", "api"), "rev-parse", "HEAD")
+	c, err := f.w.AddComment(ctx, "rev-1", store.ReviewComment{Repo: "api", Path: "min.js", Side: "new", Line: 1, Commit: head, Snippet: long, Body: "Not minified"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := strings.Repeat("é", maxSnippet-1) + "…"; c.Snippet != want || c.Body != "Not minified" {
+		t.Errorf("snippet of %d characters, body %q", utf8.RuneCountInString(c.Snippet), c.Body)
+	}
 }

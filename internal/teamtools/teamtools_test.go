@@ -198,3 +198,19 @@ func TestAMemberCantCallTheLeadsTools(t *testing.T) {
 		}
 	}
 }
+
+// Cut counts characters, not bytes, and says it cut.
+func TestCut(t *testing.T) {
+	for s, want := range map[string]string{
+		"":       "",
+		"abc":    "abc",
+		"abcd":   "abcd",
+		"abcde":  "abc…",
+		"ééééé":  "ééé…",
+		"ab  cd": "ab…", // no space left before the mark
+	} {
+		if got := teamtools.Cut(s, 4); got != want {
+			t.Errorf("Cut(%q, 4) = %q, want %q", s, got, want)
+		}
+	}
+}

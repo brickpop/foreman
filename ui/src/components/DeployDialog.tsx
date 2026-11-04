@@ -17,7 +17,6 @@ import {
 } from "../app/queries";
 import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
-import { Select } from "./Select";
 import { useToast } from "./Toasts";
 import { Button } from "./ui";
 
@@ -214,40 +213,40 @@ export function DeployDialog({
           </div>
         )}
         {profileName && profiles.data && (
-          <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
-            <span className="flex-1">
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                Its agents run on
-                <Select
-                  label="Profile"
-                  mono
-                  value={profileName}
-                  onChange={setPicked}
-                  options={[
-                    ...profiles.data.map((p) => ({
-                      value: p.name,
-                      label: p.name,
-                      detail: harnessLabel(p.harness),
-                    })),
-                    // The one the project names, even when that profile is gone.
-                    ...(!profile ? [{ value: profileName, label: profileName }] : []),
-                  ]}
-                />
-              </span>
-              <span className="mt-1 block text-tx3">
-                {!profile
-                  ? "That profile doesn’t exist: pick another."
-                  : profile.connected
-                    ? `${harnessLabel(profile.harness)}.${picked && picked !== chosen?.profile ? " It becomes the project’s profile on Deploy." : ""}`
-                    : `${harnessLabel(profile.harness)}, not connected yet, so they can’t start.`}
-              </span>
-            </span>
-            {profile && !profile.connected && (
-              <Button variant="small" onClick={() => setConnecting(profile.name)}>
-                Connect
-              </Button>
+          <Group label="Profile">
+            {profiles.data.map((p) => (
+              <button
+                key={p.name}
+                type="button"
+                aria-pressed={p.name === profileName}
+                className={option(p.name === profileName)}
+                onClick={() => setPicked(p.name)}
+              >
+                <span className="font-mono">{p.name}</span>
+                <span className="text-tx4"> · {harnessLabel(p.harness)}</span>
+              </button>
+            ))}
+            {/* The one the project names, even when that profile is gone. */}
+            {!profile && (
+              <button type="button" aria-pressed className={`${option(true)} !border-err`}>
+                <span className="font-mono">{profileName}</span>
+              </button>
             )}
-          </div>
+            <p className="m-0 flex w-full items-center gap-2 pt-0.5 text-[13px] text-tx3">
+              {!profile
+                ? "That profile doesn’t exist: pick another."
+                : profile.connected
+                  ? picked && picked !== chosen?.profile
+                    ? "It becomes the project’s profile on Deploy."
+                    : "The project’s profile: its agents run on it."
+                  : "Not connected yet, so its agents can’t start."}
+              {profile && !profile.connected && (
+                <Button variant="small" onClick={() => setConnecting(profile.name)}>
+                  Connect
+                </Button>
+              )}
+            </p>
+          </Group>
         )}
         {engineDown && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">

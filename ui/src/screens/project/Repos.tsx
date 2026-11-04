@@ -80,11 +80,7 @@ export function Repos() {
       </div>
       {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
       <span>
-        <Button
-          variant="outline"
-          className="inline-flex items-center gap-2 !px-4 !py-2"
-          onClick={() => setAdding(true)}
-        >
+        <Button variant="outline" onClick={() => setAdding(true)}>
           <RepoIcon size="size-4" />
           Add a repo
         </Button>

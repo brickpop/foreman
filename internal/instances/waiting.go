@@ -73,10 +73,8 @@ func (m *Manager) saveWaiting(ctx context.Context, id, asks string) (store.Reque
 func headline(asks string) (title, body string) {
 	asks = strings.TrimSpace(asks)
 	first, _, more := strings.Cut(asks, "\n")
-	title = strings.TrimSpace(first)
-	if r := []rune(title); len(r) > teamtools.MaxTitle {
-		title, more = strings.TrimSpace(string(r[:teamtools.MaxTitle-1]))+"…", true
-	}
+	title = teamtools.Cut(strings.TrimSpace(first), teamtools.MaxTitle)
+	more = more || title != strings.TrimSpace(first)
 	if more {
 		body = asks
 	}

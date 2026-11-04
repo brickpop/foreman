@@ -24,7 +24,7 @@ export function BranchMenu({
 }: {
   project: string;
   branch: string;
-  places: BranchPlace[];
+  places: { changed: BranchPlace[]; unchanged: BranchPlace[] };
 }) {
   const [open, setOpen] = useState(false);
   const closing = useRef<number>(undefined);
@@ -68,22 +68,43 @@ export function BranchMenu({
             onPointerLeave={mouse(leave)}
             className="z-50 flex min-w-56 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay"
           >
-            {places.map((p) => (
-              <Menu.Item key={p.repo} asChild>
-                <Link
-                  to="/projects/$project/repos/$repo"
-                  params={{ project, repo: p.repo }}
-                  search={{ branch }}
-                  className={item}
-                >
-                  <span className="min-w-0 flex-1 truncate">{p.repo}</span>
-                  <span className="shrink-0 text-[12px] text-tx4">{placeLine(p)}</span>
-                </Link>
-              </Menu.Item>
+            {places.changed.map((p) => (
+              <Place key={p.repo} project={project} branch={branch} place={p} />
+            ))}
+            {places.changed.length > 0 && places.unchanged.length > 0 && (
+              <Menu.Separator className="my-1 h-px bg-line" />
+            )}
+            {places.unchanged.map((p) => (
+              <Place key={p.repo} project={project} branch={branch} place={p} />
             ))}
           </Menu.Content>
         </Menu.Portal>
       </Menu.Root>
     </span>
+  );
+}
+
+/** A repo that has the branch: opens its page on it. */
+function Place({
+  project,
+  branch,
+  place: p,
+}: {
+  project: string;
+  branch: string;
+  place: BranchPlace;
+}) {
+  return (
+    <Menu.Item asChild>
+      <Link
+        to="/projects/$project/repos/$repo"
+        params={{ project, repo: p.repo }}
+        search={{ branch }}
+        className={item}
+      >
+        <span className="min-w-0 flex-1 truncate">{p.repo}</span>
+        <span className="shrink-0 text-[12px] text-tx4">{placeLine(p)}</span>
+      </Link>
+    </Menu.Item>
   );
 }

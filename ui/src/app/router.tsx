@@ -68,7 +68,15 @@ const wiki = createRoute({
   component: Wiki,
 });
 
-const board = createRoute({ ...section("board"), component: Board });
+const board = createRoute({
+  ...section("board"),
+  // board: the one shown, by id (none: the first declared); card: the entry open in its sheet.
+  validateSearch: (s: Record<string, unknown>): { board?: string; card?: string } => ({
+    board: text(s.board),
+    card: text(s.card),
+  }),
+  component: Board,
+});
 
 const reposRoute = createRoute({ ...section("repos"), component: Repos });
 

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { FoldedText } from "./FoldedText";
+import { FoldedText, firstLine, TextBox } from "./AgentText";
 
 const html = (body: string) => renderToStaticMarkup(<FoldedText text={body} />);
 
@@ -44,5 +44,33 @@ describe("an agent's body text", () => {
     expect(got).not.toContain("<img");
     expect(got).toContain('href="https://example.com" target="_blank" rel="noreferrer"');
     expect(got).not.toContain("javascript:");
+  });
+});
+
+// A review's description, in its header: one line in a box, the whole of it
+// in a popover (the CEO, 2026-11-05).
+describe("an agent's body text in a box", () => {
+  it("shows nothing when there is none", () => {
+    expect(renderToStaticMarkup(<TextBox text={" \n "} label="Description" />)).toBe("");
+  });
+
+  it("shows its first line, as plain words", () => {
+    expect(firstLine("\n\n## The **plan**\n\nmore")).toBe("The plan");
+    expect(firstLine("- Use `sqlc` for [the queries](https://x.dev)")).toBe(
+      "Use sqlc for the queries",
+    );
+    expect(firstLine("1. First step")).toBe("First step");
+    expect(firstLine("> quoted")).toBe("quoted");
+    // A plain line keeps its words, numbers and hyphens.
+    expect(firstLine("v2-api keeps 3 routes")).toBe("v2-api keeps 3 routes");
+  });
+
+  it("is a button holding the first line only, until opened", () => {
+    const got = renderToStaticMarkup(
+      <TextBox text={"Moves invoices to CSV\n\nSecret second paragraph"} label="Description" />,
+    );
+    expect(got).toContain('aria-label="Description"');
+    expect(got).toContain("Moves invoices to CSV");
+    expect(got).not.toContain("Secret second paragraph");
   });
 });

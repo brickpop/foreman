@@ -1,6 +1,6 @@
 import { type MouseEvent, type ReactNode, useState } from "react";
 import type { Request } from "../api/client";
-import { FoldedText } from "./FoldedText";
+import { FoldedText } from "./AgentText";
 import { Button, KindChip } from "./ui";
 
 // One request to the CEO, but a review (decided on its page). The Dashboard and

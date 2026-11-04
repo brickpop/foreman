@@ -1,5 +1,5 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client";
 import { agentOf } from "../../app/model";
@@ -115,8 +115,10 @@ export function Board() {
   const navigate = useNavigate();
   const lacking = useMissing(project).data ?? [];
   const boards = useBoards(project);
-  const [chosen, setChosen] = useState<string>();
-  const [sheet, setSheet] = useState<string>();
+  // The board shown and the card open are in the URL, so Back steps through them (the CEO, 2026-11-05).
+  const { board: chosen, card: sheet } = useSearch({ from: "/projects/$project/board" });
+  const show = (search: { board?: string; card?: string }) =>
+    navigate({ to: "/projects/$project/board", params: { project }, search });
   const [dragging, setDragging] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const toast = useToast();
@@ -149,7 +151,7 @@ export function Board() {
   const { columns, lanes } = board;
 
   const open = (path: string, card: HTMLElement) => {
-    setSheet(path);
+    show({ board: chosen, card: path });
     // Next frame: the room beside the sheet is laid out by then.
     requestAnimationFrame(() => {
       const by = revealBy(card.getBoundingClientRect().right, window.innerWidth);
@@ -187,7 +189,7 @@ export function Board() {
           <Segmented
             label="Boards"
             value={board.id}
-            onChange={setChosen}
+            onChange={(id) => show({ board: id })}
             options={list.map((b) => ({ value: b.id, label: b.name }))}
           />
         </div>
@@ -247,7 +249,7 @@ export function Board() {
         Drag a card to change its status (and its lane). Only those lines of the task's frontmatter
         are rewritten.
       </p>
-      <SideSheet project={project} path={sheet} onClose={() => setSheet(undefined)} />
+      <SideSheet project={project} path={sheet} onClose={() => show({ board: chosen })} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import * as Popover from "@radix-ui/react-popover";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
@@ -36,7 +37,7 @@ import {
   reviewTeam,
   statusLabel,
 } from "../../app/reviews";
-import { FoldedText } from "../../components/FoldedText";
+import { TextBox } from "../../components/AgentText";
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
@@ -156,7 +157,10 @@ export function Review() {
           >
             ←
           </Link>
-          <h1 className="min-w-0 text-[22px] font-semibold tracking-[-0.02em]">
+          <h1
+            className="min-w-0 truncate text-[22px] font-semibold tracking-[-0.02em]"
+            title={v.title || v.branch}
+          >
             {v.title || v.branch}
           </h1>
         </div>
@@ -189,7 +193,7 @@ export function Review() {
             </Link>
           </span>
         </p>
-        <FoldedText text={v.body} />
+        <TextBox text={v.body} label="Description" />
         {v.withdrawnReason && (
           <p className="text-[14px] text-tx3">
             Withdrawn: {v.withdrawnReason}.
@@ -697,8 +701,45 @@ function DecisionBar({
       {ticked.length > 0 ? mergeLabel(ticked) : "Merge"}
     </Button>
   );
-  // One repo open: nothing to pick, so no checkbox.
-  const several = v.mergeRequests.filter((m) => m.state === "open").length > 1;
+  const open = v.mergeRequests.filter((m) => m.state === "open");
+  // One repo's merge: its line, its checkbox when there are several to pick from, and
+  // where it merges when it may go elsewhere.
+  const repoRow = (m: (typeof open)[number], several: boolean) => {
+    const line = (
+      <span
+        className={`min-w-0 truncate font-mono text-[12.5px] ${m.conflicting ? "text-err" : "text-tx2"}`}
+        title={linkLine(m, forge)}
+      >
+        {linkLine(m, forge)}
+      </span>
+    );
+    return (
+      <span key={m.repo} className="flex min-w-0 items-center gap-2">
+        {several ? (
+          <label className="flex min-w-0 items-center gap-2">
+            <input
+              type="checkbox"
+              checked={!unticked.has(m.repo)}
+              onChange={(e) => tick(m.repo, e.target.checked)}
+            />
+            {line}
+          </label>
+        ) : (
+          line
+        )}
+        {targetsOf(m.repo).length > 1 && (
+          <Select
+            label={`Where ${m.repo} merges`}
+            value={m.target}
+            mono
+            className="shrink-0"
+            options={targetsOf(m.repo).map((t) => ({ value: t, label: t }))}
+            onChange={(target) => target !== m.target && retarget.mutate({ repo: m.repo, target })}
+          />
+        )}
+      </span>
+    );
+  };
   return (
     <footer className="flex shrink-0 flex-col gap-3 border-t border-line bg-side px-6 py-3">
       {v.status === "changes-requested" && (
@@ -707,42 +748,55 @@ function DecisionBar({
         </p>
       )}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        {v.mergeRequests
-          .filter((m) => m.state === "open")
-          .map((m) => (
-            <span key={m.repo} className="flex items-center gap-2">
-              {several ? (
-                <label className="flex items-center gap-2 font-mono text-[12.5px]">
-                  <input
-                    type="checkbox"
-                    checked={!unticked.has(m.repo)}
-                    onChange={(e) => tick(m.repo, e.target.checked)}
-                  />
-                  <span className={m.conflicting ? "text-err" : "text-tx2"}>
-                    {linkLine(m, forge)}
-                  </span>
-                </label>
-              ) : (
-                <span
-                  className={`font-mono text-[12.5px] ${m.conflicting ? "text-err" : "text-tx2"}`}
-                >
-                  {linkLine(m, forge)}
+        {/* The repos take what room the buttons leave, never theirs (the CEO, 2026-11-05):
+            one is its line, cut; several are their names in one line, opening the
+            picker in a popover. */}
+        <span className="flex min-w-0 flex-1 basis-60">
+          {open.length <= 1 ? (
+            open[0] && repoRow(open[0], false)
+          ) : (
+            <Popover.Root>
+              <Popover.Trigger
+                aria-label="The repos to merge"
+                className="flex min-w-0 items-center gap-2 rounded-[7px] border border-line2 bg-panel px-2.5 py-1 font-mono text-[12.5px] hover:border-line3 data-[state=open]:border-acc"
+              >
+                <span className="shrink-0 text-[10px] text-tx4">▸</span>
+                <span className="min-w-0 truncate">
+                  {open.map((m, i) => (
+                    <span key={m.repo}>
+                      {i > 0 && <span className="text-tx4"> · </span>}
+                      <span
+                        className={
+                          m.conflicting
+                            ? "text-err"
+                            : unticked.has(m.repo)
+                              ? "text-tx4"
+                              : "text-tx2"
+                        }
+                      >
+                        {unticked.has(m.repo) ? "☐" : "☑"} {m.repo}
+                      </span>
+                    </span>
+                  ))}
                 </span>
-              )}
-              {targetsOf(m.repo).length > 1 && (
-                <Select
-                  label={`Where ${m.repo} merges`}
-                  value={m.target}
-                  mono
-                  options={targetsOf(m.repo).map((t) => ({ value: t, label: t }))}
-                  onChange={(target) =>
-                    target !== m.target && retarget.mutate({ repo: m.repo, target })
-                  }
-                />
-              )}
-            </span>
-          ))}
-        <span className="flex-1" />
+                <span className="shrink-0 text-tx4">
+                  {ticked.length}/{open.length}
+                </span>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  side="top"
+                  align="start"
+                  sideOffset={6}
+                  collisionPadding={16}
+                  className="z-50 flex max-h-[min(420px,60vh)] w-[min(760px,calc(100vw-32px))] flex-col gap-2 overflow-auto rounded-lg border border-line2 bg-panel p-3 shadow-overlay"
+                >
+                  {open.map((m) => repoRow(m, true))}
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          )}
+        </span>
         <Button
           variant="danger"
           disabled={busy}

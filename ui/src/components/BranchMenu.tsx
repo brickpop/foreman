@@ -13,6 +13,9 @@ import { CopyButton } from "./ui";
 const item =
   "flex cursor-pointer items-center gap-3 rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover data-[highlighted]:text-tx";
 
+/** How long the pointer rests on the trigger before it opens: passing over it on the way to
+ * something else (the agent tabs above) opens nothing (the CEO, 2026-11-05). */
+const delay = 300;
 /** How long the pointer may be off the trigger and the menu before it closes:
  * the gap between them is crossed without it closing. */
 const grace = 200;
@@ -27,17 +30,21 @@ export function BranchMenu({
   places: { changed: BranchPlace[]; unchanged: BranchPlace[] };
 }) {
   const [open, setOpen] = useState(false);
-  const closing = useRef<number>(undefined);
-  const hold = () => {
-    window.clearTimeout(closing.current);
+  // One timer, opening or closing: whichever the pointer last asked for.
+  const timer = useRef<number>(undefined);
+  const later = (to: boolean, ms: number) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setOpen(to), ms);
+  };
+  const show = () => {
+    window.clearTimeout(timer.current);
     setOpen(true);
   };
-  const leave = () => {
-    closing.current = window.setTimeout(() => setOpen(false), grace);
-  };
-  // Unmounted while closing (another agent shown): no timer left behind.
+  const rest = () => (open ? show() : later(true, delay));
+  const leave = () => (open ? later(false, grace) : window.clearTimeout(timer.current));
+  // Unmounted while a timer runs (another agent shown): none left behind.
   useEffect(() => {
-    return () => window.clearTimeout(closing.current);
+    return () => window.clearTimeout(timer.current);
   }, []);
   const mouse = (run: () => void) => (e: React.PointerEvent) => e.pointerType === "mouse" && run();
   return (
@@ -49,10 +56,14 @@ export function BranchMenu({
       />
       <Menu.Root open={open} onOpenChange={setOpen} modal={false}>
         <Menu.Trigger
-          onPointerEnter={mouse(hold)}
+          onPointerEnter={mouse(rest)}
           onPointerLeave={mouse(leave)}
-          // Hovering opened it: a click mustn't close it again.
-          onPointerDown={(e) => e.pointerType === "mouse" && e.preventDefault()}
+          // A click opens it at once, without waiting; and never closes what hovering opened.
+          onPointerDown={(e) => {
+            if (e.pointerType !== "mouse") return;
+            e.preventDefault();
+            show();
+          }}
           className="flex min-w-0 items-center gap-1 rounded-md rounded-l-none border border-line2 px-2 py-0.5 font-mono text-[11.5px] text-tx3 outline-none hover:text-tx focus-visible:outline-2 focus-visible:outline-acc data-[state=open]:bg-hover data-[state=open]:text-tx"
         >
           <span className="truncate">{branch}</span>
@@ -64,7 +75,7 @@ export function BranchMenu({
           <Menu.Content
             align="start"
             sideOffset={4}
-            onPointerEnter={mouse(hold)}
+            onPointerEnter={mouse(show)}
             onPointerLeave={mouse(leave)}
             className="z-50 flex min-w-56 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay"
           >

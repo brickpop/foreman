@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Instance, type Team, useClient } from "../../api/client";
 import { agentOf, harnessLabel, plural, slotsTaken } from "../../app/model";
@@ -81,9 +81,10 @@ export function Session() {
   // Cmd+Shift+← / → move between the agent tabs, from anywhere on the page
   // (the window's capture phase, before the terminal: the agent never gets them).
   const step = useRef<(by: number) => void>(undefined);
+  const lineHeld = useRef(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const by = agentStep(e);
+      const by = agentStep(e, lineHeld.current);
       if (!by || !step.current) return;
       e.preventDefault();
       e.stopPropagation();
@@ -152,6 +153,7 @@ export function Session() {
           lead={team?.config.lead}
           focusAsk={focusAsk}
           controls={controls}
+          lineHeld={lineHeld}
         />
       )}
     </div>
@@ -295,6 +297,7 @@ function AgentSession({
   lead,
   focusAsk,
   controls,
+  lineHeld,
 }: {
   instance: Instance;
   teams: Team[];
@@ -303,6 +306,8 @@ function AgentSession({
   focusAsk: { id: string; n: number };
   /** Where its controls go: the end of the tabs row. */
   controls: HTMLElement | null;
+  /** Set while its Line holds text: the agent shortcuts don't switch away from it. */
+  lineHeld: RefObject<boolean>;
 }) {
   const terminal = useRef<TerminalHandle>(null);
   const client = useClient();
@@ -347,6 +352,13 @@ function AgentSession({
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
   const [line, setLine] = useState("");
+  lineHeld.current = lineMode && !asleep && line !== "";
+  // Gone (the agent left the roster), it holds nothing back.
+  useEffect(() => {
+    return () => {
+      lineHeld.current = false;
+    };
+  }, [lineHeld]);
   // The line goes through Foreman: typed, then sent after a pause, like a
   // delivery (never mixed with one), so the harness takes the Enter as sending.
   const sendLine = useMutation({

@@ -224,19 +224,26 @@ describe("moving between agents by keyboard", () => {
   });
 
   it("is Cmd+Shift+← / → on a Mac and Ctrl+Shift elsewhere", () => {
-    expect(agentStep(key("ArrowLeft", "cmd"), true)).toBe(-1);
-    expect(agentStep(key("ArrowRight", "cmd"), true)).toBe(1);
-    expect(agentStep(key("ArrowLeft", "ctrl"), false)).toBe(-1);
-    expect(agentStep(key("ArrowRight", "ctrl"), false)).toBe(1);
+    expect(agentStep(key("ArrowLeft", "cmd"), false, true)).toBe(-1);
+    expect(agentStep(key("ArrowRight", "cmd"), false, true)).toBe(1);
+    expect(agentStep(key("ArrowLeft", "ctrl"), false, false)).toBe(-1);
+    expect(agentStep(key("ArrowRight", "ctrl"), false, false)).toBe(1);
   });
 
   it("leaves the agent every other key", () => {
-    expect(agentStep(key("ArrowLeft", "ctrl"), true)).toBe(0); // Ctrl is the terminal's on a Mac
-    expect(agentStep(key("ArrowRight", "cmd"), false)).toBe(0);
-    expect(agentStep(key("ArrowRight", "cmd", { shiftKey: false }), true)).toBe(0); // Cmd+→
-    expect(agentStep(key("ArrowRight", "cmd", { altKey: true }), true)).toBe(0);
-    expect(agentStep(key("ArrowUp", "cmd"), true)).toBe(0);
-    expect(agentStep(key("KeyL", "cmd"), true)).toBe(0); // the Line input's
+    expect(agentStep(key("ArrowLeft", "ctrl"), false, true)).toBe(0); // Ctrl is the terminal's on a Mac
+    expect(agentStep(key("ArrowRight", "cmd"), false, false)).toBe(0);
+    expect(agentStep(key("ArrowRight", "cmd", { shiftKey: false }), false, true)).toBe(0); // Cmd+→
+    expect(agentStep(key("ArrowRight", "cmd", { altKey: true }), false, true)).toBe(0);
+    expect(agentStep(key("ArrowUp", "cmd"), false, true)).toBe(0);
+    expect(agentStep(key("KeyL", "cmd"), false, true)).toBe(0); // the Line input's
+  });
+
+  it("never switches away from text in the Line input: the keys select it", () => {
+    for (const code of ["ArrowLeft", "ArrowRight"]) {
+      expect(agentStep(key(code, "cmd"), true, true)).toBe(0);
+      expect(agentStep(key(code, "ctrl"), true, false)).toBe(0);
+    }
   });
 
   it("steps through the tabs in order, round the ends", () => {

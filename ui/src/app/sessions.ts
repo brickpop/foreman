@@ -150,9 +150,11 @@ export function isLineShortcut(e: Keys, mac = isMac): boolean {
 }
 
 /** The agent tab a key moves to: Cmd+Shift+← / → (Ctrl+Shift off a Mac) the
- * previous / next one (the CEO, 2026-10-30), 0 for any other key. */
-export function agentStep(e: Keys, mac = isMac): -1 | 0 | 1 {
-  if (!sessionKeys(e, mac)) return 0;
+ * previous / next one (the CEO, 2026-10-30), 0 for any other key. While the
+ * Line input holds text, 0 too: switching would lose it, so the keys do what the
+ * system makes them do, selecting in a text box (the CEO, 2026-11-05). */
+export function agentStep(e: Keys, lineHeld: boolean, mac = isMac): -1 | 0 | 1 {
+  if (lineHeld || !sessionKeys(e, mac)) return 0;
   return e.code === "ArrowLeft" ? -1 : e.code === "ArrowRight" ? 1 : 0;
 }
 

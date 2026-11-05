@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: in-progress
 priority: low
 tags: [feature]
 epic: terminal-multiplexer
@@ -15,5 +15,5 @@ epic: terminal-multiplexer
 
 **Done when:** both work in the reader and the board's side sheet; tests cover them.
 
-- [ ] cross-entry anchors: open the entry, then scroll to the heading
+- [x] cross-entry anchors: open the entry, then scroll to the heading (2026-11-05: the URL's `#`, as a repo's file; no test, the UI tests have no DOM: [UI component tests](./ui-component-tests.md))
 - [ ] frontmatter references: the server sends them resolved (as wikiview's `frontmatterRefs`), the chips link them

@@ -17,7 +17,8 @@ export function WikiArticle({
   project: string;
   entry: Entry;
   size?: "reader" | "sheet";
-  onOpen: (path: string) => void;
+  /** An entry, at the heading a link named (its anchor), if any. */
+  onOpen: (path: string, anchor?: string) => void;
   onTick: (line: number, done: boolean) => void;
 }) {
   const client = useClient();
@@ -33,7 +34,7 @@ export function WikiArticle({
           links={entry.links}
           headings={entry.headings}
           checkboxes={entry.checkboxes}
-          onOpen={(link) => onOpen(link.to)}
+          onOpen={(link) => onOpen(link.to, link.anchor)}
           onTick={onTick}
           imageUrl={(path) => client.wiki.imageUrl(project, path)}
         />

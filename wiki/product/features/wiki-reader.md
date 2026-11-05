@@ -35,7 +35,7 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 
 As a repo's file is shown: the entry's path in the wiki (Mono 12.5px `--tx2`, ellipsis) stays at the top of the view while it scrolls, then the entry in a panel (padding `20px 24px`), gap 14 inside. Opens `index.md` by default.
 
-No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as wikiview has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them.
+No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as wikiview has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them, and a link to another entry's heading (`x.md#heading`, from the reader or a board card's sheet) opens that entry scrolled to it (the URL's `#heading`, so Back and a shared link keep it; 2026-11-05). Reloading the entry (a tick) doesn't scroll again.
 
 1. **[Frontmatter](#frontmatter)**, folded to one line at first. A `title` field isn't among it: it is the page's H1, above the body (the CEO, 2026-10-21: a card's body doesn't repeat it). An entry with both a `title` and a body H1 shows both.
 2. **Body** rendered from Markdown:

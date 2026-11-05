@@ -175,7 +175,7 @@ export function diffKey(repo: string, path: string, line: DiffLine): string | un
 /**
  * The comments by where they show: on their line (a new-side one at the line
  * it moved to; an old-side one, a removed line, only against the target, where
- * the target's numbering is the one it was written on), general ones, the outdated
+ * the target's numbering is the one it was written on; in the file it was renamed to, if it was), general ones, the outdated
  * ones, whose line changed since, and those whose line the diff shown doesn't
  * have (its repo merged, dismissed or withdrawn, its file out of the since view).
  */
@@ -189,7 +189,11 @@ export function placeComments(comments: ReviewComment[], since: boolean, shown: 
     else if (c.outdated || (c.side === "old" && since)) outdated.push(c);
     else {
       const side = c.side === "old" ? "old" : "new";
-      const key = lineKey(c.repo, c.path, side, side === "old" ? c.line : c.now);
+      // A new-side one where its file is now: the lead may have renamed it since.
+      const key =
+        side === "old"
+          ? lineKey(c.repo, c.path, side, c.line)
+          : lineKey(c.repo, c.nowPath, side, c.now);
       if (shown.has(key)) at.set(key, [...(at.get(key) ?? []), c]);
       else elsewhere.push(c);
     }

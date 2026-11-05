@@ -39,6 +39,7 @@ const comment = (more: Partial<ReviewComment>) =>
     side: "new",
     line: 3,
     now: 3,
+    nowPath: "a.go",
     outdated: false,
     state: "sent",
     ...more,
@@ -92,7 +93,9 @@ describe("Reviews", () => {
     const general = comment({ id: "c4", repo: "", path: "", side: "", line: 0, now: 0 });
     const twice = comment({ id: "c5", line: 5, now: 5 });
     const merged = comment({ id: "c6", repo: "web", now: 5 });
-    const all = [moved, removed, changed, general, twice, merged];
+    // Written on old.go, which the lead renamed a.go since.
+    const renamed = comment({ id: "c7", path: "old.go", line: 9, now: 5, nowPath: "a.go" });
+    const all = [moved, removed, changed, general, twice, merged, renamed];
     // The lines the diff shows: api's a.go, line 5 kept (it was 3 on the target) and 7 removed.
     const shown = new Set(
       [
@@ -103,7 +106,11 @@ describe("Reviews", () => {
     );
     expect(shown.size).toBe(2);
     const main = placeComments(all, false, shown);
-    expect(main.at.get(lineKey("api", "a.go", "new", 5))?.map((c) => c.id)).toEqual(["c1", "c5"]);
+    expect(main.at.get(lineKey("api", "a.go", "new", 5))?.map((c) => c.id)).toEqual([
+      "c1",
+      "c5",
+      "c7",
+    ]);
     expect(main.at.get(lineKey("api", "a.go", "old", 7))?.map((c) => c.id)).toEqual(["c2"]);
     expect(main.at.has(lineKey("api", "a.go", "new", 3))).toBe(false);
     expect(main.general.map((c) => c.id)).toEqual(["c4"]);

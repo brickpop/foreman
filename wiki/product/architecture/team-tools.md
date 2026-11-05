@@ -80,6 +80,8 @@ Nothing about the team tools is configured by the CEO. At every spawn, Foreman:
 2. Writes the harness's MCP configuration into the instance's private config directory ([Session runner → Credentials](./session-runner.md#credentials)): one stdio server, `foreman`, running `foreman-agent mcp` (Claude Code: an `--mcp-config` file). The hooks configuration runs `foreman-agent hook <event>`.
 3. Offers only the tools the role allows: `foreman-agent` asks Foreman for its tool list, and Foreman answers by the token's role; `request_merge`, `withdraw_merge` and `reviews` are listed for the lead only, `handoff` for members only ([Tools](#tools)), and on a project with no code repo none of the git tools ([No code repo](#no-code-repo)).
 
+**A tool list older than Foreman's.** A harness loads the tool list when its session starts and keeps it, so a session that outlived a Foreman update calls with the old arguments (2026-11-04: `escalate`'s `summary`, since renamed `title`). The router checks every call's top-level arguments against the tool's current schema before the block sees it: one it doesn't take is refused, `unknown_arguments: <tool> doesn't take <names>. It takes: <names, required marked>. Your tool list may be older than Foreman's (it changed since your session started): call it again with these.`, so the agent recovers without a restart. Telling running sessions their tools changed, or restarting them, is still open ([An agent keeps an old tool schema](../../backlog/tool-schema-after-restart.md)).
+
 Agents get no other MCP servers in v1: only the team tools, plus whatever CLIs their [image](./tech-stack.md#agent-images) contains. CEO-configured MCP servers (per team or per machine) are a possible later addition.
 
 ## Waiting on approval

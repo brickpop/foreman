@@ -1626,3 +1626,82 @@ func TestACommentOnALongLineKeepsItsStart(t *testing.T) {
 		t.Errorf("snippet of %d characters, body %q", utf8.RuneCountInString(c.Snippet), c.Body)
 	}
 }
+
+// A line comment follows its file when the lead renames it (the CEO,
+// 2026-11-04): to its line there, outdated only when the line itself changed;
+// a file deleted outdates its comments. The lead reads the new path.
+func TestACommentFollowsARenamedFile(t *testing.T) {
+	f := newFixture(t)
+	lead := f.wt("mara", "api")
+	writeFile(t, filepath.Join(lead, "calc.go"), "package calc\n\nfunc One() int { return 1 }\n\nfunc Two() int { return 3 }\n")
+	writeFile(t, filepath.Join(lead, "keep.go"), "package calc\n\nconst Kept = 1\n")
+	writeFile(t, filepath.Join(lead, "gone.go"), "package calc\n\nconst Gone = 1\n")
+	f.ok("mara", "commit", commits("api", "calc"))
+	f.ok("mara", "request_merge", integration)
+	head := f.git(lead, "rev-parse", "HEAD")
+	line := func(path string, n int, body string) Comment {
+		t.Helper()
+		c, err := f.w.AddComment(ctx, "rev-1", store.ReviewComment{Repo: "api", Path: path, Side: "new", Line: n, Commit: head, Body: body})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return Comment{ReviewComment: c}
+	}
+	one, two := line("calc.go", 3, "name it"), line("calc.go", 5, "Two is 2")
+	kept, gone := line("keep.go", 3, "kept as is"), line("gone.go", 3, "why?")
+
+	// calc.go becomes math.go, gaining a line above One and fixing Two; keep.go
+	// is renamed twice, unchanged; gone.go is deleted.
+	f.git(lead, "mv", "calc.go", "math.go")
+	writeFile(t, filepath.Join(lead, "math.go"), "package calc\n\n// One is one.\nfunc One() int { return 1 }\n\nfunc Two() int { return 2 }\n")
+	f.git(lead, "mv", "keep.go", "kept.go")
+	f.ok("mara", "commit", commits("api", "rename"))
+	f.git(lead, "mv", "kept.go", "still kept.go")
+	f.git(lead, "rm", "-q", "gone.go")
+	f.ok("mara", "commit", commits("api", "rename again"))
+	f.ok("mara", "request_merge", integration)
+
+	byID := map[string]Comment{}
+	for _, c := range f.review("rev-1").Comments {
+		byID[c.ID] = c
+	}
+	for _, want := range []struct {
+		c        Comment
+		path     string
+		now      int
+		outdated bool
+	}{
+		{one, "math.go", 4, false},        // renamed with an edit above: the line moves
+		{two, "math.go", 5, true},         // renamed with its line changed
+		{kept, "still kept.go", 3, false}, // renamed twice, a space in the name: git quotes nothing, finds it
+		{gone, "gone.go", 3, true},        // deleted
+	} {
+		got := byID[want.c.ID]
+		if got.NowPath != want.path || got.Outdated != want.outdated || (!want.outdated && got.Now != want.now) {
+			t.Errorf("%s: %+v, want %s:%d outdated %v", want.c.Body, got, want.path, want.now, want.outdated)
+		}
+	}
+	sent := len(f.m.sent)
+	if err := f.w.RequestChanges(ctx, "rev-1", ""); err != nil {
+		t.Fatal(err)
+	}
+	if body := f.m.sent[sent].Body; !strings.Contains(body, "- api math.go:4: name it") || !strings.Contains(body, "- api still kept.go:3: kept as is") {
+		t.Errorf("the lead reads the new paths: %s", body)
+	}
+}
+
+func TestRenamed(t *testing.T) {
+	diff := "diff --git a/x.go b/x.go\nindex 1..2 100644\n--- a/x.go\n+++ b/x.go\n@@ -1 +1 @@\n-rename from a.go\n+b\n" +
+		"diff --git a/a.go b/b.go\nsimilarity index 90%\nrename from a.go\nrename to b.go\n@@ -1 +1,2 @@\n+x\n" +
+		"diff --git \"a/caf\\303\\251.go\" \"b/new caf\\303\\251.go\"\nsimilarity index 100%\nrename from \"caf\\303\\251.go\"\nrename to \"new caf\\303\\251.go\"\n"
+	if to, section, ok := renamed(diff, "a.go"); !ok || to != "b.go" || !strings.HasSuffix(section, "@@ -1 +1,2 @@\n+x") {
+		t.Errorf("a.go: %q %q %v", to, section, ok)
+	}
+	if to, _, ok := renamed(diff, "café.go"); !ok || to != "new café.go" {
+		t.Errorf("quoted: %q %v", to, ok)
+	}
+	// A hunk's text that reads like a header isn't one.
+	if to, _, ok := renamed(diff, "x.go"); ok {
+		t.Errorf("x.go isn't renamed: %q", to)
+	}
+}

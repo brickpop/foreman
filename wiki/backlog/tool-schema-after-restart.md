@@ -1,7 +1,7 @@
 ---
 type: task
 status: todo
-priority: medium
+priority: low
 tags: [bug, decision]
 epic: workflow
 ---
@@ -16,4 +16,6 @@ epic: workflow
 
 - tell the sessions their tools changed (MCP's `notifications/tools/list_changed`), if each harness takes it mid-session (to check, per harness)
 - or restart (continuing the conversation) the sessions started under an older Foreman, once idle
-- or accept it, and say so on the agents' refusals (`your tools changed: restart to load them`)
+- or accept it, and say so on the agents' refusals
+
+**Built first (2026-11-05, the CEO's pick of the cheapest):** a call with an argument the tool doesn't take is refused naming the current ones (`unknown_arguments`, [Team tools → Per-instance setup](../product/architecture/team-tools.md#per-instance-setup); `TestArgumentsTheToolDoesntTakeAreRefused`), so the agent recovers on its own call. Not covered: a field renamed whose old name is simply left out, with nothing extra sent, still gets the block's own refusal (which names the field it wants, so it recovers too); a changed meaning with the same names. The two options above stay open, lower priority now (medium → low).

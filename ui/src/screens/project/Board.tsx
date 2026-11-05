@@ -431,9 +431,14 @@ function SideSheet({
   useEffect(() => {
     top.current?.parentElement?.scrollTo(0, 0);
   }, [path]);
-  const open = (p: string) => {
-    onClose();
-    navigate({ to: "/projects/$project/wiki", params: { project }, search: { entry: p } });
+  // The board leaves with its card open: Back returns to it.
+  const open = (p: string, anchor = "") => {
+    navigate({
+      to: "/projects/$project/wiki",
+      params: { project },
+      search: { entry: p },
+      hash: anchor || undefined,
+    });
   };
   return (
     <Drawer

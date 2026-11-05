@@ -65,6 +65,7 @@ export interface Review extends store.Review {
  */
 export interface Comment extends store.ReviewComment {
   now: number /* int */; // its line on the branch's head; Line while it can't move
+  nowPath: string; // its file there: Path, unless the lead renamed it since
   outdated: boolean;
 }
 /**

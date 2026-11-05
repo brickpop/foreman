@@ -53,8 +53,9 @@ type Review struct {
 // the lead's commits move it, and is outdated once that line changed.
 type Comment struct {
 	store.ReviewComment `tstype:",extends"`
-	Now                 int  `json:"now"` // its line on the branch's head; Line while it can't move
-	Outdated            bool `json:"outdated"`
+	Now                 int    `json:"now"`     // its line on the branch's head; Line while it can't move
+	NowPath             string `json:"nowPath"` // its file there: Path, unless the lead renamed it since
+	Outdated            bool   `json:"outdated"`
 }
 
 // Dismiss is the CEO's Dismiss of a review: what becomes of its branches and team.
@@ -205,7 +206,7 @@ func (w *Workflow) heads(ctx context.Context, mrs []store.MergeRequest) map[stri
 // changed, or once its repo merges into another target than the one it was
 // read on. A comment in a repo no longer open stays where it was written.
 func (w *Workflow) follow(ctx context.Context, mrs []store.MergeRequest, heads map[string]string, c store.ReviewComment) Comment {
-	out := Comment{ReviewComment: c, Now: c.Line}
+	out := Comment{ReviewComment: c, Now: c.Line, NowPath: c.Path}
 	head, open := heads[c.Repo]
 	if c.Repo == "" || !open {
 		return out
@@ -228,9 +229,52 @@ func (w *Workflow) follow(ctx context.Context, mrs []store.MergeRequest, heads m
 	case c.Side == "old":
 		out.Outdated = diff != ""
 	default:
+		// Its file gone from that path: renamed since (the CEO, 2026-11-04), it follows the
+		// file, which a diff of that path alone can't see; deleted, it's outdated.
+		if deleted(diff) {
+			if all, err := w.Git.Compare(ctx, dir, c.Commit, head, 0); err == nil {
+				if to, section, ok := renamed(all, c.Path); ok {
+					out.NowPath, diff = to, section
+				}
+			}
+		}
 		out.Now, out.Outdated = followLine(diff, c.Line)
 	}
 	return out
+}
+
+// deleted says whether a diff of one path deletes its file.
+func deleted(diff string) bool {
+	return slices.Contains(strings.Split(diff, "\n"), "+++ /dev/null")
+}
+
+// renamed finds, in a whole change's diff, the file renamed from path: its
+// path now, and its section (whose hunks are the edits made with the rename).
+func renamed(diff, path string) (to, section string, ok bool) {
+	for _, s := range strings.Split(diff, "\ndiff --git ") {
+		var from string
+		for _, l := range strings.Split(s, "\n") {
+			if strings.HasPrefix(l, "@@ ") {
+				break // the header ends at its first hunk
+			}
+			if p, found := strings.CutPrefix(l, "rename from "); found {
+				from = unquote(p)
+			}
+			if p, found := strings.CutPrefix(l, "rename to "); found && from == path {
+				return unquote(p), s, true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// unquote reads a path as git prints it: quoted, C-style, when it holds a
+// quote, a backslash, a control or a non-ASCII byte.
+func unquote(p string) string {
+	if u, err := strconv.Unquote(p); err == nil && strings.HasPrefix(p, `"`) {
+		return u
+	}
+	return p
 }
 
 // followLine is where line (of the old side of a `git diff -U0`) is on its
@@ -488,7 +532,7 @@ func commentText(c Comment) string {
 	case c.Side == "old":
 		fmt.Fprintf(&b, "%s %s, removed line %d", c.Repo, c.Path, c.Line)
 	default:
-		fmt.Fprintf(&b, "%s %s:%d", c.Repo, c.Path, c.Now)
+		fmt.Fprintf(&b, "%s %s:%d", c.Repo, c.NowPath, c.Now)
 	}
 	if c.Outdated {
 		b.WriteString(" (changed since)")

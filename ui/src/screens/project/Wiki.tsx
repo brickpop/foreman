@@ -1,4 +1,4 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { isNotBuilt, type Node } from "../../api/client";
 import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
@@ -29,8 +29,17 @@ export function Wiki() {
   const tick = useTick(project, (e) =>
     toast({ title: path, body: e.message, color: "var(--err)" }),
   );
-  const open = (p: string, replace = false) =>
-    navigate({ to: "/projects/$project/wiki", params: { project }, search: { entry: p }, replace });
+  // At its anchor, when a link names one: the URL's #, as a repo's file has it.
+  const open = (p: string, anchor = "", replace = false) =>
+    navigate({
+      to: "/projects/$project/wiki",
+      params: { project },
+      search: { entry: p },
+      hash: anchor || undefined,
+      replace,
+    });
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  const loaded = current.data !== undefined;
   // Opening an entry, from anywhere, shows its top; the tree keeps its place.
   // Under 760px the panes stack and the page scrolls, in <main>.
   const article = useRef<HTMLDivElement>(null);
@@ -39,12 +48,18 @@ export function Wiki() {
     article.current?.scrollTo({ top: 0 });
     document.querySelector("main")?.scrollTo({ top: 0 });
   }, [path]);
+  // Then to the heading the link named (the CEO's card, wiki-links-polish), once it is drawn;
+  // not again when the entry reloads (a tick), which would move what the CEO reads.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on every entry shown, too
+  useEffect(() => {
+    if (hash && loaded) document.getElementById(hash)?.scrollIntoView();
+  }, [path, hash, loaded]);
   // An unknown path falls back to index.md, replacing it so Back doesn't return to it.
   const notBuilt = isNotBuilt(tree.error);
   const missing = current.isError && !notBuilt && path !== "index.md";
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the entry turns out missing
   useEffect(() => {
-    if (missing) open("index.md", true);
+    if (missing) open("index.md", "", true);
   }, [missing]);
   if (notBuilt)
     return (

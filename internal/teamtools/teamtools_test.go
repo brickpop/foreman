@@ -214,3 +214,46 @@ func TestCut(t *testing.T) {
 		}
 	}
 }
+
+// shaped is a spy whose ask has a schema, as the real blocks' tools do.
+type shaped struct{ spy }
+
+func (s *shaped) Tools() []agentlink.Tool {
+	return []agentlink.Tool{{Name: "ask", InputSchema: json.RawMessage(`{"type":"object","properties":{"teammate":{"type":"string"},"title":{"type":"string"},"body":{"type":"string"}},"required":["teammate","title"]}`)}}
+}
+
+// A session that outlived a Foreman update calls with its old arguments: it
+// is told the current ones, and nothing reaches the block.
+func TestArgumentsTheToolDoesntTakeAreRefused(t *testing.T) {
+	db := newStore(t)
+	s := &shaped{}
+	r := &teamtools.Router{Instances: db.Instances(), Deployments: db.Deployments(), Config: config{}, Blocks: []teamtools.Block{s}}
+	res := r.Call(ctx, "tove@ledger", "ask", json.RawMessage(`{"teammate":"Mara","summary":"Which DB?","wait":true}`))
+	want := "unknown_arguments: ask doesn't take summary, wait. It takes: body, teammate (required), title (required)."
+	if !res.Error || !strings.HasPrefix(res.Text, want) || !strings.Contains(res.Text, "call it again") {
+		t.Errorf("old arguments: %+v", res)
+	}
+	for _, args := range []string{`{"teammate":"Mara","title":"Which DB?"}`, `{}`, ``, `[1]`} {
+		if res := r.Call(ctx, "tove@ledger", "ask", json.RawMessage(args)); res.Error {
+			t.Errorf("%s: %+v", args, res) // the block checks what's missing, or a non-object
+		}
+	}
+	if len(s.calls) != 4 {
+		t.Errorf("calls %v", s.calls)
+	}
+}
+
+// Every real tool's schema names its properties: one that didn't would skip the check.
+func TestEveryRealToolHasItsArgumentsChecked(t *testing.T) {
+	r := &teamtools.Router{Blocks: []teamtools.Block{messaging.New(messaging.Deps{}), workflow.New(workflow.Deps{})}}
+	for _, b := range r.Blocks {
+		for _, tool := range b.Tools() {
+			var schema struct {
+				Properties map[string]json.RawMessage `json:"properties"`
+			}
+			if err := json.Unmarshal(tool.InputSchema, &schema); err != nil || schema.Properties == nil {
+				t.Errorf("%s: no properties to check against (%v)", tool.Name, err)
+			}
+		}
+	}
+}

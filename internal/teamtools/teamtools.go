@@ -115,7 +115,7 @@ func (r *Router) Call(ctx context.Context, instance, name string, args json.RawM
 	if err != nil {
 		return Refusal("unknown_caller", "%v", err)
 	}
-	_, block, ok := r.find(name)
+	tool, block, ok := r.find(name)
 	if !ok || !slices.Contains(r.offered(c), name) {
 		return Refusal("unknown_tool", "%q isn't one of your tools", name)
 	}
@@ -124,6 +124,9 @@ func (r *Router) Call(ctx context.Context, instance, name string, args json.RawM
 	}
 	if len(args) == 0 {
 		args = json.RawMessage("{}")
+	}
+	if res, ok := fitsSchema(tool, args); !ok {
+		return res
 	}
 	return block.Call(ctx, c, name, args)
 }
@@ -153,6 +156,46 @@ func (r *Router) caller(ctx context.Context, instance string) (Caller, error) {
 		return Caller{}, err
 	}
 	return Caller{Instance: inst, Deployment: dep, Team: team, Lead: inst.AgentID == team.Config.Lead}, nil
+}
+
+// fitsSchema refuses arguments the tool doesn't take, naming those it does. A
+// harness loads the tool list when its session starts and keeps it, so a
+// session that outlived a Foreman update calls with the old arguments
+// (2026-11-04: escalate's summary, renamed title): told the current ones, the
+// agent calls again without a restart. Only the top level is checked; the
+// blocks check the values.
+func fitsSchema(tool agentlink.Tool, args json.RawMessage) (agentlink.Result, bool) {
+	var schema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+		Required   []string                   `json:"required"`
+	}
+	var given map[string]json.RawMessage
+	if json.Unmarshal(tool.InputSchema, &schema) != nil || schema.Properties == nil || json.Unmarshal(args, &given) != nil {
+		return agentlink.Result{}, true
+	}
+	var unknown []string
+	for k := range given {
+		if _, ok := schema.Properties[k]; !ok {
+			unknown = append(unknown, k)
+		}
+	}
+	if len(unknown) == 0 {
+		return agentlink.Result{}, true
+	}
+	slices.Sort(unknown)
+	var takes []string
+	for k := range schema.Properties {
+		if slices.Contains(schema.Required, k) {
+			k += " (required)"
+		}
+		takes = append(takes, k)
+	}
+	slices.Sort(takes)
+	if len(takes) == 0 {
+		takes = []string{"nothing"}
+	}
+	return Refusal("unknown_arguments", "%s doesn't take %s. It takes: %s. Your tool list may be older than Foreman's (it changed since your session started): call it again with these.",
+		tool.Name, strings.Join(unknown, ", "), strings.Join(takes, ", ")), false
 }
 
 // Args decodes a tool's arguments, or says why it can't.

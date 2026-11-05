@@ -377,15 +377,18 @@ export function dotStyle(status: string): { background: string; border?: string 
 
 /** An icon button that copies text (read when clicked) to the clipboard: a
  * check, then the icon again, says it took. The clipboard needs a secure page
- * (localhost or https), so elsewhere it says it couldn't. */
+ * (localhost or https), so elsewhere it says it couldn't. Its icon says what
+ * it copies when two sit together (a folder's path beside a name). */
 export function CopyButton({
   text,
   label,
   className = "size-6",
+  icon = <CopyIcon />,
 }: {
   text: () => string;
   label: string;
   className?: string;
+  icon?: ReactNode;
 }) {
   const [shown, setShown] = useState<"copied" | "failed" | null>(null);
   const copy = async () => {
@@ -406,7 +409,7 @@ export function CopyButton({
       title={said}
       className={`inline-flex shrink-0 items-center justify-center rounded-md text-tx3 hover:bg-hover hover:text-tx ${className}`}
     >
-      {shown === "copied" ? <CheckIcon /> : <CopyIcon />}
+      {shown === "copied" ? <CheckIcon /> : icon}
     </button>
   );
 }

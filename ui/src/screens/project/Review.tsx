@@ -38,6 +38,7 @@ import {
   statusLabel,
 } from "../../app/reviews";
 import { TextBox } from "../../components/AgentText";
+import { Chevron } from "../../components/icons";
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
@@ -91,6 +92,16 @@ export function Review() {
     (file: string, on: boolean) => setFolds((now) => new Map(now).set(file, on)),
     [],
   );
+  // The repos the CEO folded: their files leave the tree and the diffs (the CEO, 2026-11-05: a
+  // review over many repos is long). A click on a file in the tree opens its repo again.
+  const [shut, setShut] = useState<Set<string>>(new Set());
+  const shutRepo = (repo: string, on: boolean) =>
+    setShut((now) => {
+      const next = new Set(now);
+      if (on) next.add(repo);
+      else next.delete(repo);
+      return next;
+    });
   const add = useReviewChange((c, n: NewComment) => c.reviews.addComment(id, n), failed);
   const edit = useReviewChange(
     (c, e: { comment: string; body: string }) => c.reviews.editComment(id, e.comment, e.body),
@@ -228,31 +239,43 @@ export function Review() {
         <nav className="flex w-[240px] shrink-0 flex-col gap-5 overflow-auto border-r border-line px-3 py-5 text-[13px] max-[900px]:hidden">
           {repos.map((r) => (
             <div key={r.repo} className="flex flex-col gap-0.5">
-              <SectionLabel>
-                {r.repo} → {r.target}
-                {decidedAs(v, r.repo) && ` · ${decidedAs(v, r.repo)}`}
-              </SectionLabel>
-              {r.files.map((f) => (
-                <button
-                  key={f.path}
-                  type="button"
-                  title={f.from ? `${f.from} → ${f.path}` : f.path}
-                  onClick={() => {
-                    const id = fileId(r.repo, f.path);
-                    fold(id, false);
-                    // After the unfold renders, so the file is where it will stay.
-                    requestAnimationFrame(() =>
-                      document.getElementById(id)?.scrollIntoView({ block: "start" }),
-                    );
-                  }}
-                  className="flex items-baseline gap-2 truncate rounded-md px-2 py-1.5 text-left text-tx2 hover:bg-hover"
-                >
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px]">{f.path}</span>
-                  <span className="font-mono text-[11px] text-ok">+{f.added}</span>
-                  <span className="font-mono text-[11px] text-err">−{f.removed}</span>
-                </button>
-              ))}
-              {r.files.length === 0 && (
+              <RepoRow
+                repo={r}
+                decided={decidedAs(v, r.repo)}
+                open={!shut.has(r.repo)}
+                onToggle={() => shutRepo(r.repo, !shut.has(r.repo))}
+              />
+              {!shut.has(r.repo) &&
+                r.files.map((f) => (
+                  <button
+                    key={f.path}
+                    type="button"
+                    title={f.from ? `${f.from} → ${f.path}` : f.path}
+                    onClick={() => {
+                      const id = fileId(r.repo, f.path);
+                      shutRepo(r.repo, false);
+                      fold(id, false);
+                      // After the unfold renders, so the file is where it will stay.
+                      requestAnimationFrame(() =>
+                        document.getElementById(id)?.scrollIntoView({ block: "start" }),
+                      );
+                    }}
+                    className="flex items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-tx2 hover:bg-hover"
+                  >
+                    {/* A path longer than the tree scrolls sideways (the CEO, 2026-11-05), its counts
+                      staying in their column. It starts at its end, the file's name; the whole
+                      of it is in the tooltip too. */}
+                    <span
+                      ref={toTheEnd}
+                      className="scroll-quiet min-w-0 flex-1 whitespace-nowrap font-mono text-[12px]"
+                    >
+                      {f.path}
+                    </span>
+                    <span className="font-mono text-[11px] text-ok">+{f.added}</span>
+                    <span className="font-mono text-[11px] text-err">−{f.removed}</span>
+                  </button>
+                ))}
+              {r.files.length === 0 && !shut.has(r.repo) && (
                 <span className={`px-1.5 ${r.targetGone ? "text-err" : "text-tx4"}`}>
                   {r.targetGone
                     ? `${r.target} is gone.`
@@ -287,24 +310,37 @@ export function Review() {
                   decided, or git no longer has its commits.
                 </Empty>
               ))}
-            {repos.map((r) =>
-              r.files.map((f) => (
-                <FileBox
-                  key={`${r.repo}/${f.path}`}
-                  repo={r.repo}
-                  head={r.head}
-                  file={f}
-                  since={since}
-                  at={placed.at}
-                  comments={comments}
-                  writing={
-                    composing?.repo === r.repo && composing.path === f.path ? composing : undefined
-                  }
-                  folded={folds.get(fileId(r.repo, f.path)) ?? foldedAtFirst(f) !== undefined}
-                  onFold={fold}
+            {repos.map((r) => (
+              <section key={r.repo} className="flex flex-col gap-5">
+                {/* Each repo heads its files, so one reads apart from the next. */}
+                <RepoRow
+                  repo={r}
+                  decided={decidedAs(v, r.repo)}
+                  open={!shut.has(r.repo)}
+                  onToggle={() => shutRepo(r.repo, !shut.has(r.repo))}
+                  big
                 />
-              )),
-            )}
+                {!shut.has(r.repo) &&
+                  r.files.map((f) => (
+                    <FileBox
+                      key={`${r.repo}/${f.path}`}
+                      repo={r.repo}
+                      head={r.head}
+                      file={f}
+                      since={since}
+                      at={placed.at}
+                      comments={comments}
+                      writing={
+                        composing?.repo === r.repo && composing.path === f.path
+                          ? composing
+                          : undefined
+                      }
+                      folded={folds.get(fileId(r.repo, f.path)) ?? foldedAtFirst(f) !== undefined}
+                      onFold={fold}
+                    />
+                  ))}
+              </section>
+            ))}
             <Conversation
               general={placed.general}
               apart={[
@@ -331,6 +367,56 @@ export function Review() {
         />
       )}
     </div>
+  );
+}
+
+/** Scrolls a line to its end once drawn: a path shows its file's name first. Defined once,
+ * so React calls it when the line mounts, not on every render (which would undo the CEO's
+ * scroll). */
+const toTheEnd = (el: HTMLElement | null) => {
+  if (el) el.scrollLeft = el.scrollWidth;
+};
+
+/** A repo's head, in the tree and over its diffs: `<repo> → <target>` on its own raised band, so
+ * one repo reads apart from the next (the CEO, 2026-11-05), and a click folds all its
+ * files. */
+function RepoRow({
+  repo: r,
+  decided,
+  open,
+  onToggle,
+  big = false,
+}: {
+  repo: { repo: string; target: string; files: FileDiff[] };
+  /** How it was decided (merged, dismissed…), or nothing while open. */
+  decided: string;
+  open: boolean;
+  onToggle: () => void;
+  /** Over the diffs: roomier, with its counts. */
+  big?: boolean;
+}) {
+  const added = r.files.reduce((n, f) => n + f.added, 0);
+  const removed = r.files.reduce((n, f) => n + f.removed, 0);
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      title={open ? "Fold its files" : "Show its files"}
+      className={`flex min-w-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left font-mono text-tx hover:border-line3 ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`}
+    >
+      <Chevron open={open} />
+      <span className="min-w-0 flex-1 truncate font-semibold">
+        {r.repo} → {r.target}
+        {decided && <span className="font-normal"> · {decided}</span>}
+      </span>
+      {big && r.files.length > 0 && (
+        <span className="shrink-0 text-[12px] font-normal text-tx3">
+          {r.files.length} {r.files.length === 1 ? "file" : "files"}{" "}
+          <span className="text-ok">+{added}</span> <span className="text-err">−{removed}</span>
+        </span>
+      )}
+    </button>
   );
 }
 

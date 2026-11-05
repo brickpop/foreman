@@ -37,7 +37,7 @@ import {
 } from "../../app/sessions";
 import { BranchMenu } from "../../components/BranchMenu";
 import { DeployDialog } from "../../components/DeployDialog";
-import { PlayIcon, PromptIcon } from "../../components/icons";
+import { FolderIcon, PlayIcon, PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
@@ -187,7 +187,8 @@ function NoTeam({ project }: { project: string }) {
 }
 
 /** The branch of the agent shown, in the header after its team: a menu of
- * the repos that have it. */
+ * the repos that have it; then the copy of the agent's folder on Foreman's
+ * machine (its worktrees, one per repo), there once its first start made it. */
 function AgentBranch({ shown }: { shown: Instance }) {
   const repos = useRepos(shown.id.split("@")[1]);
   const branches = branchesOf(repos.data ?? [], shown.agentId);
@@ -210,6 +211,11 @@ function AgentBranch({ shown }: { shown: Instance }) {
           places={branchPlaces(repos.data ?? [], b)}
         />
       ))}
+      <CopyButton
+        text={() => shown.sandboxPath}
+        label={`Copy the agent's folder: ${shown.sandboxPath}`}
+        icon={<FolderIcon open={false} />}
+      />
     </span>
   ) : null;
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"slices"
 
@@ -54,6 +55,12 @@ func desktopRoutes(mux *http.ServeMux, d Desktop, agents Agents, config Config) 
 				return
 			}
 			dir = list[i].SandboxPath
+			// Made on first use, as its first start would: the CEO may drop
+			// files in before the agent has run.
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+				return
+			}
 		case req.Instance == "" && req.Project != "":
 			if !slices.Contains(home.FileFolders, req.Folder) {
 				writeError(w, http.StatusBadRequest, "INVALID", "folder: one of inbox, shared")

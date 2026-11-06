@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Instance, Project, Request, Team } from "../api/client";
 import { keys, staleKeys } from "./queries";
-import { sidebarModel } from "./Shell";
+import { rowDot, sidebarModel } from "./Shell";
 
 const project = (id: string, name = "") => ({ id, name }) as Project;
 const team = (id: string, name: string) => ({ id, config: { name } }) as Team;
@@ -63,6 +63,24 @@ describe("sidebarModel", () => {
       [],
     );
     expect(m.projects.map((p) => p.busy)).toEqual(["running", undefined, undefined, "awaiting"]);
+  });
+});
+
+describe("rowDot", () => {
+  const row = (inbox: number, busy?: string) => ({ id: "ledger", name: "Ledger", inbox, busy });
+
+  it("shows the Session's dot while the team is busy, whatever its state", () => {
+    expect(rowDot(row(0, "running"))).toEqual({ status: "running", title: "running" });
+    expect(rowDot(row(0, "queued"))).toEqual({ status: "queued", title: "queued" });
+  });
+
+  it("shows needs-you instead when something waits on the CEO, busy or not", () => {
+    expect(rowDot(row(2, "running"))).toEqual({ title: "Needs you" });
+    expect(rowDot(row(1))).toEqual({ title: "Needs you" });
+  });
+
+  it("shows nothing at rest with nothing waiting", () => {
+    expect(rowDot(row(0))).toBeUndefined();
   });
 });
 

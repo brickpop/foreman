@@ -33,11 +33,13 @@ RUN set -eux; \
     rm /tmp/go.tgz /usr/local/go/test /usr/local/go/api -rf; \
     /usr/local/go/bin/go version
 
-ARG WIKI_VERSION=v0.14.0
+# The wiki CLI, pinned via build arg (a tag, e.g. v0.15.0) or the latest release.
+ARG WIKI_VERSION=latest
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
+    if [ "$WIKI_VERSION" = "latest" ]; then from="latest/download"; else from="download/${WIKI_VERSION}"; fi; \
     mkdir -p /tmp/wiki && cd /tmp/wiki && \
-    curl -fsSL -O "https://github.com/agentic-wiki/wiki/releases/download/${WIKI_VERSION}/wiki_linux_${arch}.tar.gz" && \
+    curl -fsSL -O "https://github.com/agentic-wiki/wiki/releases/${from}/wiki_linux_${arch}.tar.gz" && \
     tar xfz "wiki_linux_${arch}.tar.gz" && \
     mv ./wiki /usr/local/bin && \
     cd .. && \

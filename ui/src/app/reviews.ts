@@ -245,3 +245,20 @@ export function reviewGroups(reviews: Review[], done = 20) {
     done: reviews.filter((v) => !isOpen(v)).slice(0, done),
   };
 }
+
+/** A file's box in the diffs pane: its id and where its top and bottom are, on the same scale
+ * as the pane's. */
+export interface FileSpan {
+  id: string;
+  top: number;
+  bottom: number;
+}
+
+/** The file the CEO is reading, lit in the tree (the CEO, 2026-11-07): the one whose header is
+ * stuck at the pane's top (its box crosses that edge), or else the first file in view; none when
+ * no file is in view. `files` are in page order. */
+export function readingFile(files: FileSpan[], top: number, bottom: number): string | undefined {
+  const crossing = files.find((f) => f.top <= top && f.bottom > top);
+  if (crossing) return crossing.id;
+  return files.find((f) => f.top > top && f.top < bottom)?.id;
+}

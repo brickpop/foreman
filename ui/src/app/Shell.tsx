@@ -115,6 +115,15 @@ export function sidebarModel(
   };
 }
 
+/** A folded project row's one dot (the CEO, 2026-11-06): needs-you when
+ * something waits on the CEO there, else its Session's dot while the team is
+ * busy, else none. Unfolded, the dots are on its sections instead. */
+export function rowDot(p: SidebarProject): { status?: string; title: string } | undefined {
+  if (p.inbox > 0) return { title: "Needs you" };
+  if (p.busy) return { status: p.busy, title: p.busy };
+  return undefined;
+}
+
 const navActive = { className: "bg-raised !text-tx" };
 const rowItem =
   "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
@@ -186,6 +195,7 @@ function Sidebar({
 function ProjectRow({ project }: { project: SidebarProject }) {
   const current = useParams({ strict: false }).project === project.id;
   const [open, setOpen] = useState(true);
+  const dot = rowDot(project);
   // Opening a project shows its sections again.
   useEffect(() => {
     if (current) setOpen(true);
@@ -204,14 +214,14 @@ function ProjectRow({ project }: { project: SidebarProject }) {
         >
           {project.name}
           <span className="flex items-center gap-2">
-            {!open && project.inbox > 0 && <Dot title="Needs you" />}
+            {!open && dot && <Dot status={dot.status} title={dot.title} />}
             <Chevron open={open} />
           </span>
         </button>
       ) : (
         <Link to="/projects/$project" params={{ project: project.id }} className={rowItem}>
           {project.name}
-          {project.inbox > 0 && <Dot title="Needs you" />}
+          {dot && <Dot status={dot.status} title={dot.title} />}
         </Link>
       )}
       {current && open && (

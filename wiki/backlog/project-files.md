@@ -17,7 +17,7 @@ epic: workflow
   - **`files/shared/`**: the agents' persistent data, read and written by every agent of the project. Not git: no history.
 - **The session prompt** tells each agent where both are and what each is for (data later work needs goes in `shared/`; knowledge still goes in the wiki).
 - **Open on the desktop**: Foreman opens a folder with the host's `open` (macOS) or `xdg-open` (Linux, with a display). Where it can't, no Open button shows at all.
-- **Session header**: the agent's folder gets an **Open icon** (tooltip, the path) beside its copy button; then two labelled buttons for the project, **`File inbox ↗`** and **`Shared files ↗`**, a click opening that folder.
+- **Session header**, at its right end, three labelled buttons alike, a click opening that folder: **`Agent folder ↗`** (the shown agent's), **`Shared files ↗`**, **`File inbox ↗`** last. They replaced the agent's folder copy button and its Open icon: nothing copies the path any more (the CEO, 2026-11-06). Each folder is made if missing.
 - A project made before workspaces (legacy) has no `files/`: [Remove the workspace migration](./remove-workspace-migration.md) ends that case.
 
 ## Safety
@@ -34,5 +34,5 @@ epic: workflow
 - [x] server: `files/inbox` and `files/shared` made at each agent start and mounted (inbox ro, shared rw); tests
 - [x] server: `GET /api/desktop` ({canOpen}), `POST /api/desktop/open` ({instance} or {project, folder}); tests
 - [x] prompt: the two folders in This assignment; tests
-- [x] ui: the Open icon and the two buttons in the Session header, shown only with `canOpen`; client test
+- [x] ui: the three buttons in the Session header, shown only with `canOpen`; client test
 - [ ] the CEO tries it on macOS and on Fedora: the three buttons open Finder / the file manager; inside an agent, `touch <workspace>/files/inbox/x` fails and `files/shared/x` works; the prompt (Session → prompt) names both. Then fold this card into the specs and delete it

@@ -34,9 +34,11 @@ func (f *fakeDesktop) Open(dir string) error {
 	return nil
 }
 
-func withDesktop(d *fakeDesktop, files string) http.Handler {
-	agents := &fakeAgents{list: []store.Instance{{ID: "tove@ledger", SandboxPath: "/ws/ledger/agents/tove"}}}
-	config := fakeConfig{projects: []home.Project{{ID: "ledger", Files: files}, {ID: "legacy"}}}
+// withDesktop serves a project ledger whose workspace is ws, with its agent
+// tove.
+func withDesktop(d *fakeDesktop, ws string) http.Handler {
+	agents := &fakeAgents{list: []store.Instance{{ID: "tove@ledger", SandboxPath: filepath.Join(ws, "agents", "tove")}}}
+	config := fakeConfig{projects: []home.Project{{ID: "ledger", Files: filepath.Join(ws, "files")}, {ID: "legacy"}}}
 	return New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Agents: agents, Config: config, Desktop: d, UI: builtUI})
 }
 
@@ -52,13 +54,15 @@ func TestDesktopSaysWhetherItCanOpen(t *testing.T) {
 }
 
 // The server opens the folder it works out from an instance, or from a
-// project and one of its file folders (made first, so the inbox opens before
-// any agent has started); the browser never names a path, so no other
-// folder can be opened.
+// project and one of its file folders, each made first, so it opens before
+// any agent has started; the browser never names a path, so no other folder
+// can be opened.
 func TestOpenFolders(t *testing.T) {
-	files := filepath.Join(t.TempDir(), "files")
+	ws := t.TempDir()
+	files := filepath.Join(ws, "files")
+	tove := filepath.Join(ws, "agents", "tove")
 	d := &fakeDesktop{can: true}
-	h := withDesktop(d, files)
+	h := withDesktop(d, ws)
 	for _, body := range []string{
 		`{"instance":"tove@ledger"}`,
 		`{"project":"ledger","folder":"inbox"}`,
@@ -68,9 +72,12 @@ func TestOpenFolders(t *testing.T) {
 			t.Fatalf("%s: %d %s", body, w.Code, w.Body)
 		}
 	}
-	want := []string{"/ws/ledger/agents/tove", filepath.Join(files, "inbox"), filepath.Join(files, "shared")}
+	want := []string{tove, filepath.Join(files, "inbox"), filepath.Join(files, "shared")}
 	if !slices.Equal(d.opened, want) {
 		t.Errorf("opened %v, want %v", d.opened, want)
+	}
+	if _, err := os.Stat(tove); err != nil {
+		t.Errorf("the agent's folder wasn't made: %v", err)
 	}
 	for _, f := range home.FileFolders {
 		if _, err := os.Stat(filepath.Join(files, f)); err != nil {
@@ -82,7 +89,7 @@ func TestOpenFolders(t *testing.T) {
 // Every request that doesn't name exactly one known folder is refused, and
 // nothing is opened.
 func TestOpenRefuses(t *testing.T) {
-	files := filepath.Join(t.TempDir(), "files")
+	ws := t.TempDir()
 	for _, tc := range []struct {
 		name, body string
 		desk       *fakeDesktop
@@ -99,9 +106,9 @@ func TestOpenRefuses(t *testing.T) {
 		{"a path", `{"path":"/etc"}`, &fakeDesktop{can: true}, http.StatusBadRequest, "INVALID"},
 		{"not JSON", `nope`, &fakeDesktop{can: true}, http.StatusBadRequest, "INVALID"},
 		{"legacy project", `{"project":"legacy","folder":"inbox"}`, &fakeDesktop{can: true}, http.StatusConflict, "NO_FILES"},
-		{"not a folder yet", `{"instance":"tove@ledger"}`, &fakeDesktop{can: true, refuse: "/ws/ledger/agents/tove"}, http.StatusConflict, "NOT_A_FOLDER"},
+		{"refused by the opener", `{"instance":"tove@ledger"}`, &fakeDesktop{can: true, refuse: filepath.Join(ws, "agents", "tove")}, http.StatusConflict, "NOT_A_FOLDER"},
 	} {
-		w := send(withDesktop(tc.desk, files), "POST", "/api/desktop/open", tc.body)
+		w := send(withDesktop(tc.desk, ws), "POST", "/api/desktop/open", tc.body)
 		var got struct{ Code string }
 		_ = json.Unmarshal(w.Body.Bytes(), &got)
 		if w.Code != tc.code || got.Code != tc.errCode || len(tc.desk.opened) != 0 {

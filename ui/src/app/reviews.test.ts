@@ -17,6 +17,7 @@ import {
   mergeLabel,
   openRepos,
   placeComments,
+  readingFile,
   reviewGroups,
   reviewTeam,
   statusLabel,
@@ -280,5 +281,46 @@ describe("lostDrafts", () => {
   it("counts what a merge would lose, one or several", () => {
     expect(lostDrafts(1)).toBe("1 draft comment won't be sent and will be lost. Merge anyway?");
     expect(lostDrafts(3)).toBe("3 draft comments won't be sent and will be lost. Merge anyway?");
+  });
+});
+
+describe("readingFile", () => {
+  // Three files 20px apart, the pane showing 0 to 500 once scrolled.
+  const files = [
+    { id: "a", top: 0, bottom: 300 },
+    { id: "b", top: 320, bottom: 900 },
+    { id: "c", top: 920, bottom: 960 },
+  ];
+  const at = (scroll: number) =>
+    readingFile(
+      files.map((f) => ({ ...f, top: f.top - scroll, bottom: f.bottom - scroll })),
+      0,
+      500,
+    );
+
+  it("is the file whose header is stuck at the top", () => {
+    expect(at(0)).toBe("a");
+    expect(at(299)).toBe("a");
+    expect(at(400)).toBe("b");
+    expect(at(899)).toBe("b");
+  });
+
+  it("is the next file in view when the top is in the gap between two", () => {
+    expect(at(300)).toBe("b");
+    expect(at(910)).toBe("c");
+  });
+
+  it("is the first file in view when the top is above them all", () => {
+    expect(readingFile(files, -100, 500)).toBe("a");
+  });
+
+  it("is none when no file is in view", () => {
+    expect(at(1000)).toBeUndefined(); // the general comments, past the files
+    expect(readingFile(files, -600, -100)).toBeUndefined(); // the files below the view
+    expect(readingFile([], 0, 500)).toBeUndefined();
+  });
+
+  it("is never a file that only touches the view's bottom edge", () => {
+    expect(readingFile([{ id: "a", top: 500, bottom: 800 }], 0, 500)).toBeUndefined();
   });
 });

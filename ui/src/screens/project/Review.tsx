@@ -1,7 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
 import { agentOf, forgeOf, linkLine, mergeTargets, projectName, when } from "../../app/model";
@@ -35,6 +35,7 @@ import {
   mergeLabel,
   openRepos,
   placeComments,
+  readingFile,
   reviewTeam,
   statusLabel,
 } from "../../app/reviews";
@@ -132,6 +133,34 @@ export function Review() {
     );
     return placeComments(v?.comments ?? [], since, shown);
   }, [repos, v?.comments, since]);
+  // The file the CEO is reading, lit in the tree (the CEO, 2026-11-07). A click in the tree
+  // pins its file until the diffs scroll on: a short last file never reaches the top.
+  const [reading, setReading] = useState<string>();
+  const pane = useRef<HTMLDivElement>(null);
+  const tree = useRef<HTMLElement>(null);
+  const pin = useRef<{ id: string; scroll: number }>(undefined);
+  const findReading = useCallback(() => {
+    const el = pane.current;
+    if (!el) return;
+    if (pin.current) {
+      if (el.scrollTop === pin.current.scroll) return;
+      pin.current = undefined;
+    }
+    const view = el.getBoundingClientRect();
+    const files = [...el.querySelectorAll<HTMLElement>("section[id^='file:']")].map((box) => {
+      const { top, bottom } = box.getBoundingClientRect();
+      return { id: box.id, top, bottom };
+    });
+    setReading(readingFile(files, view.top, view.bottom));
+  }, []);
+  // Folding moves the files without a scroll.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a change of what the diffs show
+  useEffect(findReading, [findReading, repos, folds, shut]);
+  // A lit row out of the tree's sight comes into it, the tree moving the least it can.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a change of the file read only
+  useEffect(() => {
+    tree.current?.querySelector("[aria-current]")?.scrollIntoView({ block: "nearest" });
+  }, [reading]);
   const open = v !== undefined && isOpen(v);
   const comments: Comments = useMemo(
     () => ({
@@ -241,45 +270,53 @@ export function Review() {
         )}
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav className="flex w-[240px] shrink-0 flex-col gap-5 overflow-auto border-r border-line px-3 py-5 text-[13px] max-[900px]:hidden">
+        <nav
+          ref={tree}
+          className="flex w-[240px] shrink-0 flex-col gap-5 overflow-auto border-r border-line px-3 py-5 text-[13px] max-[900px]:hidden"
+        >
           {repos.map((r) => (
             <div key={r.repo} className="flex flex-col gap-0.5">
               <RepoRow
                 repo={r}
                 decided={decidedAs(v, r.repo)}
                 open={!shut.has(r.repo)}
-                onToggle={() => shutRepo(r.repo, !shut.has(r.repo))}
+                onToggle={repos.length > 1 ? () => shutRepo(r.repo, !shut.has(r.repo)) : undefined}
               />
               {!shut.has(r.repo) &&
-                r.files.map((f) => (
-                  <button
-                    key={f.path}
-                    type="button"
-                    title={f.from ? `${f.from} → ${f.path}` : f.path}
-                    onClick={() => {
-                      const id = fileId(r.repo, f.path);
-                      shutRepo(r.repo, false);
-                      fold(id, false);
-                      // After the unfold renders, so the file is where it will stay.
-                      requestAnimationFrame(() =>
-                        document.getElementById(id)?.scrollIntoView({ block: "start" }),
-                      );
-                    }}
-                    className="flex items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-tx2 hover:bg-hover"
-                  >
-                    {/* A path longer than the tree scrolls sideways (the CEO, 2026-11-05), its counts
+                r.files.map((f) => {
+                  const id = fileId(r.repo, f.path);
+                  return (
+                    <button
+                      key={f.path}
+                      type="button"
+                      aria-current={id === reading ? "location" : undefined}
+                      title={f.from ? `${f.from} → ${f.path}` : f.path}
+                      onClick={() => {
+                        shutRepo(r.repo, false);
+                        fold(id, false);
+                        // After the unfold renders, so the file is where it will stay.
+                        requestAnimationFrame(() => {
+                          document.getElementById(id)?.scrollIntoView({ block: "start" });
+                          pin.current = { id, scroll: pane.current?.scrollTop ?? 0 };
+                          setReading(id);
+                        });
+                      }}
+                      className={`flex items-baseline gap-2 rounded-md px-2 py-1.5 text-left ${id === reading ? "bg-accSoft text-accTx" : "text-tx2 hover:bg-hover"}`}
+                    >
+                      {/* A path longer than the tree scrolls sideways (the CEO, 2026-11-05), its counts
                       staying in their column. It starts at its end, the file's name; the whole
                       of it is in the tooltip too. */}
-                    <span
-                      ref={toTheEnd}
-                      className="scroll-quiet min-w-0 flex-1 whitespace-nowrap font-mono text-[12px]"
-                    >
-                      {f.path}
-                    </span>
-                    <span className="font-mono text-[11px] text-ok">+{f.added}</span>
-                    <span className="font-mono text-[11px] text-err">−{f.removed}</span>
-                  </button>
-                ))}
+                      <span
+                        ref={toTheEnd}
+                        className="scroll-quiet min-w-0 flex-1 whitespace-nowrap font-mono text-[12px]"
+                      >
+                        {f.path}
+                      </span>
+                      <span className="font-mono text-[11px] text-ok">+{f.added}</span>
+                      <span className="font-mono text-[11px] text-err">−{f.removed}</span>
+                    </button>
+                  );
+                })}
               {r.files.length === 0 && !shut.has(r.repo) && (
                 <span className={`px-1.5 ${r.targetGone ? "text-err" : "text-tx4"}`}>
                   {r.targetGone
@@ -294,7 +331,7 @@ export function Review() {
         </nav>
         {/* The padding is inside, not on the scrolling pane: a pane's own padding
             would hold a stuck file header 20px below its top, lines showing above. */}
-        <div className="min-w-0 flex-1 overflow-auto px-8">
+        <div ref={pane} onScroll={findReading} className="min-w-0 flex-1 overflow-auto px-8">
           <div className="flex flex-col gap-5 py-5">
             {diff.error && <p className="text-err">{diff.error.message}</p>}
             {diff.isPending && <Loading rows={8} />}
@@ -322,7 +359,9 @@ export function Review() {
                   repo={r}
                   decided={decidedAs(v, r.repo)}
                   open={!shut.has(r.repo)}
-                  onToggle={() => shutRepo(r.repo, !shut.has(r.repo))}
+                  onToggle={
+                    repos.length > 1 ? () => shutRepo(r.repo, !shut.has(r.repo)) : undefined
+                  }
                   big
                 />
                 {!shut.has(r.repo) &&
@@ -383,8 +422,8 @@ const toTheEnd = (el: HTMLElement | null) => {
 };
 
 /** A repo's head, in the tree and over its diffs: `<repo> → <target>` on its own raised band, so
- * one repo reads apart from the next (the CEO, 2026-11-05), and a click folds all its
- * files. */
+ * one repo reads apart from the next (the CEO, 2026-11-05), and a click folds all its files.
+ * Only with two repos or more: a review's only repo doesn't fold (the CEO, 2026-11-07). */
 function RepoRow({
   repo: r,
   decided,
@@ -396,21 +435,17 @@ function RepoRow({
   /** How it was decided (merged, dismissed…), or nothing while open. */
   decided: string;
   open: boolean;
-  onToggle: () => void;
+  /** Folds or unfolds its files; none when it doesn't fold. */
+  onToggle?: () => void;
   /** Over the diffs: roomier, with its counts. */
   big?: boolean;
 }) {
   const added = r.files.reduce((n, f) => n + f.added, 0);
   const removed = r.files.reduce((n, f) => n + f.removed, 0);
-  return (
-    <button
-      type="button"
-      aria-expanded={open}
-      onClick={onToggle}
-      title={open ? "Fold its files" : "Show its files"}
-      className={`flex min-w-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left font-mono text-tx hover:border-line3 ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`}
-    >
-      <Chevron open={open} />
+  const look = `flex min-w-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left font-mono text-tx ${onToggle ? "hover:border-line3" : ""} ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`;
+  const inside = (
+    <>
+      {onToggle && <Chevron open={open} />}
       <span className="min-w-0 flex-1 truncate font-semibold">
         {r.repo} → {r.target}
         {decided && <span className="font-normal"> · {decided}</span>}
@@ -421,6 +456,18 @@ function RepoRow({
           <span className="text-ok">+{added}</span> <span className="text-err">−{removed}</span>
         </span>
       )}
+    </>
+  );
+  if (!onToggle) return <div className={look}>{inside}</div>;
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={onToggle}
+      title={open ? "Fold its files" : "Show its files"}
+      className={look}
+    >
+      {inside}
     </button>
   );
 }

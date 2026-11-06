@@ -17,8 +17,10 @@ import (
 // Author is who a commit is by: an agent, never the CEO's identity.
 type Author struct{ Name, Email string }
 
+// config makes a commit the agent's: its name, and never the CEO's signature,
+// whatever the CEO's git config says (the CEO, 2026-11-06).
 func (a Author) config() []string {
-	return []string{"-c", "user.name=" + a.Name, "-c", "user.email=" + a.Email}
+	return []string{"-c", "user.name=" + a.Name, "-c", "user.email=" + a.Email, "-c", "commit.gpgsign=false"}
 }
 
 var (
@@ -28,8 +30,6 @@ var (
 	ErrBadBranch = errors.New("git: not a valid branch name")
 	// ErrNoMerge means there is no unfinished merge to abort.
 	ErrNoMerge = errors.New("git: no merge in progress")
-	// ErrBranchExists means the repo has a branch of that name already.
-	ErrBranchExists = errors.New("git: the branch exists")
 )
 
 // ConflictsError lists the files of an unfinished merge that still hold
@@ -56,6 +56,13 @@ func BranchPrefix(project, agent, team string, lead bool) string {
 		return "lead/" + project + "/" + team + "/"
 	}
 	return "wt/" + project + "/" + agent + "/"
+}
+
+// AgentBranch says whether branch is in an agents' namespace (wt/*,
+// lead/*): agents write those, so a merge never goes into one, and none is a
+// repo's default branch.
+func AgentBranch(branch string) bool {
+	return strings.HasPrefix(branch, "wt/") || strings.HasPrefix(branch, "lead/")
 }
 
 // HomeBranch is where an agent's worktree starts and idles: main under its
@@ -105,6 +112,25 @@ func (g *CLI) Branches(ctx context.Context, dir, prefix string) ([]string, error
 		}
 	}
 	slices.Sort(list)
+	return list, nil
+}
+
+// HeldBy lists dir's branches, but the agents' (AgentBranch), that hold all
+// of branch in their history: work merged there with its commits.
+func (g *CLI) HeldBy(ctx context.Context, dir, branch string) ([]string, error) {
+	if !ValidBranch(ctx, branch) {
+		return nil, ErrBadBranch
+	}
+	out, err := run(ctx, dir, "for-each-ref", "--format=%(refname:short)", "--contains", "refs/heads/"+branch, "refs/heads/")
+	if err != nil {
+		return nil, err
+	}
+	var list []string
+	for _, b := range strings.Fields(out) {
+		if !AgentBranch(b) {
+			list = append(list, b)
+		}
+	}
 	return list, nil
 }
 
@@ -198,8 +224,9 @@ func (g *CLI) freshen(ctx context.Context, repo, branch, def string) (bool, erro
 	return err == nil, err
 }
 
-// Switch checks the worktree out on branch, creating it from base when the
-// repo doesn't have it yet; created says it did. A worktree with changes is
+// Switch checks the worktree out on branch, creating it from base (a branch,
+// else any commit git can name: origin/main, a hash) when the repo doesn't
+// have it yet; created says it did. A worktree with changes is
 // refused (ErrUncommitted), so no work is carried from one branch to another.
 func (g *CLI) Switch(ctx context.Context, dir, branch, base string) (created bool, err error) {
 	if !ValidBranch(ctx, branch) {
@@ -215,25 +242,15 @@ func (g *CLI) Switch(ctx context.Context, dir, branch, base string) (created boo
 		_, err := run(ctx, dir, "checkout", "--quiet", branch)
 		return false, err
 	}
-	if !g.HasBranch(ctx, dir, base) {
-		return false, fmt.Errorf("no branch %q to start %s from", base, branch)
+	start, err := g.Resolve(ctx, dir, "refs/heads/"+base) // a branch first, over a tag of that name
+	if err != nil {
+		if start, err = g.Resolve(ctx, dir, base); err != nil {
+			return false, fmt.Errorf("no branch or commit %q to start %s from", base, branch)
+		}
 	}
-	_, err = run(ctx, dir, "checkout", "--quiet", "-b", branch, "refs/heads/"+base)
+	// At the commit, so a remote's branch (origin/main) isn't set as upstream.
+	_, err = run(ctx, dir, "checkout", "--quiet", "-b", branch, start)
 	return err == nil, err
-}
-
-// CreateBranch makes branch at commit (a hash), without checking it out;
-// one the repo has already is refused (ErrBranchExists).
-func (g *CLI) CreateBranch(ctx context.Context, dir, branch, commit string) error {
-	if !ValidBranch(ctx, branch) {
-		return ErrBadBranch
-	}
-	defer g.lock(ctx, dir)()
-	if g.HasBranch(ctx, dir, branch) {
-		return ErrBranchExists
-	}
-	_, err := run(ctx, dir, "branch", "--no-track", branch, commit)
-	return err
 }
 
 // CommitAll commits everything changed in the worktree on the branch checked

@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/store"
@@ -48,12 +47,11 @@ func (p Project) Shown() string { return cmp.Or(p.Name, readable(p.ID)) }
 
 // Repo is one of a project's code repos, anywhere on disk.
 type Repo struct {
-	Name    string   `json:"name"`          // unique in the project
-	Path    string   `json:"path"`          // absolute
-	Default string   `json:"defaultBranch"` // its default target's name (from Targets): agents start from it, merges go to it unless told otherwise
-	Targets []Target `json:"targets"`       // every target, the default first, then oldest first
-	Problem string   `json:"problem"`       // why agents can't use it (missing, …); "" when they can
-	root    string   // its first commit, which Locate looks for
+	Name    string `json:"name"`          // unique in the project
+	Path    string `json:"path"`          // absolute
+	Default string `json:"defaultBranch"` // agents start from it, merges go to it unless the lead names another branch
+	Problem string `json:"problem"`       // why agents can't use it (missing, …); "" when they can
+	root    string // its first commit, which Locate looks for
 }
 
 // Ready says whether agents can use the repo.
@@ -102,25 +100,6 @@ func (p Project) Default(name string) string {
 	return "main"
 }
 
-// Targets are the code repo's targets by name, its default first; none for
-// any other name.
-func (p Project) Targets(name string) []string {
-	r, ok := p.repo(name)
-	if !ok {
-		return nil
-	}
-	var list []string
-	for _, t := range r.Targets {
-		list = append(list, t.Name)
-	}
-	return list
-}
-
-// IsTarget says whether branch is one of the code repo's targets.
-func (p Project) IsTarget(name, branch string) bool {
-	return slices.Contains(p.Targets(name), branch)
-}
-
 func (p Project) repo(name string) (Repo, bool) {
 	for _, r := range p.Repos {
 		if r.Name == name && name != projectRepo {
@@ -128,18 +107,6 @@ func (p Project) repo(name string) (Repo, bool) {
 		}
 	}
 	return Repo{}, false
-}
-
-// Target is a branch of a code repo that merges may go to
-// (wiki/product/features/pipeline-and-merges.md#merge-targets): whether it is
-// the default, who made it (the lead's instance; "": the CEO), at which commit
-// ("" for one the CEO set) and when.
-type Target struct {
-	Name      string    `json:"name"`
-	Default   bool      `json:"default"`
-	MadeBy    string    `json:"madeBy"`
-	From      string    `json:"from"`
-	CreatedAt time.Time `json:"createdAt"`
 }
 
 // Team is a team file.
@@ -358,7 +325,7 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 		p.Config, p.Problems = ParseProject(data)
 	}
 	for _, rec := range r.Repos {
-		repo := Repo{Name: rec.Name, Path: rec.Path, Default: rec.Default, Targets: targets(rec.Targets), Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
+		repo := Repo{Name: rec.Name, Path: rec.Path, Default: rec.Default, Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
 		if !repo.Ready() {
 			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.Name, repo.Problem))
 		}
@@ -366,16 +333,6 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 	}
 	p.Problems = normalize(p.Problems)
 	return p
-}
-
-// targets are a repo's targets as recorded: never nil, so the API
-// sends a list.
-func targets(records []store.TargetRecord) []Target {
-	list := []Target{}
-	for _, t := range records {
-		list = append(list, Target(t))
-	}
-	return list
 }
 
 // checkRepo says why agents can't use a repo, or "": its folder moved or went,

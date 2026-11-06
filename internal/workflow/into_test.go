@@ -17,64 +17,26 @@ func runGit(dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// Merge targets (wiki/product/features/pipeline-and-merges.md#merge-targets).
+// Where a merge goes (wiki/product/features/pipeline-and-merges.md#where-a-merge-goes):
+// any branch of the CEO's, none listed anywhere.
 
-// release makes release/1.0 in api at its first commit, then moves api's main
-// on (NEWS), so work for the release and work for main differ.
+// release has the CEO make release/1.0 in api at its first commit, with git,
+// then move api's main on (NEWS), so work for the release and work for main
+// differ.
 func (f *fixture) release() {
 	f.t.Helper()
-	f.ok("mara", "create_target", map[string]string{"repo": "api", "name": "release/1.0", "from": "main"})
 	api := filepath.Join(f.root, "ledger", "api")
+	f.git(api, "branch", "release/1.0", "main")
 	writeFile(f.t, filepath.Join(api, "NEWS"), "v2\n")
 	if err := git.New().Commit(ctx, api, "news", "NEWS"); err != nil {
 		f.t.Fatal(err)
 	}
 }
 
-func TestCreateTarget(t *testing.T) {
-	f := newFixture(t)
-	api := filepath.Join(f.root, "ledger", "api")
-	first := f.git(api, "rev-parse", "main")
-	text := f.ok("mara", "create_target", map[string]string{"repo": "api", "name": "release/1.0", "from": first[:7]})
-	if !strings.HasPrefix(text, "release/1.0 is a target of api now, at "+first+".") {
-		t.Errorf("%q", text)
-	}
-	if at := f.git(api, "rev-parse", "release/1.0"); at != first {
-		t.Errorf("at %s", at)
-	}
-	if got := f.targets.made["api"]; len(got) != 1 || got[0].MadeBy != "mara@ledger" {
-		t.Errorf("recorded %+v", got)
-	}
-	target := func(repo, name, from string) map[string]string {
-		return map[string]string{"repo": repo, "name": name, "from": from}
-	}
-	f.refused("tove", "create_target", target("api", "release/2.0", "main"), "not_lead")
-	f.refused("mara", "create_target", target("api", "x..y", "main"), "bad_branch")
-	f.refused("mara", "create_target", target("api", "release/2.0", ""), "no_from")
-	f.refused("mara", "create_target", target("docs", "release/2.0", "main"), "no_repo")
-	f.refused("mara", "create_target", target("api", "taken", "main"), "target_exists")
-	f.refused("mara", "create_target", target("api", "release/2.0", "nope"), "bad_target")
-	// Kept as an action, refusals too.
-	acts, err := f.db.Actions().List(ctx, "atlas@ledger")
-	made, refused := 0, 0
-	for _, a := range acts {
-		switch {
-		case a.Tool != "create_target":
-		case a.Error == "" && a.Branch == "release/1.0":
-			made++
-		case a.Error != "":
-			refused++
-		}
-	}
-	if err != nil || made != 1 || refused != 6 {
-		t.Errorf("actions: %d made, %d refused (%v)", made, refused, err)
-	}
-}
-
-// Work for a target starts from it and lands on it: the review is reckoned
-// against it, the merge goes there, idle desks stay on the default, and the
-// notice that it moved goes only to merge requests into it.
-func TestWorkLandsOnItsTarget(t *testing.T) {
+// Work for a branch of the CEO's starts from it and lands on it: the review
+// is reckoned against it, the merge goes there, idle desks stay on the
+// default, and the notice that it moved goes only to merge requests into it.
+func TestWorkLandsOnTheBranchItNames(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	api := filepath.Join(f.root, "ledger", "api")
@@ -115,7 +77,7 @@ func TestWorkLandsOnItsTarget(t *testing.T) {
 		t.Errorf("main got the fix too: %q", out)
 	}
 	if at := f.git(api, "rev-parse", "wt/ledger/tove/main"); at != desk {
-		t.Error("an idle desk followed a target other than the default")
+		t.Error("an idle desk followed a branch other than the default")
 	}
 	if f.mr("mr-2").State != store.MergeMerged || f.mr("mr-1").State != store.MergeOpen {
 		t.Errorf("states %s %s", f.mr("mr-2").State, f.mr("mr-1").State)
@@ -130,10 +92,10 @@ func TestWorkLandsOnItsTarget(t *testing.T) {
 	}
 }
 
-// A review spans every repo with new commits: into must be a target of each,
-// or nothing is made. A refresh keeps the target it goes to; a new into
-// changes it.
-func TestIntoMustBeATargetOfEveryRepoWithNewCommits(t *testing.T) {
+// A review spans every repo with new commits: into must be a branch of each,
+// never an agent's, or nothing is made. A refresh keeps the branch it goes
+// to; a new into changes it.
+func TestIntoMustBeABranchOfEveryRepoWithNewCommits(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
@@ -142,7 +104,7 @@ func TestIntoMustBeATargetOfEveryRepoWithNewCommits(t *testing.T) {
 	}
 	f.ok("mara", "commit", commits("api", "fix", "web", "fix"))
 	fix := map[string]string{"branch": "lead/ledger/atlas/fix", "title": "Invoices as CSV", "entry": "backlog/led-44.md", "into": "release/1.0"}
-	if text := f.refused("mara", "request_merge", fix, "no_such_target"); !strings.Contains(text, "in web, which has no target release/1.0") {
+	if text := f.refused("mara", "request_merge", fix, "no_such_branch"); !strings.Contains(text, "in web (no release/1.0), which lacks the branch") {
 		t.Errorf("%q", text)
 	}
 	if all, _ := f.db.MergeRequests().ForProject(ctx, "ledger"); len(all) != 0 {
@@ -152,7 +114,12 @@ func TestIntoMustBeATargetOfEveryRepoWithNewCommits(t *testing.T) {
 		t.Errorf("a review was made: %+v", list)
 	}
 	fix["into"] = "nope"
-	f.refused("mara", "request_merge", fix, "no_such_target")
+	f.refused("mara", "request_merge", fix, "no_such_branch")
+	// An agent's branch, which every repo has, is never one to merge into.
+	for _, into := range []string{"wt/ledger/tove/main", "lead/ledger/atlas/integration"} {
+		fix["into"] = into
+		f.refused("mara", "request_merge", fix, "agent_branch")
+	}
 
 	// Into the defaults, then the CEO moves api's to the release: a refresh
 	// keeps it there.
@@ -165,11 +132,18 @@ func TestIntoMustBeATargetOfEveryRepoWithNewCommits(t *testing.T) {
 		t.Errorf("refresh: %q", text)
 	}
 	fix["into"] = "main"
-	f.refused("mara", "request_merge", fix, "no_such_target") // web has no main
+	f.refused("mara", "request_merge", fix, "no_such_branch") // web has no main
+
+	// A branch the CEO makes in web too, after: it can be named at once.
+	f.git(filepath.Join(f.root, "ledger", "web"), "branch", "release/1.0", "trunk")
+	fix["into"] = "release/1.0"
+	if text := f.ok("mara", "request_merge", fix); text != "Review rev-1, api (mr-1) into release/1.0, refreshed, web (mr-2) into release/1.0, refreshed: waiting for the CEO." {
+		t.Errorf("into a branch made after: %q", text)
+	}
 }
 
-// The CEO changes where one repo of a review merges: to another of its
-// targets only; the diff follows, a conflict found before is forgotten, and
+// The CEO changes where one repo of a review merges: to any branch of the
+// repo but an agent's; the diff follows, a conflict found before is forgotten, and
 // the lead is told.
 func TestRetargetReview(t *testing.T) {
 	f := newFixture(t)
@@ -185,7 +159,8 @@ func TestRetargetReview(t *testing.T) {
 		repo, target string
 		want         error
 	}{
-		"not a target":         {"api", "wt/ledger/tove/main", ErrInvalid},
+		"an agent's branch":    {"api", "wt/ledger/tove/main", ErrInvalid},
+		"no such branch":       {"api", "nope", ErrInvalid},
 		"another repo's":       {"web", "release/1.0", ErrNotOpen},
 		"a repo of no request": {"docs", "main", ErrNotOpen},
 	} {
@@ -205,7 +180,7 @@ func TestRetargetReview(t *testing.T) {
 	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); diffs[0].Target != "release/1.0" || !strings.Contains(diffs[0].Diff, "LED-44.go") {
 		t.Errorf("diff %+v", diffs)
 	}
-	// A target whose branch went outside Foreman.
+	// A branch deleted outside Foreman.
 	f.git(filepath.Join(f.root, "ledger", "api"), "branch", "-D", "release/1.0")
 	if err := f.w.RetargetReview(ctx, "rev-1", "api", "main"); err != nil {
 		t.Errorf("back to main: %v", err)
@@ -215,12 +190,12 @@ func TestRetargetReview(t *testing.T) {
 	}
 }
 
-// switch from: a target of at least one repo, used only for a new branch.
-func TestSwitchFromATarget(t *testing.T) {
+// switch from: any branch or commit at least one repo has, used only for a
+// new branch.
+func TestSwitchFromAnywhere(t *testing.T) {
 	f := newFixture(t)
 	f.release()
-	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "nope"}, "no_such_target")
-	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "wt/ledger/tove/main"}, "no_such_target")
+	f.refused("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "nope"}, "no_such_ref")
 	text := f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "release/1.0"})
 	if !strings.Contains(text, "New in api (from release/1.0), web (from trunk).") {
 		t.Errorf("%q", text)
@@ -232,19 +207,37 @@ func TestSwitchFromATarget(t *testing.T) {
 	if text := f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "release/1.0"}); !strings.Contains(text, "It existed already, so from (release/1.0) changed nothing.") {
 		t.Errorf("again: %q", text)
 	}
+	// From a teammate's branch, and from a commit only api has.
+	writeFile(t, filepath.Join(f.wt("mara", "api"), "lead.go"), "package l\n")
+	f.ok("mara", "commit", commits("api", "the lead's"))
+	leads := f.git(f.wt("mara", "api"), "rev-parse", "HEAD")
+	text = f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/y", "from": "lead/ledger/atlas/integration"})
+	if !strings.Contains(text, "New in api (from lead/ledger/atlas/integration), web (from lead/ledger/atlas/integration).") || f.git(f.wt("tove", "api"), "rev-parse", "HEAD") != leads {
+		t.Errorf("from a teammate's: %q", text)
+	}
+	text = f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/z", "from": leads})
+	if !strings.Contains(text, "New in api (from "+leads+"), web (from trunk).") {
+		t.Errorf("from a commit: %q", text)
+	}
 }
 
-// Work a target holds isn't new: no hand-off of it, and a resumed agent
-// isn't told about it.
-func TestWorkInAnyTargetIsNotNew(t *testing.T) {
+// Work a branch of the CEO's holds isn't new: no hand-off of it, wherever
+// that branch came from.
+func TestWorkTheCEOsBranchesHoldIsNotNew(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/x", "from": "release/1.0"})
 	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/x", "summary": "nothing"}, "nothing_new")
+	// Its work, once in a branch the CEO made and named nowhere, isn't new either.
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "x.go"), "package x\n")
+	f.ok("tove", "commit", commits("api", "x"))
+	f.ok("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/x", "summary": "x"})
+	f.git(filepath.Join(f.root, "ledger", "api"), "branch", "spike", "wt/ledger/tove/x")
+	f.refused("tove", "handoff", map[string]string{"teammate": "mara", "branch": "wt/ledger/tove/x", "summary": "again"}, "nothing_new")
 }
 
 // A dismissed review's branch still checked out goes back to the default
-// branch, as idle desks do, not to the target it was for.
+// branch, as idle desks do, not to the branch it was for.
 func TestDroppedBranchGoesToTheDefault(t *testing.T) {
 	f := newFixture(t)
 	f.release()
@@ -261,22 +254,8 @@ func TestDroppedBranchGoesToTheDefault(t *testing.T) {
 	}
 }
 
-// targets() lists each repo's targets, the default first, with who made the
-// others and at which commit; for members too.
-func TestTargetsTool(t *testing.T) {
-	f := newFixture(t)
-	f.release()
-	at := f.git(filepath.Join(f.root, "ledger", "api"), "rev-parse", "release/1.0")
-	text := f.ok("tove", "targets", map[string]string{})
-	for _, want := range []string{"api: main (default), release/1.0 (made by mara at " + at[:8] + ")", "web: trunk (default)", "switch(<topic>, <target>)"} {
-		if !strings.Contains(text, want) {
-			t.Errorf("no %q in %q", want, text)
-		}
-	}
-}
-
 // A refresh naming into takes every repo the review has open along, or is
-// refused: a review never ends up split between targets unasked.
+// refused: a review never ends up split between branches unasked.
 func TestIntoMovesTheWholeReview(t *testing.T) {
 	f := newFixture(t)
 	f.release()
@@ -292,7 +271,7 @@ func TestIntoMovesTheWholeReview(t *testing.T) {
 	web := filepath.Join(f.root, "ledger", "web")
 	f.git(web, "update-ref", "refs/heads/trunk", "lead/ledger/atlas/fix")
 	fix["into"] = "release/1.0"
-	if text := f.refused("mara", "request_merge", fix, "no_such_target"); !strings.Contains(text, "in web, which has no target release/1.0") {
+	if text := f.refused("mara", "request_merge", fix, "no_such_branch"); !strings.Contains(text, "in web (no release/1.0)") {
 		t.Errorf("%q", text)
 	}
 	if f.mr("mr-1").Target != "main" || f.mr("mr-2").Target != "trunk" {
@@ -300,9 +279,9 @@ func TestIntoMovesTheWholeReview(t *testing.T) {
 	}
 }
 
-// Moving a merge request to a target that holds all of it already settles it
+// Moving a merge request to a branch that holds all of it already settles it
 // there and then: the review never shows it open, and nothing waits on the CEO.
-func TestIntoATargetThatHoldsItIsMerged(t *testing.T) {
+func TestIntoABranchThatHoldsItIsMerged(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})
@@ -323,8 +302,8 @@ func TestIntoATargetThatHoldsItIsMerged(t *testing.T) {
 	}
 }
 
-// Moving a review's repo to another target outdates the comments on its
-// removed lines (they were the old target's), not those on the branch's.
+// Moving a review's repo to another branch outdates the comments on its
+// removed lines (they were the old branch's), not those on the branch's.
 func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
 	f := newFixture(t)
 	f.release()
@@ -354,9 +333,9 @@ func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
 	}
 }
 
-// A target deleted outside Foreman while a merge request goes into it: its
+// A branch deleted outside Foreman while a merge request goes into it: its
 // repo shows no diff and no head, so it can't merge until moved elsewhere.
-func TestTargetGoneUnderAnOpenReview(t *testing.T) {
+func TestBranchGoneUnderAnOpenReview(t *testing.T) {
 	f := newFixture(t)
 	f.release()
 	f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/fix", "from": "release/1.0"})

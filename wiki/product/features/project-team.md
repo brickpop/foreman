@@ -6,7 +6,7 @@ tags: [feature, ui, git, pipeline]
 
 # Project team
 
-A project's **Team** section ([Project page](./project-page.md)): the team on the project, its agents with what each is doing and the branch it has checked out, its [activity](./project-activity.md), then the work on its way to its targets and what merged. It was two sections, Deployment and Activity, until 2026-11-03 (the CEO: both are the team at work); `/deployment` and `/activity` links open their view of it. It replaced the Worktrees tab and Project settings' "Teams on this project" on 2026-10-31, both of which listed the same agents (the CEO: remove redundant info). A project has one team at most ([Deployment](../models/deployment.md#invariants)).
+A project's **Team** section ([Project page](./project-page.md)): the team on the project, its agents with what each is doing and the branch it has checked out, its [activity](./project-activity.md), then the work on its way to the CEO's branches and what merged. It was two sections, Deployment and Activity, until 2026-11-03 (the CEO: both are the team at work); `/deployment` and `/activity` links open their view of it. It replaced the Worktrees tab and Project settings' "Teams on this project" on 2026-10-31, both of which listed the same agents (the CEO: remove redundant info). A project has one team at most ([Deployment](../models/deployment.md#invariants)).
 
 ## The team
 
@@ -28,12 +28,12 @@ Where a branch is checked out comes from git (`git worktree list`), on `GET /api
 
 Apart from the team's (the CEO, 2026-11-02): **`Left by earlier teams`** ([section title](../design/design-system.md#type), with their count), `Their worktrees stay after a Stop, so a redeploy picks them up.` (13px `--tx3`), and **`Clean up`** on the right; then a panel of their rows, as above. A row is a worktree an earlier team left on the project (Stop keeps worktrees) that no agent of the team holds: one of the same id takes it over ([Team definition](../models/team-definition.md#schema)). Each is named as the team that stopped there last has it, else by its agent id.
 
-**Clean up** asks first (`Clean up what earlier teams left?`, `Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches here a target already holds (kept aside a while, recoverable by hand). Everything else stays, and is listed with why.`, **`Clean up`** in the danger style), then `POST /api/projects/:id/cleanup` removes **only what is safe** (the CEO, 2026-11-02), in each code repo, of every agent with a worktree in the project's sandboxes that doesn't run on this project (one running on another is cleaned here too: its branches there carry that project):
+**Clean up** asks first (`Clean up what earlier teams left?`, `Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches whose work is all merged (kept aside a while, recoverable by hand). Everything else stays, and is listed with why.`, **`Clean up`** in the danger style), then `POST /api/projects/:id/cleanup` removes **only what is safe** (the CEO, 2026-11-02), in each code repo, of every agent with a worktree in the project's sandboxes that doesn't run on this project (one running on another is cleaned here too: its branches there carry that project):
 
 - its **worktree**, when it holds nothing not committed (git refuses otherwise) and no merge is under way (`git worktree remove`, its folder included; its branch stays);
-- its **`wt/<project>/<agent>/*` branches** a target of the repo holds all of, and that nothing has checked out, each head kept under `refs/foreman/cleaned/<time>/` until backups are pruned ([Resume and backups](../../backlog/archive/resume-and-clean-desks.md)). A lead's `lead/<project>/<team>/*` branches stay: they are a review's.
+- its **`wt/<project>/<agent>/*` branches** whose work is all merged, and that nothing has checked out: all of the branch is in the history of one of the CEO's branches (any branch but an agent's), or merging it into the repo's default branch, or into a branch some merge request of the project went into, would change nothing (squash-aware; [Pipeline and merges → Merge to a target](./pipeline-and-merges.md#merge-to-a-target)). Each head is kept under `refs/foreman/cleaned/<time>/` until backups are pruned ([Resume and backups](../../backlog/archive/resume-and-clean-desks.md)). A lead's `lead/<project>/<team>/*` branches stay: they are a review's.
 
-It answers `{removed, kept}`, each a list of `{agent, repo, what (worktree | branch), branch, why}`; a toast says how many went, and what was kept is listed under the panel with why (`changes not committed`, `a merge is under way in it`, `no target holds all of it`, `it is checked out`). Nothing else changes: the agents' harness folders (their conversations) and sandbox folders stay.
+It answers `{removed, kept}`, each a list of `{agent, repo, what (worktree | branch), branch, why}`; a toast says how many went, and what was kept is listed under the panel with why (`changes not committed`, `a merge is under way in it`, `not all of it is merged`, `it is checked out`). Nothing else changes: the agents' harness folders (their conversations) and sandbox folders stay.
 
 ## Activity
 
@@ -41,7 +41,7 @@ The team's messages and git actions, with the map of who calls whom, then the ea
 
 ## In flight and Merged
 
-The [project pipeline](./project-pipeline.md)'s **In flight** and **Merged**: the work moving towards its targets, and what merged in the last 7 days (each with a calm line when empty: `No work in flight. It shows here from a hand-off to the lead to its merge.`, `Nothing merged in the last 7 days.`).
+The [project pipeline](./project-pipeline.md)'s **In flight** and **Merged**: the work moving towards the CEO's branches, and what merged in the last 7 days (each with a calm line when empty: `No work in flight. It shows here from a hand-off to the lead to its merge.`, `Nothing merged in the last 7 days.`).
 
 Every branch in them is a link to its code in Repos: a merge request's in its repo; a work item's (which names no repo) in the first repo that has the branch with commits beyond its default branch, else the first that has it at all. A merge request's **Review** opens its review in the [Inbox](./reviews.md).
 

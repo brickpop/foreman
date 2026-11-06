@@ -98,12 +98,6 @@ func (f fakeConfig) AddRepo(_ context.Context, project, name, path, def string) 
 func (f fakeConfig) SetRepoDefault(_ context.Context, project, name, branch string) (home.Project, error) {
 	return f.changed("SetRepoDefault", project, branch, name)
 }
-func (f fakeConfig) RemoveTarget(_ context.Context, project, repo, name string) (home.Project, error) {
-	if name == "open" {
-		return home.Project{}, fmt.Errorf("%w: open, in %s", home.ErrInUse, repo)
-	}
-	return f.changed("RemoveTarget", project, name, repo)
-}
 
 // RepoBranches lists a repo on master below /home/ceo/dev, as Browse does.
 func (f fakeConfig) RepoBranches(_ context.Context, path string) (home.Branches, error) {
@@ -404,7 +398,6 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default="}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","defaultBranch":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default=master"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `{"branch":"master"}`, []string{"SetRepoDefault", "master", "web"}},
-		{http.MethodDelete, "/api/projects/ledger/repos/web/targets/release/2.0", ``, []string{"RemoveTarget", "release/2.0", "web"}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","new":true}`, []string{"NewRepo", "web", "/home/ceo/dev/web"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
@@ -450,7 +443,6 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPost, "/api/projects", `{"name":"bad"}`, http.StatusBadRequest, `{"code":"INVALID","error":"a repo name is lowercase"}`},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"taken","path":"/x"}`, http.StatusConflict, `{"code":"EXISTS","error":"ledger has a repo taken already"}`},
 		{http.MethodDelete, "/api/projects/ledger/repos/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
-		{http.MethodDelete, "/api/projects/ledger/repos/web/targets/open", ``, http.StatusConflict, `{"code":"IN_USE","error":"open, in web"}`},
 		{http.MethodPost, "/api/projects/nope/repos", `{"name":"x","path":"/x"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPut, "/api/projects/nope/profile", `{"profile":"work"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects", `not json`, http.StatusBadRequest, `"BAD_REQUEST"`},

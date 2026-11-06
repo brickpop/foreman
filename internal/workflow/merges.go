@@ -58,6 +58,9 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 	if _, err := t.w.Wiki.Entry(t.project.ID, entry); err != nil {
 		return teamtools.Refusal("entry_not_found", "no wiki entry %q: give its path in the wiki, e.g. backlog/export-csv.md", entry)
 	}
+	if git.AgentBranch(into) {
+		return teamtools.Refusal("agent_branch", "%s is an agent's branch: a merge goes into one of the CEO's branches (the default when left out)", into)
+	}
 	if res, ok := t.unsettled(ctx, t.worktrees(), "a merge request is your committed work"); !ok {
 		return res
 	}
@@ -68,7 +71,7 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 		r      repo
 		mr     store.MergeRequest
 		exists bool
-		held   bool // moved to a target that holds all of it already
+		held   bool // moved to a branch that holds all of it already
 	}
 	var requests []request
 	var lacking []string
@@ -83,7 +86,7 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return teamtools.Refusal("internal", "%v", err)
 		}
-		// Into the target named, else the one it goes to already (the CEO may
+		// Into the branch named, else the one it goes to already (the CEO may
 		// have changed it), else the repo's default.
 		switch {
 		case into != "":
@@ -91,19 +94,16 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 		case !exists:
 			mr.Target = t.project.Default(r.name)
 		}
-		if !t.project.IsTarget(r.name, mr.Target) {
+		if !t.w.Git.HasBranch(ctx, r.dir, mr.Target) {
 			// A repo the review has open goes with it, so the review never
 			// splits; any other needs it only with new commits, reckoned from
 			// its default.
 			if merged, err := t.w.Git.Merged(ctx, r.dir, t.project.Default(r.name), branch); err != nil {
 				return gitError(err)
 			} else if exists || !merged {
-				lacking = append(lacking, r.name)
+				lacking = append(lacking, fmt.Sprintf("%s (no %s)", r.name, mr.Target))
 			}
 			continue
-		}
-		if !t.w.Git.HasBranch(ctx, r.dir, mr.Target) {
-			return teamtools.Refusal("target_missing", "%s has no branch %s any more: ask the CEO to pick another in Repos", r.name, mr.Target)
 		}
 		if merged, err := t.w.Git.Merged(ctx, r.dir, mr.Target, branch); err != nil {
 			return gitError(err)
@@ -117,9 +117,9 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case len(lacking) > 0:
-		return teamtools.Refusal("no_such_target", "%s is open or has new commits in %s, which has no target %s: create it there first with create_target, or split the work (targets() lists them)", branch, strings.Join(lacking, ", "), into)
+		return teamtools.Refusal("no_such_branch", "%s is open or has new commits in %s, which lacks the branch it would merge into: ask the CEO to make it there, or split the work", branch, strings.Join(lacking, ", "))
 	case len(requests) == 0:
-		return teamtools.Refusal("nothing_to_merge", "%s changes nothing in its target, in any repo", branch)
+		return teamtools.Refusal("nothing_to_merge", "%s changes nothing in the branch it merges into, in any repo", branch)
 	}
 	// The branch's open review takes every repo's merge request; with none
 	// open, a new review. Either way it takes this call's title and body.
@@ -507,66 +507,4 @@ func (w *Workflow) settle(ctx context.Context, mr *store.MergeRequest, head stri
 	if mr.Base, err = w.Git.PartedFrom(ctx, dir, target, head); err != nil {
 		slog.Info("where a decided merge request parted from its target", "id", mr.ID, "err", err)
 	}
-}
-
-// createTarget makes a new target in one of the project's code repos: a new
-// branch name at from, a commit some target holds
-// (wiki/product/features/pipeline-and-merges.md#merge-targets).
-func (t tool) createTarget(ctx context.Context, repo, name, from string) agentlink.Result {
-	if !t.c.Lead {
-		return teamtools.Refusal("not_lead", "only the lead creates targets: ask the lead")
-	}
-	if !git.ValidBranch(ctx, name) {
-		return teamtools.Refusal("bad_branch", "%q isn't a valid branch name", name)
-	}
-	if from == "" {
-		return teamtools.Refusal("no_from", "name the commit or branch of %s it starts at", repo)
-	}
-	p, err := t.w.Targets.CreateTarget(ctx, t.project.ID, repo, name, from, t.c.Instance.ID)
-	switch {
-	case errors.Is(err, home.ErrNotFound):
-		return teamtools.Refusal("no_repo", "no code repo %q: yours are %s", repo, names(t.worktrees()))
-	case errors.Is(err, home.ErrExists):
-		return teamtools.Refusal("target_exists", "%s", reason(err, home.ErrExists))
-	case errors.Is(err, home.ErrInvalid):
-		return teamtools.Refusal("bad_target", "%s", reason(err, home.ErrInvalid))
-	case err != nil:
-		return teamtools.Refusal("internal", "%v", err)
-	}
-	at := from
-	for _, r := range p.Repos {
-		for _, tg := range r.Targets {
-			if r.Name == repo && tg.Name == name {
-				at = tg.From
-			}
-		}
-	}
-	t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: repo, Branch: name, Created: true})
-	return agentlink.Result{Text: fmt.Sprintf("%s is a target of %s now, at %s. Start work for it with switch(<topic>, %q); ask for its merges with request_merge(<branch>, <title>, <body>, <entry>, %q).", name, repo, at, name, name)}
-}
-
-// targets lists each code repo's targets, the default first, with who made
-// the others and at which commit. Read-only.
-func (t tool) targets() agentlink.Result {
-	lines := []string{"Targets, the branches only the CEO's merges write. Start work for one with switch(<topic>, <target>); ask for its merge with request_merge(<branch>, <title>, <body>, <entry>, <target>)."}
-	for _, r := range t.project.Repos {
-		var each []string
-		for _, tg := range r.Targets {
-			switch by, _, _ := strings.Cut(tg.MadeBy, "@"); {
-			case tg.Default:
-				each = append(each, tg.Name+" (default)")
-			case by != "":
-				each = append(each, fmt.Sprintf("%s (made by %s at %.8s)", tg.Name, by, tg.From))
-			default:
-				each = append(each, tg.Name)
-			}
-		}
-		lines = append(lines, r.Name+": "+strings.Join(each, ", "))
-	}
-	return agentlink.Result{Text: strings.Join(lines, "\n")}
-}
-
-// reason is a home error's message without its sentinel's.
-func reason(err, sentinel error) string {
-	return strings.TrimPrefix(err.Error(), sentinel.Error()+": ")
 }

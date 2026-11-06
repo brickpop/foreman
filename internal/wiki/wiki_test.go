@@ -20,6 +20,8 @@ func fixture(t *testing.T, files map[string]string) (*Wikis, string) {
 	if _, ok := files["wiki.toml"]; !ok {
 		files["wiki.toml"] = "spec = \"0.1\"\n"
 	}
+	// The machine's git config stays out: it may sign commits.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	write(t, dir, files)
 	g := git.New()
 	if err := g.Init(context.Background(), filepath.Dir(dir), "main"); err != nil {

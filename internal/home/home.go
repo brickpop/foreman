@@ -132,10 +132,6 @@ type Git interface {
 	// Branch is the branch dir's checkout is on; "" when it is detached.
 	Branch(ctx context.Context, dir string) (string, error)
 	HasBranch(ctx context.Context, dir, branch string) bool
-	// CreateBranch makes branch at commit, refusing one the repo has.
-	CreateBranch(ctx context.Context, dir, branch, commit string) error
-	// InHistory reports whether commit is in branch's history.
-	InHistory(ctx context.Context, dir, branch, commit string) (bool, error)
 	// RepairWorktrees tells repo where its worktrees moved to (a migration).
 	RepairWorktrees(ctx context.Context, repo string, worktrees ...string) error
 }

@@ -18,7 +18,7 @@ import (
 // fresh is told what that is, once, so it resumes it or moves on.
 
 // Resumed tells an agent whose session starts fresh what its worktrees hold
-// from before: its branches with work no target has, the changes it hasn't
+// from before: its branches with work that hasn't landed (landed), the changes it hasn't
 // committed, and for the lead the reviews still open. Nothing when there is
 // nothing.
 func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) {
@@ -37,7 +37,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 			continue
 		}
 		for _, b := range branches {
-			if !w.inATarget(ctx, project, r, b) {
+			if !w.landed(ctx, project, r.name, r.dir, b) {
 				unmerged[b] = append(unmerged[b], r.name)
 			}
 		}
@@ -68,7 +68,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 		for _, b := range slices.Sorted(maps.Keys(unmerged)) {
 			each = append(each, fmt.Sprintf("%s (%s)", b, strings.Join(unmerged[b], ", ")))
 		}
-		text += " Branches with work no target has: " + strings.Join(each, ", ") + "."
+		text += " Branches with work not merged yet: " + strings.Join(each, ", ") + "."
 	}
 	if len(uncommitted) > 0 {
 		text += " Changes not committed in " + strings.Join(uncommitted, ", ") + "."
@@ -76,7 +76,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	if len(open) > 0 {
 		text += " Your reviews still open: " + strings.Join(open, ", ") + "."
 	}
-	text += " Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from)."
+	text += " Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another branch with switch(<topic>, from)."
 	if len(uncommitted) > 0 {
 		text += " Changes you don't want: discard()."
 	}
@@ -86,11 +86,25 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	}
 }
 
-// inATarget says whether one of the repo's targets holds all of branch: its
-// default or another. Unknown (a git error) counts as not.
-func (w *Workflow) inATarget(ctx context.Context, project home.Project, r repo, branch string) bool {
-	for _, t := range project.Targets(r.name) {
-		if merged, err := w.Git.Merged(ctx, r.dir, t, branch); err == nil && merged {
+// landed says whether all of branch is in a branch of the CEO's
+// (wiki/product/features/pipeline-and-merges.md#where-a-merge-goes): in the
+// history of any of them, or squashed into one work lands on, the repo's
+// default or one a merge request of the project went into. Unknown (a git
+// error) counts as not.
+func (w *Workflow) landed(ctx context.Context, project home.Project, name, dir, branch string) bool {
+	if held, err := w.Git.HeldBy(ctx, dir, branch); err == nil && len(held) > 0 {
+		return true
+	}
+	landings := []string{project.Default(name)}
+	if mrs, err := w.MergeRequests.ForProject(ctx, project.ID); err == nil {
+		for _, mr := range mrs {
+			if mr.Repo == name && mr.Target != "" && !slices.Contains(landings, mr.Target) {
+				landings = append(landings, mr.Target)
+			}
+		}
+	}
+	for _, l := range landings {
+		if merged, err := w.Git.Merged(ctx, dir, l, branch); err == nil && merged {
 			return true
 		}
 	}

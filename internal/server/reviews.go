@@ -25,8 +25,8 @@ type Reviews interface {
 	// MergeReview: workflow.ErrConflict, ErrLocalChanges or ErrBranchMoved
 	// for each repo that couldn't be merged (the others are).
 	MergeReview(ctx context.Context, id string, heads map[string]string) error
-	// RetargetReview changes where one repo of the review merges: another of
-	// its targets (workflow.ErrInvalid otherwise).
+	// RetargetReview changes where one repo of the review merges: another
+	// branch the repo has, not an agent's (workflow.ErrInvalid otherwise).
 	RetargetReview(ctx context.Context, id, repo, target string) error
 	// DismissReview: workflow.ErrInvalid when dropping the branches of a team
 	// left running.

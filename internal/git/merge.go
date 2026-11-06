@@ -25,7 +25,8 @@ var (
 )
 
 // Squash puts what branch changes onto target as one new commit, by the
-// CEO's git identity (Foreman's when there is none), with the message alone:
+// CEO's git identity (Foreman's when there is none), signed when the CEO's git
+// config says so (commit.gpgsign; the CEO, 2026-11-06), with the message alone:
 // no trailers (the CEO, 2026-10-29). Only while branch is at head (the commit the CEO read, its full
 // hash): ErrMoved otherwise. When target has all of it already, nothing is committed. When
 // dir (the repo's own checkout, the CEO's) has target checked out, its files
@@ -55,11 +56,14 @@ func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message str
 	if was, err := treeOf(ctx, dir, old); err != nil || was == tree {
 		return err
 	}
-	var who []string
-	if !hasIdentity(ctx, dir) {
-		who = fallbackIdentity
+	args := []string{"commit-tree", tree, "-p", old, "-m", message}
+	switch {
+	case !hasIdentity(ctx, dir):
+		args = append(slices.Clone(fallbackIdentity), args...)
+	case signs(ctx, dir):
+		args = slices.Insert(args, 1, "-S") // commit-tree ignores commit.gpgsign: only -S signs
 	}
-	commit, err := run(ctx, dir, append(who, "commit-tree", tree, "-p", old, "-m", message)...)
+	commit, err := run(ctx, dir, args...)
 	if err != nil {
 		return err
 	}

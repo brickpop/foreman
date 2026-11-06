@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { type Project, type Repo, useClient } from "../../api/client";
-import { projectName, readable, when } from "../../app/model";
+import { agentBranch, projectName, readable } from "../../app/model";
 import { keys, useDeployments, useRepos } from "../../app/queries";
 import { AddRepo } from "../../components/AddRepo";
 import { FolderBrowser, useFolderBrowser } from "../../components/FolderBrowser";
@@ -16,15 +16,13 @@ import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
 // code repo, wherever it is on disk, each opening its own page (Repo), with
-// what keeps agents from using it, and its other targets; then its project repo.
-// Added, created, located, renamed, removed and given their default branch
-// here, from each card's ⋯ menu; renaming and removing wait until no team is
-// deployed. A target the lead made is removed from its card.
+// what keeps agents from using it; then its project repo. Added, created,
+// located, renamed, removed and given their default branch here, from each
+// card's ⋯ menu; renaming and removing wait until no team is deployed.
 
 type Changing = {
-  what: "default" | "rename" | "locate" | "remove" | "target";
+  what: "default" | "rename" | "locate" | "remove";
   repo: string;
-  target?: string;
 };
 
 export function Repos() {
@@ -47,9 +45,9 @@ export function Repos() {
   });
   const readOf = (name: string) => read.data?.find((r) => r.name === name);
   const projectRepo = read.data?.find((r) => r.project);
-  const open = (what: Changing["what"], repo: string, target?: string) => {
+  const open = (what: Changing["what"], repo: string) => {
     if (what === "rename") setRenameTo(repo);
-    setChanging({ what, repo, target });
+    setChanging({ what, repo });
   };
   const target = project.repos.find((r) => r.name === changing?.repo);
   return (
@@ -101,17 +99,16 @@ export function Repos() {
           <div className="flex flex-col gap-3">
             <p className="m-0 text-[13.5px] text-tx2">
               Its agents start from it, and its merges go to it unless the lead names another
-              target. The old one stays a target, and open merge requests keep theirs.
+              branch. Open merge requests keep the branch they go into.
             </p>
             <Select
               label={`Default branch of ${target.name}`}
               value={target.defaultBranch}
               mono
               className="self-start"
-              options={(readOf(target.name)?.branches ?? []).map((b) => ({
-                value: b.name,
-                label: b.name,
-              }))}
+              options={(readOf(target.name)?.branches ?? [])
+                .filter((b) => !agentBranch(b.name))
+                .map((b) => ({ value: b.name, label: b.name }))}
               onChange={(branch) =>
                 branch !== target.defaultBranch &&
                 change.mutate(() => client.home.setRepoDefault(project.id, target.name, branch), {
@@ -187,19 +184,6 @@ export function Repos() {
         }
         onClose={close}
       />
-      <Confirm
-        open={changing?.what === "target"}
-        title={`Stop ${changing?.target ?? ""} being a target of ${changing?.repo ?? ""}?`}
-        body="Nothing merges into it any more. Its branch stays in git, as it is. Refused while a merge request into it is open."
-        action="Remove"
-        onConfirm={() =>
-          changing?.target &&
-          change.mutate(() =>
-            client.home.removeTarget(project.id, changing.repo, changing.target ?? ""),
-          )
-        }
-        onClose={close}
-      />
     </div>
   );
 }
@@ -242,7 +226,7 @@ const count = (r: Repo) =>
   `${r.branches.length} ${r.branches.length === 1 ? "branch" : "branches"}`;
 
 /** A code repo's card: its name as words, its folder, its default branch and
- * branch count, what keeps agents from using it, and its other targets. */
+ * branch count, and what keeps agents from using it. */
 function RepoCard({
   project,
   repo: r,
@@ -254,10 +238,9 @@ function RepoCard({
   repo: Project["repos"][number];
   read?: Repo;
   deployed: boolean;
-  onChange: (what: Changing["what"], repo: string, target?: string) => void;
+  onChange: (what: Changing["what"], repo: string) => void;
 }) {
   const has = (branch: string) => !read || read.branches.some((b) => b.name === branch);
-  const others = r.targets.filter((t) => !t.default);
   return (
     <Frame
       project={project}
@@ -280,29 +263,6 @@ function RepoCard({
       {!has(r.defaultBranch) && (
         <span className="text-[13px] text-err">
           No branch {r.defaultBranch}: pick its default branch, or agents can't start.
-        </span>
-      )}
-      {others.length > 0 && (
-        <span className="relative z-10 flex flex-wrap items-center gap-1.5 text-[12.5px] text-tx4">
-          Targets
-          {others.map((t) => (
-            <span
-              key={t.name}
-              title={`${t.madeBy ? `Made by ${t.madeBy.split("@")[0]} at ${t.from.slice(0, 7)}` : "Set by you"}, ${when(t.createdAt)}${has(t.name) ? "" : ". Its branch is gone: a review still goes into it, so move that review to another target"}`}
-              className={`flex items-center gap-1 rounded-[5px] bg-raised py-px pr-0.5 pl-1.5 font-mono text-[11.5px] ${has(t.name) ? "text-tx3" : "text-err"}`}
-            >
-              {t.name}
-              {!has(t.name) && " (gone)"}
-              <button
-                type="button"
-                aria-label={`Remove target ${t.name}`}
-                onClick={() => onChange("target", r.name, t.name)}
-                className="grid size-4 place-items-center rounded text-tx4 hover:bg-hover hover:text-tx"
-              >
-                ×
-              </button>
-            </span>
-          ))}
         </span>
       )}
     </Frame>

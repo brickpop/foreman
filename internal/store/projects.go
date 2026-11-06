@@ -9,11 +9,8 @@ import (
 )
 
 // ErrExists means a project, or a repo of the project, already has that
-// name (in any case) or that path; or a repo, that target.
+// name (in any case) or that path.
 var ErrExists = errors.New("store: already exists")
-
-// ErrInUse means a target can't go: a merge request into it is open.
-var ErrInUse = errors.New("store: in use")
 
 // Projects is the projects and their repos (wiki/product/models/project-config.md#the-project-record):
 // what makes a project, on this machine. Its rules are in its project repo.
@@ -32,25 +29,17 @@ type Projects interface {
 	// SetName sets the project's display name ("": shown by its id).
 	SetName(ctx context.Context, id, name string) error
 	// AddRepo adds a repo to the project, with r.Default as its default
-	// target. ErrExists if the project has that name or that path already.
+	// branch. ErrExists if the project has that name or that path already.
 	AddRepo(ctx context.Context, project string, r RepoRecord) error
 	// MoveRepo points a repo at a new path (Locate). ErrExists if another
 	// repo of the project has that path.
 	MoveRepo(ctx context.Context, project, name, path string) error
-	// SetRepoDefault makes t the repo's default target, recording it when the
-	// repo has no target of that name; the old default stays a target, and
-	// merge requests keep theirs. ErrNotFound if there is no such repo.
-	SetRepoDefault(ctx context.Context, project, name string, t TargetRecord) error
-	// AddTarget records another target of a repo. ErrExists if the repo has
-	// one of that name, ErrNotFound if there is no such repo.
-	AddTarget(ctx context.Context, project, repo string, t TargetRecord) error
-	// RemoveTarget forgets one of a repo's targets but its default:
-	// ErrNotFound if it has no other of that name, ErrInUse while a merge
-	// request into it is open.
-	RemoveTarget(ctx context.Context, project, repo, name string) error
-	// RemoveRepo takes a repo out of the project, with its targets.
+	// SetRepoDefault sets a repo's default branch. ErrNotFound if there is
+	// no such repo.
+	SetRepoDefault(ctx context.Context, project, name, branch string) error
+	// RemoveRepo takes a repo out of the project.
 	RemoveRepo(ctx context.Context, project, name string) error
-	// RenameRepo renames a repo, with its targets, and moves the project's
+	// RenameRepo renames a repo, and moves the project's
 	// open merge requests on it to the new name; closed ones keep the old name. ErrExists if the
 	// project has a repo of that name.
 	RenameRepo(ctx context.Context, project, name, newName string) error
@@ -73,26 +62,14 @@ type ProjectRecord struct {
 }
 
 // RepoRecord is one of a project's repos: a name unique in the project, its
-// folder, its first commit, which only that repo holds, and its targets, the
-// default first, then oldest first. Default names the default one (read from
-// Targets; on AddRepo, the branch recorded as it).
+// folder, its first commit, which only that repo holds, and its default
+// branch, where its agents start from and merges go unless the lead names
+// another branch.
 type RepoRecord struct {
 	Name       string
 	Path       string
 	RootCommit string
 	Default    string
-	Targets    []TargetRecord
-}
-
-// TargetRecord is a branch of a repo that merges may go to: whether it is
-// the default, who made it ("": the CEO) at which commit ("" for one set by
-// the CEO) and when.
-type TargetRecord struct {
-	Name      string
-	Default   bool
-	MadeBy    string
-	From      string
-	CreatedAt time.Time
 }
 
 // Projects returns the projects table.
@@ -125,11 +102,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	targets, err := p.targets(ctx)
-	if err != nil {
-		return nil, err
-	}
-	rows, err = p.db.QueryContext(ctx, "SELECT project_id, name, path, root_commit FROM project_repos ORDER BY project_id, name")
+	rows, err = p.db.QueryContext(ctx, "SELECT project_id, name, path, root_commit, default_branch FROM project_repos ORDER BY project_id, name")
 	if err != nil {
 		return nil, err
 	}
@@ -137,12 +110,8 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var project string
 		var r RepoRecord
-		if err := rows.Scan(&project, &r.Name, &r.Path, &r.RootCommit); err != nil {
+		if err := rows.Scan(&project, &r.Name, &r.Path, &r.RootCommit, &r.Default); err != nil {
 			return nil, err
-		}
-		r.Targets = targets[targetKey(project, r.Name)]
-		if len(r.Targets) > 0 && r.Targets[0].Default {
-			r.Default = r.Targets[0].Name
 		}
 		if i, ok := byID[strings.ToLower(project)]; ok {
 			list[i].Repos = append(list[i].Repos, r)
@@ -173,25 +142,13 @@ func (p projects) SetName(ctx context.Context, id, name string) error {
 }
 
 func (p projects) AddRepo(ctx context.Context, project string, r RepoRecord) error {
-	tx, err := p.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
 	// No row inserted: no such project.
-	res, err := tx.ExecContext(ctx, "INSERT INTO project_repos (project_id, name, path, root_commit) SELECT id, ?, ?, ? FROM projects WHERE id = ?",
-		r.Name, r.Path, r.RootCommit, project)
+	res, err := p.db.ExecContext(ctx, "INSERT INTO project_repos (project_id, name, path, root_commit, default_branch) SELECT id, ?, ?, ?, ? FROM projects WHERE id = ?",
+		r.Name, r.Path, r.RootCommit, r.Default, project)
 	if err != nil {
 		return unique(err)
 	}
-	if err := touched(res, nil); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, "INSERT INTO repo_targets (project_id, repo, name, made_by, from_commit, created_at, is_default) VALUES (?, ?, ?, '', '', ?, 1)",
-		project, r.Name, r.Default, timeText(time.Now())); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return touched(res, nil)
 }
 
 func (p projects) MoveRepo(ctx context.Context, project, name, path string) error {
@@ -202,94 +159,12 @@ func (p projects) MoveRepo(ctx context.Context, project, name, path string) erro
 	return touched(res, nil)
 }
 
-func (p projects) SetRepoDefault(ctx context.Context, project, name string, t TargetRecord) error {
-	if t.CreatedAt.IsZero() {
-		t.CreatedAt = time.Now()
-	}
-	tx, err := p.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := touched(tx.ExecContext(ctx, "UPDATE repo_targets SET is_default = 0 WHERE project_id = ? AND repo = ? AND is_default = 1", project, name)); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, "INSERT INTO repo_targets (project_id, repo, name, made_by, from_commit, created_at, is_default) VALUES (?, ?, ?, ?, ?, ?, 1) ON CONFLICT (project_id, repo, name) DO UPDATE SET is_default = 1",
-		project, name, t.Name, t.MadeBy, t.From, timeText(t.CreatedAt)); err != nil {
-		return err
-	}
-	return tx.Commit()
+func (p projects) SetRepoDefault(ctx context.Context, project, name, branch string) error {
+	return touched(p.db.ExecContext(ctx, "UPDATE project_repos SET default_branch = ? WHERE project_id = ? AND name = ?", branch, project, name))
 }
-
-func (p projects) AddTarget(ctx context.Context, project, repo string, t TargetRecord) error {
-	// No row inserted: no such repo.
-	res, err := p.db.ExecContext(ctx, "INSERT INTO repo_targets (project_id, repo, name, made_by, from_commit, created_at) SELECT project_id, name, ?, ?, ?, ? FROM project_repos WHERE project_id = ? AND name = ?",
-		t.Name, t.MadeBy, t.From, timeText(t.CreatedAt), project, repo)
-	if err != nil {
-		return unique(err)
-	}
-	return touched(res, nil)
-}
-
-func (p projects) RemoveTarget(ctx context.Context, project, repo, name string) error {
-	tx, err := p.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	var open int
-	if err := tx.QueryRowContext(ctx, "SELECT count(*) FROM merge_requests WHERE project_id = ? AND repo = ? AND target = ? AND state = ?", project, repo, name, MergeOpen).Scan(&open); err != nil {
-		return err
-	}
-	if open > 0 {
-		return ErrInUse
-	}
-	if err := touched(tx.ExecContext(ctx, "DELETE FROM repo_targets WHERE project_id = ? AND repo = ? AND name = ? AND is_default = 0", project, repo, name)); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// targets are every repo's targets, by targetKey: the default first, then
-// oldest first.
-func (p projects) targets(ctx context.Context) (map[string][]TargetRecord, error) {
-	rows, err := p.db.QueryContext(ctx, "SELECT project_id, repo, name, is_default, made_by, from_commit, created_at FROM repo_targets ORDER BY is_default DESC, created_at, name")
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	all := map[string][]TargetRecord{}
-	for rows.Next() {
-		var project, repo string
-		var t TargetRecord
-		var created sql.NullString
-		if err := rows.Scan(&project, &repo, &t.Name, &t.Default, &t.MadeBy, &t.From, &created); err != nil {
-			return nil, err
-		}
-		if t.CreatedAt, err = parseTime(created); err != nil {
-			return nil, err
-		}
-		all[targetKey(project, repo)] = append(all[targetKey(project, repo)], t)
-	}
-	return all, rows.Err()
-}
-
-// targetKey names a project's repo as both match, in any case.
-func targetKey(project, repo string) string { return strings.ToLower(project + "\x00" + repo) }
 
 func (p projects) RemoveRepo(ctx context.Context, project, name string) error {
-	tx, err := p.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if err := touched(tx.ExecContext(ctx, "DELETE FROM project_repos WHERE project_id = ? AND name = ?", project, name)); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, "DELETE FROM repo_targets WHERE project_id = ? AND repo = ?", project, name); err != nil {
-		return err
-	}
-	return tx.Commit()
+	return touched(p.db.ExecContext(ctx, "DELETE FROM project_repos WHERE project_id = ? AND name = ?", project, name))
 }
 
 func (p projects) RenameRepo(ctx context.Context, project, name, newName string) error {
@@ -307,9 +182,6 @@ func (p projects) RenameRepo(ctx context.Context, project, name, newName string)
 	}
 	if _, err := tx.ExecContext(ctx, "UPDATE merge_requests SET repo = ? WHERE project_id = ? AND repo = ? AND state = ?",
 		newName, project, name, MergeOpen); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, "UPDATE repo_targets SET repo = ? WHERE project_id = ? AND repo = ?", newName, project, name); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -333,7 +205,6 @@ func (p projects) Remove(ctx context.Context, id string) error {
 		"DELETE FROM merge_requests WHERE project_id = ?1 OR deployment_id IN (SELECT id FROM deployments WHERE project_id = ?1)",
 		"DELETE FROM requests WHERE project_id = ?1 OR deployment_id IN (SELECT id FROM deployments WHERE project_id = ?1)",
 		"DELETE FROM deployments WHERE project_id = ?",
-		"DELETE FROM repo_targets WHERE project_id = ?",
 		"DELETE FROM project_repos WHERE project_id = ?",
 	} {
 		if _, err := tx.ExecContext(ctx, q, id); err != nil {

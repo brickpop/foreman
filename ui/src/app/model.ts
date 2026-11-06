@@ -40,7 +40,7 @@ export function reloadLine(reload: ReturnType<typeof reloadOf>, teams: Team[]): 
   return `${runs} on an older prompt. ${name} ${why}: the change applies at each agent's next start. Reload once they're idle.`;
 }
 
-import type { Instance, MergeRequest, Project, Request, Team } from "../api/client";
+import type { Instance, MergeRequest, Project, Repo, Request, Team } from "../api/client";
 import type { Soul, TeamConfig } from "../api/types/home";
 
 // Pure derivations the screens share: who an instance is, how requests are
@@ -266,11 +266,17 @@ export function linkLine(mr: MergeRequest, forge: string): string {
   return `${pr}${mr.repo} · ${mr.branch} → ${mr.target}${tail ? ` · ${tail}` : ""}`;
 }
 
-/** A project's repo's targets, the branches its merges may go to, as the
- * server lists them: the default first, then the others, oldest first. None
- * for a repo the project hasn't (or before it has loaded). */
-export function targetsOf(project: Project | undefined, repo: string): string[] {
-  return project?.repos.find((x) => x.name === repo)?.targets.map((t) => t.name) ?? [];
+/** Whether a branch is an agent's (wt/*, lead/*): agents write those, so a
+ * merge never goes into one, and none is a repo's default branch. */
+export const agentBranch = (name: string): boolean =>
+  name.startsWith("wt/") || name.startsWith("lead/");
+
+/** The branches a repo's merge can go into: any of its own but an agent's, as
+ * the server lists them (the default first, then newest commit first). None
+ * for a repo not listed (or before they have loaded). */
+export function mergeTargets(repos: Repo[] | undefined, repo: string): string[] {
+  const r = repos?.find((x) => x.name === repo && !x.project);
+  return r?.branches.map((b) => b.name).filter((b) => !agentBranch(b)) ?? [];
 }
 
 /** The forge a merge request can become a PR on ("none": no Create PR): its

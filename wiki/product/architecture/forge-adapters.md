@@ -42,7 +42,7 @@ While a [merge request](../models/merge-request.md) with a PR is open, Foreman p
 - **closed** without merge: the merge request is rejected, the review request resolves, its work items go back to stage 0, the lead is told.
 - **new review comments** and "changes requested" reviews since the last poll: delivered to the lead (typed into its session when idle).
 
-In every repo, with or without a forge, Foreman also reads each target on the same interval and marks an open merge request merged when merging its branch into its target would change nothing ([Merge to a target](../features/pipeline-and-merges.md#merge-to-a-target)): the CEO may merge by hand with git, and the forge with any merge method. A merged branch then moves to the new target, so pushing it again for a next PR can't be a plain fast-forward: how (a forced push, or a new branch on the forge) is open until [The forge](../../backlog/git-forge.md) is built.
+In every repo, with or without a forge, Foreman also reads each branch an open merge request goes into on the same interval and marks an open merge request merged when merging its branch into its target would change nothing ([Merge to a target](../features/pipeline-and-merges.md#merge-to-a-target)): the CEO may merge by hand with git, and the forge with any merge method. A merged branch then moves to the new target, so pushing it again for a next PR can't be a plain fast-forward: how (a forced push, or a new branch on the forge) is open until [The forge](../../backlog/git-forge.md) is built.
 
 ### Sync (the reserved repos)
 

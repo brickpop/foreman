@@ -11,7 +11,7 @@ order: 3
 What it builds ([Sandboxes and git policy](../../product/architecture/sandboxes-and-git.md); [Building blocks → Git](../../product/architecture/building-blocks.md#8-git-git); [Pipeline and merges](../../product/features/pipeline-and-merges.md)):
 - **work items** from hand-offs, and **integration detection**: an engineer's branch contained in a lead branch (`Git.Contains`);
 - the project **checks**, run in a throwaway container before a hand-off is accepted and on `request_merge`;
-- **local merge**: the CEO's Merge into a target (`Git.Squash`; merge targets since 2026-11-02, [Merge targets](../archive/merge-targets.md)), then deleting merged branches under the existing rule (`Git.Prune`, when a deployment stops);
+- **local merge**: the CEO's Merge into a branch of the CEO's (`Git.Squash`, signed as the CEO's git config says; into any branch but an agent's since 2026-11-06, [Merges into any branch](../archive/merge-into-any-branch.md), after [Merge targets](../archive/merge-targets.md)), then deleting merged branches under the existing rule (`Git.Prune`, when a deployment stops);
 - the **optional forge PR**: the CEO's Create PR pushes the branch and opens it (`Git.Push`, the Forge adapter), and fetching `main` back after a merge there (`Git.Fetch`);
 - **merged detection**: a merge request is merged when `main` contains its branch head, whoever merged it (Foreman, the forge, or the CEO's own git);
 - **Sync** for the reserved repos: on the CEO's click, fetch the forge's `main`, merge it in, then push the global repo's or the project repo's `main`; on a conflict, stop and tell the CEO;

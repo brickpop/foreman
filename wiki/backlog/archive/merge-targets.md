@@ -10,7 +10,7 @@ epic: git
 
 **Why:** every merge request lands on its repo's one main branch, and every branch starts from it. The CEO wants work to land on other branches too ("If I ask the agent that 2 separate agents do different things and each lands in a separate target branch"), the lead creating them from any commit, and merging into any of them approved by the CEO only (the CEO, 2026-11-02).
 
-The design: [Pipeline and merges → Merge targets](../../product/features/pipeline-and-merges.md#merge-targets).
+The design: [Pipeline and merges → Merge targets](../../product/features/pipeline-and-merges.md#where-a-merge-goes).
 
 ## Decided (the CEO, 2026-11-02)
 

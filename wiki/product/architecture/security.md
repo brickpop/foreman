@@ -14,8 +14,8 @@ v1 has **no user authentication** (one CEO, local machine). That makes the HTTP 
 
 - The CEO's machine and home directory (credentials in `~/.config`, `~/.ssh`, the keychain).
 - Forge tokens and harness credentials ([Secrets](../models/secrets.md)).
-- Project code and the targets of every repo (its default branch and any other).
-- The integrity of decisions: only the CEO decides what reaches a target (Foreman merges only on the CEO's Merge; nothing goes to a forge without the CEO's Create PR or Sync) and answers approvals.
+- Project code and the CEO's branches of every repo (every branch but an agent's: its default branch and any other).
+- The integrity of decisions: only the CEO decides what reaches the CEO's branches (Foreman merges only on the CEO's Merge; nothing goes to a forge without the CEO's Create PR or Sync) and answers approvals.
 
 ## Controls
 
@@ -59,7 +59,7 @@ The Chief of Staff can create teams, hire and refine agents, and changes nothing
 
 - **Network exfiltration.** Containers need the network for model APIs, so an agent can send project code anywhere. Restricting container egress to each harness's API hosts (and package registries for checks) is future work, not v1.
 - **Secrets in PTY logs.** Session logs are raw bytes; anything a harness prints (an env dump, a token in an error) is persisted. Known Foreman secrets are redacted on write; the rest is accepted ([Secrets](../models/secrets.md#invariants)).
-- **Prompt injection between agents.** A reply's `output`, a handoff summary or a finding is text written into another agent's session. A confused or compromised agent (or a challenge team probing the build team) can inject instructions. Mitigations: injected text is framed as quoted data with its sender, length-capped, never crosses deployments ([Team tools](./team-tools.md#delivery)). The real backstop is that nothing reaches a target without the CEO. A lead can make a new target (`create_target`), but only from work a target already holds: it can't start a target at unreviewed work, and nothing reaches it later without the CEO either.
+- **Prompt injection between agents.** A reply's `output`, a handoff summary or a finding is text written into another agent's session. A confused or compromised agent (or a challenge team probing the build team) can inject instructions. Mitigations: injected text is framed as quoted data with its sender, length-capped, never crosses deployments ([Team tools](./team-tools.md#delivery)). The real backstop is that nothing reaches the CEO's branches without the CEO: agents make and write only their own branches (`wt/*`, `lead/*`), and every merge into one of the CEO's is the CEO's, on a review that shows all a branch brings along, whatever it started from or merged in.
 - **Wiki as a shared channel.** Agents read the wiki that the lead writes; it is a prompt-injection path inside a deployment, and across deployments on the same project. Accepted: the wiki is the project's shared memory by design.
 - **Model provider sees the code.** Inherent to cloud harnesses.
 - **The lead can change `project.toml` without review.** Its rw mount of the live project repo covers `project.toml`, gates (`always_ask_ceo`) and checks included, and its `commit()` lands on the project repo's `main` without review. Accepted for v1 ("v1 today is better than v1 in 10 years"); tracked in the [backlog](../../backlog/index.md#not-yet-scheduled).

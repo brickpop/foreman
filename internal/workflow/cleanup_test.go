@@ -43,7 +43,7 @@ func TestCleanUpRemovesOnlyWhatIsSafe(t *testing.T) {
 		t.Errorf("removed %q\nwant    %q", line(got.Removed), want)
 	}
 	if want := []string{
-		"tove api branch wt/ledger/tove/led-1 no target holds all of it",
+		"tove api branch wt/ledger/tove/led-1 not all of it is merged",
 		"tove web branch wt/ledger/tove/main it is checked out",
 		"tove web worktree wt/ledger/tove/main it holds changes not committed",
 	}; !reflect.DeepEqual(line(got.Kept), want) {

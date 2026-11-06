@@ -152,7 +152,7 @@ export interface WorkItem {
   mergeRequestId: string;
 }
 /**
- * MergeRequest asks the CEO to merge a branch into one of a repo's targets
+ * MergeRequest asks the CEO to merge a branch into a branch of the CEO's, its target
  * (wiki/product/models/merge-request.md).
  */
 export interface MergeRequest {
@@ -162,7 +162,7 @@ export interface MergeRequest {
   authorInstance: string;
   repo: string; // one of the project's code repos
   branch: string;
-  target: string; // the branch it merges into: its repo's default or another target
+  target: string; // the branch it merges into: its repo's default or any other but an agent's
   entry: string; // the wiki card explaining the work
   state: string; // open, merged, rejected or withdrawn
   checksStatus: string;

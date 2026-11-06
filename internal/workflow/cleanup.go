@@ -31,7 +31,7 @@ type Cleaned struct {
 // (wiki/product/features/project-team.md#earlier-teams): only what is
 // safe. A worktree goes when it holds nothing not committed (git refuses
 // otherwise) and no merge is under way; a wt/<project>/<agent>/* branch goes
-// when a target of its repo holds all of it and nothing has it checked out,
+// when all of it has landed (landed) and nothing has it checked out,
 // its head kept under refs/foreman/cleaned/ for a while. An agent running on
 // this project is left alone; one running on another is not, as its branches
 // there carry that project. Everything else is kept, and listed with why.
@@ -95,8 +95,8 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 					keep(c, "it is checked out")
 					continue
 				}
-				if !w.heldByATarget(ctx, p, r, b) {
-					keep(c, "no target holds all of it")
+				if !w.landed(ctx, p, r.Name, r.Path, b) {
+					keep(c, "not all of it is merged")
 					continue
 				}
 				if err := w.Git.DropBranch(ctx, r.Path, b, git.BackupRef("cleaned", w.Now(), b), r.Default); err != nil {
@@ -115,13 +115,4 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 		})
 	}
 	return out, nil
-}
-
-func (w *Workflow) heldByATarget(ctx context.Context, p home.Project, r home.Repo, branch string) bool {
-	for _, t := range p.Targets(r.Name) {
-		if held, err := w.Git.Merged(ctx, r.Path, t, branch); err == nil && held {
-			return true
-		}
-	}
-	return false
 }

@@ -55,9 +55,6 @@ type Config interface {
 	RenameRepo(ctx context.Context, project, name, newName string) (home.Project, error)
 	// SetRepoDefault sets a repo's default branch, one it has.
 	SetRepoDefault(ctx context.Context, project, name, branch string) (home.Project, error)
-	// RemoveTarget stops one of a repo's other targets being one (refused
-	// while a merge request into it is open: home.ErrInUse).
-	RemoveTarget(ctx context.Context, project, repo, name string) (home.Project, error)
 	// Browse lists a folder for picking repos and workspaces, inside the
 	// CEO's home folder ("" is the folder Foreman was started from).
 	Browse(path, project string) (home.Folder, error)
@@ -177,11 +174,6 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			return
 		}
 		p, err := c.SetRepoDefault(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Branch)
-		writeProject(w, p, err)
-	})
-	// A target's name may hold slashes (release/2.0).
-	mux.HandleFunc("DELETE /api/projects/{id}/repos/{repo}/targets/{target...}", func(w http.ResponseWriter, r *http.Request) {
-		p, err := c.RemoveTarget(r.Context(), r.PathValue("id"), r.PathValue("repo"), r.PathValue("target"))
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {
@@ -325,8 +317,6 @@ func writeProject(w http.ResponseWriter, v any, err error) {
 		writeError(w, http.StatusConflict, "EXISTS", strings.TrimPrefix(err.Error(), home.ErrExists.Error()+": "))
 	case errors.Is(err, home.ErrDeployed):
 		writeError(w, http.StatusConflict, "DEPLOYED", strings.TrimPrefix(err.Error(), home.ErrDeployed.Error()+": "))
-	case errors.Is(err, home.ErrInUse):
-		writeError(w, http.StatusConflict, "IN_USE", strings.TrimPrefix(err.Error(), home.ErrInUse.Error()+": "))
 	default:
 		writeFound(w, v, err, "project")
 	}

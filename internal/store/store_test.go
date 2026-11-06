@@ -832,26 +832,22 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 	}
 	aragon := list[0]
 	if aragon.ID != "aragon" || aragon.Profile != "work" || aragon.CreatedAt.IsZero() ||
-		!reflect.DeepEqual(withoutTargets(aragon.Repos), []RepoRecord{app, sdk}) || targetNames(aragon.Repos[0]) != "master*" {
+		!reflect.DeepEqual(aragon.Repos, []RepoRecord{app, sdk}) {
 		t.Errorf("aragon: %+v", aragon)
 	}
 	if list[1].Profile != "" || len(list[1].Repos) != 1 {
 		t.Errorf("ledger: %+v", list[1])
 	}
 
-	// A default branch of its own per repo, changed in one project only; the
-	// old one stays a target, and setting it back moves only the flag.
-	if err := p.SetRepoDefault(ctx, "aragon", "app", TargetRecord{Name: "trunk", From: "c0ffee", CreatedAt: time.Now()}); err != nil {
+	// A default branch of its own per repo, changed in one project only.
+	if err := p.SetRepoDefault(ctx, "aragon", "app", "trunk"); err != nil {
 		t.Fatal(err)
 	}
-	if list, _ := p.List(ctx); list[0].Repos[0].Default != "trunk" || targetNames(list[0].Repos[0]) != "trunk*,master" || list[0].Repos[1].Default != "main" || list[1].Repos[0].Default != "master" {
+	if list, _ := p.List(ctx); list[0].Repos[0].Default != "trunk" || list[0].Repos[1].Default != "main" || list[1].Repos[0].Default != "master" {
 		t.Errorf("after SetRepoDefault: %+v", list)
 	}
-	if err := p.SetRepoDefault(ctx, "aragon", "app", TargetRecord{Name: "master"}); err != nil {
+	if err := p.SetRepoDefault(ctx, "aragon", "app", "master"); err != nil {
 		t.Fatal(err)
-	}
-	if list, _ := p.List(ctx); targetNames(list[0].Repos[0]) != "master*,trunk" || list[0].Repos[0].Targets[0].From != "" {
-		t.Errorf("set back: %+v", list[0].Repos[0].Targets)
 	}
 
 	// Locate and remove, each touching only that project's repo.
@@ -868,14 +864,14 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 		"locate a repo that isn't there":        p.MoveRepo(ctx, "aragon", "sdk", "/x"),
 		"remove it again":                       p.RemoveRepo(ctx, "aragon", "sdk"),
 		"a profile for no project":              p.SetProfile(ctx, "nope", "work"),
-		"a default for a repo that isn't there": p.SetRepoDefault(ctx, "aragon", "sdk", TargetRecord{Name: "main"}),
+		"a default for a repo that isn't there": p.SetRepoDefault(ctx, "aragon", "sdk", "main"),
 	} {
 		if !errors.Is(err, ErrNotFound) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
 	list, _ = p.List(ctx)
-	if !reflect.DeepEqual(withoutTargets(list[0].Repos), []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee", Default: "master"}}) || !reflect.DeepEqual(withoutTargets(list[1].Repos), []RepoRecord{app}) {
+	if !reflect.DeepEqual(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee", Default: "master"}}) || !reflect.DeepEqual(list[1].Repos, []RepoRecord{app}) {
 		t.Errorf("after locate and remove: %+v", list)
 	}
 }
@@ -1210,128 +1206,9 @@ func TestMergeRequestsFromBeforeTargetsGoToTheDefault(t *testing.T) {
 	}
 }
 
-// A repo's targets: one list, its default first and flagged, then oldest
-// first; one per name; kept apart per project; following a rename, gone with
-// the repo; the default never removed, another refused removal while a merge
-// request into it is open. Changing the default moves the flag: the old one
-// stays a target and merge requests keep theirs.
-func TestTargets(t *testing.T) {
-	db := open(t)
-	p := db.Projects()
-	for _, id := range []string{"ledger", "relay"} {
-		if err := p.Create(ctx, id, ""); err != nil {
-			t.Fatal(err)
-		}
-		if err := p.AddRepo(ctx, id, RepoRecord{Name: "api", Path: "/h/" + id, RootCommit: "a", Default: "main"}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	at := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
-	release := TargetRecord{Name: "release/2.0", MadeBy: "mara@ledger", From: "c0ffee", CreatedAt: at}
-	hotfix := TargetRecord{Name: "hotfix", MadeBy: "mara@ledger", From: "beef", CreatedAt: at.Add(time.Hour)}
-	for _, tg := range []TargetRecord{hotfix, release} {
-		if err := p.AddTarget(ctx, "ledger", "api", tg); err != nil {
-			t.Fatal(err)
-		}
-	}
-	for name, c := range map[string]struct {
-		repo string
-		tg   TargetRecord
-		want error
-	}{
-		"the same name again":     {"api", release, ErrExists},
-		"the repo's default":      {"API", TargetRecord{Name: "main", CreatedAt: at}, ErrExists},
-		"a repo that isn't there": {"web", release, ErrNotFound},
-	} {
-		if err := p.AddTarget(ctx, "ledger", c.repo, c.tg); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v, want %v", name, err, c.want)
-		}
-	}
-	repo := func(project string) RepoRecord {
-		list, _ := p.List(ctx)
-		for _, r := range list {
-			if r.ID == project {
-				return r.Repos[0]
-			}
-		}
-		return RepoRecord{}
-	}
-	if got := repo("ledger"); targetNames(got) != "main*,release/2.0,hotfix" || !reflect.DeepEqual(got.Targets[1:], []TargetRecord{release, hotfix}) || got.Targets[0].MadeBy != "" {
-		t.Errorf("the default first, then oldest first: %+v", got.Targets)
-	}
-	if got := repo("relay"); targetNames(got) != "main*" {
-		t.Errorf("another project's repo: %+v", got.Targets)
-	}
-
-	mrs := db.MergeRequests()
-	into, _ := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/fix", Target: "hotfix"})
-	if err := p.RemoveTarget(ctx, "ledger", "api", "hotfix"); !errors.Is(err, ErrInUse) {
-		t.Errorf("with a merge request open into it: %v", err)
-	}
-	into.State = MergeMerged
-	if _, err := mrs.Save(ctx, into); err != nil {
-		t.Fatal(err)
-	}
-	if err := p.RemoveTarget(ctx, "ledger", "api", "hotfix"); err != nil {
-		t.Errorf("once it merged: %v", err)
-	}
-	for name, target := range map[string]string{"again": "hotfix", "the default": "main"} {
-		if err := p.RemoveTarget(ctx, "ledger", "api", target); !errors.Is(err, ErrNotFound) {
-			t.Errorf("%s: %v", name, err)
-		}
-	}
-
-	// Renamed with its repo.
-	if err := p.RenameRepo(ctx, "ledger", "api", "core"); err != nil {
-		t.Fatal(err)
-	}
-	if got := repo("ledger"); targetNames(got) != "main*,release/2.0" {
-		t.Errorf("after a rename: %+v", got.Targets)
-	}
-
-	// The default moves to a target, then to a branch that wasn't one.
-	toMain, _ := mrs.Save(ctx, MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "core", Branch: "lead/atlas/a", Target: "main"})
-	if err := p.SetRepoDefault(ctx, "ledger", "core", TargetRecord{Name: "release/2.0"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := repo("ledger"); got.Default != "release/2.0" || targetNames(got) != "release/2.0*,main" || got.Targets[0].MadeBy != "mara@ledger" {
-		t.Errorf("made the default: %+v", got.Targets)
-	}
-	if err := p.SetRepoDefault(ctx, "ledger", "core", TargetRecord{Name: "trunk", From: "abc", CreatedAt: at}); err != nil {
-		t.Fatal(err)
-	}
-	if got := repo("ledger"); targetNames(got) != "trunk*,release/2.0,main" || got.Targets[0].From != "abc" {
-		t.Errorf("a new default: %+v", got.Targets)
-	}
-	if got, _ := mrs.Get(ctx, toMain.ID); got.Target != "main" {
-		t.Errorf("a merge request moved with the default: into %q", got.Target)
-	}
-
-	// Gone with its repo, and with its project.
-	if err := p.RemoveRepo(ctx, "ledger", "core"); err != nil {
-		t.Fatal(err)
-	}
-	if err := p.AddRepo(ctx, "ledger", RepoRecord{Name: "core", Path: "/h/core", RootCommit: "a", Default: "main"}); err != nil {
-		t.Fatal(err)
-	}
-	if got := repo("ledger"); targetNames(got) != "main*" {
-		t.Errorf("a repo added again kept its old targets: %+v", got.Targets)
-	}
-	if err := p.AddTarget(ctx, "relay", "api", hotfix); err != nil {
-		t.Fatal(err)
-	}
-	if err := p.Remove(ctx, "relay"); err != nil {
-		t.Fatal(err)
-	}
-	var left int
-	if err := db.sql.QueryRow("SELECT count(*) FROM repo_targets WHERE project_id = 'relay'").Scan(&left); err != nil || left != 0 {
-		t.Errorf("%d targets left (%v)", left, err)
-	}
-}
-
 // Before 015 a repo's default branch was a column, its other targets apart,
-// and comments had no target: after it, the default heads its targets, and a
-// comment was read on its merge request's target.
+// and comments had no target: a comment was read on its merge request's
+// target, and the default branch survives both 015 and 021.
 func TestTargetsFromBeforeOneList(t *testing.T) {
 	db := migratedTo(t, 14)
 	const at = "2026-11-01T00:00:00Z"
@@ -1350,7 +1227,7 @@ func TestTargetsFromBeforeOneList(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, err := projects{db}.List(ctx)
-	if err != nil || len(list) != 1 || list[0].Repos[0].Default != "master" || targetNames(list[0].Repos[0]) != "master*,release" {
+	if err != nil || len(list) != 1 || list[0].Repos[0].Default != "master" {
 		t.Errorf("%+v %v", list, err)
 	}
 	comments, err := reviewComments{db}.ForReview(ctx, "rev-1")
@@ -1359,26 +1236,35 @@ func TestTargetsFromBeforeOneList(t *testing.T) {
 	}
 }
 
-// withoutTargets are repos as added: their targets left out.
-func withoutTargets(repos []RepoRecord) []RepoRecord {
-	var list []RepoRecord
-	for _, r := range repos {
-		r.Targets = nil
-		list = append(list, r)
+// Since 021 there is no list of targets: each repo keeps its default branch
+// (main for one that had no default flagged), the others are forgotten, and
+// merge requests keep the branch they go into.
+func TestOnlyTheDefaultBranchOfTheTargets(t *testing.T) {
+	db := migratedTo(t, 20)
+	const at = "2026-11-05T00:00:00Z"
+	if _, err := db.Exec(`
+		INSERT INTO projects (id, created_at) VALUES ('ledger', '` + at + `');
+		INSERT INTO project_repos (project_id, name, path, root_commit) VALUES ('ledger', 'api', '/h/api', 'a'), ('ledger', 'web', '/h/web', 'b');
+		INSERT INTO repo_targets (project_id, repo, name, made_by, from_commit, created_at, is_default) VALUES
+			('ledger', 'api', 'release', 'mara@ledger', 'c0ffee', '` + at + `', 0),
+			('ledger', 'api', 'trunk', '', '', '` + at + `', 1);
+		INSERT INTO merge_requests (project_id, author_instance, repo, branch, state, created_at, target) VALUES
+			('ledger', 'mara@ledger', 'api', 'lead/atlas/one', 'open', '` + at + `', 'release');`); err != nil {
+		t.Fatal(err)
 	}
-	return list
-}
-
-// targetNames are a repo's targets by name, in order, the default starred.
-func targetNames(r RepoRecord) string {
-	var names []string
-	for _, t := range r.Targets {
-		if t.Default {
-			t.Name += "*"
-		}
-		names = append(names, t.Name)
+	if err := migrate(ctx, db, migrationFiles); err != nil {
+		t.Fatal(err)
 	}
-	return strings.Join(names, ",")
+	list, err := projects{db}.List(ctx)
+	if err != nil || len(list) != 1 || list[0].Repos[0].Default != "trunk" || list[0].Repos[1].Default != "main" {
+		t.Errorf("%+v %v", list, err)
+	}
+	if m, err := (mergeRequests{db}).Get(ctx, "mr-1"); err != nil || m.Target != "release" {
+		t.Errorf("into %q (%v)", m.Target, err)
+	}
+	if _, err := db.Exec("SELECT 1 FROM repo_targets"); err == nil {
+		t.Error("repo_targets is still there")
+	}
 }
 
 // Settle ends an open request once: whichever way comes second (the CEO's

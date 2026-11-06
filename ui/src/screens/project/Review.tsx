@@ -4,12 +4,13 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
-import { agentOf, forgeOf, linkLine, projectName, targetsOf, when } from "../../app/model";
+import { agentOf, forgeOf, linkLine, mergeTargets, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
   useDeployments,
   useProjects,
+  useRepos,
   useReview,
   useReviewChange,
   useReviewDiff,
@@ -72,7 +73,9 @@ type Comments = {
 const fileId = (repo: string, path: string) => `file:${repo}/${path}`;
 
 export function Review() {
-  const { review: id } = useParams({ from: "/projects/$project/inbox/$review" });
+  const { review: id, project: projectId } = useParams({
+    from: "/projects/$project/inbox/$review",
+  });
   const search = useSearch({ from: "/projects/$project/inbox/$review" });
   const navigate = useNavigate({ from: "/projects/$project/inbox/$review" });
   const review = useReview(id);
@@ -80,6 +83,8 @@ export function Review() {
   const since = search.since === true && v !== undefined && hasSince(v);
   const diff = useReviewDiff(v ? id : "", since);
   const projects = useProjects();
+  // Its repos' branches: where the CEO may move a repo's merge.
+  const branches = useRepos(projectId);
   const teams = useTeams();
   const deployments = useDeployments();
   const toast = useToast();
@@ -298,8 +303,8 @@ export function Review() {
               .filter((r) => r.targetGone)
               .map((r) => (
                 <Empty key={r.repo}>
-                  {r.repo}: its target, {r.target}, is gone (its branch was deleted outside
-                  Foreman). Pick another target for it below to see its change and merge it.
+                  {r.repo}: the branch it merges into, {r.target}, is gone (deleted outside
+                  Foreman). Pick another branch for it below to see its change and merge it.
                 </Empty>
               ))}
             {repos
@@ -356,7 +361,7 @@ export function Review() {
         <DecisionBar
           review={v}
           lead={lead?.soul.name ?? "the lead"}
-          targetsOf={(repo) => targetsOf(project, repo)}
+          targetsOf={(repo) => mergeTargets(branches.data, repo)}
           forge={forgeOf(project)}
           diffs={diff.data}
           dismissAs={dismissChoices(
@@ -710,7 +715,7 @@ function DecisionBar({
 }: {
   review: ReviewData;
   lead: string;
-  /** Where a repo's merge may go instead: its targets. */
+  /** Where a repo's merge may go instead: any of its branches but an agent's. */
   targetsOf: (repo: string) => string[];
   forge: string;
   diffs: RepoDiff[] | undefined;
@@ -813,13 +818,17 @@ function DecisionBar({
         ) : (
           line
         )}
-        {targetsOf(m.repo).length > 1 && (
+        {targetsOf(m.repo).some((t) => t !== m.target) && (
           <Select
             label={`Where ${m.repo} merges`}
             value={m.target}
             mono
             className="shrink-0"
-            options={targetsOf(m.repo).map((t) => ({ value: t, label: t }))}
+            // The branch it goes into, even one gone from git: the select shows it.
+            options={[...new Set([m.target, ...targetsOf(m.repo)])].map((t) => ({
+              value: t,
+              label: t,
+            }))}
             onChange={(target) => target !== m.target && retarget.mutate({ repo: m.repo, target })}
           />
         )}

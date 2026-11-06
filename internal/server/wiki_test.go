@@ -72,6 +72,8 @@ func TestWiki(t *testing.T) {
 }
 
 func TestWikiWrites(t *testing.T) {
+	// The machine's git config stays out: it may sign commits.
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	dir := filepath.Join(t.TempDir(), "project", "wiki")
 	for name, content := range map[string]string{
 		"wiki.toml":    "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"b\"\npath = \"/backlog\"\ncolumns = [\"todo\", \"done\"]\n",

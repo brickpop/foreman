@@ -35,46 +35,16 @@ var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 }}
 
 // config is the home: projects in root/<id>, each with its repos api and web
-// and its project repo beside them, and the targets made. web's default
-// branch is trunk, so every test also checks that each repo's own is used.
+// and its project repo beside them. web's default branch is trunk, so every
+// test also checks that each repo's own is used.
 type config struct {
-	root    string
-	targets *targets
+	root string
 }
 
 func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
 	repos := []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
-	for i := range repos {
-		repos[i].Targets = append([]home.Target{{Name: repos[i].Default, Default: true}}, c.targets.made[repos[i].Name]...)
-	}
 	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: repos}, nil
-}
-
-// targets fakes the home's: each repo's targets, made as branches at from.
-// "taken" is a name the repo has already.
-type targets struct {
-	root string
-	made map[string][]home.Target
-}
-
-func (tg *targets) CreateTarget(ctx context.Context, project, repo, name, from, by string) (home.Project, error) {
-	if repo != "api" && repo != "web" {
-		return home.Project{}, home.ErrNotFound
-	}
-	if name == "taken" {
-		return home.Project{}, fmt.Errorf("%w: %s has a branch taken already", home.ErrExists, repo)
-	}
-	dir := filepath.Join(tg.root, project, repo)
-	commit, err := git.New().Resolve(ctx, dir, from)
-	if err != nil {
-		return home.Project{}, fmt.Errorf("%w: %s has no branch or commit %q", home.ErrInvalid, repo, from)
-	}
-	if err := git.New().CreateBranch(ctx, dir, name, commit); err != nil {
-		return home.Project{}, fmt.Errorf("%w: %s: %v", home.ErrInvalid, name, err)
-	}
-	tg.made[repo] = append(tg.made[repo], home.Target{Name: name, MadeBy: by, From: commit})
-	return config{tg.root, tg}.Project(project)
 }
 
 func (c config) Sandbox(project, agent string) string {
@@ -142,14 +112,13 @@ func (t *teams) Stop(_ context.Context, deployment string) error {
 }
 
 type fixture struct {
-	t       *testing.T
-	root    string
-	targets *targets
-	w       *Workflow
-	m       *messages
-	teams   *teams
-	db      *store.DB
-	events  []events.Event
+	t      *testing.T
+	root   string
+	w      *Workflow
+	m      *messages
+	teams  *teams
+	db     *store.DB
+	events []events.Event
 }
 
 // newFixture: project ledger with code repos api and web and the project
@@ -193,8 +162,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	f := &fixture{t: t, root: root, m: m, db: db, teams: &teams{running: map[string]bool{"atlas@ledger": true}}}
-	f.targets = &targets{root: root, made: map[string][]home.Target{}}
-	f.w = New(Deps{Git: g, Config: config{root, f.targets}, Targets: f.targets, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
+	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Reviews: db.Reviews(), ReviewComments: db.ReviewComments(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})
@@ -659,17 +627,17 @@ func TestAResumedAgentIsToldWhatItLeft(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "web"), "draft.txt"), "half done\n")
 	f.w.Resumed(ctx, instance("tove"), false)
 	if n := f.lastNotice(); n.ToInstance != "tove@ledger" || n.Body != "From Foreman: your worktrees hold earlier work. "+
-		"Branches with work no target has: wt/ledger/tove/LED-44 (api). Changes not committed in web (on wt/ledger/tove/LED-44). "+
-		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from). Changes you don't want: discard()." {
+		"Branches with work not merged yet: wt/ledger/tove/LED-44 (api). Changes not committed in web (on wt/ledger/tove/LED-44). "+
+		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another branch with switch(<topic>, from). Changes you don't want: discard()." {
 		t.Errorf("tove: %+v", n)
 	}
 	// The lead also hears of its reviews still open.
 	f.ok("mara", "request_merge", integration)
 	f.w.Resumed(ctx, instance("mara"), true)
 	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || n.Body != "From Foreman: your worktrees hold earlier work. "+
-		"Branches with work no target has: lead/ledger/atlas/integration (api). "+
+		"Branches with work not merged yet: lead/ledger/atlas/integration (api). "+
 		"Your reviews still open: lead/ledger/atlas/integration (waiting for the CEO). "+
-		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another target with switch(<topic>, from)." {
+		"Resume what is still wanted; new work goes on a new topic, made from the default branch with switch(<topic>), or from another branch with switch(<topic>, from)." {
 		t.Errorf("mara: %+v", n)
 	}
 }

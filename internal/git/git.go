@@ -17,9 +17,9 @@ import (
 	"time"
 )
 
-// fallbackIdentity signs commits when the CEO's git has no user configured,
-// so a save never fails for that alone.
-var fallbackIdentity = []string{"-c", "user.name=Foreman", "-c", "user.email=foreman@localhost"}
+// fallbackIdentity authors commits when the CEO's git has no user configured,
+// so a save never fails for that alone. Not the CEO, so never signed.
+var fallbackIdentity = []string{"-c", "user.name=Foreman", "-c", "user.email=foreman@localhost", "-c", "commit.gpgsign=false"}
 
 // CLI runs the git command line, one command at a time per repo, so git's own
 // lock files never collide (twelve agents starting at once share a repo).
@@ -81,7 +81,8 @@ var ErrNothingToCommit = errors.New("git: nothing to commit")
 
 // Commit commits exactly the given files (relative to dir), as they are on
 // disk, leaving anything else staged or changed alone: by the CEO's git
-// identity, or Foreman's when there is none.
+// identity, signed when the CEO's git config says so, or Foreman's when there
+// is none.
 func (g *CLI) Commit(ctx context.Context, dir, message string, files ...string) error {
 	return g.CommitAs(ctx, dir, message, Author{}, files...)
 }
@@ -112,6 +113,12 @@ func hasIdentity(ctx context.Context, dir string) bool {
 	name, err1 := run(ctx, dir, "config", "user.name")
 	email, err2 := run(ctx, dir, "config", "user.email")
 	return err1 == nil && err2 == nil && strings.TrimSpace(name) != "" && strings.TrimSpace(email) != ""
+}
+
+// signs says whether the CEO's git config asks for signed commits.
+func signs(ctx context.Context, dir string) bool {
+	out, err := run(ctx, dir, "config", "--type=bool", "commit.gpgsign")
+	return err == nil && strings.TrimSpace(out) == "true"
 }
 
 // Prepare makes worktree a git worktree of repo on branch (its agent's home
@@ -231,7 +238,7 @@ func (g *CLI) RepairWorktrees(ctx context.Context, repo string, worktrees ...str
 // can hold the repo's locks while Foreman's next command needs them (found
 // 2026-10-20, as orphaned processes under an init that doesn't reap them).
 func command(ctx context.Context, dir string, args ...string) *exec.Cmd {
-	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "commit.gpgsign=false",
+	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
 		"-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", "-C", dir}
 	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")

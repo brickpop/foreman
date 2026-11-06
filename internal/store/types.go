@@ -142,7 +142,7 @@ type WorkItem struct {
 	MergeRequestID string `json:"mergeRequestId"`
 }
 
-// MergeRequest asks the CEO to merge a branch into one of a repo's targets
+// MergeRequest asks the CEO to merge a branch into a branch of the CEO's, its target
 // (wiki/product/models/merge-request.md).
 type MergeRequest struct {
 	ID             string    `json:"id"`
@@ -151,7 +151,7 @@ type MergeRequest struct {
 	AuthorInstance string    `json:"authorInstance"`
 	Repo           string    `json:"repo"` // one of the project's code repos
 	Branch         string    `json:"branch"`
-	Target         string    `json:"target"` // the branch it merges into: its repo's default or another target
+	Target         string    `json:"target"` // the branch it merges into: its repo's default or any other but an agent's
 	Entry          string    `json:"entry"`  // the wiki card explaining the work
 	State          string    `json:"state"`  // open, merged, rejected or withdrawn
 	ChecksStatus   string    `json:"checksStatus"`

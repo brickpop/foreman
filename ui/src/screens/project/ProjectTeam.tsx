@@ -314,7 +314,7 @@ function EarlierTeams({
         open={asking}
         onClose={() => setAsking(false)}
         title="Clean up what earlier teams left?"
-        body="Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches here a target already holds (kept aside a while, recoverable by hand). Everything else stays, and is listed with why."
+        body="Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches whose work is all merged (kept aside a while, recoverable by hand). Everything else stays, and is listed with why."
         action="Clean up"
         onConfirm={run}
       />

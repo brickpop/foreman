@@ -597,8 +597,8 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 	return errors.Join(failed...)
 }
 
-// RetargetReview changes the target the review's open merge request in repo
-// merges into: another of the repo's targets, which git still has. Its diff
+// RetargetReview changes the branch the review's open merge request in repo
+// merges into: another the repo has, not an agent's. Its diff
 // is then against it, a conflict found before is forgotten (the next merge
 // tells), and the lead is told.
 func (w *Workflow) RetargetReview(ctx context.Context, id, repo, target string) error {
@@ -611,12 +611,8 @@ func (w *Workflow) RetargetReview(ctx context.Context, id, repo, target string) 
 		return fmt.Errorf("%w: %s has nothing open in this review", ErrNotOpen, repo)
 	}
 	mr := v.MergeRequests[i]
-	project, err := w.Config.Project(mr.ProjectID)
-	if err != nil {
-		return err
-	}
-	if !project.IsTarget(repo, target) {
-		return fmt.Errorf("%w: %s isn't a target of %s", ErrInvalid, target, repo)
+	if git.AgentBranch(target) {
+		return fmt.Errorf("%w: %s is an agent's branch: a merge goes into one of yours", ErrInvalid, target)
 	}
 	from, dir, err := w.repoOf(mr)
 	if err != nil {
@@ -626,7 +622,7 @@ func (w *Workflow) RetargetReview(ctx context.Context, id, repo, target string) 
 		return nil
 	}
 	if !w.Git.HasBranch(ctx, dir, target) {
-		return fmt.Errorf("%w: %s has no branch %s any more", ErrInvalid, repo, target)
+		return fmt.Errorf("%w: %s has no branch %s", ErrInvalid, repo, target)
 	}
 	mr.Target, mr.Conflicting, mr.Note = target, false, ""
 	w.saveMerge(ctx, mr)

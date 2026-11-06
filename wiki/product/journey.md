@@ -111,7 +111,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 
 ## Part 4: stop and resume
 
-**29. Stop a deployment.** Team Atlas → Deployments → **Stop** on ledger, after confirming. Its sessions end; worktrees are kept, and its agents' `wt/*` branches already merged into a target are deleted; Vesper keeps running.
+**29. Stop a deployment.** Team Atlas → Deployments → **Stop** on ledger, after confirming. Its sessions end; worktrees are kept, and its agents' `wt/*` branches already merged are deleted; Vesper keeps running.
 - *Under the hood:* Instance manager stops Atlas's instances (Execution engine `Stop`), revokes their tokens; its open requests expire; Messaging expires its queue; Git `Prune` deletes the merged `wt/*` branches.
 
 **30. Restart Foreman.** The CEO quits and starts `foreman` again (an upgrade, say). Vesper's agents never stopped.

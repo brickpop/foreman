@@ -45,6 +45,7 @@ type Git interface {
 	AbortMerge(ctx context.Context, dir string) error
 	Branches(ctx context.Context, dir, prefix string) ([]string, error)
 	Contains(ctx context.Context, dir, into, branch string) (bool, error)
+	HeldBy(ctx context.Context, dir, branch string) ([]string, error)
 	Merged(ctx context.Context, dir, into, branch string) (bool, error)
 	Squash(ctx context.Context, dir, target, branch, head, message string) error
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error
@@ -93,18 +94,12 @@ type Teams interface {
 	Stop(ctx context.Context, deployment string) error
 }
 
-// Targets make a code repo's new targets (the home).
-type Targets interface {
-	CreateTarget(ctx context.Context, project, repo, name, from, by string) (home.Project, error)
-}
-
 // Deps are the blocks Workflow is assembled from.
 type Deps struct {
 	Git      Git
 	Config   Config
 	Messages Messages
 	Teams    Teams
-	Targets  Targets
 	// Actions keeps each git tool call and what it did (the Team traffic
 	// panel); Publish announces it (team.action). Either may be nil.
 	Actions store.Actions
@@ -152,14 +147,14 @@ func object(props string, required ...string) json.RawMessage {
 }
 
 var definitions = []agentlink.Tool{
-	{Name: "switch", Description: "Switch your worktrees, in every repo, to one of your branches. A new one is made from from, a target, in every repo that has it, and from the repo's default branch where it hasn't or when from is left out. Commit first: a switch never carries changes along.",
+	{Name: "switch", Description: "Switch your worktrees, in every repo, to one of your branches. A new one is made from from (any branch, remote branch or commit) in every repo that has it, and from the repo's default branch where it hasn't or when from is left out. Commit first: a switch never carries changes along.",
 		InputSchema: object(`"branch":{"type":"string","description":"One of your branches: wt/<project>/<you>/<topic> for a member, lead/<project>/<team>/<topic> for the lead"},`+
-			`"from":{"type":"string","description":"Only for a new branch whose work lands on a target other than the default: that target, e.g. release/2.0"}`, "branch")},
+			`"from":{"type":"string","description":"Only for a new branch: where its work starts, e.g. release/2.0, a teammate's branch or a commit; best where it will be merged into, or the review shows what it brings along"}`, "branch")},
 	{Name: "commit", Description: "Commit everything you changed in each repo you name, on the branch checked out there, with that repo's message (git is read-only for you); repos you don't name are left as they are. After a merge with conflicts, committing a repo concludes its merge once no conflict markers are left.",
 		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
 			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; project for the project repo (the lead only)"},`+
 			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
-	{Name: "merge", Description: "Merge a branch (a target, the lead's, a teammate's, or a remote's that fetch() brought, e.g. origin/main) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
+	{Name: "merge", Description: "Merge any branch (the CEO's, the lead's, a teammate's, or a remote's that fetch() brought, e.g. origin/main) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
 	{Name: "discard", Description: "Throw away what you changed and didn't commit, in each repo you name (all of them if none): its files go back to the branch as committed, new files removed (ignored ones stay). Foreman keeps a copy. After a merge, abort_merge() first.",
 		InputSchema: object(`"repos":{"type":"array","items":{"type":"string"},"description":"Your repos' folders, e.g. api; all of them when left out"}`)},
@@ -184,23 +179,17 @@ var definitions = []agentlink.Tool{
 			`"body":{"type":"string","description":"Optional: what the CEO needs to answer, in Markdown: the context, what you weighed, what you suggest and why. Name wiki entries or branches for the long parts"},`+
 			`"options":{"type":"array","items":{"type":"string"},"description":"Answers to pick from, the first the one you suggest; the CEO may also write their own. An approval without them gets Approve and Deny"},`+
 			`"wait":{"type":"boolean","description":"A question only: you can't go on with that step without the answer"}`, "kind", "title")},
-	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into into, a target, in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Every one of those repos must have that target. Commit first. Call it again on the same branch to refresh it (after merging its target in, say): the title and body you give then replace the earlier ones.",
+	{Name: "request_merge", Description: "Ask the CEO to merge one of your lead branches into into, any branch of the CEO's (not an agent's wt/* or lead/*), in every repo where it has new commits: one merge request each, carrying the hand-offs merged into it. Every one of those repos must have that branch. Commit first. Call it again on the same branch to refresh it (after merging in the branch it goes into, say): the title and body you give then replace the earlier ones.",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>"},`+
 			`"title":{"type":"string","description":"What the merge brings, in one short line (at most 120 characters), e.g. Export invoices as CSV"},`+
 			`"body":{"type":"string","description":"Optional: what the CEO should know to review it, in Markdown: what changed and why, what to look at first, what was left out"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"},`+
-			`"into":{"type":"string","description":"The target it merges into, the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "title", "entry")},
-	{Name: "create_target", Description: "Make a new target in one repo: a new branch name at from, one of its targets or an older commit of one (work the CEO merged). Work for it starts there with switch(branch, from), and lands there with request_merge(branch, title, body, entry, into); only the CEO merges into it. A target across repos is one call per repo.",
-		InputSchema: object(`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api"},`+
-			`"name":{"type":"string","description":"The new branch, e.g. release/2.0: not one the repo has, nor wt/* or lead/*"},`+
-			`"from":{"type":"string","description":"One of the repo's targets, e.g. main, or a commit (its hash) one holds"}`, "repo", "name", "from")},
+			`"into":{"type":"string","description":"The branch it merges into, usually the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "title", "entry")},
 	{Name: "withdraw_merge", Description: "Withdraw your open request to merge a lead branch, in every repo, before the CEO decides it: the work is superseded by another of your branches, or no longer wanted. The branch stays. The CEO's draft comments on it are lost.",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>, with a review open"},`+
 			`"reason":{"type":"string","description":"Why, for the CEO"},`+
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
-	{Name: "fetch", Description: "Fetch every remote of each repo: what was pushed upstream shows as its remote's branches (origin/main), which you merge in with merge(\"origin/main\"). Your branches and the targets don't move.",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
-	{Name: "targets", Description: "Each repo's targets: the branches only the CEO's merges write, where work starts from (switch from) and lands (request_merge into). The default branch first; for the others, who made them and at which commit. Read-only.",
+	{Name: "fetch", Description: "Fetch every remote of each repo: what was pushed upstream shows as its remote's branches (origin/main), which you merge in with merge(\"origin/main\"). Your branches and the CEO's don't move.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
@@ -271,13 +260,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	case "request_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Title), strings.TrimSpace(a.Body), strings.TrimSpace(a.Entry), strings.TrimSpace(a.Into))
-	case "create_target":
-		act.Branch = strings.TrimSpace(a.Name)
-		res = t.createTarget(ctx, strings.TrimSpace(a.Repo), act.Branch, strings.TrimSpace(a.From))
 	case "fetch":
 		res = t.fetch(ctx)
-	case "targets":
-		return t.targets() // read-only: not an action
 	case "reviews":
 		return t.reviews(ctx) // read-only: not an action
 	case "team":
@@ -290,7 +274,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	default: // contribute
 		return t.contribute(ctx, strings.TrimSpace(a.Kind), strings.TrimSpace(a.Title), strings.TrimSpace(a.Body))
 	}
-	// The git tools (fetch too), request_merge, create_target and withdraw_merge are kept as actions, refusals included (a hand-off and a
+	// The git tools (fetch too), request_merge and withdraw_merge are kept as actions, refusals included (a hand-off and a
 	// contribution are messages already).
 	if res.Error {
 		act.Error = res.Text
@@ -444,8 +428,18 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 	if len(repos) == 0 {
 		return teamtools.Refusal("no_repos", "you have no worktree in this project")
 	}
-	if from != "" && !slices.ContainsFunc(repos, func(r repo) bool { return t.project.IsTarget(r.name, from) }) {
-		return teamtools.Refusal("no_such_target", "%s isn't a target of any of your repos: the lead makes one with create_target", from)
+	// Where it starts, per repo: from where the repo has it, else the default.
+	bases := map[string]string{}
+	for _, r := range repos {
+		bases[r.name] = t.project.Default(r.name)
+		if from != "" {
+			if _, err := t.w.Git.Resolve(ctx, r.dir, from); err == nil {
+				bases[r.name] = from
+			}
+		}
+	}
+	if from != "" && !slices.ContainsFunc(repos, func(r repo) bool { return bases[r.name] == from }) {
+		return teamtools.Refusal("no_such_ref", "none of your repos has %s: name a branch, a remote's branch (fetch() first) or a commit", from)
 	}
 	// Checked in every repo first, so a switch never stops halfway.
 	if res, ok := t.unsettled(ctx, repos, "a switch never carries changes along"); !ok {
@@ -453,10 +447,7 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 	}
 	var created []string
 	for _, r := range repos {
-		base := t.project.Default(r.name)
-		if from != "" && t.project.IsTarget(r.name, from) {
-			base = from
-		}
+		base := bases[r.name]
 		made, err := t.w.Git.Switch(ctx, r.dir, branch, base)
 		if err != nil {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
@@ -656,13 +647,13 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 			continue
 		}
 		found = true
-		news = news || !t.w.inATarget(ctx, t.project, r, branch)
+		news = news || !t.w.landed(ctx, t.project, r.name, r.dir, branch)
 	}
 	switch {
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case !news:
-		return teamtools.Refusal("nothing_new", "%s changes nothing in any of its repo's targets", branch)
+		return teamtools.Refusal("nothing_new", "%s changes nothing that its repos' default branch, or a branch merges went into, doesn't have", branch)
 	}
 	msg, err := t.w.Messages.Send(ctx, store.TeamMessage{DeploymentID: t.c.Deployment.ID, FromInstance: t.c.Instance.ID,
 		ToInstance: to, Kind: "handoff", Body: summary, ArtifactRef: branch})

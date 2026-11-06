@@ -23,7 +23,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Request](./models/request.md)
   - [Team message](./models/team-message.md)
   - [Work item](./models/work-item.md): an agent's branch on its way to the lead
-  - [Merge request](./models/merge-request.md): the lead's proposal to merge into a target
+  - [Merge request](./models/merge-request.md): the lead's proposal to merge into one of the CEO's branches
   - [Review](./models/review.md): the CEO's review of a lead branch, with its comments to the lead
   - [UI state](./models/ui-state.md): read markers and UI preferences
 

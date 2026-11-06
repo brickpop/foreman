@@ -150,9 +150,6 @@ export interface HomeArea {
   newRepo(project: string, name: string, path: string): Promise<Project>;
   /** Sets a repo's default branch, one it has. */
   setRepoDefault(project: string, name: string, branch: string): Promise<Project>;
-  /** Stops one of a repo's other targets being one (its branch stays);
-   * refused while a merge request into it is open. */
-  removeTarget(project: string, repo: string, target: string): Promise<Project>;
   /** Points a missing repo at its new folder (the same repo). */
   locateRepo(project: string, name: string, path: string): Promise<Project>;
   renameRepo(project: string, name: string, newName: string): Promise<Project>;
@@ -308,7 +305,7 @@ export interface ReviewsArea {
   /** Merges the repos named, each at the head the CEO read (repo → commit);
    * the rest stay open. A repo whose branch moved since isn't merged. */
   merge(review: string, heads: Record<string, string>): Promise<void>;
-  /** Changes where one repo of it merges: another of that repo's targets. */
+  /** Changes where one repo of it merges: another branch of that repo, not an agent's. */
   retarget(review: string, repo: string, target: string): Promise<void>;
   /** Ends it unmerged, the reason going to the lead. */
   /** Dismisses it as the CEO chose; answers with the branches it couldn't drop. */
@@ -451,14 +448,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       setRepoDefault: async (project, name, branch) =>
         (
           await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}/default`, { branch })
-        ).json() as Promise<Project>,
-      // A target's name may hold slashes (release/2.0): each part encoded apart.
-      removeTarget: async (project, repo, target) =>
-        (
-          await request(
-            "DELETE",
-            `/api/projects/${id(project)}/repos/${id(repo)}/targets/${target.split("/").map(id).join("/")}`,
-          )
         ).json() as Promise<Project>,
       locateRepo: async (project, name, path) =>
         (

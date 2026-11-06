@@ -265,12 +265,11 @@ describe("httpClient", () => {
     expect(calls[0].url).toBe("http://x/api/requests");
   });
 
-  it("sets a repo's default branch, adds a repo with one, and removes a target with slashes in its name", async () => {
+  it("sets a repo's default branch and adds a repo with one", async () => {
     const calls = stubFetch(200, { id: "ledger" });
     const client = httpClient("http://x");
     await client.home.setRepoDefault("ledger", "my api", "trunk");
     await client.home.addRepo("ledger", "web", "/h/web", "master");
-    await client.home.removeTarget("ledger", "api", "release/2.0 rc");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["PUT", "http://x/api/projects/ledger/repos/my%20api/default", { branch: "trunk" }],
       [
@@ -278,7 +277,6 @@ describe("httpClient", () => {
         "http://x/api/projects/ledger/repos",
         { name: "web", path: "/h/web", defaultBranch: "master" },
       ],
-      ["DELETE", "http://x/api/projects/ledger/repos/api/targets/release/2.0%20rc", undefined],
     ]);
   });
 

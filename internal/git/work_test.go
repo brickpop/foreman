@@ -58,6 +58,19 @@ func TestSwitchCreatesFromMainThenComesBack(t *testing.T) {
 	if created, err := g.Switch(ctx, wts["tove"], "wt/tove/main", "main"); err != nil || created {
 		t.Errorf("back home: created %v, %v", created, err)
 	}
+	// From any commit: a hash, or a branch of another agent's, not set as
+	// its upstream.
+	first := gitOut(t, r, "rev-parse", "refs/heads/main~1")
+	if created, err := g.Switch(ctx, wts["tove"], "wt/tove/old", first[:8]); err != nil || !created || gitOut(t, wts["tove"], "rev-parse", "HEAD") != first {
+		t.Errorf("from a hash: %v %v", created, err)
+	}
+	if _, err := g.Switch(ctx, wts["tove"], "wt/tove/on-top", "wt/tove/LED-44"); err != nil || gitOut(t, wts["tove"], "rev-parse", "HEAD") != gitOut(t, r, "rev-parse", "wt/tove/LED-44") {
+		t.Errorf("from another branch: %v", err)
+	}
+	if up, err := run(ctx, wts["tove"], "rev-parse", "--abbrev-ref", "@{upstream}"); err == nil {
+		t.Errorf("an upstream was set: %s", up)
+	}
+	g.Switch(ctx, wts["tove"], "wt/tove/main", "main")
 	if b := branchOf(t, r); b != "main" {
 		t.Errorf("the CEO's checkout moved to %q", b)
 	}
@@ -82,7 +95,7 @@ func TestSwitchRefusals(t *testing.T) {
 	}
 	if _, err := g.Switch(ctx, wts["tove"], "wt/tove/other", "trunk"); err == nil {
 		os.Remove(filepath.Join(wts["tove"], "draft.go"))
-		t.Error("no base branch, yet no error")
+		t.Error("no base branch or commit, yet no error")
 	}
 }
 
@@ -292,44 +305,42 @@ func TestBranchesAndContains(t *testing.T) {
 	}
 }
 
-// A target is made at a commit, nothing checked out anywhere; one the repo
-// has, or a bad name, is refused, and nothing changes.
-func TestCreateBranch(t *testing.T) {
-	r, wts := worktrees(t, "tove")
+// HeldBy lists the branches, but the agents', whose history has all of a
+// branch: where it was merged with its commits.
+func TestHeldBy(t *testing.T) {
+	dir := repo(t)
 	g := New()
-	first := gitOut(t, r, "rev-parse", "main")
-	write(t, filepath.Join(r, "NEWS"), "v2\n")
-	if err := g.Commit(ctx, r, "news", "NEWS"); err != nil {
+	write(t, filepath.Join(dir, "a"), "a\n")
+	if err := g.Commit(ctx, dir, "first", "a"); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.CreateBranch(ctx, r, "release/1.0", first); err != nil {
+	for _, b := range []string{"release/1.0", "feature/x", "lead/atlas/integration", "wt/tove/LED-44"} {
+		run(ctx, dir, "branch", b)
+	}
+	run(ctx, dir, "checkout", "-q", "wt/tove/LED-44")
+	write(t, filepath.Join(dir, "b"), "b\n")
+	if err := g.Commit(ctx, dir, "tove", "b"); err != nil {
 		t.Fatal(err)
 	}
-	if at := gitOut(t, r, "rev-parse", "release/1.0"); at != first {
-		t.Errorf("at %s, want %s", at, first)
+	if got, err := g.HeldBy(ctx, dir, "wt/tove/LED-44"); err != nil || len(got) != 0 {
+		t.Errorf("before any merge: %v %v", got, err)
 	}
-	if branchOf(t, r) != "main" || branchOf(t, wts["tove"]) != "wt/tove/main" {
-		t.Error("a checkout moved")
+	run(ctx, dir, "update-ref", "refs/heads/feature/x", "wt/tove/LED-44")
+	run(ctx, dir, "update-ref", "refs/heads/lead/atlas/integration", "wt/tove/LED-44")
+	if got, err := g.HeldBy(ctx, dir, "wt/tove/LED-44"); err != nil || !slices.Equal(got, []string{"feature/x"}) {
+		t.Errorf("held by the CEO's feature/x only, not the lead's: %v %v", got, err)
 	}
-	for name, c := range map[string]struct {
-		branch string
-		want   error
-	}{
-		"one it has":  {"main", ErrBranchExists},
-		"a bad name":  {"release/..", ErrBadBranch},
-		"option-like": {"-f", ErrBadBranch},
-	} {
-		if err := g.CreateBranch(ctx, r, c.branch, first); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v", name, err)
-		}
+	if got, _ := g.HeldBy(ctx, dir, "release/1.0"); !slices.Equal(got, []string{"feature/x", "main", "release/1.0"}) {
+		t.Errorf("an older commit: %v", got)
 	}
-	if at := gitOut(t, r, "rev-parse", "main"); at == first {
-		t.Error("main was moved")
+	if _, err := g.HeldBy(ctx, dir, "wt/tove/nope"); err == nil {
+		t.Error("an unknown branch is an error, not held by none")
+	}
+	if _, err := g.HeldBy(ctx, dir, "-x"); !errors.Is(err, ErrBadBranch) {
+		t.Errorf("option-like: %v", err)
 	}
 }
 
-// An agent's branches carry its project, so one team on two projects that
-// share a repo never shares a branch.
 func TestBranchNames(t *testing.T) {
 	for _, tc := range []struct {
 		project, agent, team string

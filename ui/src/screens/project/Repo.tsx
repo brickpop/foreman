@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tansta
 import { useEffect, useRef, useState } from "react";
 import { type RepoBranch, type Repo as RepoInfo, useClient } from "../../api/client";
 import { withoutTitle } from "../../app/frontmatter";
-import { projectName, readable, targetsOf, when } from "../../app/model";
+import { projectName, readable, when } from "../../app/model";
 import {
   useDeploymentOn,
   useRepoFile,
@@ -132,7 +132,7 @@ export function Repo() {
 
 /** The branch shown, as a button opening the repo's branches to pick from:
  * a box to find one by name, then the default first and the most recent,
- * each with whose it is, whether it is a target, how far ahead of the default,
+ * each with whose it is, whether it is the default, how far ahead of it,
  * and whether its worktree has
  * uncommitted changes. */
 function BranchPicker({
@@ -144,7 +144,6 @@ function BranchPicker({
   at: At;
   onChoose: (branch: string) => void;
 }) {
-  const project = useProject();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const shown = matching(repo.branches, query);
@@ -191,7 +190,6 @@ function BranchPicker({
                 key={b.name}
                 branch={b}
                 defaultBranch={repo.defaultBranch}
-                targets={targetsOf(project, repo.name)}
                 on={b.name === at.branch}
                 onClick={() => choose(b.name)}
               />
@@ -209,14 +207,11 @@ function BranchPicker({
 function BranchItem({
   branch: b,
   defaultBranch,
-  targets,
   on,
   onClick,
 }: {
   branch: RepoBranch;
   defaultBranch: string;
-  /** The repo's targets, its default among them. */
-  targets: string[];
   on: boolean;
   onClick: () => void;
 }) {
@@ -230,7 +225,7 @@ function BranchItem({
     if (on) self.current?.scrollIntoView({ block: "nearest" });
   }, []);
   const detail = [
-    b.name === defaultBranch ? "default branch" : targets.includes(b.name) && "target",
+    b.name === defaultBranch && "default branch",
     branchOwner(b.name, project.id, teams, deployment),
     b.ahead > 0 && `${b.ahead} ahead of ${defaultBranch}`,
   ].filter(Boolean);

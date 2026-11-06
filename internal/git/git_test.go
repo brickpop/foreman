@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -100,18 +101,57 @@ func TestInitIsIdempotent(t *testing.T) {
 	}
 }
 
-// A machine that signs every commit doesn't make Foreman's commits prompt or
-// fail: they are unsigned.
-func TestCommitsAreUnsignedEvenWhenGitSignsByDefault(t *testing.T) {
-	dir := repo(t)
-	for _, kv := range [][2]string{{"commit.gpgsign", "true"}, {"gpg.format", "ssh"}, {"user.signingkey", "/no/such/key"}} {
-		if _, err := run(ctx, dir, "config", kv[0], kv[1]); err != nil {
-			t.Fatal(err)
+// Commits by the CEO's identity (a save, a squash merge) follow the CEO's git
+// config: signed when it says so, failing rather than landing unsigned when
+// the key can't sign. Agents' commits are never signed (the CEO, 2026-11-06).
+func TestOnlyTheCEOsCommitsAreSigned(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("no ssh-keygen to make a signing key")
+	}
+	g, dir := mergeFixture(t)
+	key := filepath.Join(t.TempDir(), "key")
+	if out, err := exec.Command("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	config := func(kv ...string) {
+		for i := 0; i < len(kv); i += 2 {
+			mustRun(t, dir, "config", kv[i], kv[i+1])
 		}
 	}
-	write(t, filepath.Join(dir, "f"), "x\n")
-	if err := (New()).Commit(ctx, dir, "m", "f"); err != nil {
-		t.Errorf("commit with signing configured: %v", err)
+	signed := func(rev string) bool { return strings.Contains(mustRun(t, dir, "cat-file", "-p", rev), "gpgsig") }
+	config("user.name", "CEO", "user.email", "ceo@x", "gpg.format", "ssh", "user.signingkey", key)
+
+	// Not asked to sign: nothing is.
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "unsigned"); err != nil || signed("main") {
+		t.Errorf("a squash without commit.gpgsign: signed %v, %v", signed("main"), err)
+	}
+
+	config("commit.gpgsign", "true")
+	write(t, filepath.Join(dir, "notes"), "n\n")
+	if err := g.Commit(ctx, dir, "a save", "notes"); err != nil || !signed("HEAD") {
+		t.Errorf("the CEO's save: signed %v, %v", signed("HEAD"), err)
+	}
+	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
+	change(t, g, dir, "agent.go", "package a\n", Author{Name: "tove", Email: "tove@ledger"})
+	if signed("HEAD") {
+		t.Error("an agent's commit was signed with the CEO's key")
+	}
+	mustRun(t, dir, "checkout", "-q", "main")
+	head = mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "signed"); err != nil || !signed("main") {
+		t.Errorf("the CEO's squash: signed %v, %v", signed("main"), err)
+	}
+
+	// A key that can't sign: the merge fails, main stays.
+	config("user.signingkey", filepath.Join(t.TempDir(), "gone"))
+	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
+	change(t, g, dir, "more.go", "package a\n", Author{Name: "tove", Email: "tove@ledger"})
+	mustRun(t, dir, "checkout", "-q", "main")
+	before := mustRun(t, dir, "rev-parse", "main")
+	head = mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "no key"); err == nil || mustRun(t, dir, "rev-parse", "main") != before {
+		t.Errorf("merged without a signature: %v", err)
 	}
 }
 

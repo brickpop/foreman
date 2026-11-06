@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { Board, Card, MergeRequest, Project, Request } from "../../api/client";
+import type { Board, Card, MergeRequest, Node, Project, Request } from "../../api/client";
 import { forgeOf, linkLine, targetsOf } from "../../app/model";
 import { cellLook, columnLabel, laneLabel, lanesShown, moveOf, revealBy } from "./Board";
 import { sourceLabel } from "./Pipeline";
+import { treeLabel } from "./Wiki";
 
 const card = (path: string, column: string, lane: string) => ({ path, column, lane }) as Card;
 const board = (cards: Card[], lanes: string[] = []) =>
@@ -143,5 +144,21 @@ describe("targetsOf", () => {
   it("is none for a repo it doesn't have, or before the project loads", () => {
     expect(targetsOf(project, "gone")).toEqual([]);
     expect(targetsOf(undefined, "poc")).toEqual([]);
+  });
+});
+
+describe("the wiki tree's names", () => {
+  const node = (path: string, title: string) => ({ path, title }) as Node;
+
+  it("says which entry is a folder's page, the root's too", () => {
+    expect(treeLabel(node("backlog/index.md", "Backlog"))).toBe("Backlog - index.md");
+    expect(treeLabel(node("index.md", "Home"))).toBe("Home - index.md");
+  });
+
+  it("names other entries by their title alone, or their path without one", () => {
+    expect(treeLabel(node("backlog/reindex.md", "Reindex"))).toBe("Reindex");
+    expect(treeLabel(node("notes/index.md.md", "Odd"))).toBe("Odd");
+    expect(treeLabel(node("notes/x.md", ""))).toBe("notes/x.md");
+    expect(treeLabel(node("notes/index.md", ""))).toBe("notes/index.md");
   });
 });

@@ -35,6 +35,7 @@ import {
   stoppedLine,
   waitingOnYou,
 } from "../../app/sessions";
+import { setUnsentLine, useUnsentLine } from "../../app/unsentLines";
 import { BranchMenu } from "../../components/BranchMenu";
 import { DeployDialog } from "../../components/DeployDialog";
 import { FolderIcon, PlayIcon, PromptIcon } from "../../components/icons";
@@ -306,14 +307,17 @@ function AgentSession({
   focusAsk: { id: string; n: number };
   /** Where its controls go: the end of the tabs row. */
   controls: HTMLElement | null;
-  /** Set while its Line holds text: the agent shortcuts don't switch away from it. */
+  /** Set while its Line holds text: the agent keys select in it, not switch away. */
   lineHeld: RefObject<boolean>;
 }) {
   const terminal = useRef<TerminalHandle>(null);
   const client = useClient();
   const draft = useDraft(instance.id);
   const newline = useHarnesses().data?.find((h) => h.id === instance.harness)?.newline;
-  const [lineMode, setLineMode] = useState(false);
+  const line = useUnsentLine(instance.id);
+  const setLine = (text: string) => setUnsentLine(instance.id, text);
+  // Back on an agent with a line kept, Line opens with it.
+  const [lineMode, setLineMode] = useState(line !== "");
   const lineInput = useRef<HTMLTextAreaElement>(null);
   // Line opens with the keyboard in it (autoFocus), and closes back to the terminal.
   const closeLine = () => {
@@ -351,7 +355,6 @@ function AgentSession({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
-  const [line, setLine] = useState("");
   lineHeld.current = lineMode && !asleep && line !== "";
   // Gone (the agent left the roster), it holds nothing back.
   useEffect(() => {

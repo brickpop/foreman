@@ -10,14 +10,14 @@ the wire are relative to the wiki, e.g. backlog/LED-44.md.
 
 /**
  * Node is one folder or entry of a wiki's tree, in the reader's order:
- * index.md first, then subfolders, then entries. A folder's own index.md
- * isn't among its children: opening the folder opens it.
+ * index.md first, then subfolders, then entries. A folder's own index.md is
+ * its first child, an entry like the others (the CEO, 2026-11-05: folded into
+ * the folder's row, it took two clicks to find).
  */
 export interface Node {
   path: string; // relative to the wiki, e.g. backlog/LED-44.md
   title: string;
   folder: boolean;
-  hasIndex: boolean; // a folder that opens (it has an index.md)
   changed: boolean; // changed since the CEO last looked
   children: Node[];
 }

@@ -26,7 +26,7 @@ A grid (gap 24) using the full width, as a repo's page: the file tree, **always 
 
 ## File tree
 
-Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` first, then subfolders, then entries, alphabetically. Folders are collapsed except those on the path to the current entry. A click anywhere on a folder's row expands or collapses it; expanding a folder that has an `index.md` also opens it.
+Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` first, then subfolders, then entries, alphabetically. Folders are collapsed except those on the path to the current entry. A click anywhere on a folder's row expands or collapses it, and only that. A folder's `index.md` is its first row, named `<title> - index.md` (the root's too), so a folder's own page is seen at a glance (the CEO, 2026-11-05: folded into the folder's row, opening it took a second click when the folder was already open, and nothing said it was there).
 
 - **The file tree's look**, the same as a repo's ([Repos → A repo's page](./repos.md#a-repos-page)): a folder row has a chevron (turned down when open) and a folder icon (open or closed), a file row a file icon (both `--tx4`), in line with the folder names; an open folder's contents are indented 13px under its chevron, with a 1px `--line` guide down their left. Rows padding `3px 6px`, 13.5px, `--tx2`, ellipsis on overflow; the entries by their title. The current entry: `--accSoft`, `--accTx`. (The CEO, 2026-11-02, replacing indentation by padding alone.)
 - A 6px attention (`--attn`) **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").

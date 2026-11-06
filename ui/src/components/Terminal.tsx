@@ -9,6 +9,7 @@ import { useClient } from "../api/client";
 import type { PtyConnection } from "../api/pty";
 import { usePreferences } from "../app/queries";
 import { resolvedColor } from "../app/theme";
+import { type Fitter, fitter } from "./terminalFit";
 import { loadTerminalFont } from "./terminalFonts";
 
 // Our terminal component. Screens use this, never xterm.js directly, so the
@@ -47,7 +48,7 @@ export function Terminal({
   const host = useRef<HTMLDivElement>(null);
   const xterm = useRef<XTerm | null>(null);
   const connection = useRef<PtyConnection | null>(null);
-  const fit = useRef<FitAddon | null>(null);
+  const fit = useRef<Fitter | null>(null);
   const prefs = usePreferences().data;
   const font = prefs?.terminalFont;
   const fontSize = prefs?.terminalFontSize ?? 13;
@@ -84,12 +85,13 @@ export function Terminal({
       theme: colors(),
     });
     xterm.current = term;
-    const fitting = new FitAddon();
-    fit.current = fitting;
-    term.loadAddon(fitting);
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
     term.open(host.current);
-    fitting.fit();
+    fitAddon.fit();
+    const fitting = fitter(term, fitAddon);
+    fit.current = fitting;
 
     // The replay (the screen and its scrollback, sent first on every connect)
     // is drawn hidden, then shown at once: no flash of it scrolling by.
@@ -101,21 +103,24 @@ export function Terminal({
     };
     let fallback = setTimeout(show, 600); // nothing came: show what there is
     const conn = client.agents.openTerminal(instance, {
-      output: (data) => {
-        if (!replaying) return term.write(data);
-        term.write(data, () => {
-          term.scrollToBottom();
-          show();
-        });
-      },
-      reset: () => {
-        replaying = true;
-        view.style.opacity = "0";
-        clearTimeout(fallback);
-        fallback = setTimeout(show, 600);
-        term.reset();
-      },
-      exit: (code) => term.write(`\r\n\x1b[90m[session exited with code ${code}]\x1b[0m\r\n`),
+      output: (data) =>
+        fitting.run(() => {
+          if (!replaying) return term.write(data);
+          term.write(data, () => {
+            term.scrollToBottom();
+            show();
+          });
+        }),
+      reset: () =>
+        fitting.run(() => {
+          replaying = true;
+          view.style.opacity = "0";
+          clearTimeout(fallback);
+          fallback = setTimeout(show, 600);
+          term.reset();
+        }),
+      exit: (code) =>
+        fitting.run(() => term.write(`\r\n\x1b[90m[session exited with code ${code}]\x1b[0m\r\n`)),
     });
     connection.current = conn;
     conn.resize(term.cols, term.rows);

@@ -144,8 +144,14 @@ function hasChanged(nodes: Node[]): boolean {
 
 /** Whether a folder holds the current entry: those start expanded. */
 function holds(n: Node, path: string): boolean {
-  if (path === `${n.path}/index.md`) return true; // its own index isn't among its children
   return n.children.some((c) => c.path === path || holds(c, path));
+}
+
+/** An entry's name in the tree: its title, and a folder's page says it is one
+ * (the CEO, 2026-11-05: a folder's index.md went unnoticed). */
+export function treeLabel(n: Node): string {
+  if (!n.title) return n.path;
+  return n.path === "index.md" || n.path.endsWith("/index.md") ? `${n.title} - index.md` : n.title;
 }
 
 function Tree({
@@ -167,7 +173,7 @@ function Tree({
         onClick={() => onOpen(n.path)}
         after={n.changed && <Dot size={6} title="Changed since you last looked" />}
       >
-        {n.title || n.path}
+        {treeLabel(n)}
       </TreeRow>
     ),
   );
@@ -188,19 +194,13 @@ function Folder({
   useEffect(() => {
     if (holds(node, current)) setOpen(true);
   }, [current]);
-  const index = `${node.path}/index.md`;
-  // The whole row toggles; expanding a folder with an index.md also opens it.
-  const toggle = () => {
-    if (!open && node.hasIndex) onOpen(index);
-    setOpen(!open);
-  };
+  // The whole row toggles, and only that: its index.md is a row inside.
   return (
     <>
       <TreeRow
         folder
         open={open}
-        current={current === index}
-        onClick={toggle}
+        onClick={() => setOpen(!open)}
         after={
           !open &&
           hasChanged(node.children) && <Dot size={6} title="Changed since you last looked" />

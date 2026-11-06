@@ -18,6 +18,7 @@ import {
   useTeams,
 } from "./queries";
 import { deploymentStatus } from "./sessions";
+import { hasUnsentLine } from "./unsentLines";
 
 // The frame every screen lives in (wiki/product/features/app-shell.md): the
 // sidebar, the main area, and the overlays.
@@ -35,6 +36,7 @@ export function Shell() {
   return (
     <Toasts>
       <LiveEvents />
+      <UnsentLinesGuard />
       <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
         <button
           type="button"
@@ -264,6 +266,20 @@ function Archived({ projects }: { projects: SidebarModel["archived"] }) {
 
 /** Follows the server's events: caches refresh, and what the CEO should hear
  * about becomes a toast, and a browser notification (notifications.md). */
+/** A reload would lose the lines typed into Line and not sent: the browser asks first. */
+function UnsentLinesGuard() {
+  const instances = useInstances().data;
+  useEffect(() => {
+    const ids = (instances ?? []).map((i) => i.id);
+    const ask = (e: BeforeUnloadEvent) => {
+      if (hasUnsentLine(ids)) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [instances]);
+  return null;
+}
+
 function LiveEvents() {
   const toast = useToast();
   const navigate = useNavigate();

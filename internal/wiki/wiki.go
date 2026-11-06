@@ -111,10 +111,6 @@ func (w *Wikis) Tree(project string) ([]Node, error) {
 	for _, e := range idx.Entries {
 		p := rel(e.Path)
 		f := folder(parentDir(p))
-		if path.Base(p) == "index.md" && f != root {
-			f.node.HasIndex = true
-			continue
-		}
 		f.children = append(f.children, &branch{node: Node{Path: p, Title: title(e)}})
 	}
 	var flatten func(b *branch) []Node

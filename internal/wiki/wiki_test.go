@@ -81,14 +81,17 @@ func TestTreeOrderAndFolders(t *testing.T) {
 		t.Fatalf("top level = %v, want %v", got, want)
 	}
 	backlog := tree[2]
-	if !backlog.Folder || !backlog.HasIndex || backlog.Title != "Backlog" {
-		t.Errorf("backlog = %+v, want a folder with an index", backlog)
+	if !backlog.Folder || backlog.Title != "Backlog" {
+		t.Errorf("backlog = %+v, want a folder", backlog)
 	}
-	// Its own index.md opens the folder: it isn't among its children.
-	if got, want := paths(backlog.Children), []string{"backlog/archive", "backlog/epics", "backlog/001-first.md", "backlog/002-second.md"}; !slices.Equal(got, want) {
+	// Its own index.md is its first entry, before the subfolders.
+	if got, want := paths(backlog.Children), []string{"backlog/index.md", "backlog/archive", "backlog/epics", "backlog/001-first.md", "backlog/002-second.md"}; !slices.Equal(got, want) {
 		t.Errorf("backlog = %v, want %v", got, want)
 	}
-	if tree[1].HasIndex {
+	if backlog.Children[0].Folder || backlog.Children[0].Title != "Backlog" {
+		t.Errorf("backlog's index = %+v, want an entry titled as its H1", backlog.Children[0])
+	}
+	if slices.Contains(paths(tree[1].Children), "adr/index.md") {
 		t.Error("adr has no index.md")
 	}
 	// Sibling folders deep down both keep their entries.
@@ -99,8 +102,8 @@ func TestTreeOrderAndFolders(t *testing.T) {
 	if paths(deep.Children[0].Children)[0] != "adr/deep/er/most.md" || paths(deep.Children[1].Children)[0] != "adr/deep/other/sibling.md" {
 		t.Errorf("deep entries lost: %+v", deep.Children)
 	}
-	if tree[3].Title != "The Alpha" || backlog.Children[2].Title != "001 First" || tree[1].Children[1].Title != "014 Settlement v2" {
-		t.Errorf("titles: %q %q %q", tree[3].Title, backlog.Children[2].Title, tree[1].Children[1].Title)
+	if tree[3].Title != "The Alpha" || backlog.Children[3].Title != "001 First" || tree[1].Children[1].Title != "014 Settlement v2" {
+		t.Errorf("titles: %q %q %q", tree[3].Title, backlog.Children[3].Title, tree[1].Children[1].Title)
 	}
 	// Without a title field: the first level-1 heading, never one in a code fence.
 	if tree[0].Title != "Home" || tree[5].Title != "Zeta Heading" || tree[4].Title != "Fenced" {

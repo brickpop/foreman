@@ -130,6 +130,18 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		mounts = append(mounts, runner.Mount{Source: filepath.Join(project.Path, ".git"), Target: filepath.Join(project.Path, ".git"), ReadOnly: true})
 	}
 
+	// The project's files, whatever team is on it: the CEO's for the agents,
+	// read-only; the agents' own, writable by every one of them.
+	if err := project.MakeFiles(); err != nil {
+		return nil, err
+	}
+	if project.Files != "" {
+		inbox, shared := filepath.Join(project.Files, home.FilesInbox), filepath.Join(project.Files, home.FilesShared)
+		mounts = append(mounts,
+			runner.Mount{Source: inbox, Target: inbox, ReadOnly: true},
+			runner.Mount{Source: shared, Target: shared})
+	}
+
 	// The harness's own files, private, outside the sandbox.
 	dir := project.HarnessDir(inst.AgentID)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -186,7 +198,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 // compose is an instance's session prompt: launch writes it, Prompt shows it.
 func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
-		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, ProjectRepo: project.Path, Config: project.Config, Repos: project.Repos,
+		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, ProjectRepo: project.Path, Files: project.Files, Config: project.Config, Repos: project.Repos,
 		Tools:        m.tools(inst.AgentID == team.Config.Lead, len(project.Repos) > 0),
 		Instructions: m.Config.Settings().Settings.Instructions,
 	})

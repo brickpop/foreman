@@ -139,6 +139,19 @@ describe("httpClient", () => {
     });
   });
 
+  it("asks whether it can open folders, and names a folder to open, never a path", async () => {
+    const calls = stubFetch(200, { canOpen: true });
+    expect(await httpClient("http://x").desktop.canOpen()).toEqual({ canOpen: true });
+    expect(calls[0]).toMatchObject({ url: "http://x/api/desktop", method: "GET" });
+    const opened = stubFetch(204, undefined);
+    await httpClient("http://x").desktop.open({ instance: "tove@ledger" });
+    await httpClient("http://x").desktop.open({ project: "ledger", folder: "inbox" });
+    expect(opened.map((c) => [c.url, c.method, JSON.parse(c.body ?? "")])).toEqual([
+      ["http://x/api/desktop/open", "POST", { instance: "tove@ledger" }],
+      ["http://x/api/desktop/open", "POST", { project: "ledger", folder: "inbox" }],
+    ]);
+  });
+
   it("restarts an instance with POST", async () => {
     const calls = stubFetch(204, undefined);
     await httpClient("http://x").agents.restart("mara@ledger");

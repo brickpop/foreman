@@ -39,6 +39,16 @@ Foreman binds `127.0.0.1` only, so the URL works on this machine alone (the CEO,
 | **WebSocket hijacking.** Browsers don't apply same-origin policy to WebSockets | Check `Origin` (and the token) on every upgrade to `/ws/pty/*` |
 | **Another local user or a container** calling the API | The [access token](#access-token) |
 
+### Opening folders
+
+The Session header opens an agent's folder and the project's files in the desktop's file manager ([Sessions](../features/sessions.md#agent-tabs)). The server runs a program on the CEO's machine for it, so:
+
+- **The browser never names a path.** `POST /api/desktop/open` takes an instance, or a project and `inbox` or `shared`; the server works out the folder (the instance's sandbox, `<workspace>/files/<folder>`). Nothing else can be opened.
+- **Only a real folder.** An absolute path to a directory, not a symlink (an agent could point one anywhere), with no extension: macOS's `open` launches a bundle (`x.app`) rather than showing it, and Foreman's folders never have one (agent ids are slugs).
+- **No shell.** `open` or `xdg-open` runs directly, the folder its only argument; absolute, it can't be read as an option.
+- **Not from another website**: a POST behind the [access token and the HTTP hardening](#http-hardening), like every state-changing request.
+- **Only with a desktop**: where Foreman can't open a folder, it says so (`GET /api/desktop`) and the UI shows no Open button. On Linux, `xdg-open` opens a folder with whatever the CEO set for folders (a file manager, or an editor): the CEO's choice.
+
 ### Agent isolation
 
 Decided: every instance runs in a rootless Podman container ([Session runner](./session-runner.md)).
@@ -61,5 +71,6 @@ The Chief of Staff can create teams, hire and refine agents, and changes nothing
 - **Secrets in PTY logs.** Session logs are raw bytes; anything a harness prints (an env dump, a token in an error) is persisted. Known Foreman secrets are redacted on write; the rest is accepted ([Secrets](../models/secrets.md#invariants)).
 - **Prompt injection between agents.** A reply's `output`, a handoff summary or a finding is text written into another agent's session. A confused or compromised agent (or a challenge team probing the build team) can inject instructions. Mitigations: injected text is framed as quoted data with its sender, length-capped, never crosses deployments ([Team tools](./team-tools.md#delivery)). The real backstop is that nothing reaches the CEO's branches without the CEO: agents make and write only their own branches (`wt/*`, `lead/*`), and every merge into one of the CEO's is the CEO's, on a review that shows all a branch brings along, whatever it started from or merged in.
 - **Wiki as a shared channel.** Agents read the wiki that the lead writes; it is a prompt-injection path inside a deployment, and across deployments on the same project. Accepted: the wiki is the project's shared memory by design.
+- **Shared files as a shared channel.** Every agent of a project reads and writes `<workspace>/files/shared/`, whatever team is deployed: one agent can change or delete what another left there, without the lead and with no history, and a misled agent can leave instructions there for the others (the same path as the wiki, but with any agent as its writer). Accepted (the CEO, 2026-11-06): it is where the agents keep data that outlives a task and a team. The CEO's `files/inbox/` is read-only for every agent; on the Direct engine (no isolation) nothing is.
 - **Model provider sees the code.** Inherent to cloud harnesses.
 - **The lead can change `project.toml` without review.** Its rw mount of the live project repo covers `project.toml`, gates (`always_ask_ceo`) and checks included, and its `commit()` lands on the project repo's `main` without review. Accepted for v1 ("v1 today is better than v1 in 10 years"); tracked in the [backlog](../../backlog/index.md#not-yet-scheduled).

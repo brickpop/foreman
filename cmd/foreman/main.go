@@ -26,6 +26,7 @@ import (
 	"github.com/brickpop/foreman/internal/access"
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/cos"
+	"github.com/brickpop/foreman/internal/desktop"
 	"github.com/brickpop/foreman/internal/events"
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
@@ -406,6 +407,7 @@ func run(args []string, stdout io.Writer) error {
 		Maintenance:  maintenanceOf(running, engineRunner, engineImages, podman.Installed),
 		Terminals:    views,
 		ChiefOfStaff: chief,
+		Desktop:      desktop.Detect(),
 		UI:           files,
 	})
 	return serveUntil(quit, stopSignals, stdout, &http.Server{Handler: handler}, listener, func() {

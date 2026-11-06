@@ -31,7 +31,7 @@ var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge"
 
 func input(agent string, tools []string) Input {
 	return Input{
-		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/workspace/ledger/agents/" + agent, ProjectRepo: "/home/ceo/workspace/ledger/project", Tools: tools,
+		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/workspace/ledger/agents/" + agent, ProjectRepo: "/home/ceo/workspace/ledger/project", Files: "/home/ceo/workspace/ledger/files", Tools: tools,
 		Repos:  []home.Repo{{Name: "api", Default: "main"}},
 		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
 	}
@@ -52,6 +52,8 @@ Branches: you work on wt/ledger/tove/main, made for you from main.
 Project repo: /home/ceo/workspace/ledger/project (the project's one shared checkout, the same for every agent)
 Knowledge base: /home/ceo/workspace/ledger/project/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
+Files from the CEO: /home/ceo/workspace/ledger/files/inbox (read only, by design: what the CEO gives the team to work with).
+Shared files: /home/ceo/workspace/ledger/files/shared (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)
 Read /home/ceo/workspace/ledger/project/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on ledger
@@ -255,7 +257,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove", "")
-	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", `Goal: the "Current goal" line at the top of {project repo}/wiki/backlog/index.md`, "Project repo: {project repo} (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", `Goal: the "Current goal" line at the top of {project repo}/wiki/backlog/index.md`, "Project repo: {project repo} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -389,5 +391,15 @@ func TestTheCEOsInstructionsComeLast(t *testing.T) {
 	}
 	if got := Template(atlas, "tove", "Be brief."); !strings.HasSuffix(got, "\nBe brief.\n") {
 		t.Errorf("the template leaves them out:\n%s", got)
+	}
+}
+
+// A project without files (one made before workspaces) has no lines about
+// them: a path that isn't mounted would send the agent looking for nothing.
+func TestNoFilesNoLines(t *testing.T) {
+	in := input("tove", every)
+	in.Files = ""
+	if got := Compose(in); strings.Contains(got, "Files from the CEO") || strings.Contains(got, "Shared files") {
+		t.Errorf("files lines without files:\n%s", got)
 	}
 }

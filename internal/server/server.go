@@ -41,6 +41,7 @@ type Options struct {
 	Maintenance  Maintenance
 	Terminals    Terminals
 	ChiefOfStaff ChiefOfStaff
+	Desktop      Desktop
 	UI           fs.FS // the built web app, index.html at its root
 }
 
@@ -65,6 +66,7 @@ func New(o Options) http.Handler {
 	configRoutes(mux, o.Config)
 	wikiRoutes(mux, o.Wiki)
 	cosRoutes(mux, o.ChiefOfStaff)
+	desktopRoutes(mux, o.Desktop, o.Agents, o.Config)
 	mux.HandleFunc("GET /api/events", handleEvents(o.Events))
 	mux.HandleFunc("GET /ws/pty/{instance}", handlePTY(o.Terminals))
 	// An endpoint the server doesn't have is an API error, never the web app.

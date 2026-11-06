@@ -12,6 +12,7 @@ import {
   type Draft,
   type ForemanClient,
   type Instance,
+  type OpenTarget,
   type Preferences,
   type Proposal,
   type Request,
@@ -34,6 +35,7 @@ import { applyAccent, applyTheme, asAccent, asTheme } from "./theme";
 
 export const keys = {
   home: ["home"],
+  desktop: ["desktop"],
   projects: ["projects"],
   teams: ["teams"],
   settings: ["settings"],
@@ -54,6 +56,29 @@ export const keys = {
 export function useHomeFolder() {
   const c = useClient();
   return useQuery({ queryKey: keys.home, queryFn: () => c.home.folder() });
+}
+
+/** Whether Foreman's machine can open folders on its desktop: fixed while it
+ * runs, so asked once. */
+export function useCanOpen() {
+  const c = useClient();
+  return (
+    useQuery({
+      queryKey: keys.desktop,
+      queryFn: () => c.desktop.canOpen(),
+      staleTime: Number.POSITIVE_INFINITY,
+    }).data?.canOpen ?? false
+  );
+}
+
+/** Opens a folder on the desktop. A failure shows as a toast. */
+export function useOpenFolder() {
+  const c = useClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (target: OpenTarget) => c.desktop.open(target),
+    onError: (e: Error) => toast({ title: "Not opened", body: e.message, color: "var(--err)" }),
+  });
 }
 
 /** A repo folder's branches, while one is picked to add (or to change its main). */

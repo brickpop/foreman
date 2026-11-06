@@ -31,6 +31,8 @@ Knowledge base: {project repo}/wiki ({wiki access})
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
 {teammates and the wiki}
 {reviews in the wiki}
+Files from the CEO: {files}/inbox (read only, by design: what the CEO gives the team to work with).
+Shared files: {files}/shared (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)
 Read {project repo}/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on {project}
@@ -139,6 +141,7 @@ Why this way: nothing is written into the project's repos (an `AGENTS.md` in the
 | tools | all but `handoff`, including `request_merge`, `withdraw_merge` and `reviews` | all but `request_merge`, `withdraw_merge` and `reviews` |
 | `{ceo section}` | "The CEO talks to you. Break requests down and delegate with ask()." (the second sentence only with `ask`), then "Agree the scope with the CEO before building anything it didn't ask for." and "When the CEO must decide, bring a brief that stands alone: the question in plain words, who it affects, the options with their consequences, and your recommendation. Documents are optional depth, never required reading." | "The CEO normally talks to {lead}. If the CEO instructs you directly, do it, and tell {lead} if it's relevant to the team." |
 
+- `{files}` is the project's files folder, `<workspace>/files` ([Sandboxes and git policy → Layout](./sandboxes-and-git.md#layout)), at the same path on the host and in the container: the CEO's files for the team in `inbox/` (read-only), the team's own in `shared/` (the CEO, 2026-11-06). Both lines are left out for a project made before workspaces, which has none.
 - `{sandbox}` is the agent's sandbox, absolute (`<workspace>/agents/<agent>`), at the same path on the host and in its container. The prompt names no project folder: a project has none, its code repos live anywhere ([Project config](../models/project-config.md#the-project-record)).
 - Playbook steps resolve their `who` ([Team definition](../models/team-definition.md#playbook-and-escalation)): `lead` → the lead's name ("Mara"), `members` → "Members", `ceo` → `CEO`, a role name (`qa`) → the name(s) of the member(s) with that role, an agent id → that agent's name. Anything else is shown as written (and flagged on the [Team page](../features/team-page.md)).
 - Gates come from `always_ask_ceo`, checks from `checks` in `project.toml`.

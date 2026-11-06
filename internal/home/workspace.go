@@ -18,6 +18,7 @@ import (
 
 const (
 	agentsDir  = "agents"   // in a workspace: one sandbox per agent
+	filesDir   = "files"    // in a workspace: the files shared with its agents (Project.Files)
 	harnessDir = "harness"  // in the home: each agent's private harness folder, <project>/<agent>
 	legacyHarn = ".harness" // legacy: the harness folder inside a sandbox
 )
@@ -35,6 +36,29 @@ func (h *Home) layout(id, workspace string) (repo, agents, harness string) {
 // Sandbox is an agent's sandbox on the project: its working directory,
 // holding a worktree of each code repo.
 func (p Project) Sandbox(agent string) string { return filepath.Join(p.agents, agent) }
+
+const (
+	FilesInbox  = "inbox"  // the CEO's files for the agents: read-only for them
+	FilesShared = "shared" // the agents' data that outlives a task and a team: every agent writes it
+)
+
+// FileFolders are the folders of a project's files
+// (wiki/product/models/project-config.md#the-workspace).
+var FileFolders = []string{FilesInbox, FilesShared}
+
+// MakeFiles makes the project's file folders that are missing; none for a
+// legacy project.
+func (p Project) MakeFiles() error {
+	if p.Files == "" {
+		return nil
+	}
+	for _, f := range FileFolders {
+		if err := os.MkdirAll(filepath.Join(p.Files, f), 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // WorktreeAgent is the agent whose sandbox holds a worktree (its folder is
 // <sandbox>/<repo>), sandbox giving an agent's sandbox; "" when it is no

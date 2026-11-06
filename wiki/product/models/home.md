@@ -80,6 +80,9 @@ A project's workspace, in the projects folder ([Global settings](./global-settin
    │  ├─ project.toml      project config
    │  ├─ AGENTS.md
    │  └─ wiki/             knowledge base (wiki.toml, index.md, backlog/, product/, adr/, inbox/)
+   ├─ files/               shared with the agents, whatever the team
+   │  ├─ inbox/            the CEO's files for them (read-only for them)
+   │  └─ shared/           their data that outlives a task and a team
    └─ agents/
       └─ mara/             mara's sandbox
          └─ ledger-api/    a git worktree of each code repo, on the agent's branch

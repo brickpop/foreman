@@ -162,6 +162,12 @@ export interface Project {
    * home until migrated (legacy).
    */
   workspace: string;
+  /**
+   * Files is its folder of files for the agents, <workspace>/files: the
+   * CEO's in inbox/, the agents' own in shared/ (FileFolders). "" for a
+   * legacy project, which has none.
+   */
+  files: string;
   profile: string; // the profile its agents run on: its own, else the default
   archived: boolean; // put away: out of the sidebar's projects and the Dashboard, not deployable
   config: ProjectConfig;
@@ -219,6 +225,8 @@ export interface Change {
 //////////
 // source: workspace.go
 
+export const FilesInbox = "inbox"; // the CEO's files for the agents: read-only for them
+export const FilesShared = "shared"; // the agents' data that outlives a task and a team: every agent writes it
 /**
  * Suggestion is a new project's workspace as New project pre-fills it:
  * <projects folder>/<name>.

@@ -3,13 +3,16 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Instance, type Team, useClient } from "../../api/client";
+import { FilesInbox, FilesShared } from "../../api/types/home";
 import { agentOf, harnessLabel, plural, slotsTaken } from "../../app/model";
 import { latestStopped } from "../../app/project";
 import {
   keys,
+  useCanOpen,
   useDraft,
   useHarnesses,
   useInstances,
+  useOpenFolder,
   useProjectName,
   useRepos,
   useRequests,
@@ -38,7 +41,7 @@ import {
 import { setUnsentLine, useUnsentLine } from "../../app/unsentLines";
 import { BranchMenu } from "../../components/BranchMenu";
 import { DeployDialog } from "../../components/DeployDialog";
-import { FolderIcon, PlayIcon, PromptIcon } from "../../components/icons";
+import { FolderIcon, OpenIcon, PlayIcon, PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
@@ -135,6 +138,7 @@ export function Session() {
         {instance && <span className="text-tx4">·</span>}
         {instance && <AgentBranch key={instance.id} shown={instance} />}
         {d.needsYou && <Dot title="Needs you" />}
+        <ProjectFiles />
       </div>
       {instance && (
         <AgentTabs
@@ -191,9 +195,12 @@ function NoTeam({ project }: { project: string }) {
 
 /** The branch of the agent shown, in the header after its team: a menu of
  * the repos that have it; then the copy of the agent's folder on Foreman's
- * machine (its worktrees, one per repo), there once its first start made it. */
+ * machine (its worktrees, one per repo), there once its first start made it.
+ * Where Foreman's machine has a desktop, an Open beside the copy opens it there. */
 function AgentBranch({ shown }: { shown: Instance }) {
   const repos = useRepos(shown.id.split("@")[1]);
+  const canOpen = useCanOpen();
+  const open = useOpenFolder();
   const branches = branchesOf(repos.data ?? [], shown.agentId);
   const branch = branches.join(", ");
   // A worktree is made when its agent starts: one not seen yet is looked for
@@ -219,6 +226,17 @@ function AgentBranch({ shown }: { shown: Instance }) {
         label={`Copy the agent's folder: ${shown.sandboxPath}`}
         icon={<FolderIcon open={false} />}
       />
+      {canOpen && (
+        <button
+          type="button"
+          onClick={() => open.mutate({ instance: shown.id })}
+          aria-label={`Open the agent's folder: ${shown.sandboxPath}`}
+          title={`Open the agent's folder: ${shown.sandboxPath}`}
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-tx3 hover:bg-hover hover:text-tx"
+        >
+          <OpenIcon />
+        </button>
+      )}
     </span>
   ) : null;
 }
@@ -636,5 +654,36 @@ function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+/** The project's files, opened on the desktop: the CEO's inbox for the agents,
+ * and the files the agents share. Only where Foreman's machine can open
+ * folders, and for a project that has them (one made before workspaces
+ * hasn't). */
+function ProjectFiles() {
+  const project = useProject();
+  const canOpen = useCanOpen();
+  const open = useOpenFolder();
+  if (!canOpen || !project.files) return null;
+  const folders = [
+    [FilesInbox, "File inbox"],
+    [FilesShared, "Shared files"],
+  ] as const;
+  return (
+    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+      {folders.map(([folder, label]) => (
+        <button
+          key={folder}
+          type="button"
+          onClick={() => open.mutate({ project: project.id, folder })}
+          title={`Open on the desktop: ${project.files}/${folder}`}
+          className="inline-flex items-center gap-1 rounded-md border border-line2 px-2 py-0.5 text-[12px] text-tx3 hover:bg-hover hover:text-tx"
+        >
+          {label}
+          <OpenIcon size="size-3" />
+        </button>
+      ))}
+    </span>
   );
 }

@@ -1561,8 +1561,9 @@ func (s *specs) last() runner.Spec {
 
 // An agent gets its sandbox, each repo's .git read-only at its real path
 // (which its worktree's link names, a symlinked repo folder included), and
-// the project repo in its sandbox: writable for the lead only, its .git
-// read-only for all, and its private harness folder. Nothing else of the
+// the project repo at its real path: writable for the lead only, its .git
+// read-only for all; the project's files (the inbox read-only, shared
+// writable, both made); and its private harness folder. Nothing else of the
 // machine, nor of the home.
 func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
@@ -1588,16 +1589,25 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	project := filepath.Join(f.root, "workspace", "ledger", "project")
 	mara := f.hm.Sandbox("ledger", "mara")
 	harnessDir := f.hm.Path("harness", "ledger", "mara")
+	inbox := filepath.Join(f.root, "workspace", "ledger", "files", "inbox")
+	shared := filepath.Join(f.root, "workspace", "ledger", "files", "shared")
 	want := []runner.Mount{
 		{Source: mara, Target: mara},
 		{Source: filepath.Join(realAPI, ".git"), Target: filepath.Join(realAPI, ".git"), ReadOnly: true},
 		// At its real path, as everything else: no mount point in the sandbox.
 		{Source: project, Target: project},
 		{Source: filepath.Join(project, ".git"), Target: filepath.Join(project, ".git"), ReadOnly: true},
+		{Source: inbox, Target: inbox, ReadOnly: true},
+		{Source: shared, Target: shared},
 		{Source: harnessDir, Target: harnessDir},
 	}
 	if got := rec.last(); !slices.Equal(got.Mounts, want) || got.Labels[HomeLabel] != f.hm.Root() {
 		t.Errorf("the lead's mounts:\n%+v\nwant\n%+v\nlabels %v", got.Mounts, want, got.Labels)
+	}
+	for _, dir := range []string{inbox, shared} {
+		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+			t.Errorf("%s isn't made before its mount: %v", dir, err)
+		}
 	}
 	if _, err := os.Stat(filepath.Join(mara, "project")); !os.IsNotExist(err) {
 		t.Errorf("a project/ folder in the sandbox: %v", err)

@@ -166,3 +166,44 @@ func TestAFailedMigrationPutsEverythingBack(t *testing.T) {
 		t.Errorf("the record moved: %+v", p)
 	}
 }
+
+// A project's files are in its workspace, never in Foreman's home, and
+// MakeFiles makes their two folders, keeping what is in them; a legacy
+// project has none, and making them is a no-op.
+func TestProjectFiles(t *testing.T) {
+	h := loaded(t, nil)
+	p, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(workspace("ledger"), "files"); p.Files != want {
+		t.Fatalf("files %q, want %q", p.Files, want)
+	}
+	if err := p.MakeFiles(); err != nil {
+		t.Fatal(err)
+	}
+	kept := filepath.Join(p.Files, FilesInbox, "brief.pdf")
+	writeFile(t, kept, "%PDF\n")
+	if err := p.MakeFiles(); err != nil { // again: nothing lost
+		t.Fatal(err)
+	}
+	for _, f := range FileFolders {
+		if fi, err := os.Stat(filepath.Join(p.Files, f)); err != nil || !fi.IsDir() {
+			t.Errorf("%s: %v", f, err)
+		}
+	}
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("the inbox lost its file: %v", err)
+	}
+
+	legacy := legacyProject(t, h, "old")
+	if legacy.Files != "" {
+		t.Errorf("legacy files %q, want none", legacy.Files)
+	}
+	if err := legacy.MakeFiles(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(h.Path("files")); !os.IsNotExist(err) {
+		t.Errorf("a legacy project made files in the home: %v", err)
+	}
+}

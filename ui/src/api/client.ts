@@ -7,6 +7,8 @@ import type { Commit, TreeEntry } from "./types/git";
 import type { Endpoint, EndpointChange, Status as HarnessStatus } from "./types/harness";
 import type {
   Branches,
+  FilesInbox,
+  FilesShared,
   Folder,
   FolderEntry,
   Missing,
@@ -365,6 +367,20 @@ export interface ReposArea {
   log(project: string, repo: string, ref: string, skip?: number, all?: boolean): Promise<LogPage>;
 }
 
+/** A folder to open on the desktop: an agent's (its worktrees), or one of a
+ * project's file folders. The server works out its path: the page never
+ * names one. */
+export type OpenTarget =
+  | { instance: string }
+  | { project: string; folder: typeof FilesInbox | typeof FilesShared };
+
+/** Opening folders on the desktop of Foreman's machine, which is the CEO's. */
+export interface DesktopArea {
+  /** Whether this machine can open folders: without, no Open button shows. */
+  canOpen(): Promise<{ canOpen: boolean }>;
+  open(target: OpenTarget): Promise<void>;
+}
+
 export interface ForemanClient {
   home: HomeArea;
   agents: AgentsArea;
@@ -381,6 +397,7 @@ export interface ForemanClient {
   repos: ReposArea;
   wiki: WikiArea;
   chiefOfStaff: ChiefOfStaffArea;
+  desktop: DesktopArea;
   events: EventsArea;
 }
 
@@ -635,6 +652,10 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         await fetch(`${origin}/api/cos`, { method: "DELETE", keepalive: true });
       },
       create: async (id) => (await request("POST", "/api/cos/proposal", { id })).json(),
+    },
+    desktop: {
+      canOpen: () => getJSON("/api/desktop"),
+      open: (target) => send("POST", "/api/desktop/open", target),
     },
     events: {
       subscribe: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),

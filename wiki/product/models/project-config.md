@@ -26,7 +26,7 @@ The repos are checked when Foreman loads, on every reload and before each start,
 
 ## The workspace
 
-A project's **workspace** is a folder of the CEO's holding the project's own files: its project repo (`project/`, always there) and its agents' sandboxes (`agents/<agent>/`, a worktree of each code repo), so the CEO can find them, look at an agent's work and run its code (the CEO, 2026-10-28). Foreman's home keeps only Foreman's own data: each agent's harness folder (its config and conversations) is `~/.foreman/harness/<project>/<agent>/`, readable by the CEO only.
+A project's **workspace** is a folder of the CEO's holding the project's own files: its project repo (`project/`, always there) and its agents' sandboxes (`agents/<agent>/`, a worktree of each code repo), and its **files** for the agents (`files/`: the CEO's in `files/inbox/`, read-only for the agents; the agents' own in `files/shared/`, which every agent writes; the CEO, 2026-11-06; [Sandboxes and git policy → Layout](../architecture/sandboxes-and-git.md#layout)), so the CEO can find them, look at an agent's work and run its code (the CEO, 2026-10-28). Foreman's home keeps only Foreman's own data: each agent's harness folder (its config and conversations) is `~/.foreman/harness/<project>/<agent>/`, readable by the CEO only.
 
 - Chosen at **New project**, pre-filled `<projects folder>/<name>` (the `projects_folder` [setting](./global-settings.md), `~/workspace/foreman` by default) and editable. It and its missing parents are created with the project.
 - Anywhere inside `$HOME`, never inside Foreman's home; not a file; not inside a code repo of any project (its worktrees would show in that repo); not another project's workspace, inside one or around one.

@@ -20,6 +20,7 @@ type Input struct {
 	Project     string          // the project's id
 	Sandbox     string          // the agent's sandbox, at the same path on the host and in its container
 	ProjectRepo string          // the project repo, at the same path on the host and in its container
+	Files       string          // the project's files (inbox/, shared/), at the same path on the host and in its container; "" for none
 	Config      home.ProjectConfig
 	Repos       []home.Repo // the project's code repos, each with its default branch
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
@@ -194,6 +195,9 @@ func Compose(in Input) string {
 	}
 	if !lead && has("contribute") {
 		line("%s", memberReviews)
+	}
+	if in.Files != "" {
+		line("%s", files(in.Files))
 	}
 	line("Read %s/AGENTS.md first: how this project's wiki and tasks work.", in.ProjectRepo)
 	line("")
@@ -523,7 +527,7 @@ func instruction(s home.Soul, merges bool) string {
 // CEO's instructions are already known, so they show as they are.
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
-		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", ProjectRepo: "{project repo}",
+		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", ProjectRepo: "{project repo}", Files: "{files}",
 		Repos:        []home.Repo{{Name: "{repo}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead, true),
@@ -540,4 +544,12 @@ func goal(projectRepo string, lead bool) string {
 		return at + ", which you keep. It changes over time: read it again before planning new work. When it is missing or says none yet, ask the CEO for it in this session before anything else, then write it there. When the CEO changes it, update it there and tell your team."
 	}
 	return at + ", kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on."
+}
+
+// files says where the project's files are: the CEO's for the team, and the
+// team's own, which outlast a task and a team
+// (wiki/product/models/project-config.md#the-workspace).
+func files(dir string) string {
+	return fmt.Sprintf("Files from the CEO: %s/%s (read only, by design: what the CEO gives the team to work with).\n", dir, home.FilesInbox) +
+		fmt.Sprintf("Shared files: %s/%s (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)", dir, home.FilesShared)
 }

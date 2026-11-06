@@ -44,7 +44,7 @@ func open(ui fstest.MapFS) http.Handler {
 
 func TestEveryRouteGoesThroughTheGuard(t *testing.T) {
 	h := New(Options{Guard: closedGuard{}, Home: fakeHome("/home/ceo/.foreman"), UI: builtUI})
-	for _, path := range []string{"/", "/api/home", "/api/instances", "/api/deployments", "/api/projects", "/api/teams/x", "/api/settings", "/api/events", "/ws/pty/x", "/assets/app.js", "/no/such/route"} {
+	for _, path := range []string{"/", "/api/home", "/api/instances", "/api/deployments", "/api/projects", "/api/teams/x", "/api/settings", "/api/desktop", "/api/events", "/ws/pty/x", "/assets/app.js", "/no/such/route"} {
 		if w := get(t, h, path); w.Code != http.StatusTeapot {
 			t.Errorf("%s bypassed the guard: %d", path, w.Code)
 		}

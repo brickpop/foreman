@@ -30,16 +30,20 @@ type Project struct {
 	// Workspace is its folder (the CEO's): the project repo and the agents'
 	// sandboxes. "" for a project made before workspaces, still in Foreman's
 	// home until migrated (legacy).
-	Workspace string        `json:"workspace"`
-	Profile   string        `json:"profile"`  // the profile its agents run on: its own, else the default
-	Archived  bool          `json:"archived"` // put away: out of the sidebar's projects and the Dashboard, not deployable
-	Config    ProjectConfig `json:"config"`
-	Repos     []Repo        `json:"repos"`    // the code repos agents get worktrees of, by name
-	Version   string        `json:"version"`  // of project.toml
-	Problems  []string      `json:"problems"` // what is wrong with project.toml or a repo; Config is then the last good one
-	Source    string        `json:"source"`   // project.toml as it is on disk, shown read-only
-	agents    string        // its agents' sandboxes, one folder each (Sandbox)
-	harness   string        // its agents' harness folders, one each (HarnessDir); "" for legacy
+	Workspace string `json:"workspace"`
+	// Files is its folder of files for the agents, <workspace>/files: the
+	// CEO's in inbox/, the agents' own in shared/ (FileFolders). "" for a
+	// legacy project, which has none.
+	Files    string        `json:"files"`
+	Profile  string        `json:"profile"`  // the profile its agents run on: its own, else the default
+	Archived bool          `json:"archived"` // put away: out of the sidebar's projects and the Dashboard, not deployable
+	Config   ProjectConfig `json:"config"`
+	Repos    []Repo        `json:"repos"`    // the code repos agents get worktrees of, by name
+	Version  string        `json:"version"`  // of project.toml
+	Problems []string      `json:"problems"` // what is wrong with project.toml or a repo; Config is then the last good one
+	Source   string        `json:"source"`   // project.toml as it is on disk, shown read-only
+	agents   string        // its agents' sandboxes, one folder each (Sandbox)
+	harness  string        // its agents' harness folders, one each (HarnessDir); "" for legacy
 }
 
 // Shown is how the project reads: its display name, else its id made readable.
@@ -313,6 +317,9 @@ func (h *Home) scan(prev snapshot) snapshot {
 func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 	p := Project{ID: r.ID, Name: r.Name, Workspace: r.Workspace, Profile: r.Profile, Archived: r.Archived, Repos: []Repo{}}
 	p.Path, p.agents, p.harness = h.layout(r.ID, r.Workspace)
+	if r.Workspace != "" {
+		p.Files = filepath.Join(r.Workspace, filesDir)
+	}
 	if p.Profile == "" {
 		p.Profile = profiles.Default
 	}

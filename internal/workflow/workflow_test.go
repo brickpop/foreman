@@ -320,7 +320,7 @@ func TestCommitTheReposNamedAsTheAgent(t *testing.T) {
 }
 
 // A commit carries its message alone: the attribution a harness adds
-// (Co-Authored-By lines, Claude Code's "Generated with") goes, in any case and
+// (Co-Authored-By lines, Claude Code's or Codex's "Generated with") goes, in any case and
 // wherever it is; a message of nothing else is none.
 func TestCommitDropsAttribution(t *testing.T) {
 	f := newFixture(t)
@@ -343,6 +343,12 @@ func TestCommitDropsAttribution(t *testing.T) {
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v2\n")
 	f.ok("tove", "commit", commits("api", "cal v2\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nGenerated with [Claude Code]\n"))
 	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "cal v2" {
+		t.Errorf("message %q", msg)
+	}
+	// Codex's, after its message.
+	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v2.1\n")
+	f.ok("tove", "commit", commits("api", "cal v2.1\n\nGenerated with [Codex](https://openai.com/codex)\nCo-authored-by: Codex <noreply@openai.com>"))
+	if msg := f.git(f.wt("tove", "api"), "log", "-1", "--format=%B"); msg != "cal v2.1" {
 		t.Errorf("message %q", msg)
 	}
 	writeFile(t, filepath.Join(f.wt("tove", "api"), "cal.go"), "package cal // v3\n")

@@ -30,6 +30,7 @@ import (
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/harness/claudecode"
+	"github.com/brickpop/foreman/internal/harness/codex"
 	"github.com/brickpop/foreman/internal/harness/fake"
 	"github.com/brickpop/foreman/internal/harness/pi"
 	"github.com/brickpop/foreman/internal/home"
@@ -197,6 +198,7 @@ func run(args []string, stdout io.Writer) error {
 	adapters = map[string]harness.Adapter{
 		"claude-code": claude,
 		"pi":          pi.Adapter{GitConfig: homeGitConfig(), HostAlias: hostAlias},
+		"codex":       codex.Adapter{GitConfig: homeGitConfig()},
 	}
 	profileStore := profiles.In(userDir)
 	// Always the real harnesses' logins, even on the fake harness, which has

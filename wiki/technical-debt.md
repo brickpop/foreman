@@ -14,6 +14,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** the scroll ends with an absolute cursor move: with a harness-set scroll region (DECSTBM) or origin mode on, it would land on the wrong line (Claude Code uses neither; Codex sets a region only while inserting history). A cursor in its pending-wrap state (just past the last column) loses that state. With the cursor near the top and text below, only as many lines as sit above it can scroll away; the rest is deleted as before.
 - **Fix:** xterm.js resizing anchored at the bottom whatever the cursor's row (worth proposing upstream), then delete `terminalFit.ts`'s writes and keep the plain fit.
 
+## Codex's question tool behind a feature flag
+
+- **State:** Codex agents start with `--enable default_mode_request_user_input` ([Harness adapters → Codex](./product/architecture/harness-adapters.md#codex)), which gives the model its `request_user_input` tool outside plan mode, so an agent can ask the CEO in a dialog as on Claude Code and Pi.
+- **Why:** without it, Codex 0.167.0 refuses the tool in its default mode ("unsupported call"), and an agent could only ask in its reply and stop, which raises nothing on the Dashboard. Codex lists the feature as under development.
+- **Impact:** a Codex release may rename or drop the feature: an unknown `--enable` could then stop every Codex agent from starting, or the tool could quietly go away again.
+- **Fix:** drop the flag once Codex offers the tool by default; until then, check it when the agent image's Codex is updated (`codex features list`).
+
 ## Signing as the CEO from Foreman's process
 
 - **State:** commits in the CEO's name (Merge's squash, the UI's saves of the wiki and the global repo) are signed whenever the CEO's git config says `commit.gpgsign` ([Pipeline and merges → Merge to a target](./product/features/pipeline-and-merges.md#merge-to-a-target)), by git run from Foreman's process; a signature that fails fails the commit, and nothing moves.

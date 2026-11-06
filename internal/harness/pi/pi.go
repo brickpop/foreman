@@ -178,13 +178,7 @@ func describeTool(name string, input map[string]any, cwd string) string {
 		s, _ := input[key].(string)
 		return s
 	}
-	path := func() string {
-		p := arg("path")
-		if rel, err := filepath.Rel(cwd, p); cwd != "" && err == nil && filepath.IsAbs(p) && !strings.HasPrefix(rel, "..") {
-			return rel
-		}
-		return p
-	}
+	path := func() string { return harness.Relative(arg("path"), cwd) }
 	switch name {
 	case "bash":
 		return "Bash: " + arg("command")
@@ -207,12 +201,8 @@ func describeTool(name string, input map[string]any, cwd string) string {
 	case "":
 		return ""
 	}
-	// MCP tools are mcp__<server>__<tool>; Foreman's are the team tools.
-	if server, tool, ok := strings.Cut(strings.TrimPrefix(name, "mcp__"), "__"); ok && strings.HasPrefix(name, "mcp__") {
-		if server == "foreman" {
-			return "Team tool: " + tool
-		}
-		return server + ": " + tool
+	if line, ok := harness.MCPTool(name); ok {
+		return line
 	}
 	return name
 }

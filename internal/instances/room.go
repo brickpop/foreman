@@ -114,7 +114,7 @@ func (m *Manager) sleep(ctx context.Context, id string, r *run, since time.Time)
 }
 
 // helper reports whether a process (its command line) is one an idle harness
-// keeps: foreman-agent, Claude Code's and Pi's MCP server for the team tools.
+// keeps: foreman-agent, its MCP server for the team tools.
 func (m *Manager) helper(command string) bool {
 	program, _, _ := strings.Cut(command, " ")
 	return m.Agent.Path != "" && filepath.Base(program) == filepath.Base(m.Agent.Path)

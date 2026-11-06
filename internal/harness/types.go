@@ -3,12 +3,12 @@ package harness
 // Status is what the UI knows of a harness (tygo.yaml); its credentials are
 // a profile's (internal/profiles).
 type Status struct {
-	ID      string `json:"id"`      // claude-code, pi, …
+	ID      string `json:"id"`      // claude-code, codex, pi
 	Command string `json:"command"` // what it runs
 	Newline string `json:"newline"` // the keystroke for a new line without sending
 	// Connect is how a profile gets its credentials: "login", the harness's
-	// own login in a terminal (Claude Code); "endpoint", a model server in a
-	// form (Pi).
+	// own login in a terminal (Claude Code, Codex); "endpoint", a model
+	// server in a form (Pi).
 	Connect string `json:"connect"`
 }
 

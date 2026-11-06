@@ -560,14 +560,14 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 }
 
 // withoutAttribution is an agent's commit message without the attribution a
-// harness may add on its own: its Co-Authored-By lines, and Claude Code's
-// "🤖 Generated with [Claude Code](…)". A commit carries its message alone
-// (the CEO, 2026-10-29).
+// harness may add on its own: its Co-Authored-By lines, and the "🤖
+// Generated with [Claude Code](…)" or "Generated with [Codex](…)" line. A
+// commit carries its message alone (the CEO, 2026-10-29).
 func withoutAttribution(message string) string {
 	var kept []string
 	for _, line := range strings.Split(message, "\n") {
 		l := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), "🤖")))
-		if !strings.HasPrefix(l, "co-authored-by:") && !strings.HasPrefix(l, "generated with [claude code]") {
+		if !strings.HasPrefix(l, "co-authored-by:") && !strings.HasPrefix(l, "generated with [claude code]") && !strings.HasPrefix(l, "generated with [codex]") {
 			kept = append(kept, line)
 		}
 	}

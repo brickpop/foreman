@@ -189,36 +189,17 @@ func (Adapter) Interpret(event string, payload []byte) harness.Activity {
 // permission prompt's message.
 func (Adapter) Asks(event string, payload []byte) string {
 	var p struct {
-		ToolName  string `json:"tool_name"`
-		ToolInput struct {
-			Questions []struct {
-				Question string `json:"question"`
-				Options  []struct {
-					Label string `json:"label"`
-				} `json:"options"`
-			} `json:"questions"`
-		} `json:"tool_input"`
-		NotificationType string `json:"notification_type"`
-		Message          string `json:"message"`
+		ToolName         string          `json:"tool_name"`
+		ToolInput        json.RawMessage `json:"tool_input"`
+		NotificationType string          `json:"notification_type"`
+		Message          string          `json:"message"`
 	}
 	if json.Unmarshal(payload, &p) != nil {
 		return ""
 	}
 	switch {
 	case event == "PreToolUse" && p.ToolName == "AskUserQuestion":
-		var asks []string
-		for _, q := range p.ToolInput.Questions {
-			var labels []string
-			for _, o := range q.Options {
-				labels = append(labels, o.Label)
-			}
-			if len(labels) > 0 {
-				asks = append(asks, fmt.Sprintf("%s (%s)", q.Question, strings.Join(labels, " / ")))
-			} else {
-				asks = append(asks, q.Question)
-			}
-		}
-		return strings.Join(asks, " · ")
+		return harness.Questions(p.ToolInput)
 	case event == "Notification" && p.NotificationType == "permission_prompt":
 		return p.Message
 	}
@@ -261,13 +242,7 @@ func describeTool(name string, input map[string]any, cwd string) string {
 		s, _ := input[key].(string)
 		return s
 	}
-	path := func(key string) string {
-		p := arg(key)
-		if rel, err := filepath.Rel(cwd, p); cwd != "" && err == nil && filepath.IsAbs(p) && !strings.HasPrefix(rel, "..") {
-			return rel
-		}
-		return p
-	}
+	path := func(key string) string { return harness.Relative(arg(key), cwd) }
 	switch name {
 	case "Bash":
 		return "Bash: " + arg("command")
@@ -296,12 +271,8 @@ func describeTool(name string, input map[string]any, cwd string) string {
 	case "":
 		return ""
 	}
-	// MCP tools are mcp__<server>__<tool>; Foreman's are the team tools.
-	if server, tool, ok := strings.Cut(strings.TrimPrefix(name, "mcp__"), "__"); ok && strings.HasPrefix(name, "mcp__") {
-		if server == "foreman" {
-			return "Team tool: " + tool
-		}
-		return server + ": " + tool
+	if line, ok := harness.MCPTool(name); ok {
+		return line
 	}
 	return name
 }

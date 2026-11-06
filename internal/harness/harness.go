@@ -71,11 +71,13 @@ type Launch struct {
 	Files   []File
 }
 
-// File is written on the host before the process starts.
+// File is written on the host before the process starts: Data, or a
+// symbolic link to Link when set (what replaces a file there either way).
 type File struct {
 	Path string
 	Data []byte
 	Mode os.FileMode
+	Link string
 }
 
 // ErrNotConnected means the harness has no login yet: Settings → Agents → Profiles → Connect.
@@ -111,6 +113,15 @@ func WriteFiles(files []File) error {
 	for _, f := range files {
 		if err := os.MkdirAll(filepath.Dir(f.Path), 0o700); err != nil {
 			return err
+		}
+		if f.Link != "" {
+			if err := os.Remove(f.Path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+			if err := os.Symlink(f.Link, f.Path); err != nil {
+				return err
+			}
+			continue
 		}
 		if err := os.WriteFile(f.Path, f.Data, f.Mode); err != nil {
 			return err

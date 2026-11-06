@@ -11,7 +11,7 @@ import { Button } from "./ui";
 
 // A profile's credentials (wiki/product/features/settings.md#profiles), from
 // Settings, the setup checklist and the Deploy dialog: the harness's own login
-// in a terminal (Claude Code), or a model server in a form (Pi). Mount it
+// in a terminal (Claude Code, Codex), or a model server in a form (Pi). Mount it
 // only while open: for a login, opening starts it and closing ends it,
 // logged in or not.
 
@@ -54,8 +54,9 @@ function LoginConnect({ profile, onClose }: { profile: string; onClose: () => vo
       <div className="flex flex-col gap-3">
         <p className="m-0 text-[13.5px] text-tx3">
           {label}’s own login, in its container. For Claude Code, type{" "}
-          <span className="font-mono text-tx2">/login</span> and follow it. Every project on the{" "}
-          <span className="font-mono text-tx2">{profile}</span> profile uses it.
+          <span className="font-mono text-tx2">/login</span> and follow it; Codex shows its steps
+          below. Every project on the <span className="font-mono text-tx2">{profile}</span> profile
+          uses it.
         </p>
         <div className="h-[380px] overflow-hidden rounded-[10px] border border-line bg-term">
           {login.data && <Terminal instance={login.data} />}

@@ -35,7 +35,7 @@ The seams known today (every new component adds its own):
 |---|---|---|
 | Execution engine: where a harness process runs | `runner` | Podman (production), Direct (tests, dev, or an explicit no-isolation setting); tmux possible later ([Building blocks](./building-blocks.md#1-execution-engine-runner), [Session runner](./session-runner.md)) |
 | Session driver: how Foreman talks to a harness | `harness` | PTY (v1); Agent Client Protocol later ([Harness adapters](./harness-adapters.md#session-drivers)) |
-| Harness adapter: per-harness details | `harness` | Claude Code, Pi, Hermes Agent, custom; Codex later; the fake harness in tests |
+| Harness adapter: per-harness details | `harness` | Claude Code, Pi, Codex; Hermes Agent and custom later; the fake harness in tests |
 | Session log: each session's raw history | `sessionlog` | files under `~/.foreman/logs/`; an in-memory log in tests |
 | Screen: server-side terminal state | `terminal` (consumer) | `charmbracelet/x/vt`; a fake in the Terminal's tests ([Terminal state](./terminal-state.md)) |
 | Terminal: one live process, its buffer and viewers | `terminal` | the Terminal block; a fake in the server's tests ([Building blocks](./building-blocks.md#2-terminal-terminal)) |

@@ -184,7 +184,7 @@ function ProfilesSection() {
     <Section
       label="Profiles"
       kept={onThisMachine}
-      intro="Each profile is a harness and its credentials, yours on this machine: Claude Code's login, or the model server Pi runs on. Every project can use it; a project uses default unless its settings pick another."
+      intro="Each profile is a harness and its credentials, yours on this machine: Claude Code's or Codex's login, or the model server Pi runs on. Every project can use it; a project uses default unless its settings pick another."
     >
       {profiles.isError && <p className="m-0 text-[13px] text-err">{profiles.error.message}</p>}
       {(profiles.data ?? []).map((p) => (

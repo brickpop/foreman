@@ -3,7 +3,7 @@
 # A basic Debian box (adapted from pclaude's Dockerfile, github.com/brickpop/pclaude):
 # Node, Bun, Go, just, the wiki CLI and common shell tools; anything more specialised
 # comes from a workspace or project override later. The harnesses (Claude Code,
-# Pi) are installed last, so updating them reuses every layer above.
+# Pi, Codex) are installed last, so updating them reuses every layer above.
 # foreman-agent joins with the agent link.
 
 FROM docker.io/library/node:26-slim
@@ -56,7 +56,7 @@ USER node
 RUN curl -fsSL https://bun.sh/install | bash
 
 # Last, because it moves fastest: a version bump reuses every layer above.
-# Installed with npm because that is how Claude Code and Pi are distributed; this runs
+# Installed with npm because that is how Claude Code, Pi and Codex are distributed; this runs
 # inside the agent image only (the Bun-only rule is about Foreman's own UI build).
 ARG CLAUDE_CODE_VERSION=latest
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
@@ -68,7 +68,12 @@ ARG PI_VERSION=latest
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_VERSION} \
   && npm cache clean --force
 
-RUN node --version && bun --version && go version && claude --version && pi --version && wiki --version
+# Codex CLI, the third harness (internal/harness/codex).
+ARG CODEX_VERSION=latest
+RUN npm install -g @openai/codex@${CODEX_VERSION} \
+  && npm cache clean --force
+
+RUN node --version && bun --version && go version && claude --version && pi --version && codex --version && wiki --version
 
 # The command is exactly what Foreman passes, and defaults to Claude.
 ENTRYPOINT []

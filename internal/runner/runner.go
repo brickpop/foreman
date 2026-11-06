@@ -36,7 +36,7 @@ type Process interface {
 	// besides its main process, and in a container the init above it (not the
 	// zombies): the helpers it keeps, and anything it started and left running,
 	// orphans included. An idle agent sleeps only when
-	// nothing but its helpers is left (wiki/product/architecture/agent-runtime.md#idle-agents-sleep).
+	// nothing but its helpers is left (wiki/product/architecture/agent-runtime.md#idle-agents-make-room).
 	Processes(ctx context.Context) ([]string, error)
 }
 

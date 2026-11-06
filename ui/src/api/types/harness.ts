@@ -8,13 +8,13 @@
  * a profile's (internal/profiles).
  */
 export interface Status {
-  id: string; // claude-code, pi, …
+  id: string; // claude-code, codex, pi
   command: string; // what it runs
   newline: string; // the keystroke for a new line without sending
   /**
    * Connect is how a profile gets its credentials: "login", the harness's
-   * own login in a terminal (Claude Code); "endpoint", a model server in a
-   * form (Pi).
+   * own login in a terminal (Claude Code, Codex); "endpoint", a model
+   * server in a form (Pi).
    */
   connect: string;
 }

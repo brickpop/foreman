@@ -21,6 +21,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** a Codex release may rename or drop the feature: an unknown `--enable` could then stop every Codex agent from starting, or the tool could quietly go away again.
 - **Fix:** drop the flag once Codex offers the tool by default; until then, check it when the agent image's Codex is updated (`codex features list`).
 
+## Codex's ready opener
+
+- **State:** every Codex session that starts without an opener gets a short one asking it to reply "Ready." ([Harness adapters → Codex](./product/architecture/harness-adapters.md#codex)).
+- **Why:** Codex fires no hook before a turn begins (`SessionStart` runs inside the first turn), so a session started with nothing to do never says it is at its prompt: Foreman kept it `running` and its messages never went (the CEO, 2026-11-07).
+- **Impact:** one extra model turn per start (a deploy, a wake, a restart), with the resumed conversation as its context; the activity line shows `Working on “Foreman started this session…”` meanwhile. A model that ignores "don't start on anything" may pick its work back up before its messages come.
+- **Fix:** drop the opener once Codex reports a session at its prompt without a turn (a `SessionStart` at launch, or another event); check when the agent image's Codex is updated.
+
 ## Signing as the CEO from Foreman's process
 
 - **State:** commits in the CEO's name (Merge's squash, the UI's saves of the wiki and the global repo) are signed whenever the CEO's git config says `commit.gpgsign` ([Pipeline and merges → Merge to a target](./product/features/pipeline-and-merges.md#merge-to-a-target)), by git run from Foreman's process; a signature that fails fails the commit, and nothing moves.

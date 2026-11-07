@@ -67,7 +67,8 @@ func TestLaunch(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := ConfigDir(s.Dir)
-	if !reflect.DeepEqual(l.Command, base) {
+	// No opener given: the ready one, so the session says it is at its prompt.
+	if !reflect.DeepEqual(l.Command, append(slices.Clone(base), "--", readyOpener)) {
 		t.Errorf("command %v", l.Command)
 	}
 	if !reflect.DeepEqual(l.Env, []string{"CODEX_HOME=" + dir}) {
@@ -150,7 +151,8 @@ func TestLaunchContinuesAndOpens(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(l.Command, append(slices.Clone(base), "resume", "--last")) {
+	// Its opener was for the fresh start: continuing, it gets the ready one.
+	if !reflect.DeepEqual(l.Command, append(slices.Clone(base), "resume", "--last", "--", readyOpener)) {
 		t.Errorf("continuing: %v", l.Command)
 	}
 	s.OpenerOnContinue = true
@@ -250,7 +252,7 @@ func TestInterpret(t *testing.T) {
 		event, payload string
 		want           harness.Activity
 	}{
-		{"SessionStart", `{"source":"startup"}`, harness.Idle},
+		{"SessionStart", `{"source":"startup"}`, harness.Busy}, // inside the first turn, never at launch
 		{"UserPromptSubmit", `{"prompt":"go"}`, harness.Busy},
 		{"PreToolUse", bash, harness.Busy},
 		{"PreToolUse", question, harness.Waiting},

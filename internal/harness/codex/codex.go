@@ -107,9 +107,14 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 	if continuing {
 		args = append(args, "resume", "--last")
 	}
-	if s.Opener != "" && (!continuing || s.OpenerOnContinue) {
-		args = append(args, "--", s.Opener) // an opener may start with "-"
+	opener := s.Opener
+	if continuing && !s.OpenerOnContinue {
+		opener = ""
 	}
+	if opener == "" {
+		opener = readyOpener
+	}
+	args = append(args, "--", opener) // an opener may start with "-"
 	return harness.Launch{
 		Command: args,
 		Env:     append([]string{"CODEX_HOME=" + dir}, s.Link.Env...),
@@ -119,6 +124,13 @@ func (a Adapter) Launch(s harness.Session) (harness.Launch, error) {
 		Files:  files,
 	}, nil
 }
+
+// readyOpener is the opener of a session that has none (every team agent's start: a deploy, a
+// wake, a restart). Codex fires no hook until a turn begins (SessionStart runs inside the first
+// turn, not at launch), so a session started with nothing to do would never say it is at its
+// prompt, and its messages would wait for a turn nobody starts (the CEO, 2026-11-07). This short
+// turn ends in a Stop: idle, and the messages follow.
+const readyOpener = "Foreman started this session. Don't start on anything yet: reply only \"Ready.\" Your messages come next."
 
 // hookEvents are the Codex hooks Foreman follows (Interrupt: the CEO's Esc,
 // which ends a turn without a Stop).
@@ -142,15 +154,18 @@ const questionTool = "request_user_input"
 
 // Interpret reads a hook event: a question to the user is its question
 // tool; a finished turn is Stop, or Interrupt when the CEO stopped it.
+// SessionStart is busy, not idle as on Claude Code: Codex runs it at the
+// start of the session's first turn, so idle there would deliver messages
+// into that turn.
 func (Adapter) Interpret(event string, payload []byte) harness.Activity {
 	var p struct {
 		ToolName string `json:"tool_name"`
 	}
 	_ = json.Unmarshal(payload, &p)
 	switch event {
-	case "SessionStart", "Stop", "Interrupt":
+	case "Stop", "Interrupt":
 		return harness.Idle
-	case "UserPromptSubmit", "PostToolUse":
+	case "SessionStart", "UserPromptSubmit", "PostToolUse":
 		return harness.Busy
 	case "PreToolUse":
 		if p.ToolName == questionTool {

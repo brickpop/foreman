@@ -23,5 +23,6 @@ epic: install-first-run
 - [x] Codex in the agent image (after Pi), the adapter in `main.go`; `commit` drops Codex's `Generated with` line
 - [x] the Connect dialog's and Profiles' texts
 - [x] tests: the launch (home, prompt, config, link, mounts, flags, continue and opener), the shared login through the link, the login, the hooks read, the attribution
+- [x] **found in the CEO's check (2026-11-07): woken agents never got their messages.** Codex's `SessionStart` runs inside the first turn, not at launch, so a start with no opener stayed `running`. Every start now has an opener (the ready one when none is given, [Technical debt](../technical-debt.md#codexs-ready-opener)), and `SessionStart` reads as running
 - [ ] **the CEO's check:** a Codex profile connected (the pasted callback), a deploy, the team tools called, the activity lines and a question, a restart that continues, two agents on one login across a token refresh
 - [ ] a real-Codex integration test like `just test-claude`

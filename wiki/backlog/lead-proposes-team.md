@@ -3,7 +3,7 @@ type: task
 status: todo
 priority: medium
 tags: [feature]
-epic: chief-of-staff
+epic: director
 ---
 
 # The lead proposes changes to its own team

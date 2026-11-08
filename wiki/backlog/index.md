@@ -8,7 +8,7 @@ The epics, in order:
 2. [Messaging and hand-offs](./epics/messaging-handoffs.md) and, alongside it, [Install and first run](./epics/install-first-run.md)
 3. [Git](./epics/git.md) and, beside it, [Projects anywhere](./epics/projects-anywhere.md) (done; the CEO, 2026-10-20: before the first Foundry projects)
 4. [Workflow with the CEO](./epics/workflow.md)
-5. [Chief of Staff](./epics/chief-of-staff.md): its first card, [Create a team, hire, refine](./cos-create-team.md), is pulled ahead (the CEO, 2026-10-18)
+5. [Director](./epics/director.md) (was Chief of Staff; the CEO, 2026-11-05): the agent above the teams. Its first card, [Create a team, hire, refine](./cos-create-team.md), was pulled ahead (2026-10-18); [Sleep after a quiet spell](./sleep-when-quiet.md) can go any time
 
 Cards live in this folder (one `type: task` file each, naming its epic in its `epic:` field); retired ones in `archive/`. This page doesn't list them: browse the **Epics** and **Backlog** boards, or query them:
 

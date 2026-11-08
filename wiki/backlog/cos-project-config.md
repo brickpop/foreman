@@ -3,7 +3,7 @@ type: task
 status: backlog
 priority: low
 tags: [feature, decision]
-epic: chief-of-staff
+epic: director
 ---
 
 # Project config with the Chief of Staff

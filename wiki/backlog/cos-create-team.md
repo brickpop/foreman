@@ -3,7 +3,7 @@ type: task
 status: in-progress
 priority: high
 tags: [feature]
-epic: chief-of-staff
+epic: director
 ---
 
 # Chief of Staff: create a team, hire, refine

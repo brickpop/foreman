@@ -3,7 +3,7 @@ type: task
 status: backlog
 priority: medium
 tags: [decision]
-epic: chief-of-staff
+epic: director
 ---
 
 # Starter teams

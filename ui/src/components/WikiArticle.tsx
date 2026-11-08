@@ -1,6 +1,6 @@
 import { type Entry, useClient } from "../api/client";
 import { withoutTitle } from "../app/frontmatter";
-import { Frontmatter } from "./Frontmatter";
+import { Frontmatter, FrontmatterError } from "./Frontmatter";
 import { Markdown } from "./Markdown";
 
 // One wiki entry (wiki/product/features/wiki-reader.md#article): its
@@ -27,6 +27,7 @@ export function WikiArticle({
   return (
     <article className="flex flex-col gap-3.5">
       <Frontmatter fields={fields} onOpen={onOpen} />
+      {entry.frontmatterError && <FrontmatterError error={entry.frontmatterError} />}
       <div className={`wiki ${size === "sheet" ? "sheet" : ""}`}>
         {title && <h1>{title}</h1>}
         <Markdown

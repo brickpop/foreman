@@ -12,7 +12,7 @@ epic: terminal-multiplexer
 
 **Done when:** Foreman imports what it copied today, and `internal/wiki/copied.go` and `ui/src/app/callout.ts` are gone; the technical-debt entry is removed.
 
-- [ ] the engine (`github.com/agentic-wiki/wiki`) exports its heading-id rule; Foreman drops its copy and the cross-check test
+- [x] the engine (`github.com/agentic-wiki/wiki`) exports its heading-id rule; Foreman drops its copy and the cross-check test (wiki v0.16.1, `Heading.ID`)
 - [ ] wikiview exports the view builders (entry, tree; the boards when Foreman has them) as a public Go package, and its renderer and callout plugin as a package the UI can install
 - [ ] wikiview gets a LICENSE
 - [ ] Foreman imports them, at pinned versions

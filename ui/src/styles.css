@@ -29,7 +29,7 @@
   --err: light-dark(#cf222e, #f47067);
   /* Attention, whatever the accent: what needs the CEO, waits, or warns. */
   --attn: light-dark(#bf8700, #c69026);
-  --attnTx: light-dark(#9a6700, #daaa3f);
+  --attnTx: light-dark(#845300, #e8bd5c);
   --attnInk: light-dark(#1f2328, #22272e);
   --attnSoft: color-mix(in srgb, var(--attnTx) 14%, transparent);
   --attnLine: color-mix(in srgb, var(--attnTx) 40%, transparent);

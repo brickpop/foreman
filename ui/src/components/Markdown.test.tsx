@@ -58,6 +58,22 @@ describe("Markdown", () => {
     expect(out).toContain('<h2 id="goals-1">Goals</h2>');
   });
 
+  // The library gives a heading with no letter or digit the id "": it has no
+  // anchor, so it takes no id rather than an empty one.
+  it("leaves out an empty id", () => {
+    const out = html(
+      entry("## ???\n\n## Goals\n", {
+        headings: [
+          { id: "", bodyLine: 1 },
+          { id: "goals", bodyLine: 3 },
+        ],
+      }),
+    );
+    expect(out).toContain("<h2>???</h2>");
+    expect(out).not.toContain('id=""');
+    expect(out).toContain('<h2 id="goals">Goals</h2>');
+  });
+
   it("ticks checkboxes from the entry's table, not from the Markdown", () => {
     const out = html(
       entry("- [ ] first\n- [x] second\n- plain\n", {

@@ -28,6 +28,15 @@ function luminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+/** color-mix(in srgb, top share, under): `top` laid over `under` at `share`. */
+function mix(top: string, under: string, share: number): string {
+  const channel = (hex: string, i: number) => Number.parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5]
+    .map((i) => Math.round(channel(top, i) * share + channel(under, i) * (1 - share)))
+    .map((c) => c.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
 function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
@@ -57,6 +66,22 @@ describe("the palettes", () => {
         expect(contrast(root[name][i], root.head[i]), `${name} on head`).toBeGreaterThanOrEqual(
           4.5,
         );
+      }
+    });
+
+    // The amber notice (DeployDialog, the wiki's unreadable-header notices) is
+    // --attnTx text inside --attnSoft, a tint of itself, wherever it sits.
+    it(`keeps ${theme}'s amber notice readable in its tint`, () => {
+      const share = Number(
+        css.match(/--attnSoft: color-mix\(in srgb, var\(--attnTx\) (\d+)%/)?.[1],
+      );
+      expect(share).toBeGreaterThan(0);
+      for (const surface of ["bg", "side", "panel", "raised"]) {
+        const tint = mix(root.attnTx[i], root[surface][i], share / 100);
+        expect(
+          contrast(root.attnTx[i], tint),
+          `attnTx in its tint on ${surface}`,
+        ).toBeGreaterThanOrEqual(4.5);
       }
     });
 

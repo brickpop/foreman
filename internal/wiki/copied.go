@@ -1,12 +1,11 @@
 package wiki
 
-// Copied from wikiview v0.13.0 (internal/slug, internal/server/entry.go),
-// whose Go code is internal and can't be imported, and from the engine, which
-// keeps these rules unexported. They go when wikiview and the engine export
-// them (wiki/technical-debt.md).
+// Copied from wikiview v0.13.0 (internal/server/entry.go), whose Go code is
+// internal and can't be imported, and from the engine, which keeps its
+// frontmatter-reference rule unexported. They go when wikiview and the engine
+// export them (wiki/technical-debt.md).
 
 import (
-	"fmt"
 	"path"
 	"strings"
 	"unicode"
@@ -14,42 +13,6 @@ import (
 
 	"github.com/agentic-wiki/wiki/index"
 )
-
-// headingIDs assigns an id to each heading text, in document order, by the
-// engine's rule (unexported upstream): the one `wiki check` validates `#anchor`
-// links against. Repeats get -1, -2…, as on GitHub.
-func headingIDs(texts []string) []string {
-	seen := map[string]int{}
-	out := make([]string, len(texts))
-	for i, text := range texts {
-		s := headingID(text)
-		n := seen[s]
-		seen[s] = n + 1
-		if n > 0 {
-			s = fmt.Sprintf("%s-%d", s, n)
-		}
-		out[i] = s
-	}
-	return out
-}
-
-// headingID slugs one heading: lower-cased, spaces to hyphens, keeping
-// letters, numbers, hyphens and underscores.
-func headingID(text string) string {
-	var b strings.Builder
-	for _, r := range strings.ToLower(text) {
-		switch {
-		case r == ' ':
-			b.WriteByte('-')
-		case unicode.IsLetter(r) || unicode.IsNumber(r) || r == '-' || r == '_':
-			b.WriteRune(r)
-		}
-	}
-	if b.Len() == 0 {
-		return "heading"
-	}
-	return b.String()
-}
 
 // titleFromFilename makes a readable name out of a wiki path:
 // "003-watch-and-events.md" reads "003 Watch and events".
@@ -78,27 +41,25 @@ func readableName(name string) string {
 	return name
 }
 
-// Copied from the engine v0.10.0 (index/index.go: frontmatterRewrites and
-// normalizeLink, unexported): which frontmatter values are references.
+// Copied from the engine (index/index.go: frontmatterRewrites, unexported):
+// which frontmatter values are references.
 
 // ref is v as a value of e's frontmatter: a link to the entry it names when
-// it is a reference (ends in .md, as the engine reads them: relative to e, or
-// from the wiki's root with a leading /) to an entry that exists. One that
-// climbs above the wiki names nothing, as the engine has it.
+// it is a reference (ends in .md, as the engine reads them) to an entry that
+// exists. The engine resolves it: relative to e, or from the wiki's root with
+// a leading /, and one that climbs above the wiki names nothing.
 func ref(idx *index.Index, e *index.Entry) func(v string) Value {
 	return func(v string) Value {
-		target, _, _ := strings.Cut(v, "#")
-		if !strings.HasSuffix(target, ".md") {
+		if target, _, _ := strings.Cut(v, "#"); !strings.HasSuffix(target, ".md") {
 			return Value{Text: v}
 		}
-		if !strings.HasPrefix(target, "/") {
-			target = path.Join(strings.TrimPrefix(path.Dir(e.Path), "/"), target)
-			if target == ".." || strings.HasPrefix(target, "../") {
-				return Value{Text: v}
-			}
+		target, outside := idx.ResolveLink(e.Path, v)
+		if outside {
+			return Value{Text: v}
 		}
+		target, _, _ = strings.Cut(target, "#")
 		// Rooted, so Resolve looks it up by path, never by file name.
-		to, err := idx.Resolve("/" + strings.TrimPrefix(path.Clean(target), "/"))
+		to, err := idx.Resolve(target)
 		if err != nil {
 			return Value{Text: v}
 		}

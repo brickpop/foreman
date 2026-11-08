@@ -146,6 +146,15 @@ export function FileIcon() {
   );
 }
 
+/** A triangle with a bang: something to fix (an entry whose header couldn't be read). */
+export function WarningIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3 shrink-0">
+      <path d="M8 2 1.5 13.5h13zM8 6.5v3M8 11.5v.01" {...line} />
+    </svg>
+  );
+}
+
 /** A branch forking off: a git repo (the folder browser's repo rows). */
 export function RepoIcon({ size = "size-3.5" }: { size?: string }) {
   return (

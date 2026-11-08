@@ -38,6 +38,7 @@ export interface File {
    */
   markdown: boolean;
   frontmatter: wiki.Field[];
+  frontmatterError?: string; // why the frontmatter couldn't be read
   body: string;
   /**
    * Its body's links, resolved, and its headings' ids (Markdown only).

@@ -30,9 +30,10 @@ type File struct {
 	TooLarge bool   `json:"tooLarge"` // over FileLimit
 	// A Markdown file (.md, .markdown) has its frontmatter apart, and Body is
 	// its text without it; Text stays whole, for its source.
-	Markdown    bool         `json:"markdown"`
-	Frontmatter []wiki.Field `json:"frontmatter"`
-	Body        string       `json:"body"`
+	Markdown         bool         `json:"markdown"`
+	Frontmatter      []wiki.Field `json:"frontmatter"`
+	FrontmatterError string       `json:"frontmatterError,omitempty"` // why the frontmatter couldn't be read
+	Body             string       `json:"body"`
 	// Its body's links, resolved, and its headings' ids (Markdown only).
 	Links    []Link         `json:"links"`
 	Headings []wiki.Heading `json:"headings"`

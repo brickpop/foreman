@@ -82,10 +82,10 @@ POST   /api/reviews/:id/dismiss               {note, dropBranches, stopTeam}: st
 POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
 POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 
-GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry: its Markdown and lookup tables (Wiki engine → Rendering; reading it marks it seen); every board with its cards
+GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry: its Markdown and lookup tables (Wiki engine → Rendering; reading it marks it seen); every board with its cards. An entry whose frontmatter can't be read carries frontmatterError (on its tree node and its entry), and each board lists those under its path in unread [{path, label, error}], never as cards
 GET    /api/wiki/:project/image/:path         an image an entry links to, inside the wiki (Wiki engine → Rendering); 404 for anything else
-PUT    /api/wiki/:project/checkbox/:path      {line, done, version}: 204; 409 CONFLICT when the entry changed, 400 INVALID when there's no checkbox on that line
-PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to value, and lane when not empty; 204; 409 CONFLICT, 400 INVALID (no status, a lane on a board without lanes), 404 when the card isn't on that board
+PUT    /api/wiki/:project/checkbox/:path      {line, done, version}: 204; 409 CONFLICT when the entry changed, 400 INVALID when there's no checkbox on that line, 500 INTERNAL when the write fails
+PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to value, and lane when not empty; 204; 409 CONFLICT, 400 INVALID (no status, a lane on a board without lanes, a card with no frontmatter such as an index.md), 404 when the card isn't on that board, 422 REFUSED when the wiki library refuses the write (a frontmatter it can't edit safely), with its reason
 
 GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
 | PUT /api/settings       settings, version, problems

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/brickpop/foreman/internal/git"
@@ -78,6 +79,8 @@ func TestWikiWrites(t *testing.T) {
 	for name, content := range map[string]string{
 		"wiki.toml":    "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"b\"\npath = \"/backlog\"\ncolumns = [\"todo\", \"done\"]\n",
 		"backlog/x.md": "---\ntype: task\nstatus: todo\n---\n- [ ] one\n",
+		// A flow-map frontmatter: it reads, but the wiki library can't edit it safely.
+		"backlog/f.md": "---\n{type: task, status: todo}\n---\n",
 	} {
 		p := filepath.Join(dir, filepath.FromSlash(name))
 		_ = os.MkdirAll(filepath.Dir(p), 0o755)
@@ -97,10 +100,10 @@ func TestWikiWrites(t *testing.T) {
 
 	var boards []wiki.Board
 	decodeBody(t, get(t, h, "/api/wiki/ledger/boards"), &boards)
-	if len(boards) != 1 || len(boards[0].Cards) != 1 || boards[0].Cards[0].Column != "todo" {
+	if len(boards) != 1 || len(boards[0].Cards) != 2 || boards[0].Cards[1].Path != "backlog/x.md" || boards[0].Cards[1].Column != "todo" {
 		t.Fatalf("boards %+v", boards)
 	}
-	version := boards[0].Cards[0].Version
+	version := boards[0].Cards[1].Version
 
 	if w := send(h, "PUT", "/api/wiki/ledger/checkbox/backlog/x.md", `{"line":5,"done":true,"version":"`+version+`"}`); w.Code != http.StatusNoContent {
 		t.Fatalf("tick: %d %s", w.Code, w.Body)
@@ -127,5 +130,15 @@ func TestWikiWrites(t *testing.T) {
 		if got["code"] != c.code {
 			t.Errorf("%s %s: %d %s, want %s", c.path, c.body, w.Code, w.Body, c.code)
 		}
+	}
+
+	// A move the wiki library refuses: 422, with its reason.
+	var f wiki.Entry
+	decodeBody(t, get(t, h, "/api/wiki/ledger/entry/backlog/f.md"), &f)
+	w := send(h, "PUT", "/api/wiki/ledger/card/b/backlog/f.md", `{"value":"done","version":"`+f.Version+`"}`)
+	var got map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if w.Code != http.StatusUnprocessableEntity || got["code"] != "REFUSED" || !strings.Contains(got["error"], "can't be edited safely") {
+		t.Errorf("refused move: %d %s", w.Code, w.Body)
 	}
 }

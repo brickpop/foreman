@@ -40,11 +40,11 @@ func (w *Wikis) Boards(project string) ([]Board, error) {
 	decls, problems, err := declarations(idx)
 	if err != nil {
 		// A value of the wrong type: shown where the boards would be.
-		return []Board{{ID: "#1", Name: "wiki.toml", Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Problems: []string{err.Error()}}}, nil
+		return []Board{{ID: "#1", Name: "wiki.toml", Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Unread: []Unread{}, Problems: []string{err.Error()}}}, nil
 	}
 	out := []Board{}
 	for i, d := range decls {
-		b := Board{ID: d.ID, Name: d.Name, Columns: []string{}, Lanes: []string{}, Cards: []Card{}}
+		b := Board{ID: d.ID, Name: d.Name, Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Unread: []Unread{}}
 		if d.Path != "" {
 			b = build(idx, d)
 		}
@@ -121,9 +121,15 @@ func declarations(idx *index.Index) ([]declaration, [][]string, error) {
 // then every other status found, each its own column, then the cards with
 // none ("") when there are some. Lanes alike. No card is ever left out.
 func build(idx *index.Index, d declaration) Board {
-	b := Board{ID: d.ID, Name: d.Name, StatusField: d.Status, LaneField: d.Lane, Columns: []string{}, Lanes: []string{}, Cards: []Card{}}
+	b := Board{ID: d.ID, Name: d.Name, StatusField: d.Status, LaneField: d.Lane, Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Unread: []Unread{}}
+	for _, e := range idx.Filter(d.prefix(), nil) {
+		if reason := frontmatterError(e); reason != "" {
+			b.Unread = append(b.Unread, Unread{Path: rel(e.Path), Label: title(e), Error: reason})
+		}
+	}
+	slices.SortFunc(b.Unread, func(a, c Unread) int { return strings.Compare(a.Path, c.Path) })
 	var statuses, lanes []string
-	for _, e := range idx.Filter(d.prefix(), d.filters) {
+	for _, e := range cards(idx, d) {
 		raw, err := e.Raw()
 		if err != nil {
 			continue
@@ -192,12 +198,20 @@ func ordered(field string, declared, found []string) []string {
 
 // onBoard finds the card at p on the board: the board says which fields a move writes.
 func onBoard(idx *index.Index, d declaration, p string) (*index.Entry, bool) {
-	for _, e := range idx.Filter(d.prefix(), d.filters) {
+	for _, e := range cards(idx, d) {
 		if rel(e.Path) == p {
 			return e, true
 		}
 	}
 	return nil, false
+}
+
+// cards are the entries the board shows as cards: those under its path that
+// match its where, less any whose frontmatter couldn't be read. That one has
+// no fields, so it would match an empty where, or one of only != filters, as
+// a card with no status; the board lists it in Unread instead.
+func cards(idx *index.Index, d declaration) []*index.Entry {
+	return slices.DeleteFunc(idx.Filter(d.prefix(), d.filters), func(e *index.Entry) bool { return e.FrontmatterErr() != nil })
 }
 
 // prefix is the folder the board's cards come from, as Filter takes it ("" for

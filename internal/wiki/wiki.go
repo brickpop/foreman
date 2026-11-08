@@ -14,7 +14,6 @@ import (
 
 	"github.com/agentic-wiki/wiki/bundle"
 	"github.com/agentic-wiki/wiki/index"
-	"github.com/agentic-wiki/wiki/parse"
 
 	"github.com/brickpop/foreman/internal/home"
 )
@@ -111,7 +110,7 @@ func (w *Wikis) Tree(project string) ([]Node, error) {
 	for _, e := range idx.Entries {
 		p := rel(e.Path)
 		f := folder(parentDir(p))
-		f.children = append(f.children, &branch{node: Node{Path: p, Title: title(e)}})
+		f.children = append(f.children, &branch{node: Node{Path: p, Title: title(e), FrontmatterError: frontmatterError(e)}})
 	}
 	var flatten func(b *branch) []Node
 	flatten = func(b *branch) []Node {
@@ -165,18 +164,18 @@ func (w *Wikis) Entry(project, p string) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	// How many lines the frontmatter took, from what Body stripped.
-	offset := strings.Count(raw[:len(raw)-len(body)], "\n")
+	off := offset(raw, body)
 	return Entry{
-		Path:        rel(e.Path),
-		Title:       title(e),
-		Version:     home.Version([]byte(raw)),
-		Frontmatter: Fields(e.Frontmatter(), ref(idx, e)),
-		Body:        body,
-		Links:       links(idx, e),
-		Headings:    headings(e, offset),
-		Checkboxes:  checkboxes(e, offset),
-		Backlinks:   backlinks(idx, e),
+		Path:             rel(e.Path),
+		Title:            title(e),
+		Version:          home.Version([]byte(raw)),
+		Frontmatter:      fields(e, ref(idx, e)),
+		FrontmatterError: frontmatterError(e),
+		Body:             body,
+		Links:            links(idx, e),
+		Headings:         headings(e, off),
+		Checkboxes:       checkboxes(e, off),
+		Backlinks:        backlinks(idx, e),
 	}, nil
 }
 
@@ -261,33 +260,34 @@ func links(idx *index.Index, e *index.Entry) []Link {
 	return out
 }
 
-// Headings are the ids a Markdown body's headings take, by the engine's rule:
-// for a file outside the wiki (a repo's), read from its body alone.
-func Headings(body string) []Heading {
-	hs := parse.Headings(body)
-	texts := make([]string, len(hs))
-	for i, h := range hs {
-		texts[i] = h.Text
-	}
-	ids := headingIDs(texts)
-	out := make([]Heading, len(hs))
-	for i, h := range hs {
-		out[i] = Heading{ID: ids[i], BodyLine: h.Line}
+// Markdown is a Markdown file outside the wiki (a repo's), read by the wiki's
+// rules: its frontmatter, its body, its headings' ids and why its frontmatter
+// couldn't be read ("" when it could).
+func Markdown(p, text string) (fm []Field, body string, heads []Heading, frontmatterErr string) {
+	e := index.Read(p, text)
+	body, _ = e.Body() // never fails: a Read entry's text is in memory
+	return fields(e, nil), body, headings(e, offset(text, body)), frontmatterError(e)
+}
+
+// offset is how many lines the frontmatter took, from what Body stripped.
+func offset(raw, body string) int { return strings.Count(raw[:len(raw)-len(body)], "\n") }
+
+// headings are the entry's headings, each with its id (the engine's anchor
+// rule) and its line in the body.
+func headings(e *index.Entry, offset int) []Heading {
+	out := make([]Heading, len(e.Headings))
+	for i, h := range e.Headings {
+		out[i] = Heading{ID: h.ID, BodyLine: h.Line - offset}
 	}
 	return out
 }
 
-func headings(e *index.Entry, offset int) []Heading {
-	texts := make([]string, len(e.Headings))
-	for i, h := range e.Headings {
-		texts[i] = h.Text
+// frontmatterError is why the entry's frontmatter couldn't be read, or "".
+func frontmatterError(e *index.Entry) string {
+	if err := e.FrontmatterErr(); err != nil {
+		return err.Error()
 	}
-	ids := headingIDs(texts)
-	out := make([]Heading, len(e.Headings))
-	for i, h := range e.Headings {
-		out[i] = Heading{ID: ids[i], BodyLine: h.Line - offset}
-	}
-	return out
+	return ""
 }
 
 func checkboxes(e *index.Entry, offset int) []Checkbox {
@@ -313,18 +313,19 @@ func backlinks(idx *index.Index, e *index.Entry) []Backlink {
 	return out
 }
 
-// Fields is a frontmatter as the reader shows it, by key. Not shown: the
-// index's own keys (leading underscore), and okf_version, the format's
-// bookkeeping on the root index.md (wikiview hides it too). ref resolves a
-// value that names an entry; nil resolves none (a repo file's frontmatter).
-func Fields(fm map[string]any, ref func(v string) Value) []Field {
+// fields is an entry's frontmatter as the reader shows it, by key, each
+// field's values without empty ones (FieldList). Not shown: the index's own
+// keys (leading underscore), and okf_version, the format's bookkeeping on the
+// root index.md (wikiview hides it too). ref resolves a value that names an
+// entry; nil resolves none (a repo file's frontmatter).
+func fields(e *index.Entry, ref func(v string) Value) []Field {
 	out := []Field{}
-	for _, k := range slices.Sorted(maps.Keys(fm)) {
+	for _, k := range slices.Sorted(maps.Keys(e.Frontmatter())) {
 		if strings.HasPrefix(k, "_") || k == "okf_version" {
 			continue
 		}
 		f := Field{Key: k, Values: []Value{}}
-		for _, v := range parse.Strings(fm, k) {
+		for _, v := range e.FieldList(k) {
 			if ref == nil {
 				f.Values = append(f.Values, Value{Text: v})
 			} else {

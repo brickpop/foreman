@@ -10,8 +10,6 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/agentic-wiki/wiki/parse"
-
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/wiki"
@@ -179,10 +177,9 @@ func (b Browser) File(ctx context.Context, project, repo, ref, path string) (Fil
 	default:
 		f.Text = string(content)
 		if f.Markdown = markdown.MatchString(path); f.Markdown {
-			fm, body := parse.Frontmatter(f.Text)
-			f.Frontmatter, f.Body = wiki.Fields(fm, nil), body
+			f.Frontmatter, f.Body, f.Headings, f.FrontmatterError = wiki.Markdown(path, f.Text)
 			t := &trees{ctx: ctx, git: b.Git, dir: dir, commit: commit, read: map[string][]git.TreeEntry{}}
-			f.Links, f.Headings = t.links(path, body), wiki.Headings(body)
+			f.Links = t.links(path, f.Body)
 		}
 	}
 	return f, nil

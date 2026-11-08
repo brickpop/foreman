@@ -17,6 +17,11 @@ the wire are relative to the wiki, e.g. backlog/LED-44.md.
 export interface Node {
   path: string; // relative to the wiki, e.g. backlog/LED-44.md
   title: string;
+  /**
+   * FrontmatterError is why the entry's frontmatter couldn't be read, so the
+   * tree can mark it; omitted when it was read, and for a folder.
+   */
+  frontmatterError?: string;
   folder: boolean;
   changed: boolean; // changed since the CEO last looked
   children: Node[];
@@ -31,6 +36,11 @@ export interface Entry {
   title: string;
   version: string; // guards the writes
   frontmatter: Field[]; // by key
+  /**
+   * FrontmatterError is why the frontmatter couldn't be read (not valid YAML,
+   * or over a limit): the entry then has no fields. Omitted when it was read.
+   */
+  frontmatterError?: string;
   body: string; // frontmatter stripped
   links: Link[];
   headings: Heading[];
@@ -119,6 +129,20 @@ export interface Board {
   laneField: string; // the field the lanes come from, e.g. priority
   cards: Card[];
   problems: string[];
+  /**
+   * Unread are the entries under the board's path whose frontmatter couldn't
+   * be read, by path. They have no fields, so no column holds them: listed
+   * here, they don't leave the board without a word. Always present.
+   */
+  unread: Unread[];
+}
+/**
+ * Unread is an entry whose frontmatter couldn't be read, and why.
+ */
+export interface Unread {
+  path: string;
+  label: string; // its title, as a card's
+  error: string;
 }
 /**
  * Card is one entry on a board.

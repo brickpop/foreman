@@ -44,7 +44,7 @@ import type {
   WorkItem,
 } from "./types/store";
 import type { Preferences } from "./types/userdata";
-import type { Board, Card, Entry, Field, Node } from "./types/wiki";
+import type { Board, Card, Entry, Field, Node, Unread } from "./types/wiki";
 import type {
   Cleaned,
   Cleanup,
@@ -111,6 +111,7 @@ export type {
   TeamAction,
   TeamMessage,
   TreeEntry,
+  Unread,
   WorkItem,
 };
 

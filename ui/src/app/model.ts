@@ -225,9 +225,10 @@ export function roster(c: Team["config"]): string[] {
   return ids;
 }
 
-/** A count with its noun: "1 session", "3 sessions". */
-export function plural(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+/** A count with its noun: "1 session", "3 sessions"; many for a noun that
+ * isn't plural with an s ("entries"). */
+export function plural(n: number, noun: string, many = `${noun}s`): string {
+  return `${n} ${n === 1 ? noun : many}`;
 }
 
 /** What stopping a team ends: `1 session ends`, `3 sessions end`. */

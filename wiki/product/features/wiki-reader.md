@@ -30,6 +30,7 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 
 - **The file tree's look**, the same as a repo's ([Repos → A repo's page](./repos.md#a-repos-page)): a folder row has a chevron (turned down when open) and a folder icon (open or closed), a file row a file icon (both `--tx4`), in line with the folder names; an open folder's contents are indented 13px under its chevron, with a 1px `--line` guide down their left. Rows padding `3px 6px`, 13.5px, `--tx2`, ellipsis on overflow; the entries by their title. The current entry: `--accSoft`, `--accTx`. (The CEO, 2026-11-02, replacing indentation by padding alone.)
 - A 6px attention (`--attn`) **changed dot** on entries changed since last viewed, and on a collapsed folder holding one ([UI state](../models/ui-state.md#schema) defines "seen").
+- An amber (`--attnTx`) **warning mark** on an entry whose header couldn't be read (its `frontmatterError`), named and titled `Frontmatter couldn't be read: <reason>`.
 
 ## Article
 
@@ -67,12 +68,13 @@ As wikiview shows it (its `EntryView`; the CEO, 2026-11-02, replacing the `key: 
 - **Open**: `Properties`, then a grid of keys (`--tx4`, never colored: color is for what can be clicked) and values. An empty field says `(nothing)`; `tags` are chips, each with its colored dot (one color per tag, from its name, the same everywhere); any other list is a chip per value; a scalar is text, clipped with its whole value as its tooltip.
 - **A value naming an entry** (a reference, as the engine reads one: it ends in `.md`, relative to the entry or from the wiki's root with a leading `/`, and an entry exists there) shows that entry's title, underlined in `--accTx`, and opens it; the value as written is its tooltip. One climbing above the wiki, or naming no entry, is plain text. A repo's file names no entries: its values are all text.
 - **Open or folded** is remembered in the browser (not per entry, not on the server): it opens as the CEO last left it. Not built from wikiview: the folded line floating the grid over the text on hover.
+- **A header that couldn't be read** (not valid YAML, or past the library's limits) gives no fields. Above the body, which still renders, the amber notice (`--attnLine` border, `--attnSoft` tint, `--attnTx` text, as every amber notice) says so: `This entry's frontmatter couldn't be read: <reason>. Fix it, then run wiki check.` The reason is the library's, as wikiview shows it. A repo's Markdown file shows the same notice, saying `This file's` instead of `This entry's`.
 - **Not shown**: the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17) and the engine's own keys (a leading `_`). The fields are in key order: the engine keeps no file order.
 
 ## Behaviour
 
 - **Opening an entry** (tree, link, board "Open in wiki"): shows it in the Wiki section (`?entry=<path>`), closes the side sheet, marks the entry seen, scrolls the entry's pane to its top (the tree keeps its place). An unknown path falls back to `index.md`.
-- **Ticking a checkbox** writes that one character to the file atomically, guarded by the entry's version; on conflict the box reverts and an error toast explains it ([API](../architecture/api.md), `PUT /api/wiki/:project/checkbox/:path`).
+- **Ticking a checkbox** writes that one character to the file atomically, guarded by the entry's version; on a conflict or any failed write, the box reverts and the toast shows the server's text ([API](../architecture/api.md), `PUT /api/wiki/:project/checkbox/:path`).
 - **File changes** (agents or the CEO's editor) appear within about 1 s ([Persistence](../architecture/persistence.md)): the open entry re-renders, and changed entries get their dot.
 - Prose is read-only. The only writes are a checkbox tick here and a card move on the [Board](./board.md).
 

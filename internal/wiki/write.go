@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/agentic-wiki/wiki/index"
+	"github.com/agentic-wiki/wiki/parse"
 
 	"github.com/brickpop/foreman/internal/home"
 )
@@ -17,6 +18,10 @@ var ErrConflict = errors.New("wiki: the file changed since you read it")
 // ErrInvalid means a write that can't apply: no checkbox on that line, a move
 // to no status, a lane on a board without lanes.
 var ErrInvalid = errors.New("wiki: invalid write")
+
+// ErrRefused means the wiki library refused the write: a frontmatter it can't
+// edit safely, or that wouldn't read back the same. The error says why.
+var ErrRefused = errors.New("wiki: write refused")
 
 // Git commits Foreman's writes in the project repo (implemented by git.CLI).
 // Paths are relative to dir, which is inside the repo.
@@ -41,7 +46,7 @@ func (w *Wikis) SetCheckbox(ctx context.Context, project, p string, line int, do
 			return "", fmt.Errorf("%w: no checkbox on line %d of %s", ErrInvalid, line, p)
 		}
 		if err := e.SetCheckbox(line, done); err != nil {
-			return "", fmt.Errorf("%w: %v", ErrInvalid, err)
+			return "", err // the line was checked above: this is the file
 		}
 		verb := "Tick"
 		if !done {
@@ -89,7 +94,14 @@ func (w *Wikis) MoveCard(ctx context.Context, project, board, p, column, lane, v
 	}
 	return w.write(ctx, project, p, version, func(e *index.Entry) (string, error) {
 		if err := e.SetFields(fields); err != nil {
-			return "", fmt.Errorf("%w: %v", ErrInvalid, err)
+			var refused *parse.EditError
+			switch {
+			case errors.As(err, &refused):
+				return "", fmt.Errorf("%w: %v", ErrRefused, err)
+			case errors.Is(err, index.ErrNoFrontmatter): // an index.md or log.md on a board over every entry
+				return "", fmt.Errorf("%w: %s: %v", ErrInvalid, p, err)
+			}
+			return "", err
 		}
 		to := column
 		if lane != "" {

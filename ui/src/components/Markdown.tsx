@@ -58,7 +58,9 @@ export function Markdown({
   const heading = (level: 1 | 2 | 3 | 4 | 5 | 6) =>
     function Heading({ children, ...props }: { children?: ReactNode }) {
       const Tag = `h${level}` as const;
-      return <Tag id={headings.get(lineOf(props))}>{children}</Tag>;
+      // A heading with no letter or digit (`## ???`) has the id "": no id at
+      // all, rather than an empty one, or an anchor nothing can link to.
+      return <Tag id={headings.get(lineOf(props)) || undefined}>{children}</Tag>;
     };
 
   const components: Components = {

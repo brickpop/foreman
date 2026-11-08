@@ -372,6 +372,22 @@ describe("httpClient", () => {
     ]);
   });
 
+  // A header the library can't edit safely is refused with a 422 whose text says
+  // why: that text is the error the board's toast shows, not a status code.
+  it("carries a refused wiki write's text", async () => {
+    const refusal = "frontmatter of backlog/x.md can't be edited safely: line 2: flow mapping";
+    stubFetch(422, { error: refusal });
+    const c = httpClient("http://x");
+    for (const write of [
+      () => c.wiki.moveCard("ledger", "sprint 7", "backlog/x.md", "done", "", "v2"),
+      () => c.wiki.setCheckbox("ledger", "backlog/x.md", 12, true, "v1"),
+    ]) {
+      const e = await write().catch((e: unknown) => e);
+      expect(e).toBeInstanceOf(ApiError);
+      expect((e as Error).message).toBe(refusal);
+    }
+  });
+
   it("answers a request with the CEO's text", async () => {
     const calls = stubFetch(200, {});
     await httpClient("http://x").requests.resolve("req/1", "Approve, but pin 2.x");

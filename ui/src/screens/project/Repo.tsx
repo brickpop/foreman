@@ -25,7 +25,7 @@ import {
   shownAt,
 } from "../../app/repos";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
-import { Frontmatter } from "../../components/Frontmatter";
+import { Frontmatter, FrontmatterError } from "../../components/Frontmatter";
 import { Markdown, type ResolvedLink } from "../../components/Markdown";
 import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
 import { useProject } from "../Project";
@@ -532,6 +532,7 @@ function FileView({
       ) : f.markdown && !source ? (
         <div className="flex flex-col gap-3">
           <Frontmatter fields={fields} />
+          {f.frontmatterError && <FrontmatterError error={f.frontmatterError} noun="file" />}
           <Panel className="px-6 py-5">
             <div className="wiki">
               {title && <h1>{title}</h1>}

@@ -1,8 +1,8 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type DragEvent, useEffect, useRef, useState } from "react";
-import { type Board as BoardData, type Card, isNotBuilt } from "../../api/client";
-import { agentOf } from "../../app/model";
+import { type Board as BoardData, type Card, isNotBuilt, type Unread } from "../../api/client";
+import { agentOf, plural } from "../../app/model";
 import {
   useBoards,
   useDeploymentOn,
@@ -47,6 +47,40 @@ const columnLabels: Record<string, string> = {
   review: "Review",
   done: "Done",
 };
+
+/** The entries under a board whose header couldn't be read. They have no
+ * fields, so no column can hold them; without this they would drop off the
+ * board without a word. Each opens in the sheet, which says why. */
+export function UnreadNotice({
+  unread,
+  onOpen,
+}: {
+  unread: Unread[];
+  onOpen: (path: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-attnLine bg-attnSoft px-3 py-2.5 text-[13px] text-attnTx">
+      <p className="m-0">
+        Not on the board: {plural(unread.length, "entry", "entries")} whose frontmatter couldn't be
+        read.
+      </p>
+      <ul className="m-0 mt-1 list-none p-0">
+        {unread.map((u) => (
+          <li key={u.path}>
+            <button
+              type="button"
+              onClick={() => onOpen(u.path)}
+              className="cursor-pointer text-attnTx underline underline-offset-2"
+            >
+              {u.label}
+            </button>
+            : {u.error}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 /** A column's label; "" holds the cards with no status. */
 export function columnLabel(value: string): string {
@@ -196,6 +230,12 @@ export function Board() {
       )}
       {board.problems.length > 0 && (
         <p className="text-[13px] text-err">{board.problems.join(" · ")}</p>
+      )}
+      {board.unread.length > 0 && (
+        <UnreadNotice
+          unread={board.unread}
+          onOpen={(path) => show({ board: chosen, card: path })}
+        />
       )}
       {/* Columns reach down to the footer note, all as tall as the tallest (the CEO, 2026-10-21). */}
       <div ref={scroller} className="flex flex-1 flex-col overflow-x-auto">

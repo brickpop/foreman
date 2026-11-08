@@ -8,26 +8,32 @@ package wiki
 // its first child, an entry like the others (the CEO, 2026-11-05: folded into
 // the folder's row, it took two clicks to find).
 type Node struct {
-	Path     string `json:"path"` // relative to the wiki, e.g. backlog/LED-44.md
-	Title    string `json:"title"`
-	Folder   bool   `json:"folder"`
-	Changed  bool   `json:"changed"` // changed since the CEO last looked
-	Children []Node `json:"children"`
+	Path  string `json:"path"` // relative to the wiki, e.g. backlog/LED-44.md
+	Title string `json:"title"`
+	// FrontmatterError is why the entry's frontmatter couldn't be read, so the
+	// tree can mark it; omitted when it was read, and for a folder.
+	FrontmatterError string `json:"frontmatterError,omitempty"`
+	Folder           bool   `json:"folder"`
+	Changed          bool   `json:"changed"` // changed since the CEO last looked
+	Children         []Node `json:"children"`
 }
 
 // Entry is one entry, for the reader: its Markdown exactly as on disk, and
 // lookup tables for what the browser must not work out itself (the engine's
 // rules), as wikiview serves it.
 type Entry struct {
-	Path        string     `json:"path"`
-	Title       string     `json:"title"`
-	Version     string     `json:"version"`     // guards the writes
-	Frontmatter []Field    `json:"frontmatter"` // by key
-	Body        string     `json:"body"`        // frontmatter stripped
-	Links       []Link     `json:"links"`
-	Headings    []Heading  `json:"headings"`
-	Checkboxes  []Checkbox `json:"checkboxes"`
-	Backlinks   []Backlink `json:"backlinks"`
+	Path        string  `json:"path"`
+	Title       string  `json:"title"`
+	Version     string  `json:"version"`     // guards the writes
+	Frontmatter []Field `json:"frontmatter"` // by key
+	// FrontmatterError is why the frontmatter couldn't be read (not valid YAML,
+	// or over a limit): the entry then has no fields. Omitted when it was read.
+	FrontmatterError string     `json:"frontmatterError,omitempty"`
+	Body             string     `json:"body"` // frontmatter stripped
+	Links            []Link     `json:"links"`
+	Headings         []Heading  `json:"headings"`
+	Checkboxes       []Checkbox `json:"checkboxes"`
+	Backlinks        []Backlink `json:"backlinks"`
 }
 
 // Field is one frontmatter field, as the reader shows it: its values in
@@ -101,6 +107,17 @@ type Board struct {
 	LaneField   string   `json:"laneField"`   // the field the lanes come from, e.g. priority
 	Cards       []Card   `json:"cards"`
 	Problems    []string `json:"problems"`
+	// Unread are the entries under the board's path whose frontmatter couldn't
+	// be read, by path. They have no fields, so no column holds them: listed
+	// here, they don't leave the board without a word. Always present.
+	Unread []Unread `json:"unread"`
+}
+
+// Unread is an entry whose frontmatter couldn't be read, and why.
+type Unread struct {
+	Path  string `json:"path"`
+	Label string `json:"label"` // its title, as a card's
+	Error string `json:"error"`
 }
 
 // Card is one entry on a board.

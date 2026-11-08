@@ -20,7 +20,7 @@ type Wiki interface {
 	Boards(project string) ([]wiki.Board, error)
 	// SetCheckbox and MoveCard write an entry if it is still at version, and
 	// commit it: wiki.ErrConflict when it changed, wiki.ErrInvalid when the
-	// write can't apply.
+	// write can't apply, wiki.ErrRefused when the wiki library refuses it.
 	SetCheckbox(ctx context.Context, project, path string, line int, done bool, version string) error
 	MoveCard(ctx context.Context, project, board, path, column, lane, version string) error
 }
@@ -95,6 +95,8 @@ func writeWiki(w http.ResponseWriter, v any, err error) {
 		writeError(w, http.StatusConflict, "CONFLICT", strings.TrimPrefix(err.Error(), wiki.ErrConflict.Error()+": ")+" changed since you read it")
 	case errors.Is(err, wiki.ErrInvalid):
 		writeError(w, http.StatusBadRequest, "INVALID", strings.TrimPrefix(err.Error(), wiki.ErrInvalid.Error()+": "))
+	case errors.Is(err, wiki.ErrRefused):
+		writeError(w, http.StatusUnprocessableEntity, "REFUSED", strings.TrimPrefix(err.Error(), wiki.ErrRefused.Error()+": "))
 	case errors.Is(err, wiki.ErrNotFound):
 		writeError(w, http.StatusNotFound, "NOT_FOUND", err.Error())
 	case err != nil:

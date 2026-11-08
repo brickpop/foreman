@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { isNotBuilt, type Node } from "../../api/client";
 import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
-import { TreeIcon } from "../../components/icons";
+import { TreeIcon, WarningIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
 import { Button, Dot, NotBuilt, Panel } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
@@ -154,6 +154,17 @@ export function treeLabel(n: Node): string {
   return n.path === "index.md" || n.path.endsWith("/index.md") ? `${n.title} - index.md` : n.title;
 }
 
+/** An entry whose header couldn't be read, named with the reason: the entry
+ * still opens, so amber, a thing to fix. */
+export function UnreadableMark({ error }: { error: string }) {
+  const name = `Frontmatter couldn't be read: ${error}`;
+  return (
+    <span role="img" aria-label={name} title={name} className="text-attnTx">
+      <WarningIcon />
+    </span>
+  );
+}
+
 function Tree({
   nodes,
   current,
@@ -171,7 +182,12 @@ function Tree({
         key={n.path}
         current={n.path === current}
         onClick={() => onOpen(n.path)}
-        after={n.changed && <Dot size={6} title="Changed since you last looked" />}
+        after={
+          <>
+            {n.frontmatterError && <UnreadableMark error={n.frontmatterError} />}
+            {n.changed && <Dot size={6} title="Changed since you last looked" />}
+          </>
+        }
       >
         {treeLabel(n)}
       </TreeRow>

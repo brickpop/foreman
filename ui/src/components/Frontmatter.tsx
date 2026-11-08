@@ -149,3 +149,21 @@ function Dot({ tag }: { tag: string }) {
     />
   );
 }
+
+/** A file whose header the library couldn't read has no fields, so it would
+ * look as if it had none: say so above the body, which still renders. Shown
+ * wherever a frontmatter is, for a wiki entry and a repo's Markdown file alike,
+ * each named as what it is. */
+export function FrontmatterError({
+  error,
+  noun = "entry",
+}: {
+  error: string;
+  noun?: "entry" | "file";
+}) {
+  return (
+    <p className="m-0 rounded-lg border border-attnLine bg-attnSoft px-3 py-2.5 text-[13px] text-attnTx">
+      This {noun}'s frontmatter couldn't be read: {error}. Fix it, then run <code>wiki check</code>.
+    </p>
+  );
+}

@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"bytes"
 	"time"
 	"unicode/utf8"
 
@@ -31,13 +32,21 @@ type draft struct {
 
 // Typed hears what the CEO types into an agent's terminal: printable text
 // makes a draft; Enter, Ctrl+C and Ctrl+U end it; Backspace shrinks it.
-// Escape sequences (arrows, function keys) change nothing.
+// Navigation keys preserve the draft and restart its quiet period.
 func (m *Messenger) Typed(id string, p []byte) {
 	m.mu.Lock()
 	d := m.draft(id)
+	// Each xterm onData event is one WebSocket message. A bare Escape is
+	// a key in its own right; only a sequence introducer starts continuation.
+	if d.escape == 0 && bytes.Equal(p, []byte{0x1b}) {
+		d.lastKey = m.now()
+		m.mu.Unlock()
+		return
+	}
 	ended, submitted, keyed := false, false, false
 	for i := 0; i < len(p); {
-		if d.control(p[i]) {
+		if consumed, activity := d.control(p[i]); consumed {
+			keyed = keyed || activity
 			i++
 			continue
 		}
@@ -87,11 +96,11 @@ func (m *Messenger) Typed(id string, p []byte) {
 // control consumes terminal sequences without mistaking their payload for
 // typing. OSC color replies and other string replies end at BEL or ST; CSI
 // and SS3 include key sequences and bracketed-paste markers.
-func (d *draft) control(b byte) bool {
+func (d *draft) control(b byte) (consumed, activity bool) {
 	switch d.escape {
 	case 0:
 		if b != 0x1b {
-			return false
+			return false, false
 		}
 		d.escape = 'e'
 	case 'e':
@@ -108,9 +117,13 @@ func (d *draft) control(b byte) bool {
 	case '[':
 		if b >= 0x40 && b <= 0x7e {
 			d.escape = 0
+			// Cursor/device replies end in R, c, n or y; these finals
+			// are navigation and function keys instead.
+			activity = bytes.ContainsRune([]byte("ABCDHF~ZPQ"), rune(b))
 		}
 	case 'O':
 		d.escape = 0
+		activity = true
 	case 's':
 		switch b {
 		case 0x07:
@@ -127,7 +140,7 @@ func (d *draft) control(b byte) bool {
 			d.escape = 's'
 		}
 	}
-	return true
+	return true, activity
 }
 
 // Drafting reports whether the CEO has typed into the instance's prompt

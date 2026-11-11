@@ -246,6 +246,9 @@ func TestTerminalRepliesDoNotCreateDrafts(t *testing.T) {
 		"\x1bP>|terminal version\x1b\\",
 	} {
 		for split := 0; split <= len(reply); split++ {
+			if split == 1 { // A lone ESC event is the Escape key, not a reply fragment.
+				continue
+			}
 			m := New(Deps{})
 			m.Typed("x", []byte(reply[:split]))
 			m.Typed("x", []byte(reply[split:]))
@@ -262,7 +265,8 @@ func TestTerminalRepliesDoNotCreateDrafts(t *testing.T) {
 
 func TestColorRepliesDoNotHoldMessages(t *testing.T) {
 	f := newDraftFixture(t)
-	for _, b := range []byte("\x1b]11;rgb:0000/0000/0000\x1b\\") {
+	f.m.Typed("mara@ledger", []byte("\x1b]"))
+	for _, b := range []byte("11;rgb:0000/0000/0000\x1b\\") {
 		f.m.Typed("mara@ledger", []byte{b})
 	}
 	f.ask("build cal")
@@ -324,4 +328,55 @@ func TestTerminalRepliesPreserveAnExistingDraftAndItsQuietTime(t *testing.T) {
 	if m.Drafting("x") {
 		t.Fatal("reply left phantom characters after clearing the real draft")
 	}
+}
+
+func TestEscapeDoesNotConsumeTheNextInputEvent(t *testing.T) {
+	for _, next := range []string{"a", "[", "]", "P", "O", "_", "^", "X", "é"} {
+		t.Run(next, func(t *testing.T) {
+			m := New(Deps{})
+			m.Typed("x", []byte("\x1b"))
+			m.Typed("x", []byte(next))
+			if !m.Drafting("x") {
+				t.Fatal("Escape swallowed the next character")
+			}
+			m.Typed("x", []byte("\x7f"))
+			if m.Drafting("x") {
+				t.Fatal("Escape counted as draft text")
+			}
+		})
+	}
+	for _, clear := range []string{"\r", "\x03", "\x15"} {
+		m := New(Deps{})
+		m.Typed("x", []byte("draft"))
+		m.Typed("x", []byte("\x1b"))
+		m.Typed("x", []byte(clear))
+		if m.Drafting("x") {
+			t.Fatalf("Escape swallowed %q", clear)
+		}
+	}
+}
+
+func TestNavigationRestartsTheDraftQuietPeriod(t *testing.T) {
+	for _, key := range []string{"\x1b", "\x1b[D", "\x1b[1;5C", "\x1bOA", "\x1b[H", "\x1b[F", "\x1b[3~", "\x1b[Z"} {
+		m := New(Deps{})
+		m.Typed("x", []byte("draft"))
+		m.draft("x").lastKey = time.Now().Add(-time.Minute)
+		m.Typed("x", []byte(key))
+		if d := m.draft("x"); m.counting(d) || d.length != 5 {
+			t.Fatalf("navigation %q did not preserve draft and pause countdown: %+v", key, d)
+		}
+	}
+}
+
+func TestEscapeThenClearReleasesHeldMessages(t *testing.T) {
+	f := newDraftFixture(t)
+	f.m.Typed("mara@ledger", []byte("draft"))
+	f.ask("build cal")
+	f.eventually("held", func() bool { return f.lastDraft().OnDraft })
+	f.m.PauseCountdown("mara@ledger", true)
+	f.m.Typed("mara@ledger", []byte("\x1b"))
+	f.m.Typed("mara@ledger", []byte("\x15"))
+	f.eventually("delivered after clearing", func() bool {
+		return strings.HasPrefix(f.s.of("mara@ledger"), "Message msg-1")
+	})
 }

@@ -54,7 +54,7 @@ type Deps struct {
 	Pause time.Duration
 	// Hold is how long messages wait on the CEO's draft, counted only while
 	// the CEO isn't typing (Quiet since the last key); Tick is the countdown's
-	// step. Zero means the defaults: 60 s, 5 s (so the CEO isn't rushed), 250 ms.
+	// step. Zero means the defaults: 20 s, 5 s (so the CEO isn't rushed), 250 ms.
 	Hold, Quiet, Tick time.Duration
 }
 
@@ -69,7 +69,7 @@ type Messenger struct {
 // New returns a messenger.
 func New(d Deps) *Messenger {
 	if d.Hold == 0 {
-		d.Hold = time.Minute
+		d.Hold = 20 * time.Second
 	}
 	if d.Quiet == 0 {
 		d.Quiet = 5 * time.Second

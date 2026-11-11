@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"path"
+	"slices"
 	"strings"
 
-	"github.com/agentic-wiki/wiki/parse"
+	"github.com/agentic-wiki/wiki/index"
 
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/wiki"
@@ -60,49 +61,42 @@ func (t *trees) base(file string) string {
 	return ""
 }
 
-// links resolves the internal links of the Markdown file at file: relative
-// ones from its folder, root-absolute ones from its wiki's root. Web links
-// and same-page anchors are left to the browser.
-func (t *trees) links(file, body string) []Link {
-	set := parse.Links(body)
-	out := make([]Link, 0, len(set.Absolute)+len(set.Relative))
+// links resolves the internal links of the Markdown file at file, by the wiki
+// library's one rule: the file is read from its wiki's root (index.Read), so
+// a root-absolute link resolves from there, a relative one from its folder,
+// and its percent-encoding, ?query and #anchor are read as the engine reads
+// them. Each link, the climbing ones too, is then joined to the wiki's root:
+// it is outside only when it climbs out of the repo. Web links and same-page
+// anchors are left to the browser.
+func (t *trees) links(file, text string) []Link {
 	root := t.base(file)
-	for _, bucket := range [][]parse.Link{set.Absolute, set.Relative} {
-		for _, l := range bucket {
-			out = append(out, t.resolve(file, root, l.Target))
-		}
+	e := index.Read(path.Join("/", strings.TrimPrefix(file, root)), text) // base is a folder above file
+	out := make([]Link, 0, len(e.Links)+len(e.Outside))
+	for _, l := range slices.Concat(e.Links, e.Outside) {
+		out = append(out, t.link(root, l))
 	}
 	return out
 }
 
-func (t *trees) resolve(file, root, raw string) Link {
-	l := Link{Raw: raw}
-	target := raw
-	if h := strings.IndexByte(target, '#'); h >= 0 {
-		target, l.Anchor = target[:h], target[h+1:]
-	}
-	if q := strings.IndexByte(target, '?'); q >= 0 {
-		target = target[:q]
-	}
-	target = wiki.Decoded(target)
-	from := path.Dir(file)
-	if strings.HasPrefix(target, "/") {
-		from, target = root, strings.TrimLeft(target, "/")
-	}
-	p := path.Clean(path.Join(from, target))
+// link is l, read from the wiki rooted at root, as a path in the repo: its
+// Target joined to root, outside when that climbs out of the repo
+// (segment-exact: "..notes/a.md" is inside).
+func (t *trees) link(root string, l index.Link) Link {
+	out := Link{Raw: l.Raw, Anchor: l.Anchor}
+	p := path.Clean(path.Join(root, strings.TrimPrefix(l.Target, "/")))
 	if p == ".." || strings.HasPrefix(p, "../") {
-		l.Outside = true
-		return l
+		out.Outside = true
+		return out
 	}
 	if p == "." {
 		p = ""
 	}
-	l.To = p
-	e, ok := t.entry(l.To)
-	l.Exists = ok
-	l.Folder = ok && e.Kind == "dir"
-	l.Image = ok && e.Kind == "file" && wiki.ImageType(l.To) != ""
-	return l
+	out.To = p
+	e, ok := t.entry(p)
+	out.Exists = ok
+	out.Folder = ok && e.Kind == "dir"
+	out.Image = ok && e.Kind == "file" && wiki.ImageType(p) != ""
+	return out
 }
 
 // Image returns the image at path on ref, and its content type: only a file

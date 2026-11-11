@@ -37,10 +37,10 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 
 ## Copies of wikiview's building blocks
 
-- **State:** Foreman renders wikis as [wikiview](https://github.com/agentic-wiki/wikiview) does ([Wiki engine → Rendering](./product/architecture/wiki-engine.md#rendering)) and holds copies from wikiview v0.13.0: the readable-name rule (`internal/wiki/copied.go`), the board layout (`ordered` and its `knownOrder` table in `internal/wiki/board.go`) and the callout plugin (`ui/src/app/callout.ts`); `ui/src/components/Markdown.tsx` is adapted from its renderer, and `ui/src/components/Frontmatter.tsx` from its `EntryView` (2026-11-02). From the engine, the rule for which frontmatter values are references to entries (`ref` in `internal/wiki/copied.go`, 2026-11-02: a value ending in `.md`), which the engine keeps unexported; the engine resolves it (`index.ResolveLink`). No cross-check yet, only Foreman's own test (`TestEntry`). Heading ids come from the engine (`Heading.ID`, wiki v0.16.1).
+- **State:** Foreman renders wikis as [wikiview](https://github.com/agentic-wiki/wikiview) does ([Wiki engine → Rendering](./product/architecture/wiki-engine.md#rendering)) and holds copies from wikiview v0.13.0: the readable-name rule (`internal/wiki/copied.go`), the board layout (`ordered` and its `knownOrder` table in `internal/wiki/board.go`) and the callout plugin (`ui/src/app/callout.ts`); `ui/src/components/Markdown.tsx` is adapted from its renderer, and `ui/src/components/Frontmatter.tsx` from its `EntryView` (2026-11-02). Heading ids, link destinations, frontmatter references and titles come from the engine (`Heading.ID`, `index.Read`'s links, `Entry.FrontmatterRefs`, `Entry.Title`, wiki v0.17.0).
 - **Why:** wikiview's Go code is under `internal/` and its UI isn't a package, so Foreman can't import either (the CEO, 2026-10-17: copy now, upstream later). wikiview ships no LICENSE file either.
-- **Impact:** a fix in wikiview, or a change to the engine's reference rule, doesn't reach Foreman until copied again.
-- **Fix:** the engine exports its frontmatter-reference rule; wikiview exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import wikiview's building blocks](./backlog/wikiview-upstream.md).
+- **Impact:** a fix in wikiview doesn't reach Foreman until copied again.
+- **Fix:** wikiview exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import wikiview's building blocks](./backlog/wikiview-upstream.md).
 
 ## The workspace migration
 
@@ -80,10 +80,9 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **State:**
   - **Debounce window:** for up to ~200 ms after an edit, an entry's body is read fresh while its links, headings and checkbox lines come from the previous index, so they may disagree until the rebuild (wikiview has the same window).
   - **A broken wiki reads as none:** a wiki whose `wiki.toml` can't be read (caught mid-write, say) is served as "no wiki" until its next change.
-  - **Percent-encoded links, in the engine:** Foreman decodes a link's path (`my%20plan.md` names `my plan.md`, `wiki.Decoded`, the CEO, 2026-11-03), and the renderer looks an href up decoded too (it re-encodes `<my plan.md>`); the engine doesn't, so `wiki check` reports such a link broken, and backlinks, orphans and `unresolved` miss it.
   - **Image symlink race:** the image route resolves symlinks and checks the result is inside the wiki before serving it; an agent with write access could swap a symlink in between. Theoretical: the window is microseconds and the lead's container already holds the wiki.
 - **Why:** each is rare or short-lived, and fixing it now costs more than it saves.
-- **Fix:** the window: rebuild before reading when a change is pending (Foreman's own writes already rebuild before answering). Percent-encoded links: the engine decodes link targets (upstream), then `wiki.Decoded` goes; wikiview's renderer has the re-encoding gap too. The symlink race: open the file, then check the opened file's real path (`os.File` plus `/proc` or `F_GETPATH`), if it ever matters.
+- **Fix:** the window: rebuild before reading when a change is pending (Foreman's own writes already rebuild before answering). The symlink race: open the file, then check the opened file's real path (`os.File` plus `/proc` or `F_GETPATH`), if it ever matters.
 
 ## Snapshots: a pending line wrap, and mirrored emulator state
 

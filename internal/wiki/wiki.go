@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -169,7 +168,7 @@ func (w *Wikis) Entry(project, p string) (Entry, error) {
 		Path:             rel(e.Path),
 		Title:            title(e),
 		Version:          home.Version([]byte(raw)),
-		Frontmatter:      fields(e, ref(idx, e)),
+		Frontmatter:      fields(e, idx),
 		FrontmatterError: frontmatterError(e),
 		Body:             body,
 		Links:            links(idx, e),
@@ -208,7 +207,7 @@ func (w *Wikis) Image(project, p string) (file, contentType string, err error) {
 	target := "/" + strings.TrimPrefix(p, "/")
 	contentType = ImageType(target)
 	linked := slices.ContainsFunc(idx.Entries, func(e *index.Entry) bool {
-		return slices.ContainsFunc(e.Links, func(l index.Link) bool { return Decoded(l.Target) == target })
+		return slices.ContainsFunc(e.Links, func(l index.Link) bool { return l.Target == target })
 	})
 	if contentType == "" || !linked {
 		return "", "", fmt.Errorf("%w: %s", ErrNotFound, p)
@@ -227,31 +226,20 @@ func (w *Wikis) Image(project, p string) (file, contentType string, err error) {
 	return file, contentType, nil
 }
 
-// Decoded is a link's path as the file is named: written percent-encoded, as
-// on GitHub (`my%20file.md`), it names `my file.md` (the CEO, 2026-11-03). A
-// path that isn't valid encoding is taken as written.
-func Decoded(p string) string {
-	if d, err := url.PathUnescape(p); err == nil {
-		return d
-	}
-	return p
-}
-
 func links(idx *index.Index, e *index.Entry) []Link {
 	out := make([]Link, 0, len(e.Links)+len(e.Outside))
 	for _, l := range e.Links {
-		target := Decoded(l.Target)
-		_, err := idx.Resolve(target)
+		_, err := idx.Resolve(l.Target)
 		// Not an entry and not named like one: a file the wiki carries. A
 		// missing .md is an entry not written yet, not a file.
-		file := err != nil && !strings.HasSuffix(target, ".md") && idx.FileExists(target)
+		file := err != nil && !strings.HasSuffix(l.Target, ".md") && idx.FileExists(l.Target)
 		out = append(out, Link{
 			Raw:    l.Raw,
-			To:     rel(target),
+			To:     rel(l.Target),
 			Anchor: l.Anchor,
 			Exists: err == nil,
 			File:   file,
-			Image:  file && ImageType(target) != "",
+			Image:  file && ImageType(l.Target) != "",
 		})
 	}
 	for _, l := range e.Outside {
@@ -316,9 +304,19 @@ func backlinks(idx *index.Index, e *index.Entry) []Backlink {
 // fields is an entry's frontmatter as the reader shows it, by key, each
 // field's values without empty ones (FieldList). Not shown: the index's own
 // keys (leading underscore), and okf_version, the format's bookkeeping on the
-// root index.md (wikiview hides it too). ref resolves a value that names an
-// entry; nil resolves none (a repo file's frontmatter).
-func fields(e *index.Entry, ref func(v string) Value) []Field {
+// root index.md (wikiview hides it too). With idx, a value that names an
+// existing entry (Entry.FrontmatterRefs) links to it, with its title; a repo
+// file's frontmatter (idx nil) is text.
+func fields(e *index.Entry, idx *index.Index) []Field {
+	named := map[string]map[string]string{} // key -> value -> the entry's path
+	for _, r := range e.FrontmatterRefs() {
+		if idx != nil && !r.Outside {
+			if named[r.Key] == nil {
+				named[r.Key] = map[string]string{}
+			}
+			named[r.Key][r.Value] = r.Path
+		}
+	}
 	out := []Field{}
 	for _, k := range slices.Sorted(maps.Keys(e.Frontmatter())) {
 		if strings.HasPrefix(k, "_") || k == "okf_version" {
@@ -326,27 +324,25 @@ func fields(e *index.Entry, ref func(v string) Value) []Field {
 		}
 		f := Field{Key: k, Values: []Value{}}
 		for _, v := range e.FieldList(k) {
-			if ref == nil {
-				f.Values = append(f.Values, Value{Text: v})
-			} else {
-				f.Values = append(f.Values, ref(v))
+			value := Value{Text: v}
+			if p, ok := named[k][v]; ok {
+				if to, err := idx.Resolve(p); err == nil { // rooted: by path, never by file name
+					value.To, value.Title = rel(to.Path), title(to)
+				}
 			}
+			f.Values = append(f.Values, value)
 		}
 		out = append(out, f)
 	}
 	return out
 }
 
-// title is an entry's `title` field, else its body's first `# heading`, else
-// a readable name from its filename: cards written either way get a title.
+// title is the entry's title by the wiki library's rule (`title:`, else its
+// first `# heading`), else a readable name from its filename: cards written
+// either way get a title.
 func title(e *index.Entry) string {
-	if t := e.Field("title"); t != "" {
+	if t := e.Title(); t != "" {
 		return t
-	}
-	for _, h := range e.Headings {
-		if h.Level == 1 && h.Text != "" {
-			return h.Text
-		}
 	}
 	return titleFromFilename(e.Path)
 }

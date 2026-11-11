@@ -30,7 +30,8 @@ See [Deploy](./deploy.md), [bare](deploy.md), [setup](deploy.md#set-up), [query]
 	write(t, filepath.Join(api, "guides", "sub", "index.md"), "# Sub\n")
 	write(t, filepath.Join(api, "wiki", "wiki.toml"), "")
 	write(t, filepath.Join(api, "wiki", "index.md"), "# Wiki\n")
-	write(t, filepath.Join(api, "wiki", "notes", "a.md"), "[top](/index.md) [above](/../README.md)\n")
+	write(t, filepath.Join(api, "wiki", "notes", "a.md"), "[top](/index.md) [above](/../README.md) [up](../../README.md) [dots](..notes/a.md) [out](../../../x.md)\n")
+	write(t, filepath.Join(api, "top.md"), "[dots](..notes/a.md) [up](../x.md)\n")
 	if err := os.Symlink("logo.png", filepath.Join(api, "link.png")); err != nil {
 		t.Fatal(err)
 	}
@@ -80,14 +81,45 @@ func TestMarkdownLinksResolveAgainstTheCommit(t *testing.T) {
 		t.Errorf("headings %+v", f.Headings)
 	}
 
-	// Below a wiki.toml, a root-absolute link starts at that folder.
+	// Below a wiki.toml, a root-absolute link starts at that folder, and a link
+	// climbing out of the wiki, either way it is written, still reaches the repo
+	// (wiki/ is not the repo's root): it is outside only when it climbs out of the
+	// repo. "..notes" is a name, not a climb (segment-exact).
 	f, err = b.File(ctx, "ledger", "api", "trunk", "wiki/notes/a.md")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Link{{Raw: "/index.md", To: "wiki/index.md", Exists: true}, {Raw: "/../README.md", To: "README.md", Exists: true}}
-	if len(f.Links) != 2 || f.Links[0] != want[0] || f.Links[1] != want[1] {
+	wiki := map[string]Link{}
+	for _, l := range f.Links {
+		wiki[l.Raw] = l
+	}
+	for raw, want := range map[string]Link{
+		"/index.md":       {To: "wiki/index.md", Exists: true},
+		"/../README.md":   {To: "README.md", Exists: true},
+		"../../README.md": {To: "README.md", Exists: true},
+		"..notes/a.md":    {To: "wiki/notes/..notes/a.md"},
+		"../../../x.md":   {Outside: true},
+	} {
+		want.Raw = raw
+		if wiki[raw] != want {
+			t.Errorf("wiki %s: %+v, want %+v", raw, wiki[raw], want)
+		}
+	}
+	if len(f.Links) != 5 {
 		t.Errorf("wiki links %+v", f.Links)
+	}
+	// At the repo's root, with no wiki above: ../x climbs out of the repo, and
+	// "..notes" stays a name.
+	f, err = b.File(ctx, "ledger", "api", "trunk", "top.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	top := map[string]Link{}
+	for _, l := range f.Links {
+		top[l.Raw] = l
+	}
+	if top["..notes/a.md"] != (Link{Raw: "..notes/a.md", To: "..notes/a.md"}) || top["../x.md"] != (Link{Raw: "../x.md", Outside: true}) {
+		t.Errorf("top links %+v", f.Links)
 	}
 	// Another branch is read as it is: the docs aren't on wt/tove/x.
 	if f, err := b.File(ctx, "ledger", "api", "wt/tove/x", "README.md"); err != nil || len(f.Links) != 0 {

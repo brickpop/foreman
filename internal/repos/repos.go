@@ -179,7 +179,7 @@ func (b Browser) File(ctx context.Context, project, repo, ref, path string) (Fil
 		if f.Markdown = markdown.MatchString(path); f.Markdown {
 			f.Frontmatter, f.Body, f.Headings, f.FrontmatterError = wiki.Markdown(path, f.Text)
 			t := &trees{ctx: ctx, git: b.Git, dir: dir, commit: commit, read: map[string][]git.TreeEntry{}}
-			f.Links = t.links(path, f.Body)
+			f.Links = t.links(path, f.Text)
 		}
 	}
 	return f, nil

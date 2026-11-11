@@ -37,7 +37,7 @@ RUN set -eux; \
 # Keep it the version go.mod requires for github.com/agentic-wiki/wiki: the
 # agents' CLI and Foreman's library must read a wiki by the same rules
 # (TestWikiVersionMatchesGoMod).
-ARG WIKI_VERSION=v0.16.2
+ARG WIKI_VERSION=v0.17.0
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     if [ "$WIKI_VERSION" = "latest" ]; then from="latest/download"; else from="download/${WIKI_VERSION}"; fi; \

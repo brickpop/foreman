@@ -201,6 +201,8 @@ export interface AgentsArea {
   line(instance: string, text: string): Promise<void>;
   /** Pauses or resumes the countdown of messages waiting on the CEO's draft. */
   pauseCountdown(instance: string, paused: boolean): Promise<void>;
+  /** Releases messages held on a draft, marking it unfinished. */
+  sendNow(instance: string): Promise<void>;
   openTerminal(id: string, handlers: PtyHandlers): PtyConnection;
 }
 
@@ -533,6 +535,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       wake: (instance) => send("POST", `/api/instances/${id(instance)}/wake`),
       restart: (instance) => send("POST", `/api/instances/${id(instance)}/restart`),
       line: (instance, text) => send("POST", `/api/instances/${id(instance)}/line`, { text }),
+      sendNow: (instance) => send("POST", `/api/instances/${id(instance)}/send-now`),
       pauseCountdown: (instance, paused) =>
         send("PUT", `/api/instances/${id(instance)}/countdown`, { paused }),
       openTerminal: (instance, handlers) => openPty(`${wsOrigin}/ws/pty/${id(instance)}`, handlers),

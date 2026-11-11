@@ -446,6 +446,9 @@ function AgentSession({
                 >
                   {draft.paused ? "Resume" : "Pause"}
                 </Button>
+                <Button variant="tiny" onClick={() => client.agents.sendNow(instance.id)}>
+                  Send now
+                </Button>
               </>
             ) : (
               // The line went out: they follow at the agent's next idle, never dropped.

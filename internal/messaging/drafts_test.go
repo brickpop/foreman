@@ -234,3 +234,94 @@ func TestARestartForgetsTheDraft(t *testing.T) {
 	f.ask("build cal")
 	f.eventually("delivered at once", func() bool { return strings.HasPrefix(f.s.of("mara@ledger"), "Message msg-1") })
 }
+
+// Codex queries colors and cursor position without the CEO touching a key.
+// Terminal replies can arrive split across WebSocket frames.
+func TestTerminalRepliesDoNotCreateDrafts(t *testing.T) {
+	for _, reply := range []string{
+		"\x1b]10;rgb:ffff/ffff/ffff\x07",
+		"\x1b]11;rgb:0000/0000/0000\x1b\\",
+		"\x1b[12;34R",
+		"\x1b[?1;2c",
+		"\x1bP>|terminal version\x1b\\",
+	} {
+		for split := 0; split <= len(reply); split++ {
+			m := New(Deps{})
+			m.Typed("x", []byte(reply[:split]))
+			m.Typed("x", []byte(reply[split:]))
+			if m.Drafting("x") {
+				t.Fatalf("reply %q split at %d made a draft", reply, split)
+			}
+			m.Typed("x", []byte("\x1b[200~hello\x1b[201~"))
+			if m.draft("x").length != 5 {
+				t.Fatalf("typing after reply %q lost: %+v", reply, m.draft("x"))
+			}
+		}
+	}
+}
+
+func TestColorRepliesDoNotHoldMessages(t *testing.T) {
+	f := newDraftFixture(t)
+	for _, b := range []byte("\x1b]11;rgb:0000/0000/0000\x1b\\") {
+		f.m.Typed("mara@ledger", []byte{b})
+	}
+	f.ask("build cal")
+	f.eventually("delivered without a draft", func() bool {
+		return strings.HasPrefix(f.s.of("mara@ledger"), "Message msg-1")
+	})
+	if d := f.lastDraft(); d.Waiting != 0 {
+		t.Fatalf("unexpected notice: %+v", d)
+	}
+}
+
+func TestSendNowReleasesAPausedDraftOnce(t *testing.T) {
+	f := newDraftFixture(t)
+	f.m.SendNow("nobody")
+	f.m.Typed("mara@ledger", []byte("unfinished"))
+	f.ask("build cal")
+	f.eventually("held", func() bool { return f.lastDraft().OnDraft })
+	f.m.PauseCountdown("mara@ledger", true)
+	f.m.SendNow("mara@ledger")
+	f.m.SendNow("mara@ledger")
+	if got := f.s.of("mara@ledger"); strings.Count(got, "Message msg-1") != 1 || !strings.Contains(got, draftNote) {
+		t.Fatalf("send now typed %q", got)
+	}
+	if f.m.Drafting("mara@ledger") || f.lastDraft().Waiting != 0 {
+		t.Fatalf("draft remained: %+v", f.lastDraft())
+	}
+}
+
+func TestSendNowWaitsForAnIdleAgent(t *testing.T) {
+	f := newDraftFixture(t)
+	f.m.Typed("mara@ledger", []byte("unfinished"))
+	f.ask("build cal")
+	f.eventually("held", func() bool { return f.lastDraft().OnDraft })
+	f.setStatus("mara@ledger", "running")
+	f.m.SendNow("mara@ledger")
+	if d := f.lastDraft(); d.Waiting != 1 || d.OnDraft || d.Paused || d.Counting {
+		t.Fatalf("send now kept the countdown: %+v", d)
+	}
+	f.still(60 * time.Millisecond)
+	f.setStatus("mara@ledger", "idle")
+	f.m.StatusChanged("mara@ledger", "idle")
+	f.eventually("delivered on idle", func() bool {
+		return strings.Contains(f.s.of("mara@ledger"), "Message msg-1")
+	})
+	if !strings.Contains(f.s.of("mara@ledger"), draftNote) {
+		t.Fatalf("lost draft marker: %q", f.s.of("mara@ledger"))
+	}
+}
+
+func TestTerminalRepliesPreserveAnExistingDraftAndItsQuietTime(t *testing.T) {
+	m := New(Deps{})
+	m.Typed("x", []byte("hello"))
+	lastKey := m.draft("x").lastKey
+	m.Typed("x", []byte("\x1b]11;rgb:0000/0000/0000\x07"))
+	if d := m.draft("x"); d.length != 5 || !d.lastKey.Equal(lastKey) {
+		t.Fatalf("reply changed the draft: %+v", d)
+	}
+	m.Typed("x", []byte("\x7f\x7f\x7f\x7f\x7f"))
+	if m.Drafting("x") {
+		t.Fatal("reply left phantom characters after clearing the real draft")
+	}
+}

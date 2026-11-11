@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -427,7 +428,11 @@ func TestInitStepFollowsTheImages(t *testing.T) {
 	r := newRig(t, &engine{installed: true, running: true})
 	r.Images = twoImages{}
 	got := kinds(r.Steps(ctx))
-	want := []string{"podman done", "running working", "image todo", "image todo", "init todo"}
+	want := []string{"podman done"}
+	if runtime.GOOS == "darwin" {
+		want = append(want, "machine todo")
+	}
+	want = append(want, "running working", "image todo", "image todo", "init todo")
 	if len(got) < len(want) || !slices.Equal(got[:len(want)], want) {
 		t.Errorf("steps %v\nwant  %v, then the rest", got, want)
 	}

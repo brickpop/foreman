@@ -405,7 +405,9 @@ func TestHousekeepingNeverDetaches(t *testing.T) {
 	if strings.Contains(string(data), `"--detach"`) {
 		t.Error("git ran its housekeeping detached")
 	}
-	if strings.Contains(string(data), `"maintenance"`) && !strings.Contains(string(data), `"--no-detach"`) {
+	// Older Git has no detach option: maintenance already runs in the foreground.
+	help, _ := exec.Command("git", "maintenance", "run", "-h").CombinedOutput()
+	if strings.Contains(string(help), "--detach") && strings.Contains(string(data), `"maintenance"`) && !strings.Contains(string(data), `"--no-detach"`) {
 		t.Error("maintenance ran without --no-detach")
 	}
 }

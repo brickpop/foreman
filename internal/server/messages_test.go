@@ -16,6 +16,7 @@ type fakeMessages struct {
 	asked string
 	line  string // instance: text
 	pause string // instance: paused
+	sent  string
 }
 
 func (f *fakeMessages) Line(instance, text string) error {
@@ -25,6 +26,8 @@ func (f *fakeMessages) Line(instance, text string) error {
 	f.line = instance + ": " + text
 	return nil
 }
+
+func (f *fakeMessages) SendNow(instance string) { f.sent = instance }
 
 func (f *fakeMessages) PauseCountdown(instance string, paused bool) {
 	f.pause = fmt.Sprintf("%s: %v", instance, paused)
@@ -64,6 +67,9 @@ func TestTheCEOsLineAndTheCountdown(t *testing.T) {
 	}
 	if w := do(http.MethodPut, "/api/instances/mara%40ledger/countdown", `{"paused":true}`); w.Code != http.StatusNoContent || f.pause != "mara@ledger: true" {
 		t.Errorf("%d %q", w.Code, f.pause)
+	}
+	if w := do(http.MethodPost, "/api/instances/mara%40ledger/send-now", ""); w.Code != http.StatusNoContent || f.sent != "mara@ledger" {
+		t.Errorf("send now: %d %q", w.Code, f.sent)
 	}
 	if w := do(http.MethodPost, "/api/instances/mara%40ledger/line", `nope`); w.Code != http.StatusBadRequest {
 		t.Errorf("bad body: %d", w.Code)

@@ -181,6 +181,15 @@ describe("httpClient", () => {
     ]);
   });
 
+  it("releases held messages now", async () => {
+    const calls = stubFetch(204, undefined);
+    await httpClient("http://x").agents.sendNow("mara@ledger");
+    expect(calls[0]).toMatchObject({
+      method: "POST",
+      url: "http://x/api/instances/mara%40ledger/send-now",
+    });
+  });
+
   it("reads a project's repos at a ref", async () => {
     const calls = stubFetch(200, []);
     const client = httpClient("http://x");

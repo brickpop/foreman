@@ -19,6 +19,8 @@ type Messages interface {
 	// PauseCountdown pauses or resumes the countdown of messages waiting on
 	// the CEO's draft in an agent's terminal.
 	PauseCountdown(instance string, paused bool)
+	// SendNow releases messages held on the draft, as countdown expiry does.
+	SendNow(instance string)
 }
 
 // Activity pages team traffic, messages and git actions together (implemented
@@ -53,6 +55,10 @@ func activityRoutes(mux *http.ServeMux, act Activity) {
 }
 
 func messageRoutes(mux *http.ServeMux, m Messages) {
+	mux.HandleFunc("POST /api/instances/{id}/send-now", func(w http.ResponseWriter, r *http.Request) {
+		m.SendNow(r.PathValue("id"))
+		w.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("GET /api/messages", func(w http.ResponseWriter, r *http.Request) {
 		deployment := r.URL.Query().Get("deployment")
 		if deployment == "" {

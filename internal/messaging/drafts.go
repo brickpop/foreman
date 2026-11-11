@@ -18,7 +18,8 @@ import (
 const draftNote = "The CEO's text above is an unfinished draft: don't act on it yet."
 
 type draft struct {
-	length  int // characters the CEO typed since the last Enter (or clear)
+	escape  byte // escape parser state, retained across input frames
+	length  int  // characters the CEO typed since the last Enter (or clear)
 	lastKey time.Time
 	// The countdown, while messages wait on the draft.
 	holding bool
@@ -34,8 +35,13 @@ type draft struct {
 func (m *Messenger) Typed(id string, p []byte) {
 	m.mu.Lock()
 	d := m.draft(id)
-	ended, submitted := false, false
+	ended, submitted, keyed := false, false, false
 	for i := 0; i < len(p); {
+		if d.control(p[i]) {
+			i++
+			continue
+		}
+		keyed = true
 		switch b := p[i]; {
 		case b == '\r' || b == '\n':
 			ended, submitted = d.length > 0 || ended, true
@@ -51,8 +57,6 @@ func (m *Messenger) Typed(id string, p []byte) {
 				ended = d.length == 0 || ended
 			}
 			i++
-		case b == 0x1b:
-			i += escapeLength(p[i:])
 		case b < 0x20:
 			i++
 		default:
@@ -61,7 +65,9 @@ func (m *Messenger) Typed(id string, p []byte) {
 			i += size
 		}
 	}
-	d.lastKey = m.now()
+	if keyed {
+		d.lastKey = m.now()
+	}
 	holding := d.holding
 	if ended && d.length == 0 {
 		m.release(id, d)
@@ -78,25 +84,50 @@ func (m *Messenger) Typed(id string, p []byte) {
 	}
 }
 
-// escapeLength is how long the escape sequence at the start of p is: ESC [
-// … final byte, ESC O x, or ESC and one more byte. A bracketed paste's
-// markers are sequences too; what is pasted between them is text.
-func escapeLength(p []byte) int {
-	if len(p) < 2 {
-		return len(p)
-	}
-	switch p[1] {
-	case '[':
-		for i := 2; i < len(p); i++ {
-			if p[i] >= 0x40 && p[i] <= 0x7e {
-				return i + 1
-			}
+// control consumes terminal sequences without mistaking their payload for
+// typing. OSC color replies and other string replies end at BEL or ST; CSI
+// and SS3 include key sequences and bracketed-paste markers.
+func (d *draft) control(b byte) bool {
+	switch d.escape {
+	case 0:
+		if b != 0x1b {
+			return false
 		}
-		return len(p)
+		d.escape = 'e'
+	case 'e':
+		switch b {
+		case '[':
+			d.escape = '['
+		case ']', 'P', '_', '^', 'X':
+			d.escape = 's'
+		case 'O':
+			d.escape = 'O'
+		default:
+			d.escape = 0
+		}
+	case '[':
+		if b >= 0x40 && b <= 0x7e {
+			d.escape = 0
+		}
 	case 'O':
-		return min(3, len(p))
+		d.escape = 0
+	case 's':
+		switch b {
+		case 0x07:
+			d.escape = 0
+		case 0x1b:
+			d.escape = 't'
+		}
+	case 't':
+		switch b {
+		case '\\', 0x07:
+			d.escape = 0
+		case 0x1b:
+		default:
+			d.escape = 's'
+		}
 	}
-	return 2
+	return true
 }
 
 // Drafting reports whether the CEO has typed into the instance's prompt
@@ -116,6 +147,18 @@ func (m *Messenger) PauseCountdown(id string, paused bool) {
 		d.paused = paused
 		m.publishDraft(id, d)
 	}
+}
+
+// SendNow releases the countdown hold, preserving an unfinished draft just
+// as expiry does. Deliver still waits for the agent's next idle.
+func (m *Messenger) SendNow(id string) {
+	m.mu.Lock()
+	if d := m.drafts[id]; d != nil && d.holding {
+		d.expired, d.holding, d.paused, d.left = true, false, false, 0
+		m.publishDraft(id, d)
+	}
+	m.mu.Unlock()
+	m.Deliver(id)
 }
 
 // draft is an instance's draft, made on first use. Called with m.mu held.

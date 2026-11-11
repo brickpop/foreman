@@ -179,6 +179,8 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 | **Small** (outline) | Transparent, 1px `--line2`, `--tx2`, 500 12.5px, radius 6, padding `4px 10px` | Actions inside a row or header: Session, Open PR ↗, Open in wiki, Sync, Connect, Edit, Rebuild |
 | **Tiny** | 1px `--line2`, radius 5, padding `2px 8px`, 400 12px, `--tx3` | The draft box's Pause / Resume, a review comment's Edit and Delete |
 
+**Busy** (any variant; the CEO, 2026-11-11): while its action runs, a button shows a **spinner** before its label and is disabled (`Button busy`, `aria-busy`), its label saying so (`Deleting 3 branches`). The spinner (`Spinner`: 14px, a 2px ring in the text's color, its top open, turning) also marks a wait in running text (`Reading the branches of api…`, an agent starting).
+
 **Request option buttons** follow their position: option 1 is primary (600); option 2 is outline with `--tx`; options 3+ are outline with `--tx2`. Size `7px 14px`, 13.5px on the Dashboard and 13px in the project's Inbox (Needs you).
 
 ## Form controls

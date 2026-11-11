@@ -15,6 +15,7 @@ export function TreeRow({
   onClick,
   children,
   after,
+  title,
 }: {
   folder?: boolean;
   open?: boolean;
@@ -25,6 +26,8 @@ export function TreeRow({
   children: ReactNode;
   /** Beside the name: a changed dot, a "link" note. */
   after?: ReactNode;
+  /** The tooltip: the whole path, where the row shows only a name. */
+  title?: string;
 }) {
   const look = `flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-[3px] text-left ${
     mono ? "font-mono text-[12.5px]" : "text-[13.5px]"
@@ -39,13 +42,19 @@ export function TreeRow({
       {after}
     </>
   );
-  if (!onClick) return <span className={look}>{inside}</span>;
+  if (!onClick)
+    return (
+      <span className={look} title={title}>
+        {inside}
+      </span>
+    );
   return (
     <button
       type="button"
       aria-expanded={folder ? open : undefined}
       aria-current={current ? "page" : undefined}
       onClick={onClick}
+      title={title}
       className={look}
     >
       {inside}

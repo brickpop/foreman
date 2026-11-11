@@ -99,7 +99,10 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 					keep(c, "not all of it is merged")
 					continue
 				}
-				if err := w.Git.DropBranch(ctx, r.Path, b, git.BackupRef("cleaned", w.Now(), b), r.Default); err != nil {
+				if err := w.Git.DeleteBranch(ctx, r.Path, b, git.BackupRef("cleaned", w.Now(), b)); errors.Is(err, git.ErrCheckedOut) {
+					keep(c, "it is checked out")
+					continue
+				} else if err != nil {
 					keep(c, err.Error())
 					continue
 				}

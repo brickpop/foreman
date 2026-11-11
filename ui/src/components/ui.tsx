@@ -29,16 +29,40 @@ const buttonSizes: Partial<Record<keyof typeof buttonVariants, string>> = {
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof buttonVariants;
+  /** Its action is under way: a spinner before the label, and disabled meanwhile. */
+  busy?: boolean;
 };
 
 /** A button; disabled is real (not focusable as an action, dimmed). */
-export function Button({ variant = "secondary", className = "", ...props }: ButtonProps) {
+export function Button({
+  variant = "secondary",
+  className = "",
+  busy = false,
+  disabled,
+  children,
+  ...props
+}: ButtonProps) {
   const size = buttonSizes[variant] ?? "rounded-[7px] px-3.5 py-[7px] text-[13px]";
   return (
     <button
       type="button"
-      className={`${size} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-45 ${buttonVariants[variant]} ${className}`}
+      disabled={disabled || busy}
+      aria-busy={busy || undefined}
+      className={`${size} focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-acc disabled:opacity-45 ${buttonVariants[variant]} ${busy ? "inline-flex items-center gap-2" : ""} ${className}`}
       {...props}
+    >
+      {busy && <Spinner />}
+      {children}
+    </button>
+  );
+}
+
+/** Something under way, in the color of the text around it. */
+export function Spinner() {
+  return (
+    <span
+      aria-hidden
+      className="inline-block size-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
     />
   );
 }

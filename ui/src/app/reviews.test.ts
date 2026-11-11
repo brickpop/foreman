@@ -21,6 +21,8 @@ import {
   reviewGroups,
   reviewTeam,
   statusLabel,
+  treeWidth,
+  treeWidths,
 } from "./reviews";
 
 const mr = (repo: string, more: Partial<MergeRequest> = {}) =>
@@ -322,5 +324,28 @@ describe("readingFile", () => {
 
   it("is never a file that only touches the view's bottom edge", () => {
     expect(readingFile([{ id: "a", top: 500, bottom: 800 }], 0, 500)).toBeUndefined();
+  });
+});
+
+describe("treeWidth", () => {
+  it("keeps a width within the bounds, rounded", () => {
+    expect(treeWidth(300)).toBe(300);
+    expect(treeWidth(300.6)).toBe(301);
+    expect(treeWidth("412")).toBe(412);
+  });
+
+  it("clamps a width past either bound", () => {
+    expect(treeWidth(10)).toBe(treeWidths.min);
+    expect(treeWidth(-50)).toBe(treeWidths.min);
+    expect(treeWidth(5000)).toBe(treeWidths.max);
+    expect(treeWidth("9999")).toBe(treeWidths.max);
+    expect(treeWidth(Number.POSITIVE_INFINITY)).toBe(treeWidths.start);
+  });
+
+  it("starts at its default when nothing usable is stored", () => {
+    expect(treeWidth(null)).toBe(240);
+    expect(treeWidth("")).toBe(240);
+    expect(treeWidth("wide")).toBe(240);
+    expect(treeWidth(Number.NaN)).toBe(240);
   });
 });

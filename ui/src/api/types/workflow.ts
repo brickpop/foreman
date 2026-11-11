@@ -24,6 +24,59 @@ export interface Cleaned {
 }
 
 //////////
+// source: prune.go
+
+/**
+ * Merged: all of it is in a branch of the CEO's, or upstream (a remote's
+ * branch, but its own copy there), or merging it where work lands would
+ * change nothing (squash-aware).
+ */
+export const Merged = "merged";
+/**
+ * Superseded: not merged, but all of it is in another agents' branch.
+ */
+export const Superseded = "superseded";
+/**
+ * Unmerged: some of it is nowhere else.
+ */
+export const Unmerged = "unmerged";
+/**
+ * CleanupBranch is one branch of a code repo, as the CEO's branch cleanup
+ * lists it.
+ */
+export interface CleanupBranch {
+  branch: string;
+  /**
+   * Agents: an agents' branch (wt/*, lead/*); else the CEO's.
+   */
+  agents: boolean;
+  /**
+   * State is Merged, Superseded or Unmerged.
+   */
+  state: string;
+  /**
+   * SupersededBy are the agents' branches holding all of a superseded one.
+   */
+  supersededBy?: string[];
+  /**
+   * Legacy: an agents' branch named before branches carried their project
+   * (wt/<agent>/…), or carrying a project Foreman no longer has.
+   */
+  legacy: boolean;
+  /**
+   * Stays says why it can't be deleted: checked out, under review, an open
+   * review's target. "" when it can.
+   */
+  stays?: string;
+  /**
+   * Stray is the folder of the stray worktree that has it checked out (no
+   * project's agent's, not the CEO's checkout): picked, that worktree is
+   * removed first, unless it holds changes not committed.
+   */
+  stray?: string;
+}
+
+//////////
 // source: reviews.go
 
 /**

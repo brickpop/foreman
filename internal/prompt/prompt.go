@@ -90,7 +90,12 @@ var teamTools = []teamTool{
 	}},
 	{"fetch", leadOnly, anyone, true, []string{
 		"fetch()                             Fetch the repos' remotes: what was pushed upstream shows as",
-		"                                    origin/*, to merge in with merge(\"origin/main\"). The CEO's branches don't move.",
+		"                                    origin/*. To sync with upstream (say origin/develop): fetch(), then",
+		"                                    merge(\"origin/develop\"). The CEO's branches don't move.",
+	}},
+	{"prune", anyone, anyone, true, []string{
+		"prune(branches)                     Delete your merged or superseded branches (the lead: its teammates'",
+		"                                    too); one of yours named in branches goes even unmerged. Clean up after a merge.",
 	}},
 	{"request_merge", leadOnly, anyone, true, []string{
 		"request_merge(branch, title, body, entry, into)",

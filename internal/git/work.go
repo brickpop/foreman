@@ -115,23 +115,30 @@ func (g *CLI) Branches(ctx context.Context, dir, prefix string) ([]string, error
 	return list, nil
 }
 
-// HeldBy lists dir's branches, but the agents' (AgentBranch), that hold all
-// of branch in their history: work merged there with its commits.
-func (g *CLI) HeldBy(ctx context.Context, dir, branch string) ([]string, error) {
+// Holders lists the branches whose history holds all of branch: where its
+// commits are. local are dir's branches but branch itself (feature/x);
+// upstream a remote's as fetched (origin/main), but a remote's HEAD. Each
+// sorted.
+func (g *CLI) Holders(ctx context.Context, dir, branch string) (local, upstream []string, err error) {
 	if !ValidBranch(ctx, branch) {
-		return nil, ErrBadBranch
+		return nil, nil, ErrBadBranch
 	}
-	out, err := run(ctx, dir, "for-each-ref", "--format=%(refname:short)", "--contains", "refs/heads/"+branch, "refs/heads/")
+	out, err := run(ctx, dir, "for-each-ref", "--format=%(refname)", "--contains", "refs/heads/"+branch, "refs/heads/", "refs/remotes/")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	var list []string
-	for _, b := range strings.Fields(out) {
-		if !AgentBranch(b) {
-			list = append(list, b)
+	for _, ref := range strings.Fields(out) {
+		if name, ok := strings.CutPrefix(ref, "refs/heads/"); ok {
+			if name != branch {
+				local = append(local, name)
+			}
+		} else if name := strings.TrimPrefix(ref, "refs/remotes/"); !strings.HasSuffix(name, "/HEAD") {
+			upstream = append(upstream, name)
 		}
 	}
-	return list, nil
+	slices.Sort(local)
+	slices.Sort(upstream)
+	return local, upstream, nil
 }
 
 // Contains reports whether branch into has branch's head in its history:

@@ -48,6 +48,7 @@ import type { Board, Card, Entry, Field, Node, Unread } from "./types/wiki";
 import type {
   Cleaned,
   Cleanup,
+  CleanupBranch,
   Dismiss,
   Dismissed,
   RepoDiff,
@@ -70,6 +71,7 @@ export type {
   Card,
   Cleaned,
   Cleanup,
+  CleanupBranch,
   Commit,
   Deployment,
   Dismiss,
@@ -281,6 +283,12 @@ export interface PipelineArea {
   /** Removes what agents no longer running left on the project, only what
    * is safe; says what it removed and what it kept, with why. */
   cleanUp(project: string): Promise<Cleanup>;
+  /** What the branch cleanup offers in a code repo: the project's agents'
+   * branches and legacy ones, and the CEO's merged or superseded ones, each
+   * with where its work stands and what keeps it. */
+  cleanupBranches(project: string, repo: string): Promise<CleanupBranch[]>;
+  /** Deletes the CEO's pick of them, each checked again; those that stay, stay. */
+  deleteBranches(project: string, repo: string, branches: string[]): Promise<Cleanup>;
 }
 
 /** A comment the CEO writes: on a line of a repo's diff (its side, line, and
@@ -591,6 +599,14 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
       cleanUp: async (project) =>
         (await request("POST", `/api/projects/${id(project)}/cleanup`)).json() as Promise<Cleanup>,
+      cleanupBranches: (project, repo) =>
+        getJSON(`/api/projects/${id(project)}/repos/${id(repo)}/branch-cleanup`),
+      deleteBranches: async (project, repo, branches) =>
+        (
+          await request("POST", `/api/projects/${id(project)}/repos/${id(repo)}/branch-cleanup`, {
+            branches,
+          })
+        ).json() as Promise<Cleanup>,
     },
     reviews: {
       list: () => getJSON("/api/reviews"),

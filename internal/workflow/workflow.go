@@ -45,11 +45,12 @@ type Git interface {
 	AbortMerge(ctx context.Context, dir string) error
 	Branches(ctx context.Context, dir, prefix string) ([]string, error)
 	Contains(ctx context.Context, dir, into, branch string) (bool, error)
-	HeldBy(ctx context.Context, dir, branch string) ([]string, error)
+	Holders(ctx context.Context, dir, branch string) (local, upstream []string, err error)
 	Merged(ctx context.Context, dir, into, branch string) (bool, error)
 	Squash(ctx context.Context, dir, target, branch, head, message string) error
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error
 	DropBranch(ctx context.Context, dir, branch, backup, def string) error
+	DeleteBranch(ctx context.Context, dir, branch, backup string) error
 	Discard(ctx context.Context, worktree, backup string) (bool, error)
 	Freshen(ctx context.Context, repo, branch, def string) (bool, error)
 	PruneBackups(ctx context.Context, dir string, before time.Time) error
@@ -191,6 +192,8 @@ var definitions = []agentlink.Tool{
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
 	{Name: "fetch", Description: "Fetch every remote of each repo: what was pushed upstream shows as its remote's branches (origin/main), which you merge in with merge(\"origin/main\"). Your branches and the CEO's don't move.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
+	{Name: "prune", Description: "Delete your branches whose work is merged (all of it in one of the CEO's branches, or upstream) or superseded (all of it in another branch), in every repo; the lead also deletes its teammates' merged ones, and those superseded by another branch of the same teammate. A branch of your own named in branches goes even unmerged. Never a home branch, one anyone has checked out, or one under review. Foreman keeps a copy of each for 30 days.",
+		InputSchema: object(`"branches":{"type":"array","items":{"type":"string"},"description":"Optional: branches to delete even if not merged, each one of yours, e.g. wt/<project>/<you>/<topic> or lead/<project>/<team>/<topic>"}`)},
 	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
 	{Name: "team", Description: "Where each teammate stands: its status, when its harness last reported, and each repo's branch with whether it holds uncommitted changes or a merge under way. Read-only; wakes nobody.",
@@ -215,6 +218,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		Ref      string   `json:"ref"`
 		URL      string   `json:"url"`
 		Repos    []string `json:"repos"`
+		Branches []string `json:"branches"`
 		Reason   string   `json:"reason"`
 		By       string   `json:"superseded_by"`
 		From     string   `json:"from"`
@@ -262,6 +266,8 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Title), strings.TrimSpace(a.Body), strings.TrimSpace(a.Entry), strings.TrimSpace(a.Into))
 	case "fetch":
 		res = t.fetch(ctx)
+	case "prune":
+		res = t.prune(ctx, a.Branches)
 	case "reviews":
 		return t.reviews(ctx) // read-only: not an action
 	case "team":

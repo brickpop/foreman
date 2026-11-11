@@ -262,3 +262,14 @@ export function readingFile(files: FileSpan[], top: number, bottom: number): str
   if (crossing) return crossing.id;
   return files.find((f) => f.top > top && f.top < bottom)?.id;
 }
+
+/** The file tree's width bounds, in px (the CEO, 2026-11-11): the CEO drags it within them. */
+export const treeWidths = { min: 180, max: 560, start: 240 };
+
+/** A width for the tree, from a drag or a stored value: within the bounds, the start width when
+ * it isn't a number (nothing stored, or something else). */
+export function treeWidth(px: number | string | null): number {
+  const n = typeof px === "string" ? Number.parseFloat(px) : px;
+  if (n === null || !Number.isFinite(n)) return treeWidths.start;
+  return Math.round(Math.min(treeWidths.max, Math.max(treeWidths.min, n)));
+}

@@ -86,27 +86,10 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	}
 }
 
-// landed says whether all of branch is in a branch of the CEO's
-// (wiki/product/features/pipeline-and-merges.md#where-a-merge-goes): in the
-// history of any of them, or squashed into one work lands on, the repo's
-// default or one a merge request of the project went into. Unknown (a git
-// error) counts as not.
+// landed says whether all of branch is in a branch of the CEO's or upstream
+// (Merged: wiki/product/architecture/sandboxes-and-git.md#cleaning-up-branches).
+// Unknown (a git error) counts as not.
 func (w *Workflow) landed(ctx context.Context, project home.Project, name, dir, branch string) bool {
-	if held, err := w.Git.HeldBy(ctx, dir, branch); err == nil && len(held) > 0 {
-		return true
-	}
-	landings := []string{project.Default(name)}
-	if mrs, err := w.MergeRequests.ForProject(ctx, project.ID); err == nil {
-		for _, mr := range mrs {
-			if mr.Repo == name && mr.Target != "" && !slices.Contains(landings, mr.Target) {
-				landings = append(landings, mr.Target)
-			}
-		}
-	}
-	for _, l := range landings {
-		if merged, err := w.Git.Merged(ctx, dir, l, branch); err == nil && merged {
-			return true
-		}
-	}
-	return false
+	state, _ := w.standing(ctx, project, name, dir, branch)
+	return state == Merged
 }

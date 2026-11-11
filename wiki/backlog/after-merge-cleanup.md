@@ -10,7 +10,7 @@ epic: git
 
 **Why:** once a merge request is merged (Merge to main, or seen on the forge), what it leaves behind should go, without the CEO doing it by hand (the CEO, 2026-10-21). Today the merge request and its work items move to Merged, the review resolves and the lead is told; nothing is removed.
 
-**Already promised, not built:** [Sandboxes and git policy → Branches](../product/architecture/sandboxes-and-git.md#branches) says that once a deployment ends Foreman deletes each agent's `wt/*` branch merged into `main` (`Git.Prune`). There is no such code: the spec states it as fact.
+**Built by hand since (the CEO, 2026-11-11):** agents delete their merged and superseded branches with `prune()` (the lead its teammates' too), and the CEO any agents' branch from a repo's page ([Sandboxes and git policy → Cleaning up branches](../product/architecture/sandboxes-and-git.md#cleaning-up-branches)): one rule (never checked out, never under review, a copy kept), one primitive (`Git.DeleteBranch`). What's left here is doing it **automatically** after a merge, with that same rule: no new deletion code.
 
 ## Decided (the CEO, 2026-10-21)
 

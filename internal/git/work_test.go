@@ -305,9 +305,9 @@ func TestBranchesAndContains(t *testing.T) {
 	}
 }
 
-// HeldBy lists the branches, but the agents', whose history has all of a
-// branch: where it was merged with its commits.
-func TestHeldBy(t *testing.T) {
+// Holders lists every other branch, local or a remote's, whose history has
+// all of a branch: where its commits are.
+func TestHolders(t *testing.T) {
 	dir := repo(t)
 	g := New()
 	write(t, filepath.Join(dir, "a"), "a\n")
@@ -322,21 +322,22 @@ func TestHeldBy(t *testing.T) {
 	if err := g.Commit(ctx, dir, "tove", "b"); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := g.HeldBy(ctx, dir, "wt/tove/LED-44"); err != nil || len(got) != 0 {
-		t.Errorf("before any merge: %v %v", got, err)
+	if local, up, err := g.Holders(ctx, dir, "wt/tove/LED-44"); err != nil || len(local)+len(up) != 0 {
+		t.Errorf("before any merge: %v %v %v", local, up, err)
 	}
-	run(ctx, dir, "update-ref", "refs/heads/feature/x", "wt/tove/LED-44")
 	run(ctx, dir, "update-ref", "refs/heads/lead/atlas/integration", "wt/tove/LED-44")
-	if got, err := g.HeldBy(ctx, dir, "wt/tove/LED-44"); err != nil || !slices.Equal(got, []string{"feature/x"}) {
-		t.Errorf("held by the CEO's feature/x only, not the lead's: %v %v", got, err)
+	run(ctx, dir, "update-ref", "refs/remotes/origin/main", "wt/tove/LED-44")
+	run(ctx, dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	if local, up, err := g.Holders(ctx, dir, "wt/tove/LED-44"); err != nil || !slices.Equal(local, []string{"lead/atlas/integration"}) || !slices.Equal(up, []string{"origin/main"}) {
+		t.Errorf("held by the lead's branch and upstream's main, not itself: %v %v %v", local, up, err)
 	}
-	if got, _ := g.HeldBy(ctx, dir, "release/1.0"); !slices.Equal(got, []string{"feature/x", "main", "release/1.0"}) {
-		t.Errorf("an older commit: %v", got)
+	if local, up, _ := g.Holders(ctx, dir, "release/1.0"); !slices.Equal(local, []string{"feature/x", "lead/atlas/integration", "main", "wt/tove/LED-44"}) || !slices.Equal(up, []string{"origin/main"}) {
+		t.Errorf("an older commit: %v %v", local, up)
 	}
-	if _, err := g.HeldBy(ctx, dir, "wt/tove/nope"); err == nil {
+	if _, _, err := g.Holders(ctx, dir, "wt/tove/nope"); err == nil {
 		t.Error("an unknown branch is an error, not held by none")
 	}
-	if _, err := g.HeldBy(ctx, dir, "-x"); !errors.Is(err, ErrBadBranch) {
+	if _, _, err := g.Holders(ctx, dir, "-x"); !errors.Is(err, ErrBadBranch) {
 		t.Errorf("option-like: %v", err)
 	}
 }

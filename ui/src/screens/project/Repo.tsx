@@ -24,6 +24,7 @@ import {
   readmeOf,
   shownAt,
 } from "../../app/repos";
+import { BranchCleanup } from "../../components/BranchCleanup";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Frontmatter, FrontmatterError } from "../../components/Frontmatter";
 import { Markdown, type ResolvedLink } from "../../components/Markdown";
@@ -75,6 +76,7 @@ export function Repo() {
           {repo?.project ? "Project repo" : readable(name)}
         </h1>
         <span className="font-mono text-[12.5px] text-tx4">{name}/</span>
+        {repo && !repo.project && <BranchCleanup project={project.id} repo={repo.name} />}
       </div>
       {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
       {repos.isPending && <Loading rows={6} />}

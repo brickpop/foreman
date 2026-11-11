@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
+import { fileTree, type TreeNode } from "../../app/fileTree";
 import { agentOf, forgeOf, linkLine, mergeTargets, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
@@ -38,8 +39,11 @@ import {
   readingFile,
   reviewTeam,
   statusLabel,
+  treeWidth,
+  treeWidths,
 } from "../../app/reviews";
 import { TextBox } from "../../components/AgentText";
+import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Chevron } from "../../components/icons";
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
@@ -137,7 +141,6 @@ export function Review() {
   // pins its file until the diffs scroll on: a short last file never reaches the top.
   const [reading, setReading] = useState<string>();
   const pane = useRef<HTMLDivElement>(null);
-  const tree = useRef<HTMLElement>(null);
   const pin = useRef<{ id: string; scroll: number }>(undefined);
   const findReading = useCallback(() => {
     const el = pane.current;
@@ -156,11 +159,6 @@ export function Review() {
   // Folding moves the files without a scroll.
   // biome-ignore lint/correctness/useExhaustiveDependencies: on a change of what the diffs show
   useEffect(findReading, [findReading, repos, folds, shut]);
-  // A lit row out of the tree's sight comes into it, the tree moving the least it can.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on a change of the file read only
-  useEffect(() => {
-    tree.current?.querySelector("[aria-current]")?.scrollIntoView({ block: "nearest" });
-  }, [reading]);
   const open = v !== undefined && isOpen(v);
   const comments: Comments = useMemo(
     () => ({
@@ -270,65 +268,24 @@ export function Review() {
         )}
       </header>
       <div className="flex min-h-0 flex-1">
-        <nav
-          ref={tree}
-          className="flex w-[240px] shrink-0 flex-col gap-5 overflow-auto border-r border-line px-3 py-5 text-[13px] max-[900px]:hidden"
-        >
-          {repos.map((r) => (
-            <div key={r.repo} className="flex flex-col gap-0.5">
-              <RepoRow
-                repo={r}
-                decided={decidedAs(v, r.repo)}
-                open={!shut.has(r.repo)}
-                onToggle={repos.length > 1 ? () => shutRepo(r.repo, !shut.has(r.repo)) : undefined}
-              />
-              {!shut.has(r.repo) &&
-                r.files.map((f) => {
-                  const id = fileId(r.repo, f.path);
-                  return (
-                    <button
-                      key={f.path}
-                      type="button"
-                      aria-current={id === reading ? "location" : undefined}
-                      title={f.from ? `${f.from} → ${f.path}` : f.path}
-                      onClick={() => {
-                        shutRepo(r.repo, false);
-                        fold(id, false);
-                        // After the unfold renders, so the file is where it will stay.
-                        requestAnimationFrame(() => {
-                          document.getElementById(id)?.scrollIntoView({ block: "start" });
-                          pin.current = { id, scroll: pane.current?.scrollTop ?? 0 };
-                          setReading(id);
-                        });
-                      }}
-                      className={`flex items-baseline gap-2 rounded-md px-2 py-1.5 text-left ${id === reading ? "bg-accSoft text-accTx" : "text-tx2 hover:bg-hover"}`}
-                    >
-                      {/* A path longer than the tree scrolls sideways (the CEO, 2026-11-05), its counts
-                      staying in their column. It starts at its end, the file's name; the whole
-                      of it is in the tooltip too. */}
-                      <span
-                        ref={toTheEnd}
-                        className="scroll-quiet min-w-0 flex-1 whitespace-nowrap font-mono text-[12px]"
-                      >
-                        {f.path}
-                      </span>
-                      <span className="font-mono text-[11px] text-ok">+{f.added}</span>
-                      <span className="font-mono text-[11px] text-err">−{f.removed}</span>
-                    </button>
-                  );
-                })}
-              {r.files.length === 0 && !shut.has(r.repo) && (
-                <span className={`px-1.5 ${r.targetGone ? "text-err" : "text-tx4"}`}>
-                  {r.targetGone
-                    ? `${r.target} is gone.`
-                    : r.gone
-                      ? "Can't show it."
-                      : "No changes."}
-                </span>
-              )}
-            </div>
-          ))}
-        </nav>
+        <FilesPane
+          repos={repos}
+          decided={(repo) => decidedAs(v, repo)}
+          shut={shut}
+          onShut={repos.length > 1 ? shutRepo : undefined}
+          reading={reading}
+          onOpen={(repo, path) => {
+            const id = fileId(repo, path);
+            shutRepo(repo, false);
+            fold(id, false);
+            // After the unfold renders, so the file is where it will stay.
+            requestAnimationFrame(() => {
+              document.getElementById(id)?.scrollIntoView({ block: "start" });
+              pin.current = { id, scroll: pane.current?.scrollTop ?? 0 };
+              setReading(id);
+            });
+          }}
+        />
         {/* The padding is inside, not on the scrolling pane: a pane's own padding
             would hold a stuck file header 20px below its top, lines showing above. */}
         <div ref={pane} onScroll={findReading} className="min-w-0 flex-1 overflow-auto px-8">
@@ -414,12 +371,175 @@ export function Review() {
   );
 }
 
-/** Scrolls a line to its end once drawn: a path shows its file's name first. Defined once,
- * so React calls it when the line mounts, not on every render (which would undo the CEO's
- * scroll). */
-const toTheEnd = (el: HTMLElement | null) => {
-  if (el) el.scrollLeft = el.scrollWidth;
+const widthKey = "foreman.reviewTree";
+
+function storedWidth(): number {
+  try {
+    return treeWidth(localStorage.getItem(widthKey));
+  } catch {
+    return treeWidth(null); // Storage blocked: the default width.
+  }
+}
+
+/** How a file changed, by its name in the tree; nothing for an edit. */
+const changeLook: Record<Exclude<FileDiff["change"], "">, string> = {
+  new: "text-ok",
+  deleted: "text-err",
+  renamed: "text-tx3",
 };
+
+/** The changed files, under each repo's row, as a folder tree (the CEO, 2026-11-11): chains of
+ * lone folders compacted into one row, folders open at first. Each repo's files scroll, both
+ * ways, under its row, which stays; the right border drags (or arrow keys move) the width
+ * within treeWidths, kept in this browser. */
+function FilesPane({
+  repos,
+  decided,
+  shut,
+  onShut,
+  reading,
+  onOpen,
+}: {
+  repos: { repo: string; target: string; files: FileDiff[]; gone: boolean; targetGone: boolean }[];
+  decided: (repo: string) => string;
+  /** The repos folded. */
+  shut: Set<string>;
+  /** Folds a repo or brings it back; none with a single repo. */
+  onShut?: (repo: string, on: boolean) => void;
+  /** The file being read, by fileId: lit, or its folded folder lit. */
+  reading?: string;
+  onOpen: (repo: string, path: string) => void;
+}) {
+  const trees = useMemo(() => repos.map((r) => fileTree(r.files)), [repos]);
+  // The folders the CEO folded, by repo and path: every other one is open.
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setFolded((now) => {
+      const next = new Set(now);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  const nav = useRef<HTMLElement>(null);
+  // A lit row out of the tree's sight comes into it, the tree moving the least it can.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on a change of the file read only
+  useEffect(() => {
+    nav.current?.querySelector("[aria-current]")?.scrollIntoView({ block: "nearest" });
+  }, [reading]);
+
+  const [width, setWidth] = useState(storedWidth);
+  const drag = useRef<{ x: number; width: number }>(undefined);
+  const keep = (px: number) => {
+    try {
+      localStorage.setItem(widthKey, String(px));
+    } catch {
+      // Storage blocked: the default width next time.
+    }
+  };
+
+  const rows = (repo: string, nodes: TreeNode<FileDiff>[]): ReactNode =>
+    nodes.map((n) => {
+      if (n.kind === "file") {
+        const f = n.item;
+        return (
+          <TreeRow
+            key={f.path}
+            current={fileId(repo, f.path) === reading}
+            title={f.from ? `${f.from} → ${f.path}` : f.path}
+            onClick={() => onOpen(repo, f.path)}
+            after={
+              f.change && <span className={`text-[11px] ${changeLook[f.change]}`}>{f.change}</span>
+            }
+          >
+            {n.name}
+          </TreeRow>
+        );
+      }
+      const key = `${repo}/${n.path}`;
+      const open = !folded.has(key);
+      return (
+        <div key={`${n.path}/`} className="flex flex-col">
+          <TreeRow
+            folder
+            open={open}
+            // Folded over the file being read, the folder is lit in its place.
+            current={!open && reading?.startsWith(fileId(repo, `${n.path}/`))}
+            title={n.path}
+            onClick={() => toggle(key)}
+          >
+            {n.name}
+          </TreeRow>
+          {open && <TreeChildren>{rows(repo, n.children)}</TreeChildren>}
+        </div>
+      );
+    });
+
+  return (
+    <div className="relative flex shrink-0 max-[900px]:hidden" style={{ width }}>
+      {/* The trees scroll down as one list, each repo's row sticking at the top while its files
+          pass under it; sideways, each repo's files scroll on their own (the CEO, 2026-11-11). */}
+      <nav
+        ref={nav}
+        className="flex w-full min-w-0 flex-col gap-5 overflow-y-auto overflow-x-hidden border-r border-line px-3 pb-5 text-[13px]"
+      >
+        {repos.map((r, i) => (
+          <div key={r.repo} className="flex shrink-0 flex-col gap-0.5 first:pt-5">
+            {/* On the page's background, so rows passing under it never show at its corners. */}
+            <div className="sticky top-0 z-10 flex flex-col bg-bg pb-0.5">
+              <RepoRow
+                repo={r}
+                decided={decided(r.repo)}
+                open={!shut.has(r.repo)}
+                onToggle={onShut && (() => onShut(r.repo, !shut.has(r.repo)))}
+              />
+            </div>
+            {!shut.has(r.repo) && r.files.length > 0 && (
+              <div className="overflow-x-auto">
+                {/* As wide as its widest row, so a long name scrolls its repo's files, not its row. */}
+                <div className="flex w-max min-w-full flex-col">{rows(r.repo, trees[i])}</div>
+              </div>
+            )}
+            {r.files.length === 0 && !shut.has(r.repo) && (
+              <span className={`px-1.5 ${r.targetGone ? "text-err" : "text-tx4"}`}>
+                {r.targetGone ? `${r.target} is gone.` : r.gone ? "Can't show it." : "No changes."}
+              </span>
+            )}
+          </div>
+        ))}
+      </nav>
+      {/* biome-ignore lint/a11y/useSemanticElements: a focusable separator is the ARIA splitter; an <hr> can't be one */}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="The file tree's width"
+        aria-valuenow={width}
+        aria-valuemin={treeWidths.min}
+        aria-valuemax={treeWidths.max}
+        tabIndex={0}
+        onPointerDown={(e) => {
+          e.preventDefault(); // no text selected while dragging
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { x: e.clientX, width };
+        }}
+        onPointerMove={(e) => {
+          if (drag.current) setWidth(treeWidth(drag.current.width + e.clientX - drag.current.x));
+        }}
+        onLostPointerCapture={() => {
+          drag.current = undefined;
+          keep(width);
+        }}
+        onKeyDown={(e) => {
+          const by = { ArrowLeft: -16, ArrowRight: 16 }[e.key];
+          if (by === undefined) return;
+          e.preventDefault();
+          const to = treeWidth(width + by);
+          setWidth(to);
+          keep(to);
+        }}
+        className="absolute inset-y-0 -right-[3px] z-20 w-[6px] cursor-col-resize touch-none hover:bg-acc/40 focus-visible:bg-acc/60 focus-visible:outline-none"
+      />
+    </div>
+  );
+}
 
 /** A repo's head, in the tree and over its diffs: `<repo> → <target>` on its own raised band, so
  * one repo reads apart from the next (the CEO, 2026-11-05), and a click folds all its files.
@@ -442,7 +562,7 @@ function RepoRow({
 }) {
   const added = r.files.reduce((n, f) => n + f.added, 0);
   const removed = r.files.reduce((n, f) => n + f.removed, 0);
-  const look = `flex min-w-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left font-mono text-tx ${onToggle ? "hover:border-line3" : ""} ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`;
+  const look = `flex min-w-0 shrink-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left font-mono text-tx ${onToggle ? "hover:border-line3" : ""} ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`;
   const inside = (
     <>
       {onToggle && <Chevron open={open} />}

@@ -51,9 +51,11 @@ func (c config) Sandbox(project, agent string) string {
 	return filepath.Join(c.root, project, ".sandboxes", agent)
 }
 
+// Projects are ledger, the tests' project, and suite, another one (with no repos on disk).
 func (c config) Projects() []home.Project {
 	p, _ := c.Project("ledger")
-	return []home.Project{p}
+	s := home.Project{ID: "suite"}
+	return []home.Project{p, s}
 }
 
 // dismissedRef is a dismissed review's backup, as made at the fixture's time.

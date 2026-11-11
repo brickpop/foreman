@@ -629,6 +629,26 @@ export function useCleanUp(project: string) {
   });
 }
 
+/** What the branch cleanup offers in a code repo, read while it is open. */
+export function useCleanupBranches(project: string, repo: string) {
+  const c = useClient();
+  return useQuery({
+    queryKey: [...keys.repos, project, repo, "branch-cleanup"],
+    queryFn: () => c.pipeline.cleanupBranches(project, repo),
+  });
+}
+
+/** Deletes the CEO's pick of a code repo's branches; its repos then show
+ * what is left. */
+export function useDeleteBranches(project: string, repo: string) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (branches: string[]) => c.pipeline.deleteBranches(project, repo, branches),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.repos }),
+  });
+}
+
 export function useRepoTree(project: string, repo: string, ref: string, path: string) {
   const c = useClient();
   return useQuery({

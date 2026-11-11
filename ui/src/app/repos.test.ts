@@ -5,6 +5,8 @@ import {
   branchOwner,
   branchPlaces,
   bytes,
+  cleanupGroups,
+  cleanupPick,
   crumbs,
   folderOf,
   folderPage,
@@ -275,5 +277,58 @@ describe("matching", () => {
     expect(matching(all, "led").map((x) => x.name)).toEqual(["wt/tove/LED-44"]);
     expect(matching(all, "  ")).toBe(all);
     expect(matching(all, "nope")).toEqual([]);
+  });
+});
+
+describe("cleanupGroups", () => {
+  const b = (branch: string, agents: boolean, state: string, stays?: string, stray?: string) => ({
+    branch,
+    agents,
+    state,
+    legacy: false,
+    stays,
+    stray,
+  });
+  const list = [
+    b("feature/done", false, "merged"),
+    b("feature/base", false, "superseded"),
+    b("wt/p/tove/done", true, "merged"),
+    b("wt/tove/old", true, "merged"),
+    b("wt/p/tove/draft", true, "superseded"),
+    b("wt/p/tove/wip", true, "unmerged"),
+    b("wt/p/tove/main", true, "merged", "checked out by tove"),
+    b("release/2", false, "merged", "an open review merges into it"),
+    b(
+      "wt/leady/doc",
+      true,
+      "unmerged",
+      "checked out in /old/agents/leady/api",
+      "/old/agents/leady/api",
+    ),
+  ];
+  it("groups the agents' branches, then the CEO's, by state, then those in stray worktrees; those that stay apart", () => {
+    const { groups, staying } = cleanupGroups(list);
+    expect(groups.map((g) => [g.key, g.on, g.branches.map((x) => x.branch)])).toEqual([
+      ["agents-merged", true, ["wt/p/tove/done", "wt/tove/old"]],
+      ["agents-superseded", true, ["wt/p/tove/draft"]],
+      ["agents-unmerged", false, ["wt/p/tove/wip"]],
+      ["yours-merged", false, ["feature/done"]],
+      ["yours-superseded", false, ["feature/base"]],
+      ["stray", false, ["wt/leady/doc"]],
+    ]);
+    expect(staying.map((x) => x.branch)).toEqual(["wt/p/tove/main", "release/2"]);
+  });
+  it("ticks only the agents' merged and superseded at first, never one that stays", () => {
+    expect([...cleanupPick(cleanupGroups(list).groups)]).toEqual([
+      "wt/p/tove/done",
+      "wt/tove/old",
+      "wt/p/tove/draft",
+    ]);
+  });
+  it("leaves out empty groups", () => {
+    expect(cleanupGroups([b("feature/done", false, "merged")]).groups.map((g) => g.key)).toEqual([
+      "yours-merged",
+    ]);
+    expect(cleanupGroups([])).toEqual({ groups: [], staying: [] });
   });
 });

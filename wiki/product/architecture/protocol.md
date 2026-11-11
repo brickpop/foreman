@@ -117,6 +117,7 @@ Who may call each tool, how it blocks, which block handles it, and what each sid
 | `contribute` | anyone | no: returns once the note is written | Workflow (+ Messaging for the delivery) |
 | `escalate` | lead only | no: returns the request id at once; for an `approval` (or a `question` with `wait: true`) the lead waits for the answer before that step | Workflow |
 | `fetch` | lead only | until every remote is fetched (seconds; at most 2 min a repo) | Workflow (+ Git) |
+| `prune` | anyone | until the branches are deleted (seconds) | Workflow (+ Git) |
 | `request_merge` | the lead only | no: returns once the branch and entry are checked; checks and the review request follow | Workflow |
 | `withdraw_merge` | the lead only | no | Workflow |
 | `reviews` | the lead only | no | Workflow |
@@ -291,6 +292,16 @@ type RequestMergeResult struct { Review string; MergeRequests []string; Refreshe
 - Effect (the lead only; the CEO, 2026-11-04): Git fetches every remote of each code repo, in the CEO's repo (the worktrees share its refs), on the host and with the CEO's own credentials (their credential helper, keychain or SSH agent): only the CEO writes a repo's `.git/config`, so an agent can't point a remote elsewhere. `git fetch --all --prune --no-tags --no-recurse-submodules --no-write-fetch-head`: it moves only the remote-tracking branches (`origin/*`), pruning those deleted upstream; never a local branch (the CEO's included), a tag or a submodule (their URLs are the agents', fetched only by `set_submodule`, without credentials). It never waits on a prompt (no terminal, `GIT_TERMINAL_PROMPT=0`, no askpass), and a remote has 2 minutes.
 - The text, a line per repo: `api: origin/main 1a2b3c4..5d6e7f8, origin/feat/y new, origin/feat/x gone upstream`, `web: up to date` or `web: no remote`; when something moved, how to merge it in (`merge("origin/main")`).
 - A repo that fails leaves the others fetched; the call then fails (`fetch_failed`) with every repo's line, the failed one with git's message. Kept as a [team action](#team-actions).
+
+### `prune`
+
+```go
+type PruneArgs struct { Branches []string } // optional: each the caller's own, or for the lead a teammate's wt/<project>/<agent>/<topic>
+```
+
+- Effect ([Sandboxes and git policy → Cleaning up branches](./sandboxes-and-git.md#cleaning-up-branches); the CEO, 2026-11-11): in each code repo, on the host, Workflow deletes the caller's merged and superseded branches (`wt/<project>/<self>/*`, or the lead's `lead/<project>/<team>/*`) and, for the lead, each teammate's merged `wt/<project>/<agent>/*`, and its superseded ones held by another branch of that same teammate; a branch of the caller's own named in `Branches` goes even unmerged. Each branch's standing is read as it goes (of two at one commit, one stays). It skips home branches (named, one is kept: `a home branch stays`) and keeps, saying why, one checked out (`checked out by tove`), one with a review open (`its review is open`) or that an open review merges into, the caller's own unmerged ones not named (`not merged: name it to delete it anyway`) and a teammate's held by no branch of its own (`not merged: only its owner deletes unmerged work`). Each head is kept under `refs/foreman/cleaned/<time>/<branch>` for 30 days.
+- The text, a line per repo: `api: deleted wt/ledger/tove/led-1, lead/ledger/atlas/x; kept wt/ledger/tove/led-2 (checked out by tove)`, or `web: nothing to delete`; a named branch no repo has, `wt/ledger/tove/x: no such branch`; and `Foreman keeps a copy of each for 30 days.` when one went. Kept as a [team action](#team-actions).
+- Errors: `not_yours` (a named branch that isn't the caller's, nor for the lead a teammate's: nothing is deleted), `git_error`.
 
 ### `withdraw_merge`
 

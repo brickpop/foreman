@@ -45,7 +45,7 @@ import { OpenIcon, PlayIcon, PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
-import { Button, CopyButton, Dot, Empty, LeadTag, Loading } from "../../components/ui";
+import { Button, CopyButton, Dot, Empty, LeadTag, Loading, Spinner } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Session section (wiki/product/features/sessions.md): the team
@@ -586,7 +586,9 @@ function Starting({ name }: { name: string }) {
   const repos = useProject().repos.length;
   return (
     <p className="m-0 flex items-center gap-2.5 border-b border-line px-4 py-2.5 text-[13px] text-tx3">
-      <span className="size-3.5 shrink-0 animate-spin rounded-full border-2 border-acc border-t-transparent" />
+      <span className="text-acc">
+        <Spinner />
+      </span>
       Starting {name}:{" "}
       {repos > 0 ? `its worktrees in ${plural(repos, "code repo")}, submodules too, then ` : ""}its
       session. A first start can take a few minutes.

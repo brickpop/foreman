@@ -1,4 +1,4 @@
-import type { Repo, RepoBranch, Team } from "../api/client";
+import type { CleanupBranch, Repo, RepoBranch, Team } from "../api/client";
 import { agentOf, plural } from "./model";
 
 // The Repos section's model (wiki/product/features/repos.md).
@@ -191,4 +191,77 @@ export function graph(commits: { hash: string; parents: string[] }[]): GraphRow[
 export function placeLine(p: BranchPlace): string {
   const work = [p.ahead > 0 && plural(p.ahead, "commit"), p.uncommitted && "uncommitted changes"];
   return work.filter(Boolean).join(" · ") || "nothing new";
+}
+
+/** One group of the branch cleanup: the branches it ticks or unticks at once. */
+export type CleanupGroup = {
+  key: string;
+  /** Its section: the agents' branches, the CEO's, or those in stray worktrees. */
+  section: "agents" | "yours" | "stray";
+  label: string;
+  hint: string;
+  /** Ticked at first. */
+  on: boolean;
+  branches: CleanupBranch[];
+};
+
+type Kind = Omit<CleanupGroup, "key" | "branches"> & { state?: string };
+
+const groupKinds: Kind[] = [
+  { section: "agents", state: "merged", label: "Merged", hint: "nothing lost", on: true },
+  {
+    section: "agents",
+    state: "superseded",
+    label: "Superseded",
+    hint: "all of it is in another branch",
+    on: true,
+  },
+  { section: "agents", state: "unmerged", label: "Not merged", hint: "work only here", on: false },
+  { section: "yours", state: "merged", label: "Merged", hint: "nothing lost", on: false },
+  {
+    section: "yours",
+    state: "superseded",
+    label: "Superseded",
+    hint: "all of it is in an agent's branch",
+    on: false,
+  },
+  {
+    section: "stray",
+    label: "Checked out elsewhere",
+    hint: "its worktree goes too, with what git ignores there",
+    on: false,
+  },
+];
+
+/** The section a branch is offered in, if any: one checked out in a stray worktree in its own,
+ * whatever its work; one that stays otherwise, none. */
+function sectionOf(b: CleanupBranch): CleanupGroup["section"] | undefined {
+  if (b.stray) return "stray";
+  if (b.stays) return undefined;
+  return b.agents ? "agents" : "yours";
+}
+
+/** The branch cleanup's groups (wiki/product/features/repos.md#branch-cleanup), in order and
+ * without the empty ones: the agents' merged and superseded ticked at first, deleting them
+ * loses nothing; their unmerged work, the CEO's own branches and those in stray worktrees off.
+ * Branches that can't go are apart, in staying. */
+export function cleanupGroups(branches: CleanupBranch[]): {
+  groups: CleanupGroup[];
+  staying: CleanupBranch[];
+} {
+  const groups = groupKinds
+    .map(({ state, ...k }) => ({
+      ...k,
+      key: state ? `${k.section}-${state}` : k.section,
+      branches: branches.filter(
+        (b) => sectionOf(b) === k.section && (state === undefined || b.state === state),
+      ),
+    }))
+    .filter((g) => g.branches.length > 0);
+  return { groups, staying: branches.filter((b) => sectionOf(b) === undefined) };
+}
+
+/** What the branch cleanup ticks at first: the branches of the groups on. */
+export function cleanupPick(groups: CleanupGroup[]): Set<string> {
+  return new Set(groups.filter((g) => g.on).flatMap((g) => g.branches.map((b) => b.branch)));
 }

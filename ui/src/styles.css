@@ -166,16 +166,6 @@ a {
   }
 }
 
-/* A line that scrolls sideways with no bar (a long path in a narrow column):
-   a trackpad or Shift and the wheel move it. */
-.scroll-quiet {
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.scroll-quiet::-webkit-scrollbar {
-  display: none;
-}
-
 /* A rendered wiki entry (wiki/product/features/wiki-reader.md#article), from
    its Markdown (components/Markdown.tsx); these are its styles, reader size by
    default and smaller in the board's side sheet. */

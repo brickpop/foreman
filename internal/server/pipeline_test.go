@@ -24,6 +24,56 @@ func (fakePipeline) CleanUp(_ context.Context, project string) (workflow.Cleanup
 	return workflow.Cleanup{Removed: []workflow.Cleaned{{Agent: "tove", Repo: "api", What: "worktree", Branch: "wt/tove/main"}}}, nil
 }
 
+// CleanupBranches and DeleteBranches: ledger has repo api.
+func (fakePipeline) CleanupBranches(_ context.Context, project, repo string) ([]workflow.CleanupBranch, error) {
+	switch {
+	case project != "ledger":
+		return nil, home.ErrNotFound
+	case repo != "api":
+		return nil, workflow.ErrNoRepo
+	}
+	return []workflow.CleanupBranch{{Branch: "wt/ledger/tove/x", Agents: true, State: workflow.Merged}}, nil
+}
+
+func (f fakePipeline) DeleteBranches(ctx context.Context, project, repo string, branches []string) (workflow.Cleanup, error) {
+	if _, err := f.CleanupBranches(ctx, project, repo); err != nil {
+		return workflow.Cleanup{}, err
+	}
+	var done workflow.Cleanup
+	for _, b := range branches {
+		done.Removed = append(done.Removed, workflow.Cleaned{Repo: repo, What: "branch", Branch: b})
+	}
+	return done, nil
+}
+
+func TestCleanupBranches(t *testing.T) {
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Pipeline: fakePipeline{}, UI: builtUI})
+	var list []workflow.CleanupBranch
+	decodeBody(t, get(t, h, "/api/projects/ledger/repos/api/branch-cleanup"), &list)
+	if len(list) != 1 || list[0].Branch != "wt/ledger/tove/x" || list[0].State != workflow.Merged {
+		t.Errorf("branches %+v", list)
+	}
+	var done workflow.Cleanup
+	decodeBody(t, send(h, "POST", "/api/projects/ledger/repos/api/branch-cleanup", `{"branches":["wt/ledger/tove/x"]}`), &done)
+	if len(done.Removed) != 1 || done.Removed[0].Branch != "wt/ledger/tove/x" {
+		t.Errorf("deleted %+v", done)
+	}
+	for path, code := range map[string]int{
+		"/api/projects/nope/repos/api/branch-cleanup":    http.StatusNotFound,
+		"/api/projects/ledger/repos/nope/branch-cleanup": http.StatusNotFound,
+	} {
+		if w := send(h, "GET", path, ""); w.Code != code {
+			t.Errorf("%s: %d, want %d", path, w.Code, code)
+		}
+		if w := send(h, "POST", path, `{"branches":[]}`); w.Code != code {
+			t.Errorf("delete %s: %d, want %d", path, w.Code, code)
+		}
+	}
+	if w := send(h, "POST", "/api/projects/ledger/repos/api/branch-cleanup", `{"branches":`); w.Code != http.StatusBadRequest {
+		t.Errorf("a broken body: %d", w.Code)
+	}
+}
+
 func TestPipeline(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Pipeline: fakePipeline{}, UI: builtUI})
 	var p struct {

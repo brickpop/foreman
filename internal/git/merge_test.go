@@ -481,3 +481,50 @@ func TestKeep(t *testing.T) {
 		}
 	}
 }
+
+// DeleteBranch keeps the head aside and deletes the branch; a branch checked
+// out anywhere (a worktree, or the repo's own checkout) stays, untouched.
+func TestDeleteBranch(t *testing.T) {
+	g, dir := mergeFixture(t)
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	backup := BackupRef("cleaned", time.Now(), "lead/atlas/x")
+	if err := g.DeleteBranch(ctx, dir, "lead/atlas/x", backup); err != nil {
+		t.Fatal(err)
+	}
+	if g.HasBranch(ctx, dir, "lead/atlas/x") {
+		t.Error("the branch is still there")
+	}
+	if kept := mustRun(t, dir, "rev-parse", backup); kept != head {
+		t.Errorf("backup at %s, want %s", kept, head)
+	}
+	if err := g.DeleteBranch(ctx, dir, "lead/atlas/x", backup+"2"); !errors.Is(err, ErrNoRef) {
+		t.Errorf("a branch that isn't there: %v", err)
+	}
+	for _, bad := range [][2]string{{"-x", "refs/foreman/cleaned/x"}, {"main", "refs/heads/other"}, {"main", ""}} {
+		if err := g.DeleteBranch(ctx, dir, bad[0], bad[1]); !errors.Is(err, ErrBadBranch) {
+			t.Errorf("%q: %v", bad, err)
+		}
+	}
+}
+
+func TestDeleteBranchCheckedOut(t *testing.T) {
+	g, dir := mergeFixture(t)
+	wt := filepath.Join(t.TempDir(), "lead")
+	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
+	write(t, filepath.Join(wt, "notes.md"), "half a thought\n")
+	head := mustRun(t, wt, "rev-parse", "HEAD")
+	for _, b := range []string{"lead/atlas/x", "main"} { // a worktree's, the repo's own
+		if err := g.DeleteBranch(ctx, dir, b, BackupRef("cleaned", time.Now(), b)); !errors.Is(err, ErrCheckedOut) {
+			t.Errorf("%s: %v, want ErrCheckedOut", b, err)
+		}
+	}
+	if mustRun(t, wt, "rev-parse", "HEAD") != head || mustRun(t, wt, "branch", "--show-current") != "lead/atlas/x" {
+		t.Error("the worktree moved")
+	}
+	if data, _ := os.ReadFile(filepath.Join(wt, "notes.md")); string(data) != "half a thought\n" {
+		t.Error("the worktree's work went")
+	}
+	if refs := mustRun(t, dir, "for-each-ref", "refs/foreman/"); refs != "" {
+		t.Errorf("a backup of what stayed: %q", refs)
+	}
+}

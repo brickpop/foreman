@@ -22,6 +22,9 @@ var (
 	// ErrMoved means the branch isn't at the commit it was expected at
 	// anymore: nothing was changed.
 	ErrMoved = errors.New("git: the branch moved")
+	// ErrCheckedOut means a worktree has the branch checked out: someone works
+	// on it, so it stays.
+	ErrCheckedOut = errors.New("git: the branch is checked out")
 )
 
 // Squash puts what branch changes onto target as one new commit, by the
@@ -185,6 +188,33 @@ func (g *CLI) DropBranch(ctx context.Context, dir, branch, backup, def string) e
 		return err
 	}
 	// Deleted only if still where it was read.
+	_, err = run(ctx, dir, "update-ref", "-d", "refs/heads/"+branch, head)
+	return err
+}
+
+// DeleteBranch deletes branch, its head first kept under backup (a
+// BackupRef), so a mistake can be undone by hand. Unlike DropBranch it never
+// touches a worktree: a branch checked out in one is refused (ErrCheckedOut),
+// checked under the repo's lock, so one switched to meanwhile is never lost.
+func (g *CLI) DeleteBranch(ctx context.Context, dir, branch, backup string) error {
+	if !ValidBranch(ctx, branch) || !strings.HasPrefix(backup, "refs/foreman/") {
+		return ErrBadBranch
+	}
+	defer g.lock(ctx, dir)()
+	head, err := g.Resolve(ctx, dir, "refs/heads/"+branch)
+	if err != nil {
+		return err
+	}
+	trees, err := g.Worktrees(ctx, dir)
+	if err != nil {
+		return err
+	}
+	if _, ok := trees[branch]; ok {
+		return ErrCheckedOut
+	}
+	if _, err := run(ctx, dir, "update-ref", backup, head); err != nil {
+		return err
+	}
 	_, err = run(ctx, dir, "update-ref", "-d", "refs/heads/"+branch, head)
 	return err
 }

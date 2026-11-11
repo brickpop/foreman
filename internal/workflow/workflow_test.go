@@ -51,10 +51,11 @@ func (c config) Sandbox(project, agent string) string {
 	return filepath.Join(c.root, project, ".sandboxes", agent)
 }
 
-// Projects are ledger, the tests' project, and suite, another one (with no repos on disk).
+// Projects are ledger, the tests' project, and suite, another one: its one
+// repo, core, is ledger's api (one folder in two projects), its default stable.
 func (c config) Projects() []home.Project {
 	p, _ := c.Project("ledger")
-	s := home.Project{ID: "suite"}
+	s := home.Project{ID: "suite", Repos: []home.Repo{{Name: "core", Path: p.Repos[0].Path, Default: "stable"}}}
 	return []home.Project{p, s}
 }
 

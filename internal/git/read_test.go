@@ -203,3 +203,96 @@ func TestRootCommit(t *testing.T) {
 		t.Errorf("after joining another history: %s, of %s and %s", got, first, second)
 	}
 }
+
+// KeptHolding finds the kept refs holding a branch: a review's decided head
+// that a branch went into, though no branch has it anymore.
+func TestKeptHolding(t *testing.T) {
+	g, dir := mergeFixture(t) // lead/atlas/x one commit ahead of main
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	mustRun(t, dir, "checkout", "-q", "-b", "lead/atlas/y", "lead/atlas/x")
+	write(t, filepath.Join(dir, "more.go"), "package f\n")
+	if err := g.Commit(ctx, dir, "more", "more.go"); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, dir, "checkout", "-q", "main")
+	if err := g.Keep(ctx, dir, "refs/foreman/decided/mr-2", mustRun(t, dir, "rev-parse", "lead/atlas/y")); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Keep(ctx, dir, "refs/foreman/decided/mr-1", head); err != nil {
+		t.Fatal(err)
+	}
+	mustRun(t, dir, "branch", "-D", "lead/atlas/y") // no branch holds it now
+	if got, err := g.KeptHolding(ctx, dir, "refs/foreman/decided/", "lead/atlas/x"); err != nil || !slices.Equal(got, []string{"mr-1", "mr-2"}) {
+		t.Errorf("got %v %v", got, err)
+	}
+	if got, _ := g.KeptHolding(ctx, dir, "refs/foreman/decided/", "main"); !slices.Equal(got, []string{"mr-1", "mr-2"}) {
+		t.Errorf("main, older: %v", got)
+	}
+	mustRun(t, dir, "checkout", "-q", "-b", "wt/tove/new", "main")
+	write(t, filepath.Join(dir, "n"), "n\n")
+	if err := g.Commit(ctx, dir, "n", "n"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := g.KeptHolding(ctx, dir, "refs/foreman/decided/", "wt/tove/new"); err != nil || len(got) != 0 {
+		t.Errorf("new work: %v %v", got, err)
+	}
+	for _, bad := range []string{"refs/heads/", "refs/foreman/decided"} {
+		if _, err := g.KeptHolding(ctx, dir, bad, "main"); !errors.Is(err, ErrNoRef) {
+			t.Errorf("prefix %q: %v", bad, err)
+		}
+	}
+}
+
+// Survives tells a branch whose every change is still in a kept head from one
+// a merge dropped part of, or that was reworked since: only the first counts.
+func TestSurvives(t *testing.T) {
+	g, dir := mergeFixture(t) // main: README
+	write(t, filepath.Join(dir, "old"), "old\n")
+	if err := g.Commit(ctx, dir, "old", "old"); err != nil {
+		t.Fatal(err)
+	}
+	// tove's branch edits README, adds b.go, deletes old.
+	mustRun(t, dir, "checkout", "-q", "-b", "wt/tove/b", "main")
+	write(t, filepath.Join(dir, "README"), "hello\nfrom b\n")
+	write(t, filepath.Join(dir, "b.go"), "package b\n")
+	mustRun(t, dir, "rm", "-q", "old")
+	mustRun(t, dir, "add", ".")
+	mustRun(t, dir, "commit", "-qm", "b")
+	// kept merges b into a lead branch with a commit of the lead's own on top.
+	kept := func(name string, resolve func()) {
+		mustRun(t, dir, "checkout", "-q", "-b", "lead/atlas/"+name, "main")
+		mustRun(t, dir, "merge", "-q", "--no-ff", "--no-commit", "wt/tove/b")
+		resolve()
+		mustRun(t, dir, "add", "-A")
+		mustRun(t, dir, "commit", "-qm", "merge b")
+		write(t, filepath.Join(dir, "lead.go"), "package lead\n")
+		mustRun(t, dir, "add", ".")
+		mustRun(t, dir, "commit", "-qm", "lead's own")
+		mustRun(t, dir, "update-ref", "refs/foreman/decided/"+name, "HEAD")
+		mustRun(t, dir, "checkout", "-q", "main")
+	}
+	kept("whole", func() {})
+	kept("dropped", func() { mustRun(t, dir, "checkout", "main", "--", "README") })
+	kept("reworked", func() { write(t, filepath.Join(dir, "b.go"), "package b // reworked\n") })
+	kept("revived", func() { mustRun(t, dir, "checkout", "main", "--", "old") })
+	for ref, want := range map[string]bool{"whole": true, "dropped": false, "reworked": false, "revived": false} {
+		if got, err := g.Survives(ctx, dir, "wt/tove/b", "main", "refs/foreman/decided/"+ref); err != nil || got != want {
+			t.Errorf("%s: %v %v, want %v", ref, got, err, want)
+		}
+	}
+	// No change of its own: nothing to lose.
+	mustRun(t, dir, "branch", "wt/tove/empty", "main")
+	if got, err := g.Survives(ctx, dir, "wt/tove/empty", "main", "refs/foreman/decided/dropped"); err != nil || !got {
+		t.Errorf("no changes: %v %v", got, err)
+	}
+	// from gone: can't be told, so not kept.
+	if got, err := g.Survives(ctx, dir, "wt/tove/b", "gone", "refs/foreman/decided/whole"); err != nil || got {
+		t.Errorf("from gone: %v %v", got, err)
+	}
+	if _, err := g.Survives(ctx, dir, "wt/tove/b", "main", "refs/heads/main"); !errors.Is(err, ErrNoRef) {
+		t.Errorf("a ref outside refs/foreman/: %v", err)
+	}
+	if _, err := g.Survives(ctx, dir, "-x", "main", "refs/foreman/decided/whole"); !errors.Is(err, ErrBadBranch) {
+		t.Errorf("a bad branch: %v", err)
+	}
+}

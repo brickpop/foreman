@@ -374,3 +374,95 @@ func TestCleanupStrayWorktrees(t *testing.T) {
 		t.Error("git still lists the worktree whose folder was gone")
 	}
 }
+
+// A squash merge leaves the lead's integration commits out of main and moves
+// the lead branch on: a teammate's branch it carried is then held only by the
+// merged review's kept head (refs/foreman/decided/<mr>). That counts as
+// merged, for any project with the repo, while every line the branch changed
+// is still there; a rejected review's kept head never does, nor one where the
+// lead dropped some of the branch (resolving a conflict, say).
+func TestPruneMergedReview(t *testing.T) {
+	f := newFixture(t)
+	api := filepath.Join(f.root, "ledger", "api")
+	// review carries branch in a lead branch with a commit of the lead's on
+	// top, decides it as state, keeps its head and deletes the lead branch
+	// (as a squash moves it on). drop: the lead's commit removes the
+	// branch's file.
+	review := func(branch, project, repo, state string, drop bool) {
+		lead := "lead/ledger/atlas/carried-" + filepath.Base(branch)
+		f.ahead(lead, branch)
+		if drop {
+			f.git(api, "checkout", "-q", lead)
+			f.git(api, "rm", "-q", strings.ReplaceAll(branch, "/", "-"))
+			f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "dropped")
+			f.git(api, "checkout", "-q", "main")
+		}
+		mr, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: project, DeploymentID: "atlas@ledger",
+			Repo: repo, Branch: lead, Target: "main", State: state})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := git.New().Keep(ctx, api, "refs/foreman/decided/"+mr.ID, f.git(api, "rev-parse", lead)); err != nil {
+			t.Fatal(err)
+		}
+		f.git(api, "branch", "-D", lead)
+	}
+	f.ahead("wt/ledger/tove/squashed", "main")
+	review("wt/ledger/tove/squashed", "ledger", "api", store.MergeMerged, false)
+	f.ahead("wt/ledger/tove/rejected", "main")
+	review("wt/ledger/tove/rejected", "ledger", "api", store.MergeRejected, false)
+	f.ahead("wt/ledger/tove/elsewhere", "main")
+	review("wt/ledger/tove/elsewhere", "suite", "core", store.MergeMerged, false)
+	f.ahead("wt/ledger/tove/dropped", "main")
+	review("wt/ledger/tove/dropped", "ledger", "api", store.MergeMerged, true)
+
+	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	states := map[string]string{}
+	for _, b := range list {
+		states[b.Branch] = b.State
+	}
+	want := map[string]string{"wt/ledger/tove/squashed": Merged, "wt/ledger/tove/elsewhere": Merged,
+		"wt/ledger/tove/rejected": Unmerged, "wt/ledger/tove/dropped": Unmerged}
+	for b, s := range want {
+		if states[b] != s {
+			t.Errorf("%s: %q, want %q", b, states[b], s)
+		}
+	}
+	f.ok("mara", "prune", map[string]any{})
+	for b, s := range want {
+		if f.has(b) != (s == Unmerged) {
+			t.Errorf("after the lead's prune, %s: kept %v", b, f.has(b))
+		}
+	}
+}
+
+// A repo in two projects: work that landed in either's default, or in a
+// target of either's merge requests, is merged for both.
+func TestMergedInAnotherProject(t *testing.T) {
+	f := newFixture(t)
+	api := filepath.Join(f.root, "ledger", "api")
+	f.ahead("wt/ledger/tove/picked", "main")
+	// Squashed into suite's default (stable): its commit isn't there, its change is.
+	f.git(api, "checkout", "-q", "-b", "stable", "main")
+	f.git(api, "-c", "user.name=t", "-c", "user.email=t@t", "cherry-pick", "wt/ledger/tove/picked")
+	f.git(api, "checkout", "-q", "main")
+	f.ahead("wt/ledger/tove/unpicked", "main")
+
+	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	if err != nil {
+		t.Fatal(err)
+	}
+	states := map[string]string{}
+	for _, b := range list {
+		states[b.Branch] = b.State
+	}
+	if states["wt/ledger/tove/picked"] != Merged || states["wt/ledger/tove/unpicked"] != Unmerged {
+		t.Errorf("states: %v", states)
+	}
+	if _, ok := states["stable"]; ok {
+		t.Error("suite's default was offered")
+	}
+}

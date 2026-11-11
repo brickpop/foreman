@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -266,4 +269,70 @@ func (g *CLI) Count(ctx context.Context, dir, commit string) (int, error) {
 		return 0, err
 	}
 	return strconv.Atoi(strings.TrimSpace(out))
+}
+
+// KeptHolding lists the refs Keep made under prefix (refs/foreman/decided/)
+// whose history holds all of branch, by their name past prefix, sorted.
+func (g *CLI) KeptHolding(ctx context.Context, dir, prefix, branch string) ([]string, error) {
+	if !ValidBranch(ctx, branch) {
+		return nil, ErrBadBranch
+	}
+	if !strings.HasPrefix(prefix, "refs/foreman/") || !strings.HasSuffix(prefix, "/") {
+		return nil, ErrNoRef
+	}
+	out, err := run(ctx, dir, "for-each-ref", "--format=%(refname)", "--contains", "refs/heads/"+branch, prefix)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, ref := range strings.Fields(out) {
+		names = append(names, strings.TrimPrefix(ref, prefix))
+	}
+	slices.Sort(names)
+	return names, nil
+}
+
+// Survives says whether every change branch made since it left from (their
+// merge base) is still, line for line, in the commit at ref (one Keep made,
+// under refs/foreman/): its own diff undoes cleanly there. False when a
+// merge into ref dropped or reworked any of it, or when a change of it
+// can't be told (from gone, a submodule's): then its work is not counted
+// as kept.
+func (g *CLI) Survives(ctx context.Context, dir, branch, from, ref string) (bool, error) {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, from) {
+		return false, ErrBadBranch
+	}
+	if !strings.HasPrefix(ref, "refs/foreman/") {
+		return false, ErrNoRef
+	}
+	base, err := run(ctx, dir, "merge-base", "refs/heads/"+from, "refs/heads/"+branch)
+	if err != nil {
+		return false, nil // no common history, or from is gone
+	}
+	patch, err := run(ctx, dir, "diff", "--binary", "--no-renames", strings.TrimSpace(base), "refs/heads/"+branch)
+	if err != nil {
+		return false, err
+	}
+	if patch == "" {
+		return true, nil
+	}
+	// Undo it onto ref's files in an index of its own: no checkout is touched.
+	tmp, err := os.MkdirTemp("", "foreman-index-")
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }()
+	withIndex := func(args ...string) *exec.Cmd {
+		cmd := command(ctx, dir, args...)
+		cmd.Env = append(cmd.Env, "GIT_INDEX_FILE="+filepath.Join(tmp, "index"))
+		return cmd
+	}
+	if _, err := output(withIndex("read-tree", ref), []string{"read-tree"}); err != nil {
+		return false, err
+	}
+	check := withIndex("apply", "--cached", "--check", "--reverse", "-")
+	check.Stdin = strings.NewReader(patch)
+	// Not undoing cleanly is the answer, not a failure.
+	_, err = output(check, []string{"apply"})
+	return err == nil, nil
 }

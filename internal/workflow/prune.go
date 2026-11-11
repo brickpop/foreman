@@ -81,11 +81,37 @@ func (w *Workflow) standing(ctx context.Context, project home.Project, name, dir
 			return Merged, nil
 		}
 	}
-	landings := []string{project.Default(name)}
-	if mrs, err := w.MergeRequests.ForProject(ctx, project.ID); err == nil {
-		for _, mr := range mrs {
-			if mr.Repo == name && mr.Target != "" && !slices.Contains(landings, mr.Target) {
-				landings = append(landings, mr.Target)
+	// In a review the CEO merged: the lead branch has moved on since (a squash
+	// moves it to the merged commit), but its head then is kept. Its history
+	// holding branch isn't enough: resolving a conflict, the lead may have
+	// dropped some of it, which the review never showed; so every line branch
+	// changed must still be there (the CEO, 2026-11-11).
+	if kept, err := w.Git.KeptHolding(ctx, dir, "refs/foreman/decided/", branch); err == nil {
+		for _, id := range kept {
+			mr, err := w.MergeRequests.Get(ctx, id)
+			if err != nil || mr.State != store.MergeMerged {
+				continue
+			}
+			if ok, _ := w.Git.Survives(ctx, dir, branch, mr.Target, "refs/foreman/decided/"+id); ok {
+				return Merged, nil
+			}
+		}
+	}
+	// Where work lands: each project's default for the repo, and each target
+	// one of its merge requests went into.
+	var landings []string
+	land := func(b string) {
+		if b != "" && !slices.Contains(landings, b) {
+			landings = append(landings, b)
+		}
+	}
+	for _, s := range w.sharing(project, name) {
+		land(s.project.Default(s.repo.Name))
+		if mrs, err := w.MergeRequests.ForProject(ctx, s.project.ID); err == nil {
+			for _, mr := range mrs {
+				if mr.Repo == s.repo.Name {
+					land(mr.Target)
+				}
 			}
 		}
 	}
@@ -119,28 +145,46 @@ func (w *Workflow) branchRepo(ctx context.Context, p home.Project, r home.Repo) 
 		return branchRepo{}, err
 	}
 	b := branchRepo{project: p, repo: r, trees: trees, review: map[string]bool{}, target: map[string]bool{}}
-	// The repo may be in other projects too: their reviews read it as well.
-	projects := w.Config.Projects()
-	if !slices.ContainsFunc(projects, func(q home.Project) bool { return q.ID == p.ID }) {
-		projects = append(projects, p)
-	}
-	for _, q := range projects {
-		for _, qr := range q.Repos {
-			if qr.Path != r.Path {
-				continue
-			}
-			mrs, err := w.MergeRequests.ForProject(ctx, q.ID)
-			if err != nil {
-				return b, err
-			}
-			for _, mr := range mrs {
-				if mr.Repo == qr.Name && mr.State == store.MergeOpen {
-					b.review[mr.Branch], b.target[mr.Target] = true, true
-				}
+	for _, s := range w.sharing(p, r.Name) {
+		mrs, err := w.MergeRequests.ForProject(ctx, s.project.ID)
+		if err != nil {
+			return b, err
+		}
+		for _, mr := range mrs {
+			if mr.Repo == s.repo.Name && mr.State == store.MergeOpen {
+				b.review[mr.Branch], b.target[mr.Target] = true, true
 			}
 		}
 	}
 	return b, nil
+}
+
+// shared is one project's name for a git repo.
+type shared struct {
+	project home.Project
+	repo    home.Repo
+}
+
+// sharing is project's repo name and every other project's that is the same
+// repo (the same folder): its reviews, targets and default read it as well.
+// Project's own comes first.
+func (w *Workflow) sharing(project home.Project, name string) []shared {
+	i := slices.IndexFunc(project.Repos, func(r home.Repo) bool { return r.Name == name })
+	if i < 0 {
+		return []shared{{project, home.Repo{Name: name}}}
+	}
+	all := []shared{{project, project.Repos[i]}}
+	for _, q := range w.Config.Projects() {
+		if q.ID == project.ID {
+			continue
+		}
+		for _, qr := range q.Repos {
+			if sameDir(qr.Path, project.Repos[i].Path) {
+				all = append(all, shared{q, qr})
+			}
+		}
+	}
+	return all
 }
 
 // checkedOut says who has branch checked out: an agent ("tove", or
@@ -246,8 +290,8 @@ func (w *Workflow) offered(p home.Project, r home.Repo, branch, state string) (l
 			return false, "another project's"
 		}
 		return legacy, ""
-	case branch == r.Default:
-		return false, "the default branch"
+	case slices.ContainsFunc(w.sharing(p, r.Name), func(s shared) bool { return s.repo.Default == branch }):
+		return false, "the default branch" // of any project with this repo
 	case slices.Contains(longLived, branch):
 		return false, "a long-lived branch"
 	case state == Unmerged:

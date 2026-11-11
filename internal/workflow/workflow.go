@@ -46,6 +46,8 @@ type Git interface {
 	Branches(ctx context.Context, dir, prefix string) ([]string, error)
 	Contains(ctx context.Context, dir, into, branch string) (bool, error)
 	Holders(ctx context.Context, dir, branch string) (local, upstream []string, err error)
+	KeptHolding(ctx context.Context, dir, prefix, branch string) ([]string, error)
+	Survives(ctx context.Context, dir, branch, from, ref string) (bool, error)
 	Merged(ctx context.Context, dir, into, branch string) (bool, error)
 	Squash(ctx context.Context, dir, target, branch, head, message string) error
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error

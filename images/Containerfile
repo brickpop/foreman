@@ -1,7 +1,7 @@
 # Foreman's agent image, phase 1: one image for every project, built by Foreman
 # as localhost/foreman/harness (wiki/product/architecture/tech-stack.md#agent-images).
 # A basic Debian box (adapted from pclaude's Dockerfile, github.com/brickpop/pclaude):
-# Node, Bun, Go, just, the wiki CLI and common shell tools; anything more specialised
+# Node, Bun, Go, Python 3, just, the wiki CLI and common shell tools; anything more specialised
 # comes from a workspace or project override later. The harnesses (Claude Code,
 # Pi, Codex) are installed last, so updating them reuses every layer above.
 # foreman-agent joins with the agent link.
@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       unzip \
       just \
       procps \
+      python3 \
   && rm -rf /var/lib/apt/lists/*
 
 # Go, pinned via build arg or resolved at build time with "latest".
@@ -78,7 +79,7 @@ ARG CODEX_VERSION=latest
 RUN npm install -g @openai/codex@${CODEX_VERSION} \
   && npm cache clean --force
 
-RUN node --version && bun --version && go version && claude --version && pi --version && codex --version && wiki --version
+RUN node --version && bun --version && go version && python3 --version && claude --version && pi --version && codex --version && wiki --version
 
 # The command is exactly what Foreman passes, and defaults to Claude.
 ENTRYPOINT []

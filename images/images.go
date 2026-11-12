@@ -4,7 +4,8 @@ package images
 
 import _ "embed"
 
-// Harness is the phase 1 image: one image for every project, with Claude Code.
+// Harness is the phase 1 image: one image for every project, with every
+// harness (Claude Code, Pi, Codex).
 //
 //go:embed Containerfile
 var Harness []byte

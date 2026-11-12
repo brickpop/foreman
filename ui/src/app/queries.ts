@@ -521,8 +521,25 @@ export function useReviewDiff(id: string, since: boolean) {
   });
 }
 
-/** A change to a review (a comment, a decision): the review, the pipeline and
- * the requests are refetched after it, whether it worked or not. */
+/** A change to a review's draft comments: only that review is refetched after it, whether it
+ * worked or not. Its diff and the list of reviews don't change with a comment, and refetching
+ * them made each comment wait on the slowest calls. */
+export function useCommentChange<T>(
+  id: string,
+  change: (c: ForemanClient, input: T) => Promise<unknown>,
+  onError: (e: Error) => void,
+) {
+  const c = useClient();
+  const queries = useQueryClient();
+  return useMutation({
+    mutationFn: (input: T) => change(c, input),
+    onError,
+    onSettled: () => queries.invalidateQueries({ queryKey: [...reviewsKey, id], exact: true }),
+  });
+}
+
+/** A decision on a review: the review, the pipeline and the requests are refetched after it,
+ * whether it worked or not. */
 export function useReviewChange<T, R = void>(
   change: (c: ForemanClient, input: T) => Promise<R>,
   onError: (e: Error) => void,

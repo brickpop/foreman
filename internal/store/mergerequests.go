@@ -29,8 +29,10 @@ type MergeRequests interface {
 	// every open one.
 	ForProject(ctx context.Context, projectID string) ([]MergeRequest, error)
 	Open(ctx context.Context) ([]MergeRequest, error)
-	// ForReview lists a review's merge requests, oldest first.
+	// ForReview lists a review's merge requests, oldest first; InReviews
+	// every review's at once, for a list of them.
 	ForReview(ctx context.Context, reviewID string) ([]MergeRequest, error)
+	InReviews(ctx context.Context) ([]MergeRequest, error)
 	// OpenReview is the review an open merge request of the project's branch
 	// is in, in any repo: "" when none is open.
 	OpenReview(ctx context.Context, projectID, branch string) (string, error)
@@ -92,6 +94,10 @@ func (s mergeRequests) Open(ctx context.Context) ([]MergeRequest, error) {
 
 func (s mergeRequests) ForReview(ctx context.Context, reviewID string) ([]MergeRequest, error) {
 	return s.query(ctx, "WHERE review_id = ?", reviewID)
+}
+
+func (s mergeRequests) InReviews(ctx context.Context) ([]MergeRequest, error) {
+	return s.query(ctx, "WHERE review_id IS NOT NULL")
 }
 
 func (s mergeRequests) OpenReview(ctx context.Context, projectID, branch string) (string, error) {

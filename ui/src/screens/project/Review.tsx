@@ -10,6 +10,7 @@ import { agentBranch, agentOf, forgeOf, linkLine, projectName, when } from "../.
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
+  useCommentChange,
   useDeployments,
   useProjects,
   useReview,
@@ -110,12 +111,14 @@ export function Review() {
       else next.delete(repo);
       return next;
     });
-  const add = useReviewChange((c, n: NewComment) => c.reviews.addComment(id, n), failed);
-  const edit = useReviewChange(
+  const add = useCommentChange(id, (c, n: NewComment) => c.reviews.addComment(id, n), failed);
+  const edit = useCommentChange(
+    id,
     (c, e: { comment: string; body: string }) => c.reviews.editComment(id, e.comment, e.body),
     failed,
   );
-  const remove = useReviewChange(
+  const remove = useCommentChange(
+    id,
     (c, comment: string) => c.reviews.deleteComment(id, comment),
     failed,
   );

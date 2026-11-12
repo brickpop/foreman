@@ -162,6 +162,38 @@ func TestMigrationsMustBeNumberedWithoutGaps(t *testing.T) {
 
 // --- deployments -------------------------------------------------------------
 
+// The lookups every list of reviews or of a pipeline runs, once per row, read an
+// index: a scan of the whole table each made listing the reviews grow with the
+// square of their number.
+func TestHotLookupsUseAnIndex(t *testing.T) {
+	db := open(t)
+	for _, q := range []string{
+		"SELECT * FROM merge_requests WHERE review_id = 'rev-1'",
+		"SELECT * FROM merge_requests WHERE project_id = 'p'",
+		"SELECT * FROM requests WHERE status = 'open' AND kind = 'review' AND review_id = 'rev-1'",
+		"SELECT * FROM work_items w WHERE w.deployment_id = 'a@p' AND w.branch = 'b'",
+		"SELECT * FROM review_comments WHERE review_id = 'rev-1'",
+	} {
+		rows, err := db.sql.Query("EXPLAIN QUERY PLAN " + q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plan []string
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+				t.Fatal(err)
+			}
+			plan = append(plan, detail)
+		}
+		_ = rows.Close()
+		if !slices.ContainsFunc(plan, func(d string) bool { return strings.Contains(d, "USING INDEX") }) {
+			t.Errorf("%s scans: %v", q, plan)
+		}
+	}
+}
+
 func TestDeployStopAndRedeploy(t *testing.T) {
 	deps := open(t).Deployments()
 	before := time.Now().Add(-time.Second)
@@ -682,6 +714,10 @@ func TestMergeRequests(t *testing.T) {
 	}
 	if list, _ := mrs.ForReview(ctx, "rev-1"); len(list) != 1 || list[0].ID != "mr-1" {
 		t.Errorf("for review %+v", list)
+	}
+	// Every review's at once: mr-2 (web) is in none, so it isn't listed.
+	if list, _ := mrs.InReviews(ctx); len(list) != 1 || list[0].ID != "mr-1" {
+		t.Errorf("in reviews %+v", list)
 	}
 	m.State, m.MergedAt, m.Conflicting, m.Note = MergeMerged, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC), true, "x"
 	m.ReviewedHead, m.Head, m.Base = "abc123", "def456", "abc000"

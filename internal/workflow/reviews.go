@@ -126,18 +126,23 @@ func status(r store.Review, mrs []store.MergeRequest) string {
 }
 
 // ListReviews lists every review, newest first, without their comments.
+// Their merge requests come in one query, not one per review.
 func (w *Workflow) ListReviews(ctx context.Context) ([]Review, error) {
 	list, err := w.Reviews.List(ctx)
 	if err != nil {
 		return nil, err
 	}
+	all, err := w.MergeRequests.InReviews(ctx)
+	if err != nil {
+		return nil, err
+	}
+	of := map[string][]store.MergeRequest{}
+	for _, mr := range all {
+		of[mr.ReviewID] = append(of[mr.ReviewID], mr)
+	}
 	out := make([]Review, 0, len(list))
 	for i := len(list) - 1; i >= 0; i-- {
-		v, err := w.view(ctx, list[i])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, v)
+		out = append(out, w.viewOf(list[i], of[list[i].ID]))
 	}
 	return out, nil
 }
@@ -169,6 +174,14 @@ func (w *Workflow) view(ctx context.Context, r store.Review) (Review, error) {
 	if err != nil {
 		return Review{}, err
 	}
+	return w.viewOf(r, mrs), nil
+}
+
+// viewOf is the review as the screens read it, from its merge requests (oldest first).
+func (w *Workflow) viewOf(r store.Review, mrs []store.MergeRequest) Review {
+	if mrs == nil {
+		mrs = []store.MergeRequest{} // a list, never null, for the screens
+	}
 	v := Review{Review: r, Status: status(r, mrs), MergeRequests: mrs, UpdatedAt: r.CreatedAt}
 	for _, mr := range mrs {
 		v.Entry, v.DeploymentID, v.Lead = mr.Entry, mr.DeploymentID, mr.AuthorInstance
@@ -181,7 +194,7 @@ func (w *Workflow) view(ctx context.Context, r store.Review) (Review, error) {
 	if len(mrs) > 0 {
 		v.EntryTitle = w.titleOf(mrs[len(mrs)-1])
 	}
-	return v, nil
+	return v
 }
 
 // heads are the branch's heads, by repo, for the open merge requests.

@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1022,6 +1024,48 @@ func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
 	list, err := f.w.ListReviews(ctx)
 	if err != nil || len(list) != 1 || list[0].Comments != nil || list[0].Title != "Invoices as CSV" {
 		t.Errorf("list %+v %v", list, err)
+	}
+}
+
+// The list reads every review's merge requests in one query: each review still gets its own, the
+// same as when it is read alone, newest review first.
+func TestListReviewsMatchesEachReview(t *testing.T) {
+	f := newFixture(t)
+	save := func(r store.Review, states ...string) string {
+		r, err := f.db.Reviews().Save(ctx, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, state := range states {
+			mr := store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger", Repo: []string{"api", "web"}[i], Branch: r.Branch, Target: "main", State: state, ReviewID: r.ID, Entry: "backlog/led-44.md"}
+			if _, err := f.db.MergeRequests().Save(ctx, mr); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return r.ID
+	}
+	merged := save(store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/a", Title: "a"}, store.MergeMerged, store.MergeRejected)
+	open := save(store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/b", Title: "b"}, store.MergeOpen)
+	empty := save(store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/c", Title: "c"})
+	list, err := f.w.ListReviews(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ids := []string{list[0].ID, list[1].ID, list[2].ID}; len(list) != 3 || !slices.Equal(ids, []string{empty, open, merged}) {
+		t.Fatalf("order %v", ids)
+	}
+	for _, v := range list {
+		alone, err := f.w.Review(ctx, v.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		alone.Comments = nil
+		if !reflect.DeepEqual(v, alone) {
+			t.Errorf("listed %+v\nalone  %+v", v, alone)
+		}
+	}
+	if list[1].Status != ReviewNeedsYou || len(list[1].MergeRequests) != 1 || len(list[2].MergeRequests) != 2 || len(list[0].MergeRequests) != 0 {
+		t.Errorf("grouped wrong: %+v", list)
 	}
 }
 

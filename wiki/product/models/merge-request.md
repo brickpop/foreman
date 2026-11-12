@@ -21,12 +21,13 @@ Table `merge_requests`.
 | `deployment_id` | String → Deployment | yes | | | The lead's deployment |
 | `author_instance` | String → Instance | yes | | | The lead that called `request_merge` |
 | `repo` | String | yes | | | The code repo it merges into |
-| `target` | String | yes | its repo's default branch | a branch of the repo, never an agent's (`wt/*`, `lead/*`) | The branch it merges into: `into` of the lead's `request_merge`, else the default branch; the CEO can change it on its review while it is open. It stays when the repo's default branch changes ([Where a merge goes](../features/pipeline-and-merges.md#where-a-merge-goes)) |
+| `target` | String | yes | its repo's default branch | a branch of the repo, never an agent's (`wt/*`, `lead/*`) | The branch it merges into: `into` of the lead's `request_merge`, else the default branch; fixed: its diff is always against it, and only the lead changes it, asking again with another `into` (the CEO, 2026-11-11: the CEO asks for that in a comment). It stays when the repo's default branch changes ([Where a merge goes](../features/pipeline-and-merges.md#where-a-merge-goes)) |
 | `branch` | String | yes | | | A lead branch `lead/<project>/<team>/<topic>` |
 | `entry` | String | yes | | a path in the project's wiki | The task card explaining what was done, from `request_merge`; its title is the merge request's title |
 | `state` | String | yes | `open` | enum: `open`, `merged`, `rejected`, `withdrawn` | |
 | `checks_status` | String | | | | Result of the project `checks` run on the latest `request_merge` for this branch |
-| `conflicting` | Boolean | | `false` | | The branch doesn't merge cleanly into its target (found by Merge, or from the forge's mergeability); shown as "conflicts with `<target>`"; cleared when the CEO changes the target |
+| `landing` | String | | `""` | a valid branch name, never an agent's; from the lead, only under the project's [`landing_prefixes`](./project-config.md) | Where it lands instead of on `target`, `""` for `target` itself: a branch made at `target`'s head when the CEO merges, or one already there at that commit (never one elsewhere). The lead proposes it (`land` of `request_merge`; kept on a refresh without it); the CEO lands it there, under another name, or on `target` (the CEO, 2026-11-11). Once merged, where it landed |
+| `conflicting` | Boolean | | `false` | | The branch doesn't merge cleanly into its target (found by Merge, or from the forge's mergeability); shown as "conflicts with `<target>`" |
 | `forge_pr_url` | String | | | | Set by Create PR |
 | `forge_pr_number` | Integer | | | | Set by Create PR |
 | `note` | String | | | | Latest status line (e.g. "2 review comments", the CEO's reason for rejecting, the reason it was withdrawn) |

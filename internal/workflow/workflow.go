@@ -49,7 +49,7 @@ type Git interface {
 	KeptHolding(ctx context.Context, dir, prefix, branch string) ([]string, error)
 	Survives(ctx context.Context, dir, branch, from, ref string) (bool, error)
 	Merged(ctx context.Context, dir, into, branch string) (bool, error)
-	Squash(ctx context.Context, dir, target, branch, head, message string) error
+	Squash(ctx context.Context, dir, target, onto, branch, head, message string) error
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error
 	DropBranch(ctx context.Context, dir, branch, backup, def string) error
 	DeleteBranch(ctx context.Context, dir, branch, backup string) error
@@ -187,7 +187,8 @@ var definitions = []agentlink.Tool{
 			`"title":{"type":"string","description":"What the merge brings, in one short line (at most 120 characters), e.g. Export invoices as CSV"},`+
 			`"body":{"type":"string","description":"Optional: what the CEO should know to review it, in Markdown: what changed and why, what to look at first, what was left out"},`+
 			`"entry":{"type":"string","description":"The wiki entry explaining the work, usually its task card, e.g. backlog/export-csv.md"},`+
-			`"into":{"type":"string","description":"The branch it merges into, usually the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"}`, "branch", "title", "entry")},
+			`"into":{"type":"string","description":"The branch it merges into, which its diff is against, usually the one its work started from: each repo's default branch when left out (or, on a refresh, the one it goes to already)"},`+
+			`"land":{"type":"string","description":"Optional: the name of a new branch it lands on instead, made from into when the CEO merges, e.g. f/export-csv: only under the project's landing prefixes (f/, feat/, fix/ unless the project names others). The CEO may land it under another name. To stack (main < f/a < f/b): once f/a is merged, request the next with into f/a and land f/b"}`, "branch", "title", "entry")},
 	{Name: "withdraw_merge", Description: "Withdraw your open request to merge a lead branch, in every repo, before the CEO decides it: the work is superseded by another of your branches, or no longer wanted. The branch stays. The CEO's draft comments on it are lost.",
 		InputSchema: object(`"branch":{"type":"string","description":"lead/<project>/<team>/<topic>, with a review open"},`+
 			`"reason":{"type":"string","description":"Why, for the CEO"},`+
@@ -225,6 +226,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		By       string   `json:"superseded_by"`
 		From     string   `json:"from"`
 		Into     string   `json:"into"`
+		Land     string   `json:"land"`
 		Name     string   `json:"name"`
 		Options  []string `json:"options"`
 		Wait     bool     `json:"wait"`
@@ -265,7 +267,7 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 		return t.handoff(ctx, a.Teammate, strings.TrimSpace(a.Branch), strings.TrimSpace(a.Summary))
 	case "request_merge":
 		act.Branch = strings.TrimSpace(a.Branch)
-		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Title), strings.TrimSpace(a.Body), strings.TrimSpace(a.Entry), strings.TrimSpace(a.Into))
+		res = t.requestMerge(ctx, act.Branch, strings.TrimSpace(a.Title), strings.TrimSpace(a.Body), strings.TrimSpace(a.Entry), strings.TrimSpace(a.Into), strings.TrimSpace(a.Land))
 	case "fetch":
 		res = t.fetch(ctx)
 	case "prune":

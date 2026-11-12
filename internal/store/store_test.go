@@ -685,11 +685,12 @@ func TestMergeRequests(t *testing.T) {
 	}
 	m.State, m.MergedAt, m.Conflicting, m.Note = MergeMerged, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC), true, "x"
 	m.ReviewedHead, m.Head, m.Base = "abc123", "def456", "abc000"
+	m.Target, m.Landing = "release/2", "f/x"
 	if _, err := mrs.Save(ctx, m); err != nil {
 		t.Fatal(err)
 	}
 	got, err := mrs.Get(ctx, "mr-1")
-	if err != nil || got.State != MergeMerged || !got.MergedAt.Equal(m.MergedAt) || !got.Conflicting || got.Entry != "backlog/led-44.md" || got.ReviewID != "rev-1" || got.ReviewedHead != "abc123" || got.Head != "def456" || got.Base != "abc000" {
+	if err != nil || got.State != MergeMerged || !got.MergedAt.Equal(m.MergedAt) || !got.Conflicting || got.Entry != "backlog/led-44.md" || got.ReviewID != "rev-1" || got.ReviewedHead != "abc123" || got.Head != "def456" || got.Base != "abc000" || got.Target != "release/2" || got.Landing != "f/x" {
 		t.Errorf("got %+v %v", got, err)
 	}
 	// A merged one is no longer the branch's open review.

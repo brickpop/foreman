@@ -46,3 +46,11 @@ function shape<T>(nodes: TreeNode<T>[]): TreeNode<T>[] {
       a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "folder" ? -1 : 1,
     );
 }
+
+/** The items in the order the tree shows them, top to bottom: the diffs are
+ * read in that order too (the CEO, 2026-11-11). */
+export function treeOrder<T extends { path: string }>(items: T[]): T[] {
+  const walk = (nodes: TreeNode<T>[]): T[] =>
+    nodes.flatMap((n) => (n.kind === "file" ? [n.item] : walk(n.children)));
+  return walk(fileTree(items));
+}

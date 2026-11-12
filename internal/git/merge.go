@@ -25,17 +25,24 @@ var (
 	// ErrCheckedOut means a worktree has the branch checked out: someone works
 	// on it, so it stays.
 	ErrCheckedOut = errors.New("git: the branch is checked out")
+	// ErrBranchExists means a branch of that name is there already: nothing
+	// was changed.
+	ErrBranchExists = errors.New("git: the branch exists")
 )
 
-// Squash puts what branch changes onto target as one new commit, by the
-// CEO's git identity (Foreman's when there is none), signed when the CEO's git
-// config says so (commit.gpgsign; the CEO, 2026-11-06), with the message alone:
-// no trailers (the CEO, 2026-10-29). Only while branch is at head (the commit the CEO read, its full
-// hash): ErrMoved otherwise. When target has all of it already, nothing is committed. When
-// dir (the repo's own checkout, the CEO's) has target checked out, its files
-// move with target; otherwise they are left alone.
-func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message string) error {
-	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, target) {
+// Squash puts what branch changes against target onto onto as one new commit
+// on target's head, by the CEO's git identity (Foreman's when there is none),
+// signed when the CEO's git config says so (commit.gpgsign; the CEO,
+// 2026-11-06), with the message alone: no trailers (the CEO, 2026-10-29).
+// onto is target itself, or the branch it lands on instead (the CEO,
+// 2026-11-11): made there, or one already at target's head, never one
+// elsewhere (ErrBranchExists, nothing changed). Only while branch is at head
+// (the commit the CEO read, its full hash): ErrMoved otherwise. When target
+// has all of it already, nothing is committed (a new onto is still made, at
+// target's head). When dir (the repo's own checkout, the CEO's) has onto
+// checked out, its files move with it; otherwise they are left alone.
+func (g *CLI) Squash(ctx context.Context, dir, target, onto, branch, head, message string) error {
+	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, target) || !ValidBranch(ctx, onto) {
 		return ErrBadBranch
 	}
 	if !hash.MatchString(head) {
@@ -56,7 +63,21 @@ func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message str
 	if err != nil {
 		return err
 	}
-	if was, err := treeOf(ctx, dir, old); err != nil || was == tree {
+	// What onto must be at as it moves: "" for one git must make.
+	expected := old
+	if onto != target {
+		if was, err := g.Resolve(ctx, dir, "refs/heads/"+onto); err != nil {
+			expected = ""
+		} else if was != old {
+			return ErrBranchExists
+		}
+	}
+	if was, err := treeOf(ctx, dir, old); err != nil {
+		return err
+	} else if was == tree {
+		if expected == "" {
+			_, err = run(ctx, dir, "update-ref", "refs/heads/"+onto, old, "")
+		}
 		return err
 	}
 	args := []string{"commit-tree", tree, "-p", old, "-m", message}
@@ -71,7 +92,7 @@ func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message str
 		return err
 	}
 	commit = strings.TrimSpace(commit)
-	if current, _ := run(ctx, dir, "branch", "--show-current"); strings.TrimSpace(current) == target {
+	if current, _ := run(ctx, dir, "branch", "--show-current"); strings.TrimSpace(current) == onto {
 		// A fast-forward to the new commit: the checkout's files follow, and
 		// git refuses when the CEO's own changes are in the way.
 		if _, err := run(ctx, dir, "merge", "--ff-only", "--quiet", commit); err != nil {
@@ -82,8 +103,9 @@ func (g *CLI) Squash(ctx context.Context, dir, target, branch, head, message str
 		}
 		return nil
 	}
-	// Moved only if target is still where it was read: never over someone else's move.
-	_, err = run(ctx, dir, "update-ref", "refs/heads/"+target, commit, old)
+	// Moved only if onto is still where it was read (or still not there):
+	// never over someone else's move.
+	_, err = run(ctx, dir, "update-ref", "refs/heads/"+onto, commit, expected)
 	return err
 }
 

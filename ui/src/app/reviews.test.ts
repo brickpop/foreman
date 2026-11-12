@@ -10,6 +10,7 @@ import {
   drafts,
   hasSince,
   keptLines,
+  landsOn,
   lineKey,
   lostDrafts,
   lostNote,
@@ -64,23 +65,28 @@ describe("Reviews", () => {
       "",
     ]);
   });
-  it("lists the repos still open, each with its target", () => {
+  it("lists the repos still open, each with its target and landing", () => {
     const v = review([
-      mr("api", { target: "main" }),
-      mr("web", { target: "release/2.0" }),
+      mr("api", { target: "main", landing: "f/csv" }),
+      mr("web", { target: "release/2.0", landing: "" }),
       mr("cli", { state: "merged", target: "main" }),
     ]);
-    expect(openRepos(v).map((r) => [r.repo, r.target])).toEqual([
-      ["api", "main"],
-      ["web", "release/2.0"],
+    expect(openRepos(v).map((r) => [r.repo, r.target, r.landing])).toEqual([
+      ["api", "main", "f/csv"],
+      ["web", "release/2.0", ""],
     ]);
   });
 
-  it("labels the merge by the targets ticked", () => {
-    expect(mergeLabel([{ target: "release/2.0" }, { target: "release/2.0" }])).toBe(
-      "Merge to release/2.0",
-    );
-    expect(mergeLabel([{ target: "main" }, { target: "trunk" }])).toBe("Merge");
+  it("labels the merge by where the repos ticked land", () => {
+    const to = (target: string, landing = "") => ({ target, landing });
+    expect(mergeLabel([to("release/2.0"), to("release/2.0")])).toBe("Merge to release/2.0");
+    expect(mergeLabel([to("main"), to("trunk")])).toBe("Merge");
+    // The lead's landing, over its target; the CEO's name over both, for every repo.
+    expect(mergeLabel([to("main", "f/csv"), to("trunk", "f/csv")])).toBe("Merge to f/csv");
+    expect(mergeLabel([to("main", "f/csv"), to("main")])).toBe("Merge");
+    expect(mergeLabel([to("main", "f/csv"), to("trunk")], "f/other")).toBe("Merge to f/other");
+    expect(landsOn(to("main", "f/csv"))).toBe("f/csv");
+    expect(landsOn(to("main"), "")).toBe("main");
   });
 
   it("has a since-your-last-look only once changes were requested on an open repo", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Board, Card, MergeRequest, Node, Project, Repo, Request } from "../../api/client";
-import { agentBranch, forgeOf, linkLine, mergeTargets } from "../../app/model";
+import type { Board, Card, MergeRequest, Node, Project, Request } from "../../api/client";
+import { agentBranch, forgeOf, linkLine } from "../../app/model";
 import { cellLook, columnLabel, laneLabel, lanesShown, moveOf, revealBy } from "./Board";
 import { sourceLabel } from "./Pipeline";
 import { treeLabel } from "./Wiki";
@@ -113,6 +113,10 @@ describe("Changes", () => {
     expect(linkLine({ ...mr, conflicting: true, target: "develop" }, "none")).toBe(
       "web · lead/ledger/atlas/integration → develop · conflicts with develop",
     );
+    // Landing on a branch of its own: there, from its target.
+    expect(linkLine({ ...mr, landing: "f/csv" }, "none")).toBe(
+      "web · lead/ledger/atlas/integration → f/csv (from main) · checks pass",
+    );
   });
 });
 
@@ -126,31 +130,7 @@ describe("forgeOf", () => {
   });
 });
 
-describe("where a merge can go", () => {
-  const branches = (...names: string[]) => names.map((name) => ({ name }));
-  const repos = [
-    {
-      name: "api",
-      project: false,
-      defaultBranch: "main",
-      branches: branches(
-        "main",
-        "wt/ledger/tove/main",
-        "release/2.0",
-        "lead/ledger/atlas/x",
-        "spike",
-      ),
-    },
-    { name: "project", project: true, defaultBranch: "main", branches: branches("main") },
-  ] as unknown as Repo[];
-  it("is any branch of the repo but an agent's, as listed", () => {
-    expect(mergeTargets(repos, "api")).toEqual(["main", "release/2.0", "spike"]);
-  });
-  it("is none for the project repo, a repo it doesn't have, or before they load", () => {
-    expect(mergeTargets(repos, "project")).toEqual([]);
-    expect(mergeTargets(repos, "gone")).toEqual([]);
-    expect(mergeTargets(undefined, "api")).toEqual([]);
-  });
+describe("agent branches", () => {
   it("tells an agent's branch by its namespace only", () => {
     expect(["wt/x", "lead/x", "wt", "leader/x", "feature/wt/x", "main"].map(agentBranch)).toEqual([
       true,

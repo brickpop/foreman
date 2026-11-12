@@ -33,7 +33,7 @@ func input(agent string, tools []string) Input {
 	return Input{
 		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/workspace/ledger/agents/" + agent, ProjectRepo: "/home/ceo/workspace/ledger/project", Files: "/home/ceo/workspace/ledger/files", Tools: tools,
 		Repos:  []home.Repo{{Name: "api", Default: "main"}},
-		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}},
+		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}, LandingPrefixes: []string{"f/", "fix/"}},
 	}
 }
 
@@ -97,8 +97,9 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"(read and write: edit, then commit its repo, project)",
 		"- Mara, Team Lead (lead: integrates, requests merges)\n",
 		"## Tools (from Foreman)\n",
-		"request_merge(branch, title, body, entry, into)\n                                    Ask the CEO to merge one of your lead/ledger/atlas/* branches into into,",
+		"request_merge(branch, title, body, entry, into, land)\n                                    Ask the CEO to merge one of your lead/ledger/atlas/* branches into into,",
 		"The CEO talks to you. Break requests down and delegate with ask().",
+		"when the CEO merges (under f/, fix/); the CEO may rename it.",
 		"Before you request a merge, run: npm test",
 		// so the lead never asks a member for what its mount refuses
 		"Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.",
@@ -109,6 +110,12 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 	}
 	if strings.Contains(got, "handoff(teammate") {
 		t.Error("the lead was offered handoff")
+	}
+	// A project that takes no landing names says so.
+	none := input("mara", every)
+	none.Config.LandingPrefixes = nil
+	if got := Compose(none); !strings.Contains(got, "when the CEO merges (this project takes none: leave it out)") {
+		t.Error("no landing prefixes, not said")
 	}
 }
 
@@ -181,7 +188,7 @@ func TestTodaysTools(t *testing.T) {
 		}
 	}
 	lead := Compose(input("mara", Offered(true, true)))
-	if !strings.Contains(lead, "request_merge(branch, title, body, entry, into)\n") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, title, body, entry, into), one per branch, usually into the branch its work started from.") || strings.Contains(lead, "target") ||
+	if !strings.Contains(lead, "request_merge(branch, title, body, entry, into, land)\n") || !strings.Contains(lead, "Ask for a merge with request_merge(branch, title, body, entry, into, land), one per branch, usually into the branch its work started from. To stack them (main < f/a < f/b), request the first with land f/a, and the next into f/a once the CEO merged it.") || strings.Contains(lead, "target") ||
 		!strings.Contains(lead, "withdraw_merge(branch, reason,      Take back your open request") || !strings.Contains(lead, "reviews()                           Where your reviews stand") ||
 		!strings.Contains(lead, "team()                              Where each teammate stands") ||
 		!strings.Contains(lead, "fetch()                             Fetch the repos' remotes") ||

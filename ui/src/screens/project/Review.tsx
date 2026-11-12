@@ -1,17 +1,17 @@
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
-import { fileTree, type TreeNode } from "../../app/fileTree";
-import { agentOf, forgeOf, linkLine, mergeTargets, projectName, when } from "../../app/model";
+import { fileTree, type TreeNode, treeOrder } from "../../app/fileTree";
+import { agentBranch, agentOf, forgeOf, linkLine, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
   useDeployments,
   useProjects,
-  useRepos,
   useReview,
   useReviewChange,
   useReviewDiff,
@@ -29,6 +29,7 @@ import {
   hasSince,
   isOpen,
   keptLines,
+  landsOn,
   lineKey,
   lostDrafts,
   lostNote,
@@ -45,8 +46,7 @@ import {
 import { TextBox } from "../../components/AgentText";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Chevron } from "../../components/icons";
-import { Confirm } from "../../components/Overlays";
-import { Select } from "../../components/Select";
+import { Confirm, Modal } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
 import {
   Button,
@@ -78,7 +78,7 @@ type Comments = {
 const fileId = (repo: string, path: string) => `file:${repo}/${path}`;
 
 export function Review() {
-  const { review: id, project: projectId } = useParams({
+  const { review: id } = useParams({
     from: "/projects/$project/inbox/$review",
   });
   const search = useSearch({ from: "/projects/$project/inbox/$review" });
@@ -88,8 +88,6 @@ export function Review() {
   const since = search.since === true && v !== undefined && hasSince(v);
   const diff = useReviewDiff(v ? id : "", since);
   const projects = useProjects();
-  // Its repos' branches: where the CEO may move a repo's merge.
-  const branches = useRepos(projectId);
   const teams = useTeams();
   const deployments = useDeployments();
   const toast = useToast();
@@ -124,7 +122,7 @@ export function Review() {
   // Worked out once per diff and per change of the comments, not on each
   // render: a big review has tens of thousands of lines.
   const repos = useMemo(
-    () => (diff.data ?? []).map((d) => ({ ...d, files: diffFiles(d.diff) })),
+    () => (diff.data ?? []).map((d) => ({ ...d, files: treeOrder(diffFiles(d.diff)) })),
     [diff.data],
   );
   const placed = useMemo(() => {
@@ -357,7 +355,6 @@ export function Review() {
         <DecisionBar
           review={v}
           lead={lead?.soul.name ?? "the lead"}
-          targetsOf={(repo) => mergeTargets(branches.data, repo)}
           forge={forgeOf(project)}
           diffs={diff.data}
           dismissAs={dismissChoices(
@@ -874,7 +871,6 @@ function Composer({
 function DecisionBar({
   review: v,
   lead,
-  targetsOf,
   forge,
   diffs,
   dismissAs,
@@ -882,8 +878,6 @@ function DecisionBar({
 }: {
   review: ReviewData;
   lead: string;
-  /** Where a repo's merge may go instead: any of its branches but an agent's. */
-  targetsOf: (repo: string) => string[];
   forge: string;
   diffs: RepoDiff[] | undefined;
   dismissAs: DismissChoice[];
@@ -905,8 +899,10 @@ function DecisionBar({
     setText("");
     choose("keep");
   };
+  // landing: the CEO's name for where it lands, "" for the lead's (or the target).
   const merge = useReviewChange(
-    (c, heads: Record<string, string>) => c.reviews.merge(v.id, heads),
+    (c, m: { heads: Record<string, string>; landing: string }) =>
+      c.reviews.merge(v.id, m.heads, m.landing || undefined),
     failed,
   );
   const changes = useReviewChange(
@@ -917,11 +913,9 @@ function DecisionBar({
     (c, choice: DismissChoice) => c.reviews.dismiss(v.id, dismissRequest(choice, text)),
     failed,
   );
-  const retarget = useReviewChange(
-    (c, to: { repo: string; target: string }) => c.reviews.retarget(v.id, to.repo, to.target),
-    failed,
-  );
-  const busy = merge.isPending || changes.isPending || dismiss.isPending || retarget.isPending;
+  // The CEO naming a new branch for the review to land on.
+  const [naming, setNaming] = useState(false);
+  const busy = merge.isPending || changes.isPending || dismiss.isPending;
   const repos = openRepos(v);
   const ticked = repos.filter((r) => !unticked.has(r.repo));
   const heads = mergeHeads(
@@ -935,33 +929,73 @@ function DecisionBar({
     else next.add(repo);
     setUnticked(next);
   };
-  const [confirming, setConfirming] = useState(false);
-  const mergeNow = () =>
+  // The landing a Merge waits with while the CEO confirms losing the drafts; undefined: none.
+  const [confirming, setConfirming] = useState<string>();
+  const mergeNow = (landing = "") =>
     heads &&
-    merge.mutate(heads, {
-      onSuccess: () => {
-        toast({
-          title: "Merged",
-          body: ticked.map((r) => `${r.repo} → ${r.target}`).join(", "),
-          color: "var(--ok)",
-          // To watch the lead pick it up.
-          onOpen: () => navigate(sessionOf(v.lead)),
-        });
-        back();
+    merge.mutate(
+      { heads, landing },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Merged",
+            body: ticked.map((r) => `${r.repo} → ${landsOn(r, landing)}`).join(", "),
+            color: "var(--ok)",
+            // To watch the lead pick it up.
+            onOpen: () => navigate(sessionOf(v.lead)),
+          });
+          setNaming(false);
+          back();
+        },
       },
-    });
+    );
+  const mergeAs = (landing = "") => (draft > 0 ? setConfirming(landing) : mergeNow(landing));
+  // Over the lead's landing, its target itself: only when the ticked repos share one.
+  const targets = [...new Set(ticked.map((r) => r.target))];
+  const onTarget = ticked.some((r) => r.landing) && targets.length === 1 ? targets[0] : "";
+  const variant = draft > 0 ? "secondary" : "primary";
+  const off = busy || ticked.length === 0 || !heads;
+  // Merge where it lands, or (its menu) on the target or under a new name (the CEO, 2026-11-11).
   const mergeButton = (
-    <Button
-      variant={draft > 0 ? "secondary" : "primary"}
-      disabled={busy || ticked.length === 0 || !heads}
-      onClick={() => (draft > 0 ? setConfirming(true) : mergeNow())}
-    >
-      {ticked.length > 0 ? mergeLabel(ticked) : "Merge"}
-    </Button>
+    <span className="inline-flex">
+      <Button variant={variant} disabled={off} onClick={() => mergeAs()} className="rounded-r-none">
+        {ticked.length > 0 ? mergeLabel(ticked) : "Merge"}
+      </Button>
+      <Menu.Root>
+        <Menu.Trigger asChild disabled={off}>
+          <Button
+            variant={variant}
+            aria-label="Other ways to merge"
+            className="rounded-l-none border-l border-l-line2 px-2"
+          >
+            <span className="inline-block rotate-90">
+              <Chevron open={false} />
+            </span>
+          </Button>
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Content
+            side="top"
+            align="end"
+            sideOffset={6}
+            className="z-50 flex min-w-56 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay"
+          >
+            {onTarget && (
+              <Menu.Item className={menuItem} onSelect={() => mergeAs(onTarget)}>
+                Merge to {onTarget}
+              </Menu.Item>
+            )}
+            <Menu.Item className={menuItem} onSelect={() => setNaming(true)}>
+              Merge to a new branch…
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu.Root>
+    </span>
   );
   const open = v.mergeRequests.filter((m) => m.state === "open");
-  // One repo's merge: its line, its checkbox when there are several to pick from, and
-  // where it merges when it may go elsewhere.
+  // One repo's merge: its line (where it lands), and its checkbox when there are several to
+  // pick from.
   const repoRow = (m: (typeof open)[number], several: boolean) => {
     const line = (
       <span
@@ -984,20 +1018,6 @@ function DecisionBar({
           </label>
         ) : (
           line
-        )}
-        {targetsOf(m.repo).some((t) => t !== m.target) && (
-          <Select
-            label={`Where ${m.repo} merges`}
-            value={m.target}
-            mono
-            className="shrink-0"
-            // The branch it goes into, even one gone from git: the select shows it.
-            options={[...new Set([m.target, ...targetsOf(m.repo)])].map((t) => ({
-              value: t,
-              label: t,
-            }))}
-            onChange={(target) => target !== m.target && retarget.mutate({ repo: m.repo, target })}
-          />
         )}
       </span>
     );
@@ -1078,12 +1098,12 @@ function DecisionBar({
         {draft === 0 && mergeButton}
       </div>
       <Confirm
-        open={confirming}
+        open={confirming !== undefined}
         title="Merge without sending the drafts?"
         body={lostDrafts(draft)}
         action="Merge anyway"
-        onConfirm={mergeNow}
-        onClose={() => setConfirming(false)}
+        onConfirm={() => mergeNow(confirming)}
+        onClose={() => setConfirming(undefined)}
       />
       {form && (
         <form
@@ -1168,6 +1188,86 @@ function DecisionBar({
           </span>
         </form>
       )}
+      {/* Mounted while open: each opening starts with no name. */}
+      {naming && (
+        <MergeToDialog
+          repos={ticked}
+          busy={merge.isPending}
+          onClose={() => setNaming(false)}
+          onMerge={mergeAs}
+        />
+      )}
     </footer>
+  );
+}
+
+/** An item of the Merge button's menu. */
+const menuItem =
+  "flex cursor-pointer items-center rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover data-[highlighted]:text-tx";
+
+/** Merge to a new branch (the CEO, 2026-11-11): the repos ticked land on a branch of the CEO's
+ * naming, made on Merge from each one's target (or one already at its head), the lead's
+ * proposal filled in. The target, which the diff is against, stays. Nothing is pushed. */
+function MergeToDialog({
+  repos,
+  busy,
+  onClose,
+  onMerge,
+}: {
+  /** The repos ticked, each with its target and the lead's landing. */
+  repos: { repo: string; target: string; landing: string }[];
+  busy: boolean;
+  onClose: () => void;
+  onMerge: (landing: string) => void;
+}) {
+  const proposed = new Set(repos.map((r) => r.landing));
+  const [name, setName] = useState(proposed.size === 1 ? [...proposed][0] : "");
+  const branch = name.trim();
+  const theirs = agentBranch(branch);
+  return (
+    <Modal open onClose={onClose} title="Merge to a new branch">
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (branch && !theirs) onMerge(branch);
+        }}
+      >
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          aria-label="Name of the branch it lands on"
+          placeholder="f/my-feature"
+          spellCheck={false}
+          // biome-ignore lint/a11y/noAutofocus: opened to type the name
+          autoFocus
+          className="rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
+        />
+        <p className="m-0 text-[13px] text-tx3">
+          {theirs ? (
+            <span className="text-err">An agent's branch: name one of yours.</span>
+          ) : (
+            <>
+              Made from{" "}
+              {repos.map((r, i) => (
+                <span key={r.repo}>
+                  {i > 0 && ", "}
+                  <span className="font-mono text-tx2">{r.target}</span> in {r.repo}
+                </span>
+              ))}
+              , as reviewed, or one of that name already there. Here only: nothing is pushed.
+            </>
+          )}
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={!branch || theirs} busy={busy}>
+            {branch && !theirs ? `Merge to ${branch}` : "Merge"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

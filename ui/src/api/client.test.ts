@@ -319,14 +319,14 @@ describe("httpClient", () => {
     await c.reviews.deleteComment("rev-1", "com-2");
     await c.reviews.requestChanges("rev-1", "see the comments");
     await c.reviews.merge("rev-1", { api: "a1b2" });
-    await c.reviews.retarget("rev-1", "api", "release/2.0");
+    await c.reviews.merge("rev-1", { api: "a1b2" }, "f/csv");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["POST", "http://x/api/reviews/rev-1/comments", general],
       ["PUT", "http://x/api/reviews/rev-1/comments/com-2", { body: "Why not?" }],
       ["DELETE", "http://x/api/reviews/rev-1/comments/com-2", undefined],
       ["POST", "http://x/api/reviews/rev-1/changes", { note: "see the comments" }],
       ["POST", "http://x/api/reviews/rev-1/merge", { heads: { api: "a1b2" } }],
-      ["PUT", "http://x/api/reviews/rev-1/target", { repo: "api", target: "release/2.0" }],
+      ["POST", "http://x/api/reviews/rev-1/merge", { heads: { api: "a1b2" }, landing: "f/csv" }],
     ]);
   });
 

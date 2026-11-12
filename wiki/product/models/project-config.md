@@ -50,6 +50,7 @@ always_ask_ceo = [                     # gates: these always raise an approval r
   "scope change vs an accepted ADR",
 ]
 recursive_submodules = false           # also the submodules of submodules, in the agents' worktrees
+landing_prefixes = ["f/", "feat/", "fix/"]  # the names a lead may propose for a branch its merge lands on
 
 [forge]
 kind = "forgejo"                       # github | forgejo | gitea | none
@@ -68,6 +69,7 @@ project_repo = "https://localhost:3000/ledger/ledger-project"  # the project rep
 | `forge.project_repo` | String (URL) | when `kind` ≠ `none` | | | The [project repo](#the-project-repo) on the forge, given in full: its name is free, since `project` would clash between projects under one owner. Sync pushes `main` there |
 | `always_ask_ceo` | Array of String | | `[]` | | Gates. Hitting one makes the agent raise an approval [request](../features/requests.md). Listed in each [session prompt](../architecture/session-prompt.md) |
 | `recursive_submodules` | Boolean | | `false` | | Also check out the submodules of submodules in the agents' worktrees ([Sandboxes and git policy → Submodules](../architecture/sandboxes-and-git.md#submodules)). Off by default (the CEO, 2026-10-19) |
+| `landing_prefixes` | Array of strings | | `["f/", "feat/", "fix/"]` | each a folder of branches, ending in `/`, never `wt/` or `lead/` | The names a lead may propose, with `request_merge`'s `land`, for a new branch its merge lands on, made only when the CEO merges ([Pipeline and merges → Where a merge goes](../features/pipeline-and-merges.md#where-a-merge-goes)). `[]`: none; the CEO names one at Merge anyway. The default when the key is left out (the CEO, 2026-11-11) |
 
 The wiki has no field: it is always `wiki/` in the project repo. A `project` or `repos` field is reported as one Foreman doesn't know: the name and the repos are the [record](#the-project-record)'s. A `main` field (every `project.toml` before 2026-10-21 has `main = "main"`) is a problem saying each code repo has its own default branch now (Repos) and to remove the line; so is a `merge_to_main` field (every `project.toml` before 2026-11-02 has `merge_to_main = "ceo"`, the only value it ever took), saying only the CEO merges, always. Like any problem, each blocks new deployments until the line is gone.
 

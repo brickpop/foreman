@@ -123,7 +123,7 @@ func TestOnlyTheCEOsCommitsAreSigned(t *testing.T) {
 
 	// Not asked to sign: nothing is.
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "unsigned"); err != nil || signed("main") {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "unsigned"); err != nil || signed("main") {
 		t.Errorf("a squash without commit.gpgsign: signed %v, %v", signed("main"), err)
 	}
 
@@ -139,7 +139,7 @@ func TestOnlyTheCEOsCommitsAreSigned(t *testing.T) {
 	}
 	mustRun(t, dir, "checkout", "-q", "main")
 	head = mustRun(t, dir, "rev-parse", "lead/atlas/x")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "signed"); err != nil || !signed("main") {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "signed"); err != nil || !signed("main") {
 		t.Errorf("the CEO's squash: signed %v, %v", signed("main"), err)
 	}
 
@@ -150,7 +150,7 @@ func TestOnlyTheCEOsCommitsAreSigned(t *testing.T) {
 	mustRun(t, dir, "checkout", "-q", "main")
 	before := mustRun(t, dir, "rev-parse", "main")
 	head = mustRun(t, dir, "rev-parse", "lead/atlas/x")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "no key"); err == nil || mustRun(t, dir, "rev-parse", "main") != before {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "no key"); err == nil || mustRun(t, dir, "rev-parse", "main") != before {
 		t.Errorf("merged without a signature: %v", err)
 	}
 }

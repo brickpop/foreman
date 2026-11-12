@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { diffFiles } from "./diff";
-import { fileTree, type TreeNode } from "./fileTree";
+import { fileTree, type TreeNode, treeOrder } from "./fileTree";
 
 /** A tree as nested names, folders ending in `/`, for readable expectations. */
 type Shape = string | { [folder: string]: Shape[] };
@@ -84,5 +84,30 @@ describe("fileTree", () => {
 
   it("shows a file replaced by a folder of the same name as both", () => {
     expect(tree("a", "a/x.ts")).toEqual([{ "a/": ["x.ts"] }, "a"]);
+  });
+});
+
+describe("treeOrder", () => {
+  it("lists the items as the tree shows them: folders first, at every level", () => {
+    // git's order: plain path order, a file before a folder that sorts after it.
+    const git = ["README.md", "a.ts", "src/b/y.ts", "src/x.ts", "z/w.ts"].map((path) => ({ path }));
+    expect(treeOrder(git).map((f) => f.path)).toEqual([
+      "src/b/y.ts",
+      "src/x.ts",
+      "z/w.ts",
+      "a.ts", // names as the tree sorts them: case aside
+      "README.md",
+    ]);
+  });
+
+  it("keeps every item, once, and the same objects", () => {
+    const items = [{ path: "x/a" }, { path: "b" }, { path: "x/y/c" }];
+    const ordered = treeOrder(items);
+    expect(ordered).toHaveLength(3);
+    for (const i of items) expect(ordered).toContain(i);
+  });
+
+  it("is empty without items", () => {
+    expect(treeOrder([])).toEqual([]);
   });
 });

@@ -559,12 +559,16 @@ func changesMessage(v Review, note string, comments []Comment) string {
 }
 
 // MergeReview merges the review's open merge requests in the repos named,
-// each at the head the CEO read (heads: repo → commit), into its target;
-// the others stay open in the review. A repo that can't be merged (a
+// each at the head the CEO read (heads: repo → commit), against its target
+// onto where it lands: landing when the CEO names one (any branch name but an
+// agent's; its target's own name lands on it), else where the lead proposed,
+// else the target itself (the CEO, 2026-11-11). Nothing merges unless every
+// repo picked can land: its landing not a branch yet, or one at its target's
+// head. The others stay open in the review. A repo that can't be merged (a
 // conflict, the CEO's local changes, a branch that moved since) stops
 // nothing else; the error names it. Once nothing is open in it, its draft
 // comments are dropped.
-func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]string) error {
+func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]string, landing string) error {
 	v, err := w.openReview(ctx, id)
 	if err != nil {
 		return err
@@ -581,7 +585,30 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 		if heads[repo] == "" {
 			return fmt.Errorf("%w: name the commit of %s you read", ErrInvalid, repo)
 		}
-		picked = append(picked, v.MergeRequests[i])
+		mr := v.MergeRequests[i]
+		if landing != "" {
+			mr.Landing = landing
+			if landing == mr.Target {
+				mr.Landing = ""
+			}
+		}
+		picked = append(picked, mr)
+	}
+	if landing != "" && (!git.ValidBranch(ctx, landing) || git.AgentBranch(landing)) {
+		return fmt.Errorf("%w: %q isn't a branch name of yours", ErrInvalid, landing)
+	}
+	var taken []string
+	for _, mr := range picked {
+		target, dir, err := w.repoOf(mr)
+		if err != nil {
+			return err
+		}
+		if mr.Landing != "" && !w.landable(ctx, dir, target, mr.Landing) {
+			taken = append(taken, fmt.Sprintf("%s (%s)", mr.Repo, mr.Landing))
+		}
+	}
+	if len(taken) > 0 {
+		return fmt.Errorf("%w: a branch of that name is in %s already, at another commit than the one it merges into: land it under another name", ErrInvalid, strings.Join(taken, ", "))
 	}
 	var failed []error
 	for _, mr := range picked {
@@ -595,39 +622,6 @@ func (w *Workflow) MergeReview(ctx context.Context, id string, heads map[string]
 		w.dropDrafts(ctx, id)
 	}
 	return errors.Join(failed...)
-}
-
-// RetargetReview changes the branch the review's open merge request in repo
-// merges into: another the repo has, not an agent's. Its diff
-// is then against it, a conflict found before is forgotten (the next merge
-// tells), and the lead is told.
-func (w *Workflow) RetargetReview(ctx context.Context, id, repo, target string) error {
-	v, err := w.openReview(ctx, id)
-	if err != nil {
-		return err
-	}
-	i := slices.IndexFunc(v.MergeRequests, func(mr store.MergeRequest) bool { return mr.Repo == repo && mr.State == store.MergeOpen })
-	if i < 0 {
-		return fmt.Errorf("%w: %s has nothing open in this review", ErrNotOpen, repo)
-	}
-	mr := v.MergeRequests[i]
-	if git.AgentBranch(target) {
-		return fmt.Errorf("%w: %s is an agent's branch: a merge goes into one of yours", ErrInvalid, target)
-	}
-	from, dir, err := w.repoOf(mr)
-	if err != nil {
-		return err
-	}
-	if from == target {
-		return nil
-	}
-	if !w.Git.HasBranch(ctx, dir, target) {
-		return fmt.Errorf("%w: %s has no branch %s", ErrInvalid, repo, target)
-	}
-	mr.Target, mr.Conflicting, mr.Note = target, false, ""
-	w.saveMerge(ctx, mr)
-	w.tell(ctx, mr, "foreman", fmt.Sprintf("From Foreman: the CEO changed where %s merges in %s: into %s, no longer %s. Its review is reckoned against %s now; when told %s moved, merge that in.", mr.Branch, repo, target, from, target, target))
-	return nil
 }
 
 // DismissReview ends the review unmerged, in every repo still open in it: the

@@ -111,6 +111,7 @@ func (w *Workflow) standing(ctx context.Context, project home.Project, name, dir
 			for _, mr := range mrs {
 				if mr.Repo == s.repo.Name {
 					land(mr.Target)
+					land(mr.Landing)
 				}
 			}
 		}

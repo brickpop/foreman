@@ -120,7 +120,12 @@ export function isOpen(v: Review): boolean {
 export function openRepos(v: Review) {
   return v.mergeRequests
     .filter((m) => m.state === "open")
-    .map((m) => ({ repo: m.repo, target: m.target, conflicting: m.conflicting }));
+    .map((m) => ({
+      repo: m.repo,
+      target: m.target,
+      landing: m.landing,
+      conflicting: m.conflicting,
+    }));
 }
 
 /** How a repo of the review was decided: "merged", "dismissed" or
@@ -130,10 +135,20 @@ export function decidedAs(v: Review, repo: string): string {
   return state === "open" ? "" : state === "rejected" ? "dismissed" : state;
 }
 
-/** The decision button for the repos ticked: one target for all, else per repo. */
-export function mergeLabel(ticked: { target: string }[]): string {
-  const targets = new Set(ticked.map((r) => r.target));
-  return targets.size === 1 ? `Merge to ${ticked[0].target}` : "Merge";
+/** The Merge button for the repos ticked: where they land (landing: the CEO's name), when all
+ * in one place, else just Merge. */
+export function mergeLabel(ticked: Lands[], landing = ""): string {
+  const where = new Set(ticked.map((r) => landsOn(r, landing)));
+  return where.size === 1 ? `Merge to ${[...where][0]}` : "Merge";
+}
+
+/** A merge request's target (its diff is against it) and the lead's landing, if any. */
+type Lands = { target: string; landing: string };
+
+/** Where a repo's merge lands: the CEO's name for it, else the lead's, else its target
+ * (wiki/product/features/pipeline-and-merges.md#where-a-merge-goes). */
+export function landsOn(r: Lands, landing = ""): string {
+  return landing || r.landing || r.target;
 }
 
 /** What Merge sends: each ticked repo with the head its diff was shown at,

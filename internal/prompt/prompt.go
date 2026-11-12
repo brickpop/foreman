@@ -98,11 +98,13 @@ var teamTools = []teamTool{
 		"                                    too); one of yours named in branches goes even unmerged. Clean up after a merge.",
 	}},
 	{"request_merge", leadOnly, anyone, true, []string{
-		"request_merge(branch, title, body, entry, into)",
+		"request_merge(branch, title, body, entry, into, land)",
 		"                                    Ask the CEO to merge one of your {lead}* branches into into,",
 		"                                    a branch of the CEO's (each repo's default when left out). title: what it",
 		"                                    brings, one short line; body, if any: what to know to review it;",
 		"                                    entry: the wiki card that explains the work. Only you can.",
+		"                                    land, if any: a new branch it lands on instead, made from into",
+		"                                    when the CEO merges ({landings}); the CEO may rename it.",
 		"                                    Call it again on the same branch to refresh it.",
 	}},
 	{"withdraw_merge", leadOnly, anyone, true, []string{
@@ -315,7 +317,8 @@ func branches(in Input, lead bool, has func(string) bool) string {
 		return fmt.Sprintf("you work on %s, made for you from %s.", git.HomeBranch(in.Project, in.Agent, in.Team.Team, false), defaults(in.Repos))
 	case lead && has("request_merge"):
 		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
-			"Ask for a merge with request_merge(branch, title, body, entry, into), one per branch, usually into the branch its work started from. When told the branch it goes into moved, merge that in with merge(<that branch>), "+
+			"Ask for a merge with request_merge(branch, title, body, entry, into, land), one per branch, usually into the branch its work started from. "+
+			"To stack them (main < f/a < f/b), request the first with land f/a, and the next into f/a once the CEO merged it. When told the branch it goes into moved, merge that in with merge(<that branch>), "+
 			"resolve any conflicts and commit(), then call request_merge again.%s %s", ours, ours, oneTopic(has), fewRequests)
 	case lead:
 		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
@@ -421,7 +424,7 @@ func tools(in Input, lead bool, has func(string) bool) string {
 	for _, t := range teamTools {
 		if has(t.name) {
 			for _, row := range t.rows {
-				rows = append(rows, strings.ReplaceAll(row, "{lead}", git.BranchPrefix(in.Project, in.Agent, in.Team.Team, true)))
+				rows = append(rows, strings.NewReplacer("{lead}", git.BranchPrefix(in.Project, in.Agent, in.Team.Team, true), "{landings}", landings(in.Config)).Replace(row))
 			}
 		}
 	}
@@ -557,4 +560,13 @@ func goal(projectRepo string, lead bool) string {
 func files(dir string) string {
 	return fmt.Sprintf("Files from the CEO: %s/%s (read only, by design: what the CEO gives the team to work with).\n", dir, home.FilesInbox) +
 		fmt.Sprintf("Shared files: %s/%s (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)", dir, home.FilesShared)
+}
+
+// landings says where a lead may name a branch its merge lands on: the
+// project's landing prefixes.
+func landings(c home.ProjectConfig) string {
+	if len(c.LandingPrefixes) == 0 {
+		return "this project takes none: leave it out"
+	}
+	return "under " + strings.Join(c.LandingPrefixes, ", ")
 }

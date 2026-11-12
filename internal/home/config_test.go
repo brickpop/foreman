@@ -2,6 +2,7 @@ package home
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -43,6 +44,16 @@ func TestProjectExampleParsesWithDefaults(t *testing.T) {
 	if len(p) > 0 || minimal.Forge.Kind != "none" {
 		t.Errorf("minimal: %+v %v", minimal, p)
 	}
+	// Landing prefixes: the default without the key, none with [], else the list.
+	if !slices.Equal(minimal.LandingPrefixes, DefaultLandingPrefixes) {
+		t.Errorf("default landing prefixes: %v", minimal.LandingPrefixes)
+	}
+	if c, p := ParseProject([]byte("landing_prefixes = []")); len(p) > 0 || len(c.LandingPrefixes) != 0 {
+		t.Errorf("none: %v %v", c.LandingPrefixes, p)
+	}
+	if c, p := ParseProject([]byte(`landing_prefixes = ["release/"]`)); len(p) > 0 || !slices.Equal(c.LandingPrefixes, []string{"release/"}) {
+		t.Errorf("listed: %v %v", c.LandingPrefixes, p)
+	}
 }
 
 func TestProjectProblems(t *testing.T) {
@@ -57,6 +68,8 @@ func TestProjectProblems(t *testing.T) {
 		"main, now per repo":      {"main = \"main\"", "main: each code repo has its own default branch now"},
 		"syntax error":            {`checks = `, "line 1"},
 		"multi-line describe":     {"description = \"\"\"a\nb\"\"\"", "one line"},
+		"a landing prefix, no /":  {`landing_prefixes = ["f"]`, "landing_prefixes: \"f\""},
+		"an agent's prefix":       {`landing_prefixes = ["wt/x/"]`, "never wt/ or lead/"},
 	} {
 		if _, p := ParseProject([]byte(tc.toml)); !hasProblem(p, tc.want) {
 			t.Errorf("%s: problems %v, want one with %q", name, p, tc.want)

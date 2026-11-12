@@ -141,7 +141,7 @@ func TestMergingAReviewWithdrawsTheOnesItHolds(t *testing.T) {
 	}
 	// Only api first: small's web isn't in trunk yet, so small stays open.
 	sent := len(f.m.sent)
-	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api")); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api"), ""); err != nil {
 		t.Fatal(err)
 	}
 	if v := f.review("rev-1"); v.Status != ReviewNeedsYou {
@@ -152,7 +152,7 @@ func TestMergingAReviewWithdrawsTheOnesItHolds(t *testing.T) {
 	}
 	// Then web: main holds all of small now.
 	sent = len(f.m.sent)
-	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "web")); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "web"), ""); err != nil {
 		t.Fatal(err)
 	}
 	v := f.review("rev-1")
@@ -195,13 +195,13 @@ func TestMergingTheLastRepoDropsTheDrafts(t *testing.T) {
 		}
 		return len(comments)
 	}
-	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api")); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api"), ""); err != nil {
 		t.Fatal(err)
 	}
 	if n := drafts(); n != 1 {
 		t.Errorf("web still open: %d drafts, want 1", n)
 	}
-	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "web")); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "web"), ""); err != nil {
 		t.Fatal(err)
 	}
 	if n := drafts(); n != 0 {
@@ -213,7 +213,7 @@ func TestMergingTheLastRepoDropsTheDrafts(t *testing.T) {
 func TestMergingTheSmallerKeepsTheBigger(t *testing.T) {
 	f := newFixture(t)
 	f.smallAndBig()
-	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api", "web")); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api", "web"), ""); err != nil {
 		t.Fatal(err)
 	}
 	if v := f.review("rev-2"); v.Status != ReviewNeedsYou || !v.WithdrawnAt.IsZero() {
@@ -267,7 +267,7 @@ func TestADecidedReviewKeepsItsDiff(t *testing.T) {
 			}
 			switch end {
 			case "merged":
-				err = f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api"))
+				err = f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api"), "")
 			case "dismissed":
 				_, err = f.w.DismissReview(ctx, "rev-1", Dismiss{DropBranches: true, StopTeam: true})
 			case "withdrawn":

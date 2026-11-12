@@ -10,6 +10,8 @@ epic: git
 
 **Why:** a project with a forge (GitHub, Forgejo, Gitea) can send a merge request there as a PR, and the reserved repos (the project repo, the global repo) sync with theirs ([Forge adapters](../product/architecture/forge-adapters.md), [Pipeline and merges](../product/features/pipeline-and-merges.md)).
 
+**Landings and stacks (the CEO, 2026-11-11):** a merge request may land on a branch of its own ([Where a merge goes](../product/features/pipeline-and-merges.md#where-a-merge-goes)), and leads stack them (`main < f/a < f/b`). Create PR on such a review: decide whether the PR's head is the landing (`f/b`, pushed after it is made) and its base the target (`f/a`), so a stack becomes a forge's stacked PRs one to one.
+
 **Done when:** Settings → Forge accounts checks and stores a token; a merge request offers **Create PR**, pushes the branch and opens the PR; Foreman follows it (merged, closed, review comments to the lead); **Sync** fetches, merges and pushes the project and workspace repos' `main`, stopping on a conflict; tests against a fake forge.
 
 - [ ] tokens: `GET /api/secrets/forge`, `PUT /api/secrets/forge/:kind`; the real client in Settings

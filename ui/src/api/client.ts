@@ -316,10 +316,10 @@ export interface ReviewsArea {
   /** Sends the draft comments and the note to the lead. */
   requestChanges(review: string, note: string): Promise<void>;
   /** Merges the repos named, each at the head the CEO read (repo → commit);
-   * the rest stay open. A repo whose branch moved since isn't merged. */
-  merge(review: string, heads: Record<string, string>): Promise<void>;
-  /** Changes where one repo of it merges: another branch of that repo, not an agent's. */
-  retarget(review: string, repo: string, target: string): Promise<void>;
+   * the rest stay open. A repo whose branch moved since isn't merged. landing: the CEO's name
+   * for the branch they land on (made from each target, or one at its head); else the lead's,
+   * else the target. */
+  merge(review: string, heads: Record<string, string>, landing?: string): Promise<void>;
   /** Ends it unmerged, the reason going to the lead. */
   /** Dismisses it as the CEO chose; answers with the branches it couldn't drop. */
   dismiss(review: string, c: Dismiss): Promise<Dismissed>;
@@ -619,9 +619,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         send("DELETE", `/api/reviews/${id(review)}/comments/${id(comment)}`),
       requestChanges: (review, note) =>
         send("POST", `/api/reviews/${id(review)}/changes`, { note }),
-      merge: (review, heads) => send("POST", `/api/reviews/${id(review)}/merge`, { heads }),
-      retarget: (review, repo, target) =>
-        send("PUT", `/api/reviews/${id(review)}/target`, { repo, target }),
+      merge: (review, heads, landing) =>
+        send("POST", `/api/reviews/${id(review)}/merge`, { heads, landing }),
       dismiss: async (review, c) =>
         (
           await request("POST", `/api/reviews/${id(review)}/dismiss`, c)

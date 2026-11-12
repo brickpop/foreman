@@ -67,7 +67,7 @@ func TestSquashTheCheckedOutTarget(t *testing.T) {
 	mustRun(t, dir, "checkout", "-q", "main")
 	base, head := mustRun(t, dir, "rev-parse", "main"), mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	write(t, filepath.Join(dir, "notes.txt"), "the CEO's own, unrelated\n")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "Settlement v2"); err != nil {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "Settlement v2"); err != nil {
 		t.Fatal(err)
 	}
 	// The message alone, however many authors wrote the branch.
@@ -91,7 +91,7 @@ func TestSquashRefusesToOverwriteTheCEOsEdits(t *testing.T) {
 	mustRun(t, dir, "checkout", "-q", "main")
 	head := mustRun(t, dir, "rev-parse", "main")
 	write(t, filepath.Join(dir, "README"), "the CEO's edit\n")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); !errors.Is(err, ErrLocalChanges) {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); !errors.Is(err, ErrLocalChanges) {
 		t.Fatalf("err %v, want ErrLocalChanges", err)
 	}
 	if mustRun(t, dir, "rev-parse", "main") != head {
@@ -113,7 +113,7 @@ func TestSquashBacksOutOfAConflict(t *testing.T) {
 			mustRun(t, dir, "checkout", "-q", "-b", "elsewhere")
 		}
 		head := mustRun(t, dir, "rev-parse", "main")
-		if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); !errors.Is(err, ErrConflict) {
+		if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); !errors.Is(err, ErrConflict) {
 			t.Fatalf("checked out %v: err %v, want ErrConflict", checkedOut, err)
 		}
 		if mustRun(t, dir, "rev-parse", "main") != head || mustRun(t, dir, "status", "--porcelain") != "" {
@@ -130,7 +130,7 @@ func TestSquashWithoutTouchingAnotherCheckout(t *testing.T) {
 	base := mustRun(t, dir, "rev-parse", "main")
 	mustRun(t, dir, "checkout", "-q", "-b", "the-ceos-work")
 	write(t, filepath.Join(dir, "draft.txt"), "wip\n")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "Settlement v2"); err != nil {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "Settlement v2"); err != nil {
 		t.Fatal(err)
 	}
 	squashed(t, dir, base, "Settlement v2")
@@ -147,11 +147,11 @@ func TestSquashWithoutTouchingAnotherCheckout(t *testing.T) {
 
 func TestSquashWhatMainHasAlready(t *testing.T) {
 	g, dir := mergeFixture(t)
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "once"); err != nil {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "once"); err != nil {
 		t.Fatal(err)
 	}
 	head := mustRun(t, dir, "rev-parse", "main")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "twice"); err != nil {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "twice"); err != nil {
 		t.Fatal(err)
 	}
 	if mustRun(t, dir, "rev-parse", "main") != head {
@@ -168,12 +168,12 @@ func TestSquashOnlyTheCommitRead(t *testing.T) {
 	mustRun(t, dir, "checkout", "-q", "main")
 	// The lead committed after the CEO read it: nothing is merged.
 	for _, head := range []string{read, read[:12]} {
-		if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "x"); !errors.Is(err, ErrMoved) {
+		if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "x"); !errors.Is(err, ErrMoved) {
 			t.Errorf("%s: %v, want ErrMoved", head, err)
 		}
 	}
 	for _, head := range []string{"", "main", "-x", "HEAD~1"} {
-		if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "x"); !errors.Is(err, ErrNoRef) {
+		if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "x"); !errors.Is(err, ErrNoRef) {
 			t.Errorf("%q: %v, want ErrNoRef", head, err)
 		}
 	}
@@ -191,7 +191,7 @@ func TestMerged(t *testing.T) {
 		}
 	}
 	merged(false)
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); err != nil {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); err != nil {
 		t.Fatal(err)
 	}
 	// Its commits aren't in main, its changes are.
@@ -227,7 +227,7 @@ func TestMoveBranchCheckedOutInAWorktree(t *testing.T) {
 	g, dir := mergeFixture(t)
 	wt := filepath.Join(t.TempDir(), "lead")
 	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
-	if err := g.Squash(ctx, dir, "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); err != nil {
+	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); err != nil {
 		t.Fatal(err)
 	}
 	change(t, g, dir, "README", "main moved on\n", Author{})
@@ -417,7 +417,7 @@ func TestPartedFrom(t *testing.T) {
 	}{
 		{"open", func(*testing.T, *CLI, string, string) {}, false},
 		{"squashed", func(t *testing.T, g *CLI, dir, head string) {
-			if err := g.Squash(ctx, dir, "main", "lead/atlas/x", head, "Feature"); err != nil {
+			if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", head, "Feature"); err != nil {
 				t.Fatal(err)
 			}
 		}, false},
@@ -526,5 +526,77 @@ func TestDeleteBranchCheckedOut(t *testing.T) {
 	}
 	if refs := mustRun(t, dir, "for-each-ref", "refs/foreman/"); refs != "" {
 		t.Errorf("a backup of what stayed: %q", refs)
+	}
+}
+
+// Squash onto a landing branch of its own (the CEO, 2026-11-11): made at the
+// target's head with the squash on it, the target untouched; one already
+// there is used only while at the target's head.
+func TestSquashOntoALanding(t *testing.T) {
+	g, dir := mergeFixture(t) // lead/atlas/x one commit ahead of main
+	main := mustRun(t, dir, "rev-parse", "main")
+	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
+	if err := g.Squash(ctx, dir, "main", "f/feature", "lead/atlas/x", head, "Feature"); err != nil {
+		t.Fatal(err)
+	}
+	if mustRun(t, dir, "rev-parse", "main") != main {
+		t.Error("main moved")
+	}
+	if p := mustRun(t, dir, "log", "-1", "--format=%P %B", "f/feature"); p != main+" Feature" {
+		t.Errorf("f/feature's head: %q", p)
+	}
+	if mustRun(t, dir, "show", "f/feature:feature.go") != "package f" {
+		t.Error("the change isn't on f/feature")
+	}
+
+	// One already at main's head is used; one elsewhere is never moved.
+	mustRun(t, dir, "branch", "f/same", "main")
+	if err := g.Squash(ctx, dir, "main", "f/same", "lead/atlas/x", head, "Same"); err != nil {
+		t.Fatal(err)
+	}
+	if p := mustRun(t, dir, "log", "-1", "--format=%P", "f/same"); p != main {
+		t.Errorf("f/same's head has parents %q", p)
+	}
+	elsewhere := mustRun(t, dir, "rev-parse", "f/feature")
+	if err := g.Squash(ctx, dir, "main", "f/feature", "lead/atlas/x", head, "Again"); !errors.Is(err, ErrBranchExists) {
+		t.Errorf("onto a branch elsewhere: %v", err)
+	}
+	if mustRun(t, dir, "rev-parse", "f/feature") != elsewhere {
+		t.Error("the branch elsewhere moved")
+	}
+
+	// Checked out in the CEO's checkout: its files follow.
+	mustRun(t, dir, "branch", "f/out", "main")
+	mustRun(t, dir, "checkout", "-q", "f/out")
+	if err := g.Squash(ctx, dir, "main", "f/out", "lead/atlas/x", head, "Out"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "feature.go")); err != nil || mustRun(t, dir, "status", "--porcelain") != "" {
+		t.Errorf("the checkout didn't follow: %v", err)
+	}
+	mustRun(t, dir, "checkout", "-q", "main")
+
+	// A conflict makes nothing.
+	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
+	change(t, g, dir, "README", "the lead's\n", tove)
+	mustRun(t, dir, "checkout", "-q", "main")
+	change(t, g, dir, "README", "main's\n", Author{})
+	if err := g.Squash(ctx, dir, "main", "f/conflict", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "x"); !errors.Is(err, ErrConflict) {
+		t.Errorf("a conflict: %v", err)
+	}
+	if g.HasBranch(ctx, dir, "f/conflict") {
+		t.Error("a landing made though nothing merged")
+	}
+
+	// Nothing to add: the landing is still made, at main's head.
+	mustRun(t, dir, "branch", "lead/atlas/none", "main")
+	if err := g.Squash(ctx, dir, "main", "f/none", "lead/atlas/none", mustRun(t, dir, "rev-parse", "main"), "x"); err != nil {
+		t.Fatal(err)
+	}
+	if mustRun(t, dir, "rev-parse", "f/none") != mustRun(t, dir, "rev-parse", "main") {
+		t.Error("f/none isn't at main")
+	}
+	if err := g.Squash(ctx, dir, "main", "-x", "lead/atlas/x", head, "x"); !errors.Is(err, ErrBadBranch) {
+		t.Errorf("a bad landing: %v", err)
 	}
 }

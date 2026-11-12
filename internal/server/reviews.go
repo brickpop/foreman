@@ -23,11 +23,10 @@ type Reviews interface {
 	DeleteComment(ctx context.Context, review, id string) error
 	RequestChanges(ctx context.Context, id, note string) error
 	// MergeReview: workflow.ErrConflict, ErrLocalChanges or ErrBranchMoved
-	// for each repo that couldn't be merged (the others are).
-	MergeReview(ctx context.Context, id string, heads map[string]string) error
-	// RetargetReview changes where one repo of the review merges: another
-	// branch the repo has, not an agent's (workflow.ErrInvalid otherwise).
-	RetargetReview(ctx context.Context, id, repo, target string) error
+	// for each repo that couldn't be merged (the others are); ErrInvalid,
+	// nothing merged, when a repo can't land where it goes (landing: the
+	// CEO's name for it, "" for the lead's or the target).
+	MergeReview(ctx context.Context, id string, heads map[string]string, landing string) error
 	// DismissReview: workflow.ErrInvalid when dropping the branches of a team
 	// left running.
 	DismissReview(ctx context.Context, id string, c workflow.Dismiss) (workflow.Dismissed, error)
@@ -78,22 +77,13 @@ func reviewRoutes(mux *http.ServeMux, rv Reviews) {
 	})
 	mux.HandleFunc("POST /api/reviews/{id}/merge", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Heads map[string]string `json:"heads"`
+			Heads   map[string]string `json:"heads"`
+			Landing string            `json:"landing"`
 		}
-		if !decode(w, r, &req, "expected {heads}: each repo to merge, with the commit you read") {
+		if !decode(w, r, &req, "expected {heads, landing?}: each repo to merge, with the commit you read") {
 			return
 		}
-		writeReview(w, nil, rv.MergeReview(r.Context(), r.PathValue("id"), req.Heads))
-	})
-	mux.HandleFunc("PUT /api/reviews/{id}/target", func(w http.ResponseWriter, r *http.Request) {
-		var req struct {
-			Repo   string `json:"repo"`
-			Target string `json:"target"`
-		}
-		if !decode(w, r, &req, "expected {repo, target}") {
-			return
-		}
-		writeReview(w, nil, rv.RetargetReview(r.Context(), r.PathValue("id"), req.Repo, req.Target))
+		writeReview(w, nil, rv.MergeReview(r.Context(), r.PathValue("id"), req.Heads, strings.TrimSpace(req.Landing)))
 	})
 	mux.HandleFunc("POST /api/reviews/{id}/dismiss", func(w http.ResponseWriter, r *http.Request) {
 		var req workflow.Dismiss

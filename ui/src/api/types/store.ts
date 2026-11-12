@@ -162,7 +162,18 @@ export interface MergeRequest {
   authorInstance: string;
   repo: string; // one of the project's code repos
   branch: string;
-  target: string; // the branch it merges into: its repo's default or any other but an agent's
+  /**
+   * Target is the branch the lead asked it to merge into (its repo's default
+   * or any other but an agent's), fixed: the diff is always against it.
+   */
+  target: string;
+  /**
+   * Landing is where it lands instead, "" for Target itself: a branch made
+   * at Target's head on Merge (or one already there), named by the lead
+   * (request_merge's land, under the project's prefixes) or by the CEO at
+   * Merge.
+   */
+  landing: string;
   entry: string; // the wiki card explaining the work
   state: string; // open, merged, rejected or withdrawn
   checksStatus: string;

@@ -52,6 +52,12 @@ export interface ProjectConfig {
    * agents' worktrees.
    */
   recursiveSubmodules: boolean;
+  /**
+   * LandingPrefixes are the names a lead may propose for a branch its merge
+   * lands on (request_merge's land), made only when the CEO merges:
+   * DefaultLandingPrefixes when the file names none, nothing with [].
+   */
+  landingPrefixes: string[];
   forge: Forge;
 }
 /**

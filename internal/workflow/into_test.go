@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"errors"
+	"maps"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -67,7 +68,7 @@ func TestWorkLandsOnTheBranchItNames(t *testing.T) {
 	}
 
 	before := len(f.m.sent)
-	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api")); err != nil {
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api"), ""); err != nil {
 		t.Fatal(err)
 	}
 	if out := f.git(api, "show", "release/1.0:fix.go"); out != "package fix" {
@@ -121,14 +122,10 @@ func TestIntoMustBeABranchOfEveryRepoWithNewCommits(t *testing.T) {
 		f.refused("mara", "request_merge", fix, "agent_branch")
 	}
 
-	// Into the defaults, then the CEO moves api's to the release: a refresh
-	// keeps it there.
+	// Into the defaults: a refresh keeps them.
 	delete(fix, "into")
 	f.ok("mara", "request_merge", fix)
-	if err := f.w.RetargetReview(ctx, "rev-1", "api", "release/1.0"); err != nil {
-		t.Fatal(err)
-	}
-	if text := f.ok("mara", "request_merge", fix); text != "Review rev-1, api (mr-1) into release/1.0, refreshed, web (mr-2) into trunk, refreshed: waiting for the CEO." {
+	if text := f.ok("mara", "request_merge", fix); text != "Review rev-1, api (mr-1) into main, refreshed, web (mr-2) into trunk, refreshed: waiting for the CEO." {
 		t.Errorf("refresh: %q", text)
 	}
 	fix["into"] = "main"
@@ -139,54 +136,6 @@ func TestIntoMustBeABranchOfEveryRepoWithNewCommits(t *testing.T) {
 	fix["into"] = "release/1.0"
 	if text := f.ok("mara", "request_merge", fix); text != "Review rev-1, api (mr-1) into release/1.0, refreshed, web (mr-2) into release/1.0, refreshed: waiting for the CEO." {
 		t.Errorf("into a branch made after: %q", text)
-	}
-}
-
-// The CEO changes where one repo of a review merges: to any branch of the
-// repo but an agent's; the diff follows, a conflict found before is forgotten, and
-// the lead is told.
-func TestRetargetReview(t *testing.T) {
-	f := newFixture(t)
-	f.release()
-	f.integrated()
-	f.ok("mara", "request_merge", integration)
-	mr := f.mr("mr-1")
-	mr.Conflicting, mr.Note = true, "conflicts with main"
-	if _, err := f.db.MergeRequests().Save(ctx, mr); err != nil {
-		t.Fatal(err)
-	}
-	for name, c := range map[string]struct {
-		repo, target string
-		want         error
-	}{
-		"an agent's branch":    {"api", "wt/ledger/tove/main", ErrInvalid},
-		"no such branch":       {"api", "nope", ErrInvalid},
-		"another repo's":       {"web", "release/1.0", ErrNotOpen},
-		"a repo of no request": {"docs", "main", ErrNotOpen},
-	} {
-		if err := f.w.RetargetReview(ctx, "rev-1", c.repo, c.target); !errors.Is(err, c.want) {
-			t.Errorf("%s: %v, want %v", name, err, c.want)
-		}
-	}
-	if err := f.w.RetargetReview(ctx, "rev-1", "api", "release/1.0"); err != nil {
-		t.Fatal(err)
-	}
-	if mr := f.mr("mr-1"); mr.Target != "release/1.0" || mr.Conflicting || mr.Note != "" {
-		t.Errorf("merge request %+v", mr)
-	}
-	if n := f.lastNotice(); n.ToInstance != "mara@ledger" || !strings.Contains(n.Body, "the CEO changed where lead/ledger/atlas/integration merges in api: into release/1.0, no longer main") {
-		t.Errorf("notice %+v", n)
-	}
-	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); diffs[0].Target != "release/1.0" || !strings.Contains(diffs[0].Diff, "LED-44.go") {
-		t.Errorf("diff %+v", diffs)
-	}
-	// A branch deleted outside Foreman.
-	f.git(filepath.Join(f.root, "ledger", "api"), "branch", "-D", "release/1.0")
-	if err := f.w.RetargetReview(ctx, "rev-1", "api", "main"); err != nil {
-		t.Errorf("back to main: %v", err)
-	}
-	if err := f.w.RetargetReview(ctx, "rev-1", "api", "release/1.0"); !errors.Is(err, ErrInvalid) {
-		t.Errorf("to a branch that's gone: %v", err)
 	}
 }
 
@@ -302,7 +251,7 @@ func TestIntoABranchThatHoldsItIsMerged(t *testing.T) {
 	}
 }
 
-// Moving a review's repo to another branch outdates the comments on its
+// The lead asking again into another branch outdates the comments on its
 // removed lines (they were the old branch's), not those on the branch's.
 func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
 	f := newFixture(t)
@@ -325,16 +274,17 @@ func TestRetargetOutdatesRemovedLineComments(t *testing.T) {
 	if got := outdated(); len(got) != 2 || got[0] || got[1] {
 		t.Fatalf("before: %v", got)
 	}
-	if err := f.w.RetargetReview(ctx, "rev-1", "api", "release/1.0"); err != nil {
-		t.Fatal(err)
-	}
+	into := maps.Clone(integration)
+	into["into"] = "release/1.0"
+	f.ok("mara", "request_merge", into)
 	if got := outdated(); !got[0] || got[1] {
 		t.Errorf("after: %v, want the removed line's only", got)
 	}
 }
 
 // A branch deleted outside Foreman while a merge request goes into it: its
-// repo shows no diff and no head, so it can't merge until moved elsewhere.
+// repo shows no diff and no head, so it can't merge until the lead asks into
+// another.
 func TestBranchGoneUnderAnOpenReview(t *testing.T) {
 	f := newFixture(t)
 	f.release()
@@ -347,10 +297,102 @@ func TestBranchGoneUnderAnOpenReview(t *testing.T) {
 	if err != nil || len(diffs) != 1 || !diffs[0].TargetGone || diffs[0].Head != "" || diffs[0].Diff != "" {
 		t.Fatalf("%+v %v", diffs, err)
 	}
-	if err := f.w.RetargetReview(ctx, "rev-1", "api", "main"); err != nil {
-		t.Fatal(err)
-	}
+	f.ok("mara", "request_merge", map[string]string{"branch": "lead/ledger/atlas/fix", "title": "Invoices as CSV", "entry": "backlog/led-44.md", "into": "main"})
 	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); diffs[0].TargetGone || diffs[0].Head == "" {
 		t.Errorf("moved to main: %+v", diffs[0])
+	}
+}
+
+// A lead proposes where its merge lands, under the project's prefixes; the
+// CEO lands it there, or under another name, or on the target itself. The
+// landing is made from the target's head on Merge, never before; one taken
+// at another commit is never moved. A stack is the next request into it.
+func TestLandOnANewBranch(t *testing.T) {
+	f := newFixture(t)
+	api := filepath.Join(f.root, "ledger", "api")
+	f.integrated() // lead/ledger/atlas/integration, api only
+	land := maps.Clone(integration)
+	for _, name := range []string{"release/x", "f/", "wt/ledger/tove/x", "-f/x"} {
+		land["land"] = name
+		f.refused("mara", "request_merge", land, "landing_not_allowed")
+	}
+	f.git(api, "branch", "f/taken", "lead/ledger/atlas/integration") // not at main
+	land["land"] = "f/taken"
+	f.refused("mara", "request_merge", land, "landing_taken")
+
+	land["land"] = "f/csv"
+	if text := f.ok("mara", "request_merge", land); text != "Review rev-1, api (mr-1) into main, landing on f/csv: waiting for the CEO." {
+		t.Fatalf("request: %q", text)
+	}
+	if git.New().HasBranch(ctx, api, "f/csv") {
+		t.Error("made before the CEO merged")
+	}
+	if diffs, _ := f.w.ReviewDiff(ctx, "rev-1", false); diffs[0].Target != "main" || !strings.Contains(diffs[0].Diff, "LED-44.go") {
+		t.Errorf("the diff isn't against main: %+v", diffs)
+	}
+	main := f.git(api, "rev-parse", "main")
+	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api"), ""); err != nil {
+		t.Fatal(err)
+	}
+	if f.git(api, "rev-parse", "main") != main || f.git(api, "log", "-1", "--format=%P", "f/csv") != main {
+		t.Error("not landed on f/csv from main, or main moved")
+	}
+	if mr := f.mr("mr-1"); mr.State != store.MergeMerged || mr.Landing != "f/csv" || mr.Target != "main" {
+		t.Errorf("merge request %+v", mr)
+	}
+	if f.git(api, "rev-parse", "lead/ledger/atlas/integration") != f.git(api, "rev-parse", "f/csv") {
+		t.Error("the lead branch didn't move to where it landed")
+	}
+	if n := f.lastNotice(); !strings.Contains(n.Body, "merged into f/csv in api") {
+		t.Errorf("notice %q", n.Body)
+	}
+
+	// A stack: the next lead branch, into f/csv, landing on f/csv-2. The CEO
+	// lands it under another name.
+	work := func(topic string) {
+		f.ok("mara", "switch", map[string]string{"branch": "lead/ledger/atlas/" + topic, "from": "f/csv"})
+		writeFile(t, filepath.Join(f.wt("mara", "api"), topic+".go"), "package x\n")
+		f.ok("mara", "commit", commits("api", topic))
+	}
+	work("two")
+	two := map[string]string{"branch": "lead/ledger/atlas/two", "title": "Two", "entry": "backlog/led-44.md", "into": "f/csv", "land": "f/csv-2"}
+	f.ok("mara", "request_merge", two)
+	if diffs, _ := f.w.ReviewDiff(ctx, "rev-2", false); strings.Contains(diffs[0].Diff, "LED-44.go") || !strings.Contains(diffs[0].Diff, "two.go") {
+		t.Errorf("rev-2 shows more than its own: %s", diffs[0].Diff)
+	}
+	for _, bad := range []string{"wt/ledger/tove/x", "-x"} {
+		if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api"), bad); !errors.Is(err, ErrInvalid) {
+			t.Errorf("landing %q: %v", bad, err)
+		}
+	}
+	// Taken at another commit: nothing merges.
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api"), "f/taken"); !errors.Is(err, ErrInvalid) || f.mr("mr-2").State != store.MergeOpen {
+		t.Errorf("onto a taken name: %v, %s", err, f.mr("mr-2").State)
+	}
+	// One at the target's head is used.
+	f.git(api, "branch", "f/ready", "f/csv")
+	if err := f.w.MergeReview(ctx, "rev-2", f.shown("rev-2", "api"), "f/ready"); err != nil {
+		t.Fatal(err)
+	}
+	if f.git(api, "log", "-1", "--format=%P", "f/ready") != f.git(api, "rev-parse", "f/csv") || git.New().HasBranch(ctx, api, "f/csv-2") {
+		t.Error("not landed on f/ready, or f/csv-2 made anyway")
+	}
+	if mr := f.mr("mr-2"); mr.Landing != "f/ready" {
+		t.Errorf("landed on %q", mr.Landing)
+	}
+
+	// The target's own name lands on the target, whatever the lead proposed.
+	work("three")
+	three := map[string]string{"branch": "lead/ledger/atlas/three", "title": "Three", "entry": "backlog/led-44.md", "into": "f/csv", "land": "f/csv-3"}
+	f.ok("mara", "request_merge", three)
+	before := f.git(api, "rev-parse", "f/csv")
+	if err := f.w.MergeReview(ctx, "rev-3", f.shown("rev-3", "api"), "f/csv"); err != nil {
+		t.Fatal(err)
+	}
+	if f.git(api, "log", "-1", "--format=%P", "f/csv") != before || git.New().HasBranch(ctx, api, "f/csv-3") {
+		t.Error("not landed on f/csv itself")
+	}
+	if mr := f.mr("mr-3"); mr.Landing != "" {
+		t.Errorf("landing kept: %q", mr.Landing)
 	}
 }

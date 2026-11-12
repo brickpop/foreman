@@ -1,10 +1,12 @@
 package workflow
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -36,7 +38,7 @@ var (
 	ErrBranchMoved = git.ErrMoved
 )
 
-func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into string) agentlink.Result {
+func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into, land string) agentlink.Result {
 	if !t.c.Lead {
 		return teamtools.Refusal("not_lead", "only the lead requests merges: hand your work to the lead")
 	}
@@ -61,6 +63,17 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 	if git.AgentBranch(into) {
 		return teamtools.Refusal("agent_branch", "%s is an agent's branch: a merge goes into one of the CEO's branches (the default when left out)", into)
 	}
+	// A landing is only proposed: the CEO makes it on Merge, under the
+	// project's prefixes (the CEO, 2026-11-11).
+	if land != "" {
+		prefixes := t.project.Config.LandingPrefixes
+		switch {
+		case len(prefixes) == 0:
+			return teamtools.Refusal("landing_not_allowed", "this project takes no landing names (project.toml's landing_prefixes): leave out land, and it lands on into")
+		case !git.ValidBranch(ctx, land) || !slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(land, p) && len(land) > len(p) }):
+			return teamtools.Refusal("landing_not_allowed", "%q isn't a landing name you may propose: one under %s", land, strings.Join(prefixes, ", "))
+		}
+	}
 	if res, ok := t.unsettled(ctx, t.worktrees(), "a merge request is your committed work"); !ok {
 		return res
 	}
@@ -74,7 +87,7 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 		held   bool // moved to a branch that holds all of it already
 	}
 	var requests []request
-	var lacking []string
+	var lacking, taken []string
 	found := false
 	for _, r := range t.worktrees() {
 		if !t.w.Git.HasBranch(ctx, r.dir, branch) {
@@ -86,13 +99,16 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return teamtools.Refusal("internal", "%v", err)
 		}
-		// Into the branch named, else the one it goes to already (the CEO may
-		// have changed it), else the repo's default.
+		// Into the branch named, else the one it goes to already, else the
+		// repo's default; landing on land when named, else where it did.
 		switch {
 		case into != "":
 			mr.Target = into
 		case !exists:
 			mr.Target = t.project.Default(r.name)
+		}
+		if land != "" {
+			mr.Landing = land
 		}
 		if !t.w.Git.HasBranch(ctx, r.dir, mr.Target) {
 			// A repo the review has open goes with it, so the review never
@@ -105,19 +121,25 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 			}
 			continue
 		}
-		if merged, err := t.w.Git.Merged(ctx, r.dir, mr.Target, branch); err != nil {
+		merged, err := t.w.Git.Merged(ctx, r.dir, mr.Target, branch)
+		if err != nil {
 			return gitError(err)
 		} else if merged && !(exists && mr.Target != was) {
 			continue
-		} else {
-			requests = append(requests, request{r, mr, exists, merged})
 		}
+		if mr.Landing != "" && !t.w.landable(ctx, r.dir, mr.Target, mr.Landing) {
+			taken = append(taken, fmt.Sprintf("%s (%s)", r.name, mr.Landing))
+			continue
+		}
+		requests = append(requests, request{r, mr, exists, merged})
 	}
 	switch {
 	case !found:
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
 	case len(lacking) > 0:
 		return teamtools.Refusal("no_such_branch", "%s is open or has new commits in %s, which lacks the branch it would merge into: ask the CEO to make it there, or split the work", branch, strings.Join(lacking, ", "))
+	case len(taken) > 0:
+		return teamtools.Refusal("landing_taken", "the landing is a branch already in %s, at another commit than the branch it merges into: name another with land", strings.Join(taken, ", "))
 	case len(requests) == 0:
 		return teamtools.Refusal("nothing_to_merge", "%s changes nothing in the branch it merges into, in any repo", branch)
 	}
@@ -154,6 +176,9 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 		t.w.carry(ctx, q.r.dir, mr)
 		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: q.r.name, Branch: branch, MergeRequest: mr.ID})
 		what := fmt.Sprintf("%s (%s) into %s", q.r.name, mr.ID, mr.Target)
+		if mr.Landing != "" {
+			what += ", landing on " + mr.Landing
+		}
 		switch {
 		case q.held:
 			// Settled now, not at the next Reconcile: the review never shows it
@@ -203,9 +228,10 @@ func (w *Workflow) carry(ctx context.Context, dir string, mr store.MergeRequest)
 }
 
 // mergeToTarget squashes one merge request's branch, at head (the commit
-// the CEO read), into its target: one commit "<entry title>", in the CEO's
-// checkout when it has the target checked out, without a working tree
-// otherwise (wiki/product/features/pipeline-and-merges.md#merge-to-a-target).
+// the CEO read), against its target onto where it lands (mr.Landing: made at
+// the target's head, or the target itself): one commit "<entry title>", in
+// the CEO's checkout when it has that branch checked out, without a working
+// tree otherwise (wiki/product/features/pipeline-and-merges.md#merge-to-a-target).
 func (w *Workflow) mergeToTarget(ctx context.Context, mr store.MergeRequest, head string) error {
 	target, dir, err := w.repoOf(mr)
 	if err != nil {
@@ -215,7 +241,10 @@ func (w *Workflow) mergeToTarget(ctx context.Context, mr store.MergeRequest, hea
 	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil {
 		title = e.Title
 	}
-	switch err := w.Git.Squash(ctx, dir, target, mr.Branch, head, title); {
+	onto := cmp.Or(mr.Landing, target)
+	switch err := w.Git.Squash(ctx, dir, target, onto, mr.Branch, head, title); {
+	case errors.Is(err, git.ErrBranchExists):
+		return fmt.Errorf("%w: %s is in %s already, at another commit than %s: land it under another name", ErrInvalid, onto, mr.Repo, target)
 	case errors.Is(err, git.ErrConflict):
 		mr.Conflicting, mr.Note = true, "conflicts with "+target
 		w.saveMerge(ctx, mr)
@@ -224,8 +253,19 @@ func (w *Workflow) mergeToTarget(ctx context.Context, mr store.MergeRequest, hea
 	case err != nil:
 		return err
 	}
-	w.merged(ctx, mr, target, dir, head)
+	w.merged(ctx, mr, onto, dir, head)
 	return nil
+}
+
+// landable says whether landing can take a merge into target in dir: not a
+// branch yet, or one at target's head (the CEO, 2026-11-11).
+func (w *Workflow) landable(ctx context.Context, dir, target, landing string) bool {
+	if !w.Git.HasBranch(ctx, dir, landing) {
+		return true
+	}
+	at, err := w.Git.Resolve(ctx, dir, "refs/heads/"+landing)
+	was, err2 := w.Git.Resolve(ctx, dir, "refs/heads/"+target)
+	return err == nil && err2 == nil && at == was
 }
 
 // free says whether a work item is carried by no merge request, or only by

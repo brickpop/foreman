@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"testing"
 
@@ -16,11 +15,12 @@ import (
 
 // fakeReviews knows rev-1; it records what it was asked.
 type fakeReviews struct {
-	since  bool
-	added  store.ReviewComment
-	did    []string
-	merges map[string]string
-	err    error // what a decision answers
+	since   bool
+	added   store.ReviewComment
+	did     []string
+	merges  map[string]string
+	landing string
+	err     error // what a decision answers
 }
 
 func (*fakeReviews) ListReviews(context.Context) ([]workflow.Review, error) {
@@ -66,16 +66,8 @@ func (f *fakeReviews) RequestChanges(_ context.Context, id, note string) error {
 	return f.err
 }
 
-func (f *fakeReviews) MergeReview(_ context.Context, id string, heads map[string]string) error {
-	f.merges = heads
-	return f.err
-}
-
-func (f *fakeReviews) RetargetReview(_ context.Context, id, repo, target string) error {
-	if target == "gone" {
-		return fmt.Errorf("%w: gone isn't a target of %s", workflow.ErrInvalid, repo)
-	}
-	f.did = append(f.did, fmt.Sprintf("retarget %s %s %s", id, repo, target))
+func (f *fakeReviews) MergeReview(_ context.Context, id string, heads map[string]string, landing string) error {
+	f.merges, f.landing = heads, landing
 	return f.err
 }
 
@@ -143,18 +135,16 @@ func TestReviewRoutes(t *testing.T) {
 	if w := send(h, "POST", "/api/reviews/rev-1/merge", `{"heads":{"api":"a1b2","web":"c3d4"}}`); w.Code != http.StatusNoContent || len(f.merges) != 2 || f.merges["api"] != "a1b2" || f.merges["web"] != "c3d4" {
 		t.Errorf("merge: %d %v", w.Code, f.merges)
 	}
-	if w := send(h, "PUT", "/api/reviews/rev-1/target", `{"repo":"api","target":"release/2.0"}`); w.Code != http.StatusNoContent || !slices.Contains(f.did, "retarget rev-1 api release/2.0") {
-		t.Errorf("retarget: %d %v", w.Code, f.did)
-	}
-	if w := send(h, "PUT", "/api/reviews/rev-1/target", `{"repo":"api","target":"gone"}`); w.Code != http.StatusBadRequest || errorCode(w.Body.String()) != "INVALID: gone isn't a target of api" {
-		t.Errorf("retarget to no target: %d %s", w.Code, w.Body)
+	// Landed under the CEO's name.
+	if w := send(h, "POST", "/api/reviews/rev-1/merge", `{"heads":{"api":"a1b2"},"landing":" f/csv "}`); w.Code != http.StatusNoContent || f.landing != "f/csv" {
+		t.Errorf("merge onto a landing: %d %q", w.Code, f.landing)
 	}
 	// The dismissal answers with the branches it kept, for the CEO.
 	if w := send(h, "POST", "/api/reviews/rev-1/dismiss", `{"note":"not now","dropBranches":true,"stopTeam":true}`); w.Code != http.StatusOK ||
 		strings.TrimSpace(w.Body.String()) != `{"kept":[{"repo":"api","branch":"lead/atlas/x","why":"changes in the way"}]}` {
 		t.Errorf("dismiss: %d %s", w.Code, w.Body)
 	}
-	if got, want := strings.Join(f.did, "; "), "edit rev-1 com-2 better; delete rev-1 com-2; changes rev-1 see below; retarget rev-1 api release/2.0; dismiss rev-1 not now drop=true stop=true"; got != want {
+	if got, want := strings.Join(f.did, "; "), "edit rev-1 com-2 better; delete rev-1 com-2; changes rev-1 see below; dismiss rev-1 not now drop=true stop=true"; got != want {
 		t.Errorf("did %q, want %q", got, want)
 	}
 

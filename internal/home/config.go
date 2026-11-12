@@ -31,9 +31,17 @@ type ProjectConfig struct {
 	AlwaysAskCEO []string `toml:"always_ask_ceo,omitempty" json:"alwaysAskCeo"`
 	// RecursiveSubmodules also checks out the submodules of submodules in the
 	// agents' worktrees.
-	RecursiveSubmodules bool  `toml:"recursive_submodules,omitempty" json:"recursiveSubmodules"`
-	Forge               Forge `toml:"forge,omitempty" json:"forge"`
+	RecursiveSubmodules bool `toml:"recursive_submodules,omitempty" json:"recursiveSubmodules"`
+	// LandingPrefixes are the names a lead may propose for a branch its merge
+	// lands on (request_merge's land), made only when the CEO merges:
+	// DefaultLandingPrefixes when the file names none, nothing with [].
+	LandingPrefixes []string `toml:"landing_prefixes,omitempty" json:"landingPrefixes"`
+	Forge           Forge    `toml:"forge,omitempty" json:"forge"`
 }
+
+// DefaultLandingPrefixes are the landing prefixes of a project.toml without
+// landing_prefixes (the CEO, 2026-11-11).
+var DefaultLandingPrefixes = []string{"f/", "feat/", "fix/"}
 
 // Forge is where the CEO can create PRs.
 type Forge struct {
@@ -174,6 +182,15 @@ func ParseProject(data []byte) (ProjectConfig, []string) {
 		c.Forge.Kind = "none"
 	}
 	c.AlwaysAskCEO = normalize(c.AlwaysAskCEO)
+	if !md.IsDefined("landing_prefixes") {
+		c.LandingPrefixes = slices.Clone(DefaultLandingPrefixes)
+	}
+	for _, prefix := range c.LandingPrefixes {
+		// A prefix names a folder of branches: never an agent's.
+		if !strings.HasSuffix(prefix, "/") || prefix == "/" || strings.HasPrefix(prefix, "wt/") || strings.HasPrefix(prefix, "lead/") {
+			p.add("landing_prefixes: %q is not a folder of branches of yours (like \"f/\"; never wt/ or lead/)", prefix)
+		}
+	}
 	if strings.ContainsAny(c.Description, "\n") {
 		p.add("description: one line")
 	}

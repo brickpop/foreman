@@ -13,10 +13,10 @@ import { ProjectRequest } from "./Pipeline";
 // waits on the lead, and the last reviews done. A review opens inside it.
 export function Inbox() {
   const project = useProject();
-  const reviews = useReviews();
+  const reviews = useReviews(project.id);
   const teams = useTeams();
   const requests = inbox(useRequests().data ?? []).filter((r) => r.projectId === project.id);
-  const groups = reviewGroups((reviews.data ?? []).filter((v) => v.projectId === project.id));
+  const groups = reviewGroups(reviews.data ?? []);
   const rows = (shown: Review[]) =>
     shown.length > 0 && (
       <Panel>

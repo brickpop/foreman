@@ -74,6 +74,8 @@ type Comments = {
   remove: (c: ReviewComment) => void;
   /** The review is open: comments can be written. */
   open: boolean;
+  /** A new comment is on its way: kept, then shown. */
+  adding: boolean;
 };
 
 const fileId = (repo: string, path: string) => `file:${repo}/${path}`;
@@ -168,8 +170,9 @@ export function Review() {
       edit: (c, body) => edit.mutate({ comment: c.id, body }),
       remove: (c) => remove.mutate(c.id),
       open,
+      adding: add.isPending,
     }),
-    [add.mutate, edit.mutate, remove.mutate, open],
+    [add.mutate, add.isPending, edit.mutate, remove.mutate, open],
   );
 
   if (review.error)
@@ -723,6 +726,7 @@ const FileBox = memo(function FileBox({
                     {here && writing && (
                       <Composer
                         placeholder="What should change here?"
+                        busy={comments.adding}
                         onSave={(body) => comments.add({ ...writing, body })}
                         onCancel={() => comments.compose(undefined)}
                       />
@@ -760,6 +764,7 @@ function Conversation({
           // A new box once the comment is kept; on a failure the text stays.
           key={general.length}
           placeholder="A comment on the whole change…"
+          busy={comments.adding}
           onSave={(body) =>
             comments.add({ repo: "", path: "", side: "", line: 0, commit: "", snippet: "", body })
           }
@@ -830,11 +835,14 @@ function CommentItem({ comment: c, comments }: { comment: ReviewComment; comment
 function Composer({
   initial = "",
   placeholder,
+  busy = false,
   onSave,
   onCancel,
 }: {
   initial?: string;
   placeholder: string;
+  /** Its comment is being kept: Save waits, so it is never sent twice. */
+  busy?: boolean;
   onSave: (body: string) => void;
   onCancel?: () => void;
 }) {
@@ -844,7 +852,7 @@ function Composer({
       className="flex flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
-        if (body.trim()) onSave(body.trim());
+        if (body.trim() && !busy) onSave(body.trim());
       }}
     >
       <textarea
@@ -859,7 +867,7 @@ function Composer({
       />
       <span className="flex justify-end gap-2">
         {onCancel && <Button onClick={onCancel}>Cancel</Button>}
-        <Button type="submit" variant="primary" disabled={!body.trim()}>
+        <Button type="submit" variant="primary" disabled={!body.trim()} busy={busy}>
           {initial ? "Save" : "Add to the draft"}
         </Button>
       </span>

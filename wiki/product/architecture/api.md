@@ -72,7 +72,7 @@ GET    /api/pipeline?project=                 work items and merge requests (ope
 POST   /api/projects/:id/cleanup                removes what agents running nowhere left on the project, only what is safe → {removed, kept} ([Project deployment → Earlier teams](../features/project-deployment.md#earlier-teams))
 GET    /api/projects/:id/repos/:repo/branch-cleanup  what the branch cleanup offers in a code repo → [{branch, agents, state (merged, superseded, unmerged), supersededBy?, legacy, stays?}] ([Repos → Branch cleanup](../features/repos.md#branch-cleanup))
 POST   /api/projects/:id/repos/:repo/branch-cleanup  {branches} → {removed, kept}: deletes the pick, each checked again; what stays, stays
-GET    /api/reviews                           every review, newest first, with its merge requests and status, without comments (Review)
+GET    /api/reviews?project=<id>              a project's open reviews and its 20 decided last (by when), newest first, with their merge requests and status, without comments (Review); 400 without project
 GET    /api/reviews/:id                       one review, with its comments where they are now ({now, outdated} each); 404
 GET    /api/reviews/:id/diff                  [?since=1] [{repo, target, head, since, diff, gone, targetGone}] per repo open in it: against its target, or from the head at the last Request changes; targetGone (no head, no diff) when its target's branch was deleted outside Foreman
 POST   /api/reviews/:id/comments              {repo, path, side, line, commit, snippet, body} (no repo: general): a draft comment; 200 the comment; 400 INVALID; 409 NOT_OPEN

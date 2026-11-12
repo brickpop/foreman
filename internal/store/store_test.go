@@ -715,10 +715,6 @@ func TestMergeRequests(t *testing.T) {
 	if list, _ := mrs.ForReview(ctx, "rev-1"); len(list) != 1 || list[0].ID != "mr-1" {
 		t.Errorf("for review %+v", list)
 	}
-	// Every review's at once: mr-2 (web) is in none, so it isn't listed.
-	if list, _ := mrs.InReviews(ctx); len(list) != 1 || list[0].ID != "mr-1" {
-		t.Errorf("in reviews %+v", list)
-	}
 	m.State, m.MergedAt, m.Conflicting, m.Note = MergeMerged, time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC), true, "x"
 	m.ReviewedHead, m.Head, m.Base = "abc123", "def456", "abc000"
 	m.Target, m.Landing = "release/2", "f/x"
@@ -1084,8 +1080,11 @@ func TestReviewsAndTheirComments(t *testing.T) {
 	if _, err := revs.Save(ctx, Review{ProjectID: "other", Branch: "lead/x/y"}); err != nil {
 		t.Fatal(err)
 	}
-	if list, _ := revs.List(ctx); len(list) != 2 || list[0].ID != "rev-1" || !list[1].WithdrawnAt.IsZero() || list[1].SupersededBy != "" {
-		t.Errorf("list %+v", list)
+	if list, _ := revs.ForProject(ctx, r.ProjectID); len(list) != 1 || list[0].ID != "rev-1" {
+		t.Errorf("of its project %+v", list)
+	}
+	if list, _ := revs.ForProject(ctx, "other"); len(list) != 1 || list[0].ID != "rev-2" || !list[0].WithdrawnAt.IsZero() || list[0].SupersededBy != "" {
+		t.Errorf("of the other %+v", list)
 	}
 
 	line, err := comments.Save(ctx, ReviewComment{ReviewID: "rev-1", Repo: "api", Path: "a.go", Side: "new", Line: 12, Commit: "c0ffee", Snippet: "x := 1", Body: "why 1?"})
@@ -1153,7 +1152,7 @@ func TestOpenMergeRequestsFromBeforeGetAReviewPerBranch(t *testing.T) {
 	if err != nil || len(open) != 2 || open[0].ID != "req-1" || open[0].ReviewID != "rev-1" || open[1].ReviewID != "rev-2" {
 		t.Errorf("open requests %+v %v", open, err)
 	}
-	if list, _ := (reviews{db}).List(ctx); len(list) != 2 || list[0].Branch != "lead/atlas/integration" || list[1].Branch != "lead/atlas/v2" {
+	if list, _ := (reviews{db}).ForProject(ctx, "ledger"); len(list) != 2 || list[0].Branch != "lead/atlas/integration" || list[1].Branch != "lead/atlas/v2" {
 		t.Errorf("reviews %+v", list)
 	}
 }

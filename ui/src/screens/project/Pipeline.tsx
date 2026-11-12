@@ -219,7 +219,7 @@ function MergeRow({
 }) {
   const navigate = useNavigate();
   const lead = agentOf(teams, mr.deploymentId, mr.authorInstance);
-  const title = useReviewTitle(mr.reviewId);
+  const title = useReviewTitle(project, mr.reviewId);
   return (
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
       <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3">
@@ -293,7 +293,7 @@ function MergedRow({
   teams: Team[];
   items: WorkItem[];
 }) {
-  const title = useReviewTitle(mr.reviewId);
+  const title = useReviewTitle(project, mr.reviewId);
   return (
     <div className="flex flex-col gap-1.5">
       <span className="flex items-center gap-2">

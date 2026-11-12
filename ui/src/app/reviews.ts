@@ -251,13 +251,13 @@ export function commentAt(
   return undefined;
 }
 
-/** The Inbox's reviews: what needs the CEO, what waits on a lead,
- * and the last ones done (newest first, as the server lists them). */
-export function reviewGroups(reviews: Review[], done = 20) {
+/** The Inbox's reviews: what needs the CEO, what waits on a lead, and the last ones done (the
+ * server lists only those, newest first). */
+export function reviewGroups(reviews: Review[]) {
   return {
     needsYou: reviews.filter((v) => v.status === ReviewNeedsYou),
     waiting: reviews.filter((v) => v.status === ReviewChangesRequested),
-    done: reviews.filter((v) => !isOpen(v)).slice(0, done),
+    done: reviews.filter((v) => !isOpen(v)),
   };
 }
 

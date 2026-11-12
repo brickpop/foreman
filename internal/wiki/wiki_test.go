@@ -117,6 +117,36 @@ func TestTreeOrderAndFolders(t *testing.T) {
 	}
 }
 
+// Title is the same title Entry gives, from the index alone, and refuses what Entry refuses.
+func TestTitle(t *testing.T) {
+	w, _ := fixture(t, map[string]string{
+		"backlog/led-44.md":    "---\ntype: task\ntitle: Export invoices\n---\n# Something else\n",
+		"backlog/no-title.md":  note("no title of its own\n"),
+		"backlog/a-heading.md": note("# From the heading\n"),
+	})
+	for _, p := range []string{"backlog/led-44.md", "/backlog/no-title.md", "backlog/a-heading.md"} {
+		got, err := w.Title("p", p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		e, err := w.Entry("p", p)
+		if err != nil || got != e.Title || got == "" {
+			t.Errorf("%s: title %q, entry's %q %v", p, got, e.Title, err)
+		}
+	}
+	if got, _ := w.Title("p", "backlog/led-44.md"); got != "Export invoices" {
+		t.Errorf("title %q", got)
+	}
+	for _, p := range []string{"backlog/gone.md", "../p/project/wiki/backlog/led-44.md", ""} {
+		if _, err := w.Title("p", p); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%q: %v", p, err)
+		}
+	}
+	if _, err := w.Title("other", "backlog/led-44.md"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("another project: %v", err)
+	}
+}
+
 func TestEntry(t *testing.T) {
 	w, dir := fixture(t, map[string]string{
 		"index.md": "---\nokf_version: \"0.1\"\n---\n# Home\n\nSee [the plan](plan/a.md#goals).\n",

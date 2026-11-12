@@ -143,6 +143,20 @@ func sortTree(nodes []Node) {
 	})
 }
 
+// Title is an entry's title, from the index alone: for a name in a list, where
+// Entry would read and work out the whole page.
+func (w *Wikis) Title(project, p string) (string, error) {
+	idx, err := w.open(project)
+	if err != nil {
+		return "", err
+	}
+	e, err := idx.Resolve("/" + strings.TrimPrefix(p, "/"))
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrNotFound, p)
+	}
+	return title(e), nil
+}
+
 // Entry is one entry of the project's wiki, with what the reader needs to
 // render it.
 func (w *Wikis) Entry(project, p string) (Entry, error) {

@@ -27,7 +27,6 @@ import (
 	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
-	"github.com/brickpop/foreman/internal/wiki"
 )
 
 // Git is what Workflow needs of the Git block.
@@ -78,7 +77,8 @@ type Config interface {
 
 // Wiki reads a project's wiki entries (the Wiki block).
 type Wiki interface {
-	Entry(project, path string) (wiki.Entry, error)
+	// Title is an entry's title: wiki.ErrNotFound when there is no such entry.
+	Title(project, path string) (string, error)
 }
 
 // Messages sends a message to a teammate (Messaging).

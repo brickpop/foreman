@@ -15,7 +15,8 @@ import (
 // commenting, and deciding (implemented by Workflow;
 // wiki/product/features/reviews.md).
 type Reviews interface {
-	ListReviews(ctx context.Context) ([]workflow.Review, error)
+	// ListReviews lists a project's open reviews and its last decided ones.
+	ListReviews(ctx context.Context, project string) ([]workflow.Review, error)
 	Review(ctx context.Context, id string) (workflow.Review, error)
 	ReviewDiff(ctx context.Context, id string, since bool) ([]workflow.RepoDiff, error)
 	AddComment(ctx context.Context, review string, c store.ReviewComment) (store.ReviewComment, error)
@@ -34,7 +35,12 @@ type Reviews interface {
 
 func reviewRoutes(mux *http.ServeMux, rv Reviews) {
 	mux.HandleFunc("GET /api/reviews", func(w http.ResponseWriter, r *http.Request) {
-		list, err := rv.ListReviews(r.Context())
+		project := r.URL.Query().Get("project")
+		if project == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected ?project=<id>")
+			return
+		}
+		list, err := rv.ListReviews(r.Context(), project)
 		writeReview(w, list, err)
 	})
 	mux.HandleFunc("GET /api/reviews/{id}", func(w http.ResponseWriter, r *http.Request) {

@@ -344,12 +344,12 @@ describe("httpClient", () => {
   it("reads the reviews and a review's change", async () => {
     const calls = stubFetch(200, []);
     const c = httpClient("http://x");
-    await c.reviews.list();
+    await c.reviews.list("ledger");
     await c.reviews.get("rev-1");
     await c.reviews.diff("rev-1", false);
     await c.reviews.diff("rev-1", true);
     expect(calls.map((c) => c.url)).toEqual([
-      "http://x/api/reviews",
+      "http://x/api/reviews?project=ledger",
       "http://x/api/reviews/rev-1",
       "http://x/api/reviews/rev-1/diff",
       "http://x/api/reviews/rev-1/diff?since=1",

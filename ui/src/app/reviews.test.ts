@@ -165,7 +165,7 @@ describe("reviewGroups", () => {
       at("r5", "needs-review"),
       at("r6", "withdrawn"),
     ];
-    const g = reviewGroups(all, 3);
+    const g = reviewGroups(all);
     expect(g.needsYou.map((v) => v.id)).toEqual(["r2", "r5"]);
     expect(g.waiting.map((v) => v.id)).toEqual(["r3"]);
     expect(g.done.map((v) => v.id)).toEqual(["r1", "r4", "r6"]);

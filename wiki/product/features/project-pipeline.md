@@ -53,4 +53,4 @@ Entries of a stopped [deployment](../models/deployment.md) stay listed with a `s
 
 ## 3. Merged
 
-Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), its review's title (with `PR #<n>` when it went through one) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and the target it merged into; local time, with the date when not today); under each, its work items as the same compact lines.
+Shown only when there is something. Merge requests merged in the last 7 days, newest first, at most 20: `✓` (`--ok`), its review's title (with `PR #<n>` when it went through one; the branch instead when that review was decided before the Inbox's last 20, which carry the titles) and a note (`--tx4`), e.g. `api · merged to main · 14:05` (its repo and the target it merged into; local time, with the date when not today); under each, its work items as the same compact lines.

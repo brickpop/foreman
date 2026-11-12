@@ -306,7 +306,8 @@ export type NewComment = {
 /** The CEO's reviews of the leads' branches (wiki/product/features/reviews.md). */
 export interface ReviewsArea {
   /** Every review, newest first, without their comments. */
-  list(): Promise<Review[]>;
+  /** A project's open reviews and its last decided ones, newest first. */
+  list(project: string): Promise<Review[]>;
   get(review: string): Promise<Review>;
   /** Each repo's change: against its target, or since the CEO last requested changes. */
   diff(review: string, since: boolean): Promise<RepoDiff[]>;
@@ -609,7 +610,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         ).json() as Promise<Cleanup>,
     },
     reviews: {
-      list: () => getJSON("/api/reviews"),
+      list: (project) => getJSON(`/api/reviews?project=${id(project)}`),
       get: (review) => getJSON(`/api/reviews/${id(review)}`),
       diff: (review, since) => getJSON(`/api/reviews/${id(review)}/diff${since ? "?since=1" : ""}`),
       addComment: (review, c) => send("POST", `/api/reviews/${id(review)}/comments`, c),

@@ -490,15 +490,20 @@ export function useSaveSettings() {
 /** The reviews (under ["pipeline"], so merge requests' events refresh them). */
 const reviewsKey = ["pipeline", "reviews"] as const;
 
-/** Every review, newest first. */
-export function useReviews() {
+/** A project's open reviews and its last decided ones, newest first. ("project" keeps the key
+ * apart from a review's, which is its id.) */
+export function useReviews(project: string) {
   const c = useClient();
-  return useQuery({ queryKey: reviewsKey, queryFn: () => c.reviews.list() });
+  return useQuery({
+    queryKey: [...reviewsKey, "project", project],
+    queryFn: () => c.reviews.list(project),
+  });
 }
 
-/** A review's title, as its lead gave it; undefined until the reviews load. */
-export function useReviewTitle(id: string) {
-  return useReviews().data?.find((r) => r.id === id)?.title;
+/** A review's title, as its lead gave it; undefined until the reviews load, and for a review
+ * decided before the project's last ones done. */
+export function useReviewTitle(project: string, id: string) {
+  return useReviews(project).data?.find((r) => r.id === id)?.title;
 }
 
 /** One review, with its comments where they are now. */
@@ -523,7 +528,8 @@ export function useReviewDiff(id: string, since: boolean) {
 
 /** A change to a review's draft comments: only that review is refetched after it, whether it
  * worked or not. Its diff and the list of reviews don't change with a comment, and refetching
- * them made each comment wait on the slowest calls. */
+ * them made each comment wait on the slowest calls. The change is pending until that refetch is
+ * in, so the comment shows as its box closes. */
 export function useCommentChange<T>(
   id: string,
   change: (c: ForemanClient, input: T) => Promise<unknown>,

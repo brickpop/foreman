@@ -23,8 +23,8 @@ type Reviews interface {
 	Save(ctx context.Context, r Review) (Review, error)
 	// Get returns one by id: ErrNotFound if none.
 	Get(ctx context.Context, id string) (Review, error)
-	// List lists every review, oldest first.
-	List(ctx context.Context) ([]Review, error)
+	// ForProject lists a project's reviews, oldest first.
+	ForProject(ctx context.Context, projectID string) ([]Review, error)
 }
 
 // ReviewComments is the review_comments table.
@@ -84,7 +84,9 @@ func (s reviews) Get(ctx context.Context, id string) (Review, error) {
 	return list[0], nil
 }
 
-func (s reviews) List(ctx context.Context) ([]Review, error) { return s.query(ctx, "") }
+func (s reviews) ForProject(ctx context.Context, projectID string) ([]Review, error) {
+	return s.query(ctx, "WHERE project_id = ?", projectID)
+}
 
 func (s reviews) query(ctx context.Context, where string, args ...any) ([]Review, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT seq, project_id, branch, title, body, created_at, changes_requested_at, changes_note, withdrawn_at, withdrawn_reason, superseded_by FROM reviews "+where+" ORDER BY seq", args...)

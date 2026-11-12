@@ -48,7 +48,7 @@ func (w *Workflow) Resumed(ctx context.Context, inst store.Instance, lead bool) 
 	}
 	var open []string
 	if lead {
-		reviews, _ := w.ListReviews(ctx)
+		reviews, _ := w.projectReviews(ctx, projectID)
 		for _, v := range reviews {
 			switch {
 			case v.DeploymentID != inst.DeploymentID:

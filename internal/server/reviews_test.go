@@ -23,7 +23,10 @@ type fakeReviews struct {
 	err     error // what a decision answers
 }
 
-func (*fakeReviews) ListReviews(context.Context) ([]workflow.Review, error) {
+func (*fakeReviews) ListReviews(_ context.Context, project string) ([]workflow.Review, error) {
+	if project != "ledger" {
+		return []workflow.Review{}, nil
+	}
 	return []workflow.Review{{Review: store.Review{ID: "rev-1"}, Status: workflow.ReviewNeedsYou}}, nil
 }
 
@@ -87,9 +90,12 @@ func TestReviewRoutes(t *testing.T) {
 	f := &fakeReviews{}
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Reviews: f, UI: builtUI})
 	var list []workflow.Review
-	decodeBody(t, get(t, h, "/api/reviews"), &list)
+	decodeBody(t, get(t, h, "/api/reviews?project=ledger"), &list)
 	if len(list) != 1 || list[0].ID != "rev-1" || list[0].Status != "needs-review" {
 		t.Errorf("list %+v", list)
+	}
+	if w := send(h, "GET", "/api/reviews", ""); w.Code != http.StatusBadRequest {
+		t.Errorf("no project: %d", w.Code)
 	}
 	var one map[string]any
 	decodeBody(t, get(t, h, "/api/reviews/rev-1"), &one)

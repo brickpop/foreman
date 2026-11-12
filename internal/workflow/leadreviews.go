@@ -25,15 +25,14 @@ func (t tool) reviews(ctx context.Context) agentlink.Result {
 	if !t.c.Lead {
 		return teamtools.Refusal("not_lead", "only the lead has reviews")
 	}
-	list, err := t.w.ListReviews(ctx)
+	list, err := t.w.projectReviews(ctx, t.project.ID)
 	if err != nil {
 		return teamtools.Refusal("internal", "%v", err)
 	}
 	since := t.w.Now().Add(-recentlyDecided)
 	var each []string
 	for _, v := range list {
-		open := v.Status == ReviewNeedsYou || v.Status == ReviewChangesRequested
-		if v.DeploymentID != t.c.Deployment.ID || (!open && v.UpdatedAt.Before(since)) {
+		if v.DeploymentID != t.c.Deployment.ID || (!v.Open() && v.UpdatedAt.Before(since)) {
 			continue
 		}
 		text, err := t.reviewText(ctx, v)

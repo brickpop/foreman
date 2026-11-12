@@ -57,7 +57,7 @@ func (t tool) requestMerge(ctx context.Context, branch, title, body, entry, into
 	if entry == "" {
 		return teamtools.Refusal("entry_not_found", "name the wiki entry that explains the work, usually its task card")
 	}
-	if _, err := t.w.Wiki.Entry(t.project.ID, entry); err != nil {
+	if _, err := t.w.Wiki.Title(t.project.ID, entry); err != nil {
 		return teamtools.Refusal("entry_not_found", "no wiki entry %q: give its path in the wiki, e.g. backlog/export-csv.md", entry)
 	}
 	if git.AgentBranch(into) {
@@ -238,8 +238,8 @@ func (w *Workflow) mergeToTarget(ctx context.Context, mr store.MergeRequest, hea
 		return err
 	}
 	title := mr.Entry
-	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil {
-		title = e.Title
+	if t, err := w.Wiki.Title(mr.ProjectID, mr.Entry); err == nil {
+		title = t
 	}
 	onto := cmp.Or(mr.Landing, target)
 	switch err := w.Git.Squash(ctx, dir, target, onto, mr.Branch, head, title); {
@@ -492,8 +492,8 @@ func (w *Workflow) review(ctx context.Context, reviewID string) {
 
 // titleOf is the title of the entry a merge request names, else its path.
 func (w *Workflow) titleOf(mr store.MergeRequest) string {
-	if e, err := w.Wiki.Entry(mr.ProjectID, mr.Entry); err == nil && e.Title != "" {
-		return e.Title
+	if t, err := w.Wiki.Title(mr.ProjectID, mr.Entry); err == nil && t != "" {
+		return t
 	}
 	return mr.Entry
 }

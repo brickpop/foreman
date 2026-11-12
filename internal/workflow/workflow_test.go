@@ -68,11 +68,11 @@ const dismissedRef = "refs/foreman/dismissed/2026-10-16T09-00-00Z/"
 // entries is a wiki: path to title.
 type entries map[string]string
 
-func (e entries) Entry(_, path string) (wiki.Entry, error) {
+func (e entries) Title(_, path string) (string, error) {
 	if title, ok := e[path]; ok {
-		return wiki.Entry{Path: path, Title: title}, nil
+		return title, nil
 	}
-	return wiki.Entry{}, wiki.ErrNotFound
+	return "", wiki.ErrNotFound
 }
 
 // messages records what Workflow sends.
@@ -1021,7 +1021,7 @@ func TestOneReviewForEveryRepoOfABranch(t *testing.T) {
 	if v := f.review("rev-1"); v.Status != ReviewMerged {
 		t.Errorf("status %q", v.Status)
 	}
-	list, err := f.w.ListReviews(ctx)
+	list, err := f.w.ListReviews(ctx, "ledger")
 	if err != nil || len(list) != 1 || list[0].Comments != nil || list[0].Title != "Invoices as CSV" {
 		t.Errorf("list %+v %v", list, err)
 	}
@@ -1047,7 +1047,7 @@ func TestListReviewsMatchesEachReview(t *testing.T) {
 	merged := save(store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/a", Title: "a"}, store.MergeMerged, store.MergeRejected)
 	open := save(store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/b", Title: "b"}, store.MergeOpen)
 	empty := save(store.Review{ProjectID: "ledger", Branch: "lead/ledger/atlas/c", Title: "c"})
-	list, err := f.w.ListReviews(ctx)
+	list, err := f.w.ListReviews(ctx, "ledger")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1066,6 +1066,57 @@ func TestListReviewsMatchesEachReview(t *testing.T) {
 	}
 	if list[1].Status != ReviewNeedsYou || len(list[1].MergeRequests) != 1 || len(list[2].MergeRequests) != 2 || len(list[0].MergeRequests) != 0 {
 		t.Errorf("grouped wrong: %+v", list)
+	}
+}
+
+// A project's list keeps every open review, however old, and the doneListed decided last (by when
+// they were decided, not made); another project's are never in it.
+func TestListReviewsKeepsTheOpenAndTheLastDone(t *testing.T) {
+	f := newFixture(t)
+	at := time.Now().Add(24 * time.Hour) // after they are all made: decided, each is updated then
+	save := func(project, branch, state string, decided time.Time) string {
+		r, err := f.db.Reviews().Save(ctx, store.Review{ProjectID: project, Branch: branch, Title: branch})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mr := store.MergeRequest{ProjectID: project, DeploymentID: "atlas@" + project, Repo: "api", Branch: branch, Target: "main", State: state, MergedAt: decided, ReviewID: r.ID}
+		if _, err := f.db.MergeRequests().Save(ctx, mr); err != nil {
+			t.Fatal(err)
+		}
+		return r.ID
+	}
+	old := save("ledger", "lead/ledger/atlas/old", store.MergeOpen, time.Time{})
+	var decided []string
+	for i := range doneListed + 2 {
+		decided = append(decided, save("ledger", fmt.Sprintf("lead/ledger/atlas/d%d", i), store.MergeMerged, at.Add(time.Duration(i)*time.Hour)))
+	}
+	// Made last, decided first: the two left out.
+	late := []string{
+		save("ledger", "lead/ledger/atlas/late1", store.MergeMerged, at.Add(-time.Hour)),
+		save("ledger", "lead/ledger/atlas/late2", store.MergeMerged, at.Add(-2*time.Hour)),
+	}
+	if _, err := f.db.Reviews().Save(ctx, store.Review{ProjectID: "suite", Branch: "lead/suite/atlas/x"}); err != nil {
+		t.Fatal(err)
+	}
+	list, err := f.w.ListReviews(ctx, "ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, v := range list {
+		ids = append(ids, v.ID)
+	}
+	// Newest made first: the decided ones, past the 2 decided earliest, then the old open one.
+	want := slices.Clone(decided[2:])
+	slices.Reverse(want)
+	want = append(want, old)
+	if !slices.Equal(ids, want) {
+		t.Errorf("listed %v\nwant   %v", ids, want)
+	}
+	for _, id := range append(late, decided[:2]...) {
+		if slices.Contains(ids, id) {
+			t.Errorf("%s listed: decided before the last %d", id, doneListed)
+		}
 	}
 }
 

@@ -125,20 +125,50 @@ func status(r store.Review, mrs []store.MergeRequest) string {
 	return ReviewDismissed
 }
 
-// ListReviews lists every review, newest first, without their comments.
-// Their merge requests come in one query, not one per review.
-func (w *Workflow) ListReviews(ctx context.Context) ([]Review, error) {
-	list, err := w.Reviews.List(ctx)
+// Open says whether the CEO can still act on it: comment, merge, request changes, dismiss.
+func (v Review) Open() bool { return v.Status == ReviewNeedsYou || v.Status == ReviewChangesRequested }
+
+// doneListed is how many decided reviews ListReviews keeps: the Inbox's last
+// ones done.
+const doneListed = 20
+
+// ListReviews lists a project's reviews, newest first, without their
+// comments: the open ones, and the doneListed decided last.
+func (w *Workflow) ListReviews(ctx context.Context, project string) ([]Review, error) {
+	all, err := w.projectReviews(ctx, project)
 	if err != nil {
 		return nil, err
 	}
-	all, err := w.MergeRequests.InReviews(ctx)
+	var done []Review
+	for _, v := range all {
+		if !v.Open() {
+			done = append(done, v)
+		}
+	}
+	slices.SortStableFunc(done, func(a, b Review) int { return b.UpdatedAt.Compare(a.UpdatedAt) })
+	kept := map[string]bool{}
+	for _, v := range done[:min(len(done), doneListed)] {
+		kept[v.ID] = true
+	}
+	return slices.DeleteFunc(all, func(v Review) bool { return !v.Open() && !kept[v.ID] }), nil
+}
+
+// projectReviews are all of a project's reviews, newest first, without their
+// comments. Their merge requests come in one query, not one per review.
+func (w *Workflow) projectReviews(ctx context.Context, project string) ([]Review, error) {
+	list, err := w.Reviews.ForProject(ctx, project)
+	if err != nil {
+		return nil, err
+	}
+	mrs, err := w.MergeRequests.ForProject(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 	of := map[string][]store.MergeRequest{}
-	for _, mr := range all {
-		of[mr.ReviewID] = append(of[mr.ReviewID], mr)
+	for _, mr := range mrs {
+		if mr.ReviewID != "" {
+			of[mr.ReviewID] = append(of[mr.ReviewID], mr)
+		}
 	}
 	out := make([]Review, 0, len(list))
 	for i := len(list) - 1; i >= 0; i-- {
@@ -474,7 +504,7 @@ func (w *Workflow) openReview(ctx context.Context, id string) (Review, error) {
 	if err != nil {
 		return Review{}, err
 	}
-	if v.Status != ReviewNeedsYou && v.Status != ReviewChangesRequested {
+	if !v.Open() {
 		return v, ErrNotOpen
 	}
 	return v, nil

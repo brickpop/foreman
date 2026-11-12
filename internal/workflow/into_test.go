@@ -111,7 +111,7 @@ func TestIntoMustBeABranchOfEveryRepoWithNewCommits(t *testing.T) {
 	if all, _ := f.db.MergeRequests().ForProject(ctx, "ledger"); len(all) != 0 {
 		t.Errorf("made %+v", all)
 	}
-	if list, _ := f.db.Reviews().List(ctx); len(list) != 0 {
+	if list, _ := f.db.Reviews().ForProject(ctx, "ledger"); len(list) != 0 {
 		t.Errorf("a review was made: %+v", list)
 	}
 	fix["into"] = "nope"

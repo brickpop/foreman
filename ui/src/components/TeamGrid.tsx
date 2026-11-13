@@ -15,7 +15,7 @@ export function TeamGrid() {
   const openChiefOfStaff = useOpenChiefOfStaff();
   const [deploy, setDeploy] = useState<string>();
   const cards = teamCards(teams.data ?? [], instances.data ?? []);
-  const canDeploy = (projects.data ?? []).some((p) => !p.archived);
+  const canDeploy = (projects.data ?? []).length > 0;
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
       {teams.isPending && <Loading className="min-h-[132px]" />}

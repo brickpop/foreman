@@ -41,9 +41,6 @@ func (m *Manager) deployable(ctx context.Context, teamID, projectID string) (hom
 	if len(team.Problems) > 0 {
 		return team, project, on, fmt.Errorf("%w: team %s has problems: %v", ErrInvalid, teamID, team.Problems)
 	}
-	if project.Archived {
-		return team, project, on, fmt.Errorf("%w: project %s is archived: unarchive it first (its Project settings)", ErrInvalid, projectID)
-	}
 	if len(project.Problems) > 0 {
 		return team, project, on, fmt.Errorf("%w: project %s has problems: %v", ErrInvalid, projectID, project.Problems)
 	}

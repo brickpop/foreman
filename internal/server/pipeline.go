@@ -54,4 +54,3 @@ func pipelineRoutes(mux *http.ServeMux, p Pipeline) {
 		writeFound(w, done, err, "project")
 	})
 }
-

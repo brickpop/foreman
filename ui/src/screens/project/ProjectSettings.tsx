@@ -66,6 +66,7 @@ function Configuration({ project }: { project: Project }) {
         <ProjectNameField project={project} />
         <Workspace project={project} />
         <ProfileChoice project={project} />
+        <HideProject project={project} />
       </GroupCard>
       <GroupCard title="Rules" aside="project.toml">
         <Block title="What comes to you">
@@ -174,7 +175,6 @@ function Configuration({ project }: { project: Project }) {
         </Block>
       </GroupCard>
       <GroupCard title="Danger zone" danger>
-        <ArchiveProject project={project} />
         <RemoveProject project={project} />
       </GroupCard>
     </section>
@@ -367,70 +367,45 @@ function ProfileChoice({ project }: { project: Project }) {
   );
 }
 
-/** Archives the project (out of the sidebar's projects and the Dashboard, not
- * deployable; everything kept), stopping the teams on it after a confirmation;
- * or unarchives it. */
-function ArchiveProject({ project }: { project: Project }) {
+/** Hides the project (out of the sidebar's projects, into More, and off the Dashboard), or
+ * shows it again: nothing else changes, a team on it keeps working. */
+function HideProject({ project }: { project: Project }) {
   const client = useClient();
   const queries = useQueryClient();
   const toast = useToast();
-  const teams = useTeams().data ?? [];
-  const running = (useDeployments().data ?? []).filter((d) => d.projectId === project.id);
-  const names = running.map((d) => teams.find((t) => t.id === d.teamId)?.config.name || d.teamId);
-  const [confirming, setConfirming] = useState(false);
-  const archive = useMutation({
-    mutationFn: async () => {
-      if (!project.archived) {
-        for (const d of running) await client.agents.stop(d.id);
-      }
-      return client.home.setArchived(project.id, !project.archived);
-    },
-    onSettled: () => {
-      queries.invalidateQueries({ queryKey: keys.projects });
-      queries.invalidateQueries({ queryKey: keys.deployments });
-      queries.invalidateQueries({ queryKey: keys.instances });
-    },
+  const hide = useMutation({
+    mutationFn: () => client.home.setHidden(project.id, !project.hidden),
+    onSettled: () => queries.invalidateQueries({ queryKey: keys.projects }),
     onError: (e: Error) =>
       toast({
-        title: project.archived ? "Project not unarchived" : "Project not archived",
+        title: project.hidden ? "Project not shown" : "Project not hidden",
         body: e.message,
         color: "var(--err)",
       }),
   });
   return (
-    <Block title={project.archived ? "Archived" : "Archive this project"}>
+    <Block title="Visibility">
       <span className="text-[13.5px] text-tx2">
-        {project.archived
-          ? "It is out of the sidebar's projects and the Dashboard, and takes no deployment, until you unarchive it."
-          : `It leaves the sidebar's projects and the Dashboard, and takes no deployment until you unarchive it. Everything is kept.${running.length > 0 ? ` ${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} first.` : ""}`}
+        {project.hidden
+          ? "Hidden: it is under More in the sidebar, and off the Dashboard. Everything else works as usual."
+          : "Hide it to keep the sidebar and the Dashboard to what you work on: it moves under More. Everything else works as usual, a team on it included."}
       </span>
       <span>
-        <Button
-          variant="small"
-          disabled={archive.isPending}
-          onClick={() =>
-            running.length > 0 && !project.archived ? setConfirming(true) : archive.mutate()
-          }
-        >
-          {project.archived ? "Unarchive project" : "Archive project"}
+        <Button variant="small" disabled={hide.isPending} onClick={() => hide.mutate()}>
+          {project.hidden ? "Show project" : "Hide project"}
         </Button>
       </span>
-      <Confirm
-        open={confirming}
-        title={`Stop ${names.join(", ")} and archive ${projectName([project], project.id)}?`}
-        body={`${names.join(", ")} ${running.length === 1 ? "stops" : "stop"} on ${projectName([project], project.id)}: ${running.length === 1 ? "its" : "their"} sessions end; worktrees and branches are kept. Then ${projectName([project], project.id)} is archived.`}
-        action="Stop and archive"
-        onConfirm={() => archive.mutate()}
-        onClose={() => setConfirming(false)}
-      />
     </Block>
   );
 }
 
-/** Removes an archived project and its history; its project repo folder only
- * when asked. One not archived is archived first. */
+/** Removes the project and its history; its project repo folder and its agents' worktrees
+ * only when asked. Never while a team is deployed on it: stopped first. */
 function RemoveProject({ project }: { project: Project }) {
   const client = useClient();
+  const teams = useTeams().data ?? [];
+  const running = (useDeployments().data ?? []).filter((d) => d.projectId === project.id);
+  const names = running.map((d) => teams.find((t) => t.id === d.teamId)?.config.name || d.teamId);
   const queries = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
@@ -454,14 +429,14 @@ function RemoveProject({ project }: { project: Project }) {
   return (
     <Block title="Remove this project">
       <span className="text-[13.5px] text-tx2">
-        {project.archived
-          ? "Its record and its history go. Its workspace stays. Your code repos keep their branches."
-          : "Archive it first: archiving keeps everything, removing deletes its history."}
+        {running.length > 0
+          ? `Stop ${names.join(", ")} on it first (its Team section).`
+          : "Its record and its history go. Its workspace stays. Your code repos keep their branches."}
       </span>
       <span>
         <Button
           variant="small"
-          disabled={!project.archived || remove.isPending}
+          disabled={running.length > 0 || remove.isPending}
           onClick={() => {
             setDeleteRepo(false);
             setDeleteWorktrees(false);

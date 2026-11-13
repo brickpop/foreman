@@ -64,8 +64,8 @@ type Config interface {
 	SetProfile(ctx context.Context, project, profile string) (home.Project, error)
 	// SetName gives the project its display name ("": shown by its id).
 	SetName(ctx context.Context, project, name string) (home.Project, error)
-	// SetArchived archives the project, or unarchives it.
-	SetArchived(ctx context.Context, project string, archived bool) (home.Project, error)
+	// SetHidden hides the project, or shows it again.
+	SetHidden(ctx context.Context, project string, hidden bool) (home.Project, error)
 	// Missing lists the scaffold files a project repo lacks (wiki.toml…), and
 	// Scaffold creates them, never overwriting one.
 	Missing(project string) ([]home.Missing, error)
@@ -213,15 +213,15 @@ func configRoutes(mux *http.ServeMux, c Config) {
 		p, err := c.SetName(r.Context(), r.PathValue("id"), *req.Name)
 		writeProject(w, p, err)
 	})
-	mux.HandleFunc("PUT /api/projects/{id}/archived", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PUT /api/projects/{id}/hidden", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Archived *bool `json:"archived"`
+			Hidden *bool `json:"hidden"`
 		}
-		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil || req.Archived == nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {archived}")
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil || req.Hidden == nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {hidden}")
 			return
 		}
-		p, err := c.SetArchived(r.Context(), r.PathValue("id"), *req.Archived)
+		p, err := c.SetHidden(r.Context(), r.PathValue("id"), *req.Hidden)
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("GET /api/projects/{id}/scaffold", func(w http.ResponseWriter, r *http.Request) {

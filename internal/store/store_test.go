@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -781,42 +782,85 @@ func TestRequests(t *testing.T) {
 
 // --- projects -------------------------------------------------------------------
 
-// A project is archived and unarchived on its own; one never added can't be.
-func TestArchiveAProject(t *testing.T) {
+// A project is hidden and shown again on its own; one never added can't be.
+func TestHideAProject(t *testing.T) {
 	p := open(t).Projects()
 	for _, id := range []string{"ledger", "aragon"} {
 		if err := p.Create(ctx, id, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
-	archived := func() []bool {
+	hidden := func() []bool {
 		list, err := p.List(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var got []bool
 		for _, r := range list {
-			got = append(got, r.Archived)
+			got = append(got, r.Hidden)
 		}
 		return got
 	}
-	if got := archived(); !slices.Equal(got, []bool{false, false}) {
+	if got := hidden(); !slices.Equal(got, []bool{false, false}) {
 		t.Errorf("new projects: %v", got)
 	}
-	if err := p.SetArchived(ctx, "Ledger", true); err != nil {
+	if err := p.SetHidden(ctx, "Ledger", true); err != nil {
 		t.Fatal(err)
 	}
-	if got := archived(); !slices.Equal(got, []bool{false, true}) {
-		t.Errorf("ledger archived: %v", got)
+	if got := hidden(); !slices.Equal(got, []bool{false, true}) {
+		t.Errorf("ledger hidden: %v", got)
 	}
-	if err := p.SetArchived(ctx, "ledger", false); err != nil {
+	if err := p.SetHidden(ctx, "ledger", false); err != nil {
 		t.Fatal(err)
 	}
-	if got := archived(); !slices.Equal(got, []bool{false, false}) {
-		t.Errorf("ledger unarchived: %v", got)
+	if got := hidden(); !slices.Equal(got, []bool{false, false}) {
+		t.Errorf("ledger shown: %v", got)
 	}
-	if err := p.SetArchived(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
+	if err := p.SetHidden(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
 		t.Errorf("no such project: %v", err)
+	}
+}
+
+// A project archived before hidden replaced it stays out of sight.
+func TestAnArchivedProjectIsHidden(t *testing.T) {
+	names, err := fs.Glob(migrationFiles, "migrations/*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	upTo := func(last string) fstest.MapFS {
+		fsys := fstest.MapFS{}
+		for _, n := range names {
+			body, _ := fs.ReadFile(migrationFiles, n)
+			fsys[n] = &fstest.MapFile{Data: body}
+			if strings.HasPrefix(path.Base(n), last) {
+				break
+			}
+		}
+		return fsys
+	}
+	db := rawDB(t)
+	if err := migrate(ctx, db, upTo("023_")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec("INSERT INTO projects (id, archived, created_at) VALUES ('ledger', 1, 0), ('aragon', 0, 0)"); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, db, migrationFiles); err != nil {
+		t.Fatal(err)
+	}
+	var hidden []string
+	rows, err := db.Query("SELECT id FROM projects WHERE hidden ORDER BY id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		_ = rows.Scan(&id)
+		hidden = append(hidden, id)
+	}
+	if !slices.Equal(hidden, []string{"ledger"}) {
+		t.Errorf("hidden %v", hidden)
 	}
 }
 

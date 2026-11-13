@@ -153,9 +153,6 @@ func TestNewProjectTakesOverAKeptProjectRepo(t *testing.T) {
 	writeFile(t, filepath.Join(p.Path, "wiki", "notes.md"), "kept\n")
 	gitOut(t, p.Path, "add", "-A")
 	gitOut(t, p.Path, "commit", "--quiet", "-m", "Notes")
-	if _, err := h.SetArchived(ctx, "ledger", true); err != nil {
-		t.Fatal(err)
-	}
 	if err := h.RemoveProject(ctx, "ledger", false, false); err != nil {
 		t.Fatal(err)
 	}
@@ -457,39 +454,30 @@ func TestSetProfile(t *testing.T) {
 	}
 }
 
-// Archiving keeps everything but is refused while a team is deployed;
-// unarchiving never is. Each is announced, and survives a restart.
-func TestSetArchived(t *testing.T) {
+// Hiding changes only where a project is listed: never refused, a team on it
+// or not. Each is announced, and survives a restart.
+func TestSetHidden(t *testing.T) {
 	h := loaded(t, nil)
 	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
 		t.Fatal(err)
 	}
-	deployed := true
-	h.deployed = func(_ context.Context, project string) bool { return deployed && project == "ledger" }
-	if _, err := h.SetArchived(ctx, "ledger", true); !errors.Is(err, ErrDeployed) || !strings.Contains(err.Error(), "stop the team on ledger before archiving it") {
-		t.Errorf("while deployed: %v", err)
-	}
-	if p, _ := h.Project("ledger"); p.Archived {
-		t.Error("archived although refused")
-	}
-	deployed = false
+	h.deployed = func(_ context.Context, project string) bool { return project == "ledger" }
 	var changes []Change
 	h.notify = func(c Change) { changes = append(changes, c) }
-	if p, err := h.SetArchived(ctx, "ledger", true); err != nil || !p.Archived {
-		t.Errorf("%+v %v", p, err)
+	if p, err := h.SetHidden(ctx, "ledger", true); err != nil || !p.Hidden {
+		t.Errorf("hidden with a team on it: %+v %v", p, err)
 	}
 	if len(changes) != 1 || changes[0].Kind != "projects" {
 		t.Errorf("changes %+v", changes)
 	}
 	reload(t, h)
-	if p, _ := h.Project("ledger"); !p.Archived || !exists(p.Path) {
+	if p, _ := h.Project("ledger"); !p.Hidden || !exists(p.Path) {
 		t.Errorf("after a restart: %+v", p)
 	}
-	deployed = true // can't be, once archived; unarchiving is never refused
-	if p, err := h.SetArchived(ctx, "ledger", false); err != nil || p.Archived {
-		t.Errorf("unarchived: %+v %v", p, err)
+	if p, err := h.SetHidden(ctx, "ledger", false); err != nil || p.Hidden {
+		t.Errorf("shown: %+v %v", p, err)
 	}
-	if _, err := h.SetArchived(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
+	if _, err := h.SetHidden(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
 		t.Errorf("no such project: %v", err)
 	}
 }
@@ -730,14 +718,9 @@ func TestRemoveProject(t *testing.T) {
 	writeFile(t, filepath.Join(ledger.HarnessDir("mara"), "claude-code", "CLAUDE.md"), "x")
 	writeFile(t, h.Path("logs", "mara@ledger", "1.log"), "x")
 	writeFile(t, h.Path("logs", "kai@relay", "1.log"), "x")
-	// Only once archived; and never while deployed (a deploy racing the archive).
-	if err := h.RemoveProject(ctx, "ledger", false, true); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "archive ledger before removing it") {
-		t.Errorf("not archived: %v", err)
-	}
-	for _, id := range []string{"ledger", "relay"} {
-		if _, err := h.SetArchived(ctx, id, true); err != nil {
-			t.Fatal(err)
-		}
+	// Any project, hidden or not (relay is), but never while deployed.
+	if _, err := h.SetHidden(ctx, "relay", true); err != nil {
+		t.Fatal(err)
 	}
 	deployed := true
 	h.deployed = func(_ context.Context, project string) bool { return deployed && project == "ledger" }
@@ -782,9 +765,6 @@ func TestRemoveProject(t *testing.T) {
 		t.Errorf("removed twice: %v", err)
 	}
 	if _, _, err := h.NewProject(ctx, "books", "", workspace("books")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.SetArchived(ctx, "books", true); err != nil {
 		t.Fatal(err)
 	}
 	if err := h.RemoveProject(ctx, "books", true, true); err != nil {

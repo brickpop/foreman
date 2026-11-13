@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Instance, Project, Request, Team } from "../api/client";
 import { keys, staleKeys } from "./queries";
-import { rowDot, sidebarModel } from "./Shell";
+import { groupDot, rowDot, sidebarModel } from "./Shell";
 
 const project = (id: string, name = "") => ({ id, name }) as Project;
 const team = (id: string, name: string) => ({ id, config: { name } }) as Team;
@@ -28,18 +28,18 @@ describe("sidebarModel", () => {
     ]);
   });
 
-  it("puts the archived projects in their own group, still marked when they need the CEO", () => {
+  it("puts the hidden projects in their own group, still marked when they need the CEO", () => {
     const m = sidebarModel(
       [
         project("ledger"),
-        { ...project("relay"), archived: true },
-        { ...project("harbor"), archived: true },
+        { ...project("relay"), hidden: true },
+        { ...project("harbor"), hidden: true },
       ],
       [],
       [request("harbor")],
     );
     expect(m.projects).toEqual([{ id: "ledger", name: "Ledger", inbox: 0 }]);
-    expect(m.archived).toEqual([
+    expect(m.hidden).toEqual([
       { id: "relay", name: "Relay", inbox: 0 },
       { id: "harbor", name: "Harbor", inbox: 1 },
     ]);
@@ -81,6 +81,23 @@ describe("rowDot", () => {
 
   it("shows nothing at rest with nothing waiting", () => {
     expect(rowDot(row(0))).toBeUndefined();
+  });
+});
+
+describe("groupDot", () => {
+  const row = (inbox: number, busy?: string) => ({ id: "x", name: "X", inbox, busy });
+
+  it("says needs-you when any project of the group needs the CEO, ahead of a busy one before it", () => {
+    expect(groupDot([row(0, "running"), row(0), row(1)])).toEqual({ title: "Needs you" });
+  });
+
+  it("else shows the first busy project's dot, and nothing when all rest", () => {
+    expect(groupDot([row(0), row(0, "queued"), row(0, "running")])).toEqual({
+      status: "queued",
+      title: "queued",
+    });
+    expect(groupDot([row(0), row(0)])).toBeUndefined();
+    expect(groupDot([])).toBeUndefined();
   });
 });
 
@@ -213,14 +230,9 @@ describe("the Dashboard's model", () => {
     expect(card.on).toEqual(["ledger", "relay"]);
   });
 
-  it("gives each project not archived its line and state", () => {
+  it("gives each project not hidden its line and state", () => {
     const rows = projectRows(
-      [
-        project("ledger"),
-        project("relay"),
-        project("harbor"),
-        { ...project("old"), archived: true },
-      ],
+      [project("ledger"), project("relay"), project("harbor"), { ...project("old"), hidden: true }],
       [team("atlas", "Atlas"), team("orion", "Orion")],
       [
         inst("mara@ledger", "running", "atlas@ledger"),

@@ -171,8 +171,8 @@ export interface HomeArea {
   setProfile(project: string, profile: string): Promise<Project>;
   /** Gives a project its display name ("": shown by its id). Its id stays. */
   setName(project: string, name: string): Promise<Project>;
-  /** Archives a project (refused while a team is deployed on it), or unarchives it. */
-  setArchived(project: string, archived: boolean): Promise<Project>;
+  /** Hides a project (out of the sidebar's projects and the Dashboard), or shows it again. */
+  setHidden(project: string, hidden: boolean): Promise<Project>;
   /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
   missing(project: string): Promise<Missing[]>;
   scaffold(project: string): Promise<Missing[]>;
@@ -509,9 +509,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", `/api/projects/${id(project)}/name`, { name })
         ).json() as Promise<Project>,
-      setArchived: async (project, archived) =>
+      setHidden: async (project, hidden) =>
         (
-          await request("PUT", `/api/projects/${id(project)}/archived`, { archived })
+          await request("PUT", `/api/projects/${id(project)}/hidden`, { hidden })
         ).json() as Promise<Project>,
       missing: (project) => getJSON(`/api/projects/${id(project)}/scaffold`),
       scaffold: async (project) =>

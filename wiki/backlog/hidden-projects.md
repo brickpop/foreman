@@ -1,8 +1,8 @@
 ---
 type: task
-status: todo
+status: done
 priority: medium
-tags: [decision]
+tags: [feature]
 epic: workflow
 ---
 
@@ -12,9 +12,10 @@ epic: workflow
 
 Proposal: **hidden** is visibility only. The sidebar's collapsed group reads `More` instead of `Archived`; everything else works as for any project. Unreleased, so a plain rename: a migration renaming the column, `PUT /api/projects/:id/hidden`, no shim.
 
-Open (proposed answers in brackets, waiting on the CEO):
+Decided (the CEO, 2026-11-13):
 
-- [ ] A hidden project with a team on it: [keeps running; `More` shows its attention dot, so a waiting agent isn't missed]
-- [ ] Remove: [allowed on any project with no team deployed, behind its confirmation; no archive-first step]
-- [ ] Dashboard: [hidden ones left out, as in the sidebar]
-- [ ] Then: store, home, server, UI (sidebar, Dashboard, Project settings, Deploy dialog), specs, tests
+- [x] A hidden project with a team on it keeps running; folded, `More` shows one dot for its projects (needs-you first), so a waiting agent isn't missed
+- [x] Remove: any project with no team deployed, behind its confirmation; no archive-first step
+- [x] Dashboard: hidden ones left out, as in the sidebar
+- [x] Migration 024 renames the column (an archived project stays out of sight); `PUT /api/projects/:id/hidden`; Deploy no longer refuses one; Project settings: a Visibility block in General, Remove disabled while a team is deployed
+- [x] Tests: store (hide, the migration), home (hide with a team on it, remove without hiding), instances (a hidden project deploys), server route, UI (sidebar groups, `groupDot`, Dashboard rows, client)

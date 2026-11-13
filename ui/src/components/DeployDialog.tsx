@@ -69,11 +69,6 @@ export function DeployDialog({
   const chosen = projects.data?.find((p) => p.id === project);
   const [picked, setPicked] = useState<string>();
   const profileName = picked ?? chosen?.profile;
-  // An archived project takes no deployment: unarchived from here, as from its settings.
-  const unarchive = useMutation({
-    mutationFn: () => client.home.setArchived(project ?? "", false),
-    onSettled: () => queries.invalidateQueries({ queryKey: keys.projects }),
-  });
   const profile = profiles.data?.find((p) => p.name === profileName);
   const profileReady = profile?.connected ?? false;
   // Agents start only once Podman runs (and the instances are restored).
@@ -122,8 +117,7 @@ export function DeployDialog({
       });
     },
   });
-  const ready =
-    team && project && !already(project) && !chosen?.archived && profileReady && !engineDown;
+  const ready = team && project && !already(project) && profileReady && !engineDown;
   return (
     <Modal
       open={open}
@@ -165,11 +159,7 @@ export function DeployDialog({
                   setPicked(undefined);
                 }}
               >
-                {there
-                  ? `${projectName([p], p.id)} (already there)`
-                  : p.archived
-                    ? `${projectName([p], p.id)} (archived)`
-                    : projectName([p], p.id)}
+                {there ? `${projectName([p], p.id)} (already there)` : projectName([p], p.id)}
                 {on(p.id) && !there && (
                   <span className="text-tx4"> · {nameOf(on(p.id)?.teamId ?? "")}</span>
                 )}
@@ -195,22 +185,6 @@ export function DeployDialog({
               disk).
             </span>
           </label>
-        )}
-        {chosen?.archived && (
-          <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
-            <span className="flex-1">
-              <span className="font-mono">{chosen.id}</span> is archived, so no team can be deployed
-              to it.
-              {unarchive.error && <span className="text-err"> {unarchive.error.message}</span>}
-            </span>
-            <Button
-              variant="small"
-              disabled={unarchive.isPending}
-              onClick={() => unarchive.mutate()}
-            >
-              Unarchive
-            </Button>
-          </div>
         )}
         {profileName && profiles.data && (
           <Group label="Profile">

@@ -220,18 +220,18 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("sets a project's profile and name, scaffolds its project repo and archives it", async () => {
+  it("sets a project's profile and name, scaffolds its project repo and hides it", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
     await client.home.setProfile("my project", "work");
     await client.home.scaffold("my project");
-    await client.home.setArchived("my project", true);
+    await client.home.setHidden("my project", true);
     await client.home.setName("my project", "Ledger · EUR");
     await client.home.setName("my project", "");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
       ["PUT", "http://x/api/projects/my%20project/profile", { profile: "work" }],
       ["POST", "http://x/api/projects/my%20project/scaffold", undefined],
-      ["PUT", "http://x/api/projects/my%20project/archived", { archived: true }],
+      ["PUT", "http://x/api/projects/my%20project/hidden", { hidden: true }],
       ["PUT", "http://x/api/projects/my%20project/name", { name: "Ledger · EUR" }],
       ["PUT", "http://x/api/projects/my%20project/name", { name: "" }],
     ]);

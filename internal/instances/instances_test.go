@@ -1078,23 +1078,14 @@ func TestDeployAProjectWithoutRepos(t *testing.T) {
 	}
 }
 
-// An archived project takes no deployment until it is unarchived.
-func TestDeployRefusesAnArchivedProject(t *testing.T) {
+// A hidden project is only out of sight: it takes a deployment as any other.
+func TestAHiddenProjectDeploys(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, err := f.hm.SetArchived(ctx, "ledger", true); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "ledger is archived") {
-		t.Errorf("%v", err)
-	}
-	if deps, _ := f.db.Deployments().List(ctx); len(deps) != 0 {
-		t.Errorf("deployed anyway: %+v", deps)
-	}
-	if _, err := f.hm.SetArchived(ctx, "ledger", false); err != nil {
+	if _, err := f.hm.SetHidden(ctx, "ledger", true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
-		t.Errorf("unarchived: %v", err)
+		t.Errorf("hidden: %v", err)
 	}
 }
 

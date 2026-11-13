@@ -86,8 +86,8 @@ export type SidebarProject = {
 
 export type SidebarModel = {
   projects: SidebarProject[];
-  /** The archived projects, in a collapsed group of their own. */
-  archived: SidebarProject[];
+  /** The hidden projects, in a collapsed group of their own (More). */
+  hidden: SidebarProject[];
 };
 
 const busy = ["awaiting", "running", "starting", "queued"];
@@ -110,9 +110,18 @@ export function sidebarModel(
     };
   };
   return {
-    projects: projects.filter((p) => !p.archived).map(row),
-    archived: projects.filter((p) => p.archived).map(row),
+    projects: projects.filter((p) => !p.hidden).map(row),
+    hidden: projects.filter((p) => p.hidden).map(row),
   };
+}
+
+/** A folded group's one dot: needs-you when any of its projects needs the CEO, else the
+ * first busy one's, else none. */
+export function groupDot(
+  projects: SidebarProject[],
+): { status?: string; title: string } | undefined {
+  const dots = projects.map(rowDot);
+  return dots.find((d) => d && !d.status) ?? dots.find(Boolean);
 }
 
 /** A folded project row's one dot (the CEO, 2026-11-06): needs-you when
@@ -170,7 +179,7 @@ function Sidebar({
         {model.projects.map((p) => (
           <ProjectRow key={p.id} project={p} />
         ))}
-        <Archived projects={model.archived} />
+        <More projects={model.hidden} />
         <button
           type="button"
           onClick={onNewProject}
@@ -247,14 +256,16 @@ function ProjectRow({ project }: { project: SidebarProject }) {
   );
 }
 
-/** The archived projects, collapsed; open while one of them is. */
-function Archived({ projects }: { projects: SidebarModel["archived"] }) {
+/** The hidden projects, collapsed; open while one of them is. Folded, its one dot says
+ * whether any of them needs the CEO or is busy, so a waiting agent isn't missed. */
+function More({ projects }: { projects: SidebarModel["hidden"] }) {
   const [open, setOpen] = useState(false);
   const current = useParams({ strict: false }).project;
   if (projects.length === 0) {
     return null;
   }
   const shown = open || projects.some((p) => p.id === current);
+  const dot = groupDot(projects);
   return (
     <>
       <button
@@ -267,7 +278,8 @@ function Archived({ projects }: { projects: SidebarModel["archived"] }) {
         className="flex items-center gap-1.5 px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
       >
         <Chevron open={shown} />
-        Archived
+        More
+        {!shown && dot && <Dot status={dot.status} title={dot.title} />}
       </button>
       {shown && projects.map((p) => <ProjectRow key={p.id} project={p} />)}
     </>

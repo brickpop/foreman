@@ -121,8 +121,8 @@ func (f fakeConfig) SetProfile(_ context.Context, project, profile string) (home
 func (f fakeConfig) SetName(_ context.Context, project, name string) (home.Project, error) {
 	return f.changed("SetName", project, name, "")
 }
-func (f fakeConfig) SetArchived(_ context.Context, project string, archived bool) (home.Project, error) {
-	return f.changed("SetArchived", project, fmt.Sprint(archived), "")
+func (f fakeConfig) SetHidden(_ context.Context, project string, hidden bool) (home.Project, error) {
+	return f.changed("SetHidden", project, fmt.Sprint(hidden), "")
 }
 
 // A project repo from before the scaffold: its wiki.toml is missing.
@@ -404,8 +404,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
 		{http.MethodPut, "/api/projects/ledger/name", `{"name":"Ledger v2"}`, []string{"SetName", "Ledger v2", ""}},
 		{http.MethodPut, "/api/projects/ledger/name", `{"name":""}`, []string{"SetName", "", ""}},
-		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":true}`, []string{"SetArchived", "true", ""}},
-		{http.MethodPut, "/api/projects/ledger/archived", `{"archived":false}`, []string{"SetArchived", "false", ""}},
+		{http.MethodPut, "/api/projects/ledger/hidden", `{"hidden":true}`, []string{"SetHidden", "true", ""}},
+		{http.MethodPut, "/api/projects/ledger/hidden", `{"hidden":false}`, []string{"SetHidden", "false", ""}},
 		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git","workspace":"/w"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git ws=/w"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"site"}`, []string{"RenameRepo", "site", "web"}},
 	} {
@@ -453,10 +453,10 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodGet, "/api/folders?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodGet, "/api/folders/branches?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
-		{http.MethodPut, "/api/projects/ledger/archived", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
+		{http.MethodPut, "/api/projects/ledger/hidden", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
 		{http.MethodPut, "/api/projects/ledger/name", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`},     // never a missing field read as clearing it
 		{http.MethodPut, "/api/projects/nope/name", `{"name":"x"}`, http.StatusNotFound, `"NOT_FOUND"`},
-		{http.MethodPut, "/api/projects/nope/archived", `{"archived":true}`, http.StatusNotFound, `"NOT_FOUND"`},
+		{http.MethodPut, "/api/projects/nope/hidden", `{"hidden":true}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects/nope/migrate", `{"workspace":"/w"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"busy"}`, http.StatusConflict, `"DEPLOYED"`},
 		{http.MethodPost, "/api/projects/ledger/migrate", `{`, http.StatusBadRequest, `"BAD_REQUEST"`},

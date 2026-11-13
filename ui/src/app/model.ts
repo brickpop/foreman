@@ -131,7 +131,7 @@ export type ProjectRow = {
   state: "needs you" | "on track" | "idle";
 };
 
-/** One row per project not archived: its team and working agents, and its state. */
+/** One row per project not hidden: its team and working agents, and its state. */
 export function projectRows(
   projects: Project[],
   teams: Team[],
@@ -139,7 +139,7 @@ export function projectRows(
   requests: Request[],
 ): ProjectRow[] {
   return projects
-    .filter((p) => !p.archived)
+    .filter((p) => !p.hidden)
     .map((p) => {
       const mine = instances.filter((i) => i.id.endsWith(`@${p.id}`));
       const teamIds = [...new Set(mine.map((i) => i.deploymentId.split("@")[0]))];

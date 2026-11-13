@@ -373,7 +373,6 @@ func (w *Workflow) freshenDesks(ctx context.Context, project, dir, def string) {
 	}
 }
 
-
 // backupsKept is how long a backup under refs/foreman/ is kept.
 const backupsKept = 30 * 24 * time.Hour
 

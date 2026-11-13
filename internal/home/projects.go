@@ -313,18 +313,15 @@ func (h *Home) SetProfile(ctx context.Context, project, profile string) (Project
 	return h.rescan(project)
 }
 
-// SetArchived archives a project, or unarchives it. Archiving is refused
-// while a team is deployed on it, as removing it is.
-func (h *Home) SetArchived(ctx context.Context, project string, archived bool) (Project, error) {
+// SetHidden hides a project, or shows it again: where it is listed, nothing
+// else (a team on it keeps working).
+func (h *Home) SetHidden(ctx context.Context, project string, hidden bool) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
 	if _, ok := h.snap.projects[project]; !ok {
 		return Project{}, ErrNotFound
 	}
-	if archived && h.deployed != nil && h.deployed(ctx, project) {
-		return Project{}, fmt.Errorf("%w: stop the team on %s before archiving it", ErrDeployed, project)
-	}
-	if err := h.records.SetArchived(ctx, project, archived); err != nil {
+	if err := h.records.SetHidden(ctx, project, hidden); err != nil {
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
@@ -641,18 +638,13 @@ func (h *Home) RenameRepo(ctx context.Context, project, name, newName string) (P
 // stays, the CEO's files (the CEO, 2026-10-28): its agents' worktrees go
 // only when asked (its code repos forget them; their branches stay), and its
 // project repo only when asked (one never pushed has no other copy); an
-// empty workspace goes too. Only an archived project can be removed (the
-// CEO, 2026-10-23: archiving first, which keeps everything, is the step
-// back), and never while a team is deployed on it.
+// empty workspace goes too. Never while a team is deployed on it.
 func (h *Home) RemoveProject(ctx context.Context, id string, deleteRepo, deleteWorktrees bool) error {
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[id]
 	if !ok {
 		return ErrNotFound
-	}
-	if !p.Archived {
-		return fmt.Errorf("%w: archive %s before removing it", ErrInvalid, id)
 	}
 	if h.deployed != nil && h.deployed(ctx, id) {
 		return fmt.Errorf("%w: stop the team on %s before removing it", ErrDeployed, id)

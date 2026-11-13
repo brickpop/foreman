@@ -36,7 +36,7 @@ Today only review requests are built, so the section doesn't show yet.
 
 ## Projects
 
-One card per project not [archived](../models/project-config.md#the-project-record) (cards at least 240px wide), by name, as the [sidebar](./app-shell.md#sidebar) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
+One card per project not [hidden](../models/project-config.md#the-project-record) (cards at least 240px wide), by name, as the [sidebar](./app-shell.md#sidebar) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
 
 - A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right its state as a status pill: `needs you` (`--attn`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
 - Its description (13.5px `--tx3`, two lines, kept at two so cards line up), or `No description yet.`

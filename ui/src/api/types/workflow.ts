@@ -41,10 +41,11 @@ export const Superseded = "superseded";
  */
 export const Unmerged = "unmerged";
 /**
- * CleanupBranch is one branch of a code repo, as the CEO's branch cleanup
- * lists it.
+ * CleanupBranch is one branch of one of a project's code repos, as the CEO's
+ * branch cleanup lists it.
  */
 export interface CleanupBranch {
+  repo: string;
   branch: string;
   /**
    * Agents: an agents' branch (wt/*, lead/*); else the CEO's.
@@ -74,6 +75,13 @@ export interface CleanupBranch {
    * removed first, unless it holds changes not committed.
    */
   stray?: string;
+}
+/**
+ * BranchPick is a branch of one of a project's code repos, picked to delete.
+ */
+export interface BranchPick {
+  repo: string;
+  branch: string;
 }
 
 //////////

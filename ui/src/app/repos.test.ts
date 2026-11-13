@@ -7,11 +7,13 @@ import {
   bytes,
   cleanupGroups,
   cleanupPick,
+  cleanupSections,
   crumbs,
   folderOf,
   folderPage,
   graph,
   matching,
+  pickKey,
   placeLine,
   readmeOf,
   reposWith,
@@ -299,16 +301,17 @@ describe("matching", () => {
 });
 
 describe("cleanupGroups", () => {
-  const b = (branch: string, agents: boolean, state: string, stays?: string, stray?: string) => ({
-    branch,
-    agents,
-    state,
-    legacy: false,
-    stays,
-    stray,
-  });
+  const b = (
+    branch: string,
+    agents: boolean,
+    state: string,
+    stays?: string,
+    stray?: string,
+    repo = "api",
+  ) => ({ repo, branch, agents, state, legacy: false, stays, stray });
   const list = [
     b("feature/done", false, "merged"),
+    b("feature/done", false, "merged", undefined, undefined, "web"),
     b("feature/base", false, "superseded"),
     b("wt/p/tove/done", true, "merged"),
     b("wt/tove/old", true, "merged"),
@@ -319,28 +322,42 @@ describe("cleanupGroups", () => {
     b(
       "wt/leady/doc",
       true,
-      "unmerged",
+      "merged",
       "checked out in /old/agents/leady/api",
       "/old/agents/leady/api",
     ),
   ];
-  it("groups the agents' branches, then the CEO's, by state, then those in stray worktrees; those that stay apart", () => {
+  it("puts what loses nothing first (the agents' then the CEO's), then unmerged work, then strays; those that stay apart", () => {
     const { groups, staying } = cleanupGroups(list);
-    expect(groups.map((g) => [g.key, g.on, g.branches.map((x) => x.branch)])).toEqual([
-      ["agents-merged", true, ["wt/p/tove/done", "wt/tove/old"]],
-      ["agents-superseded", true, ["wt/p/tove/draft"]],
-      ["agents-unmerged", false, ["wt/p/tove/wip"]],
-      ["yours-merged", false, ["feature/done"]],
-      ["yours-superseded", false, ["feature/base"]],
-      ["stray", false, ["wt/leady/doc"]],
+    expect(groups.map((g) => [g.key, g.on, g.branches.map(pickKey)])).toEqual([
+      ["agents-merged", true, ["api:wt/p/tove/done", "api:wt/tove/old"]],
+      ["agents-superseded", true, ["api:wt/p/tove/draft"]],
+      ["yours-merged", true, ["api:feature/done", "web:feature/done"]],
+      ["yours-superseded", true, ["api:feature/base"]],
+      ["unmerged", false, ["api:wt/p/tove/wip"]],
+      // In a stray worktree, merged or not: its worktree goes too, so never ticked at first.
+      ["stray", false, ["api:wt/leady/doc"]],
     ]);
-    expect(staying.map((x) => x.branch)).toEqual(["wt/p/tove/main", "release/2"]);
+    expect(staying.map(pickKey)).toEqual(["api:wt/p/tove/main", "api:release/2"]);
   });
-  it("ticks only the agents' merged and superseded at first, never one that stays", () => {
+  it("follows the sections' order, folding the ones that may lose work", () => {
+    const order = cleanupSections.map((s) => s.key);
+    const { groups } = cleanupGroups(list);
+    const seen = groups.map((g) => order.indexOf(g.section));
+    expect(seen).toEqual([...seen].sort((x, y) => x - y));
+    expect(cleanupSections.filter((s) => s.folded).map((s) => s.key)).toEqual([
+      "unmerged",
+      "stray",
+    ]);
+  });
+  it("ticks the merged and superseded at first, by repo: the same name in two repos is two picks", () => {
     expect([...cleanupPick(cleanupGroups(list).groups)]).toEqual([
-      "wt/p/tove/done",
-      "wt/tove/old",
-      "wt/p/tove/draft",
+      "api:wt/p/tove/done",
+      "api:wt/tove/old",
+      "api:wt/p/tove/draft",
+      "api:feature/done",
+      "web:feature/done",
+      "api:feature/base",
     ]);
   });
   it("leaves out empty groups", () => {

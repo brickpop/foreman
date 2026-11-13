@@ -25,23 +25,20 @@ func (fakePipeline) CleanUp(_ context.Context, project string) (workflow.Cleanup
 }
 
 // CleanupBranches and DeleteBranches: ledger has repo api.
-func (fakePipeline) CleanupBranches(_ context.Context, project, repo string) ([]workflow.CleanupBranch, error) {
-	switch {
-	case project != "ledger":
+func (fakePipeline) CleanupBranches(_ context.Context, project string) ([]workflow.CleanupBranch, error) {
+	if project != "ledger" {
 		return nil, home.ErrNotFound
-	case repo != "api":
-		return nil, workflow.ErrNoRepo
 	}
-	return []workflow.CleanupBranch{{Branch: "wt/ledger/tove/x", Agents: true, State: workflow.Merged}}, nil
+	return []workflow.CleanupBranch{{Repo: "api", Branch: "wt/ledger/tove/x", Agents: true, State: workflow.Merged}}, nil
 }
 
-func (f fakePipeline) DeleteBranches(ctx context.Context, project, repo string, branches []string) (workflow.Cleanup, error) {
-	if _, err := f.CleanupBranches(ctx, project, repo); err != nil {
+func (f fakePipeline) DeleteBranches(ctx context.Context, project string, picks []workflow.BranchPick) (workflow.Cleanup, error) {
+	if _, err := f.CleanupBranches(ctx, project); err != nil {
 		return workflow.Cleanup{}, err
 	}
 	var done workflow.Cleanup
-	for _, b := range branches {
-		done.Removed = append(done.Removed, workflow.Cleaned{Repo: repo, What: "branch", Branch: b})
+	for _, b := range picks {
+		done.Removed = append(done.Removed, workflow.Cleaned{Repo: b.Repo, What: "branch", Branch: b.Branch})
 	}
 	return done, nil
 }
@@ -49,28 +46,29 @@ func (f fakePipeline) DeleteBranches(ctx context.Context, project, repo string, 
 func TestCleanupBranches(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Pipeline: fakePipeline{}, UI: builtUI})
 	var list []workflow.CleanupBranch
-	decodeBody(t, get(t, h, "/api/projects/ledger/repos/api/branch-cleanup"), &list)
-	if len(list) != 1 || list[0].Branch != "wt/ledger/tove/x" || list[0].State != workflow.Merged {
+	decodeBody(t, get(t, h, "/api/projects/ledger/branch-cleanup"), &list)
+	if len(list) != 1 || list[0].Repo != "api" || list[0].Branch != "wt/ledger/tove/x" || list[0].State != workflow.Merged {
 		t.Errorf("branches %+v", list)
 	}
 	var done workflow.Cleanup
-	decodeBody(t, send(h, "POST", "/api/projects/ledger/repos/api/branch-cleanup", `{"branches":["wt/ledger/tove/x"]}`), &done)
-	if len(done.Removed) != 1 || done.Removed[0].Branch != "wt/ledger/tove/x" {
+	decodeBody(t, send(h, "POST", "/api/projects/ledger/branch-cleanup", `{"branches":[{"repo":"api","branch":"wt/ledger/tove/x"}]}`), &done)
+	if len(done.Removed) != 1 || done.Removed[0].Repo != "api" || done.Removed[0].Branch != "wt/ledger/tove/x" {
 		t.Errorf("deleted %+v", done)
 	}
-	for path, code := range map[string]int{
-		"/api/projects/nope/repos/api/branch-cleanup":    http.StatusNotFound,
-		"/api/projects/ledger/repos/nope/branch-cleanup": http.StatusNotFound,
-	} {
-		if w := send(h, "GET", path, ""); w.Code != code {
-			t.Errorf("%s: %d, want %d", path, w.Code, code)
-		}
-		if w := send(h, "POST", path, `{"branches":[]}`); w.Code != code {
-			t.Errorf("delete %s: %d, want %d", path, w.Code, code)
+	if w := send(h, "GET", "/api/projects/nope/branch-cleanup", ""); w.Code != http.StatusNotFound {
+		t.Errorf("no such project: %d", w.Code)
+	}
+	if w := send(h, "POST", "/api/projects/nope/branch-cleanup", `{"branches":[]}`); w.Code != http.StatusNotFound {
+		t.Errorf("delete in no such project: %d", w.Code)
+	}
+	for _, body := range []string{`{"branches":`, `{"branches":["wt/ledger/tove/x"]}`} {
+		if w := send(h, "POST", "/api/projects/ledger/branch-cleanup", body); w.Code != http.StatusBadRequest {
+			t.Errorf("%s: %d", body, w.Code)
 		}
 	}
-	if w := send(h, "POST", "/api/projects/ledger/repos/api/branch-cleanup", `{"branches":`); w.Code != http.StatusBadRequest {
-		t.Errorf("a broken body: %d", w.Code)
+	// The per-repo routes are gone: the cleanup is the project's.
+	if w := send(h, "GET", "/api/projects/ledger/repos/api/branch-cleanup", ""); w.Code == http.StatusOK {
+		t.Error("the per-repo route still answers")
 	}
 }
 

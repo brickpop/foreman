@@ -201,11 +201,40 @@ export function placeLine(p: BranchPlace): string {
   return work.filter(Boolean).join(" · ") || "nothing new";
 }
 
+/** A branch of the branch cleanup, by its repo and name: what a pick holds. */
+export const pickKey = (b: CleanupBranch) => `${b.repo}:${b.branch}`;
+
+/** One section of the branch cleanup: its groups, folded or open at first. */
+export type CleanupSection = {
+  key: "agents" | "yours" | "unmerged" | "stray";
+  title: string;
+  note?: string;
+  /** Folded at first: those whose deletion may lose work (the CEO, 2026-11-13). */
+  folded: boolean;
+};
+
+/** The sections, the safest to delete first (the CEO, 2026-11-13). */
+export const cleanupSections: CleanupSection[] = [
+  { key: "agents", title: "Agents' branches, merged", folded: false },
+  {
+    key: "yours",
+    title: "Your branches, merged",
+    note: "Deleted here only: a copy upstream stays.",
+    folded: false,
+  },
+  { key: "unmerged", title: "Agents' branches, not merged", folded: true },
+  {
+    key: "stray",
+    title: "In stray worktrees",
+    note: "checked out in a folder no agent of any project has (an old workspace's, one since deleted): picked, that worktree is removed first, unless it holds changes not committed.",
+    folded: true,
+  },
+];
+
 /** One group of the branch cleanup: the branches it ticks or unticks at once. */
 export type CleanupGroup = {
   key: string;
-  /** Its section: the agents' branches, the CEO's, or those in stray worktrees. */
-  section: "agents" | "yours" | "stray";
+  section: CleanupSection["key"];
   label: string;
   hint: string;
   /** Ticked at first. */
@@ -215,6 +244,7 @@ export type CleanupGroup = {
 
 type Kind = Omit<CleanupGroup, "key" | "branches"> & { state?: string };
 
+// Ticked at first exactly where deleting loses nothing: merged or superseded, in no stray worktree.
 const groupKinds: Kind[] = [
   { section: "agents", state: "merged", label: "Merged", hint: "nothing lost", on: true },
   {
@@ -224,15 +254,15 @@ const groupKinds: Kind[] = [
     hint: "all of it is in another branch",
     on: true,
   },
-  { section: "agents", state: "unmerged", label: "Not merged", hint: "work only here", on: false },
-  { section: "yours", state: "merged", label: "Merged", hint: "nothing lost", on: false },
+  { section: "yours", state: "merged", label: "Merged", hint: "nothing lost", on: true },
   {
     section: "yours",
     state: "superseded",
     label: "Superseded",
     hint: "all of it is in an agent's branch",
-    on: false,
+    on: true,
   },
+  { section: "unmerged", label: "Not merged", hint: "work only here", on: false },
   {
     section: "stray",
     label: "Checked out elsewhere",
@@ -242,17 +272,18 @@ const groupKinds: Kind[] = [
 ];
 
 /** The section a branch is offered in, if any: one checked out in a stray worktree in its own,
- * whatever its work; one that stays otherwise, none. */
-function sectionOf(b: CleanupBranch): CleanupGroup["section"] | undefined {
+ * whatever its work; one that stays otherwise, none. The CEO's unmerged ones are never offered. */
+function sectionOf(b: CleanupBranch): CleanupSection["key"] | undefined {
   if (b.stray) return "stray";
   if (b.stays) return undefined;
-  return b.agents ? "agents" : "yours";
+  if (!b.agents) return "yours";
+  return b.state === "unmerged" ? "unmerged" : "agents";
 }
 
 /** The branch cleanup's groups (wiki/product/features/repos.md#branch-cleanup), in order and
- * without the empty ones: the agents' merged and superseded ticked at first, deleting them
- * loses nothing; their unmerged work, the CEO's own branches and those in stray worktrees off.
- * Branches that can't go are apart, in staying. */
+ * without the empty ones: merged and superseded first, the agents' then the CEO's, ticked, as
+ * deleting them loses nothing; then the agents' unmerged work and those in stray worktrees,
+ * off. Branches that can't go are apart, in staying. */
 export function cleanupGroups(branches: CleanupBranch[]): {
   groups: CleanupGroup[];
   staying: CleanupBranch[];
@@ -271,5 +302,5 @@ export function cleanupGroups(branches: CleanupBranch[]): {
 
 /** What the branch cleanup ticks at first: the branches of the groups on. */
 export function cleanupPick(groups: CleanupGroup[]): Set<string> {
-  return new Set(groups.filter((g) => g.on).flatMap((g) => g.branches.map((b) => b.branch)));
+  return new Set(groups.filter((g) => g.on).flatMap((g) => g.branches.map(pickKey)));
 }

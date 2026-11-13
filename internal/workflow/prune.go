@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/git"
@@ -34,9 +35,10 @@ const (
 	Unmerged = "unmerged"
 )
 
-// CleanupBranch is one branch of a code repo, as the CEO's branch cleanup
-// lists it.
+// CleanupBranch is one branch of one of a project's code repos, as the CEO's
+// branch cleanup lists it.
 type CleanupBranch struct {
+	Repo   string `json:"repo"`
 	Branch string `json:"branch"`
 	// Agents: an agents' branch (wt/*, lead/*); else the CEO's.
 	Agents bool `json:"agents"`
@@ -305,29 +307,32 @@ func (w *Workflow) offered(p home.Project, r home.Repo, branch, state string) (l
 // merged or not (the CEO, 2026-11-11), whatever the repo's default is.
 var longLived = []string{"main", "master", "trunk", "develop", "development", "dev", "staging", "production", "prod"}
 
-func (w *Workflow) codeRepo(projectID, name string) (home.Project, home.Repo, error) {
+// CleanupBranches lists what the CEO's branch cleanup offers in each of the
+// project's code repos (offered; a missing repo has none), each with where its
+// work stands and what keeps it: by repo, in the project's order, then by
+// branch. The repos are read side by side: where each branch stands takes a
+// moment on a repo with many.
+func (w *Workflow) CleanupBranches(ctx context.Context, projectID string) ([]CleanupBranch, error) {
 	p, err := w.Config.Project(projectID)
-	if err != nil {
-		return p, home.Repo{}, err
-	}
-	for _, r := range p.Repos {
-		if r.Name == name {
-			return p, r, nil
-		}
-	}
-	return p, home.Repo{}, ErrNoRepo
-}
-
-// ErrNoRepo means the project has no code repo of that name.
-var ErrNoRepo = errors.New("no such repo in this project")
-
-// CleanupBranches lists what the CEO's branch cleanup offers in a code repo
-// (offered), sorted, each with where its work stands and what keeps it.
-func (w *Workflow) CleanupBranches(ctx context.Context, projectID, repo string) ([]CleanupBranch, error) {
-	p, r, err := w.codeRepo(projectID, repo)
 	if err != nil {
 		return nil, err
 	}
+	lists := make([][]CleanupBranch, len(p.Repos))
+	errs := make([]error, len(p.Repos))
+	var wg sync.WaitGroup
+	for i, r := range p.Repos {
+		if r.Ready() {
+			wg.Go(func() { lists[i], errs[i] = w.cleanupIn(ctx, p, r) })
+		}
+	}
+	wg.Wait()
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return append([]CleanupBranch{}, slices.Concat(lists...)...), nil
+}
+
+func (w *Workflow) cleanupIn(ctx context.Context, p home.Project, r home.Repo) ([]CleanupBranch, error) {
 	b, err := w.branchRepo(ctx, p, r)
 	if err != nil {
 		return nil, err
@@ -336,7 +341,7 @@ func (w *Workflow) CleanupBranches(ctx context.Context, projectID, repo string) 
 	if err != nil {
 		return nil, err
 	}
-	list := []CleanupBranch{}
+	var list []CleanupBranch
 	for _, name := range names {
 		state, by := w.standing(ctx, p, r.Name, r.Path, name)
 		legacy, why := w.offered(p, r, name, state)
@@ -344,25 +349,62 @@ func (w *Workflow) CleanupBranches(ctx context.Context, projectID, repo string) 
 			continue
 		}
 		_, stray := w.checkedOut(b, name)
-		list = append(list, CleanupBranch{Branch: name, Agents: git.AgentBranch(name), State: state,
+		list = append(list, CleanupBranch{Repo: r.Name, Branch: name, Agents: git.AgentBranch(name), State: state,
 			SupersededBy: by, Legacy: legacy, Stays: w.stays(b, name), Stray: stray})
 	}
 	return list, nil
 }
 
+// BranchPick is a branch of one of a project's code repos, picked to delete.
+type BranchPick struct {
+	Repo   string `json:"repo"`
+	Branch string `json:"branch"`
+}
+
 // DeleteBranches deletes the CEO's pick of what CleanupBranches offers, each
 // checked again as it goes: what stays, stays, and one of the CEO's no longer
-// merged nor superseded (its only holder deleted just before) is kept.
-func (w *Workflow) DeleteBranches(ctx context.Context, projectID, repo string, branches []string) (Cleanup, error) {
-	p, r, err := w.codeRepo(projectID, repo)
-	if err != nil {
-		return Cleanup{}, err
-	}
-	b, err := w.branchRepo(ctx, p, r)
+// merged nor superseded (its only holder deleted just before) is kept. A pick
+// in a repo the project hasn't (or one missing) is kept, with why.
+func (w *Workflow) DeleteBranches(ctx context.Context, projectID string, picks []BranchPick) (Cleanup, error) {
+	p, err := w.Config.Project(projectID)
 	if err != nil {
 		return Cleanup{}, err
 	}
 	var out Cleanup
+	for _, r := range p.Repos {
+		var names []string
+		for _, pick := range picks {
+			if pick.Repo == r.Name {
+				names = append(names, pick.Branch)
+			}
+		}
+		if len(names) == 0 {
+			continue
+		}
+		if !r.Ready() {
+			for _, name := range names {
+				out.Kept = append(out.Kept, Cleaned{Repo: r.Name, What: "branch", Branch: name, Why: "its repo is " + r.Problem})
+			}
+			continue
+		}
+		if err := w.deleteIn(ctx, p, r, names, &out); err != nil {
+			return out, err
+		}
+	}
+	for _, pick := range picks {
+		if !slices.ContainsFunc(p.Repos, func(r home.Repo) bool { return r.Name == pick.Repo }) {
+			out.Kept = append(out.Kept, Cleaned{Repo: pick.Repo, What: "branch", Branch: pick.Branch, Why: "no such repo"})
+		}
+	}
+	return out, nil
+}
+
+func (w *Workflow) deleteIn(ctx context.Context, p home.Project, r home.Repo, branches []string, out *Cleanup) error {
+	b, err := w.branchRepo(ctx, p, r)
+	if err != nil {
+		return err
+	}
+	removed := len(out.Removed)
 	for _, name := range slices.Compact(slices.Sorted(slices.Values(branches))) {
 		c := Cleaned{Repo: r.Name, What: "branch", Branch: name}
 		if !git.ValidBranch(ctx, name) || !w.Git.HasBranch(ctx, r.Path, name) {
@@ -370,7 +412,7 @@ func (w *Workflow) DeleteBranches(ctx context.Context, projectID, repo string, b
 		} else {
 			state, _ := w.standing(ctx, p, r.Name, r.Path, name)
 			if _, c.Why = w.offered(p, r, name, state); c.Why == "" {
-				c.Why = w.unstray(ctx, b, name, &out)
+				c.Why = w.unstray(ctx, b, name, out)
 			}
 			if c.Why == "" {
 				c.Why = w.delete(ctx, b, name)
@@ -382,10 +424,10 @@ func (w *Workflow) DeleteBranches(ctx context.Context, projectID, repo string, b
 			out.Kept = append(out.Kept, c)
 		}
 	}
-	if len(out.Removed) > 0 {
+	if len(out.Removed) > removed {
 		w.pruneBackups(ctx, r.Path)
 	}
-	return out, nil
+	return nil
 }
 
 // unstray removes the stray worktree that has branch checked out, if one does

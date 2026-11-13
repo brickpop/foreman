@@ -6,6 +6,7 @@ import { type Project, type Repo, useClient } from "../../api/client";
 import { agentBranch, projectName, readable } from "../../app/model";
 import { keys, useDeployments, useRepos } from "../../app/queries";
 import { AddRepo } from "../../components/AddRepo";
+import { BranchCleanup } from "../../components/BranchCleanup";
 import { FolderBrowser, useFolderBrowser } from "../../components/FolderBrowser";
 import { RepoIcon } from "../../components/icons";
 import { Confirm, Modal } from "../../components/Overlays";
@@ -77,11 +78,12 @@ export function Repos() {
         )}
       </div>
       {read.isError && <p className="m-0 text-[13px] text-err">{read.error.message}</p>}
-      <span>
+      <span className="flex items-center gap-2">
         <Button variant="outline" onClick={() => setAdding(true)}>
           <RepoIcon size="size-4" />
           Add a repo
         </Button>
+        {project.repos.length > 0 && <BranchCleanup project={project.id} />}
       </span>
       <Modal
         open={adding}

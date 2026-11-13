@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -212,7 +211,7 @@ func TestCleanupBranchesAndDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	list, err := f.cleanupIn("api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +248,7 @@ func TestCleanupBranchesAndDelete(t *testing.T) {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 
-	done, err := f.w.DeleteBranches(ctx, "ledger", "api", []string{"wt/ledger/tove/old", "wt/tove/legacy", "wt/ledger/tove/main",
+	done, err := f.deleteIn("api", []string{"wt/ledger/tove/old", "wt/tove/legacy", "wt/ledger/tove/main",
 		"wt/suite/tove/x", "feature/wip", "main", "release/2", "feature/done", "wt/ledger/tove/none", "wt/tove/legacy", "-x"})
 	if err != nil {
 		t.Fatal(err)
@@ -275,14 +274,78 @@ func TestCleanupBranchesAndDelete(t *testing.T) {
 		t.Errorf("kept %q\nwant %q", line(done.Kept), want)
 	}
 	// The CEO's feature/base was superseded only by tove's on-base: once that is gone, it is unmerged and stays.
-	if done, _ := f.w.DeleteBranches(ctx, "ledger", "api", []string{"wt/ledger/tove/on-base"}); len(done.Removed) != 1 {
+	if done, _ := f.deleteIn("api", []string{"wt/ledger/tove/on-base"}); len(done.Removed) != 1 {
 		t.Errorf("on-base: %+v", done)
 	}
-	if done, _ := f.w.DeleteBranches(ctx, "ledger", "api", []string{"feature/base"}); !reflect.DeepEqual(line(done.Kept), []string{"feature/base not merged"}) {
+	if done, _ := f.deleteIn("api", []string{"feature/base"}); !reflect.DeepEqual(line(done.Kept), []string{"feature/base not merged"}) {
 		t.Errorf("feature/base: %q", line(done.Kept))
 	}
-	if _, err := f.w.CleanupBranches(ctx, "ledger", "nope"); !errors.Is(err, ErrNoRepo) {
-		t.Errorf("no such repo: %v", err)
+}
+
+// cleanupIn is what the branch cleanup offers in one of ledger's repos.
+func (f *fixture) cleanupIn(repo string) ([]CleanupBranch, error) {
+	all, err := f.w.CleanupBranches(ctx, "ledger")
+	var list []CleanupBranch
+	for _, b := range all {
+		if b.Repo == repo {
+			list = append(list, b)
+		}
+	}
+	return list, err
+}
+
+// deleteIn deletes branches of one of ledger's repos through the branch cleanup.
+func (f *fixture) deleteIn(repo string, branches []string) (Cleanup, error) {
+	var picks []BranchPick
+	for _, b := range branches {
+		picks = append(picks, BranchPick{Repo: repo, Branch: b})
+	}
+	return f.w.DeleteBranches(ctx, "ledger", picks)
+}
+
+// The branch cleanup is the project's: every code repo at once, each branch
+// with its repo, in the project's order; a pick goes in its own repo only,
+// and one in a repo the project hasn't is kept, saying so.
+func TestCleanupBranchesAcrossRepos(t *testing.T) {
+	f := newFixture(t)
+	f.git(filepath.Join(f.root, "ledger", "api"), "branch", "feature/done", "main")
+	f.git(filepath.Join(f.root, "ledger", "web"), "branch", "feature/done", "trunk")
+	f.git(filepath.Join(f.root, "ledger", "web"), "branch", "feature/web-only", "trunk")
+	list, err := f.w.CleanupBranches(ctx, "ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, b := range list {
+		if strings.HasPrefix(b.Branch, "feature/") {
+			got = append(got, b.Repo+" "+b.Branch)
+		}
+	}
+	if want := []string{"api feature/done", "web feature/done", "web feature/web-only"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("listed %q, want %q", got, want)
+	}
+	done, err := f.w.DeleteBranches(ctx, "ledger", []BranchPick{{"web", "feature/done"}, {"web", "feature/web-only"}, {"nope", "feature/done"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var removed, kept []string
+	for _, c := range done.Removed {
+		removed = append(removed, c.Repo+" "+c.Branch)
+	}
+	for _, c := range done.Kept {
+		kept = append(kept, c.Repo+" "+c.Branch+" "+c.Why)
+	}
+	if want := []string{"web feature/done", "web feature/web-only"}; !reflect.DeepEqual(removed, want) {
+		t.Errorf("removed %q", removed)
+	}
+	if want := []string{"nope feature/done no such repo"}; !reflect.DeepEqual(kept, want) {
+		t.Errorf("kept %q", kept)
+	}
+	if !f.has("feature/done") {
+		t.Error("api's feature/done went with web's")
+	}
+	if _, err := f.w.CleanupBranches(ctx, "nope"); err == nil {
+		t.Error("no such project: no error")
 	}
 }
 
@@ -293,7 +356,7 @@ func TestCleanupNeverOffersLongLivedBranches(t *testing.T) {
 	for _, b := range []string{"master", "develop", "staging", "feature/done"} {
 		f.git(api, "branch", b, "main")
 	}
-	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	list, err := f.cleanupIn("api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +365,7 @@ func TestCleanupNeverOffersLongLivedBranches(t *testing.T) {
 			t.Errorf("%s offered", b.Branch)
 		}
 	}
-	done, _ := f.w.DeleteBranches(ctx, "ledger", "api", []string{"develop", "feature/done"})
+	done, _ := f.deleteIn("api", []string{"develop", "feature/done"})
 	if len(done.Removed) != 1 || len(done.Kept) != 1 || done.Kept[0].Why != "a long-lived branch" || !f.has("develop") {
 		t.Errorf("%+v", done)
 	}
@@ -325,7 +388,7 @@ func TestCleanupStrayWorktrees(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	list, err := f.cleanupIn("api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +410,7 @@ func TestCleanupStrayWorktrees(t *testing.T) {
 		t.Errorf("tove's prune: %q", got)
 	}
 
-	done, err := f.w.DeleteBranches(ctx, "ledger", "api", []string{"wt/leady/doc", "wt/ledger/ivo/draft", "wt/ledger/tove/gone"})
+	done, err := f.deleteIn("api", []string{"wt/leady/doc", "wt/ledger/ivo/draft", "wt/ledger/tove/gone"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -416,7 +479,7 @@ func TestPruneMergedReview(t *testing.T) {
 	f.ahead("wt/ledger/tove/dropped", "main")
 	review("wt/ledger/tove/dropped", "ledger", "api", store.MergeMerged, true)
 
-	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	list, err := f.cleanupIn("api")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +514,7 @@ func TestMergedInAnotherProject(t *testing.T) {
 	f.git(api, "checkout", "-q", "main")
 	f.ahead("wt/ledger/tove/unpicked", "main")
 
-	list, err := f.w.CleanupBranches(ctx, "ledger", "api")
+	list, err := f.cleanupIn("api")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	"github.com/brickpop/foreman/internal/workflow"
@@ -15,11 +14,11 @@ type Pipeline interface {
 	// CleanUp removes what agents no longer running left on a project, only
 	// what is safe, and says what it kept (home.ErrNotFound: no such project).
 	CleanUp(ctx context.Context, project string) (workflow.Cleanup, error)
-	// CleanupBranches lists the branches of a code repo the CEO may delete
-	// (the Repos page's branch cleanup); DeleteBranches deletes the pick
-	// (home.ErrNotFound: no such project; workflow.ErrNoRepo: no such repo).
-	CleanupBranches(ctx context.Context, project, repo string) ([]workflow.CleanupBranch, error)
-	DeleteBranches(ctx context.Context, project, repo string, branches []string) (workflow.Cleanup, error)
+	// CleanupBranches lists the branches of the project's code repos the CEO
+	// may delete (the Repos section's branch cleanup); DeleteBranches deletes
+	// the pick (home.ErrNotFound: no such project).
+	CleanupBranches(ctx context.Context, project string) ([]workflow.CleanupBranch, error)
+	DeleteBranches(ctx context.Context, project string, branches []workflow.BranchPick) (workflow.Cleanup, error)
 }
 
 func pipelineRoutes(mux *http.ServeMux, p Pipeline) {
@@ -40,28 +39,19 @@ func pipelineRoutes(mux *http.ServeMux, p Pipeline) {
 		done, err := p.CleanUp(r.Context(), r.PathValue("id"))
 		writeFound(w, done, err, "project")
 	})
-	mux.HandleFunc("GET /api/projects/{id}/repos/{repo}/branch-cleanup", func(w http.ResponseWriter, r *http.Request) {
-		list, err := p.CleanupBranches(r.Context(), r.PathValue("id"), r.PathValue("repo"))
-		writeBranches(w, list, err)
+	mux.HandleFunc("GET /api/projects/{id}/branch-cleanup", func(w http.ResponseWriter, r *http.Request) {
+		list, err := p.CleanupBranches(r.Context(), r.PathValue("id"))
+		writeFound(w, list, err, "project")
 	})
-	mux.HandleFunc("POST /api/projects/{id}/repos/{repo}/branch-cleanup", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /api/projects/{id}/branch-cleanup", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Branches []string `json:"branches"`
+			Branches []workflow.BranchPick `json:"branches"`
 		}
-		if !decode(w, r, &req, "expected {branches}") {
+		if !decode(w, r, &req, "expected {branches: [{repo, branch}]}") {
 			return
 		}
-		done, err := p.DeleteBranches(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Branches)
-		writeBranches(w, done, err)
+		done, err := p.DeleteBranches(r.Context(), r.PathValue("id"), req.Branches)
+		writeFound(w, done, err, "project")
 	})
 }
 
-// writeBranches answers a branch cleanup: 404 for a project or repo that
-// isn't there.
-func writeBranches(w http.ResponseWriter, v any, err error) {
-	if errors.Is(err, workflow.ErrNoRepo) {
-		writeError(w, http.StatusNotFound, "NOT_FOUND", "No such repo in this project")
-		return
-	}
-	writeFound(w, v, err, "project")
-}

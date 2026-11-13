@@ -8,6 +8,7 @@ import {
 import { useEffect, useRef } from "react";
 import {
   type Board,
+  type BranchPick,
   type Doing,
   type Draft,
   type ForemanClient,
@@ -652,22 +653,22 @@ export function useCleanUp(project: string) {
   });
 }
 
-/** What the branch cleanup offers in a code repo, read while it is open. */
-export function useCleanupBranches(project: string, repo: string) {
+/** What the branch cleanup offers in the project's code repos, read while it is open. */
+export function useCleanupBranches(project: string) {
   const c = useClient();
   return useQuery({
-    queryKey: [...keys.repos, project, repo, "branch-cleanup"],
-    queryFn: () => c.pipeline.cleanupBranches(project, repo),
+    queryKey: [...keys.repos, project, "branch-cleanup"],
+    queryFn: () => c.pipeline.cleanupBranches(project),
   });
 }
 
-/** Deletes the CEO's pick of a code repo's branches; its repos then show
+/** Deletes the CEO's pick of the project's branches; its repos then show
  * what is left. */
-export function useDeleteBranches(project: string, repo: string) {
+export function useDeleteBranches(project: string) {
   const c = useClient();
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: (branches: string[]) => c.pipeline.deleteBranches(project, repo, branches),
+    mutationFn: (branches: BranchPick[]) => c.pipeline.deleteBranches(project, branches),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.repos }),
   });
 }

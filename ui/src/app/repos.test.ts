@@ -89,28 +89,46 @@ describe("worktrees", () => {
         branch("lead/atlas/integration", { agent: "mara" }),
         branch("wt/ines/old", { ahead: 1 }),
       ],
+      idle: [{ agent: "ivo", uncommitted: false }],
     },
     {
       name: "web",
       project: false,
       defaultBranch: "trunk",
       branches: [branch("trunk"), branch("wt/tove/LED-44", { agent: "tove" })],
+      idle: [
+        { agent: "ivo", uncommitted: true },
+        { agent: "mara", uncommitted: false },
+      ],
     },
-    { name: "project", project: true, defaultBranch: "main", branches: [branch("main")] },
+    {
+      name: "project",
+      project: true,
+      defaultBranch: "main",
+      branches: [branch("main")],
+      idle: [],
+    },
   ] as Repo[];
 
-  it("gives each agent its checked-out branch per repo", () => {
+  it("gives each agent its checked-out branch per repo, and the repos it has open on none", () => {
     expect(
-      worktrees(repos).map((w) => [w.agent, w.branches.map((b) => `${b.repo}:${b.branch.name}`)]),
+      worktrees(repos).map((w) => [
+        w.agent,
+        w.branches.map((b) => `${b.repo}:${b.branch.name}`),
+        w.idle.map((i) => `${i.repo}${i.uncommitted ? "*" : ""}`),
+      ]),
     ).toEqual([
-      ["mara", ["api:lead/atlas/integration"]],
-      ["tove", ["api:wt/tove/LED-44", "web:wt/tove/LED-44"]],
+      // Open only on no branch: an agent with a worktree all the same.
+      ["ivo", [], ["api", "web*"]],
+      ["mara", ["api:lead/atlas/integration"], ["web"]],
+      ["tove", ["api:wt/tove/LED-44", "web:wt/tove/LED-44"], []],
     ]);
   });
 
   it("gives the branch an agent is on, once however many repos it spans", () => {
     expect(branchesOf(repos, "mara")).toEqual(["lead/atlas/integration"]);
     expect(branchesOf(repos, "ines")).toEqual([]); // a branch but no worktree
+    expect(branchesOf(repos, "ivo")).toEqual([]); // idle
     expect(branchesOf([], "tove")).toEqual([]);
     // Repos on different branches (never through switch): each one, in the repos' order.
     const split = [

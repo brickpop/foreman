@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 
-	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/harness"
 	"github.com/brickpop/foreman/internal/home"
 	"github.com/brickpop/foreman/internal/prompt"
@@ -97,22 +97,30 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err := os.MkdirAll(inst.SandboxPath, 0o755); err != nil {
 		return nil, err
 	}
-	branch := git.HomeBranch(project.ID, inst.AgentID, team.ID, lead)
+	opens := slices.Contains(m.tools(lead, len(project.Repos) > 0), "open")
 	var mounts []runner.Mount
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {
 		repoDir, worktree := repo.Path, filepath.Join(inst.SandboxPath, repo.Name)
-		if err := m.Git.Prepare(ctx, repoDir, worktree, branch, repo.Default); err != nil {
-			return nil, err
-		}
-		// An agent starts without a submodule that can't be fetched (offline,
-		// a private repo) rather than not at all: its next switch or merge
-		// tries again, and says so.
-		if err := m.Git.SyncSubmodules(ctx, worktree, project.Config.RecursiveSubmodules); err != nil {
-			slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo.Name, "err", err)
+		// Only the repos it opened have a worktree: one is made when the agent
+		// needs it (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo).
+		// Those it has are relinked if their repo moved, and caught up when idle.
+		// An agent with no team tools can't open one: it gets them all, idle.
+		_, err := os.Stat(filepath.Join(worktree, ".git"))
+		if err == nil || !opens {
+			if err := m.Git.Prepare(ctx, repoDir, worktree, "", repo.Default); err != nil {
+				return nil, err
+			}
+			// An agent starts without a submodule that can't be fetched (offline,
+			// a private repo) rather than not at all: its next switch or merge
+			// tries again, and says so.
+			if err := m.Git.SyncSubmodules(ctx, worktree, project.Config.RecursiveSubmodules); err != nil {
+				slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo.Name, "err", err)
+			}
 		}
 		// Agents read git; only Foreman writes it. At its real path, which the
-		// worktree's link names.
+		// worktree's link names, and through which an agent reads a repo it
+		// hasn't opened.
 		real, err := filepath.EvalSymlinks(repoDir)
 		if err != nil {
 			return nil, err

@@ -121,16 +121,20 @@ func signs(ctx context.Context, dir string) bool {
 	return err == nil && strings.TrimSpace(out) == "true"
 }
 
-// Prepare makes worktree a git worktree of repo on branch (its agent's home
-// branch), creating the branch from base when it doesn't exist. A worktree
-// already there is reused as it is, on whatever branch its agent switched to
-// (wiki/product/architecture/sandboxes-and-git.md), and relinked to repo if
-// repo moved since (Locate). Either way branch, when idle, follows base
-// (Freshen).
+// Prepare makes worktree a git worktree of repo: on branch, creating it from
+// base (a branch) when the repo doesn't have it, or detached at base with no
+// branch ("": an idle worktree owns none). A worktree already there is reused
+// as it is, on whatever its agent switched to
+// (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo), and
+// relinked to repo if repo moved since (Locate). Either way, idle (detached),
+// it follows base (Freshen).
 func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) error {
+	if !ValidBranch(ctx, base) || (branch != "" && !ValidBranch(ctx, branch)) {
+		return ErrBadBranch
+	}
 	defer g.lock(ctx, repo)()
-	// An idle desk not brought up to date is no reason to fail a deploy.
-	defer func() { _, _ = g.freshen(ctx, repo, branch, base) }()
+	// An idle desk not brought up to date is no reason to fail a start.
+	defer func() { _, _ = g.freshen(ctx, worktree, base) }()
 	common, err := run(ctx, repo, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
 		return fmt.Errorf("%s is not a git repo: %w", repo, err)
@@ -153,12 +157,17 @@ func (g *CLI) Prepare(ctx context.Context, repo, worktree, branch, base string) 
 	if _, err := run(ctx, repo, "worktree", "prune"); err != nil {
 		return err
 	}
-	args := []string{"worktree", "add", "--quiet", worktree, branch}
-	if _, err := run(ctx, repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch); err != nil {
-		if _, err := run(ctx, repo, "rev-parse", "--verify", "--quiet", "refs/heads/"+base); err != nil {
-			return fmt.Errorf("%s has no branch %q to start %s from (deleted, or its default branch is another: pick it in the project's Repos)", repo, base, branch)
-		}
-		args = []string{"worktree", "add", "--quiet", "-b", branch, worktree, base}
+	hasBase := g.HasBranch(ctx, repo, base)
+	var args []string
+	switch {
+	case branch != "" && g.HasBranch(ctx, repo, branch):
+		args = []string{"worktree", "add", "--quiet", worktree, branch}
+	case !hasBase:
+		return fmt.Errorf("%s has no branch %q to start from (deleted, or its default branch is another: pick it in the project's Repos)", repo, base)
+	case branch == "":
+		args = []string{"worktree", "add", "--quiet", "--detach", worktree, "refs/heads/" + base}
+	default:
+		args = []string{"worktree", "add", "--quiet", "-b", branch, worktree, "refs/heads/" + base}
 	}
 	_, err = run(ctx, repo, args...)
 	return err

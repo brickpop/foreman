@@ -1327,23 +1327,37 @@ func TestOldBackupsArePruned(t *testing.T) {
 	}
 }
 
-// After a merge, idle desks follow the new main; one with work stays.
+// After a merge, the project's idle worktrees (on no branch) follow the new main; one with edits,
+// one on a topic, another project's sharing the repo, and one outside any sandbox stay.
 func TestAMergeBringsIdleDesksUpToMain(t *testing.T) {
 	f := newFixture(t)
-	f.integrated() // tove now on wt/ledger/tove/LED-44: wt/ledger/tove/main idles, not checked out
+	f.integrated() // tove now on wt/ledger/tove/LED-44
 	api := filepath.Join(f.root, "ledger", "api")
 	f.ok("mara", "request_merge", integration)
-	before := f.git(api, "rev-parse", "wt/ledger/tove/main")
-	// Another project sharing the repo has its own default branch: its desks stay.
-	f.git(api, "branch", "wt/suite/tove/main", before)
+	before := f.git(api, "rev-parse", "main")
+	g := git.New()
+	idle := func(dir string) string {
+		if err := g.Prepare(ctx, api, dir, "", "main"); err != nil {
+			t.Fatal(err)
+		}
+		return dir
+	}
+	ivo := idle(filepath.Join(f.w.Config.Sandbox("ledger", "ivo"), "api"))
+	busy := idle(filepath.Join(f.w.Config.Sandbox("ledger", "una"), "api"))
+	writeFile(t, filepath.Join(busy, "draft.txt"), "not committed\n")
+	suite := idle(filepath.Join(f.w.Config.Sandbox("suite", "ivo"), "core"))
+	stray := idle(filepath.Join(t.TempDir(), "ivo", "api"))
 	if err := f.w.MergeReview(ctx, "rev-1", f.shown("rev-1", "api"), ""); err != nil {
 		t.Fatal(err)
 	}
-	if main := f.git(api, "rev-parse", "main"); main == before || f.git(api, "rev-parse", "wt/ledger/tove/main") != main {
-		t.Error("tove's idle desk didn't follow main")
+	main := f.git(api, "rev-parse", "main")
+	if main == before || f.git(ivo, "rev-parse", "HEAD") != main || f.git(ivo, "branch", "--show-current") != "" {
+		t.Error("ivo's idle desk didn't follow main, on no branch")
 	}
-	if f.git(api, "rev-parse", "wt/suite/tove/main") != before {
-		t.Error("another project's desk followed this project's main")
+	for name, dir := range map[string]string{"with edits": busy, "another project's": suite, "outside any sandbox": stray} {
+		if f.git(dir, "rev-parse", "HEAD") != before {
+			t.Errorf("a desk %s followed main", name)
+		}
 	}
 	if f.git(f.wt("tove", "api"), "branch", "--show-current") != "wt/ledger/tove/LED-44" {
 		t.Error("tove's work moved")

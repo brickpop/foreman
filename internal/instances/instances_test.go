@@ -272,11 +272,11 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 			t.Errorf("%s: %+v", id, inst)
 		}
 	}
-	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api")); b != "lead/ledger/atlas/integration" {
-		t.Errorf("the lead's branch %q", b)
-	}
-	if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", "tove"), "ledger-api")); b != "wt/ledger/tove/main" {
-		t.Errorf("a member's branch %q", b)
+	// Without the agent link it can't open a repo: it gets them all, idle on no branch.
+	for _, agent := range []string{"mara", "tove"} {
+		if b := f.branch(filepath.Join(f.hm.Sandbox("ledger", agent), "ledger-api")); b != "HEAD" {
+			t.Errorf("%s's worktree on %q, not idle", agent, b)
+		}
 	}
 	prompt, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
 	if !strings.Contains(string(prompt), "project/wiki/backlog/index.md, kept by your lead") || strings.Contains(string(prompt), "## Tools") {
@@ -928,7 +928,8 @@ func TestHooksBecomeActivityLines(t *testing.T) {
 	}
 }
 
-// The harness gets foreman-agent's place and the instance's own token.
+// The harness gets foreman-agent's place and the instance's own token. With
+// the tools, it opens repos itself: its start makes no worktree, and no branch.
 func TestTheHarnessGetsTheAgentLink(t *testing.T) {
 	f := newFixture(t, `echo "link=$FOREMAN_AGENT_URL $FOREMAN_AGENT_TOKEN"; cat`, 12)
 	f.deps.Agent = AgentLink{Host: "/bin/foreman-agent", Path: "/opt/foreman/foreman-agent", URL: "http://h:8889",
@@ -937,8 +938,15 @@ func TestTheHarnessGetsTheAgentLink(t *testing.T) {
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
-	f.waitStatus("mara@ledger", Running)
+	mara := f.waitStatus("mara@ledger", Running)
 	f.output("mara@ledger", "link=http://h:8889 token-of-mara@ledger")
+	if _, err := os.Stat(filepath.Join(mara.SandboxPath, "ledger-api")); !os.IsNotExist(err) {
+		t.Errorf("a repo checked out at start: %v", err)
+	}
+	repo := filepath.Join(f.root, "dev", "ledger-api")
+	if out, _ := exec.Command("git", "-C", repo, "for-each-ref", "refs/heads/wt/", "refs/heads/lead/").Output(); len(out) > 0 {
+		t.Errorf("branches made at start: %s", out)
+	}
 }
 
 // A run frees only its own slot: the late end of a stopped run must not free
@@ -1656,7 +1664,7 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
-	if b := f.branch(worktree); b != "lead/ledger/atlas/integration" {
+	if b := f.branch(worktree); b != "HEAD" {
 		t.Errorf("the relinked worktree's branch %q", b)
 	}
 	if data, _ := os.ReadFile(filepath.Join(worktree, "work.txt")); string(data) != "mara's\n" {
@@ -1664,9 +1672,9 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 	}
 }
 
-// The same team on two projects that share a repo, at once: its branches
-// carry the project, so each agent works on its own (the CEO, 2026-11-03).
-// Stopped on one, it starts again on the other all the same.
+// The same team on two projects that share a repo, at once: each agent has its
+// own worktree on each (the CEO, 2026-11-03), idle on no branch, so nothing
+// collides. Stopped on one, it starts again on the other all the same.
 func TestATeamWorksOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	if _, _, err := f.hm.NewProject(ctx, "suite", "", filepath.Join(f.root, "workspace", "suite")); err != nil {
@@ -1686,10 +1694,10 @@ func TestATeamWorksOnTwoProjectsSharingARepo(t *testing.T) {
 		}
 	}
 	ledger, suite := f.waitStatus("mara@ledger", Running), f.waitStatus("mara@suite", Running)
-	if b := f.branch(filepath.Join(ledger.SandboxPath, "ledger-api")); b != "lead/ledger/atlas/integration" {
+	if b := f.branch(filepath.Join(ledger.SandboxPath, "ledger-api")); b != "HEAD" {
 		t.Errorf("on ledger: %q", b)
 	}
-	if b := f.branch(filepath.Join(suite.SandboxPath, "api")); b != "lead/suite/atlas/integration" {
+	if b := f.branch(filepath.Join(suite.SandboxPath, "api")); b != "HEAD" {
 		t.Errorf("on suite: %q", b)
 	}
 	// Stopped on ledger, its worktrees stay; on suite, its agents start anyway.
@@ -1700,7 +1708,7 @@ func TestATeamWorksOnTwoProjectsSharingARepo(t *testing.T) {
 		t.Fatal(err)
 	}
 	tove := f.waitStatus("tove@suite", Running)
-	if b := f.branch(filepath.Join(tove.SandboxPath, "api")); b != "wt/suite/tove/main" {
+	if b := f.branch(filepath.Join(tove.SandboxPath, "api")); b != "HEAD" {
 		t.Errorf("tove on suite: %q", b)
 	}
 	// atlas replaced on suite: another team's agents get their own branches there.

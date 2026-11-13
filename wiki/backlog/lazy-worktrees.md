@@ -1,6 +1,6 @@
 ---
 type: task
-status: in-progress
+status: done
 priority: high
 tags: [feature]
 epic: git
@@ -12,12 +12,13 @@ epic: git
 
 Done means an agent start makes no worktree and no branch, and the tools behave as the spec says.
 
-- [ ] Git: make a worktree detached at the default branch (`Prepare` without a branch); `Freshen` moves a clean detached worktree whose commit the default branch holds
-- [ ] Launch: reuse open worktrees only (relink, freshen), no `Prepare` per repo; keep mounting every repo's `.git`
-- [ ] `open(repo)` tool: on the branch the agent's other worktrees are on (made from the default when missing), else detached; then submodules; recorded as an action
-- [ ] Implicit opening: `switch` (repos that have the branch), `merge` (repos that have the branch), `set_submodule` (its repo); `switch` to a new branch with no repo open refuses
-- [ ] `commit`, `merge`, `set_submodule` refuse while detached: switch to a topic first
-- [ ] `freshenDesks` after a merge: detached worktrees, not home branches; drop `HomeBranch`/`IsHomeBranch` and the "home branch never goes" prune rule
-- [ ] Session prompt: no "you work on <home branch>"; says repos open on demand, how to read one unopened, and to switch to a topic before committing
-- [ ] Specs: team-tools, protocol (open tool, refusals), session-prompt, agent-runtime (start), project-team (worktree status of unopened repos)
-- [ ] Tests for each of the above
+- [x] Git: make a worktree detached at the default branch (`Prepare` without a branch); `Freshen` moves a clean detached worktree whose commit the default branch holds
+- [x] Launch: reuse open worktrees only (relink, freshen), no `Prepare` per repo; keep mounting every repo's `.git`. An agent with no team tools (no `open`) gets every repo, detached
+- [x] `open(repo)` tool: on the branch the agent's other worktrees are on (made from the default when missing), else detached; then submodules; recorded as an action
+- [x] Implicit opening: `switch` (repos that have the branch), `merge` (repos that have the branch), `set_submodule` (its repo); `switch` to a new branch with no repo open refuses
+- [x] `commit`, `merge`, `set_submodule` refuse while detached: switch to a topic first
+- [x] `freshenDesks` after a merge: detached worktrees, not home branches; drop `HomeBranch`/`IsHomeBranch` and the "home branch never goes" prune rule
+- [x] Session prompt: no "you work on <home branch>"; says repos open on demand, how to read one unopened, and to switch to a topic before committing
+- [x] Specs: team-tools, protocol (open tool, refusals), session-prompt, agent-runtime (start), project-team (worktree status of unopened repos)
+- [x] Team section and Clean up see idle worktrees: `GET …/repos` gives each repo's `idle` agents; Clean up removes a clean idle worktree like any other
+- [x] Tests for each of the above

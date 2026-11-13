@@ -47,26 +47,34 @@ export type Worktree = {
   agent: string;
   /** The branch checked out in each of its repos, in the repos' order. */
   branches: { repo: string; branch: RepoBranch }[];
+  /** Its repos open on no branch, in the repos' order. */
+  idle: { repo: string; uncommitted: boolean }[];
 };
 
-/** The agents' worktrees, from the branches checked out in each repo: one
- * per agent, by agent id. */
+/** The agents' worktrees, from the branches checked out in each repo and the
+ * repos open on none: one per agent, by agent id. An agent with no repo open
+ * has none. */
 export function worktrees(repos: Repo[]): Worktree[] {
   const by = new Map<string, Worktree>();
+  const of = (agent: string) => {
+    const w = by.get(agent) ?? { agent, branches: [], idle: [] };
+    by.set(agent, w);
+    return w;
+  };
   for (const repo of repos) {
     for (const branch of repo.branches) {
-      if (!branch.agent) continue;
-      const w = by.get(branch.agent) ?? { agent: branch.agent, branches: [] };
-      w.branches.push({ repo: repo.name, branch });
-      by.set(branch.agent, w);
+      if (branch.agent) of(branch.agent).branches.push({ repo: repo.name, branch });
+    }
+    for (const t of repo.idle) {
+      of(t.agent).idle.push({ repo: repo.name, uncommitted: t.uncommitted });
     }
   }
   return [...by.values()].sort((a, b) => a.agent.localeCompare(b.agent));
 }
 
 /** The branch an agent has checked out: one, since `switch` moves all its
- * repos together; each different one, should they ever differ. None with no
- * worktree yet. */
+ * repos together; each different one, should they ever differ. None while
+ * idle or with no repo open. */
 export function branchesOf(repos: Repo[], agent: string): string[] {
   const w = worktrees(repos).find((w) => w.agent === agent);
   return [...new Set(w?.branches.map((b) => b.branch.name))];

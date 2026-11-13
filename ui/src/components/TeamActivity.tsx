@@ -334,6 +334,12 @@ function ActionText({ action: a }: { action: TeamAction }) {
           {refused ? "tried to merge" : "merged"} <Ref>{a.branch}</Ref>
         </span>
       );
+    case "open":
+      return (
+        <span className="text-[12.5px] text-tx2">
+          {refused ? "tried to open" : "opened"} <Ref>{a.repos[0]?.repo ?? "a repo"}</Ref>
+        </span>
+      );
     case "abort_merge":
       return (
         <span className="text-[12.5px] text-tx2">

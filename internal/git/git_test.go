@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -194,6 +195,37 @@ func TestPrepareMakesAWorktreeOnANewBranch(t *testing.T) {
 	}
 	if b := branchOf(t, r); b != "main" {
 		t.Errorf("the CEO's checkout moved to %q", b)
+	}
+}
+
+// An idle worktree owns no branch: detached at the default branch's head, so any number of
+// agents idle on it at once, and no branch is made.
+func TestPrepareMakesADetachedWorktree(t *testing.T) {
+	r := codeRepo(t, "main")
+	g := New()
+	before := strings.Fields(mustRun(t, r, "for-each-ref", "--format=%(refname)", "refs/heads/"))
+	for _, agent := range []string{"mara", "tove"} {
+		wt := filepath.Join(t.TempDir(), agent, "api")
+		if err := g.Prepare(ctx, r, wt, "", "main"); err != nil {
+			t.Fatal(err)
+		}
+		if b := branchOf(t, wt); b != "" {
+			t.Errorf("%s on %q", agent, b)
+		}
+		if mustRun(t, wt, "rev-parse", "HEAD") != mustRun(t, r, "rev-parse", "main") {
+			t.Errorf("%s not at main", agent)
+		}
+	}
+	if after := strings.Fields(mustRun(t, r, "for-each-ref", "--format=%(refname)", "refs/heads/")); !slices.Equal(before, after) {
+		t.Errorf("branches made: %v", after)
+	}
+	if trees, err := g.Detached(ctx, r); err != nil || len(trees) != 2 {
+		t.Errorf("detached %v %v", trees, err)
+	}
+	for _, bad := range [][2]string{{"", "-x"}, {"-x", "main"}} {
+		if err := g.Prepare(ctx, r, filepath.Join(t.TempDir(), "x"), bad[0], bad[1]); !errors.Is(err, ErrBadBranch) {
+			t.Errorf("%q from %q: %v", bad[0], bad[1], err)
+		}
 	}
 }
 

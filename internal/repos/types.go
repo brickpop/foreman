@@ -11,6 +11,14 @@ type Repo struct {
 	Project  bool     `json:"project"` // the project repo (project/), listed last
 	Default  string   `json:"defaultBranch"`
 	Branches []Branch `json:"branches"` // the default first, then newest commit first
+	Idle     []Idle   `json:"idle"`     // the agents' worktrees of it on no branch, by agent
+}
+
+// Idle is an agent's worktree of a repo that sits on no branch: opened, and no
+// topic yet (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo).
+type Idle struct {
+	Agent       string `json:"agent"`
+	Uncommitted bool   `json:"uncommitted"` // it has changes not committed yet
 }
 
 // Branch is one branch of a repo.

@@ -30,6 +30,8 @@ var (
 	ErrBadBranch = errors.New("git: not a valid branch name")
 	// ErrNoMerge means there is no unfinished merge to abort.
 	ErrNoMerge = errors.New("git: no merge in progress")
+	// ErrNotDetached: the worktree is on a branch, not idle.
+	ErrNotDetached = errors.New("git: the worktree is on a branch")
 )
 
 // ConflictsError lists the files of an unfinished merge that still hold
@@ -63,22 +65,6 @@ func BranchPrefix(project, agent, team string, lead bool) string {
 // repo's default branch.
 func AgentBranch(branch string) bool {
 	return strings.HasPrefix(branch, "wt/") || strings.HasPrefix(branch, "lead/")
-}
-
-// HomeBranch is where an agent's worktree starts and idles: main under its
-// prefix for a member, integration for the lead.
-func HomeBranch(project, agent, team string, lead bool) string {
-	if lead {
-		return BranchPrefix(project, agent, team, lead) + "integration"
-	}
-	return BranchPrefix(project, agent, team, lead) + "main"
-}
-
-// IsHomeBranch reports whether branch is some agent's HomeBranch.
-func IsHomeBranch(branch string) bool {
-	parts := strings.Split(branch, "/")
-	return len(parts) == 4 && parts[1] != "" && parts[2] != "" &&
-		(parts[0] == "wt" && parts[3] == "main" || parts[0] == "lead" && parts[3] == "integration")
 }
 
 // HasBranch reports whether the repo of dir has the branch.
@@ -188,41 +174,32 @@ func (g *CLI) Merging(ctx context.Context, dir string) (bool, error) {
 	return err == nil, nil
 }
 
-// Freshen moves branch up to where branch def is, when it holds nothing def
-// lacks (merging it would change nothing) and the worktree that has it
-// checked out, if one does, holds nothing not committed: an idle desk follows
-// the default branch. moved says it did.
-func (g *CLI) Freshen(ctx context.Context, repo, branch, def string) (moved bool, err error) {
-	if !ValidBranch(ctx, branch) || !ValidBranch(ctx, def) {
+// Freshen moves an idle worktree, detached on no branch, up to the head of
+// branch def, when its commit is in def's history and it holds nothing not
+// committed: an idle desk follows the default branch. A worktree on a branch
+// stays as it is. moved says it did.
+func (g *CLI) Freshen(ctx context.Context, worktree, def string) (moved bool, err error) {
+	if !ValidBranch(ctx, def) {
 		return false, ErrBadBranch
 	}
-	defer g.lock(ctx, repo)()
-	return g.freshen(ctx, repo, branch, def)
+	defer g.lock(ctx, worktree)()
+	return g.freshen(ctx, worktree, def)
 }
 
-func (g *CLI) freshen(ctx context.Context, repo, branch, def string) (bool, error) {
-	if !g.HasBranch(ctx, repo, branch) {
-		return false, nil
+func (g *CLI) freshen(ctx context.Context, tree, def string) (bool, error) {
+	if on, err := g.Branch(ctx, tree); err != nil || on != "" {
+		return false, err
 	}
-	head, err := g.Resolve(ctx, repo, "refs/heads/"+branch)
+	head, err := g.Resolve(ctx, tree, "HEAD")
 	if err != nil {
 		return false, err
 	}
-	target, err := g.Resolve(ctx, repo, "refs/heads/"+def)
+	target, err := g.Resolve(ctx, tree, "refs/heads/"+def)
 	if err != nil || head == target {
 		return false, err
 	}
-	if merged, err := g.Merged(ctx, repo, def, branch); err != nil || !merged {
+	if in, err := g.InHistory(ctx, tree, def, head); err != nil || !in {
 		return false, err
-	}
-	trees, err := g.Worktrees(ctx, repo)
-	if err != nil {
-		return false, err
-	}
-	tree, ok := trees[branch]
-	if !ok {
-		_, err = run(ctx, repo, "update-ref", "refs/heads/"+branch, target, head)
-		return err == nil, err
 	}
 	if clean, err := g.Clean(ctx, tree); err != nil || !clean {
 		return false, err
@@ -364,7 +341,29 @@ func (g *CLI) Merge(ctx context.Context, dir, branch string, by Author) (conflic
 	return nil, nil
 }
 
-// Branch is the branch checked out in the worktree.
+// Name puts an idle worktree (detached, on no branch) on a new branch made
+// where it stands, keeping what it holds not committed: an agent that started
+// editing while idle names its topic (ErrNotDetached on a branch,
+// ErrBranchExists when the repo has the branch).
+func (g *CLI) Name(ctx context.Context, dir, branch string) error {
+	if !ValidBranch(ctx, branch) {
+		return ErrBadBranch
+	}
+	defer g.lock(ctx, dir)()
+	if on, err := g.Branch(ctx, dir); err != nil {
+		return err
+	} else if on != "" {
+		return ErrNotDetached
+	}
+	if g.HasBranch(ctx, dir, branch) {
+		return ErrBranchExists
+	}
+	_, err := run(ctx, dir, "checkout", "--quiet", "-b", branch)
+	return err
+}
+
+// Branch is the branch checked out in the worktree: "" when it is on none
+// (detached: an idle worktree).
 func (g *CLI) Branch(ctx context.Context, dir string) (string, error) {
 	out, err := run(ctx, dir, "branch", "--show-current")
 	return strings.TrimSpace(out), err

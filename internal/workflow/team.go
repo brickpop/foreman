@@ -82,7 +82,7 @@ func (w *Workflow) checkouts(ctx context.Context, project home.Project, sandbox 
 			each = append(each, r.name+" unreadable: "+err.Error())
 			continue
 		}
-		s := r.name + " on " + on
+		s := r.name + " " + onBranch(on)
 		if merging, err := w.Git.Merging(ctx, r.dir); err == nil && merging {
 			s += ", merge under way"
 		} else if clean, err := w.Git.Clean(ctx, r.dir); err == nil && !clean {

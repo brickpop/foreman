@@ -107,7 +107,7 @@ export interface TeamMessage {
   deliveredAt: string /* RFC 3339 */; // zero while queued
 }
 /**
- * TeamAction is one git tool an agent called (switch, commit, merge,
+ * TeamAction is one git tool an agent called (open, switch, commit, merge,
  * abort_merge, discard, set_submodule, request_merge, withdraw_merge) and
  * what it did (wiki/product/architecture/protocol.md#team-actions).
  */

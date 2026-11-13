@@ -342,27 +342,55 @@ func TestHolders(t *testing.T) {
 	}
 }
 
-func TestBranchNames(t *testing.T) {
+func TestBranchPrefix(t *testing.T) {
 	for _, tc := range []struct {
 		project, agent, team string
 		lead                 bool
-		prefix, home         string
+		prefix               string
 	}{
-		{"ledger", "tove", "atlas", false, "wt/ledger/tove/", "wt/ledger/tove/main"},
-		{"ledger", "mara", "atlas", true, "lead/ledger/atlas/", "lead/ledger/atlas/integration"},
-		{"suite", "mara", "atlas", true, "lead/suite/atlas/", "lead/suite/atlas/integration"},
+		{"ledger", "tove", "atlas", false, "wt/ledger/tove/"},
+		{"ledger", "mara", "atlas", true, "lead/ledger/atlas/"},
+		{"suite", "mara", "atlas", true, "lead/suite/atlas/"},
 	} {
 		if got := BranchPrefix(tc.project, tc.agent, tc.team, tc.lead); got != tc.prefix {
 			t.Errorf("prefix %+v: %q", tc, got)
 		}
-		if got := HomeBranch(tc.project, tc.agent, tc.team, tc.lead); got != tc.home || !IsHomeBranch(got) {
-			t.Errorf("home %+v: %q", tc, got)
-		}
 	}
-	// The old names, a topic, a part missing or another kind aren't anyone's home.
-	for _, b := range []string{"wt/tove/main", "lead/atlas/integration", "wt/ledger/tove/LED-44", "wt//tove/main", "wt/ledger//main", "lead/ledger/atlas/main", "wt/ledger/tove/integration", "release/ledger/x/main", "wt/ledger/tove/main/x"} {
-		if IsHomeBranch(b) {
-			t.Errorf("%s taken for a home branch", b)
-		}
+}
+
+// An idle worktree with edits names its topic where it stands, the edits kept; a worktree on a
+// branch, or a name taken, is refused and nothing moves.
+func TestName(t *testing.T) {
+	r := codeRepo(t, "main")
+	g := New()
+	wt := filepath.Join(t.TempDir(), "tove")
+	if err := g.Prepare(ctx, r, wt, "", "main"); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(wt, "README"), "edited while idle\n")
+	if err := g.Name(ctx, wt, "wt/tove/LED-1"); err != nil {
+		t.Fatal(err)
+	}
+	if on, _ := g.Branch(ctx, wt); on != "wt/tove/LED-1" {
+		t.Errorf("on %q", on)
+	}
+	if data, _ := os.ReadFile(filepath.Join(wt, "README")); string(data) != "edited while idle\n" {
+		t.Errorf("the edit was lost: %q", data)
+	}
+	if err := g.Name(ctx, wt, "wt/tove/LED-2"); !errors.Is(err, ErrNotDetached) {
+		t.Errorf("on a branch: %v", err)
+	}
+	other := filepath.Join(t.TempDir(), "mara")
+	if err := g.Prepare(ctx, r, other, "", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Name(ctx, other, "wt/tove/LED-1"); !errors.Is(err, ErrBranchExists) {
+		t.Errorf("taken: %v", err)
+	}
+	if on, _ := g.Branch(ctx, other); on != "" {
+		t.Errorf("moved to %q", on)
+	}
+	if err := g.Name(ctx, other, "-x"); !errors.Is(err, ErrBadBranch) {
+		t.Errorf("option-like: %v", err)
 	}
 }

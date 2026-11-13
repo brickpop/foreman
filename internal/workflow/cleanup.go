@@ -59,8 +59,22 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 		if err != nil {
 			return out, err
 		}
-		agents := map[string]bool{}
+		// Those on a branch, by branch, and the idle ones, on none ("").
+		type tree struct{ branch, dir string }
+		var all []tree
 		for branch, dir := range trees {
+			all = append(all, tree{branch, dir})
+		}
+		idle, err := w.Git.Detached(ctx, r.Path)
+		if err != nil {
+			return out, err
+		}
+		for _, dir := range idle {
+			all = append(all, tree{"", dir})
+		}
+		agents := map[string]bool{}
+		for _, t := range all {
+			branch, dir := t.branch, t.dir
 			agent := home.WorktreeAgent(dir, func(agent string) string { return w.Config.Sandbox(p.ID, agent) })
 			if agent == "" || running[agent] {
 				continue

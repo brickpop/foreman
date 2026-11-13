@@ -188,6 +188,25 @@ func (g *CLI) Worktrees(ctx context.Context, dir string) (map[string]string, err
 	return trees, nil
 }
 
+// Detached lists the repo's worktrees on no branch (detached), by path.
+func (g *CLI) Detached(ctx context.Context, dir string) ([]string, error) {
+	out, err := run(ctx, dir, "worktree", "list", "--porcelain")
+	if err != nil {
+		return nil, err
+	}
+	var trees []string
+	var at string
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case strings.HasPrefix(line, "worktree "):
+			at = strings.TrimPrefix(line, "worktree ")
+		case line == "detached":
+			trees = append(trees, at)
+		}
+	}
+	return trees, nil
+}
+
 // RecentBranches lists the repo's branches by their last commit, newest
 // first (by name when two were committed at the same second).
 func (g *CLI) RecentBranches(ctx context.Context, dir string) ([]string, error) {

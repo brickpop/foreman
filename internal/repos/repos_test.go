@@ -52,7 +52,8 @@ func write(t *testing.T, path, content string) {
 
 // fixture: ledger with code repo api (main is trunk) and its project repo;
 // tove works on wt/tove/x in a worktree, one commit ahead and an edit not
-// committed; outside.txt sits beside the repos.
+// committed; ivo has api open on no branch, with an edit, and mara with none;
+// outside.txt sits beside the repos.
 func fixture(t *testing.T) Browser {
 	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
@@ -72,6 +73,12 @@ func fixture(t *testing.T) Browser {
 	t.Setenv("GIT_COMMITTER_DATE", "2030-01-01T10:00:00Z") // newer than trunk, whatever the clock
 	gitIn(t, tree, "commit", "--quiet", "-m", "x")
 	write(t, filepath.Join(tree, "x.go"), "package x // edited\n")
+	for _, agent := range []string{"mara", "ivo"} {
+		gitIn(t, api, "worktree", "add", "--quiet", "--detach", filepath.Join(root, "ledger", ".sandboxes", agent, "api"), "trunk")
+	}
+	write(t, filepath.Join(root, "ledger", ".sandboxes", "ivo", "api", "idea.txt"), "not committed\n")
+	// The CEO's own, elsewhere: nobody's.
+	gitIn(t, api, "worktree", "add", "--quiet", "--detach", filepath.Join(root, "ceo-api"), "trunk")
 	project := filepath.Join(root, "ledger", "project")
 	gitIn(t, root, "init", "--quiet", "--initial-branch=main", project)
 	write(t, filepath.Join(project, "project.toml"), "project = \"ledger\"\n")
@@ -100,6 +107,12 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 	// trunk is checked out in the CEO's own checkout: no agent's.
 	if trunk := api.Branches[0]; trunk.Agent != "" {
 		t.Errorf("trunk %+v", trunk)
+	}
+	if want := []Idle{{Agent: "ivo", Uncommitted: true}, {Agent: "mara"}}; !reflect.DeepEqual(api.Idle, want) {
+		t.Errorf("idle %+v, want %+v", api.Idle, want)
+	}
+	if list[1].Idle == nil || len(list[1].Idle) != 0 {
+		t.Errorf("the project repo's idle: %#v, want empty", list[1].Idle)
 	}
 	if _, err := b.Repos(ctx, "nope"); !errors.Is(err, home.ErrNotFound) {
 		t.Errorf("unknown project: %v", err)

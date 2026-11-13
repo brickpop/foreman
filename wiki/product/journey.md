@@ -42,7 +42,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 
 **9. Deploy.** Team → **Deploy to a project** → `ledger` → **Deploy**. The goal isn't asked: it is ledger's, in its wiki's `backlog/index.md`, none yet.
 - *Under the hood:* the deployment is stored (State store). Instance manager `Ensure(deployment)`, for each member:
-  1. Git `Prepare`: a worktree of `ledger-api` at `~/workspace/foreman/ledger/agents/<agent>/ledger-api` (`git worktree add` on the host), on `wt/<project>/<agent>/main`; Mara's is on `lead/ledger/atlas/integration`.
+  1. Nothing checked out yet: each agent opens `ledger-api` the first time it needs it (`open`, or a `switch` or `merge` that needs it), a worktree at `~/workspace/foreman/ledger/agents/<agent>/ledger-api` (`git worktree add` on the host), idle on no branch until it switches to a topic.
   2. Image builder `Ensure(ledger)` → the image ledger's agents run on (`localhost/foreman/harness` while every project shares one).
   3. Harness adapter `Launch`: the session prompt (soul + team + project, pointing to the goal in the wiki) as the instance's `CLAUDE.md`, the MCP config pointing at `foreman-agent`, the hooks config.
   4. Agent link: registers the instance's token.

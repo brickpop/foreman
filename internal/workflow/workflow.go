@@ -37,6 +37,8 @@ type Git interface {
 	HasRemoteBranch(ctx context.Context, dir, branch string) bool
 	FetchRemotes(ctx context.Context, dir string) ([]git.RemoteChange, error)
 	Switch(ctx context.Context, dir, branch, base string) (bool, error)
+	Name(ctx context.Context, dir, branch string) error
+	Prepare(ctx context.Context, repo, worktree, branch, base string) error
 	CommitAll(ctx context.Context, dir, message string, by git.Author) (string, error)
 	CommitAs(ctx context.Context, dir, message string, by git.Author, files ...string) error
 	Merge(ctx context.Context, dir, branch string, by git.Author) ([]string, error)
@@ -53,7 +55,8 @@ type Git interface {
 	DropBranch(ctx context.Context, dir, branch, backup, def string) error
 	DeleteBranch(ctx context.Context, dir, branch, backup string) error
 	Discard(ctx context.Context, worktree, backup string) (bool, error)
-	Freshen(ctx context.Context, repo, branch, def string) (bool, error)
+	Freshen(ctx context.Context, worktree, def string) (bool, error)
+	Detached(ctx context.Context, dir string) ([]string, error)
 	PruneBackups(ctx context.Context, dir string, before time.Time) error
 	Worktrees(ctx context.Context, dir string) (map[string]string, error)
 	RemoveWorktree(ctx context.Context, repo, worktree string) error
@@ -150,14 +153,16 @@ func object(props string, required ...string) json.RawMessage {
 }
 
 var definitions = []agentlink.Tool{
-	{Name: "switch", Description: "Switch your worktrees, in every repo, to one of your branches. A new one is made from from (any branch, remote branch or commit) in every repo that has it, and from the repo's default branch where it hasn't or when from is left out. Commit first: a switch never carries changes along.",
+	{Name: "open", Description: "Check one of the project's code repos out in your sandbox, at <sandbox>/<repo>, the first time you need its files: on the branch your other repos are on, or on no branch (at its default branch's head) while you're idle. Until then, read it through its git without opening it (git -C <repo path> show main:<file>). switch, merge and set_submodule open the repos they need on their own.",
+		InputSchema: object(`"repo":{"type":"string","description":"The repo's name, e.g. api"}`, "repo")},
+	{Name: "switch", Description: "Switch your open repos to one of your branches, and open those not open that have it. A new one is made from from (any branch, remote branch or commit) in every repo that has it, and from the repo's default branch where it hasn't or when from is left out. Commit first: a switch never carries changes along, except from no branch (idle) to a new one with no from, made where you are. With no repo open, open(repo) first.",
 		InputSchema: object(`"branch":{"type":"string","description":"One of your branches: wt/<project>/<you>/<topic> for a member, lead/<project>/<team>/<topic> for the lead"},`+
 			`"from":{"type":"string","description":"Only for a new branch: where its work starts, e.g. release/2.0, a teammate's branch or a commit; best where it will be merged into, or the review shows what it brings along"}`, "branch")},
 	{Name: "commit", Description: "Commit everything you changed in each repo you name, on the branch checked out there, with that repo's message (git is read-only for you); repos you don't name are left as they are. After a merge with conflicts, committing a repo concludes its merge once no conflict markers are left.",
 		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
 			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; project for the project repo (the lead only)"},`+
 			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
-	{Name: "merge", Description: "Merge any branch (the CEO's, the lead's, a teammate's, or a remote's that fetch() brought, e.g. origin/main) into yours, in every repo that has it. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
+	{Name: "merge", Description: "Merge any branch (the CEO's, the lead's, a teammate's, or a remote's that fetch() brought, e.g. origin/main) into yours, in every repo that has it, opening those not open. Not while you're on no branch: switch first. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
 	{Name: "discard", Description: "Throw away what you changed and didn't commit, in each repo you name (all of them if none): its files go back to the branch as committed, new files removed (ignored ones stay). Foreman keeps a copy. After a merge, abort_merge() first.",
 		InputSchema: object(`"repos":{"type":"array","items":{"type":"string"},"description":"Your repos' folders, e.g. api; all of them when left out"}`)},
@@ -195,7 +200,7 @@ var definitions = []agentlink.Tool{
 			`"superseded_by":{"type":"string","description":"Only when another of your lead branches, with its own review open, holds all of this one: that branch"}`, "branch", "reason")},
 	{Name: "fetch", Description: "Fetch every remote of each repo: what was pushed upstream shows as its remote's branches (origin/main), which you merge in with merge(\"origin/main\"). Your branches and the CEO's don't move.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
-	{Name: "prune", Description: "Delete your branches whose work is merged (all of it in one of the CEO's branches, or upstream) or superseded (all of it in another branch), in every repo; the lead also deletes its teammates' merged ones, and those superseded by another branch of the same teammate. A branch of your own named in branches goes even unmerged. Never a home branch, one anyone has checked out, or one under review. Foreman keeps a copy of each for 30 days.",
+	{Name: "prune", Description: "Delete your branches whose work is merged (all of it in one of the CEO's branches, or upstream) or superseded (all of it in another branch), in every repo; the lead also deletes its teammates' merged ones, and those superseded by another branch of the same teammate. A branch of your own named in branches goes even unmerged. Never one anyone has checked out, or one under review. Foreman keeps a copy of each for 30 days.",
 		InputSchema: object(`"branches":{"type":"array","items":{"type":"string"},"description":"Optional: branches to delete even if not merged, each one of yours, e.g. wt/<project>/<you>/<topic> or lead/<project>/<team>/<topic>"}`)},
 	{Name: "reviews", Description: "Where your reviews stand: the open ones and those decided in the last 7 days, each repo's state, and while changes are requested, the CEO's note and comments, each on its line now. Read-only.",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`)},
@@ -246,6 +251,9 @@ func (w *Workflow) Call(ctx context.Context, c teamtools.Caller, name string, ar
 	t := tool{w: w, c: c, project: project, act: act}
 	var res agentlink.Result
 	switch name {
+	case "open":
+		act.Repos = []store.ActionRepo{{Repo: strings.TrimSpace(a.Repo)}} // named even when refused
+		res = t.openRepo(ctx, act.Repos[0].Repo)
 	case "switch":
 		act.Branch = strings.TrimSpace(a.Branch)
 		res = t.switchTo(ctx, act.Branch, strings.TrimSpace(a.From))
@@ -341,6 +349,70 @@ func worktreesIn(project home.Project, sandbox string) []repo {
 	return repos
 }
 
+// unopened are the project's code repos the caller has no worktree of yet.
+func (t tool) unopened() []home.Repo {
+	var out []home.Repo
+	for _, r := range t.project.Repos {
+		if _, err := os.Stat(filepath.Join(t.c.Instance.SandboxPath, r.Name, ".git")); err != nil {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// current is the branch the caller's open worktrees are on: "" while it is
+// idle (detached) or has none open. They move together, so the first says.
+func (t tool) current(ctx context.Context) string {
+	for _, r := range t.worktrees() {
+		if on, err := t.w.Git.Branch(ctx, r.dir); err == nil && on != "" {
+			return on
+		}
+	}
+	return ""
+}
+
+// open makes the caller's worktree of a code repo, on branch (made from the
+// repo's default when the repo lacks it), or detached at the default for ""
+// (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo).
+func (t tool) open(ctx context.Context, r home.Repo, branch string) (repo, error) {
+	wt := repo{r.Name, filepath.Join(t.c.Instance.SandboxPath, r.Name)}
+	if err := t.w.Git.Prepare(ctx, r.Path, wt.dir, branch, t.project.Default(r.Name)); err != nil {
+		return wt, fmt.Errorf("opening %s: %w", r.Name, err)
+	}
+	return wt, nil
+}
+
+// stillClosed tells the agent which repos it hasn't opened, so it knows to
+// open one its work needs (with a leading space; "" when all are open).
+func (t tool) stillClosed() string {
+	var names []string
+	for _, r := range t.unopened() {
+		names = append(names, r.Name)
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	return " Not open: " + strings.Join(names, ", ") + ": open(repo) any your work needs."
+}
+
+// idle refuses (ok false) an action that commits while a repo is on no
+// branch: an idle worktree is detached, and a commit there would be on no
+// branch at all.
+func (t tool) idle(ctx context.Context, repos []repo, what string) (agentlink.Result, bool) {
+	var detached []string
+	for _, r := range repos {
+		if on, err := t.w.Git.Branch(ctx, r.dir); err != nil {
+			return gitError(err), false
+		} else if on == "" {
+			detached = append(detached, r.name)
+		}
+	}
+	if len(detached) > 0 {
+		return teamtools.Refusal("no_branch", "%s on no branch (idle): switch(<topic>) first, then %s; uncommitted changes come along to a new topic", strings.Join(detached, ", "), what), false
+	}
+	return agentlink.Result{}, true
+}
+
 func (t tool) projectRepo() repo {
 	return repo{"project", t.project.Path}
 }
@@ -427,6 +499,44 @@ func names(repos []repo) string {
 	return strings.Join(n, ", ")
 }
 
+// openRepo is the open tool: the caller's worktree of a code repo, on the
+// branch its other worktrees are on, or detached at the default while idle.
+func (t tool) openRepo(ctx context.Context, name string) agentlink.Result {
+	i := slices.IndexFunc(t.project.Repos, func(r home.Repo) bool { return r.Name == name })
+	if i < 0 {
+		var all []string
+		for _, r := range t.project.Repos {
+			all = append(all, r.Name)
+		}
+		return teamtools.Refusal("unknown_repo", "%q isn't a code repo of this project: they are %s", name, strings.Join(all, ", "))
+	}
+	r := t.project.Repos[i]
+	dir := filepath.Join(t.c.Instance.SandboxPath, r.Name)
+	if !slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.Name == name }) {
+		on, _ := t.w.Git.Branch(ctx, dir)
+		return agentlink.Result{Text: fmt.Sprintf("%s is open already, at %s, %s.", name, dir, onBranch(on))}
+	}
+	branch := t.current(ctx)
+	wt, err := t.open(ctx, r, branch)
+	if err != nil {
+		return gitError(err)
+	}
+	t.act.Repos = []store.ActionRepo{{Repo: name, Branch: branch}}
+	text := fmt.Sprintf("Opened %s at %s, %s.", name, wt.dir, onBranch(branch))
+	if branch == "" {
+		text += " Switch to a topic before you commit there."
+	}
+	return agentlink.Result{Text: text + t.synced(ctx, []repo{wt})}
+}
+
+// onBranch says where a worktree is: on its branch, or idle on none.
+func onBranch(branch string) string {
+	if branch == "" {
+		return "idle on no branch, at its default branch's head"
+	}
+	return "on " + branch
+}
+
 func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Result {
 	if !git.ValidBranch(ctx, branch) {
 		return teamtools.Refusal("bad_branch", "%q isn't a valid branch name", branch)
@@ -435,8 +545,15 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 		return teamtools.Refusal("branch_not_allowed", "%s isn't one of your branches: yours are %s", branch, pattern)
 	}
 	repos := t.worktrees()
-	if len(repos) == 0 {
-		return teamtools.Refusal("no_repos", "you have no worktree in this project")
+	// The repos not open yet that have the branch: they open on it.
+	var closed []home.Repo
+	for _, r := range t.unopened() {
+		if t.w.Git.HasBranch(ctx, r.Path, branch) {
+			closed = append(closed, r)
+		}
+	}
+	if len(repos) == 0 && len(closed) == 0 {
+		return teamtools.Refusal("no_repos", "none of your repos is open, and none has %s yet: open(repo) the repos the work is in first", branch)
 	}
 	// Where it starts, per repo: from where the repo has it, else the default.
 	bases := map[string]string{}
@@ -448,15 +565,38 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 			}
 		}
 	}
-	if from != "" && !slices.ContainsFunc(repos, func(r repo) bool { return bases[r.name] == from }) {
+	if from != "" && len(repos) > 0 && !slices.ContainsFunc(repos, func(r repo) bool { return bases[r.name] == from }) {
 		return teamtools.Refusal("no_such_ref", "none of your repos has %s: name a branch, a remote's branch (fetch() first) or a commit", from)
 	}
+	// An idle worktree going to a new branch from where it stands names it
+	// there, keeping its changes: the agent started editing before its topic.
+	naming := map[string]bool{}
+	var moving []repo
+	for _, r := range repos {
+		on, err := t.w.Git.Branch(ctx, r.dir)
+		if err != nil {
+			return gitError(fmt.Errorf("%s: %w", r.name, err))
+		}
+		if on == "" && from == "" && !t.w.Git.HasBranch(ctx, r.dir, branch) {
+			naming[r.name] = true
+		} else {
+			moving = append(moving, r)
+		}
+	}
 	// Checked in every repo first, so a switch never stops halfway.
-	if res, ok := t.unsettled(ctx, repos, "a switch never carries changes along"); !ok {
+	if res, ok := t.unsettled(ctx, moving, "a switch never carries changes along"); !ok {
 		return res
 	}
-	var created []string
+	var created, opened []string
 	for _, r := range repos {
+		if naming[r.name] {
+			if err := t.w.Git.Name(ctx, r.dir, branch); err != nil {
+				return gitError(fmt.Errorf("%s: %w", r.name, err))
+			}
+			t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.name, Branch: branch, Created: true})
+			created = append(created, fmt.Sprintf("%s (where it was idle, changes kept)", r.name))
+			continue
+		}
 		base := bases[r.name]
 		made, err := t.w.Git.Switch(ctx, r.dir, branch, base)
 		if err != nil {
@@ -467,13 +607,25 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 			created = append(created, fmt.Sprintf("%s (from %s)", r.name, base))
 		}
 	}
+	for _, r := range closed {
+		wt, err := t.open(ctx, r, branch)
+		if err != nil {
+			return gitError(err)
+		}
+		repos = append(repos, wt)
+		opened = append(opened, r.Name)
+		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.Name, Branch: branch})
+	}
 	text := fmt.Sprintf("Switched %s to %s.", names(repos), branch)
 	if len(created) > 0 {
 		text += fmt.Sprintf(" New in %s.", strings.Join(created, ", "))
 	} else if from != "" {
 		text += fmt.Sprintf(" It existed already, so from (%s) changed nothing.", from)
 	}
-	return agentlink.Result{Text: text + t.synced(ctx, repos)}
+	if len(opened) > 0 {
+		text += fmt.Sprintf(" Opened %s, which had it.", strings.Join(opened, ", "))
+	}
+	return agentlink.Result{Text: text + t.synced(ctx, repos) + t.stillClosed()}
 }
 
 // committable are the repos the caller may commit, by name: its worktrees,
@@ -504,6 +656,9 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 		a := &asked[i]
 		a.Message = withoutAttribution(a.Message)
 		if _, ok := repos[a.Repo]; !ok {
+			if slices.ContainsFunc(t.unopened(), func(r home.Repo) bool { return r.Name == a.Repo }) {
+				return teamtools.Refusal("not_open", "%s isn't open, so nothing changed there: open(%s) to work in it", a.Repo, a.Repo)
+			}
 			names := slices.Sorted(maps.Keys(repos))
 			return teamtools.Refusal("unknown_repo", "%q isn't one of your repos: yours are %s", a.Repo, strings.Join(names, ", "))
 		}
@@ -514,6 +669,15 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 		if a.Message == "" {
 			return teamtools.Refusal("empty", "give %s a commit message", a.Repo)
 		}
+	}
+	var code []repo
+	for _, a := range asked {
+		if a.Repo != t.projectRepo().name {
+			code = append(code, repos[a.Repo])
+		}
+	}
+	if res, ok := t.idle(ctx, code, "commit"); !ok {
+		return res
 	}
 	var done, unchanged, conflicts, unsettled, nested []string
 	for i := range asked {
@@ -590,28 +754,49 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 	}
 	// A local branch, else the remote-tracking one a fetch() made (origin/main),
 	// named in full so git never guesses between the two.
+	// Every code repo that has it, open or not: one not open opens for it.
 	var repos []repo
+	var closed []home.Repo
 	refs := map[string]string{}
-	for _, r := range t.worktrees() {
+	for _, r := range t.project.Repos {
 		switch {
-		case t.w.Git.HasBranch(ctx, r.dir, branch):
-			refs[r.dir] = "refs/heads/" + branch
-		case t.w.Git.HasRemoteBranch(ctx, r.dir, branch):
-			refs[r.dir] = "refs/remotes/" + branch
+		case t.w.Git.HasBranch(ctx, r.Path, branch):
+			refs[r.Name] = "refs/heads/" + branch
+		case t.w.Git.HasRemoteBranch(ctx, r.Path, branch):
+			refs[r.Name] = "refs/remotes/" + branch
 		default:
 			continue
 		}
-		repos = append(repos, r)
+		if slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.Name == r.Name }) {
+			closed = append(closed, r)
+		} else {
+			repos = append(repos, repo{r.Name, filepath.Join(t.c.Instance.SandboxPath, r.Name)})
+		}
 	}
-	if len(repos) == 0 {
+	if len(repos) == 0 && len(closed) == 0 {
 		return teamtools.Refusal("branch_not_found", "no branch %q in your repos", branch)
+	}
+	// Into the branch the caller is on: never while idle, on none.
+	into := t.current(ctx)
+	if into == "" {
+		return teamtools.Refusal("no_branch", "you're on no branch (idle): switch(<topic>) first, then merge %s into it", branch)
+	}
+	if res, ok := t.idle(ctx, repos, "merge"); !ok {
+		return res
 	}
 	if res, ok := t.unsettled(ctx, repos, "a merge never mixes with unsaved work"); !ok {
 		return res
 	}
+	for _, r := range closed {
+		wt, err := t.open(ctx, r, into)
+		if err != nil {
+			return gitError(err)
+		}
+		repos = append(repos, wt)
+	}
 	var merged, conflicted []string
 	for _, r := range repos {
-		files, err := t.w.Git.Merge(ctx, r.dir, refs[r.dir], t.author())
+		files, err := t.w.Git.Merge(ctx, r.dir, refs[r.name], t.author())
 		if err != nil {
 			return gitError(fmt.Errorf("%s: %w", r.name, err))
 		}
@@ -838,18 +1023,31 @@ func (t tool) discard(ctx context.Context, asked []string) agentlink.Result {
 // (adding it from url first), committed on its branch, or staged during a
 // merge (wiki/product/architecture/sandboxes-and-git.md#submodules).
 func (t tool) setSubmodule(ctx context.Context, name, path, ref, url string) agentlink.Result {
-	var r repo
-	repos := t.worktrees()
-	for _, w := range repos {
-		if w.name == name {
-			r = w
-		}
-	}
+	i := slices.IndexFunc(t.project.Repos, func(r home.Repo) bool { return r.Name == name })
 	switch {
-	case r.dir == "":
-		return teamtools.Refusal("unknown_repo", "%q isn't one of your code repos: yours are %s", name, names(repos))
+	case i < 0:
+		var all []string
+		for _, r := range t.project.Repos {
+			all = append(all, r.Name)
+		}
+		return teamtools.Refusal("unknown_repo", "%q isn't one of your code repos: yours are %s", name, strings.Join(all, ", "))
 	case path == "" || ref == "":
 		return teamtools.Refusal("empty", "give the submodule's path and the ref to put it on")
+	}
+	// Committed on the caller's branch: never while idle. A repo not open
+	// opens on that branch.
+	into := t.current(ctx)
+	if into == "" {
+		return teamtools.Refusal("no_branch", "you're on no branch (idle): switch(<topic>) first, then set the submodule")
+	}
+	r := repo{name, filepath.Join(t.c.Instance.SandboxPath, name)}
+	if slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.Name == name }) {
+		var err error
+		if r, err = t.open(ctx, t.project.Repos[i], into); err != nil {
+			return gitError(err)
+		}
+	} else if res, ok := t.idle(ctx, []repo{r}, "set the submodule"); !ok {
+		return res
 	}
 	message := fmt.Sprintf("Move submodule %s to %s", path, ref)
 	if url != "" {

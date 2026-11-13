@@ -108,68 +108,71 @@ func TestDiscard(t *testing.T) {
 
 func TestFreshen(t *testing.T) {
 	g, dir := mergeFixture(t)
-	mustRun(t, dir, "branch", "wt/tove/main", "main")
 	wt := filepath.Join(t.TempDir(), "tove")
-	mustRun(t, dir, "worktree", "add", "-q", wt, "wt/tove/main")
+	mustRun(t, dir, "worktree", "add", "-q", "--detach", wt, "main")
 	write(t, filepath.Join(dir, "README"), "moved on\n")
 	mustRun(t, dir, "commit", "-q", "-am", "main moves")
 	main := mustRun(t, dir, "rev-parse", "main")
 
 	// Changes not committed: the desk isn't idle.
 	write(t, filepath.Join(wt, "scratch.txt"), "x\n")
-	if moved, err := g.Freshen(ctx, dir, "wt/tove/main", "main"); err != nil || moved {
+	if moved, err := g.Freshen(ctx, wt, "main"); err != nil || moved {
 		t.Errorf("moved over changes: %v %v", moved, err)
 	}
 	if err := os.Remove(filepath.Join(wt, "scratch.txt")); err != nil {
 		t.Fatal(err)
 	}
-	// Idle, behind main: it follows, the worktree with it.
-	if moved, err := g.Freshen(ctx, dir, "wt/tove/main", "main"); err != nil || !moved {
+	// Idle, behind main: it follows, still on no branch.
+	if moved, err := g.Freshen(ctx, wt, "main"); err != nil || !moved {
 		t.Fatalf("idle: %v %v", moved, err)
 	}
-	if mustRun(t, wt, "rev-parse", "HEAD") != main || mustRun(t, wt, "status", "--porcelain") != "" {
-		t.Error("the worktree didn't follow")
+	if mustRun(t, wt, "rev-parse", "HEAD") != main || mustRun(t, wt, "status", "--porcelain") != "" || mustRun(t, wt, "branch", "--show-current") != "" {
+		t.Error("the worktree didn't follow, detached")
 	}
 	// At main already: nothing to do.
-	if moved, err := g.Freshen(ctx, dir, "wt/tove/main", "main"); err != nil || moved {
+	if moved, err := g.Freshen(ctx, wt, "main"); err != nil || moved {
 		t.Errorf("at main: %v %v", moved, err)
 	}
-	// Work main hasn't got: it stays, checked out or not.
-	if moved, err := g.Freshen(ctx, dir, "lead/atlas/x", "main"); err != nil || moved {
+	// Detached on a commit main hasn't got (the lead's): it stays.
+	mustRun(t, wt, "checkout", "-q", "--detach", "lead/atlas/x")
+	at := mustRun(t, wt, "rev-parse", "HEAD")
+	if moved, err := g.Freshen(ctx, wt, "main"); err != nil || moved || mustRun(t, wt, "rev-parse", "HEAD") != at {
 		t.Errorf("moved over work: %v %v", moved, err)
 	}
-	// Not checked out, and all of it in main already (squashed there): it follows.
-	mustRun(t, dir, "branch", "wt/tove/old", "lead/atlas/x")
-	mustRun(t, dir, "checkout", "-q", "main")
-	mustRun(t, dir, "merge", "-q", "--squash", "lead/atlas/x")
-	mustRun(t, dir, "commit", "-q", "-m", "squashed")
-	if moved, err := g.Freshen(ctx, dir, "wt/tove/old", "main"); err != nil || !moved {
-		t.Fatalf("squashed: %v %v", moved, err)
+	// On a branch, even one main holds: a topic stays as it is.
+	mustRun(t, wt, "checkout", "-q", "-b", "wt/tove/LED-1", main+"~1")
+	if moved, err := g.Freshen(ctx, wt, "main"); err != nil || moved {
+		t.Errorf("moved a topic: %v %v", moved, err)
 	}
-	if mustRun(t, dir, "rev-parse", "wt/tove/old") != mustRun(t, dir, "rev-parse", "main") {
-		t.Error("not at main")
-	}
-	if moved, err := g.Freshen(ctx, dir, "wt/nobody/main", "main"); err != nil || moved {
-		t.Errorf("no such branch: %v %v", moved, err)
+	if _, err := g.Freshen(ctx, wt, "-x"); !errors.Is(err, ErrBadBranch) {
+		t.Errorf("option-like: %v", err)
 	}
 }
 
-// A redeploy finds its idle desks brought up to main.
-func TestPrepareBringsAnIdleHomeBranchUpToMain(t *testing.T) {
+// A restart finds its idle worktree brought up to main; one on a topic stays.
+func TestPrepareBringsAnIdleWorktreeUpToMain(t *testing.T) {
 	r := codeRepo(t, "main")
-	wt := filepath.Join(t.TempDir(), "mara")
+	idle, topic := filepath.Join(t.TempDir(), "mara"), filepath.Join(t.TempDir(), "tove")
 	g := New()
-	if err := g.Prepare(ctx, r, wt, "wt/mara/main", "main"); err != nil {
+	if err := g.Prepare(ctx, r, idle, "", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Prepare(ctx, r, topic, "wt/tove/LED-1", "main"); err != nil {
 		t.Fatal(err)
 	}
 	write(t, filepath.Join(r, "README"), "later\n")
 	if err := g.Commit(ctx, r, "later", "README"); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.Prepare(ctx, r, wt, "wt/mara/main", "main"); err != nil {
-		t.Fatal(err)
+	for _, wt := range []string{idle, topic} {
+		if err := g.Prepare(ctx, r, wt, "", "main"); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if data, _ := os.ReadFile(filepath.Join(wt, "README")); string(data) != "later\n" {
+	if data, _ := os.ReadFile(filepath.Join(idle, "README")); string(data) != "later\n" {
 		t.Errorf("README %q: the idle desk stayed behind", data)
+	}
+	if data, _ := os.ReadFile(filepath.Join(topic, "README")); string(data) == "later\n" {
+		t.Error("a topic was moved")
 	}
 }

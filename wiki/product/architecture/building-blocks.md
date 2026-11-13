@@ -83,9 +83,9 @@ Every arrow, in words:
 | Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
-| Agent link | Workflow | `switch`, `commit`, `merge`, `abort_merge`, `discard`, `set_submodule`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
+| Agent link | Workflow | `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard`, `set_submodule`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
 | Agent link | Instance manager | Hook events (busy, idle, waiting for the CEO) |
-| Instance manager | Git | The instance's worktrees, before it starts |
+| Instance manager | Git | The instance's worktrees it opened, relinked and caught up before it starts |
 | Instance manager | Image builder | The project's image |
 | Instance manager | Harness adapter | Launch spec and files; delivering text; reading hook events; diagnosing exits |
 | Instance manager | Agent link | Register an instance's token when it starts, revoke it when it stops |
@@ -275,7 +275,7 @@ type Workflow interface {
 }
 ```
 
-Built so far (`internal/workflow`): `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the live project repo), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in `project/wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
+Built so far (`internal/workflow`): `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the live project repo), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in `project/wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
 
 Details: [Requests](../features/requests.md), [Pipeline and merges](../features/pipeline-and-merges.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and merge requests](./protocol.md#work-items-and-merge-requests).
 
@@ -285,7 +285,7 @@ Everything Foreman does with repositories on the agents' behalf, on the host. Ea
 
 ```go
 type Git interface {
-    Prepare(instance, repo) (path string, err error) // the instance's worktree of the repo, made if missing
+    Prepare(instance, repo, branch) (path string, err error) // the instance's worktree of the repo, made when it opens it: on branch, or idle on none
     Switch(instance, repo, branch, from) error       // switch its worktree to the branch, made from from (any branch or commit; else the default branch) if missing
     Commit(instance, repo, message) (commit string, err error) // everything changed in its worktree (or the live project repo, for its writers), on its branch, authored as the agent
     Merge(instance, repo, branch) (conflicts []string, err error) // merge a branch into its worktree; conflicts stay as markers
@@ -299,7 +299,7 @@ type Git interface {
 }
 ```
 
-**Phasing.** `Prepare` (a worktree and home branch per agent) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit`, `Merge` and `AbortMerge`, behind the `switch`, `commit`, `merge` and `abort_merge` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `Squash`, `HeldBy`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
+**Phasing.** `Prepare` (a worktree per agent; made on demand and idle on no branch since 2026-11-12, [Opening a repo](./sandboxes-and-git.md#opening-a-repo)) arrives in epic 1, [Terminal multiplexer](../../backlog/epics/terminal-multiplexer.md); `Switch`, `Commit`, `Merge` and `AbortMerge`, behind the `switch`, `commit`, `merge` and `abort_merge` team tools, arrive with the agent link in epic 2, together with hand-offs that name a branch (nothing to fetch: every worktree shares the repo). `Prune`, `Contains`, `Squash`, `HeldBy`, `Push` and `Fetch` (merge plumbing) arrive with the [Git epic](../../backlog/epics/git.md).
 
 ## The foundation blocks
 
@@ -414,7 +414,7 @@ The flows everything else is made of. Time runs downwards. The [journey](../jour
 
 ```
 Instance manager      Image builder     Harness adapter        Agent link     Execution engine     Terminal
-      │ Git.Prepare(instance, repo) for each code repo → its worktrees (made if missing)
+      │ Git.Prepare(instance, repo) for each code repo it opened → relinked, caught up (none made)
       │ Ensure(project) ──▶│
       │◀── image ref ──────│
       │ Launch(instance) ───────────────────▶│ spec + files (prompt, MCP config → foreman-agent, hooks)
@@ -490,7 +490,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 - `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
 - `internal/home`: Home & config (`home.Dashboard`): the home's layout (its lock is `internal/userdata`'s), the projects' records (with `store.Projects`) and their code repos' checks, `project.toml`, team files and settings (TOML, validated), the global repo, version-guarded saves (one commit each), the file watcher, New project, and adding, creating, locating and removing code repos.
-- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager; it repairs a worktree whose repo was located elsewhere), `RootCommit`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
+- `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (on branch, or detached at base for none; the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager; it repairs a worktree whose repo was located elsewhere), `RootCommit`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
 - `internal/instances`: the Instance manager.
 - `internal/setup`: the setup checklist and the engine's watcher: reaches Podman whenever it is there, restores the instances the first time, builds the agent image in the background, and holds deploying and waking until then ([First run](../features/first-run.md)).
 - `internal/harness` (the `Adapter` interface: `Launch`, `Login`, `Connected` so far) with `harness/claudecode` and `harness/fake`; `internal/prompt`: the session prompt composer.

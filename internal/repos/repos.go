@@ -9,6 +9,7 @@ import (
 	"errors"
 	"regexp"
 	"slices"
+	"strings"
 
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
@@ -42,6 +43,7 @@ type Git interface {
 	RecentBranches(ctx context.Context, dir string) ([]string, error)
 	Ahead(ctx context.Context, dir, branch, base string) (int, error)
 	Worktrees(ctx context.Context, dir string) (map[string]string, error)
+	Detached(ctx context.Context, dir string) ([]string, error)
 	Clean(ctx context.Context, dir string) (bool, error)
 	Resolve(ctx context.Context, dir, ref string) (string, error)
 	Tree(ctx context.Context, dir, commit, path string) ([]git.TreeEntry, error)
@@ -93,7 +95,11 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, Repo{Name: name, Project: name == projectRepo, Default: def, Branches: branches})
+		idle, err := b.idle(ctx, project, dir)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, Repo{Name: name, Project: name == projectRepo, Default: def, Branches: branches, Idle: idle})
 	}
 	return list, nil
 }
@@ -135,6 +141,26 @@ func (b Browser) branches(ctx context.Context, project, dir, def string) ([]Bran
 		}
 		return 0
 	})
+	return list, nil
+}
+
+// idle lists the agents' worktrees of the repo on no branch; any other
+// detached worktree (the CEO's own, say) is nobody's and left out.
+func (b Browser) idle(ctx context.Context, project, dir string) ([]Idle, error) {
+	trees, err := b.Git.Detached(ctx, dir)
+	if err != nil {
+		return nil, err
+	}
+	list := []Idle{}
+	for _, tree := range trees {
+		agent := home.WorktreeAgent(tree, func(agent string) string { return b.Config.Sandbox(project, agent) })
+		if agent == "" {
+			continue
+		}
+		clean, err := b.Git.Clean(ctx, tree)
+		list = append(list, Idle{Agent: agent, Uncommitted: err == nil && !clean})
+	}
+	slices.SortFunc(list, func(x, y Idle) int { return strings.Compare(x.Agent, y.Agent) })
 	return list, nil
 }
 

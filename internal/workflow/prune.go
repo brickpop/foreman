@@ -462,12 +462,6 @@ func (t tool) prune(ctx context.Context, named []string) agentlink.Result {
 			own := prefix == ownPrefix
 			for _, name := range branches {
 				found[name] = true
-				if git.IsHomeBranch(name) {
-					if asked[name] {
-						kept = append(kept, name+" (a home branch stays)")
-					}
-					continue
-				}
 				why := ""
 				switch state, by := t.w.standing(ctx, t.project, r.Name, r.Path, name); {
 				case state == Merged:

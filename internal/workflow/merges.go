@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -351,27 +352,27 @@ func (w *Workflow) merged(ctx context.Context, mr store.MergeRequest, target, di
 }
 
 // freshenDesks brings the project's idle desks in the repo up to its new
-// default branch, def: every agent's home branch there (another project
-// sharing the repo has its own default) holding nothing def lacks, with nothing
-// uncommitted where it is checked out (git.Freshen). A desk with work stays
-// as it is.
+// default branch, def: every worktree of the project's agents there on no
+// branch (another project sharing the repo has its own default, and the CEO's
+// own checkout is never touched), at a commit def holds, with nothing
+// uncommitted (git.Freshen). A desk on a topic stays as it is.
 func (w *Workflow) freshenDesks(ctx context.Context, project, dir, def string) {
-	for _, prefix := range []string{"wt/" + project + "/", "lead/" + project + "/"} {
-		branches, err := w.Git.Branches(ctx, dir, prefix)
-		if err != nil {
-			slog.Info("listing the idle desks", "repo", dir, "err", err)
-			return
+	trees, err := w.Git.Detached(ctx, dir)
+	if err != nil {
+		slog.Info("listing the idle desks", "repo", dir, "err", err)
+		return
+	}
+	for _, tree := range trees {
+		sandbox := filepath.Dir(tree)
+		if !sameDir(sandbox, w.Config.Sandbox(project, filepath.Base(sandbox))) {
+			continue
 		}
-		for _, b := range branches {
-			if !git.IsHomeBranch(b) {
-				continue
-			}
-			if _, err := w.Git.Freshen(ctx, dir, b, def); err != nil {
-				slog.Info("bringing a desk up to the default branch", "repo", dir, "branch", b, "err", err)
-			}
+		if _, err := w.Git.Freshen(ctx, tree, def); err != nil {
+			slog.Info("bringing a desk up to the default branch", "worktree", tree, "err", err)
 		}
 	}
 }
+
 
 // backupsKept is how long a backup under refs/foreman/ is kept.
 const backupsKept = 30 * 24 * time.Hour

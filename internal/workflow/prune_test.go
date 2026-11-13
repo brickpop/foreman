@@ -32,8 +32,8 @@ func (f *fixture) has(branch string) bool {
 	return git.New().HasBranch(ctx, filepath.Join(f.root, "ledger", "api"), branch)
 }
 
-// A member's prune() deletes only its own merged branches: never its home
-// branch, the one it is on, unmerged work it didn't name, or anyone else's.
+// A member's prune() deletes only its own merged branches: never the one it is on, unmerged work
+// it didn't name, or anyone else's.
 func TestPruneMember(t *testing.T) {
 	f := newFixture(t)
 	f.branchAt("wt/ledger/tove/done", false)
@@ -42,8 +42,8 @@ func TestPruneMember(t *testing.T) {
 	f.branchAt("lead/ledger/atlas/done", false)
 
 	got := f.ok("tove", "prune", map[string]any{})
-	want := "api: deleted wt/ledger/tove/done; kept wt/ledger/tove/wip (not merged: name it to delete it anyway)\n" +
-		"web: nothing to delete\nForeman keeps a copy of each for 30 days."
+	want := "api: deleted wt/ledger/tove/done; kept wt/ledger/tove/main (checked out by tove), wt/ledger/tove/wip (not merged: name it to delete it anyway)\n" +
+		"web: kept wt/ledger/tove/main (checked out by tove)\nForeman keeps a copy of each for 30 days."
 	if got != want {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
@@ -63,12 +63,12 @@ func TestPruneMember(t *testing.T) {
 	if f.has("wt/ledger/tove/wip") {
 		t.Error("the named branch stayed")
 	}
-	// Anyone else's, never; a home branch named stays.
+	// Anyone else's, never; the one it is on, named, stays.
 	for _, b := range []string{"wt/ledger/ivo/done", "lead/ledger/atlas/done", "main", "wt/ledger/tove/"} {
 		f.refused("tove", "prune", map[string]any{"branches": []string{b}}, "not_yours")
 	}
-	if got := f.ok("tove", "prune", map[string]any{"branches": []string{"wt/ledger/tove/main"}}); !strings.Contains(got, "wt/ledger/tove/main (a home branch stays)") {
-		t.Errorf("home branch: %q", got)
+	if got := f.ok("tove", "prune", map[string]any{"branches": []string{"wt/ledger/tove/main"}}); !strings.Contains(got, "wt/ledger/tove/main (checked out by tove)") || !f.has("wt/ledger/tove/main") {
+		t.Errorf("the branch it is on: %q", got)
 	}
 	if got := f.ok("tove", "prune", map[string]any{"branches": []string{"wt/ledger/tove/gone"}}); !strings.Contains(got, "wt/ledger/tove/gone: no such branch") {
 		t.Errorf("a branch that isn't there: %q", got)
@@ -77,7 +77,9 @@ func TestPruneMember(t *testing.T) {
 
 // The lead's prune() also deletes its teammates' merged branches, but never
 // what a teammate works on: the branch it has checked out (whatever it holds
-// uncommitted), nor its unmerged work, even named.
+// uncommitted), nor its unmerged work, even named. A home branch from before
+// idle worktrees went detached is an ordinary branch: merged and not checked
+// out, it goes.
 func TestPruneLeadKeepsTeammatesWork(t *testing.T) {
 	f := newFixture(t)
 	f.branchAt("lead/ledger/atlas/done", false)
@@ -89,7 +91,8 @@ func TestPruneLeadKeepsTeammatesWork(t *testing.T) {
 
 	got := f.ok("mara", "prune", map[string]any{})
 	for _, want := range []string{
-		"deleted lead/ledger/atlas/done, wt/ledger/ivo/done",
+		"deleted lead/ledger/atlas/done, wt/ledger/ivo/done, wt/ledger/tove/main",
+		"lead/ledger/atlas/integration (checked out by mara)",
 		"wt/ledger/ivo/parked (not merged: only its owner deletes unmerged work)",
 		"wt/ledger/tove/led-1 (checked out by tove)",
 	} {
@@ -97,11 +100,8 @@ func TestPruneLeadKeepsTeammatesWork(t *testing.T) {
 			t.Errorf("missing %q in\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "/main") || strings.Contains(got, "integration") {
-		t.Errorf("home branches listed: %s", got)
-	}
 	f.ok("mara", "prune", map[string]any{"branches": []string{"wt/ledger/ivo/parked", "wt/ledger/tove/led-1"}})
-	for _, b := range []string{"wt/ledger/ivo/parked", "wt/ledger/tove/led-1", "wt/ledger/tove/main", "lead/ledger/atlas/integration"} {
+	for _, b := range []string{"wt/ledger/ivo/parked", "wt/ledger/tove/led-1", "lead/ledger/atlas/integration"} {
 		if !f.has(b) {
 			t.Errorf("%s went", b)
 		}

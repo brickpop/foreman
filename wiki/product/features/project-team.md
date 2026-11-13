@@ -6,7 +6,7 @@ tags: [feature, ui, git, pipeline]
 
 # Project team
 
-A project's **Team** section ([Project page](./project-page.md)): the team on the project, its agents with what each is doing and the branch it has checked out, its [activity](./project-activity.md), then the work on its way to the CEO's branches and what merged. It was two sections, Deployment and Activity, until 2026-11-03 (the CEO: both are the team at work); `/deployment` and `/activity` links open their view of it. It replaced the Worktrees tab and Project settings' "Teams on this project" on 2026-10-31, both of which listed the same agents (the CEO: remove redundant info). A project has one team at most ([Deployment](../models/deployment.md#invariants)).
+A project's **Team** section ([Project page](./project-page.md)): the team on the project, its agents with what each is doing and the branch it has checked out (or the repos it has open on none), its [activity](./project-activity.md), then the work on its way to the CEO's branches and what merged. It was two sections, Deployment and Activity, until 2026-11-03 (the CEO: both are the team at work); `/deployment` and `/activity` links open their view of it. It replaced the Worktrees tab and Project settings' "Teams on this project" on 2026-10-31, both of which listed the same agents (the CEO: remove redundant info). A project has one team at most ([Deployment](../models/deployment.md#invariants)).
 
 ## The team
 
@@ -18,11 +18,11 @@ A project's **Team** section ([Project page](./project-page.md)): the team on th
 - **One panel, a row per agent of the team** (padding `12px 16px`, rows split by `--line`), the lead first, then the team file's order.
   - An 8px status dot while it is on the team (a worktree left by an earlier team has none).
   - Its name (500) and, for the lead, the ["lead" tag](../design/design-system.md#chips-and-badges) unless its name says it already, then `<Team> · <role>` (12.5px `--tx4`).
-  - What it is doing, its [activity line](../architecture/harness-adapters.md#activity-lines) and when (Mono 12px `--tx3`), while there is one. Then a line per repo: the repo (Mono 12px `--tx4`), the branch checked out there (Mono 12.5px `--accTx`), `N ahead` when it has commits its repo's default branch hasn't, and `uncommitted changes` (`--accTx`) when the worktree holds changes not committed yet. Each line opens [Repos](./repos.md) on that repo and branch. A team agent with no worktree yet says `No worktree yet: made at its first start.`
+  - What it is doing, its [activity line](../architecture/harness-adapters.md#activity-lines) and when (Mono 12px `--tx3`), while there is one. Then a line per repo: the repo (Mono 12px `--tx4`), the branch checked out there (Mono 12.5px `--accTx`), `N ahead` when it has commits its repo's default branch hasn't, and `uncommitted changes` (`--accTx`) when the worktree holds changes not committed yet. Each line opens [Repos](./repos.md) on that repo and branch. A repo it has open on no branch ([idle](../architecture/sandboxes-and-git.md#opening-a-repo)) is a line too, not a link: the repo, `idle, on no branch` (12.5px `--tx3`), and `uncommitted changes` (`--attnTx`) when it holds some. A team agent with no repo open says `No repo open yet: it opens one when it needs it.`
   - **`Session`** for the team's agents (opens it in the [Session](./sessions.md) section), else `not on the team` (`--tx4`).
-- **Empty** (no team): `No team is on <project>. Deploy one and each member gets its own worktree of the project's repos.`
+- **Empty** (no team): `No team is on <project>. Deploy one and each member gets its own sandbox, where it opens the project's repos as it needs them.`
 
-Where a branch is checked out comes from git (`git worktree list`), on `GET /api/projects/:id/repos`: each branch's `agent` is the agent whose sandbox holds that worktree ([Repos → Data](./repos.md#data)).
+Where a branch is checked out comes from git (`git worktree list`), on `GET /api/projects/:id/repos`: each branch's `agent` is the agent whose sandbox holds that worktree, and each repo's `idle` the agents' worktrees of it on no branch ([Repos → Data](./repos.md#data)).
 
 ### Earlier teams
 
@@ -30,7 +30,7 @@ Apart from the team's (the CEO, 2026-11-02): **`Left by earlier teams`** ([secti
 
 **Clean up** asks first (`Clean up what earlier teams left?`, `Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches whose work is all merged (kept aside a while, recoverable by hand). Everything else stays, and is listed with why.`, **`Clean up`** in the danger style), then `POST /api/projects/:id/cleanup` removes **only what is safe** (the CEO, 2026-11-02), in each code repo, of every agent with a worktree in the project's sandboxes that doesn't run on this project (one running on another is cleaned here too: its branches there carry that project):
 
-- its **worktree**, when it holds nothing not committed (git refuses otherwise) and no merge is under way (`git worktree remove`, its folder included; its branch stays);
+- its **worktree**, on a branch or idle on none (`branch` is then empty), when it holds nothing not committed (git refuses otherwise) and no merge is under way (`git worktree remove`, its folder included; its branch stays);
 - its **`wt/<project>/<agent>/*` branches** whose work is all merged ([Sandboxes and git policy → Cleaning up branches](../architecture/sandboxes-and-git.md#cleaning-up-branches)), and that nothing has checked out. Each head is kept under `refs/foreman/cleaned/<time>/` until backups are pruned ([Resume and backups](../../backlog/archive/resume-and-clean-desks.md)). A lead's `lead/<project>/<team>/*` branches stay: they are a review's.
 
 It answers `{removed, kept}`, each a list of `{agent, repo, what (worktree | branch), branch, why}`; a toast says how many went, and what was kept is listed under the panel with why (`changes not committed`, `a merge is under way in it`, `not all of it is merged`, `it is checked out`). Nothing else changes: the agents' harness folders (their conversations) and sandbox folders stay.

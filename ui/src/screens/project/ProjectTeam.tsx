@@ -35,7 +35,7 @@ import { InFlight, Merged } from "./Pipeline";
 
 // A project's Team section (wiki/product/features/project-team.md):
 // the team on it, its agents with what they do and the branch
-// each has checked out (and the worktrees earlier teams left); then the work
+// each has checked out, or the repos it has open on none (and the worktrees earlier teams left); then the work
 // on its way to its targets, and what merged; the team's activity between. Deploy (replacing the team), Reload
 // (its agents left on an older prompt) and Stop.
 export function ProjectTeam() {
@@ -124,7 +124,7 @@ export function ProjectTeam() {
           {!d && repos.isSuccess && (
             <Empty>
               No team is on {projectName([project], project.id)}. Deploy one and each member gets
-              its own worktree of the project's repos.
+              its own sandbox, where it opens the project's repos as it needs them.
             </Empty>
           )}
           {left.length > 0 && (
@@ -221,8 +221,19 @@ function AgentRow({
             </span>
           </Link>
         ))}
+        {w?.idle.map(({ repo, uncommitted }) => (
+          <span key={repo} className="flex min-w-0 items-baseline gap-2 text-[13px]">
+            <span className="shrink-0 font-mono text-[12px] text-tx4">{repo}</span>
+            <span className="truncate text-[12.5px] text-tx3">idle, on no branch</span>
+            {uncommitted && (
+              <span className="shrink-0 text-[12px] text-attnTx">uncommitted changes</span>
+            )}
+          </span>
+        ))}
         {!w && (
-          <span className="text-[12.5px] text-tx4">No worktree yet: made at its first start.</span>
+          <span className="text-[12.5px] text-tx4">
+            No repo open yet: it opens one when it needs it.
+          </span>
         )}
       </span>
       {instance ? (

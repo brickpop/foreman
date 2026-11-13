@@ -11,9 +11,7 @@ How an [instance](../models/instance.md) (one agent of one [deployment](../model
 ## Instance lifecycle
 
 1. **Deploy**: create a deployment (see [Deploy a team](../features/deploy-team.md)), then an instance for each team member: the lead `starting` (or `queued`), every other member `asleep` ([Lazy starts](#lazy-starts)). Steps 2–3 happen when an instance starts, so an asleep member has no sandbox yet.
-2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. `Git.Prepare` makes a git worktree of each code repo at `<workspace>/agents/<agent>/<repo>` if it doesn't exist yet, and brings the agent's home branch up to its repo's default branch when it is idle ([Sandboxes and git policy](./sandboxes-and-git.md#branches)), checked out on:
-   - lead: `lead/<project>/<team>/integration` (created from the default branch if missing)
-   - members: their home branch `wt/<project>/<agent>/main` (created from the default branch). They create `wt/<project>/<agent>/<topic>` when assigned a card, from the default branch or the branch the lead names.
+2. **Sandbox**: a project with a [repo problem](../models/project-config.md#the-project-record) (a code repo missing or changed) refuses the start. No worktree is made: the agent opens each repo when it needs it ([Sandboxes and git policy → Opening a repo](./sandboxes-and-git.md#opening-a-repo)). Those it opened before are reused (`Git.Prepare`: relinked when their repo moved, an idle one brought up to its default branch), and every repo's `.git` is mounted read-only, so it reads any repo without opening it. An agent without team tools (no agent link) can't open one: it gets every repo, idle. Members make `wt/<project>/<agent>/<topic>` when assigned a card, the lead `lead/<project>/<team>/<topic>`, with `switch`.
 3. **Compose prompt** ([Session prompt](./session-prompt.md)) and **spawn** the harness in its container with the sandbox as working directory ([Harness adapters](./harness-adapters.md)).
 4. **Run**: status follows harness signals and team-message activity:
    - `running`: producing output / working a turn

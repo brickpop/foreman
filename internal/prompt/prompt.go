@@ -60,6 +60,10 @@ var teamTools = []teamTool{
 	{"ask", anyone, nobody, true, []string{"ask(teammate, request)              Get info or work. Keep going meanwhile."}},
 	{"reply", anyone, nobody, true, []string{"reply(request_id, output)           Answer a request. Only `output` is returned."}},
 	{"read_message", anyone, nobody, true, []string{"read_message(id)                    Read a message to you in full (a delivery quotes only its start)."}},
+	{"open", anyone, anyone, true, []string{
+		"open(repo)                          Check a code repo out in your sandbox, the first time you need its",
+		"                                    files. switch, merge and set_submodule open what they need.",
+	}},
 	{"switch", anyone, anyone, true, []string{
 		"switch(branch, from)                Go to one of your branches; a new one starts from from, any branch",
 		"                                    or commit (each repo's default branch when left out).",
@@ -176,7 +180,12 @@ func Compose(in Input) string {
 	line("Project: %s", in.Project)
 	line("Goal: %s", goal(in.ProjectRepo, lead))
 	if code {
-		line("Your sandbox: %s (your own git worktree of each code repo)", in.Sandbox)
+		if has("open") {
+			line("Your sandbox: %s. A code repo is checked out there, as <sandbox>/<repo>, only once you open it: open(repo), or switch, merge or set_submodule opening what they need. Before working in a repo, open it.", in.Sandbox)
+			line("Code repos: %s. Read one you haven't opened through its git, no checkout needed: git -C <its path> log %s, show %s:<file>, grep -n <text> %s.", repoList(in.Repos), first(in.Repos), first(in.Repos), first(in.Repos))
+		} else {
+			line("Your sandbox: %s (your own git worktree of each code repo)", in.Sandbox)
+		}
 		line("Branches: %s", branches(in, lead, has))
 	} else {
 		line("Your sandbox: %s, your working folder. This project has no code repo: its work is its knowledge base.", in.Sandbox)
@@ -286,6 +295,23 @@ func Compose(in Input) string {
 	return b.String()
 }
 
+// repoList names each code repo with its path and default branch.
+func repoList(repos []home.Repo) string {
+	var each []string
+	for _, r := range repos {
+		each = append(each, fmt.Sprintf("%s at %s (default %s)", r.Name, r.Path, r.Default))
+	}
+	return strings.Join(each, "; ")
+}
+
+// first is the first repo's default branch, for an example.
+func first(repos []home.Repo) string {
+	if len(repos) == 0 {
+		return "main"
+	}
+	return repos[0].Default
+}
+
 // defaults names the branch the agent's branches are made from: one name when
 // every repo has the same default, else each repo's ("master in api, main in web").
 func defaults(repos []home.Repo) string {
@@ -310,22 +336,21 @@ func branches(in Input, lead bool, has func(string) bool) string {
 	// project sharing a repo.
 	mine := git.BranchPrefix(in.Project, in.Agent, in.Team.Team, false)
 	ours := git.BranchPrefix(in.Project, in.Agent, in.Team.Team, true)
+	idle := " Between pieces of work your repos sit on no branch, at their default branch: switch to a topic before you commit or merge (edits made meanwhile come along to a new topic)."
 	switch {
-	case !switching && lead:
-		return fmt.Sprintf("you work on %s, made for you from %s.", git.HomeBranch(in.Project, in.Agent, in.Team.Team, true), defaults(in.Repos))
 	case !switching:
-		return fmt.Sprintf("you work on %s, made for you from %s.", git.HomeBranch(in.Project, in.Agent, in.Team.Team, false), defaults(in.Repos))
+		return fmt.Sprintf("none of your own: your worktrees sit on no branch, at %s.", defaults(in.Repos))
 	case lead && has("request_merge"):
-		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
+		return fmt.Sprintf("%s<topic>, as many as you need. Switch to one (or make it) with switch(branch, from)."+idle+" "+
 			"Ask for a merge with request_merge(branch, title, body, entry, into, land), one per branch, usually into the branch its work started from. "+
 			"To stack them (main < f/a < f/b), request the first with land f/a, and the next into f/a once the CEO merged it. When told the branch it goes into moved, merge that in with merge(<that branch>), "+
-			"resolve any conflicts and commit(), then call request_merge again.%s %s", ours, ours, oneTopic(has), fewRequests)
+			"resolve any conflicts and commit(), then call request_merge again.%s %s", ours, oneTopic(has), fewRequests)
 	case lead:
-		return fmt.Sprintf("%s<topic>, as many as you need (%sintegration exists). Switch to one (or make it) with switch(branch, from). "+
+		return fmt.Sprintf("%s<topic>, as many as you need. Switch to one (or make it) with switch(branch, from)."+idle+" "+
 			"Merge the hand-offs you accept into it with merge(branch). When told a branch your work goes into moved, merge that in with merge(<that branch>). "+
-			"Tell the CEO which lead branch is ready for review.%s", ours, ours, oneTopic(has))
+			"Tell the CEO which lead branch is ready for review.%s", ours, oneTopic(has))
 	default:
-		return fmt.Sprintf("%s<card> only; switch to one (or make it) with switch(branch, from). Never push.%s", mine, oneCard(has))
+		return fmt.Sprintf("%s<card> only; switch to one (or make it) with switch(branch, from)."+idle+" Never push.%s", mine, oneCard(has))
 	}
 }
 
@@ -376,7 +401,7 @@ const (
 // (wiki/product/architecture/sandboxes-and-git.md#branches), so an agent may
 // start on earlier work, and a lead hands out work on fresh topics.
 func persisting(leadOfTeam bool, has func(string) bool) string {
-	s := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
+	s := "Your worktrees persist between runs: they may hold earlier work. Before you start, check what you have open (ls your sandbox) and where each is (git status, git branch). " +
 		"New work goes on a new topic: switch(<topic>) makes it from the default branch, switch(<topic>, from) from another branch. Earlier work you resume, or commit to its topic before switching."
 	if has("discard") {
 		s += " What you don't want: discard()."
@@ -536,7 +561,7 @@ func instruction(s home.Soul, merges bool) string {
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
 		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", ProjectRepo: "{project repo}", Files: "{files}",
-		Repos:        []home.Repo{{Name: "{repo}", Default: "{default}"}},
+		Repos:        []home.Repo{{Name: "{repo}", Path: "{repo path}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead, true),
 		Instructions: instructions,

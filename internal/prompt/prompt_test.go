@@ -27,12 +27,12 @@ var atlas = home.TeamConfig{
 }
 
 // every team tool, as the finished epic will offer them
-var every = []string{"ask", "reply", "read_message", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate", "request_merge", "withdraw_merge"}
+var every = []string{"ask", "reply", "read_message", "open", "switch", "commit", "merge", "abort_merge", "discard", "set_submodule", "handoff", "contribute", "escalate", "request_merge", "withdraw_merge"}
 
 func input(agent string, tools []string) Input {
 	return Input{
 		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/workspace/ledger/agents/" + agent, ProjectRepo: "/home/ceo/workspace/ledger/project", Files: "/home/ceo/workspace/ledger/files", Tools: tools,
-		Repos:  []home.Repo{{Name: "api", Default: "main"}},
+		Repos:  []home.Repo{{Name: "api", Path: "/home/ceo/dev/api", Default: "main"}},
 		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}, LandingPrefixes: []string{"f/", "fix/"}},
 	}
 }
@@ -48,7 +48,7 @@ Own the UI.
 Project: ledger
 Goal: the "Current goal" line at the top of /home/ceo/workspace/ledger/project/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
 Your sandbox: /home/ceo/workspace/ledger/agents/tove (your own git worktree of each code repo)
-Branches: you work on wt/ledger/tove/main, made for you from main.
+Branches: none of your own: your worktrees sit on no branch, at main.
 Project repo: /home/ceo/workspace/ledger/project (the project's one shared checkout, the same for every agent)
 Knowledge base: /home/ceo/workspace/ledger/project/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
@@ -93,7 +93,10 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 	for _, want := range []string{
 		"# You are Mara, Team Lead on team Atlas\nCalm, decisive.\n",
 		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges into the CEO's branches", // the role's default job
-		"Branches: lead/ledger/atlas/<topic>, as many as you need (lead/ledger/atlas/integration exists).",
+		"Branches: lead/ledger/atlas/<topic>, as many as you need. Switch to one (or make it) with switch(branch, from). Between pieces of work your repos sit on no branch, at their default branch: switch to a topic before you commit or merge (edits made meanwhile come along to a new topic).",
+		"Your sandbox: /home/ceo/workspace/ledger/agents/mara. A code repo is checked out there, as <sandbox>/<repo>, only once you open it: open(repo), or switch, merge or set_submodule opening what they need. Before working in a repo, open it.",
+		"open(repo)                          Check a code repo out in your sandbox, the first time you need its",
+		"Code repos: api at /home/ceo/dev/api (default main). Read one you haven't opened through its git, no checkout needed: git -C <its path> log main, show main:<file>, grep -n <text> main.",
 		"(read and write: edit, then commit its repo, project)",
 		"- Mara, Team Lead (lead: integrates, requests merges)\n",
 		"## Tools (from Foreman)\n",
@@ -136,7 +139,7 @@ func TestMemberToolsAndLeadWithoutTools(t *testing.T) {
 			t.Errorf("an epic 1 prompt mentions %q:\n%s", absent, lead)
 		}
 	}
-	if !strings.Contains(lead, "Branches: you work on lead/ledger/atlas/integration, made for you from main.") || !strings.Contains(lead, "(read and write)") ||
+	if !strings.Contains(lead, "Branches: none of your own: your worktrees sit on no branch, at main.") || !strings.Contains(lead, "(read and write)") ||
 		!strings.Contains(lead, "Your teammates can't write it: ask them for content, never to write wiki files.") {
 		t.Errorf("epic 1 lead:\n%s", lead)
 	}
@@ -153,7 +156,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 			t.Errorf("%q with nothing to say:\n%s", absent, got)
 		}
 	}
-	if !strings.Contains(got, "made for you from trunk.") {
+	if !strings.Contains(got, "sit on no branch, at trunk.") {
 		t.Error("the repo's main branch name isn't used")
 	}
 	solo := input("mara", every)
@@ -214,7 +217,7 @@ func TestTodaysTools(t *testing.T) {
 // where it is and start new work from the default branch or another branch;
 // the lead, to name the topic it hands out and the branch it starts from. Without switch there is nothing to say.
 func TestWorktreesPersist(t *testing.T) {
-	persist := "Your worktrees persist between runs: they may hold earlier work. Before you start, check where you are (git status, git branch). " +
+	persist := "Your worktrees persist between runs: they may hold earlier work. Before you start, check what you have open (ls your sandbox) and where each is (git status, git branch). " +
 		"New work goes on a new topic: switch(<topic>) makes it from the default branch, switch(<topic>, from) from another branch. Earlier work you resume, or commit to its topic before switching. What you don't want: discard()."
 	handOut := "Your teammates' worktrees persist too: when you give one new work, name the topic branch it should switch to, and the branch it starts from when it isn't the default."
 	lead, member := Compose(input("mara", Offered(true, true))), Compose(input("ilya", Offered(false, true)))
@@ -264,7 +267,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove", "")
-	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox} (", `Goal: the "Current goal" line at the top of {project repo}/wiki/backlog/index.md`, "Project repo: {project repo} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox}. A code repo", "Code repos: {repo} at {repo path} (default {default}).", `Goal: the "Current goal" line at the top of {project repo}/wiki/backlog/index.md`, "Project repo: {project repo} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -298,8 +301,8 @@ func TestTheDefaultBranchOfEachRepo(t *testing.T) {
 		repos []home.Repo
 		want  string
 	}{
-		{[]home.Repo{{Name: "api", Default: "main"}, {Name: "web", Default: "main"}}, "made for you from main."},
-		{[]home.Repo{{Name: "poc", Default: "master"}, {Name: "web", Default: "main"}}, "made for you from master in poc, main in web."},
+		{[]home.Repo{{Name: "api", Default: "main"}, {Name: "web", Default: "main"}}, "sit on no branch, at main."},
+		{[]home.Repo{{Name: "poc", Default: "master"}, {Name: "web", Default: "main"}}, "sit on no branch, at master in poc, main in web."},
 	} {
 		in := input("tove", nil)
 		in.Repos = tc.repos

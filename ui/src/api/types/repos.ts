@@ -13,6 +13,15 @@ export interface Repo {
   project: boolean; // the project repo (project/), listed last
   defaultBranch: string;
   branches: Branch[]; // the default first, then newest commit first
+  idle: Idle[]; // the agents' worktrees of it on no branch, by agent
+}
+/**
+ * Idle is an agent's worktree of a repo that sits on no branch: opened, and no
+ * topic yet (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo).
+ */
+export interface Idle {
+  agent: string;
+  uncommitted: boolean; // it has changes not committed yet
 }
 /**
  * Branch is one branch of a repo.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Board, Card, MergeRequest, Node, Project, Request } from "../../api/client";
-import { agentBranch, forgeOf, linkLine } from "../../app/model";
+import type { Board, Card, MergeRequest, Node, Request } from "../../api/client";
+import { agentBranch, linkLine } from "../../app/model";
 import { cellLook, columnLabel, laneLabel, lanesShown, moveOf, revealBy } from "./Board";
 import { sourceLabel } from "./Pipeline";
 import { treeLabel } from "./Wiki";
@@ -95,38 +95,23 @@ describe("Changes", () => {
       target: "main",
       checksStatus: "pass",
     } as MergeRequest;
-    expect(linkLine(mr, "forgejo")).toBe(
-      "web · lead/ledger/atlas/integration → main · checks pass",
-    );
-    expect(linkLine({ ...mr, forgePrNumber: 128 }, "forgejo")).toBe(
-      "PR #128 on Forgejo · web · lead/ledger/atlas/integration → main · checks pass",
-    );
-    expect(linkLine({ ...mr, conflicting: true }, "none")).toBe(
+    expect(linkLine(mr)).toBe("web · lead/ledger/atlas/integration → main · checks pass");
+    expect(linkLine({ ...mr, conflicting: true })).toBe(
       "web · lead/ledger/atlas/integration → main · conflicts with main",
     );
-    expect(linkLine({ ...mr, checksStatus: "" }, "none")).toBe(
+    expect(linkLine({ ...mr, checksStatus: "" })).toBe(
       "web · lead/ledger/atlas/integration → main",
     );
-    expect(linkLine({ ...mr, checksStatus: "running", target: "develop" }, "none")).toBe(
+    expect(linkLine({ ...mr, checksStatus: "running", target: "develop" })).toBe(
       "web · lead/ledger/atlas/integration → develop · checks running",
     );
-    expect(linkLine({ ...mr, conflicting: true, target: "develop" }, "none")).toBe(
+    expect(linkLine({ ...mr, conflicting: true, target: "develop" })).toBe(
       "web · lead/ledger/atlas/integration → develop · conflicts with develop",
     );
     // Landing on a branch of its own: there, from its target.
-    expect(linkLine({ ...mr, landing: "f/csv" }, "none")).toBe(
+    expect(linkLine({ ...mr, landing: "f/csv" })).toBe(
       "web · lead/ledger/atlas/integration → f/csv (from main) · checks pass",
     );
-  });
-});
-
-describe("forgeOf", () => {
-  const project = (kind: string) =>
-    ({ config: { forge: { kind, url: "", projectRepo: "" } } }) as unknown as Project;
-  it("is the project's forge, or none without a project", () => {
-    expect(forgeOf(project("github"))).toBe("github");
-    expect(forgeOf(project("none"))).toBe("none");
-    expect(forgeOf(undefined)).toBe("none");
   });
 });
 

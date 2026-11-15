@@ -42,7 +42,6 @@ Guiding constraints, from the [vision](../vision.md): one local binary, local-fi
 | Server-side terminal state | `github.com/charmbracelet/x/vt`, pinned at v0.1.0, behind the `Screen` interface | A maintained, pure-Go VT emulator (screen, scrollback, alternate screen, modes, styled render) from the Charm team. Its first tagged release is v0.1.0 (2026-10-12); the post-1.0 alternatives are a parser only (`go-vte`) or unmaintained since 2020 without scrollback (`vt10x`). Round-trip tests guard upgrades ([Terminal state](./terminal-state.md)) |
 | File watching | `github.com/fsnotify/fsnotify` | Config, team and wiki changes reach the UI within ~1s ([Persistence](./persistence.md)). |
 | Git | The `git` CLI (on the host for Foreman's own operations, in the container for agents) | Same behaviour as the CEO's git; `go-git` lacks parts of worktrees and hooks. |
-| Forges | Plain `net/http` clients: GitHub REST, and one Gitea client that also serves Forgejo (same API) | Three small adapters behind one interface ([Forge adapters](./forge-adapters.md)). |
 | Logging | stdlib `log/slog` | Structured logs, no dependency. |
 | CLI flags | stdlib `flag` | `foreman` has a handful of flags. |
 
@@ -134,7 +133,6 @@ foreman/
 │   ├── messaging/        # Messaging: queues and deliveries between agents and the CEO
 │   ├── workflow/         # Workflow: requests, work items, merge requests, gates
 │   ├── git/              # Git: worktrees per agent, branch policy, pushes
-│   ├── forge/            # Forge adapters: github, gitea (also Forgejo), none
 │   ├── store/            # State store: SQLite, migrations
 │   ├── home/             # Home & config: projects (records and repos), teams, settings, file watcher
 │   ├── wiki/             # thin layer over agentic-wiki: tree, entries with their lookup tables, images

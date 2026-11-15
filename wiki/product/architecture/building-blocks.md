@@ -19,7 +19,7 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 │ Screens: Dashboard · Project · Team · Agent · Settings · Chief of Staff   │
 │                 │ never talk to the network themselves                       │
 │ ForemanClient ──── real client: HTTP + event stream + terminal WebSockets    │
-│ (main.tsx)          (an area not built yet refuses: "Not built yet")        │
+│ (main.tsx)                                                                 │
 └───────────────────────────────────┬────────────────────────────────────────┘
                                     │ 127.0.0.1:8888, access token
 ┌───────────────────────── foreman (one Go binary) ──────────────────────────┐
@@ -27,8 +27,7 @@ Three places run code: the CEO's **browser**, the **`foreman` binary** on the CE
 │ CORE        Workflow · Messaging · Instance manager · Agent link            │
 │             Harness adapters · Terminal · Execution engine + Image builder  │
 │             Git (worktrees per agent)                                       │
-│ FOUNDATION  Home & config · Wiki · State store · Event bus · Secrets ·      │
-│             Forge adapter                                                   │
+│ FOUNDATION  Home & config · Wiki · State store · Event bus                  │
 └──────┬────────────────────────────────────────────────────▲────────────────┘
        │ start · attach · resize · build (Podman REST API)    │ agent port 127.0.0.1:<p>,
        ▼                                                      │ one token per instance
@@ -51,7 +50,7 @@ An arrow means "calls through an interface". Blocks below the dashed line are us
    │   manager    │  └───────────┘  └──┬────┬──┘  │ Wiki               │  │
    └─┬───┬───┬──┬─┘        ▲           │    │     └────────────────────┘  │
      │   │   │  │          │           ▼    ▼                              │
-     │   │   │  │          │         Git   Forge adapter                   │
+     │   │   │  │          │         Git                             │
      │   │   │  │ register │ ask, reply,          ▲ escalate, handoff,     │
      │   │   │  │ tokens   │ handoff              │ request_merge, …       │
      │   │   │  └────────▶ Agent link ────────────┘                        │
@@ -65,7 +64,7 @@ An arrow means "calls through an interface". Blocks below the dashed line are us
      ▼                                                                     │
    Image builder                                       events ─────────────┘
  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─
- Used by all of the above: State store · Event bus (→ the UI's live updates) · Secrets
+ Used by all of the above: State store · Event bus (→ the UI's live updates)
 ```
 
 Every arrow, in words:
@@ -74,12 +73,11 @@ Every arrow, in words:
 |---|---|---|
 | Web server | Instance manager | Open a terminal view, type into it, deploy, stop |
 | Web server | Messaging | The CEO's Line; the project's Activity; the countdown on the CEO's draft |
-| Web server | Workflow | Answer a request; a review's comments and decisions (Request changes, Merge, Dismiss; later Create PR); Sync a reserved repo |
+| Web server | Workflow | Answer a request; a review's comments and decisions (Request changes, Merge, Dismiss) |
 | Web server | Home & config, Wiki | Projects, teams, settings, wiki pages and boards; edits to souls, checkboxes, card moves |
 | Web server | Event bus | Stream live events to the browser |
-| Workflow | Messaging | Deliver answers, notices ("PR #128 opened", "main moved") to agents |
-| Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge into one of the CEO's branches, push a branch for a PR, or Sync a reserved repo (Git epic) |
-| Workflow | Forge adapter | On the CEO's Create PR: open, then poll, comment on and close pull requests |
+| Workflow | Messaging | Deliver answers, notices ("main moved") to agents |
+| Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge into one of the CEO's branches (Git epic) |
 | Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
@@ -116,7 +114,7 @@ Every arrow, in words:
 │   …/profiles/<name>/     the project's profile's login file (the CEO's; rw)         │
 │   ~/.gitconfig           ro, if it exists                                           │
 │  Never mounted: the rest of ~ (~/.ssh, ~/.config, …), the rest of ~/.foreman/       │
-│  (secrets, state, teams), the CEO's working files, other agents' worktrees          │
+│  (credentials, state, teams), the CEO's working files, other agents' worktrees      │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -265,7 +263,7 @@ Details: [Team tools](./team-tools.md), [Team message](../models/team-message.md
 
 ### 7. Workflow (`workflow`)
 
-Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on the Dashboard (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's decisions on a review (Merge, Request changes, Close; later Create PR) → Git, Messaging and the Forge adapter; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
+Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on the Dashboard (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's `wiki/inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's decisions on a review (Merge, Request changes, Close) → Git and Messaging; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
 
 ```go
 type Workflow interface {
@@ -294,8 +292,7 @@ type Git interface {
     Contains(repo, branch, into string) (bool, error) // integration detection: is the work in a lead branch?
     Squash(repo, target, branch) error               // the CEO's Merge: the branch into its target on the host, one commit
     HeldBy(repo, branch) ([]string, error)           // the CEO's branches (any but an agent's) holding all of branch in their history: has it landed?
-    Push(repo, branch, remote) error                 // on the CEO's Create PR (the branch) or Sync (a reserved repo's main), with Foreman's token
-    Fetch(repo) error                                // after a merge on the forge, and as Sync's first step: fetch the forge's main into the repo
+    FetchRemotes(repo) ([]RemoteChange, error)       // the lead's fetch: every remote's branches, with the CEO's credentials, never prompting
 }
 ```
 
@@ -365,33 +362,10 @@ type Bus interface {
 
 Details: [API → Events](./api.md#events), [Protocol → Events](./protocol.md#events).
 
-### Secrets (`secrets`)
-
-Forge tokens and the access token, in a 0600 file; never mounted into containers. Harness logins are not here (they live in their own credentials folder).
-
-```go
-type Secrets interface { Set(key, value) error; Get(key) (string, error); Has(key) bool }
-```
-
-Details: [Secrets](../models/secrets.md).
-
-### Forge adapter (`forge`)
-
-```go
-type Forge interface {
-    OpenPR(repo, branch, title, body) (PR, error)
-    PR(repo, number) (PR, error)                     // state, checks, mergeable; polled
-    Comment(repo, number, text) error
-    Close(repo, number) error
-}
-```
-
-Implementations: GitHub, Gitea (also Forgejo), none. Used only on the CEO's Create PR or Sync; never merges. Details: [Forge adapters](./forge-adapters.md).
-
 ### Web server + UI (`server`, `access`, `ui/`)
 
 - **Web server**: the API, the event stream, the terminal WebSockets, behind the **Access guard** (token, Host and Origin checks). It holds no logic of its own: it calls the blocks above. Details: [API](./api.md), [Security](./security.md).
-- **UI**: screens use only the `ForemanClient` interface. `ui/src/main.tsx`, the UI's composition root, provides the **real client** (HTTP, events, WebSockets). An area whose server side isn't built yet refuses every call with `NOT_BUILT`, and its screen says "Not built yet" ([Full UI on a demo client](../../backlog/epics/full-ui-demo.md#going-live)).
+- **UI**: screens use only the `ForemanClient` interface. `ui/src/main.tsx`, the UI's composition root, provides the **real client** (HTTP, events, WebSockets).
 
 ```ts
 interface ForemanClient {
@@ -460,15 +434,8 @@ Member ── handoff(lead, branch, summary) ──▶ Workflow: Git.Commit (pen
                                           └▶ Messaging: deliver "⇄ Tove handed off …" to the lead
 Lead ── merge(branch) ──▶ Workflow: Git.Merge into lead/<project>/<team>/<topic> in its worktree ──▶ Git.Contains → work item integrated
 Lead ── request_merge(branch, entry) ──▶ Workflow: checks ──▶ merge request + request "Review" ──▶ Dashboard
-CEO, on a review: Merge ──▶ Workflow ──▶ Git.Squash  │  Create PR ──▶ Git.Push ──▶ Forge.OpenPR  │  Request changes, Dismiss ──▶ delivered to the lead
-(after Create PR) CEO merges on the forge ──▶ Forge.PR (polling) ──▶ Workflow: merged, lead told, other leads told to merge main in ──▶ Git.Fetch
-```
-
-**6. A screen whose backend isn't built yet**
-
-```
-Screen ──▶ ForemanClient (real client) ──▶ that area refuses with NOT_BUILT, no request sent ──▶ the screen says "Not built yet"
-                                        ╲─▶ the endpoints, once that area's backend lands (its lines in client.ts)
+CEO, on a review: Merge ──▶ Workflow ──▶ Git.Squash  │  Request changes, Dismiss ──▶ delivered to the lead
+CEO merges outside Foreman (own git) ──▶ Workflow (polling the targets): merged, lead told, other leads told to merge main in
 ```
 
 ## What is proven, and what isn't

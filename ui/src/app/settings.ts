@@ -1,11 +1,10 @@
 // The Settings screen's tabs (wiki/product/features/settings.md), by topic.
 
-export type SettingsTab = "teams" | "agents" | "git" | "look" | "system";
+export type SettingsTab = "teams" | "agents" | "look" | "system";
 
 export const settingsTabs: { tab: SettingsTab; label: string }[] = [
   { tab: "teams", label: "Teams" },
   { tab: "agents", label: "Agents" },
-  { tab: "git", label: "Git & forges" },
   { tab: "look", label: "Notifications & look" },
   { tab: "system", label: "System" },
 ];

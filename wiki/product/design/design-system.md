@@ -126,7 +126,6 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 - **Status pill** (`StatusPill`): the status's 7px dot and word (12px `--tx2`) on a 16% tint of its color, fully rounded, padding `2px 8px`.
 - **Loading** (`Loading`): where data is still on its way, faint bars (12px, `--hover`, pulsing unless the CEO's system asks for reduced motion) in a panel, in place of the content and never its empty state, which would read as "there's none". Every list, page and file view that waits on the server shows it (the CEO, 2026-10-21).
 - **Empty state**: `1px dashed var(--line2)`, radius 12, `--tx3` text, centered copy.
-- **Not built yet**: an empty state where the server doesn't serve an area yet: "**Not built yet.** The server doesn't serve <the wiki>." ("Not built yet." in `--tx2`, 500), in place of what the area would show.
 - **Overlays** (drawers, side sheet, modals, toasts) use `--panel` and `--shadow`. Layering: side sheet 44, modals 50, toasts 60. See [App shell](../features/app-shell.md).
 
 ## Status colors
@@ -207,4 +206,4 @@ The prototype has no focus styles, no Escape handling, no focus trap and fake di
 
 ## Not to replicate from the prototype
 
-The prototype carries simulation-only state that has no meaning in the real app: section chevrons and collapsible sidebar sections, a forge picker, a theme toggle helper, "needs" counters that disagree with each other, and in-memory edits to the project list. Behaviour is specified by the feature entries, not by the prototype's code.
+The prototype carries simulation-only state that has no meaning in the real app: section chevrons and collapsible sidebar sections, a theme toggle helper, "needs" counters that disagree with each other, and in-memory edits to the project list. Behaviour is specified by the feature entries, not by the prototype's code.

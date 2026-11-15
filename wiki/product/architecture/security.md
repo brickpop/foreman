@@ -13,9 +13,9 @@ v1 has **no user authentication** (one CEO, local machine). That makes the HTTP 
 ## Assets
 
 - The CEO's machine and home directory (credentials in `~/.config`, `~/.ssh`, the keychain).
-- Forge tokens and harness credentials ([Secrets](../models/secrets.md)).
+- Harness credentials ([Session runner → Credentials](./session-runner.md#credentials)), the access token and the agent-link secret.
 - Project code and the CEO's branches of every repo (every branch but an agent's: its default branch and any other).
-- The integrity of decisions: only the CEO decides what reaches the CEO's branches (Foreman merges only on the CEO's Merge; nothing goes to a forge without the CEO's Create PR or Sync) and answers approvals.
+- The integrity of decisions: only the CEO decides what reaches the CEO's branches (Foreman merges only on the CEO's Merge, and never pushes a code repo: the CEO does, with their own git) and answers approvals.
 
 ## Controls
 
@@ -53,9 +53,8 @@ The Session header opens an agent's folder and the project's files in the deskto
 
 Decided: every instance runs in a rootless Podman container ([Session runner](./session-runner.md)).
 - Mounted: the instance's own sandbox, i.e. its git worktrees (rw), each code repo's `.git` (**read-only**, shared by every agent of the project), its private harness config directory (rw), the live project repo with `project.toml` and the wiki (files rw for the lead, else ro; its `.git` ro for everyone), the login file of the project's profile, `~/.foreman/profiles/<name>/` (rw), and `~/.gitconfig` (ro, only if it exists) ([Credentials](./session-runner.md#credentials)).
-- Never mounted: the home directory, `~/.config`, `~/.ssh`, the keychain, the rest of `~/.foreman/` (secrets, state, the global repo, other projects and sandboxes), other agents' worktrees, the CEO's working files.
-- **The secrets store is never mounted into containers** (forge tokens, the access token). The one credential agents hold is their harness's shared login. A misbehaving agent could log it out or corrupt it for every agent of that harness, which then raises "Reconnect" ([Credentials](./session-runner.md#credentials)). Accepted for v1; per-instance logins would contain it.
-- **Forge tokens are used only by Foreman's push path** ([Forge adapters](./forge-adapters.md)); no agent ever receives one.
+- Never mounted: the home directory, `~/.config`, `~/.ssh`, the keychain, the rest of `~/.foreman/` (the access token, credentials, state, the global repo, other projects and sandboxes), other agents' worktrees, the CEO's working files.
+- **Foreman's own secrets are never mounted into containers** (the access token, the agent-link secret). The one credential agents hold is their harness's shared login. A misbehaving agent could log it out or corrupt it for every agent of that harness, which then raises "Reconnect" ([Credentials](./session-runner.md#credentials)). Accepted for v1; per-instance logins would contain it.
 - **Git belongs to Foreman; agents only read it.** Every repo's `.git` is mounted read-only for every agent, the project repo's included (its only writer, the lead, edits its files and commits through `commit`), and every git write is a team tool (`switch`, `commit`, `merge`, `handoff`) that Foreman runs on the host, with the repo's hooks and fsmonitor turned off ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). So the **branch policy** holds by construction, never by hooks in the repo ([where it is enforced](./sandboxes-and-git.md#where-the-policy-is-enforced)), and no agent can damage refs or plant a hook or a `.git/config` setting (`core.hooksPath`, `core.fsmonitor`) that would run a program on the host the next time the CEO or Foreman runs git there. Foreman's review diffs also never run an external diff or textconv program, whoever configured one (the CEO's own config included), as hooks never run. Accepted: every agent can read every branch of the repo. Hiding `.git` entirely is a later option.
 - **Team-tools identity** comes from the per-instance token, never from a field the caller sends ([Team tools](./team-tools.md#transport)). Team messaging is scoped to one deployment.
 
@@ -68,7 +67,7 @@ The Chief of Staff can create teams, hire and refine agents, and changes nothing
 ## Accepted limitations (v1)
 
 - **Network exfiltration.** Containers need the network for model APIs, so an agent can send project code anywhere. Restricting container egress to each harness's API hosts (and package registries for checks) is future work, not v1.
-- **Secrets in PTY logs.** Session logs are raw bytes; anything a harness prints (an env dump, a token in an error) is persisted. Known Foreman secrets are redacted on write; the rest is accepted ([Secrets](../models/secrets.md#invariants)).
+- **Secrets in PTY logs.** Session logs are raw bytes; anything a harness prints (an env dump, a token in an error) is persisted. Known Foreman secrets are redacted on write; the rest is accepted.
 - **Prompt injection between agents.** A reply's `output`, a handoff summary or a finding is text written into another agent's session. A confused or compromised agent (or a challenge team probing the build team) can inject instructions. Mitigations: injected text is framed as quoted data with its sender, length-capped, never crosses deployments ([Team tools](./team-tools.md#delivery)). The real backstop is that nothing reaches the CEO's branches without the CEO: agents make and write only their own branches (`wt/*`, `lead/*`), and every merge into one of the CEO's is the CEO's, on a review that shows all a branch brings along, whatever it started from or merged in.
 - **Wiki as a shared channel.** Agents read the wiki that the lead writes; it is a prompt-injection path inside a deployment, and across deployments on the same project. Accepted: the wiki is the project's shared memory by design.
 - **Shared files as a shared channel.** Every agent of a project reads and writes `<workspace>/files/shared/`, whatever team is deployed: one agent can change or delete what another left there, without the lead and with no history, and a misled agent can leave instructions there for the others (the same path as the wiki, but with any agent as its writer). Accepted (the CEO, 2026-11-06): it is where the agents keep data that outlives a task and a team. The CEO's `files/inbox/` is read-only for every agent; on the Direct engine (no isolation) nothing is.

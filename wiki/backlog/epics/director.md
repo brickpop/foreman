@@ -37,6 +37,6 @@ The design conversation, consolidated. Each card below carries the detail of its
 
 Already in this epic: [Create a team, hire, refine](../cos-create-team.md) (in progress), [The lead proposes changes to its own team](../lead-proposes-team.md), [A Teams page](../teams-page.md), [Project config with the Chief of Staff](../cos-project-config.md) and the decision on [Starter teams](../starter-teams.md).
 
-**Journey steps:** 7 and 25 of [the journey](../../product/journey.md); 27 (project config) later; the cross-project steps get written by [The Director and the leads](../director-leads.md).
+**Journey steps:** 6 and 24 of [the journey](../../product/journey.md); 26 (project config) later; the cross-project steps get written by [The Director and the leads](../director-leads.md).
 
 **Exit criteria:** the steps above work end to end on the real server, with tests on the fake harness.

@@ -2,6 +2,3 @@ checks = ""
 
 # Ask the CEO before any of these:
 # always_ask_ceo = ["new dependency", "touches shared staging"]
-
-[forge]
-kind = "none"

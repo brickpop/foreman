@@ -11,7 +11,7 @@ order: 2
 Cards: [Release build](../archive/release-build.md) (everything embedded, a foreman-agent per CPU type), [First run](../first-run.md) (sensible defaults, a setup checklist), [New project folder](../archive/new-project-folder.md) (create a project from nothing), [Profiles per agent](../profiles-per-agent.md) and [Model, effort and auto-compact per agent](../agent-model-settings.md) (later; profiles themselves, a harness and its login, one per project, are built: [Session runner → Credentials](../../product/architecture/session-runner.md#credentials)), [Stop containers on exit](../archive/stop-containers-on-exit.md) (agents asleep on the next start) and [Pi as a second harness](../pi-harness.md) (after idle sleep) and [Codex as a harness](../codex-harness.md), and [Free memory before the machine runs out](../memory-pressure.md) (later).
 
 Next (the CEO, 2026-11-15: before installing Foreman on a second machine), in order:
-1. [Remove the forge](../remove-forge.md): a clean slate; merges stay local, the CEO pushes code.
+1. [Remove the forge](../archive/remove-forge.md): a clean slate; merges stay local, the CEO pushes code.
 2. [One Foreman folder](../foreman-folder.md): `~/foreman/{hq,projects,repos,worktrees}`, HQs, the global repo gone (replaces [Project workspaces](../archive/project-workspaces.md) and its migration).
 3. [The wiki at the HQ's root](../wiki-at-root.md).
 4. [Portable projects](../portable-projects.md): `projects.toml`, automatic sync of the HQs, restore and Bring here on a new machine. The CEO's one-off move script runs after it, then the new machine restores.

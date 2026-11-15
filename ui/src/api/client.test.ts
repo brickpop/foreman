@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, httpClient, isNotBuilt } from "./client";
+import { ApiError, httpClient } from "./client";
 
 type Call = { url: string; method: string; body?: string; headers?: Record<string, string> };
 
@@ -414,21 +414,5 @@ describe("httpClient", () => {
       url: "http://x/api/requests/req%2F1/dismiss",
       method: "POST",
     });
-  });
-
-  it("refuses the areas the server doesn't serve yet, without asking it", async () => {
-    const calls = stubFetch(200, []);
-    const c = httpClient("http://x");
-    for (const call of [() => c.forge.accounts()]) {
-      const e = await call().catch((e: unknown) => e);
-      expect(isNotBuilt(e)).toBe(true);
-    }
-    expect(calls).toEqual([]);
-  });
-
-  it("tells a refusal that isn't NOT_BUILT apart", () => {
-    expect(isNotBuilt(new ApiError("taken", "CONFLICT"))).toBe(false);
-    expect(isNotBuilt(new Error("NOT_BUILT"))).toBe(false);
-    expect(isNotBuilt(undefined)).toBe(false);
   });
 });

@@ -307,15 +307,6 @@ export function Empty({ children }: { children: ReactNode }) {
   );
 }
 
-/** Where the server doesn't serve an area yet (isNotBuilt). */
-export function NotBuilt({ what }: { what: string }) {
-  return (
-    <Empty>
-      <span className="font-medium text-tx2">Not built yet.</span> The server doesn't serve {what}.
-    </Empty>
-  );
-}
-
 /** A section label ("Projects", "Needs you"). */
 /** A small label over a group inside a section (a review's repo in its tree). */
 export function SectionLabel({ children }: { children: ReactNode }) {

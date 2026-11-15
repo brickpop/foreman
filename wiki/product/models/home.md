@@ -19,7 +19,6 @@ A project's own files are not in the home: they are in its **workspace**, a fold
 | **Project knowledge base** | `<workspace>/project/wiki/` (`wiki.toml`, board, product, ADRs), in the project repo | The lead commits through `commit()` (no review); other agents through `contribute`; the CEO in their editor | Read-only prose. Exceptions, as in wikiview: toggling a checkbox, and moving a board card (rewrites one frontmatter field). See [Wiki engine](../architecture/wiki-engine.md). |
 | **Team definitions** | `config/teams/<team>.toml`, in the global repo | The UI (one commit per save, the Chief of Staff's proposals included), or the editor | Editable in the UI. Changes write to the file and apply to every running instance on its next turn. See [Team definition](./team-definition.md). |
 | **Global settings** | `config/settings.toml`, in the global repo | The UI (one commit per save) | Editable in the UI. See [Global settings](./global-settings.md). |
-| **Secrets** | OS keychain, or a 0600 file in the home, outside the global repo | The UI | Write-only fields. Never written into a repo. See [Secrets](./secrets.md). |
 | **Runtime state** | `state.db` (SQLite) | Foreman | Projects' records, deployments, instances, requests, team messages, work items, merge requests, read markers. See [Persistence](../architecture/persistence.md). |
 | **Session logs** | `logs/<agent>@<project>/<session-id>.log` | Foreman | Raw terminal byte stream: each session's history and audit trail. |
 
@@ -27,7 +26,7 @@ The file watcher reloads `config/` and each project's `project.toml` within abou
 
 ### The global repo
 
-`config/` is a git repo, made (`git init`, a first commit "Global repo") the first time Foreman starts on the home; teams and settings put there by hand come in with that commit. It versions what the CEO owns: `teams/` and `settings.toml`. Its `.gitignore` holds `*.tmp` (the files a save writes before its rename); when a newer Foreman ignores a new line, it is added at start, in one commit, keeping the CEO's lines. Every save from the UI is **one commit**, and so is every Chief of Staff proposal the CEO confirms: the Chief of Staff never writes here itself ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)). Nothing is pushed automatically: with a forge set, the CEO pushes `main` there with **Sync** in [Settings](../features/settings.md#forge-accounts) ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)).
+`config/` is a git repo, made (`git init`, a first commit "Global repo") the first time Foreman starts on the home; teams and settings put there by hand come in with that commit. It versions what the CEO owns: `teams/` and `settings.toml`. Its `.gitignore` holds `*.tmp` (the files a save writes before its rename); when a newer Foreman ignores a new line, it is added at start, in one commit, keeping the CEO's lines. Every save from the UI is **one commit**, and so is every Chief of Staff proposal the CEO confirms: the Chief of Staff never writes here itself ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)). Nothing is pushed automatically: the CEO pushes it with their own git (its automatic sync comes with [Portable projects](../../backlog/portable-projects.md)).
 
 The global repo is its own subfolder, not the home itself, so that git run in a legacy sandbox (under `sandboxes/`) never finds it as an enclosing repo (the CEO, 2026-10-20).
 
@@ -54,7 +53,7 @@ foreman [--home <dir>] [--no-open] [--port 8888] [--new-token]
 ~/.foreman/
 ├─ config/                 the global repo (git)
 │  ├─ .gitignore           *.tmp
-│  ├─ settings.toml        global settings (port, limits, engine, forges, notifications)
+│  ├─ settings.toml        global settings (port, limits, engine, notifications)
 │  └─ teams/               team definitions (souls + playbooks)
 │     └─ atlas.toml
 ├─ harness/
@@ -92,8 +91,8 @@ The code repos are wherever the CEO keeps them, e.g. `~/dev/ledger-api`. A proje
 
 ## Invariants
 
-- The home is 0700: it holds the access token, the logins and the secrets.
+- The home is 0700: it holds the access token, the agent-link secret and the logins.
 - Nothing in the home but an agent's own harness folder is mounted into its container, beside its sandbox and its project's repo in the workspace, plus each code repo's `.git` read-only at its own path (so the worktree's link resolves) and the login of the project's profile ([Session runner → Credentials](../architecture/session-runner.md#credentials)). The one exception is the Chief of Staff: its own `cos/` and `config/teams/` read-only; it changes team files only through `propose_team`, which Foreman writes on the CEO's click ([Chief of Staff → How it runs](../features/chief-of-staff.md#how-it-runs)).
 - No code repo or workspace is inside the home, and the home is never added as a repo. Both are inside `$HOME`.
 - A workspace isn't inside a code repo (its worktrees would show in it), nor inside or around another project's.
-- Secrets are never written into a repo or a log.
+- The access token and the agent-link secret are never written into a repo or a log.

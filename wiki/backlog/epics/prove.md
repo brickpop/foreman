@@ -14,7 +14,7 @@ order: 0
 
 **Usable when done:** nothing new for the CEO: a design that is known to work.
 
-**Journey steps it underpins:** 1–3 and 9 (engine, images, login), 13–14 (agent link, delivery), 21–22 (waiting for the CEO). See [the journey](../../product/journey.md).
+**Journey steps it underpins:** 1–3 and 8 (engine, images, login), 12–13 (agent link, delivery), 20–21 (waiting for the CEO). See [the journey](../../product/journey.md).
 
 **Exit criteria:** every experiment card is retired with PASS, or with FAIL and the specs already changed to the alternative design.
 

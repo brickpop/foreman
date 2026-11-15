@@ -22,9 +22,6 @@ packages:
   - path: github.com/brickpop/foreman/internal/runner
     output_path: ui/src/api/types/runner.ts
     include_files: [types.go]
-  - path: github.com/brickpop/foreman/internal/forge
-    output_path: ui/src/api/types/forge.ts
-    include_files: [types.go]
   - path: github.com/brickpop/foreman/internal/messaging
     output_path: ui/src/api/types/messaging.ts
     include_files: [types.go]

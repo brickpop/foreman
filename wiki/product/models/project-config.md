@@ -1,12 +1,12 @@
 ---
 type: spec
 status: planned
-tags: [model, config, home, forge]
+tags: [model, config, home]
 ---
 
 # Project config
 
-A project is a **record** in Foreman's database (its name, its workspace, its code repos, its profile) plus its **project repo** at `<workspace>/project/`, whose `project.toml` holds the project's rules: the checks, the gates that always reach the CEO, and the forge where the CEO can create PRs. The UI shows it **read-only**; changes are made in the CEO's editor ([Project settings](../features/project-settings.md)); changes by the [Chief of Staff](../features/chief-of-staff.md) come later ([Project config with the Chief of Staff](../../backlog/cos-project-config.md)). Deployments are **not** in this file: they are runtime state ([Deployment](./deployment.md)).
+A project is a **record** in Foreman's database (its name, its workspace, its code repos, its profile) plus its **project repo** at `<workspace>/project/`, whose `project.toml` holds the project's rules: the checks and the gates that always reach the CEO. The UI shows it **read-only**; changes are made in the CEO's editor ([Project settings](../features/project-settings.md)); changes by the [Chief of Staff](../features/chief-of-staff.md) come later ([Project config with the Chief of Staff](../../backlog/cos-project-config.md)). Deployments are **not** in this file: they are runtime state ([Deployment](./deployment.md)).
 
 ## The project record
 
@@ -18,7 +18,7 @@ Kept in `state.db` (tables `projects` and `project_repos`, [Persistence](../arch
 - **profile**: the [profile](../architecture/session-runner.md#credentials) its agents run on (a harness and its login); empty means `default`. Set from [Project settings](../features/project-settings.md) (`PUT /api/projects/{id}/profile`); it reaches each agent at its next start.
 - **hidden** (the CEO, 2026-11-13, replacing **archived** of 2026-10-23, which also refused deploys and had to come before a removal): out of sight only, out of the sidebar's projects (into its collapsed **More** group, [App shell](../features/app-shell.md#sidebar)) and the [Dashboard](../features/dashboard.md#projects). Everything else works as for any project, deploying and a team on it included, and removing it ([Add a project → Removing a project](../features/add-project.md#removing-a-project)). Set from [Project settings](../features/project-settings.md) (`PUT /api/projects/{id}/hidden`). On this machine only, like the rest of the record.
 - **code repos**: each a **name** (unique in the project in any case, never `project`), an absolute **path** anywhere in the CEO's home folder, its **root commit** (the lowest hash among the commits with no parent), kept so that **Locate** accepts only a folder holding that commit, and its **default branch** (below).
-- **default branch**, one per code repo (the CEO, 2026-10-21; called its main branch until 2026-11-02): the branch its agents start their branches from, its idle desks follow, and its merges go to unless the lead names another branch ([Pipeline and merges → Where a merge goes](../features/pipeline-and-merges.md#where-a-merge-goes)). One of the CEO's branches, like every branch but an agent's: no agent writes it; it changes only by the CEO's decision: Merge, a PR merged on the forge, or the CEO's own git. It is `main` when the repo has a branch of that name; otherwise the add dialog asks which branch is its default (listing its branches, the checkout's preselected, `GET /api/folders/branches`). A new empty repo is made on `main`. [Repos](../features/repos.md) changes it to any branch the repo has but an agent's (`wt/*`, `lead/*`: agents write those, so no merge ever goes into one; adding a repo refuses them too) (`PUT /api/projects/{id}/repos/{repo}/default`); that just sets it: worktrees made before stay on their branches, and open merge requests keep the branch they go into. One a repo no longer has (renamed) is flagged there, and its agents can't start: their start fails with the reason in their pane ([Instance](./instance.md)). Repos added before 2026-10-21 got `main`. Kept in `state.db` as `default_branch` on `project_repos` (since migration 021, the CEO, 2026-11-06, which dropped the list of targets of 2026-11-02, keeping each repo's default). The project repo is always on `main` (Foreman makes it).
+- **default branch**, one per code repo (the CEO, 2026-10-21; called its main branch until 2026-11-02): the branch its agents start their branches from, its idle desks follow, and its merges go to unless the lead names another branch ([Pipeline and merges → Where a merge goes](../features/pipeline-and-merges.md#where-a-merge-goes)). One of the CEO's branches, like every branch but an agent's: no agent writes it; it changes only by the CEO's decision: Merge, or the CEO's own git (a PR the CEO merged on a forge included). It is `main` when the repo has a branch of that name; otherwise the add dialog asks which branch is its default (listing its branches, the checkout's preselected, `GET /api/folders/branches`). A new empty repo is made on `main`. [Repos](../features/repos.md) changes it to any branch the repo has but an agent's (`wt/*`, `lead/*`: agents write those, so no merge ever goes into one; adding a repo refuses them too) (`PUT /api/projects/{id}/repos/{repo}/default`); that just sets it: worktrees made before stay on their branches, and open merge requests keep the branch they go into. One a repo no longer has (renamed) is flagged there, and its agents can't start: their start fails with the reason in their pane ([Instance](./instance.md)). Repos added before 2026-10-21 got `main`. Kept in `state.db` as `default_branch` on `project_repos` (since migration 021, the CEO, 2026-11-06, which dropped the list of targets of 2026-11-02, keeping each repo's default). The project repo is always on `main` (Foreman makes it).
 
 A repo is added by the path of a git repo's top folder: its `.git` a folder (it is mounted read-only at its own path), with at least one commit, its real path inside the CEO's home folder (`$HOME`) and outside Foreman's home ([Add a project → Picking repos](../features/add-project.md#picking-repos)), and not already in the project. Or a **new** empty repo is made at a path that doesn't exist yet, inside `$HOME` too (a README in a first commit, on `main`). A repo may be in several projects (a docs repo several projects read). Foreman never moves or deletes a code repo, nor touches its files: it writes only in its `.git` (the agents' branches and the records of their worktrees, which live in the workspace) ([Sandboxes and git policy](../architecture/sandboxes-and-git.md)).
 
@@ -37,7 +37,7 @@ A project's **workspace** is a folder of the CEO's holding the project's own fil
 
 Every project has **one reserved git repo**, `<workspace>/project/`, made by **New project** (`POST /api/projects`). It carries what the project *is* rather than its code: `project.toml` and the project's knowledge base, the [wiki bundle](../architecture/wiki-engine.md) `project/wiki/` (`wiki.toml`, the board's task cards, product specs, ADRs, and `inbox/` for [contributions](../architecture/team-tools.md#tools)). [Add a project](../features/add-project.md) creates it (`git init`, `project.toml`, a starter wiki, `AGENTS.md`), or clones an existing one from a git URL or a local path with the CEO's own git ([Add a project → Effect](../features/add-project.md#effect)). It is never a code repo: agents get no worktree of it, but one live checkout shared by the whole team, writable by the lead only ([Sandboxes and git policy](../architecture/sandboxes-and-git.md#project-knowledge-base)).
 
-The project repo uses the project's `forge`, like the code repos, at the URL `forge.project_repo` names explicitly (any repo name, since `project` would clash between projects under one owner). Nothing is pushed on its own: the CEO pushes its `main` with **Sync** in [Project settings](../features/project-settings.md) ([Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)). Foreman's own writes to it (contributions, the CEO's checkbox ticks and card moves) are committed directly, one commit per write ([Sandboxes and git policy](../architecture/sandboxes-and-git.md#project-knowledge-base)).
+Nothing is pushed on its own: the CEO pushes its `main` with their own git, to its `origin` (its automatic sync comes with [Portable projects](../../backlog/portable-projects.md)). Foreman's own writes to it (contributions, the CEO's checkbox ticks and card moves) are committed directly, one commit per write ([Sandboxes and git policy](../architecture/sandboxes-and-git.md#project-knowledge-base)).
 
 ## Example
 
@@ -51,11 +51,6 @@ always_ask_ceo = [                     # gates: these always raise an approval r
 ]
 recursive_submodules = false           # also the submodules of submodules, in the agents' worktrees
 landing_prefixes = ["f/", "feat/", "fix/"]  # the names a lead may propose for a branch its merge lands on
-
-[forge]
-kind = "forgejo"                       # github | forgejo | gitea | none
-url = "https://localhost:3000/ledger"  # org/owner base; repo name on the forge = the repo's name in the project
-project_repo = "https://localhost:3000/ledger/ledger-project"  # the project repo on the forge: any name
 ```
 
 ## Schema
@@ -64,20 +59,17 @@ project_repo = "https://localhost:3000/ledger/ledger-project"  # the project rep
 |---|---|---|---|---|---|
 | `description` | String | | | one line | Shown at the head of the project's Wiki and on its Dashboard card |
 | `checks` | String | | | shell command | Run in a sandbox before handoff and on a merge request ([Pipeline and merges](../features/pipeline-and-merges.md)) |
-| `forge.kind` | String | | `none` | enum: `github`, `forgejo`, `gitea`, `none` | `none` = no forge: a review merges locally, with no Create PR ([Forge adapters](../architecture/forge-adapters.md)). A missing `forge` table means `none`; New project writes it explicitly |
-| `forge.url` | String (URL) | when `kind` ≠ `none` | | | Org/owner base URL; the repo name on the forge = the repo's name in the project |
-| `forge.project_repo` | String (URL) | when `kind` ≠ `none` | | | The [project repo](#the-project-repo) on the forge, given in full: its name is free, since `project` would clash between projects under one owner. Sync pushes `main` there |
 | `always_ask_ceo` | Array of String | | `[]` | | Gates. Hitting one makes the agent raise an approval [request](../features/requests.md). Listed in each [session prompt](../architecture/session-prompt.md) |
 | `recursive_submodules` | Boolean | | `false` | | Also check out the submodules of submodules in the agents' worktrees ([Sandboxes and git policy → Submodules](../architecture/sandboxes-and-git.md#submodules)). Off by default (the CEO, 2026-10-19) |
 | `landing_prefixes` | Array of strings | | `["f/", "feat/", "fix/"]` | each a folder of branches, ending in `/`, never `wt/` or `lead/` | The names a lead may propose, with `request_merge`'s `land`, for a new branch its merge lands on, made only when the CEO merges ([Pipeline and merges → Where a merge goes](../features/pipeline-and-merges.md#where-a-merge-goes)). `[]`: none; the CEO names one at Merge anyway. The default when the key is left out (the CEO, 2026-11-11) |
 
-The wiki has no field: it is always `wiki/` in the project repo. A `project` or `repos` field is reported as one Foreman doesn't know: the name and the repos are the [record](#the-project-record)'s. A `main` field (every `project.toml` before 2026-10-21 has `main = "main"`) is a problem saying each code repo has its own default branch now (Repos) and to remove the line; so is a `merge_to_main` field (every `project.toml` before 2026-11-02 has `merge_to_main = "ceo"`, the only value it ever took), saying only the CEO merges, always. Like any problem, each blocks new deployments until the line is gone.
+The wiki has no field: it is always `wiki/` in the project repo. A `project`, `repos` or `forge` field (the forge was removed on 2026-11-15) is reported as one Foreman doesn't know: the name and the repos are the [record](#the-project-record)'s. A `main` field (every `project.toml` before 2026-10-21 has `main = "main"`) is a problem saying each code repo has its own default branch now (Repos) and to remove the line; so is a `merge_to_main` field (every `project.toml` before 2026-11-02 has `merge_to_main = "ceo"`, the only value it ever took), saying only the CEO merges, always. Like any problem, each blocks new deployments until the line is gone.
 
 ## Invariants
 
 - The project repo's folder name is the project id.
 - Foreman never writes this file after New project made it.
-- No secret ever appears in this file. The forge token lives in [Secrets](./secrets.md).
+- No secret ever appears in this file.
 
 ## Invalid config
 

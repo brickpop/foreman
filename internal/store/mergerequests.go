@@ -41,7 +41,7 @@ func (db *DB) MergeRequests() MergeRequests { return mergeRequests{db.sql} }
 
 type mergeRequests struct{ db *sql.DB }
 
-const mergeRequestColumns = "seq, project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, forge_pr_url, forge_pr_number, note, created_at, merged_at, rejected_at, review_id, reviewed_head, head, base, target, landing"
+const mergeRequestColumns = "seq, project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, note, created_at, merged_at, rejected_at, review_id, reviewed_head, head, base, target, landing"
 
 func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, error) {
 	if m.State == "" {
@@ -51,10 +51,10 @@ func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, 
 		m.CreatedAt = time.Now().UTC()
 	}
 	values := []any{nullText(m.ProjectID), nullText(m.DeploymentID), m.AuthorInstance, m.Repo, m.Branch, nullText(m.Entry), m.State,
-		nullText(m.ChecksStatus), m.Conflicting, nullText(m.ForgePRURL), m.ForgePRNumber, nullText(m.Note),
+		nullText(m.ChecksStatus), m.Conflicting, nullText(m.Note),
 		timeText(m.CreatedAt), timeText(m.MergedAt), timeText(m.RejectedAt), nullText(m.ReviewID), nullText(m.ReviewedHead), nullText(m.Head), nullText(m.Base), m.Target, m.Landing}
 	if m.ID == "" {
-		res, err := s.db.ExecContext(ctx, "INSERT INTO merge_requests (project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, forge_pr_url, forge_pr_number, note, created_at, merged_at, rejected_at, review_id, reviewed_head, head, base, target, landing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
+		res, err := s.db.ExecContext(ctx, "INSERT INTO merge_requests (project_id, deployment_id, author_instance, repo, branch, entry, state, checks_status, conflicting, note, created_at, merged_at, rejected_at, review_id, reviewed_head, head, base, target, landing) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", values...)
 		if err != nil {
 			return m, err
 		}
@@ -66,7 +66,7 @@ func (s mergeRequests) Save(ctx context.Context, m MergeRequest) (MergeRequest, 
 	if err != nil {
 		return m, err
 	}
-	res, err := s.db.ExecContext(ctx, "UPDATE merge_requests SET project_id = ?, deployment_id = ?, author_instance = ?, repo = ?, branch = ?, entry = ?, state = ?, checks_status = ?, conflicting = ?, forge_pr_url = ?, forge_pr_number = ?, note = ?, created_at = ?, merged_at = ?, rejected_at = ?, review_id = ?, reviewed_head = ?, head = ?, base = ?, target = ?, landing = ? WHERE seq = ?", append(values, seq)...)
+	res, err := s.db.ExecContext(ctx, "UPDATE merge_requests SET project_id = ?, deployment_id = ?, author_instance = ?, repo = ?, branch = ?, entry = ?, state = ?, checks_status = ?, conflicting = ?, note = ?, created_at = ?, merged_at = ?, rejected_at = ?, review_id = ?, reviewed_head = ?, head = ?, base = ?, target = ?, landing = ? WHERE seq = ?", append(values, seq)...)
 	return m, touched(res, err)
 }
 
@@ -122,13 +122,13 @@ func (s mergeRequests) query(ctx context.Context, where string, args ...any) ([]
 	for rows.Next() {
 		var m MergeRequest
 		var seq int64
-		var project, deployment, entry, checks, prURL, note, created, merged, rejected, review, reviewed, head, base sql.NullString
+		var project, deployment, entry, checks, note, created, merged, rejected, review, reviewed, head, base sql.NullString
 		if err := rows.Scan(&seq, &project, &deployment, &m.AuthorInstance, &m.Repo, &m.Branch, &entry, &m.State, &checks,
-			&m.Conflicting, &prURL, &m.ForgePRNumber, &note, &created, &merged, &rejected, &review, &reviewed, &head, &base, &m.Target, &m.Landing); err != nil {
+			&m.Conflicting, &note, &created, &merged, &rejected, &review, &reviewed, &head, &base, &m.Target, &m.Landing); err != nil {
 			return nil, err
 		}
 		m.ID = "mr-" + strconv.FormatInt(seq, 10)
-		m.ProjectID, m.DeploymentID, m.Entry, m.ChecksStatus, m.ForgePRURL, m.Note = project.String, deployment.String, entry.String, checks.String, prURL.String, note.String
+		m.ProjectID, m.DeploymentID, m.Entry, m.ChecksStatus, m.Note = project.String, deployment.String, entry.String, checks.String, note.String
 		m.ReviewID, m.ReviewedHead = review.String, reviewed.String
 		m.Head, m.Base = head.String, base.String
 		if m.CreatedAt, err = parseTime(created); err != nil {

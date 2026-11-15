@@ -6,7 +6,7 @@ import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState
 import type { NewComment, RepoDiff, ReviewComment, Review as ReviewData } from "../../api/client";
 import { type DiffLine, diffFiles, type FileDiff, foldedAtFirst } from "../../app/diff";
 import { fileTree, type TreeNode, treeOrder } from "../../app/fileTree";
-import { agentBranch, agentOf, forgeOf, linkLine, projectName, when } from "../../app/model";
+import { agentBranch, agentOf, linkLine, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
   keys,
@@ -187,7 +187,6 @@ export function Review() {
         <Loading rows={6} />
       </Page>
     );
-  const project = projects.data?.find((p) => p.id === v.projectId);
   const lead = agentOf(teams.data ?? [], v.deploymentId, v.lead);
   // Two panes under the header, each scrolling on its own: going to a file
   // moves the diffs, never the tree.
@@ -361,7 +360,6 @@ export function Review() {
         <DecisionBar
           review={v}
           lead={lead?.soul.name ?? "the lead"}
-          forge={forgeOf(project)}
           diffs={diff.data}
           dismissAs={dismissChoices(
             reviewTeam(v, deployments.data ?? [], teams.data ?? []),
@@ -882,14 +880,12 @@ function Composer({
 function DecisionBar({
   review: v,
   lead,
-  forge,
   diffs,
   dismissAs,
   failed,
 }: {
   review: ReviewData;
   lead: string;
-  forge: string;
   diffs: RepoDiff[] | undefined;
   dismissAs: DismissChoice[];
   failed: (e: Error) => void;
@@ -1011,9 +1007,9 @@ function DecisionBar({
     const line = (
       <span
         className={`min-w-0 truncate font-mono text-[12.5px] ${m.conflicting ? "text-err" : "text-tx2"}`}
-        title={linkLine(m, forge)}
+        title={linkLine(m)}
       >
-        {linkLine(m, forge)}
+        {linkLine(m)}
       </span>
     );
     return (

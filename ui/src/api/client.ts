@@ -2,7 +2,6 @@ import { createContext, useContext } from "react";
 import { type EventHandlers, subscribeEvents } from "./events";
 import { openPty, type PtyConnection, type PtyHandlers } from "./pty";
 import type { Proposal } from "./types/cos";
-import type { Account as ForgeAccount } from "./types/forge";
 import type { Commit, TreeEntry } from "./types/git";
 import type { Endpoint, EndpointChange, Status as HarnessStatus } from "./types/harness";
 import type {
@@ -84,7 +83,6 @@ export type {
   Field,
   Folder,
   FolderEntry,
-  ForgeAccount,
   HarnessStatus,
   ImageStatus,
   Instance,
@@ -258,12 +256,6 @@ export interface SetupArea {
   createMachine(size: { cpus: number; memory: number }): Promise<void>;
 }
 
-export interface ForgeArea {
-  accounts(): Promise<ForgeAccount[]>;
-  /** Checks the token against the forge, then stores it with the host. */
-  connect(kind: string, url: string, token: string): Promise<void>;
-}
-
 export interface RequestsArea {
   list(): Promise<Request[]>;
   resolve(id: string, answer: string): Promise<void>;
@@ -403,7 +395,6 @@ export interface ForemanClient {
   preferences: PreferencesArea;
   maintenance: MaintenanceArea;
   setup: SetupArea;
-  forge: ForgeArea;
   requests: RequestsArea;
   messages: MessagesArea;
   pipeline: PipelineArea;
@@ -633,11 +624,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         send("POST", `/api/requests/${id(request)}/resolve`, { answer }),
       dismiss: (request) => send("POST", `/api/requests/${id(request)}/dismiss`),
     },
-    // The areas below wait on their server side: each screen says "Not built yet".
-    forge: {
-      accounts: notBuilt("forge accounts"),
-      connect: notBuilt("forge accounts"),
-    },
     repos: {
       list: (project) => getJSON(`/api/projects/${id(project)}/repos`),
       tree: (project, repo, ref, path) =>
@@ -683,12 +669,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
 }
 
 /** An area the server doesn't serve yet: every call is refused with NOT_BUILT. */
-const notBuilt = (what: string) => (): Promise<never> =>
-  Promise.reject(new ApiError(`The server doesn't serve ${what} yet`, "NOT_BUILT"));
-
-/** Whether a failure is an area that isn't built yet, which a screen shows as "Not built yet". */
-export const isNotBuilt = (e: unknown): boolean => e instanceof ApiError && e.code === "NOT_BUILT";
-
 /** A refused request, with the API's machine code (CONFLICT, INVALID, …). */
 export class ApiError extends Error {
   constructor(

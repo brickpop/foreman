@@ -46,7 +46,6 @@ export const keys = {
   harnesses: ["harnesses"],
   profiles: ["profiles"],
   preferences: ["preferences"],
-  forge: ["forge"],
   maintenance: ["maintenance"],
   setup: ["setup"],
   messages: ["messages"],

@@ -14,7 +14,7 @@ Decided ([Pipeline and merges → Where a merge goes](../../product/features/pip
 - the list of targets is gone: a merge request goes into any branch of the repo but an agent's (`wt/*`, `lead/*`), the default when the lead names none; the CEO can move it to any such branch on the review
 - agents start work from anywhere (any branch, a remote's, a commit) and merge whatever they like into their own branches: nothing gained by refusing, and the review shows what a branch brings along
 - the rules about one card or topic per branch and at most two open merge requests become advice: more when the work justifies them, and work held back is said
-- Merge is local only (nothing is pushed); Create PR is a later card ([The forge](../git-forge.md))
+- Merge is local only (nothing is pushed); Create PR is a later card (The forge card (retired 2026-11-15, [Remove the forge](./remove-forge.md)))
 
 - [x] store: migration 021 keeps each repo's default branch (`project_repos.default_branch`) and drops `repo_targets`
 - [x] home, server, UI: `CreateTarget`, `RemoveTarget`, `ForgetGoneTargets`, the targets route, the Repos chips and `targetsOf` removed; a default branch is any branch but an agent's

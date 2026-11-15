@@ -51,16 +51,14 @@ Acceptance:
 
 ## 5. Merge review
 
-Mara calls `request_merge("lead/ledger/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO reviews it in Foreman and merges to main, requests changes with comments, or dismisses it with a reason; or creates a PR on Forgejo and merges there.
+Mara calls `request_merge("lead/ledger/atlas/integration", "backlog/LED-44.md")`. Foreman runs the checks. A review request appears. The CEO reviews it in Foreman and merges to main, requests changes with comments, or dismisses it with a reason.
 
 Acceptance:
-- [ ] `request_merge` from the lead runs the project checks and creates a [merge request](./models/merge-request.md) for each repo with new commits, titled from the entry and carrying every integrated work item (they leave "In flight" and are listed under it). Nothing is pushed to the forge.
-- [ ] A review request appears with the entry's title and the repos, and a Review button that opens its review: the files changed by repo, the diff, the checks per repo, and Merge / Request changes / Dismiss (Create PR on Forgejo comes with the forge).
+- [ ] `request_merge` from the lead runs the project checks and creates a [merge request](./models/merge-request.md) for each repo with new commits, titled from the entry and carrying every integrated work item (they leave "In flight" and are listed under it). Nothing is pushed.
+- [ ] A review request appears with the entry's title and the repos, and a Review button that opens its review: the files changed by repo, the diff, the checks per repo, and Merge / Request changes / Dismiss.
 - [ ] Comments on lines and general ones stay drafts until Request changes sends them to the lead in one message, each with its repo, file and line; the lead's next `request_merge` shows the new diff, a comment whose line changed is marked outdated, and "Since your last review" shows only what changed.
 - [ ] Merge merges the branch into its target (the repo's default branch unless the lead named another) on the host, resolves the request, tells the lead, and lists the merge request with its work items under Merged. A branch that doesn't merge cleanly changes nothing, shows "conflicts with <target>" and asks the lead to merge the target in.
 - [ ] The CEO makes `release/2.0` in api with git; the lead starts a branch from it with `switch(branch, from)` and asks with `request_merge(…, into: "release/2.0")`; the review is reckoned against `release/2.0`, Merge lands there and not on the default branch, and the CEO can move an open repo of a review to any other branch of that repo but an agent's. `into` naming a branch a repo with new commits lacks is refused, naming that repo.
-- [ ] Create PR pushes the branch and opens a PR on the forge; the panel then shows Open PR ↗. When the CEO merges it on the forge, Foreman notices within a polling interval, resolves the request and notifies the lead; closing it without merging rejects the merge request and tells the lead to stop work on it; review comments made on the forge reach the lead's session.
-- [ ] On a repo without a forge, Create PR is not offered.
 - [ ] Dismiss (the work isn't wanted) keeps the team working (its lead told to stop, with an optional note), or stops it, keeping or dropping the branches (dropped ones recoverable under `refs/foreman/dismissed/`; never under a team left running); closes the PR if there is one; its work items leave In flight.
 - [ ] A non-lead calling `request_merge` is refused; so is an entry that doesn't exist in the wiki.
 - [ ] Two lead branches (of one lead, or of two teams' leads) can each have an open merge request at the same time; `request_merge` on a branch outside `lead/<project>/<own team>/*` is refused.
@@ -105,11 +103,11 @@ Acceptance:
 
 *Later* ([Project config with the Chief of Staff](../backlog/cos-project-config.md)): how the change is approved is decided there; the scenario below is the earlier proposal.
 
-In Project Settings, choose "Change with Chief of Staff" and ask it to "Use GitHub as the forge". A branch is created with the edit, and a review request appears.
+In Project Settings, choose "Change with Chief of Staff" and ask it to "Ask me before any new dependency". A branch is created with the edit, and a review request appears.
 
 Acceptance:
 - [ ] The CoS edits `project.toml` on a branch `foreman/config-N` of the project repo, never on `main`.
-- [ ] A review request appears in the project's Inbox, with Merge to main, Create PR (when the project repo has a forge) and Reject; once merged, `project.toml` on `main` changes and the UI reflects it within 1 s; Reject leaves `main` untouched and tells the Chief of Staff why.
+- [ ] A review request appears in the project's Inbox, with Merge to main and Reject; once merged, `project.toml` on `main` changes and the UI reflects it within 1 s; Reject leaves `main` untouched and tells the Chief of Staff why.
 
 ## 11. Read the wiki
 

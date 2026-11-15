@@ -101,8 +101,6 @@ DELETE /api/profiles/:name/connect            end its login, if one runs (the Co
 GET    /api/profiles/:name/endpoint           a Pi profile's model server: {url, model, contextWindow, maxTokens, apiKeySet}, zero when unset; the key is never sent (400 INVALID for a login harness; 404)
 PUT    /api/profiles/:name/endpoint           {url, apiKey, model, contextWindow, maxTokens} → 204; an empty apiKey keeps the one set (400 INVALID with the reason; 404)
 POST   /api/profiles/:name/endpoint/models    {url, apiKey} → the ids the server lists (GET <url>/models, asked from Foreman; an empty apiKey uses the one set); 502 UNREACHABLE with the server's error (400 INVALID; 404)
-GET    /api/secrets/forge                     [{kind, tokenSet}]: which forges have a token (never the token)
-PUT    /api/secrets/forge/:kind               {url, token}: check the token against the forge, store it, save the host in forges.<kind>
 GET    /api/maintenance                       {running, engine, podman, images}: the engine running now (podman or direct) and its state; why Podman can't be chosen ("" when installed); each image's name, ref, state, last build log
 POST   /api/maintenance/rebuild               202: rebuild the images without cache; GET /api/maintenance follows it
 

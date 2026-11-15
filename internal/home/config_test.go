@@ -25,11 +25,6 @@ const projectExample = `
 description = "Settlement and reconciliation service."
 checks = "npm test"
 always_ask_ceo = ["new dependency"]
-
-[forge]
-kind = "forgejo"
-url = "https://localhost:3000/ledger"
-project_repo = "https://localhost:3000/ledger/ledger-project"
 `
 
 func TestProjectExampleParsesWithDefaults(t *testing.T) {
@@ -37,11 +32,11 @@ func TestProjectExampleParsesWithDefaults(t *testing.T) {
 	if len(p) > 0 {
 		t.Fatalf("problems: %v", p)
 	}
-	if c.Forge.Kind != "forgejo" || len(c.AlwaysAskCEO) != 1 {
+	if c.Checks != "npm test" || len(c.AlwaysAskCEO) != 1 {
 		t.Errorf("parsed %+v", c)
 	}
 	minimal, p := ParseProject(nil)
-	if len(p) > 0 || minimal.Forge.Kind != "none" {
+	if len(p) > 0 || minimal.Checks != "" {
 		t.Errorf("minimal: %+v %v", minimal, p)
 	}
 	// Landing prefixes: the default without the key, none with [], else the list.
@@ -58,18 +53,16 @@ func TestProjectExampleParsesWithDefaults(t *testing.T) {
 
 func TestProjectProblems(t *testing.T) {
 	for name, tc := range map[string]struct{ toml, want string }{
-		"forge without urls":      {"[forge]\nkind = \"github\"", "forge.url: required"},
-		"forge kind":              {"[forge]\nkind = \"bitbucket\"", "forge.kind"},
-		"forge url scheme":        {"[forge]\nkind = \"github\"\nurl = \"ftp://x\"\nproject_repo = \"https://x/y\"", "not an http(s) URL"},
-		"its name, the record's":  {`project = "ledger"`, "project: not a field Foreman knows"},
-		"its repos, the record's": {`repos = ["api"]`, "repos: not a field Foreman knows"},
-		"merge_to_main, retired":  {"merge_to_main = \"ceo\"", "merge_to_main: only the CEO merges, always; remove this line"},
-		"unknown field":           {"wiki = \"docs\"", "wiki: not a field Foreman knows"},
-		"main, now per repo":      {"main = \"main\"", "main: each code repo has its own default branch now"},
-		"syntax error":            {`checks = `, "line 1"},
-		"multi-line describe":     {"description = \"\"\"a\nb\"\"\"", "one line"},
-		"a landing prefix, no /":  {`landing_prefixes = ["f"]`, "landing_prefixes: \"f\""},
-		"an agent's prefix":       {`landing_prefixes = ["wt/x/"]`, "never wt/ or lead/"},
+		"a forge (removed 2026-11-15)": {"[forge]\nkind = \"none\"", "forge.kind: not a field Foreman knows"},
+		"its name, the record's":       {`project = "ledger"`, "project: not a field Foreman knows"},
+		"its repos, the record's":      {`repos = ["api"]`, "repos: not a field Foreman knows"},
+		"merge_to_main, retired":       {"merge_to_main = \"ceo\"", "merge_to_main: only the CEO merges, always; remove this line"},
+		"unknown field":                {"wiki = \"docs\"", "wiki: not a field Foreman knows"},
+		"main, now per repo":           {"main = \"main\"", "main: each code repo has its own default branch now"},
+		"syntax error":                 {`checks = `, "line 1"},
+		"multi-line describe":          {"description = \"\"\"a\nb\"\"\"", "one line"},
+		"a landing prefix, no /":       {`landing_prefixes = ["f"]`, "landing_prefixes: \"f\""},
+		"an agent's prefix":            {`landing_prefixes = ["wt/x/"]`, "never wt/ or lead/"},
 	} {
 		if _, p := ParseProject([]byte(tc.toml)); !hasProblem(p, tc.want) {
 			t.Errorf("%s: problems %v, want one with %q", name, p, tc.want)
@@ -199,16 +192,15 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 		t.Errorf("listen left over: %+v %v", s, p)
 	}
 	for name, tc := range map[string]struct{ toml, want string }{
-		"port":       {`port = 70000`, "port"},
-		"sessions":   {`max_sessions = 0`, "max_sessions"},
-		"engine":     {`engine = "docker"`, "engine"},
-		"harnesses":  {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: not a field Foreman knows"},
-		"stuck":      {`stuck_after_minutes = 0`, "stuck_after_minutes"},
-		"log cap":    {`log_cap_mb = -1`, "log_cap_mb"},
-		"forge kind": {"[forges.bitbucket]\nurl = \"https://x\"", "forges.bitbucket"},
-		"repo forge": {"[global_forge]\nkind = \"github\"", "global_forge.url: required"},
-		"unknown":    {`theme = "dark"`, "theme: not a field Foreman knows"},
-		"wrong type": {`port = "8888"`, "port"},
+		"port":                         {`port = 70000`, "port"},
+		"sessions":                     {`max_sessions = 0`, "max_sessions"},
+		"engine":                       {`engine = "docker"`, "engine"},
+		"harnesses":                    {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: not a field Foreman knows"},
+		"stuck":                        {`stuck_after_minutes = 0`, "stuck_after_minutes"},
+		"log cap":                      {`log_cap_mb = -1`, "log_cap_mb"},
+		"a forge (removed 2026-11-15)": {"[global_forge]\nkind = \"none\"", "global_forge.kind: not a field Foreman knows"},
+		"unknown":                      {`theme = "dark"`, "theme: not a field Foreman knows"},
+		"wrong type":                   {`port = "8888"`, "port"},
 	} {
 		if _, p := ParseSettings([]byte(tc.toml)); !hasProblem(p, tc.want) {
 			t.Errorf("%s: problems %v, want one with %q", name, p, tc.want)

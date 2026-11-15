@@ -31,7 +31,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 ## Signing as the CEO from Foreman's process
 
 - **State:** commits in the CEO's name (Merge's squash, the UI's saves of the wiki and the global repo) are signed whenever the CEO's git config says `commit.gpgsign` ([Pipeline and merges → Merge to a target](./product/features/pipeline-and-merges.md#merge-to-a-target)), by git run from Foreman's process; a signature that fails fails the commit, and nothing moves.
-- **Why:** the CEO's forge rejects unsigned commits, and a merge landing unsigned would be refused at the CEO's next push (the CEO, 2026-11-06).
+- **Why:** everything Foreman commits for the CEO is signed (the CEO, 2026-11-15: "everything that can be signed, is signed"), and their forge rejects unsigned commits at the CEO's own push (the CEO, 2026-11-06).
 - **Impact:** Foreman's process must reach the signer: an SSH agent (`SSH_AUTH_SOCK`) or a GPG agent with a cached passphrase, or a pinentry that can ask without a terminal (pinentry-mac does). Started where it can't (a service with no agent), every Merge and every wiki save fails with git's error until the key is reachable; a GPG pinentry that waits on a terminal holds the request until it is cancelled.
 - **Fix:** a check when Foreman starts that signing works when the config asks for it, shown on the dashboard's health with git's reason, so a failing setup is found before a merge; when it is first seen.
 

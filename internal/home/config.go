@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -36,19 +35,11 @@ type ProjectConfig struct {
 	// lands on (request_merge's land), made only when the CEO merges:
 	// DefaultLandingPrefixes when the file names none, nothing with [].
 	LandingPrefixes []string `toml:"landing_prefixes,omitempty" json:"landingPrefixes"`
-	Forge           Forge    `toml:"forge,omitempty" json:"forge"`
 }
 
 // DefaultLandingPrefixes are the landing prefixes of a project.toml without
 // landing_prefixes (the CEO, 2026-11-11).
 var DefaultLandingPrefixes = []string{"f/", "feat/", "fix/"}
-
-// Forge is where the CEO can create PRs.
-type Forge struct {
-	Kind        string `toml:"kind,omitempty" json:"kind"`
-	URL         string `toml:"url,omitempty" json:"url"`
-	ProjectRepo string `toml:"project_repo,omitempty" json:"projectRepo"`
-}
 
 // TeamConfig is a team file, teams/<team>.toml.
 type TeamConfig struct {
@@ -83,30 +74,17 @@ type Soul struct {
 
 // Settings is settings.toml. Absent fields keep their defaults.
 type Settings struct {
-	Port              int                     `toml:"port" json:"port"`
-	MaxSessions       int                     `toml:"max_sessions" json:"maxSessions"`
-	Engine            string                  `toml:"engine" json:"engine"`
-	StuckAfterMinutes int                     `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
-	LogCapMB          int                     `toml:"log_cap_mb" json:"logCapMb"`
-	Forges            map[string]ForgeAccount `toml:"forges,omitempty" json:"forges"`
-	GlobalForge       GlobalForge             `toml:"global_forge" json:"globalForge"`
-	ProjectsFolder    string                  `toml:"projects_folder" json:"projectsFolder"`
-	Notifications     Notifications           `toml:"notifications" json:"notifications"`
+	Port              int           `toml:"port" json:"port"`
+	MaxSessions       int           `toml:"max_sessions" json:"maxSessions"`
+	Engine            string        `toml:"engine" json:"engine"`
+	StuckAfterMinutes int           `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
+	LogCapMB          int           `toml:"log_cap_mb" json:"logCapMb"`
+	ProjectsFolder    string        `toml:"projects_folder" json:"projectsFolder"`
+	Notifications     Notifications `toml:"notifications" json:"notifications"`
 	// Instructions are the CEO's standing instructions for every agent, added
 	// to each session prompt (wiki/product/architecture/session-prompt.md).
 	// Written as a multi-line string (encodeSettings).
 	Instructions string `toml:"instructions,omitempty" json:"instructions"`
-}
-
-// ForgeAccount is a forge account's host or owner; its token is a secret.
-type ForgeAccount struct {
-	URL string `toml:"url" json:"url"`
-}
-
-// GlobalForge is the forge hosting the global repo (teams and settings).
-type GlobalForge struct {
-	Kind string `toml:"kind" json:"kind"`
-	URL  string `toml:"url,omitempty" json:"url"`
 }
 
 // Notifications are the browser notification switches.
@@ -122,15 +100,13 @@ func DefaultSettings() Settings {
 		Port: 8888, MaxSessions: 12, Engine: "podman",
 		StuckAfterMinutes: 20, LogCapMB: 50,
 		ProjectsFolder: "~/workspace/foreman",
-		GlobalForge:    GlobalForge{Kind: "none"},
 		Notifications:  Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
 	}
 }
 
 var (
-	slug       = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-	snakeCase  = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
-	forgeKinds = []string{"github", "forgejo", "gitea", "none"}
+	slug      = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	snakeCase = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 )
 
 // Version identifies a file's content: writes carry the version they read.
@@ -164,7 +140,6 @@ func decode(data []byte, v any, retired ...func(toml.Key) bool) (toml.MetaData, 
 
 // ParseProject parses a project.toml: the project's rules, which travel with
 // its project repo (its name and repos are this machine's, in the database).
-// Defaults are applied (forge none).
 func ParseProject(data []byte) (ProjectConfig, []string) {
 	var c ProjectConfig
 	md, p := decode(data, &c)
@@ -177,9 +152,6 @@ func ParseProject(data []byte) (ProjectConfig, []string) {
 			p = slices.DeleteFunc(p, func(s string) bool { return strings.HasPrefix(s, r.key+": ") })
 			p.add("%s: %s; remove this line", r.key, r.note)
 		}
-	}
-	if c.Forge.Kind == "" {
-		c.Forge.Kind = "none"
 	}
 	c.AlwaysAskCEO = normalize(c.AlwaysAskCEO)
 	if !md.IsDefined("landing_prefixes") {
@@ -194,23 +166,7 @@ func ParseProject(data []byte) (ProjectConfig, []string) {
 	if strings.ContainsAny(c.Description, "\n") {
 		p.add("description: one line")
 	}
-	if !slices.Contains(forgeKinds, c.Forge.Kind) {
-		p.add("forge.kind: %q is not one of %s", c.Forge.Kind, strings.Join(forgeKinds, ", "))
-	} else if c.Forge.Kind != "none" {
-		checkURL(&p, "forge.url", c.Forge.URL)
-		checkURL(&p, "forge.project_repo", c.Forge.ProjectRepo)
-	}
 	return c, p
-}
-
-func checkURL(p *problems, field, value string) {
-	if value == "" {
-		p.add("%s: required when a forge is set", field)
-		return
-	}
-	if u, err := url.Parse(value); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		p.add("%s: %q is not an http(s) URL", field, value)
-	}
 }
 
 // ParseTeam parses the team file of team id. Rules across teams (agent ids
@@ -325,16 +281,6 @@ func (s Settings) validate() problems {
 	}
 	if f := s.ProjectsFolder; f != "~" && !strings.HasPrefix(f, "~/") && !filepath.IsAbs(f) {
 		p.add("projects_folder: %q must be an absolute path or start with ~/", f)
-	}
-	for _, k := range sortedKeys(s.Forges) {
-		if k == "none" || !slices.Contains(forgeKinds, k) {
-			p.add("forges.%s: not a forge kind", k)
-		}
-	}
-	if !slices.Contains(forgeKinds, s.GlobalForge.Kind) {
-		p.add("global_forge.kind: %q is not one of %s", s.GlobalForge.Kind, strings.Join(forgeKinds, ", "))
-	} else if s.GlobalForge.Kind != "none" {
-		checkURL(&p, "global_forge.url", s.GlobalForge.URL)
 	}
 	return p
 }

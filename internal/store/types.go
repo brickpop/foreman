@@ -158,19 +158,17 @@ type MergeRequest struct {
 	// at Target's head on Merge (or one already there), named by the lead
 	// (request_merge's land, under the project's prefixes) or by the CEO at
 	// Merge.
-	Landing       string    `json:"landing"`
-	Entry         string    `json:"entry"` // the wiki card explaining the work
-	State         string    `json:"state"` // open, merged, rejected or withdrawn
-	ChecksStatus  string    `json:"checksStatus"`
-	Conflicting   bool      `json:"conflicting"`
-	ForgePRURL    string    `json:"forgePrUrl"`
-	ForgePRNumber int       `json:"forgePrNumber"`
-	Note          string    `json:"note"`
-	CreatedAt     time.Time `json:"createdAt"`
-	MergedAt      time.Time `json:"mergedAt"`
-	RejectedAt    time.Time `json:"rejectedAt"`
-	ReviewID      string    `json:"reviewId"`     // the review it is decided in
-	ReviewedHead  string    `json:"reviewedHead"` // the branch head at the CEO's last Request changes
+	Landing      string    `json:"landing"`
+	Entry        string    `json:"entry"` // the wiki card explaining the work
+	State        string    `json:"state"` // open, merged, rejected or withdrawn
+	ChecksStatus string    `json:"checksStatus"`
+	Conflicting  bool      `json:"conflicting"`
+	Note         string    `json:"note"`
+	CreatedAt    time.Time `json:"createdAt"`
+	MergedAt     time.Time `json:"mergedAt"`
+	RejectedAt   time.Time `json:"rejectedAt"`
+	ReviewID     string    `json:"reviewId"`     // the review it is decided in
+	ReviewedHead string    `json:"reviewedHead"` // the branch head at the CEO's last Request changes
 	// Where the branch stood when it left open (merged, dismissed, withdrawn):
 	// its head, kept under refs/foreman/decided/<id>, and the commit it parted
 	// from its target at ("" after a fast-forward), so its review still shows it.

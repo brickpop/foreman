@@ -1,11 +1,11 @@
 import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { isNotBuilt, type Node } from "../../api/client";
+import type { Node } from "../../api/client";
 import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { TreeIcon, WarningIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
-import { Button, Dot, NotBuilt, Panel } from "../../components/ui";
+import { Button, Dot, Panel } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 import { useProject } from "../Project";
@@ -55,18 +55,11 @@ export function Wiki() {
     if (hash && loaded) document.getElementById(hash)?.scrollIntoView();
   }, [path, hash, loaded]);
   // An unknown path falls back to index.md, replacing it so Back doesn't return to it.
-  const notBuilt = isNotBuilt(tree.error);
-  const missing = current.isError && !notBuilt && path !== "index.md";
+  const missing = current.isError && path !== "index.md";
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the entry turns out missing
   useEffect(() => {
     if (missing) open("index.md", "", true);
   }, [missing]);
-  if (notBuilt)
-    return (
-      <div className="px-6 pt-6">
-        <NotBuilt what="the wiki" />
-      </div>
-    );
   // Without its files there is no wiki to read: the tree is irrelevant.
   if (lacking.some((m) => m.required))
     return (

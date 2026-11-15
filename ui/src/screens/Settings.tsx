@@ -4,7 +4,6 @@ import { settingsTab, settingsTabs } from "../app/settings";
 import { TeamGrid } from "../components/TeamGrid";
 import { PageTitle } from "../components/ui";
 import { AgentsTab } from "./settings/AgentsTab";
-import { GitTab } from "./settings/GitTab";
 import { LookTab } from "./settings/LookTab";
 import { SystemTab } from "./settings/SystemTab";
 
@@ -53,7 +52,6 @@ export function Settings() {
       )}
       {tab === "teams" && <TeamGrid />}
       {tab === "agents" && <AgentsTab settings={s} />}
-      {tab === "git" && s && <GitTab settings={s} />}
       {tab === "look" && <LookTab settings={s} />}
       {tab === "system" && <SystemTab settings={s} />}
     </>

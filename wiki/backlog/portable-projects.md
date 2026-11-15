@@ -10,7 +10,7 @@ epic: install-first-run
 
 **Why:** the CEO, 2026-11-15: "I will install this on a new computer and I want things to be easy to sync (teams, config, project backlogs/wiki, etc.) and currently it is not." Today the CEO clones `~/.foreman/config` and each project repo by hand, and a new machine still doesn't know which projects exist: their records (name, code repos, default branches) are only in `state.db`. **This reverses** [Projects anywhere](./epics/projects-anywhere.md)'s "projects belong to the machine" (2026-10-20): projects travel; only their paths stay on the machine.
 
-Blocked by [Remove the forge](./remove-forge.md), [One Foreman folder](./foreman-folder.md) and [The wiki at the HQ's root](./wiki-at-root.md): it builds on `~/foreman/{hq,projects,repos}` and on sync through each repo's `origin`.
+Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](./foreman-folder.md) and [The wiki at the HQ's root](./wiki-at-root.md): it builds on `~/foreman/{hq,projects,repos}` and on sync through each repo's `origin`.
 
 ## Decided (the CEO, 2026-11-15)
 

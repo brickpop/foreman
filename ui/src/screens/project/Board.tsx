@@ -1,7 +1,7 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { type DragEvent, useEffect, useRef, useState } from "react";
-import { type Board as BoardData, type Card, isNotBuilt, type Unread } from "../../api/client";
+import type { Board as BoardData, Card, Unread } from "../../api/client";
 import { agentOf, plural } from "../../app/model";
 import {
   useBoards,
@@ -15,7 +15,7 @@ import {
 } from "../../app/queries";
 import { Drawer } from "../../components/Overlays";
 import { useToast } from "../../components/Toasts";
-import { Button, Loading, NotBuilt, Segmented } from "../../components/ui";
+import { Button, Loading, Segmented } from "../../components/ui";
 import { WikiArticle } from "../../components/WikiArticle";
 import { ScaffoldNotice, WikiSetup } from "../../components/WikiSetup";
 import { useProject } from "../Project";
@@ -165,12 +165,6 @@ export function Board() {
     return (
       <div className="px-6 pt-6">
         <Loading rows={5} />
-      </div>
-    );
-  if (isNotBuilt(boards.error))
-    return (
-      <div className="px-6 pt-6">
-        <NotBuilt what="the wiki" />
       </div>
     );
   // Boards are declared in wiki.toml: without it there are none to show.

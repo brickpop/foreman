@@ -44,7 +44,7 @@ wiki/
 `wiki/wiki.toml` enforces this vocabulary: `wiki check` errors on any other type.
 
 **Tags** (cross-cutting, fixed vocabulary):
-- Specs: exactly one kind, `model` / `feature` / `architecture` / `design`, plus topics: `home`, `config`, `teams`, `agents`, `sessions`, `requests`, `pipeline`, `team-tools`, `git`, `forge`, `wiki`, `ui`, `api`, `security`, `runtime`.
+- Specs: exactly one kind, `model` / `feature` / `architecture` / `design`, plus topics: `home`, `config`, `teams`, `agents`, `sessions`, `requests`, `pipeline`, `team-tools`, `git`, `wiki`, `ui`, `api`, `security`, `runtime`.
 - Tasks: exactly one work-kind, `feature` / `bug` / `chore` / `test` / `decision` / `spike`.
   - `decision`: a question the user must answer before the affected specs can be relied on.
   - `spike`: throwaway exploration to de-risk a design (a prototype, a measurement); its outcome is folded into a spec.

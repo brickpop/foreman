@@ -77,4 +77,4 @@ A review can end before the CEO decides it, **withdrawn** (the CEO, 2026-10-22):
 
 ## Phasing
 
-Built (2026-10-21, [the review page card](../../backlog/review-page.md)). Withdrawn (2026-10-22, [its card](../../backlog/archive/withdraw-merge-request.md)). Not yet: comments on a range of lines, threads (answers from the lead), **Create PR** on the forge from the decision bar ([The forge](../../backlog/git-forge.md)). A merge request from before reviews that was already dismissed has no page. Repos already merged or dismissed show no diff on an open review.
+Built (2026-10-21, [the review page card](../../backlog/review-page.md)). Withdrawn (2026-10-22, [its card](../../backlog/archive/withdraw-merge-request.md)). Not yet: comments on a range of lines, threads (answers from the lead). A merge request from before reviews that was already dismissed has no page. Repos already merged or dismissed show no diff on an open review.

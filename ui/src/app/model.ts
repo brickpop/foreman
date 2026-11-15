@@ -242,21 +242,8 @@ export function replacingLine(team: string, project: string, sessions: number): 
   return `Replaces ${team} on ${project}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
 }
 
-const forgeLabels: Record<string, string> = {
-  github: "GitHub",
-  forgejo: "Forgejo",
-  gitea: "Gitea",
-  none: "No forge",
-};
-
-/** A forge kind as it reads. */
-export function forgeLabel(kind: string): string {
-  return forgeLabels[kind] ?? kind;
-}
-
-/** A merge request's line on its review's decision bar: its PR, its repo and branch, and its checks. */
-export function linkLine(mr: MergeRequest, forge: string): string {
-  const pr = mr.forgePrNumber ? `PR #${mr.forgePrNumber} on ${forgeLabel(forge)} · ` : "";
+/** A merge request's line on its review's decision bar: its repo and branch, and its checks. */
+export function linkLine(mr: MergeRequest): string {
   // No checks status: the project has no checks (or they haven't run): nothing to say.
   const tail = mr.conflicting
     ? `conflicts with ${mr.target}`
@@ -266,19 +253,13 @@ export function linkLine(mr: MergeRequest, forge: string): string {
   // The repo first: a review ticks its repos one by one.
   // A landing of its own: where it lands, and the target its diff is against.
   const into = mr.landing ? `${mr.landing} (from ${mr.target})` : mr.target;
-  return `${pr}${mr.repo} · ${mr.branch} → ${into}${tail ? ` · ${tail}` : ""}`;
+  return `${mr.repo} · ${mr.branch} → ${into}${tail ? ` · ${tail}` : ""}`;
 }
 
 /** Whether a branch is an agent's (wt/*, lead/*): agents write those, so a
  * merge never goes into one, and none is a repo's default branch. */
 export const agentBranch = (name: string): boolean =>
   name.startsWith("wt/") || name.startsWith("lead/");
-
-/** The forge a merge request can become a PR on ("none": no Create PR): its
- * project's, since merge requests are on the project's code repos. */
-export function forgeOf(project?: Project): string {
-  return project?.config.forge.kind ?? "none";
-}
 
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

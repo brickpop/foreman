@@ -454,7 +454,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodGet, "/api/folders/branches?path=/etc", ``, http.StatusBadRequest, `{"code":"INVALID","error":"/etc is outside /home/ceo/dev"}`},
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `nope`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodPut, "/api/projects/ledger/hidden", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`}, // never a missing field read as false
-		{http.MethodPut, "/api/projects/ledger/name", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`},     // never a missing field read as clearing it
+		{http.MethodPut, "/api/projects/ledger/name", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`},   // never a missing field read as clearing it
 		{http.MethodPut, "/api/projects/nope/name", `{"name":"x"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPut, "/api/projects/nope/hidden", `{"hidden":true}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects/nope/migrate", `{"workspace":"/w"}`, http.StatusNotFound, `"NOT_FOUND"`},

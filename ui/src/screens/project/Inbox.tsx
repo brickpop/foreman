@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { isNotBuilt, type Review, type Team } from "../../api/client";
+import type { Review, Team } from "../../api/client";
 import { agentOf, inbox, when } from "../../app/model";
 import { reviewOf } from "../../app/project";
 import { useRequests, useReviews, useTeams } from "../../app/queries";
 import { reviewGroups, statusLabel } from "../../app/reviews";
-import { Empty, Loading, NotBuilt, Panel, SectionTitle } from "../../components/ui";
+import { Empty, Loading, Panel, SectionTitle } from "../../components/ui";
 import { useProject } from "../Project";
 import { ProjectRequest } from "./Pipeline";
 
@@ -32,7 +32,6 @@ export function Inbox() {
         {rows(shown)}
       </section>
     );
-  if (isNotBuilt(reviews.error)) return <NotBuilt what="reviews" />;
   const needsYou = groups.needsYou.length + requests.length;
   return (
     <div className="flex max-w-[920px] flex-col gap-8 px-6 pt-6 pb-12">

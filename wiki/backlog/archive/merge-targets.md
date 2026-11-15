@@ -24,7 +24,7 @@ The design: [Pipeline and merges → Merge targets](../../product/features/pipel
 - [x] Rename "main branch" to "default branch" everywhere; retire `merge_to_main`
 - [x] Records: a repo's targets (name, made by, from, when), the main branch first; a merge request's `target` (existing ones: their repo's main branch at the migration)
 - [x] `create_target` (lead only) with its refusals; `switch` with `from`; `request_merge` with `into`
-- [x] Merge to `<target>`, conflicts, "what counts as merged" and the decided diff, all against the merge request's target; "when a target moves" notices per target. The forge PR's base is carried by [The forge](../git-forge.md), not built yet
+- [x] Merge to `<target>`, conflicts, "what counts as merged" and the decided diff, all against the merge request's target; "when a target moves" notices per target. The forge PR's base is carried by The forge card (retired 2026-11-15, [Remove the forge](./remove-forge.md)), not built yet
 - [x] The review: `→ <target>`, its button, changing the target (diff and conflicts redone)
 - [x] Repos: the targets list, Remove (refused while one is open into it), missing ones flagged
 - [x] Session prompt: each repo's targets

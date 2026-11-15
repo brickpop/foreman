@@ -27,7 +27,7 @@ The blocks:
   ```
   ~/workspace/foreman/ledger/
   ├─ project/           project repo (git)
-  │  ├─ project.toml    checks, gates, forge
+  │  ├─ project.toml    checks, gates
   │  └─ wiki/           knowledge base + wiki.toml (boards)
   └─ agents/            one sandbox per agent: a worktree of each repo
   ~/.foreman/
@@ -43,7 +43,7 @@ The blocks:
   ├─ config/              global repo (git): teams, settings
   ├─ projects/
   │  └─ <project>/
-  │     ├─ project.toml    checks, gates, forge
+  │     ├─ project.toml    checks, gates
   │     └─ wiki/           knowledge base + wiki.toml (boards)
   ├─ sandboxes/
   │  └─ <project>/      one git worktree per agent, per repo
@@ -66,10 +66,7 @@ The blocks:
   - Review: "The lead calls request_merge() with the card that explains the work. Foreman runs the checks, then you review it: merge it, request changes, or dismiss it."
   - Finding: "A challenge team rates something high severity. You decide who fixes it, and when."
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
-- **"Merges"**: the forge label (`Forgejo`, `GitHub`, `Gitea` or `No forge`, 500) and a note:
-  - forge `none`: "No forge. You merge requested branches into their target from their review, in the Inbox; Foreman does the merge."
-  - otherwise: "Merge from a branch's review, in the Inbox, or create a PR on `<forge url>` and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file."
-  - **Project repo**: when `forge.project_repo` is set, a row `project repo → <url>` with a small outline **`Sync`** button that fetches the forge's `main`, merges it in and pushes the project repo's `main` there, stopping with a message on a conflict (nothing is pushed automatically; [Forge adapters → Sync](../architecture/forge-adapters.md#sync-the-reserved-repos)), and the time of the last sync. **Phasing:** Sync comes with the [Git epic](../../backlog/epics/git.md); until then the button shows, disabled.
+- **"Merges"**: "You merge requested branches into their target from their review, in the Inbox; Foreman does the merge. Nothing is pushed: you push with your own git."
 - **"The file"** (`project.toml`): a row with `<workspace>/project/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
 - **"Remove this project"** (last): "Its record and its history go. Its workspace stays. Your code repos keep their branches."; while a team is deployed on it, "Stop <teams> on it first (its Team section)." with the button disabled. **`Remove project`** asks first: "Remove <project>?", "Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its workspace, your code repos and their branches stay.", with two checkboxes, off at each opening: "Also delete its agents' worktrees, their uncommitted work included. Their branches stay in your code repos." and "Also delete its project repo folder, <path>: its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, it's taken over by a new project in the same workspace." Removing opens the Dashboard with the toast "<project> removed"; a refusal is a toast "Project not removed" ([Add a project → Removing a project](./add-project.md#removing-a-project)).
 

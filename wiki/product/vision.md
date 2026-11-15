@@ -14,7 +14,7 @@ Foreman is a self-hosted server and web UI. It lets one person (the **CEO**) run
 - A team is **[deployed](./models/deployment.md)** onto a project, which has one team at most and keeps its goal in its wiki. One team can be deployed on many projects at the same time. Each deployment runs its own sessions.
 - Each agent in a deployment runs as a real **coding harness process** (Claude Code, Codex CLI, Pi, Hermes Agent or a custom command), an [instance](./models/instance.md). It works in its **own git worktree** of each of the project's repos, on its own branch ([Sandboxes and git policy](./architecture/sandboxes-and-git.md)).
 - Agents talk to each other through a message router ([Team tools](./architecture/team-tools.md)). Only the designated output of a request crosses from one sandbox to another.
-- Only the team **lead** can ask for changes to reach a repo's default branch (or another of the CEO's branches, a release branch say), with a **merge request**. The CEO reviews it in Foreman, file by file, with comments back to the lead, and decides: **Merge** (Foreman merges locally), **Request changes**, or **Dismiss** with a reason; later, **Create PR** on the project's forge (GitHub, Forgejo or Gitea) to merge there. Nothing reaches a forge unless the CEO asks, and Foreman never merges on its own ([Pipeline and merges](./features/pipeline-and-merges.md)).
+- Only the team **lead** can ask for changes to reach a repo's default branch (or another of the CEO's branches, a release branch say), with a **merge request**. The CEO reviews it in Foreman, file by file, with comments back to the lead, and decides: **Merge** (Foreman merges locally), **Request changes**, or **Dismiss** with a reason. Foreman never merges on its own, and never pushes code: the CEO does, with their own git ([Pipeline and merges](./features/pipeline-and-merges.md)).
 - Anything that needs the CEO arrives as a typed **[request](./features/requests.md)** (approval, question, review, finding, blocked). It shows in the UI and as a browser [notification](./features/notifications.md).
 - The UI is also a **terminal multiplexer** ([Sessions](./features/sessions.md)). Every agent session's stdin/stdout/stderr is live in the browser, with copy and paste.
 
@@ -34,8 +34,7 @@ Terms are defined in the [Glossary](./glossary.md). The end-to-end scenarios v1 
 - Multi-user accounts, permissions or remote multi-tenant hosting.
 - Cloning code repositories. The CEO keeps them where they like and adds them to a project by path.
 - Editing project config or wiki prose from the UI. Files are edited in the CEO's editor or by agents.
-- Built-in code review UI (diffs). Review happens on the forge, or locally via `git`.
-- Hosting the forge. Foreman connects to an existing GitHub, Forgejo or Gitea.
+- Talking to a forge (GitHub, Forgejo, Gitea): no PRs, no tokens (the CEO, 2026-11-15). The CEO pushes and opens PRs with their own tools.
 - Billing, model routing or token accounting, beyond showing harness rate-limit failures.
 
 ## Users and roles
@@ -58,8 +57,8 @@ Roles with default job descriptions (used by the Chief of Staff and the example 
 
 ## Non-functional requirements
 
-- **Local first**: binds to localhost by default. There is no telemetry. Works offline, except harnesses and forges that need the network.
-- **Security**: there are no user accounts in v1, but every request needs the per-install access token from the URL Foreman prints at start ([Security](./architecture/security.md#access-token)); binding to the network shows a warning. Secrets are never written to a repo or to config; Foreman redacts the secrets it knows from session logs, and anything else a harness prints is a documented limit. Agents never receive forge tokens ([Secrets](./models/secrets.md#invariants), [Security](./architecture/security.md)).
+- **Local first**: binds to localhost by default. There is no telemetry. Works offline, except harnesses that need the network.
+- **Security**: there are no user accounts in v1, but every request needs the per-install access token from the URL Foreman prints at start ([Security](./architecture/security.md#access-token)); binding to the network shows a warning. Secrets are never written to a repo or to config; Foreman redacts the secrets it knows from session logs, and anything else a harness prints is a documented limit. See [Security](./architecture/security.md).
 - **Isolation**: a separate worktree and container per instance. Team tools return only designated outputs. Write access to the knowledge base is limited to the lead; the others use `contribute`.
 - **Reliability**:
   - Instances survive UI disconnects.

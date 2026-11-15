@@ -58,15 +58,6 @@ export interface ProjectConfig {
    * DefaultLandingPrefixes when the file names none, nothing with [].
    */
   landingPrefixes: string[];
-  forge: Forge;
-}
-/**
- * Forge is where the CEO can create PRs.
- */
-export interface Forge {
-  kind: string;
-  url: string;
-  projectRepo: string;
 }
 /**
  * TeamConfig is a team file, teams/<team>.toml.
@@ -114,8 +105,6 @@ export interface Settings {
   engine: string;
   stuckAfterMinutes: number /* int */;
   logCapMb: number /* int */;
-  forges: { [key: string]: ForgeAccount};
-  globalForge: GlobalForge;
   projectsFolder: string;
   notifications: Notifications;
   /**
@@ -124,19 +113,6 @@ export interface Settings {
    * Written as a multi-line string (encodeSettings).
    */
   instructions: string;
-}
-/**
- * ForgeAccount is a forge account's host or owner; its token is a secret.
- */
-export interface ForgeAccount {
-  url: string;
-}
-/**
- * GlobalForge is the forge hosting the global repo (teams and settings).
- */
-export interface GlobalForge {
-  kind: string;
-  url: string;
 }
 /**
  * Notifications are the browser notification switches.

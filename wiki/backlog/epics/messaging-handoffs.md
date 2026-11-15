@@ -18,7 +18,7 @@ From the Claude Code adapter (epic 1 built `Launch`): `Deliver`, `Interpret` and
 
 **Usable when done:** the CEO gives the lead a goal, the lead delegates to teammates, teammates work and report back, and the lead reviews and continues, all visible in the UI.
 
-**Journey steps:** 12–16 and 24 of [the journey](../../product/journey.md).
+**Journey steps:** 11–15 and 23 of [the journey](../../product/journey.md).
 
 **Blocked by:** [Prove](./prove.md) (experiments C and D) and [Terminal multiplexer](./terminal-multiplexer.md).
 

@@ -8,7 +8,7 @@ epic: workflow
 
 # A review page: the change, file by file, with comments to the lead
 
-**Why:** a review request today is decided on its card (Merge to main · Create PR · Reject), with the change one click away in a dialog. The CEO wants to review as on a forge before deciding (the CEO, 2026-10-21): the files changed, the diff, and comments pinned to lines or general, sent back to the lead as a request for changes. The decision belongs on that page, not on the card.
+**Why:** a review request today is decided on its card (Merge to main · Reject), with the change one click away in a dialog. The CEO wants to review as on a forge before deciding (the CEO, 2026-10-21): the files changed, the diff, and comments pinned to lines or general, sent back to the lead as a request for changes. The decision belongs on that page, not on the card.
 
 Since 2026-10-31 reviews are listed in each project's Inbox, not in a Reviews section across projects ([The project is the workplace](./project-workplace.md)); the decisions below are as made on 2026-10-21.
 
@@ -16,7 +16,7 @@ Since 2026-10-31 reviews are listed in each project's Inbox, not in a Reviews se
 
 - A **Reviews** section: one entry per review, and the review card (Dashboard, Needs you) links to it instead of deciding.
 - On the review: a **tree of the changed files**, each click scrolling to its diff; the **diff**, per file ([the diff view](../product/features/project-pipeline.md) as it is now: one box per file); **comments**, on a line or a range of the diff, or general, sent to the lead as a request for changes.
-- The **decision is made only there**: Merge to main, Request changes. Create PR on the forge later ([The forge](./git-forge.md)).
+- The **decision is made only there**: Merge to main, Request changes.
 - What happens after a merge: [After a merge: clean up](./after-merge-cleanup.md).
 
 ## Decided (the CEO, 2026-10-21)

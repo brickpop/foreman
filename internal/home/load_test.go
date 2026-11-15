@@ -495,7 +495,7 @@ func TestInstructionsRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 		got, problems := ParseSettings(data)
-		if len(problems) > 0 || got.Instructions != text || got.GlobalForge.Kind != "none" {
+		if len(problems) > 0 || got.Instructions != text {
 			t.Errorf("%q came back %q, %v:\n%s", text, got.Instructions, problems, data)
 		}
 	}

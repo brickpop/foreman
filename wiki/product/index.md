@@ -16,7 +16,6 @@ Files Foreman reads or owns, and the runtime state it keeps.
 - [Team definition](./models/team-definition.md) (`config/teams/<team>.toml`)
 - [Agent soul](./models/agent-soul.md)
 - [Global settings](./models/global-settings.md) (`config/settings.toml`)
-- [Secrets](./models/secrets.md)
 - Runtime state (`state.db`)
   - [Deployment](./models/deployment.md)
   - [Instance](./models/instance.md)
@@ -67,7 +66,6 @@ Files Foreman reads or owns, and the runtime state it keeps.
 - [Sandboxes and git policy](./architecture/sandboxes-and-git.md)
 - [Team tools](./architecture/team-tools.md): the agent tools and message delivery
 - [Session prompt](./architecture/session-prompt.md)
-- [Forge adapters](./architecture/forge-adapters.md)
 - [Wiki engine](./architecture/wiki-engine.md)
 - [Persistence](./architecture/persistence.md): state.db, logs, file watching
 - [API](./architecture/api.md): HTTP, SSE and WebSocket surface

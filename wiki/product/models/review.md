@@ -70,4 +70,4 @@ Derived, never stored:
 
 ## Phasing
 
-Built (2026-10-21, [the review page card](../../backlog/review-page.md)): the tables, the grouping and the review requests, comments with line following, Request changes, Merge (repos) and Close (Dismiss since 2026-10-22). Withdrawal (2026-10-22, [its card](../../backlog/archive/withdraw-merge-request.md)): `withdraw_merge`, and Foreman's withdrawal on a merge. Not yet: comments on a range of lines, threads (the lead answering a comment), Create PR from a review ([The forge](../../backlog/git-forge.md)).
+Built (2026-10-21, [the review page card](../../backlog/review-page.md)): the tables, the grouping and the review requests, comments with line following, Request changes, Merge (repos) and Close (Dismiss since 2026-10-22). Withdrawal (2026-10-22, [its card](../../backlog/archive/withdraw-merge-request.md)): `withdraw_merge`, and Foreman's withdrawal on a merge. Not yet: comments on a range of lines, threads (the lead answering a comment).

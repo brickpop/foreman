@@ -2,14 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
-import {
-  forgeLabel,
-  harnessLabel,
-  nameTakenBy,
-  onOtherProfile,
-  projectName,
-  readable,
-} from "../../app/model";
+import { harnessLabel, nameTakenBy, onOtherProfile, projectName, readable } from "../../app/model";
 import {
   keys,
   useDeployments,
@@ -34,13 +27,12 @@ export function ProjectSettings() {
 
 function Configuration({ project }: { project: Project }) {
   const home = useHomeFolder().data?.path ?? "~/.foreman";
-  const forge = project.config.forge;
   const tree = (
     project.workspace
       ? [
           `${project.workspace}/`,
           "├─ project/           project repo (git)",
-          "│  ├─ project.toml    checks, gates, forge",
+          "│  ├─ project.toml    checks, gates",
           "│  └─ wiki/           knowledge base + wiki.toml (boards)",
           "└─ agents/            one sandbox per agent: a worktree of each repo",
           `${home}/`,
@@ -53,7 +45,7 @@ function Configuration({ project }: { project: Project }) {
           "├─ config/              global repo (git): teams, settings",
           "├─ projects/",
           `│  └─ ${project.id}/`,
-          "│     ├─ project.toml    checks, gates, forge",
+          "│     ├─ project.toml    checks, gates",
           "│     └─ wiki/           knowledge base + wiki.toml (boards)",
           "├─ sandboxes/",
           `│  └─ ${project.id}/      one git worktree per agent, per repo`,
@@ -110,20 +102,10 @@ function Configuration({ project }: { project: Project }) {
           </div>
         </Block>
         <Block title="Merges">
-          <span className="font-medium">{forgeLabel(forge.kind)}</span>
           <span className="text-[13.5px] text-tx2">
-            {forge.kind === "none"
-              ? "No forge. You merge requested branches into their target from their review, in the Inbox; Foreman does the merge."
-              : `Merge from a branch's review, in the Inbox, or create a PR on ${forge.url} and merge it there; Foreman notices. Nothing is pushed until you choose. The token lives in Settings, never in this file.`}
+            You merge requested branches into their target from their review, in the Inbox; Foreman
+            does the merge. Nothing is pushed: you push with your own git.
           </span>
-          {forge.projectRepo && (
-            <span className="flex items-center gap-3 text-[13px] text-tx3">
-              <span className="font-mono">project repo → {forge.projectRepo}</span>
-              <Button variant="small" disabled title="Comes with the Git epic">
-                Sync
-              </Button>
-            </span>
-          )}
         </Block>
         <Block title="The file">
           <span className="font-mono text-[12.5px] text-tx3">

@@ -2,17 +2,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { ClientContext, httpClient, isNotBuilt } from "./api/client";
+import { ClientContext, httpClient } from "./api/client";
 import { router } from "./app/router";
 import { applyAccent, applyTheme, savedAccent, savedTheme } from "./app/theme";
 import "./styles.css";
 
 // The composition root: the only place that picks concrete implementations.
 const client = httpClient();
-const queries = new QueryClient({
-  // An area that isn't built yet won't be built by asking again.
-  defaultOptions: { queries: { retry: (failures, e) => !isNotBuilt(e) && failures < 3 } },
-});
+const queries = new QueryClient();
 
 applyTheme(savedTheme());
 applyAccent(savedAccent());

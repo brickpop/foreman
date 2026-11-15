@@ -1,12 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  isNotBuilt,
-  type MergeRequest,
-  type Project,
-  type Request,
-  type Team,
-  type WorkItem,
-} from "../../api/client";
+import type { MergeRequest, Project, Request, Team, WorkItem } from "../../api/client";
 import { agentOf, projectName, when } from "../../app/model";
 import { reviewOf, sessionOf } from "../../app/project";
 import {
@@ -21,7 +14,7 @@ import {
 } from "../../app/queries";
 import { reposWith } from "../../app/repos";
 import { RequestPanel } from "../../components/RequestPanel";
-import { Button, Empty, Loading, NotBuilt, Panel } from "../../components/ui";
+import { Button, Empty, Loading, Panel } from "../../components/ui";
 
 // A project's pipeline (wiki/product/features/project-pipeline.md): what needs
 // the CEO, in its Inbox (a review opens its page there); the work moving
@@ -59,7 +52,6 @@ export function InFlight({ project }: { project: Project }) {
   // items stay with it, out of the way, until a new hand-off frees them.
   const carried = (w: (typeof items)[number]) => mrs.some((m) => m.id === w.mergeRequestId);
   const loose = items.filter((w) => !carried(w));
-  if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
   if (pipeline.isPending) return <Loading />;
   if (loose.length === 0 && openMrs.length === 0)
     return (
@@ -98,7 +90,6 @@ export function Merged({ project }: { project: Project }) {
     .filter((m) => m.state === "merged" && Date.parse(m.mergedAt) >= weekAgo)
     .sort((a, b) => b.mergedAt.localeCompare(a.mergedAt))
     .slice(0, 20);
-  if (isNotBuilt(pipeline.error)) return <NotBuilt what="the pipeline" />;
   if (pipeline.isPending) return <Loading />;
   if (merged.length === 0) return <Empty>Nothing merged in the last 7 days.</Empty>;
   return merged.map((m) => (
@@ -224,10 +215,7 @@ function MergeRow({
     <div className="flex flex-col gap-2 border-b border-line px-4 py-3 last:border-b-0">
       <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3">
         <span className="flex min-w-0 flex-col">
-          <span className="truncate font-medium">
-            {title || mr.branch}
-            {mr.forgePrNumber > 0 && <span className="text-tx3"> PR #{mr.forgePrNumber}</span>}
-          </span>
+          <span className="truncate font-medium">{title || mr.branch}</span>
           <span className="truncate text-[12.5px] text-tx3">
             {lead?.soul.name ?? mr.authorInstance} · {mr.repo} ·{" "}
             <BranchLink project={project} repo={mr.repo} branch={mr.branch} /> → {mr.target}
@@ -236,16 +224,12 @@ function MergeRow({
           </span>
         </span>
         <span className="rounded-[5px] bg-raised px-2 py-[3px] text-[12.5px] text-tx2">
-          {mr.forgePrNumber ? "PR open" : "merge requested"}
+          merge requested
         </span>
         <Button variant="small" onClick={() => navigate(reviewOf(project, mr.reviewId))}>
           Review
         </Button>
-        {mr.forgePrUrl ? (
-          <Button variant="small" onClick={() => window.open(mr.forgePrUrl, "_blank", "noopener")}>
-            Open PR ↗
-          </Button>
-        ) : live ? (
+        {live ? (
           <Button variant="small" onClick={() => navigate(sessionOf(mr.authorInstance))}>
             Session
           </Button>
@@ -299,7 +283,6 @@ function MergedRow({
       <span className="flex items-center gap-2">
         <span className="text-ok">✓</span>
         <span className="font-medium">{title || mr.branch}</span>
-        {mr.forgePrNumber > 0 && <span className="text-tx3">PR #{mr.forgePrNumber}</span>}
         <span className="text-[13px] text-tx4">
           {mr.repo} · merged to {mr.target} · {when(mr.mergedAt)}
         </span>

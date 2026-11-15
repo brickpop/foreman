@@ -3,13 +3,13 @@ import { settingsTab, withCurrent } from "./settings";
 
 describe("settingsTab", () => {
   it("keeps a topic tab", () => {
-    for (const tab of ["teams", "agents", "git", "look", "system"]) {
+    for (const tab of ["teams", "agents", "look", "system"]) {
       expect(settingsTab(tab)).toBe(tab);
     }
   });
 
   it("opens Teams for the old tabs and anything else", () => {
-    for (const tab of ["workspace", "global", "Git", "", 3, undefined, ["git"]]) {
+    for (const tab of ["workspace", "global", "git", "", 3, undefined, ["look"]]) {
       expect(settingsTab(tab)).toBe("teams");
     }
   });

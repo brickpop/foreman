@@ -8,7 +8,7 @@ tags: [model, pipeline, git]
 
 One agent's branch on its way to the lead, stored in `state.db`: from a member's worktree, through the lead's review, to integration into the lead branch. Work items are **informational**: a handoff never creates a [request](./request.md) and needs nothing from the CEO. They show in the project's [Repositories](../features/repos.md) tab under "In flight" ([Project pipeline](../features/project-pipeline.md#2-in-flight)). Integrated work items reach one of the CEO's branches inside a [merge request](./merge-request.md), the pipeline's other entry. The flow is in [Pipeline and merges](../features/pipeline-and-merges.md).
 
-**Why two tables, not one with a `kind`.** Work items and merge requests share almost no fields: a work item has an author, a `wt/` branch, a board card and a stage; a merge request has a wiki entry, checks, an optional forge PR, a state and a merge time. One table would leave most columns empty for each kind and make every query filter on `kind`. Two tables with one foreign key keep the queries obvious: "In flight" is the work items with no PR plus the open PRs; "Merged" is the merged PRs with their work items.
+**Why two tables, not one with a `kind`.** Work items and merge requests share almost no fields: a work item has an author, a `wt/` branch, a board card and a stage; a merge request has a wiki entry, checks, a state and a merge time. One table would leave most columns empty for each kind and make every query filter on `kind`. Two tables with one foreign key keep the queries obvious: "In flight" is the work items with no PR plus the open PRs; "Merged" is the merged PRs with their work items.
 
 ## Schema
 
@@ -33,7 +33,7 @@ Table `work_items`.
 - Stage 3 ("integrated") is set when the branch is merged into any of the lead's `lead/<project>/<team>/*` branches in the lead's worktree: checked right after the lead's `merge` or `commit`, in every repo that has the branch.
 - `merge_request_id` is set only by the lead's `request_merge`, only on stage-3 work items of the same deployment that have no `merge_request_id` yet and whose branch head is contained in the merge request's branch (git ancestry), at creation or at a later refresh of it. A work item with a `merge_request_id` is listed under its merge request, not on its own.
 - A work item is merged when its merge request is merged; it has no merge time of its own.
-- Its merge request being rejected (Close on its review, or its PR closed on the forge) leaves it carried by that merge request, at its stage: the work isn't wanted, so it leaves In flight with it. A new hand-off of its branch frees it (clears `merge_request_id`) and starts it over as new work; so does a later `request_merge` taking it, as a work item carried by a rejected merge request counts as free.
+- Its merge request being rejected (Close on its review) leaves it carried by that merge request, at its stage: the work isn't wanted, so it leaves In flight with it. A new hand-off of its branch frees it (clears `merge_request_id`) and starts it over as new work; so does a later `request_merge` taking it, as a work item carried by a rejected merge request counts as free.
 - The note's **tone** (`ok`, `err`, `ask`, neutral), which Team → In flight colors it by, is derived from the work item's state (checks, stage), never stored.
 
 ## Phasing

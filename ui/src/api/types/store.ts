@@ -178,8 +178,6 @@ export interface MergeRequest {
   state: string; // open, merged, rejected or withdrawn
   checksStatus: string;
   conflicting: boolean;
-  forgePrUrl: string;
-  forgePrNumber: number /* int */;
   note: string;
   createdAt: string /* RFC 3339 */;
   mergedAt: string /* RFC 3339 */;

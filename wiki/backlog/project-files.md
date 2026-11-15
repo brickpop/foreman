@@ -18,7 +18,7 @@ epic: workflow
 - **The session prompt** tells each agent where both are and what each is for (data later work needs goes in `shared/`; knowledge still goes in the wiki).
 - **Open on the desktop**: Foreman opens a folder with the host's `open` (macOS) or `xdg-open` (Linux, with a display). Where it can't, no Open button shows at all.
 - **Session header**, at its right end, three labelled buttons alike, a click opening that folder: **`Agent folder ↗`** (the shown agent's), **`Shared files ↗`**, **`File inbox ↗`** last. They replaced the agent's folder copy button and its Open icon: nothing copies the path any more (the CEO, 2026-11-06). Each folder is made if missing.
-- A project made before workspaces (legacy) has no `files/`: [Remove the workspace migration](./remove-workspace-migration.md) ends that case.
+- A project made before workspaces (legacy) has no `files/`: [One Foreman folder](./foreman-folder.md) ends that case.
 
 ## Safety
 

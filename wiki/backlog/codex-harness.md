@@ -14,7 +14,7 @@ epic: install-first-run
 - **The browser login, for business accounts and the like**; the device-code login (`codex login --device-auth`) isn't one the CEO can use.
 - **No port opened for its callback:** the Connect terminal asks for the address the browser lands on and hands it to Codex inside the container ([Harness adapters → Codex](../product/architecture/harness-adapters.md#codex)).
 - **The CEO's `~/.codex` stays out:** a profile has its own login, as Claude Code's do.
-- **No Codex code for moving conversations**, a legacy path ([Remove the workspace migration](./remove-workspace-migration.md)): a Codex agent whose sandbox moves starts fresh.
+- **No Codex code for moving conversations**, a legacy path ([One Foreman folder](./foreman-folder.md)): a Codex agent whose sandbox moves starts fresh.
 
 **Probed** on Codex 0.167.0 in a terminal against a stand-in Responses API server and a stand-in MCP server (2026-11-06): the trust dialog skipped with the sandbox trusted; hooks run only when trusted (`--dangerously-bypass-hook-trust`); the hooks' payloads (`Bash` for its command tool, `mcp__foreman__<tool>`, `request_user_input`, `Interrupt` on Esc and no `Stop`); the question tool refused outside plan mode without `default_mode_request_user_input`; `AGENTS.md` in `CODEX_HOME` reaches the model; `resume --last -- <opener>`; Ctrl+J is a new line; an idle session keeps only its MCP server. The adapter's own generated launch ran real Codex end to end. The login wrapper relayed a pasted callback to Codex's server (refused, as expected, for a made-up `state`). How `auth.json` is saved and shared was read in Codex's code.
 

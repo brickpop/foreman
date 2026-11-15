@@ -78,7 +78,7 @@ Claude Code and Pi file each conversation under its working folder's path, so an
 
 Codex files its conversations by date and finds them by the working folder recorded inside, and its adapter isn't a `Mover`: no new code for a legacy path (the CEO, 2026-11-06). A Codex agent whose sandbox moves starts fresh.
 
-Legacy: it goes with the migration ([Remove the workspace migration](../../backlog/remove-workspace-migration.md)).
+Legacy: it goes with the migration ([One Foreman folder](../../backlog/foreman-folder.md)).
 
 ## Pi
 

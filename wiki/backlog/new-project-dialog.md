@@ -15,7 +15,7 @@ epic: install-first-run
 - **Nothing asks for a profile.** A new project gets the default profile without saying so ([Add a project → Effect](../product/features/add-project.md#effect), step 5). The only place to choose one is [Project settings](../product/features/project-settings.md) (`ProfileChoice`), which the CEO has to know to look for.
 - **The overall flow is unclear.** The project is created in step 1, before its repos. The project (its Wiki) opens behind the dialog while step 2 is still open. **Later** and **Done** both just close the dialog.
 
-Was blocked by [Project workspaces](./project-workspaces.md), built 2026-10-28: step 1 already has a typed **Workspace** field (following the name, `GET /api/folders/workspace`); this card adds its **Change** (the folder browser, picking a folder, existing or to be made) in place of typing.
+Was blocked by [Project workspaces](./archive/project-workspaces.md), built 2026-10-28: step 1 already has a typed **Workspace** field (following the name, `GET /api/folders/workspace`); this card was to add its **Change**; [One Foreman folder](./foreman-folder.md) removes the field instead (every project's folder is `~/foreman/projects/<id>/`), and [Portable projects](./portable-projects.md) adds Clone beside picking a repo.
 
 ## Decided (the CEO, 2026-11-04), replacing step 2 below
 
@@ -48,6 +48,6 @@ web   ~/dev/web       trunk    [Remove]
 
 - [x] agree on the structure with the CEO
 - [x] ~~step 2, `AddRepo`'s list~~: the Repos page instead (2026-11-04)
-- [ ] the workspace's **Change** (the folder browser); the browser's `added` (the server marks the entries, given the project); the profile in step 1
+- [ ] the browser's `added` (the server marks the entries, given the project); the profile in step 1
 - [ ] tests: an added repo can't be picked again (through a symlink too); the profile chosen is the one the project gets; the Repos page opens once the project is created
 - [ ] update the specs above

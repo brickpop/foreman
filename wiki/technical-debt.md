@@ -47,14 +47,14 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **State:** Foreman moves a project made before workspaces out of `~/.foreman/projects/` and `~/.foreman/sandboxes/` into its workspace (`home.Migrate`, `POST /api/projects/{id}/migrate`, the "Move into a workspace" offer in Project settings), worktrees repaired and the agents' conversations carried over (`harness.Mover` in the Claude Code and Pi adapters); so it still knows the old layout's paths (`projectsDir`, `sandboxesDir`, `legacyHarn`, the legacy branch of `Home.layout` and `Project.HarnessDir`, the watcher's `projects/`).
 - **Why:** only the CEO's existing projects need it: Foreman has no other users yet (the CEO, 2026-10-28).
 - **Impact:** code, a route and a UI offer kept for a one-off move; the old paths stay named in the code. Its known edges, accepted for a one-off: the moves are renames, so a workspace on another file system than the home is refused by the OS (`EXDEV`, "invalid cross-device link") and nothing moves; a stopped deployment's instance rows keep their old `sandbox_path` until a redeploy writes new ones (nothing reads them meanwhile: a start uses the row a deploy just wrote); a conversation folder Claude Code named with a hash (a path over 200 characters) can't be carried over, so the move is refused; and a failed undo (a rename back that fails too) is ignored, leaving that folder where it got to.
-- **Fix:** removed once the CEO has migrated every project: [Remove the workspace migration](./backlog/remove-workspace-migration.md).
+- **Fix:** removed by [One Foreman folder](./backlog/foreman-folder.md); the CEO's projects move with its one-off script.
 
 ## The old project mount point
 
 - **State:** until 2026-11-02 the project repo was mounted in each container at `<sandbox>/project`, so every sandbox a launch made holds an empty `project/` folder. Each launch removes it when empty (`os.Remove` in `instances/launch.go`), since the project repo is now mounted at its real path.
 - **Why:** sandboxes made before then would keep a confusing empty folder, which an agent may take for the project repo.
 - **Impact:** one line run at every launch; a sandbox never launched again keeps its folder (Clean up removes the worktrees, not it).
-- **Fix:** removed with [Remove the workspace migration](./backlog/remove-workspace-migration.md), once every deployment has relaunched.
+- **Fix:** removed by [One Foreman folder](./backlog/foreman-folder.md), whose script moves every worktree.
 
 ## Old team files' `look`
 
@@ -106,7 +106,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 
 ## Project workspaces: known edges
 
-- **State** (from [Project workspaces](./backlog/project-workspaces.md), 2026-10-28):
+- **State** (from [Project workspaces](./backlog/archive/project-workspaces.md), 2026-10-28):
   - **Worktrees kept on remove:** removing a project without its worktrees leaves them in `<workspace>/agents/`, their records in each code repo, so those branches can't be deleted while checked out there, and a new project in the same workspace reuses the folders as they are.
   - **A workspace inside an enclosing git repo** (`~/workspace` a repo itself) is refused only when that repo is a code repo of some project; otherwise git run there on the host (the Direct engine) sees the enclosing repo. In a container it isn't mounted.
   - **The workspace is typed, not browsed** in New project and in the move offer: the folder browser lists repos to add, not a place for a new folder.

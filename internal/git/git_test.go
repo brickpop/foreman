@@ -471,4 +471,29 @@ func TestRemoveWorktree(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(dirty, "draft.txt")); string(data) != "not committed\n" {
 		t.Errorf("the work went: %q", data)
 	}
+	// Locked by the CEO: it stays.
+	locked := filepath.Join(t.TempDir(), "kai", "api")
+	if err := g.Prepare(ctx, r, locked, "wt/kai/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(ctx, r, "worktree", "lock", locked); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.RemoveWorktree(ctx, r, locked); err == nil {
+		t.Error("removed a locked worktree")
+	}
+	// Its folder deleted by hand: git forgets it.
+	gone := filepath.Join(t.TempDir(), "ana", "api")
+	if err := g.Prepare(ctx, r, gone, "wt/ana/main", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(gone); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.RemoveWorktree(ctx, r, gone); err != nil {
+		t.Errorf("a folder gone: %v", err)
+	}
+	if trees, _ := g.Worktrees(ctx, r); trees["wt/ana/main"] != "" {
+		t.Error("still listed")
+	}
 }

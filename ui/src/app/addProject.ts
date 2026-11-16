@@ -15,6 +15,19 @@ export function repoName(path: string): string {
     .slice(0, 63);
 }
 
+/** A cloned repo's default name, from its URL: the last part of its path
+ * without .git (git@github.com:me/ledger-api.git is ledger-api), as
+ * repoName makes it. */
+export function cloneName(url: string): string {
+  return repoName(
+    url
+      .trim()
+      .replace(/\/+$/, "")
+      .replace(/\.git$/, "")
+      .replaceAll(":", "/"),
+  );
+}
+
 /** A new project's name from what the CEO typed: a slug, as the server
  * requires (it names its folders; readable makes how it shows):
  * lowercase letters and digits, accents dropped, anything else one hyphen,

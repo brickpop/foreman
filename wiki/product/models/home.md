@@ -8,7 +8,7 @@ tags: [model, home, config]
 
 Foreman on this machine, on macOS and Linux alike, is two folders (the CEO, 2026-11-08): its **home**, `~/.foreman` (or `--home`), holding Foreman's machinery, and **[Foreman's folder](#foremans-folder)**, `~/foreman` by default, holding what the CEO owns. One Foreman runs per machine: `server.lock` keeps a second one from starting, and that one prints the first one's URL instead (the CEO, 2026-10-20).
 
-The home holds this machine's [settings](./global-settings.md) (`settings.toml`, a plain file, in no repo), each agent's private **harness folder** (`harness/<project>/<agent>/`), and Foreman's state. Nothing under the home is in a repo. Foreman's folder holds **[Foreman's HQ](#foremans-hq)** (the teams, the CEO's instructions and the projects' records), each project's **HQ** and files ([Project config → The project's folder](./project-config.md#the-projects-folder)), and the agents' worktrees. A project is a record plus its HQ and files, and its code repos live anywhere in the CEO's home folder. Foreman never clones code: the repos it creates are Foreman's HQ, each project's HQ (new, or cloned from a URL or a local path), and, on the CEO's request, a new **empty code repo** at a path the CEO picks (a README in a first commit, on `main`).
+The home holds this machine's [settings](./global-settings.md) (`settings.toml`, a plain file, in no repo), each agent's private **harness folder** (`harness/<project>/<agent>/`), and Foreman's state. Nothing under the home is in a repo. Foreman's folder holds **[Foreman's HQ](#foremans-hq)** (the teams, the CEO's instructions and the projects' records), each project's **HQ** and files ([Project config → The project's folder](./project-config.md#the-projects-folder)), and the agents' worktrees. A project is a record plus its HQ and files, and its code repos live anywhere in the CEO's home folder. The repos Foreman creates are Foreman's HQ, each project's HQ (new, or cloned from a URL or a local path), and, on the CEO's request, a new **empty code repo** at a path the CEO picks (a README in a first commit, on `main`) or a code repo **cloned** from its URL into `repos/` ([Add a project → Cloning a repo](../features/add-project.md#cloning-a-repo)).
 
 ## Config vs. state vs. content
 
@@ -63,7 +63,7 @@ foreman [--home <dir>] [--no-open] [--port 8888] [--new-token]
 
 The UI doesn't change it (the CEO, 2026-11-15): [Settings → System](../features/settings.md) shows it read-only, beside the home. To move it, the CEO stops Foreman, moves the folder by hand and edits `settings.toml`. `just dev` uses its own, `.dev/<harness>-folder`.
 
-What it holds splits by what the CEO keeps: `hq/` and `projects/` are what to back up; `worktrees/` is what can go, since every commit is in the code repo and Foreman makes a missing worktree again when its agent opens that repo ([Sandboxes and git policy](../architecture/sandboxes-and-git.md)). Removing a worktree loses only what an agent left uncommitted.
+What it holds splits by what the CEO keeps: `hq/` and `projects/` are what to back up (their origins do it: [Syncing the HQs](#syncing-the-hqs)); `repos/` holds the code repos Foreman cloned, backed up by their own remotes; `worktrees/` is what can go, since every commit is in the code repo and Foreman makes a missing worktree again when its agent opens that repo ([Sandboxes and git policy](../architecture/sandboxes-and-git.md)). Removing a worktree loses only what an agent left uncommitted.
 
 ## Layout
 
@@ -80,10 +80,12 @@ What it holds splits by what the CEO keeps: `hq/` and `projects/` are what to ba
 │     ├─ hq/               the project's HQ (git), made by New project
 │     │  ├─ project.toml   project config
 │     │  ├─ AGENTS.md
-│     │  └─ wiki/          knowledge base (wiki.toml, index.md, backlog/, product/, adr/, inbox/)
+│     │  └─ wiki.toml, …   its knowledge base, at the HQ's root (index.md, backlog/, product/, inbox/)
 │     └─ files/            shared with the agents, whatever the team
 │        ├─ inbox/         the CEO's files for them (read-only for them)
 │        └─ shared/        their data that outlives a task and a team
+├─ repos/
+│  └─ me/ledger-api/       a code repo Foreman cloned, by its URL's path (the CEO's, like any repo)
 └─ worktrees/
    └─ ledger/
       └─ mara/             mara's sandbox

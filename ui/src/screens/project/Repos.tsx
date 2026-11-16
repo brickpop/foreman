@@ -162,6 +162,25 @@ export function Repos() {
           <p className="m-0 text-[13.5px] text-tx2">
             Pick its folder now. It must be the same repo: Foreman checks they share a commit.
           </p>
+          {changing?.what === "locate" && target?.remote && (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="min-w-0 flex-1 text-[13px] break-words text-tx2">
+                Or clone it from <span className="font-mono text-[12.5px]">{target.remote}</span>{" "}
+                into Foreman's repos/, with your git.
+              </span>
+              <Button
+                variant="small"
+                disabled={change.isPending}
+                onClick={() =>
+                  change.mutate(() => client.home.cloneMissingRepo(project.id, changing.repo), {
+                    onSuccess: close,
+                  })
+                }
+              >
+                Clone it
+              </Button>
+            </div>
+          )}
           {changing?.what === "locate" && (
             <Locate
               project={project.id}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cloneName,
   createdBody,
   defaultToSend,
   folderCrumbs,
@@ -7,6 +8,17 @@ import {
   projectSlug,
   repoName,
 } from "./addProject";
+
+describe("cloneName", () => {
+  it("is the URL's last part, without .git", () => {
+    expect(cloneName("git@github.com:me/ledger-api.git")).toBe("ledger-api");
+    expect(cloneName("https://gitlab.com/acme/platform/deploy.git/")).toBe("deploy");
+    expect(cloneName("ssh://git@host:2222/~ceo/ledger")).toBe("ledger");
+    expect(cloneName("git@github.com:solo.git")).toBe("solo");
+    expect(cloneName("https://github.com/me/My Repo.git")).toBe("My-Repo");
+    expect(cloneName("")).toBe("");
+  });
+});
 
 describe("repoName", () => {
   it("is the folder's own name", () => {

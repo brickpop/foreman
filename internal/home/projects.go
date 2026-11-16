@@ -488,15 +488,6 @@ func writeScaffold(project, dir string) ([]string, error) {
 	return created, nil
 }
 
-// oldWikiDir is where an HQ kept its wiki before the wiki moved to its root
-// (wiki/backlog/wiki-at-root.md).
-const oldWikiDir = "wiki/"
-
-// oldWiki says whether the HQ at dir still keeps its wiki in wiki/.
-func oldWiki(dir string) bool {
-	return !exists(filepath.Join(dir, "wiki.toml")) && exists(filepath.Join(dir, oldWikiDir, "wiki.toml"))
-}
-
 func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return !errors.Is(err, fs.ErrNotExist)
@@ -510,16 +501,11 @@ func makeFile(path, content string) error {
 }
 
 // Missing lists the scaffold files the project's HQ lacks: deleted, or
-// never there in an HQ made elsewhere. An HQ whose wiki is still in wiki/
-// (from before the wiki moved to the HQ's root) lacks only that move: the
-// CEO makes it, as Foreman can't tell what else of theirs is in there.
+// never there in an HQ made elsewhere.
 func (h *Home) Missing(id string) ([]Missing, error) {
 	p, err := h.Project(id)
 	if err != nil {
 		return nil, err
-	}
-	if oldWiki(p.Path) {
-		return []Missing{{File: "wiki.toml", Why: "the wiki is still in wiki/: Foreman reads it at the HQ's root", Required: true, From: oldWikiDir}}, nil
 	}
 	out := []Missing{}
 	for _, f := range scaffold {
@@ -536,9 +522,6 @@ func (h *Home) Scaffold(ctx context.Context, id string) error {
 	p, err := h.Project(id)
 	if err != nil {
 		return err
-	}
-	if oldWiki(p.Path) {
-		return fmt.Errorf("%w: its wiki is still in %s: move it to the HQ's root first", ErrInvalid, oldWikiDir)
 	}
 	created, err := writeScaffold(id, p.Path)
 	if err != nil || len(created) == 0 {

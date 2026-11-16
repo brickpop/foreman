@@ -485,48 +485,6 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	}
 }
 
-// An HQ whose wiki is still in wiki/ (made before the wiki moved to the
-// HQ's root: a clone of an old one) is told to move it, and nothing is
-// created beside it: a second, empty wiki would hide the real one.
-func TestAWikiStillInItsOldFolderIsToldToMove(t *testing.T) {
-	h := loaded(t, nil)
-	p, _, err := h.NewProject(ctx, "old", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	repo := p.Path
-	if err := os.Mkdir(filepath.Join(repo, "wiki"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range []string{"wiki.toml", "index.md", "product", "backlog", "technical-debt.md"} {
-		gitOut(t, repo, "mv", f, "wiki/"+f)
-	}
-	gitOut(t, repo, "commit", "--quiet", "-m", "the old layout")
-	got, err := h.Missing("old")
-	if err != nil || len(got) != 1 || got[0].File != "wiki.toml" || !got[0].Required || got[0].From != "wiki/" {
-		t.Fatalf("missing %+v %v", got, err)
-	}
-	head := gitOut(t, repo, "rev-parse", "HEAD")
-	if err := h.Scaffold(ctx, "old"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "move it") {
-		t.Errorf("scaffold over the old layout: %v", err)
-	}
-	if exists(filepath.Join(repo, "wiki.toml")) || gitOut(t, repo, "rev-parse", "HEAD") != head {
-		t.Error("the scaffold wrote beside the old wiki")
-	}
-	// Moved by hand: read at the root, nothing missing.
-	for _, f := range []string{"wiki.toml", "index.md", "product", "backlog", "technical-debt.md"} {
-		gitOut(t, repo, "mv", "wiki/"+f, f)
-	}
-	if got, err := h.Missing("old"); err != nil || len(got) != 0 {
-		t.Errorf("after the move: %+v %v", got, err)
-	}
-	// A wiki/ folder that isn't a wiki bundle is just a folder of the wiki.
-	writeFile(t, filepath.Join(repo, "wiki", "notes.md"), "x")
-	if got, _ := h.Missing("old"); len(got) != 0 {
-		t.Errorf("a plain wiki/ folder: %+v", got)
-	}
-}
-
 // The scaffold list and the starter folder are one thing: neither has a file
 // the other lacks.
 func TestScaffoldIsTheStarterFolder(t *testing.T) {

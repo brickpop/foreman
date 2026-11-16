@@ -7,14 +7,10 @@ import { Button, Empty } from "./ui";
 // the scaffold had them, or one whose files were deleted. Each creates what
 // is missing, never over a file that exists.
 
-/** Instead of the wiki: some missing file is one it can't be read without.
- * A wiki still in its HQ's wiki/ (from before the wiki moved to the HQ's
- * root) is the CEO's to move: nothing is created beside it. */
+/** Instead of the wiki: some missing file is one it can't be read without. */
 export function WikiSetup({ project, missing }: { project: string; missing: Missing[] }) {
   const scaffold = useScaffold(project);
   const repo = useProjectHQ(project);
-  const from = missing.find((m) => m.from)?.from;
-  if (from) return <MoveWiki hq={repo} from={from} />;
   return (
     <Empty>
       <div className="flex flex-col items-center gap-3">
@@ -56,28 +52,5 @@ export function ScaffoldNotice({ project, missing }: { project: string; missing:
       </Button>
       {scaffold.error && <span className="text-err">{scaffold.error.message}</span>}
     </div>
-  );
-}
-
-/** A wiki still in the HQ's wiki/: how to move it to the HQ's root. */
-function MoveWiki({ hq, from }: { hq: string; from: string }) {
-  const move = `cd ${hq} && git mv ${from}* . && git commit -m "The wiki at the HQ's root"`;
-  return (
-    <Empty>
-      <div className="flex max-w-[620px] flex-col items-center gap-3">
-        <span className="font-medium text-tx2">
-          This project's wiki is still in its HQ's {from}.
-        </span>
-        <span>
-          Foreman reads it at the HQ's root. Move it there with your git, while no team is deployed
-          on the project; Foreman picks it up:
-        </span>
-        <code className="font-mono text-[13px] text-tx2 select-text">{move}</code>
-        <span className="text-[13px]">
-          If its AGENTS.md is Foreman's starter, it still describes the old place: delete it, and
-          Foreman offers the current one.
-        </span>
-      </div>
-    </Empty>
   );
 }

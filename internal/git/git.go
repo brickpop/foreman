@@ -204,14 +204,24 @@ func (g *CLI) MoveWorktree(ctx context.Context, repo, from, to string) error {
 }
 
 // RemoveWorktree removes one of repo's worktrees, its folder included; its
-// branch stays. Git refuses one with changes not committed (tracked or not),
-// so nothing is lost: ErrUncommitted.
+// branch stays. One with changes not committed (tracked or not, in a
+// submodule too) or a merge under way stays, so nothing is lost:
+// ErrUncommitted. A locked one stays too. What git ignores in it goes.
 func (g *CLI) RemoveWorktree(ctx context.Context, repo, worktree string) error {
 	defer g.lock(ctx, repo)()
-	_, err := run(ctx, repo, "worktree", "remove", "--", worktree)
-	if err != nil && strings.Contains(err.Error(), "contains modified or untracked files") {
-		return ErrUncommitted
+	if _, err := os.Stat(worktree); err == nil {
+		clean, err := g.Clean(ctx, worktree)
+		if err != nil {
+			return err
+		}
+		if !clean {
+			return ErrUncommitted
+		}
 	}
+	// Checked clean above, submodules included: without --force, git refuses
+	// any worktree with a submodule checked out, however clean. One --force
+	// still refuses a locked worktree.
+	_, err := run(ctx, repo, "worktree", "remove", "--force", "--", worktree)
 	return err
 }
 

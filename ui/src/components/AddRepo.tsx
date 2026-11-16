@@ -1,23 +1,100 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { type Project, useClient } from "../api/client";
-import { defaultToSend, inside, repoName } from "../app/addProject";
+import { cloneName, defaultToSend, inside, repoName } from "../app/addProject";
 import { keys, useBranches } from "../app/queries";
 import { FolderBrowser, useFolderBrowser } from "./FolderBrowser";
 import { Select } from "./Select";
-import { Button } from "./ui";
+import { Button, Segmented } from "./ui";
 
-// Adds a code repo to a project (wiki/product/features/add-project.md#picking-repos),
-// in one step: the folder the browser shows is the pick. A git repo's top
-// folder is added as it is; any other folder gets a new empty repo inside it.
-// Used by Repos.
+// Adds a code repo to a project (wiki/product/features/add-project.md#picking-repos):
+// from a folder, in one step (the folder the browser shows is the pick: a git
+// repo's top folder is added as it is; any other folder gets a new empty
+// repo inside it), or cloned from a URL into Foreman's repos/. Used by Repos.
 
 const label = "text-[13px] font-medium text-tx4";
 const field =
   "rounded-lg border border-line2 bg-term px-3 py-2 text-[13.5px] text-tx disabled:opacity-45";
 const hint = "text-[12.5px] text-tx4";
 
-export function AddRepo({ project, onAdded }: { project: string; onAdded: (p: Project) => void }) {
+type Props = { project: string; onAdded: (p: Project) => void };
+
+export function AddRepo(props: Props) {
+  const [from, setFrom] = useState<"folder" | "clone">("folder");
+  return (
+    <div className="flex flex-col gap-3">
+      <Segmented
+        label="Add from"
+        value={from}
+        onChange={setFrom}
+        options={[
+          { value: "folder", label: "A folder" },
+          { value: "clone", label: "Clone from a URL" },
+        ]}
+      />
+      {from === "folder" ? <FromFolder {...props} /> : <FromClone {...props} />}
+    </div>
+  );
+}
+
+/** Clones a repo with the CEO's git into Foreman's repos/<the URL's path>;
+ * the server picks its default branch (main, else the remote's). */
+function FromClone({ project, onAdded }: Props) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const [url, setUrl] = useState("");
+  const [typed, setTyped] = useState<string>();
+  const name = (typed ?? cloneName(url)).trim();
+  const add = useMutation({
+    mutationFn: () => client.home.cloneRepo(project, name, url.trim()),
+    onSuccess: (p) => {
+      queries.invalidateQueries({ queryKey: keys.projects });
+      setUrl("");
+      setTyped(undefined);
+      onAdded(p);
+    },
+  });
+  return (
+    <div className="flex flex-col gap-3">
+      <label className="flex flex-col gap-1.5">
+        <span className={label}>URL</span>
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="git@github.com:me/ledger-api.git"
+          spellCheck={false}
+          className={`${field} font-mono`}
+        />
+        <span className={hint}>
+          Cloned with your git (your SSH keys, credential helper) into Foreman's folder, repos/ and
+          the URL's path (me/ledger-api). A clone already there is used as it is. Its default branch
+          is main, or the remote's when it has no main.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1.5">
+        <span className={label}>Repo name</span>
+        <input
+          value={typed ?? cloneName(url)}
+          onChange={(e) => setTyped(e.target.value)}
+          spellCheck={false}
+          className={field}
+        />
+      </label>
+      {add.error && <p className="m-0 text-[13px] text-err">{add.error.message}</p>}
+      <div className="flex justify-end">
+        <Button
+          variant="primary"
+          disabled={!url.trim() || !name || add.isPending}
+          onClick={() => add.mutate()}
+        >
+          {add.isPending ? "Cloning…" : "Clone repo"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FromFolder({ project, onAdded }: Props) {
   const client = useClient();
   const queries = useQueryClient();
   const browser = useFolderBrowser(project);

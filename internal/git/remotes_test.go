@@ -116,6 +116,12 @@ func TestOrigin(t *testing.T) {
 	if got := g.Origin(ctx, filepath.Join(t.TempDir(), "gone")); got != "" {
 		t.Errorf("no repo: %q", got)
 	}
+	// This machine's rewrites stay out of it.
+	mustRun(t, dir, "config", "url.git@github.com:.insteadOf", "https://github.com/")
+	mustRun(t, dir, "remote", "set-url", "origin", "https://github.com/acme/api.git")
+	if got := g.Origin(ctx, dir); got != "https://github.com/acme/api.git" {
+		t.Errorf("rewritten: %q", got)
+	}
 	for url, want := range map[string]string{
 		"https://ghp_secret@github.com/acme/api.git":       "https://github.com/acme/api.git",
 		"https://ceo:hunter2@git.example.com/acme/api.git": "https://git.example.com/acme/api.git",

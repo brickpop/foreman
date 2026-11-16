@@ -175,6 +175,7 @@ export interface Repo {
   name: string; // unique in the project
   path: string; // absolute
   defaultBranch: string; // agents start from it, merges go to it unless the lead names another branch
+  remote: string; // where it can be cloned from (its origin when added); "" when unknown
   problem: string; // why agents can't use it (missing, …); "" when they can
 }
 /**
@@ -203,11 +204,6 @@ export interface Missing {
   file: string; // in the HQ, e.g. backlog/index.md
   why: string; // what goes wrong without it
   required: boolean; // the wiki can't be read without it
-  /**
-   * From is the folder the wiki is in, to move to the HQ's root ("wiki/"):
-   * an HQ from before the wiki was at its root. Nothing is created then.
-   */
-  from?: string;
 }
 /**
  * Change says what changed, for the UI to refetch.

@@ -104,6 +104,12 @@ func (f fakeConfig) RepoBranches(_ context.Context, path string) (home.Branches,
 func (f fakeConfig) NewRepo(_ context.Context, project, name, path string) (home.Project, error) {
 	return f.changed("NewRepo", project, name, path)
 }
+func (f fakeConfig) CloneRepo(_ context.Context, project, name, remote, def string) (home.Project, error) {
+	return f.changed("CloneRepo", project, name, remote+" default="+def)
+}
+func (f fakeConfig) CloneMissingRepo(_ context.Context, project, name string) (home.Project, error) {
+	return f.changed("CloneMissingRepo", project, name, "")
+}
 func (f fakeConfig) LocateRepo(_ context.Context, project, name, path string) (home.Project, error) {
 	return f.changed("LocateRepo", project, name, path)
 }
@@ -120,21 +126,14 @@ func (f fakeConfig) SetHidden(_ context.Context, project string, hidden bool) (h
 	return f.changed("SetHidden", project, fmt.Sprint(hidden), "")
 }
 
-// An HQ from before the scaffold: its wiki.toml is missing. suite's wiki is
-// still in wiki/, which Scaffold refuses to write beside.
+// An HQ from before the scaffold: its wiki.toml is missing.
 func (f fakeConfig) Missing(project string) ([]home.Missing, error) {
-	switch project {
-	case "ledger":
+	if project == "ledger" {
 		return []home.Missing{{File: "wiki.toml", Required: true}}, nil
-	case "suite":
-		return []home.Missing{{File: "wiki.toml", Required: true, From: "wiki/"}}, nil
 	}
 	return nil, home.ErrNotFound
 }
 func (f fakeConfig) Scaffold(_ context.Context, project string) error {
-	if project == "suite" {
-		return fmt.Errorf("%w: its wiki is still in wiki/: move it to the HQ's root first", home.ErrInvalid)
-	}
 	_, err := f.Missing(project)
 	return err
 }
@@ -439,6 +438,8 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `{"branch":"master"}`, []string{"SetRepoDefault", "master", "web"}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","new":true}`, []string{"NewRepo", "web", "/home/ceo/dev/web"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
+		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","clone":"git@github.com:me/web.git","defaultBranch":"trunk"}`, []string{"CloneRepo", "web", "git@github.com:me/web.git default=trunk"}},
+		{http.MethodPut, "/api/projects/ledger/repos/web", `{"clone":true}`, []string{"CloneMissingRepo", "web", ""}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
 		{http.MethodPut, "/api/projects/ledger/name", `{"name":"Ledger v2"}`, []string{"SetName", "Ledger v2", ""}},
@@ -468,14 +469,6 @@ func TestProjectRoutes(t *testing.T) {
 	}
 	if w := send(http.MethodPost, "/api/projects/ledger/scaffold", ""); w.Code != http.StatusOK {
 		t.Errorf("scaffold: %d %s", w.Code, w.Body)
-	}
-	// A wiki still in wiki/: said, and nothing created beside it.
-	decodeBody(t, get(t, h, "/api/projects/suite/scaffold"), &missing)
-	if len(missing) != 1 || missing[0].From != "wiki/" {
-		t.Errorf("an old layout's missing %v", missing)
-	}
-	if w := send(http.MethodPost, "/api/projects/suite/scaffold", ""); w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "move it") {
-		t.Errorf("scaffold over an old layout: %d %s", w.Code, w.Body)
 	}
 	for _, w := range []*httptest.ResponseRecorder{get(t, h, "/api/projects/nope/scaffold"), send(http.MethodPost, "/api/projects/nope/scaffold", "")} {
 		if w.Code != http.StatusNotFound {

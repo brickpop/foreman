@@ -63,18 +63,25 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 - `Home.Sync` on start, after Load and before any agent (each step bounded at 30 s), `Home.PushAll` on stop after the agents (10 s each). `Home.Backups` is the Dashboard's **Not backed up** (`GET /api/home`, `backups`).
 - Taken as defaults (say if not): the sync runs before the server serves, so a slow remote delays the start up to the bounds; no "Sync now" button (a remote added by hand shows at the next start).
 
+## Built in part 3 (cloning), 2026-11-16
+
+- `internal/home/clone.go`: `cloneDir` (the URL's path under `repos/`; only URLs with a host), `CloneRepo` (Repos → Add, tab **Clone from a URL**), `CloneMissingRepo` (Repos → Locate, **Clone it** from the record's remote: what Bring here will use). A clone already there is reused when its origin is that URL (adding) or it holds the root commit (locating); anything else refused, untouched.
+- `git.Origin` reads `remote.origin.url` as set: `get-url` applied the CEO's `insteadOf` rewrites, which would have put this machine's rewrite in `projects.toml`.
+- Add a project has no repo picking of its own (a new project opens Repos), so there is nothing to add there; Bring here (part 4) uses Clone it.
+- A clone runs with the home's lock held, as an HQ clone does: the UI waits on it, and other home changes wait meanwhile (bounded by git's own timeouts, none of Foreman's).
+
 ## Edge cases (accepted)
 
 - A merge conflict in `projects.toml` happens only if two machines changed projects without syncing between them, which one-at-a-time rules out; when it happens it is a sync warning like any other.
 - A code repo's `remote` is read once, when it is added. A repo whose origin changes later keeps the old URL until the CEO edits `projects.toml` (or removes and adds the repo).
 - Removing a project removes its `projects.toml` entry; its HQ's remote is untouched. Bringing it back means adding it again with Clone.
-- Two remotes with the same path on different hosts (`github.com/me/app`, `gitlab.com/me/app`) map to one folder: the second is used if its root commit matches, refused if not.
+- Two remotes with the same path on different hosts (`github.com/me/app`, `gitlab.com/me/app`) map to one folder: the second is used if it is the same repo, refused if not ([Clones: two remotes with the same path](./clones-by-host.md)).
 
 ## Steps
 
 - [x] `projects.toml`: its model and checks, read at start and on reload; every project change writes it (one commit); `state.db`'s project tables keep only path and profile (a migration; the CEO's records go into `projects.toml` through the move script of [One Foreman folder](./foreman-folder.md))
 - [x] sync: on start (fetch, merge, push; a conflict aborted and reported), on stop (push, bounded); the Dashboard's warnings (conflict, not backed up, push failed)
-- [ ] clone into `~/foreman/repos/<path>`: the path from the URL, reuse by root commit, refusals; offered beside picking a folder in Bring here, Add a project and Repos → Add
+- [x] clone into `~/foreman/repos/<path>`: the path from the URL, reuse by root commit, refusals; offered beside picking a folder in Bring here, Add a project and Repos → Add
 - [ ] restore: the checklist's first step (Start fresh, Restore from a git URL)
 - [ ] Bring here: projects not on this machine on the Dashboard, the HQ cloned, each repo resolved
 - [ ] specs: home, project-config (the record split between `projects.toml` and `state.db`), persistence, add-project, repos, project-settings, first-run, dashboard, glossary ("never clones" out), security (clone URLs, the CEO's credentials used from Foreman's process)

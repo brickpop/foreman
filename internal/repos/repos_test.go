@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
@@ -202,4 +204,29 @@ func (m mainIs) Project(id string) (home.Project, error) {
 	p, err := m.config.Project(id)
 	p.Repos[0].Default = m.main
 	return p, err
+}
+
+// each runs every step, never more than gitAtOnce at a time, and says the
+// first error.
+func TestEach(t *testing.T) {
+	var mu sync.Mutex
+	running, most, done := 0, 0, 0
+	err := each(50, func(i int) error {
+		mu.Lock()
+		running++
+		most = max(most, running)
+		mu.Unlock()
+		time.Sleep(time.Millisecond)
+		mu.Lock()
+		running--
+		done++
+		mu.Unlock()
+		if i == 7 {
+			return errors.New("seven")
+		}
+		return nil
+	})
+	if done != 50 || most > gitAtOnce || most < 2 || err == nil || err.Error() != "seven" {
+		t.Errorf("done %d, at most %d at once, err %v", done, most, err)
+	}
 }

@@ -17,7 +17,7 @@ import (
 //	hq/                                  Foreman's HQ: teams/, instructions.md
 //	projects/<project>/hq/               the project's HQ
 //	projects/<project>/files/            the files for and from its agents
-//	repos/<path>/                        the code repos Foreman clones (Portable projects, planned)
+//	repos/<path>/                        the code repos Foreman clones (clone.go)
 //	worktrees/<project>/<agent>/<repo>/  the agents' worktrees: disposable
 //
 // Each agent's harness folder is in the home: harness/<project>/<agent>/.
@@ -26,6 +26,7 @@ const (
 	hqDir        = "hq"        // an HQ's folder: Foreman's in the folder, a project's in projects/<project>/
 	projectsDir  = "projects"  // in the folder: one folder per project
 	worktreesDir = "worktrees" // in the folder: <project>/<agent>/<repo>
+	reposDir     = "repos"     // in the folder: the code repos Foreman clones, by their URL's path
 	filesDir     = "files"     // in a project's folder: the files shared with its agents (Project.Files)
 	harnessDir   = "harness"   // in the home: each agent's private harness folder, <project>/<agent>
 )

@@ -5,11 +5,13 @@ package repos
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
@@ -116,20 +118,25 @@ func (b Browser) branches(ctx context.Context, project, dir, def string) ([]Bran
 	// A default branch deleted outside Foreman leaves nothing to count from:
 	// its branches show no ahead count.
 	hasDefault := slices.Contains(names, def)
-	list := []Branch{}
-	for _, name := range names {
-		br := Branch{Name: name}
-		if hasDefault && name != def {
-			if br.Ahead, err = b.Git.Ahead(ctx, dir, name, def); err != nil {
-				return nil, err
+	list := make([]Branch, len(names))
+	err = each(len(names), func(i int) error {
+		br := Branch{Name: names[i]}
+		if hasDefault && br.Name != def {
+			var err error
+			if br.Ahead, err = b.Git.Ahead(ctx, dir, br.Name, def); err != nil {
+				return err
 			}
 		}
-		if tree, ok := trees[name]; ok {
+		if tree, ok := trees[br.Name]; ok {
 			clean, err := b.Git.Clean(ctx, tree)
 			br.Uncommitted = err == nil && !clean
 			br.Agent = home.WorktreeAgent(tree, func(agent string) string { return b.Config.Sandbox(project, agent) })
 		}
-		list = append(list, br)
+		list[i] = br
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	// The default first, then the most recently committed.
 	slices.SortStableFunc(list, func(x, y Branch) int {
@@ -144,6 +151,32 @@ func (b Browser) branches(ctx context.Context, project, dir, def string) ([]Bran
 	return list, nil
 }
 
+// gitAtOnce is how many git commands one listing runs at a time: a repo with
+// hundreds of branches (one count each) and worktrees (one status each)
+// reads in seconds, not minutes, without flooding the machine.
+const gitAtOnce = 8
+
+// each runs do for 0..n-1, gitAtOnce at a time; the first error, if any.
+func each(n int, do func(i int) error) error {
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var first error
+	slots := make(chan struct{}, gitAtOnce)
+	for i := range n {
+		slots <- struct{}{}
+		wg.Go(func() {
+			defer func() { <-slots }()
+			if err := do(i); err != nil {
+				mu.Lock()
+				first = cmp.Or(first, err)
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	return first
+}
+
 // idle lists the agents' worktrees of the repo on no branch; any other
 // detached worktree (the CEO's own, say) is nobody's and left out.
 func (b Browser) idle(ctx context.Context, project, dir string) ([]Idle, error) {
@@ -151,15 +184,16 @@ func (b Browser) idle(ctx context.Context, project, dir string) ([]Idle, error) 
 	if err != nil {
 		return nil, err
 	}
-	list := []Idle{}
-	for _, tree := range trees {
-		agent := home.WorktreeAgent(tree, func(agent string) string { return b.Config.Sandbox(project, agent) })
-		if agent == "" {
-			continue
+	all := make([]Idle, len(trees))
+	_ = each(len(trees), func(i int) error {
+		all[i].Agent = home.WorktreeAgent(trees[i], func(agent string) string { return b.Config.Sandbox(project, agent) })
+		if all[i].Agent != "" {
+			clean, err := b.Git.Clean(ctx, trees[i])
+			all[i].Uncommitted = err == nil && !clean
 		}
-		clean, err := b.Git.Clean(ctx, tree)
-		list = append(list, Idle{Agent: agent, Uncommitted: err == nil && !clean})
-	}
+		return nil
+	})
+	list := slices.DeleteFunc(all, func(i Idle) bool { return i.Agent == "" })
 	slices.SortFunc(list, func(x, y Idle) int { return strings.Compare(x.Agent, y.Agent) })
 	return list, nil
 }

@@ -731,3 +731,31 @@ func TestASubmoduleTheCEOLacksIsFetchedShallow(t *testing.T) {
 		t.Error("lib/dep was fetched with its whole history")
 	}
 }
+
+// A worktree with its submodule checked out goes like any other (git alone
+// refuses it, however clean); one whose submodule holds changes stays.
+func TestRemoveWorktreeWithASubmodule(t *testing.T) {
+	r, _, _, _, wts := withSubmodule(t, "tove", "mara")
+	g := local()
+	for _, a := range []string{"tove", "mara"} {
+		if err := g.SyncSubmodules(ctx, wts[a], false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if emptyOrMissing(filepath.Join(wts["tove"], "lib/dep")) {
+		t.Fatal("the submodule isn't checked out: the test proves nothing")
+	}
+	write(t, filepath.Join(wts["mara"], "lib/dep", "draft.txt"), "not committed\n")
+	if err := g.RemoveWorktree(ctx, r, wts["mara"]); !errors.Is(err, ErrUncommitted) {
+		t.Errorf("a change in its submodule: %v", err)
+	}
+	if read(t, filepath.Join(wts["mara"], "lib/dep", "draft.txt")) != "not committed\n" {
+		t.Error("the change went")
+	}
+	if err := g.RemoveWorktree(ctx, r, wts["tove"]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(wts["tove"]); !os.IsNotExist(err) {
+		t.Errorf("the folder stayed: %v", err)
+	}
+}

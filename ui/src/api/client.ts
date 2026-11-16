@@ -157,6 +157,16 @@ export interface HomeArea {
    * on main. */
   addRepo(project: string, name: string, path: string, defaultBranch?: string): Promise<Project>;
   newRepo(project: string, name: string, path: string): Promise<Project>;
+  /** Adds a repo cloned from remote into Foreman's repos/<its URL's path>
+   * (or the clone already there); cloneMissingRepo locates one by cloning
+   * the remote its record keeps. */
+  cloneRepo(
+    project: string,
+    name: string,
+    remote: string,
+    defaultBranch?: string,
+  ): Promise<Project>;
+  cloneMissingRepo(project: string, name: string): Promise<Project>;
   /** Sets a repo's default branch, one it has. */
   setRepoDefault(project: string, name: string, branch: string): Promise<Project>;
   /** Points a missing repo at its new folder (the same repo). */
@@ -462,6 +472,18 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       newRepo: async (project, name, path) =>
         (
           await request("POST", `/api/projects/${id(project)}/repos`, { name, path, new: true })
+        ).json() as Promise<Project>,
+      cloneRepo: async (project, name, remote, defaultBranch) =>
+        (
+          await request("POST", `/api/projects/${id(project)}/repos`, {
+            name,
+            clone: remote,
+            defaultBranch,
+          })
+        ).json() as Promise<Project>,
+      cloneMissingRepo: async (project, name) =>
+        (
+          await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}`, { clone: true })
         ).json() as Promise<Project>,
       setRepoDefault: async (project, name, branch) =>
         (

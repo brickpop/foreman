@@ -50,6 +50,7 @@ type Repo struct {
 	Name    string `json:"name"`          // unique in the project
 	Path    string `json:"path"`          // absolute
 	Default string `json:"defaultBranch"` // agents start from it, merges go to it unless the lead names another branch
+	Remote  string `json:"remote"`        // where it can be cloned from (its origin when added); "" when unknown
 	Problem string `json:"problem"`       // why agents can't use it (missing, …); "" when they can
 	root    string // its first commit, which Locate looks for
 }
@@ -131,9 +132,6 @@ type Missing struct {
 	File     string `json:"file"`     // in the HQ, e.g. backlog/index.md
 	Why      string `json:"why"`      // what goes wrong without it
 	Required bool   `json:"required"` // the wiki can't be read without it
-	// From is the folder the wiki is in, to move to the HQ's root ("wiki/"):
-	// an HQ from before the wiki was at its root. Nothing is created then.
-	From string `json:"from,omitempty"`
 }
 
 // Change says what changed, for the UI to refetch.
@@ -353,7 +351,7 @@ func (h *Home) project(ctx context.Context, id string, r Record, here store.Proj
 	for _, name := range sortedKeys(r.Repos) {
 		rec := r.Repos[name]
 		path := paths[strings.ToLower(name)]
-		repo := Repo{Name: name, Path: path, Default: rec.DefaultBranch, Problem: h.checkRepo(ctx, path, rec.RootCommit), root: rec.RootCommit}
+		repo := Repo{Name: name, Path: path, Default: rec.DefaultBranch, Remote: rec.Remote, Problem: h.checkRepo(ctx, path, rec.RootCommit), root: rec.RootCommit}
 		if !repo.Ready() {
 			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.Name, repo.Problem))
 		}

@@ -44,6 +44,10 @@ type Config interface {
 	// a new folder, on main, and adds it.
 	AddRepo(ctx context.Context, project, name, path, def string) (home.Project, error)
 	NewRepo(ctx context.Context, project, name, path string) (home.Project, error)
+	// CloneRepo adds a repo cloned from remote into Foreman's repos/;
+	// CloneMissingRepo locates one by cloning the remote its record keeps.
+	CloneRepo(ctx context.Context, project, name, remote, def string) (home.Project, error)
+	CloneMissingRepo(ctx context.Context, project, name string) (home.Project, error)
 	// LocateRepo points a missing repo at its new folder; RemoveRepo takes a
 	// repo out of the project (refused while a team is deployed on it).
 	LocateRepo(ctx context.Context, project, name, path string) (home.Project, error)
@@ -129,16 +133,20 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			Path    string `json:"path"`
 			Default string `json:"defaultBranch"`
 			New     bool   `json:"new"`
+			Clone   string `json:"clone"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, defaultBranch?, new?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, path, defaultBranch?, new?} or {name, clone, defaultBranch?}")
 			return
 		}
 		var p home.Project
 		var err error
-		if req.New {
+		switch {
+		case req.Clone != "":
+			p, err = c.CloneRepo(r.Context(), r.PathValue("id"), req.Name, req.Clone, req.Default)
+		case req.New:
 			p, err = c.NewRepo(r.Context(), r.PathValue("id"), req.Name, req.Path)
-		} else {
+		default:
 			p, err = c.AddRepo(r.Context(), r.PathValue("id"), req.Name, req.Path, req.Default)
 		}
 		writeProject(w, p, err)
@@ -160,13 +168,20 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			Path string `json:"path"`
+			Path  string `json:"path"`
+			Clone bool   `json:"clone"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {path}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {path} or {clone: true}")
 			return
 		}
-		p, err := c.LocateRepo(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Path)
+		var p home.Project
+		var err error
+		if req.Clone {
+			p, err = c.CloneMissingRepo(r.Context(), r.PathValue("id"), r.PathValue("repo"))
+		} else {
+			p, err = c.LocateRepo(r.Context(), r.PathValue("id"), r.PathValue("repo"), req.Path)
+		}
 		writeProject(w, p, err)
 	})
 	mux.HandleFunc("DELETE /api/projects/{id}/repos/{repo}", func(w http.ResponseWriter, r *http.Request) {

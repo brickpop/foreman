@@ -146,21 +146,24 @@ function NotBackedUp({ backups }: { backups: Backup[] }) {
               icon={<FolderIcon open={false} />}
             />
           </div>
-          <p className="m-0 break-words">{b.problem}</p>
-          {b.command && (
-            <>
-              <p className="m-0">
+          <p className="m-0 break-words">
+            {b.problem}
+            {b.command && (
+              <>
+                {" "}
                 Make an empty repo for it (GitHub, GitLab…), then run this with its URL in place of{" "}
                 <span className="font-mono">&lt;its URL&gt;</span>. Foreman pushes it at every
                 start and stop from then on.
-              </p>
-              <div className="flex items-start gap-2 rounded-md bg-term px-2.5 py-2">
-                <code className="min-w-0 flex-1 font-mono text-[12px] break-all text-tx2">
-                  {b.command}
-                </code>
-                <CopyButton text={() => b.command} label="Copy the command" />
-              </div>
-            </>
+              </>
+            )}
+          </p>
+          {b.command && (
+            <div className="flex items-start gap-2 rounded-md bg-term px-2.5 py-2">
+              <pre className="m-0 min-w-0 flex-1 font-mono text-[12px] break-all whitespace-pre-wrap text-tx2">
+                {b.command}
+              </pre>
+              <CopyButton text={() => b.command} label="Copy the commands" />
+            </div>
           )}
         </div>
       ))}

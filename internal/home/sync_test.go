@@ -109,7 +109,7 @@ func TestSyncReportsWhatIsNotBackedUp(t *testing.T) {
 		got[b.Project] = b
 	}
 	// No origin: the command that sets one up, for the HQ's own path.
-	if b := got[""]; b.Path != h.HQ() || !strings.Contains(b.Problem, "no origin") || b.Command != fmt.Sprintf("git -C %q remote add origin <its URL> && git -C %q push -u origin main", h.HQ(), h.HQ()) {
+	if b := got[""]; b.Path != h.HQ() || !strings.Contains(b.Problem, "no origin") || b.Command != fmt.Sprintf("cd %q\ngit remote add origin <its URL>\ngit push -u origin main", h.HQ()) {
 		t.Errorf("Foreman's HQ: %+v", b)
 	}
 	if b := got["ledger"]; b.Path != ledger.Path || !strings.Contains(b.Problem, "no origin") || !strings.Contains(b.Command, ledger.Path) {

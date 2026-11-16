@@ -35,8 +35,8 @@ type Backup struct {
 	Project string `json:"project"` // "" for Foreman's HQ
 	Path    string `json:"path"`
 	Problem string `json:"problem"`
-	// Command is what sets its origin up, <its URL> to fill in; "" when the
-	// problem isn't a missing origin.
+	// Command is what sets its origin up, one step per line, <its URL> to
+	// fill in; "" when the problem isn't a missing origin.
 	Command string `json:"command"`
 }
 
@@ -143,7 +143,7 @@ func synced(project, dir string, err error) Backup {
 func noOrigin(project, dir string) Backup {
 	return Backup{
 		Project: project, Path: dir, Problem: "It has no origin: nothing backs it up.",
-		Command: fmt.Sprintf("git -C %q remote add origin <its URL> && git -C %q push -u origin %s", dir, dir, hqBranch),
+		Command: fmt.Sprintf("cd %q\ngit remote add origin <its URL>\ngit push -u origin %s", dir, hqBranch),
 	}
 }
 

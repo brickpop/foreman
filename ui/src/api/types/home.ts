@@ -105,12 +105,6 @@ export interface Settings {
   engine: string;
   stuckAfterMinutes: number /* int */;
   logCapMb: number /* int */;
-  /**
-   * ForemanFolder holds what the CEO owns (Home.Folder): Foreman's HQ, the
-   * projects, the cloned repos, the agents' worktrees. Read at start only;
-   * it has no field in Settings (the CEO, 2026-11-15).
-   */
-  foremanFolder: string;
   notifications: Notifications;
   /**
    * The look of the UI and its terminal (Settings → Notifications & look).

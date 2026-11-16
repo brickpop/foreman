@@ -1,6 +1,6 @@
 ---
 type: spec
-status: planned
+status: built
 tags: [model, config, home]
 ---
 
@@ -24,7 +24,7 @@ tags: [model, config, home]
 | `accent` | String | | `blue` | enum: `blue`, `green`, `purple`, `teal`, `orange`, `pink`, `amber` | The UI's accent color; first-frame copy as for `theme` |
 | `terminal_font` | String | | `jetbrains-mono` | enum: `jetbrains-mono`, `fira-code`, `source-code-pro`, `system` | The terminal's font; `system` is the operating system's monospace |
 | `terminal_font_size` | Number | | `13` | 10–24 | The terminal's font size, in px |
-| `foreman_folder` | String (path) | | `~/foreman` | `~`, `~/…` or an absolute path; after `~`, inside `$HOME`, neither inside Foreman's home nor around it | [Foreman's folder](./home.md#foremans-folder): Foreman's HQ, the projects, the agents' worktrees. Kept as a `~` path. Read at start only: a change takes effect at the next start, and one Foreman can't use stops the start, saying why. No UI changes it (the CEO, 2026-11-15): Settings → System shows it read-only; the CEO moves the folder by hand with Foreman stopped and edits the file |
+| `foreman_folder` | String (path) | | `~/foreman` | `~`, `~/…` or an absolute path; after `~`, inside `$HOME`, neither inside Foreman's home nor around it | [Foreman's folder](./home.md#foremans-folder): Foreman's HQ, the projects, the agents' worktrees. Kept as a `~` path. Read at start only: a change takes effect at the next start, and one Foreman can't use stops the start, saying why. Never through Foreman (the CEO, 2026-11-15 and 11-16): no UI, and the API neither serves it nor changes it (a settings save keeps the file's); Settings → System shows the folder in use, read-only (`/api/home`). The CEO stops Foreman, moves the folder by hand, edits the file and starts it again |
 
 An invalid `theme`, `accent`, `terminal_font` or `terminal_font_size` reads as its default, the problem still reported, so the UI always gets a look it has.
 

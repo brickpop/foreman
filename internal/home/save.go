@@ -47,6 +47,8 @@ func (h *Home) SaveSettings(ctx context.Context, s Settings, version string) (st
 	if p := s.validate(); len(p) > 0 {
 		return "", &InvalidError{p}
 	}
+	// Never through the API: the CEO edits it in the file, Foreman stopped.
+	s.ForemanFolder = h.snap.settings.Settings.ForemanFolder
 	data, err := encode(s)
 	if err != nil {
 		return "", err

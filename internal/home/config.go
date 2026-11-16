@@ -80,9 +80,9 @@ type Settings struct {
 	StuckAfterMinutes int    `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
 	LogCapMB          int    `toml:"log_cap_mb" json:"logCapMb"`
 	// ForemanFolder holds what the CEO owns (Home.Folder): Foreman's HQ, the
-	// projects, the cloned repos, the agents' worktrees. Read at start only;
-	// it has no field in Settings (the CEO, 2026-11-15).
-	ForemanFolder string        `toml:"foreman_folder" json:"foremanFolder"`
+	// projects, the agents' worktrees. Read at start only, and never through
+	// the API: not served, kept on a save (the CEO, 2026-11-15 and 11-16).
+	ForemanFolder string        `toml:"foreman_folder" json:"-"`
 	Notifications Notifications `toml:"notifications" json:"notifications"`
 	// The look of the UI and its terminal (Settings → Notifications & look).
 	Theme  string `toml:"theme" json:"theme"`   // system, dark or light

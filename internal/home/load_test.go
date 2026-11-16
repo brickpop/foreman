@@ -2,6 +2,7 @@ package home
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -140,6 +141,14 @@ func TestLoadMakesForemansHQWithWhatIsThere(t *testing.T) {
 	reload(t, h)
 	if again := gitLog(t, h.HQ()); again != log {
 		t.Errorf("a second load committed:\n%s", again)
+	}
+	// One whose making stopped before its first commit is made at the next start.
+	h = loaded(t, func(root string) {
+		writeFile(t, filepath.Join(hqOf(root), "teams", "atlas.toml"), teamExample)
+		gitOut(t, hqOf(root), "init", "--quiet")
+	})
+	if got := gitOut(t, h.HQ(), "log", "--format=%s"); got != "Foreman's HQ" || len(h.Teams()) != 1 {
+		t.Errorf("a halfway HQ: log %q, teams %d", got, len(h.Teams()))
 	}
 	// An HQ with no teams yet is made too.
 	if h := loaded(t, nil); gitOut(t, h.HQ(), "log", "--format=%s") != "Foreman's HQ" || !exists(h.HQ("teams")) {
@@ -486,15 +495,21 @@ func TestInstructions(t *testing.T) {
 }
 
 // Settings are this machine's: settings.toml in the home, in no repo, the
-// look of the UI included; a save rewrites them, fields the UI doesn't show
-// (foreman_folder) kept, and refuses a look Foreman doesn't have.
+// look of the UI included; a save rewrites them, and refuses a look Foreman
+// doesn't have. foreman_folder is never the API's: not served, and a save
+// keeps the file's whatever it is sent (the CEO, 2026-11-16).
 func TestSettingsStayOnThisMachine(t *testing.T) {
 	h := loaded(t, func(root string) {
 		writeFile(t, filepath.Join(root, "settings.toml"), "foreman_folder = \"~/f\"\n")
 	})
 	s := h.Settings().Settings
+	if data, _ := json.Marshal(h.Settings()); strings.Contains(string(data), "~/f") || strings.Contains(strings.ToLower(string(data)), "foremanfolder") {
+		t.Errorf("foreman_folder is served: %s", data)
+	}
 	s.Theme, s.Accent, s.TerminalFont, s.TerminalFontSize = "dark", "teal", "fira-code", 15
-	if _, err := h.SaveSettings(ctx, s, h.Settings().Version); err != nil {
+	sent := s
+	sent.ForemanFolder = "~/elsewhere"
+	if _, err := h.SaveSettings(ctx, sent, h.Settings().Version); err != nil {
 		t.Fatal(err)
 	}
 	reload(t, h)

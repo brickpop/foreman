@@ -95,10 +95,9 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **State** (from [Project workspaces](./backlog/archive/project-workspaces.md), 2026-10-28, and [One Foreman folder](./backlog/foreman-folder.md), 2026-11-15):
   - **Worktrees kept on remove:** removing a project without its worktrees leaves them in `worktrees/<project>/`, their records in each code repo, so those branches can't be deleted while checked out there, and a new project of the same id reuses the folders as they are.
   - **A Foreman folder inside an enclosing git repo** (a home folder kept in git, say) isn't refused: git run there on the host (the Direct engine) sees the enclosing repo wherever Foreman's own repos are missing. In a container it isn't mounted.
-  - **Clean up's uncommitted option** keeps the changes git can see (`git.Discard`): files ignored by the repo go with the worktree, and a worktree whose changes are inside a submodule stays, listed as holding changes not committed. The kept changes are pruned with the other backups after 30 days, with nothing in the UI to bring them back: `git show <ref>` or `git checkout <ref> -- <file>` by hand.
-  - **`foreman_folder` is read at start only**, and moving the folder is by hand: Foreman doesn't notice a change until it restarts, and refuses to start on a folder outside the home folder or overlapping its own home.
-- **Why:** each is rare, or a deliberate trade next to what the cards had to land.
-- **Fix:** a removed project's kept worktrees get an action in Foreman (or are pruned with it); the folder check refusing an enclosing repo; a restore of a cleaned-up worktree's changes from the UI, if the CEO ever needs one.
+  - **Clean up's uncommitted option** keeps the changes git can see (`git.Discard`): files ignored by the repo go with the worktree, and a worktree whose changes are inside a submodule stays, listed as holding changes not committed. The kept changes are pruned with the other backups after 30 days, with nothing in the UI to bring them back: `git show <ref>` or `git checkout <ref> -- <file>` by hand. Card: [Clean up: what its uncommitted option can't keep](./backlog/cleanup-kept-changes.md).
+  - **Why:** each is rare, or a deliberate trade next to what the cards had to land.
+- **Fix:** a removed project's kept worktrees get an action in Foreman (or are pruned with it); the folder check refusing an enclosing repo; Clean up's gaps in their card.
 
 ## Projects as records: known edges
 

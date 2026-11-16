@@ -216,7 +216,8 @@ func homeFolder() (string, error) {
 // empty instructions.md and .gitignore, in a first commit with whatever was
 // put there by hand.
 func (h *Home) ensureHQ(ctx context.Context) error {
-	if topOfRepo(h.HQ()) {
+	// A repo with no commit is one whose making stopped halfway: made again.
+	if _, err := h.git.Resolve(ctx, h.HQ(), "HEAD"); err == nil && topOfRepo(h.HQ()) {
 		return nil
 	}
 	if err := os.MkdirAll(h.HQ(teamsDir), 0o755); err != nil {

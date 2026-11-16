@@ -70,6 +70,14 @@ describe("httpClient", () => {
     expect(JSON.parse(calls[0].body ?? "")).toEqual({ name: "work", harness: "claude-code" });
   });
 
+  it("switches a profile's harness", async () => {
+    const calls = stubFetch(200, { name: "default", harness: "codex", connected: false });
+    const p = await httpClient("http://x").profiles.setHarness("default", "codex");
+    expect(p.harness).toBe("codex");
+    expect(calls[0]).toMatchObject({ url: "http://x/api/profiles/default/harness", method: "PUT" });
+    expect(JSON.parse(calls[0].body ?? "")).toEqual({ harness: "codex" });
+  });
+
   it("deletes a profile, escaping its name", async () => {
     const calls = stubFetch(204, undefined);
     await httpClient("http://x").profiles.remove("a/b");

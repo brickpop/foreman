@@ -241,6 +241,8 @@ export interface ProfilesArea {
   create(name: string, harness: string): Promise<Profile>;
   /** Deletes it and its credentials; never the default. */
   remove(name: string): Promise<void>;
+  /** Switches it to another harness: the old one's credentials go. */
+  setHarness(name: string, harness: string): Promise<Profile>;
   /** Starts its harness's login; returns the terminal to open with agents.openTerminal. */
   connect(name: string): Promise<string>;
   /** Ends its login, if one runs. */
@@ -577,6 +579,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       create: async (name, harness) =>
         (await request("POST", "/api/profiles", { name, harness })).json(),
       remove: (name) => send("DELETE", `/api/profiles/${id(name)}`),
+      setHarness: async (name, harness) =>
+        (await request("PUT", `/api/profiles/${id(name)}/harness`, { harness })).json(),
       connect: async (name) => {
         const r = await request("POST", `/api/profiles/${id(name)}/connect`);
         return ((await r.json()) as { terminal: string }).terminal;

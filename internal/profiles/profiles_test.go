@@ -105,3 +105,37 @@ func TestDirStaysInTheStore(t *testing.T) {
 		}
 	}
 }
+
+// Switching harness takes the old one's credentials away; staying on it
+// keeps them. The default switches like any other.
+func TestSetHarness(t *testing.T) {
+	s := Store{Root: filepath.Join(t.TempDir(), "profiles")}
+	if err := s.Ensure("claude-code"); err != nil {
+		t.Fatal(err)
+	}
+	login := filepath.Join(s.Dir(Default), ".claude", ".credentials.json")
+	write(t, login, "secret")
+	if p, err := s.SetHarness(Default, "claude-code"); err != nil || p.Harness != "claude-code" {
+		t.Fatalf("the same harness: %+v %v", p, err)
+	}
+	if _, err := os.Stat(login); err != nil {
+		t.Errorf("the same harness lost the login: %v", err)
+	}
+	if p, err := s.SetHarness(Default, "codex"); err != nil || p.Harness != "codex" {
+		t.Fatalf("switch: %+v %v", p, err)
+	}
+	if entries, _ := os.ReadDir(s.Dir(Default)); len(entries) != 1 || entries[0].Name() != file {
+		t.Errorf("left behind: %v", entries)
+	}
+	if p, err := s.Get(Default); err != nil || p.Harness != "codex" {
+		t.Errorf("read back %+v %v", p, err)
+	}
+	if _, err := s.SetHarness(Default, ""); !errors.Is(err, ErrInvalid) {
+		t.Errorf("no harness: %v", err)
+	}
+	for _, bad := range []string{"nope", "../profiles"} {
+		if _, err := s.SetHarness(bad, "pi"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s: %v", bad, err)
+		}
+	}
+}

@@ -83,6 +83,19 @@ func (p profileLogins) Delete(name string) error {
 	return nil
 }
 
+// SetHarness switches a profile to a supported harness. A login still
+// running is the old harness's: it ends.
+func (p profileLogins) SetHarness(name, h string) (profiles.Profile, error) {
+	if p.adapters[h] == nil {
+		return profiles.Profile{}, fmt.Errorf("%w: %q", server.ErrUnknownHarness, h)
+	}
+	if _, err := p.store.SetHarness(name, h); err != nil {
+		return profiles.Profile{}, err
+	}
+	_ = p.terms.stop("connect:" + name)
+	return p.get(name)
+}
+
 // Connect starts the profile's harness login in a terminal, connect:<profile>,
 // and returns its id; a login already running is reused.
 func (p profileLogins) Connect(ctx context.Context, name string) (string, error) {

@@ -77,6 +77,19 @@ func (f *fakeProfiles) Delete(name string) error {
 	return f.find(name)
 }
 
+func (f *fakeProfiles) SetHarness(name, h string) (profiles.Profile, error) {
+	if h != "claude-code" && h != "pi" {
+		return profiles.Profile{}, ErrUnknownHarness
+	}
+	for i, p := range f.list {
+		if p.Name == name {
+			f.list[i] = profiles.Profile{Name: name, Harness: h}
+			return f.list[i], nil
+		}
+	}
+	return profiles.Profile{}, profiles.ErrNotFound
+}
+
 func (f *fakeProfiles) Connect(_ context.Context, name string) (string, error) {
 	if err := f.find(name); err != nil {
 		return "", err
@@ -121,6 +134,23 @@ func TestProfiles(t *testing.T) {
 		if w := send(h, "DELETE", path, ""); w.Code != want {
 			t.Errorf("delete %s: %d, want %d", path, w.Code, want)
 		}
+	}
+	for _, c := range []struct {
+		path, body string
+		want       int
+	}{
+		{"/api/profiles/default/harness", `{"harness":"nope"}`, http.StatusBadRequest},
+		{"/api/profiles/nope/harness", `{"harness":"pi"}`, http.StatusNotFound},
+		{"/api/profiles/default/harness", `not json`, http.StatusBadRequest},
+		{"/api/profiles/default/harness", `{"harness":"pi"}`, http.StatusOK},
+		{"/api/profiles/default/harness", `{"harness":"claude-code"}`, http.StatusOK},
+	} {
+		if w := send(h, "PUT", c.path, c.body); w.Code != c.want {
+			t.Errorf("switch %s %s: %d %s, want %d", c.path, c.body, w.Code, w.Body, c.want)
+		}
+	}
+	if f.harness("default") != "claude-code" {
+		t.Errorf("default is on %q", f.harness("default"))
 	}
 	w := send(h, "POST", "/api/profiles/default/connect", "")
 	var body map[string]string

@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useClient } from "../api/client";
 import type { Endpoint } from "../api/types/harness";
 import { harnessLabel } from "../app/model";
 import { keys, useHarnesses, useProfiles } from "../app/queries";
-import { Modal } from "./Overlays";
+import { Confirm, Modal } from "./Overlays";
 import { Select } from "./Select";
 import { Terminal } from "./Terminal";
 import { Button } from "./ui";
@@ -13,20 +13,91 @@ import { Button } from "./ui";
 // Settings, the setup checklist and the Deploy dialog: the harness's own login
 // in a terminal (Claude Code, Codex), or a model server in a form (Pi). Mount it
 // only while open: for a login, opening starts it and closing ends it,
-// logged in or not.
+// logged in or not. Its harness is picked on top: switching remounts the
+// dialog for the new one.
 
 export function ConnectDialog({ profile, onClose }: { profile: string; onClose: () => void }) {
-  const harness = useProfiles().data?.find((p) => p.name === profile)?.harness;
-  const connect = useHarnesses().data?.find((h) => h.id === harness)?.connect;
-  if (!connect) return null; // until both are known: a login must not start for a form
+  const found = useProfiles().data?.find((p) => p.name === profile);
+  const harnesses = useHarnesses().data;
+  const connect = harnesses?.find((h) => h.id === found?.harness)?.connect;
+  // Until both are known: a login must not start for a form.
+  if (!found || !harnesses || !connect) return null;
+  const picker = (
+    <HarnessPicker
+      profile={profile}
+      current={found.harness}
+      connected={found.connected}
+      harnesses={harnesses.map((h) => h.id)}
+    />
+  );
   return connect === "endpoint" ? (
-    <EndpointConnect profile={profile} onClose={onClose} />
+    <EndpointConnect key={found.harness} profile={profile} picker={picker} onClose={onClose} />
   ) : (
-    <LoginConnect profile={profile} onClose={onClose} />
+    <LoginConnect key={found.harness} profile={profile} picker={picker} onClose={onClose} />
   );
 }
 
-function LoginConnect({ profile, onClose }: { profile: string; onClose: () => void }) {
+/** The profile's harness. A profile is one harness and its credentials, so
+ * switching removes the old one's: a connected profile asks first. */
+function HarnessPicker({
+  profile,
+  current,
+  connected,
+  harnesses,
+}: {
+  profile: string;
+  current: string;
+  connected: boolean;
+  harnesses: string[];
+}) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const [asking, setAsking] = useState<string>();
+  const change = useMutation({
+    mutationFn: (harness: string) => client.profiles.setHarness(profile, harness),
+    onSuccess: () => {
+      // The list only: the old harness's own queries (Pi's endpoint) would
+      // refetch into an error before the dialog remounts.
+      queries.invalidateQueries({ queryKey: keys.profiles, exact: true });
+      queries.invalidateQueries({ queryKey: keys.setup });
+    },
+  });
+  const pick = (harness: string) => {
+    if (harness === current || change.isPending) return;
+    if (connected) setAsking(harness);
+    else change.mutate(harness);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[13px]">
+      <span className="text-tx3">Harness</span>
+      <Select
+        label="Harness"
+        value={current}
+        onChange={pick}
+        options={harnesses.map((h) => ({ value: h, label: harnessLabel(h) }))}
+      />
+      {change.error && <span className="basis-full text-err">{change.error.message}</span>}
+      <Confirm
+        open={asking !== undefined}
+        title={`Switch ${profile} to ${harnessLabel(asking ?? "")}?`}
+        body={`Its ${harnessLabel(current)} credentials are removed. Agents on the projects that use it switch at their next start, fresh.`}
+        action="Switch"
+        onConfirm={() => asking && change.mutate(asking)}
+        onClose={() => setAsking(undefined)}
+      />
+    </div>
+  );
+}
+
+function LoginConnect({
+  profile,
+  picker,
+  onClose,
+}: {
+  profile: string;
+  picker: ReactNode;
+  onClose: () => void;
+}) {
   const client = useClient();
   const queries = useQueryClient();
   const login = useMutation({ mutationFn: () => client.profiles.connect(profile) });
@@ -52,6 +123,7 @@ function LoginConnect({ profile, onClose }: { profile: string; onClose: () => vo
   return (
     <Modal open onClose={close} title={`Connect ${profile}`} width={760} buttonsOnly>
       <div className="flex flex-col gap-3">
+        {picker}
         <p className="m-0 text-[13.5px] text-tx3">
           {label}’s own login, in its container. For Claude Code, type{" "}
           <span className="font-mono text-tx2">/login</span> and follow it; Codex shows its steps
@@ -76,7 +148,15 @@ function LoginConnect({ profile, onClose }: { profile: string; onClose: () => vo
 }
 
 /** A Pi profile's model server and model. */
-function EndpointConnect({ profile, onClose }: { profile: string; onClose: () => void }) {
+function EndpointConnect({
+  profile,
+  picker,
+  onClose,
+}: {
+  profile: string;
+  picker: ReactNode;
+  onClose: () => void;
+}) {
   const client = useClient();
   const current = useQuery({
     queryKey: [...keys.profiles, profile, "endpoint"],
@@ -84,8 +164,13 @@ function EndpointConnect({ profile, onClose }: { profile: string; onClose: () =>
   });
   return (
     <Modal open onClose={onClose} title={`Connect ${profile}`} width={560} buttonsOnly>
-      {current.error && <p className="m-0 text-[13px] text-err">{current.error.message}</p>}
-      {current.data && <EndpointForm profile={profile} current={current.data} onClose={onClose} />}
+      <div className="flex flex-col gap-3">
+        {picker}
+        {current.error && <p className="m-0 text-[13px] text-err">{current.error.message}</p>}
+        {current.data && (
+          <EndpointForm profile={profile} current={current.data} onClose={onClose} />
+        )}
+      </div>
     </Modal>
   );
 }

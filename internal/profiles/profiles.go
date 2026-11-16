@@ -134,6 +134,35 @@ func (s Store) Ensure(harness string) error {
 	return err
 }
 
+// SetHarness switches a profile to harness. A profile is one harness and its
+// credentials, so the old harness's go: everything in its folder but
+// profile.toml. The same harness changes nothing.
+func (s Store) SetHarness(profile, harness string) (Profile, error) {
+	p, err := s.Get(profile)
+	if err != nil || p.Harness == harness {
+		return p, err
+	}
+	if harness == "" {
+		return Profile{}, fmt.Errorf("%w: no harness", ErrInvalid)
+	}
+	entries, err := os.ReadDir(s.Dir(profile))
+	if err != nil {
+		return Profile{}, err
+	}
+	for _, e := range entries {
+		if e.Name() == file {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(s.Dir(profile), e.Name())); err != nil {
+			return Profile{}, err
+		}
+	}
+	if err := s.write(profile, harness); err != nil {
+		return Profile{}, err
+	}
+	return Profile{Name: profile, Harness: harness}, nil
+}
+
 // Delete removes a profile and its credentials; never the default.
 func (s Store) Delete(profile string) error {
 	if profile == Default {

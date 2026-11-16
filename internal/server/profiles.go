@@ -19,6 +19,9 @@ type Profiles interface {
 	Create(name, harness string) (profiles.Profile, error)
 	// Delete removes a profile and its credentials; never the default.
 	Delete(name string) error
+	// SetHarness switches a profile to a supported harness, its old
+	// credentials removed (none when it is the same), its login ended.
+	SetHarness(name, harness string) (profiles.Profile, error)
 	// Connect starts the profile's harness login in a terminal and returns
 	// the terminal's id, for /ws/pty/{id}; one already running is reused.
 	Connect(ctx context.Context, name string) (string, error)
@@ -83,6 +86,26 @@ func profileRoutes(mux *http.ServeMux, p Profiles) {
 			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 		default:
 			w.WriteHeader(http.StatusNoContent)
+		}
+	})
+	mux.HandleFunc("PUT /api/profiles/{name}/harness", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Harness string `json:"harness"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {harness}")
+			return
+		}
+		p, err := p.SetHarness(r.PathValue("name"), req.Harness)
+		switch {
+		case errors.Is(err, profiles.ErrNotFound):
+			writeError(w, http.StatusNotFound, "NOT_FOUND", "No such profile")
+		case errors.Is(err, profiles.ErrInvalid), errors.Is(err, ErrUnknownHarness):
+			writeError(w, http.StatusBadRequest, "INVALID", err.Error())
+		case err != nil:
+			writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
+		default:
+			writeJSON(w, http.StatusOK, p)
 		}
 	})
 	mux.HandleFunc("POST /api/profiles/{name}/connect", func(w http.ResponseWriter, r *http.Request) {

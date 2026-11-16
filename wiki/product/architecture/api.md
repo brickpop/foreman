@@ -91,6 +91,7 @@ GET    /api/harnesses                         the supported harnesses: their com
 GET    /api/profiles                          the CEO's profiles (each a harness and its credentials, shared by every project): name, harness, connected; default first
 POST   /api/profiles                          {name, harness} → 201 the profile, with no login yet (400 INVALID: a bad name or an unsupported harness; 409 EXISTS)
 DELETE /api/profiles/:name                    deletes it and its login, ending its login terminal (204; 400 INVALID for default; 404)
+PUT    /api/profiles/:name/harness            {harness} → the profile on that harness: the old one's credentials removed (everything in its folder but profile.toml; nothing for the same harness), its login terminal ended (400 INVALID for an unknown harness; 404)
 POST   /api/profiles/:name/connect            start its harness login in a terminal → {terminal}: open it with WS /ws/pty/:terminal (404; 400 INVALID for a harness set in a form, Pi)
 DELETE /api/profiles/:name/connect            end its login, if one runs (the Connect dialog closed) → 204
 GET    /api/profiles/:name/endpoint           a Pi profile's model server: {url, model, contextWindow, maxTokens, apiKeySet}, zero when unset; the key is never sent (400 INVALID for a login harness; 404)

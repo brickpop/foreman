@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
+
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // Guard decides which requests reach the server (implemented by access.TokenGuard).
@@ -22,6 +24,8 @@ type Home interface {
 	Folder() string
 	// RecordsProblems is what is wrong with projects.toml, in Foreman's HQ.
 	RecordsProblems() []string
+	// Backups lists the HQs their origin doesn't back up, and why.
+	Backups() []home.Backup
 }
 
 // Options are the parts the server is assembled from.
@@ -52,7 +56,7 @@ type Options struct {
 func New(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/home", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root(), Folder: o.Home.Folder(), ProjectsProblems: o.Home.RecordsProblems()})
+		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root(), Folder: o.Home.Folder(), ProjectsProblems: o.Home.RecordsProblems(), Backups: o.Home.Backups()})
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
@@ -88,6 +92,9 @@ type homeSummary struct {
 	// ProjectsProblems is what is wrong with projects.toml: the projects stay
 	// as last read, and can't be changed, until the CEO fixes it.
 	ProjectsProblems []string `json:"projectsProblems"`
+	// Backups are the HQs their origin doesn't back up: none set, or the
+	// start's sync failed.
+	Backups []home.Backup `json:"backups"`
 }
 
 // ui serves the built SPA: real files as they are, every other path as

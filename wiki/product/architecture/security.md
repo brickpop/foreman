@@ -15,7 +15,7 @@ v1 has **no user authentication** (one CEO, local machine). That makes the HTTP 
 - The CEO's machine and home directory (credentials in `~/.config`, `~/.ssh`, the keychain).
 - Harness credentials ([Session runner → Credentials](./session-runner.md#credentials)), the access token and the agent-link secret.
 - Project code and the CEO's branches of every repo (every branch but an agent's: its default branch and any other).
-- The integrity of decisions: only the CEO decides what reaches the CEO's branches (Foreman merges only on the CEO's Merge, and never pushes a code repo: the CEO does, with their own git) and answers approvals.
+- The integrity of decisions: only the CEO decides what reaches the CEO's branches (Foreman merges only on the CEO's Merge, and never pushes a code repo: the CEO does, with their own git; it pushes only the HQs, to their origins, [Home → Syncing the HQs](../models/home.md#syncing-the-hqs)) and answers approvals.
 
 ## Controls
 
@@ -57,6 +57,8 @@ Decided: every instance runs in a rootless Podman container ([Session runner](./
 - **Foreman's own secrets are never mounted into containers** (the access token, the agent-link secret). The one credential agents hold is their harness's shared login. A misbehaving agent could log it out or corrupt it for every agent of that harness, which then raises "Reconnect" ([Credentials](./session-runner.md#credentials)). Accepted for v1; per-instance logins would contain it.
 - **Git belongs to Foreman; agents only read it.** Every repo's `.git` is mounted read-only for every agent, the HQ's included (its only writer, the lead, edits its files and commits through `commit`), and every git write is a team tool (`switch`, `commit`, `merge`, `handoff`) that Foreman runs on the host, with the repo's hooks and fsmonitor turned off ([Sandboxes and git policy → Agents and git](./sandboxes-and-git.md#agents-and-git)). So the **branch policy** holds by construction, never by hooks in the repo ([where it is enforced](./sandboxes-and-git.md#where-the-policy-is-enforced)), and no agent can damage refs or plant a hook or a `.git/config` setting (`core.hooksPath`, `core.fsmonitor`) that would run a program on the host the next time the CEO or Foreman runs git there. Foreman's review diffs also never run an external diff or textconv program, whoever configured one (the CEO's own config included), as hooks never run. Accepted: every agent can read every branch of the repo. Hiding `.git` entirely is a later option.
 - **Team-tools identity** comes from the per-instance token, never from a field the caller sends ([Team tools](./team-tools.md#transport)). Team messaging is scoped to one deployment.
+
+- **The CEO's git credentials, from Foreman's process.** Syncing the HQs fetches and pushes with the CEO's own git (SSH agent, credential helper), on the host, to each HQ's `origin` only, which only the CEO's git sets: an agent can't point it elsewhere (every `.git` is read-only to agents). Nothing is stored by Foreman, and no prompt ever waits (`GIT_TERMINAL_PROMPT=0`, no askpass, a session of its own). What a lead committed to its HQ is pushed as it is: the CEO's origin receives the agent's commits, unsigned. Origins written to `projects.toml` drop an https URL's user and password, as that file is committed and pushed.
 
 Harness credentials are designed in [Session runner → Credentials](./session-runner.md#credentials) (the CEO's host login is shared, the host's harness config directories never are).
 

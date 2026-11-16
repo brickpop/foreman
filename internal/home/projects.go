@@ -715,6 +715,7 @@ func (h *Home) RemoveProject(ctx context.Context, id string, deleteHQ, deleteWor
 	if err := h.machine.Remove(ctx, p.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
+	delete(h.synced, p.ID) // a project made again under its id is synced afresh
 	if deleteWorktrees {
 		if err := os.RemoveAll(p.worktrees); err != nil {
 			return err

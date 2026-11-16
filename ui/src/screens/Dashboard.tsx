@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
-import type { Project, Request, Team } from "../api/client";
+import type { Backup, Project, Request, Team } from "../api/client";
 import {
   agentOf,
   byName,
@@ -47,7 +47,8 @@ export function Dashboard() {
   const projects = useProjects();
   const teams = useTeams();
   const setup = useSetup();
-  const problems = useHomeFolder().data?.projectsProblems ?? [];
+  const home = useHomeFolder().data;
+  const problems = home?.projectsProblems ?? [];
   const [deploy, setDeploy] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const asks = inbox(requests.data ?? []);
@@ -77,6 +78,7 @@ export function Dashboard() {
         </p>
       )}
       {setup.data && setupPending(setup.data) && <SetupChecklist steps={setup.data} />}
+      {(home?.backups ?? []).length > 0 && <NotBackedUp backups={home?.backups ?? []} />}
       {asks.length > 0 && (
         <section className="flex flex-col gap-2.5">
           <SectionTitle count={asks.length}>Needs you</SectionTitle>
@@ -107,6 +109,28 @@ export function Dashboard() {
       {deploy && <DeployDialog open onClose={() => setDeploy(false)} />}
       {newProject && <NewProject onClose={() => setNewProject(false)} />}
     </div>
+  );
+}
+
+/** The HQs their origin doesn't back up: what travels to a new machine
+ * (wiki/product/features/dashboard.md#not-backed-up). */
+function NotBackedUp({ backups }: { backups: Backup[] }) {
+  const projectNameOf = useProjectName();
+  return (
+    <section className="flex flex-col gap-2.5">
+      <SectionTitle count={backups.length}>Not backed up</SectionTitle>
+      {backups.map((b) => (
+        <p
+          key={b.path}
+          className="m-0 rounded-lg border border-attn px-3 py-2 text-[13px] break-words text-tx2"
+        >
+          <span className="font-semibold text-tx">
+            {b.project === "" ? "Foreman's HQ" : `${projectNameOf(b.project)}'s HQ`}
+          </span>{" "}
+          ({b.path}): {b.problem}
+        </p>
+      ))}
+    </section>
   );
 }
 

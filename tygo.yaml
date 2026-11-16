@@ -4,7 +4,7 @@
 packages:
   - path: github.com/brickpop/foreman/internal/home
     output_path: ui/src/api/types/home.ts
-    include_files: [config.go, load.go, browse.go, folder.go]
+    include_files: [config.go, load.go, browse.go, folder.go, sync.go]
   - path: github.com/brickpop/foreman/internal/events
     output_path: ui/src/api/types/events.ts
     include_files: [event.go]

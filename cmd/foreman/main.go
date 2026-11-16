@@ -129,6 +129,9 @@ func run(args []string, stdout io.Writer) error {
 	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start}); err != nil {
 		return err
 	}
+	// Before any agent starts: what came in is in place when they read it.
+	fmt.Fprintln(stdout, "Syncing the HQs with their origins")
+	h.Sync(ctx)
 	// Read once the settings are loaded; a change of the port or the engine
 	// takes effect on restart.
 	port := portOf(*portFlag, h.Settings().Settings.Port)
@@ -410,6 +413,9 @@ func run(args []string, stdout io.Writer) error {
 		manager.Shutdown(context.Background())
 		login.terms.stopAll()
 		_ = agentServer.Close()
+		// After the agents: their last commits go too.
+		fmt.Fprintln(stdout, "Pushing the HQs to their origins")
+		h.PushAll(context.Background())
 	})
 }
 

@@ -5,6 +5,7 @@ import type { Proposal } from "./types/cos";
 import type { Commit, TreeEntry } from "./types/git";
 import type { Endpoint, EndpointChange, Status as HarnessStatus } from "./types/harness";
 import type {
+  Backup,
   Branches,
   FilesInbox,
   FilesShared,
@@ -65,6 +66,7 @@ export type {
   ActionRepo,
   ActivityItem,
   ActivityPage,
+  Backup,
   Board,
   Branches,
   BranchPick,
@@ -117,9 +119,15 @@ export type {
 
 /** Foreman's home on this machine (~/.foreman: its machinery) and its folder
  * (~/foreman: what the CEO owns). */
-/** GET /api/home: Foreman's home and folder, and what is wrong with
- * projects.toml (the projects stay as last read until it is fixed). */
-export type HomeFolder = { path: string; folder: string; projectsProblems: string[] };
+/** GET /api/home: Foreman's home and folder, what is wrong with
+ * projects.toml (the projects stay as last read until it is fixed), and the
+ * HQs their origin doesn't back up. */
+export type HomeFolder = {
+  path: string;
+  folder: string;
+  projectsProblems: string[];
+  backups: Backup[];
+};
 
 export interface HomeArea {
   folder(): Promise<HomeFolder>;

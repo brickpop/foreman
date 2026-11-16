@@ -45,15 +45,7 @@ func (g *CLI) FetchRemotes(ctx context.Context, dir string) ([]RemoteChange, err
 	}
 	fetchCtx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
-	cmd := command(fetchCtx, dir, "fetch", "--all", "--prune", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--quiet")
-	cmd.Env = slices.DeleteFunc(cmd.Env, func(kv string) bool {
-		name, _, _ := strings.Cut(kv, "=")
-		return name == "GIT_ASKPASS" || name == "SSH_ASKPASS"
-	})
-	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0", "SSH_ASKPASS_REQUIRE=never", "GCM_INTERACTIVE=never")
-	// A session of its own has no terminal for ssh to ask a passphrase on.
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	_, fetchErr := output(cmd, []string{"fetch"})
+	_, fetchErr := remote(fetchCtx, dir, "fetch", "--all", "--prune", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--quiet")
 	after, err := remoteBranches(ctx, dir)
 	if err != nil {
 		return nil, errors.Join(fetchErr, err)
@@ -71,6 +63,22 @@ func (g *CLI) FetchRemotes(ctx context.Context, dir string) ([]RemoteChange, err
 	}
 	slices.SortFunc(changes, func(a, b RemoteChange) int { return strings.Compare(a.Branch, b.Branch) })
 	return changes, fetchErr
+}
+
+// remote runs a git command that reaches a remote with the CEO's own
+// credentials (their helper, keychain or SSH agent), never waiting on a
+// prompt: with nobody to answer it, a missing credential fails at once
+// rather than hang the server on a terminal nobody watches.
+func remote(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := command(ctx, dir, args...)
+	cmd.Env = slices.DeleteFunc(cmd.Env, func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return name == "GIT_ASKPASS" || name == "SSH_ASKPASS"
+	})
+	cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0", "SSH_ASKPASS_REQUIRE=never", "GCM_INTERACTIVE=never")
+	// A session of its own has no terminal for ssh to ask a passphrase on.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return output(cmd, args)
 }
 
 // remoteBranches are the repo's remote-tracking branches (origin/main) and

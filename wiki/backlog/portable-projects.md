@@ -56,7 +56,12 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 - `git.Origin` strips an https URL's user and password (a token there would be committed and pushed). `git -C ""` now fails (`ErrNoFolder`) instead of acting on the server's folder: a repo with no path must never run git where Foreman runs.
 - A row with no entry (taken out of `projects.toml` by hand) is cleared, history included, when a new project takes that id.
 - `GET /api/home` has `projectsProblems`; the Dashboard shows them.
-- Left for part 2: the `hq` URL is written when a project is made (from a clone's origin), refreshed at each sync.
+
+## Built in part 2 (sync), 2026-11-16
+
+- `git.Pull` / `git.Push` (`internal/git/sync.go`): origin and `main` only, no prompt. Pull merges only when the HQ is clean; with uncommitted changes, a fast-forward or nothing (an aborted merge can lose them); a conflict is aborted. Push never forces.
+- `Home.Sync` on start, after Load and before any agent (each step bounded at 30 s), `Home.PushAll` on stop after the agents (10 s each). `Home.Backups` is the Dashboard's **Not backed up** (`GET /api/home`, `backups`).
+- Taken as defaults (say if not): the sync runs before the server serves, so a slow remote delays the start up to the bounds; no "Sync now" button (a remote added by hand shows at the next start).
 
 ## Edge cases (accepted)
 
@@ -68,7 +73,7 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 ## Steps
 
 - [x] `projects.toml`: its model and checks, read at start and on reload; every project change writes it (one commit); `state.db`'s project tables keep only path and profile (a migration; the CEO's records go into `projects.toml` through the move script of [One Foreman folder](./foreman-folder.md))
-- [ ] sync: on start (fetch, merge, push; a conflict aborted and reported), on stop (push, bounded); the Dashboard's warnings (conflict, not backed up, push failed)
+- [x] sync: on start (fetch, merge, push; a conflict aborted and reported), on stop (push, bounded); the Dashboard's warnings (conflict, not backed up, push failed)
 - [ ] clone into `~/foreman/repos/<path>`: the path from the URL, reuse by root commit, refusals; offered beside picking a folder in Bring here, Add a project and Repos → Add
 - [ ] restore: the checklist's first step (Start fresh, Restore from a git URL)
 - [ ] Bring here: projects not on this machine on the Dashboard, the HQ cloned, each repo resolved

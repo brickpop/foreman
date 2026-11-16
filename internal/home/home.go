@@ -37,6 +37,7 @@ type Home struct {
 
 	mu      sync.Mutex // guards snap, saves and pending
 	snap    snapshot
+	synced  map[string]string // each HQ's problem after the start's sync, by project ("" Foreman's HQ); "" for none
 	notify  func(Change)      // set by Watch
 	watcher *fsnotify.Watcher // set by Watch
 	// rewatch: a project was made, its HQ to watch (unlock).
@@ -134,6 +135,13 @@ type Git interface {
 	HasBranch(ctx context.Context, dir, branch string) bool
 	// Origin is the repo's origin URL, without credentials; "" when none.
 	Origin(ctx context.Context, dir string) string
+	// Pull brings origin's branch into dir's checkout, never over
+	// uncommitted changes, aborting a conflict (git.ErrNoRemote: no origin).
+	Pull(ctx context.Context, dir, branch string) error
+	// Push pushes dir's branch to origin's, never forcing.
+	Push(ctx context.Context, dir, branch string) error
+	// Uncommitted lists what dir's checkout holds not committed.
+	Uncommitted(ctx context.Context, dir string) ([]string, error)
 }
 
 // Deps is what Load needs besides the home's files.

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/brickpop/foreman/internal/home"
 )
 
 // The server is tested only through its interfaces, with doubles behind them.
@@ -29,6 +31,9 @@ func (f fakeHome) Root() string   { return string(f) }
 func (f fakeHome) Folder() string { return filepath.Join(filepath.Dir(string(f)), "foreman") }
 func (f fakeHome) RecordsProblems() []string {
 	return []string{"ledger.nmae: not a field Foreman knows"}
+}
+func (f fakeHome) Backups() []home.Backup {
+	return []home.Backup{{Project: "ledger", Path: "/home/ceo/foreman/projects/ledger/hq", Problem: "it has no origin"}}
 }
 
 var builtUI = fstest.MapFS{
@@ -58,7 +63,7 @@ func TestEveryRouteGoesThroughTheGuard(t *testing.T) {
 
 func TestHomeSummaryIsTheHomesPath(t *testing.T) {
 	w := get(t, open(builtUI), "/api/home")
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman","projectsProblems":["ledger.nmae: not a field Foreman knows"]`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman","projectsProblems":["ledger.nmae: not a field Foreman knows"],"backups":[{"project":"ledger","path":"/home/ceo/foreman/projects/ledger/hq","problem":"it has no origin"}]`) {
 		t.Errorf("got %d %q", w.Code, w.Body.String())
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/json" {

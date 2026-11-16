@@ -15,7 +15,7 @@ All endpoints are local-only: Foreman binds `127.0.0.1`. Every request passes th
 The PRD's surface (indicative; names may still change during implementation, this entry is then updated):
 
 ```
-GET    /api/home                              {path, folder, projectsProblems}: Foreman's home on this machine and Foreman's folder (real paths), and what is wrong with projects.toml (empty when nothing)
+GET    /api/home                              {path, folder, projectsProblems, backups}: Foreman's home on this machine and Foreman's folder (real paths), what is wrong with projects.toml, and the HQs not backed up ([{project ("" for Foreman's HQ), path, problem}]); each empty when nothing
 GET    /api/desktop                           {canOpen}: whether this machine can open folders on its desktop (macOS; Linux with xdg-open and a display); without, the UI shows no Open button
 POST   /api/desktop/open                      {instance} (the agent's folder) | {project, folder: inbox|shared} (the project's files), each made if missing → opens it in the desktop's file manager; the server works out the path, never the browser (204; 400 INVALID; 404 NOT_FOUND; 409 NO_DESKTOP, NOT_A_FOLDER for anything but a real folder: Security → Opening folders)
 GET    /api/projects | /api/projects/:id      the record (id, name, path: its HQ, files, profile, hidden, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager

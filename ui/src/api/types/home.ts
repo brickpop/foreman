@@ -227,3 +227,16 @@ export interface Instructions {
   text: string;
   version: string; // "" while the file doesn't exist
 }
+
+//////////
+// source: sync.go
+
+/**
+ * Backup is an HQ not backed up by its origin, and why: none set, or the
+ * last sync failed.
+ */
+export interface Backup {
+  project: string; // "" for Foreman's HQ
+  path: string;
+  problem: string;
+}

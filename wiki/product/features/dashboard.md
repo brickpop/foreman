@@ -22,6 +22,14 @@ Width up to 1080px, the page's 24px sides (16px under 760px), 40px between secti
 
 While any setup step is left, the setup checklist comes under the header: Podman, its machine (macOS), the agent image, each harness login, a team, a project, a code repo per project, each with its button ([First run](./first-run.md#the-checklist)). It goes away once every step is done.
 
+## projects.toml needs fixing
+
+While `projects.toml` has problems ([Project config → projects.toml](../models/project-config.md#projectstoml)), a red notice under the header lists them: the projects show as last read and can't be changed until the CEO fixes the file (`GET /api/home`, `projectsProblems`).
+
+## Not backed up
+
+The HQs their origin doesn't back up, one line each (`GET /api/home`, `backups`), after the setup checklist; left out when there are none. Each names the HQ (Foreman's, or the project's), its path, and the problem: **no origin**, with the `git remote add origin …` and `git push -u origin main` to run (Foreman's git config is the CEO's; Foreman has no field for it), or **not synced with its origin**, with git's reason (a conflict, aborted; uncommitted changes in the way; a remote that refused or couldn't be reached). Judged at the start's [sync](../models/home.md#syncing-the-hqs), and for a project made since, by whether it has an origin. A remote added by hand shows at the next start.
+
 ## Needs you
 
 The open [requests](../models/request.md) of every kind but reviews, across projects, one **request panel** each (gap 10); left out when there are none. Reviews are decided in each project's [Inbox](./reviews.md#the-inbox) only. The kinds, their actions and their effect are in [Requests](./requests.md). The Dashboard and the project's Inbox ([Needs you](./project-pipeline.md#1-needs-you)) use the same request panel component, so they can't drift: approvals and questions carry the free-text answer field here too.

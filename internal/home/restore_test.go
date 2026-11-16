@@ -127,6 +127,12 @@ func TestPristine(t *testing.T) {
 			}
 			return h
 		},
+		// Connected to a remote by the CEO: theirs, even with nothing in it.
+		"an origin": func(t *testing.T) *Home {
+			h := loaded(t, nil)
+			gitOut(t, h.HQ(), "remote", "add", "origin", "git@example.com:ceo/hq.git")
+			return h
+		},
 		// Put there by hand before the first start: in its first commit.
 		"a team": func(t *testing.T) *Home {
 			return loaded(t, func(root string) {

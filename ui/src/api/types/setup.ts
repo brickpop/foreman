@@ -13,6 +13,11 @@ export interface Step {
   detail: string; // what it waits for, or why it failed
   log: string; // a machine creation's or an image build's output (its end)
   machine?: MachineSize; // a new machine's sizes (kind machine, while todo)
+  /**
+   * Restorable: Foreman's HQ may still be replaced by another machine's
+   * (kind hq, always done: there is always an HQ).
+   */
+  restorable?: boolean;
 }
 /**
  * MachineSize is the size a new Podman machine may have: memory in GiB.

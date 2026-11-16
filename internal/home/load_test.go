@@ -518,14 +518,17 @@ func TestSettingsStayOnThisMachine(t *testing.T) {
 		t.Errorf("foreman_folder is served: %s", data)
 	}
 	s.Theme, s.Accent, s.TerminalFont, s.TerminalFontSize = "dark", "teal", "fira-code", 15
-	sent := s
-	sent.ForemanFolder = "~/elsewhere"
-	if _, err := h.SaveSettings(ctx, sent, h.Settings().Version); err != nil {
-		t.Fatal(err)
-	}
-	reload(t, h)
-	if got := h.Settings().Settings; got != s || got.ForemanFolder != "~/f" {
-		t.Errorf("read back %+v", got)
+	// As the API decodes them: without it. Set some other way, it's ignored too.
+	for _, folder := range []string{"", "~/elsewhere"} {
+		sent := s
+		sent.ForemanFolder = folder
+		if _, err := h.SaveSettings(ctx, sent, h.Settings().Version); err != nil {
+			t.Fatalf("sent with %q: %v", folder, err)
+		}
+		reload(t, h)
+		if got := h.Settings().Settings; got != s || got.ForemanFolder != "~/f" {
+			t.Errorf("sent with %q, read back %+v", folder, got)
+		}
 	}
 	if _, err := exec.Command("git", "-C", h.Root(), "rev-parse", "--git-dir").CombinedOutput(); err == nil {
 		t.Error("the home is in a repo")

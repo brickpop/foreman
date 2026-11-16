@@ -17,7 +17,7 @@ const restoreDir = ".hq-restore"
 
 // Pristine says whether Foreman's HQ is still as its first start made it,
 // so Restore may replace it: its first commit only, nothing changed since,
-// no team and no project.
+// no team, no project and no origin (one the CEO connected is theirs).
 func (h *Home) Pristine(ctx context.Context) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -26,7 +26,7 @@ func (h *Home) Pristine(ctx context.Context) bool {
 
 // pristine is Pristine. Called with h.mu held.
 func (h *Home) pristine(ctx context.Context) bool {
-	if len(h.snap.teams) > 0 || exists(h.HQ(projectsFile)) {
+	if len(h.snap.teams) > 0 || exists(h.HQ(projectsFile)) || h.git.Origin(ctx, h.HQ()) != "" {
 		return false
 	}
 	if _, err := h.git.Resolve(ctx, h.HQ(), "HEAD~1"); err == nil {
@@ -45,7 +45,7 @@ func (h *Home) Restore(ctx context.Context, url string) error {
 	h.mu.Lock()
 	defer h.unlock()
 	if !h.pristine(ctx) {
-		return fmt.Errorf("%w: Foreman's HQ has teams, projects or changes of its own: Restore only replaces the one made at first start", ErrExists)
+		return fmt.Errorf("%w: Foreman's HQ has teams, projects, changes or an origin of its own: Restore only replaces the one made at first start", ErrExists)
 	}
 	tmp := filepath.Join(h.folder, restoreDir)
 	// What a restore stopped halfway left.

@@ -79,7 +79,7 @@ function StepRow({
         {!done && <StepAction step={s} startable={startable} />}
       </div>
       {s.state === "todo" && s.machine && <MachineForm size={s.machine} />}
-      {s.state === "todo" && s.kind === "hq" && <RestoreForm />}
+      {s.restorable && <RestoreForm />}
       {(s.state === "working" || s.state === "failed") && s.log && (
         <pre className="m-0 ml-[30px] max-h-36 overflow-auto rounded-lg bg-term px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-tx3">
           {logTail(s.log)}
@@ -154,8 +154,9 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
   }
 }
 
-/** Restore Foreman's HQ from another machine's origin: it replaces the one
- * the first start made, while nothing was done in it. */
+/** Restore Foreman's HQ from another machine's origin: an offer under the
+ * HQ's row, while the one the first start made is untouched and has no
+ * origin. */
 function RestoreForm() {
   const client = useClient();
   const queries = useQueryClient();
@@ -173,6 +174,7 @@ function RestoreForm() {
         if (url.trim() && !restore.isPending) restore.mutate();
       }}
     >
+      <span className="basis-full">Coming from another machine? Restore your HQ from its git URL.</span>
       <input
         aria-label="Your HQ's git URL"
         placeholder="git@github.com:me/foreman-hq.git"

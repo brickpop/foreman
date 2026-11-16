@@ -10,6 +10,9 @@ type Step struct {
 	Detail  string       `json:"detail"`            // what it waits for, or why it failed
 	Log     string       `json:"log"`               // a machine creation's or an image build's output (its end)
 	Machine *MachineSize `json:"machine,omitempty"` // a new machine's sizes (kind machine, while todo)
+	// Restorable: Foreman's HQ may still be replaced by another machine's
+	// (kind hq, always done: there is always an HQ).
+	Restorable bool `json:"restorable,omitempty"`
 }
 
 // MachineSize is the size a new Podman machine may have: memory in GiB.

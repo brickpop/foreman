@@ -44,11 +44,12 @@ func (h *Home) SaveTeam(ctx context.Context, c TeamConfig, version string) (Team
 func (h *Home) SaveSettings(ctx context.Context, s Settings, version string) (string, error) {
 	h.mu.Lock()
 	defer h.unlock()
+	// Never through the API (json:"-", so it comes empty): the CEO edits it
+	// in the file, Foreman stopped.
+	s.ForemanFolder = h.snap.settings.Settings.ForemanFolder
 	if p := s.validate(); len(p) > 0 {
 		return "", &InvalidError{p}
 	}
-	// Never through the API: the CEO edits it in the file, Foreman stopped.
-	s.ForemanFolder = h.snap.settings.Settings.ForemanFolder
 	data, err := encode(s)
 	if err != nil {
 		return "", err

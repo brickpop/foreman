@@ -282,10 +282,10 @@ func TestSteps(t *testing.T) {
 		{"nothing yet: the default profile, a team, a project", config{},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}},
 			[]string{"hq done", "image todo", "profile:default done", "team todo", "project todo"}},
-		// The HQ first start made: Restore it, or go on.
+		// The HQ first start made: done all the same, Restore only offered.
 		{"a pristine HQ", config{pristine: true},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}},
-			[]string{"hq todo", "image todo", "profile:default done", "team todo", "project todo"}},
+			[]string{"hq done", "image todo", "profile:default done", "team todo", "project todo"}},
 		// The profiles the projects use: one not connected, one that doesn't exist.
 		{"a project without a repo is no step: a research team needs none",
 			config{teams: []home.Team{team}, projects: []home.Project{
@@ -299,6 +299,9 @@ func TestSteps(t *testing.T) {
 			steps := s.Steps(ctx)
 			if got := kinds(steps); !reflect.DeepEqual(got, c.want) {
 				t.Errorf("steps %v\nwant  %v", got, c.want)
+			}
+			if steps[0].Restorable != c.config.pristine {
+				t.Errorf("restorable %v", steps[0].Restorable)
 			}
 			for _, st := range steps {
 				if st.Subject == "gone" && !strings.Contains(st.Detail, "No such profile") {

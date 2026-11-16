@@ -20,7 +20,7 @@ Width up to 1080px, the page's 24px sides (16px under 760px), 40px between secti
 
 ## Setup checklist
 
-While any setup step is left, the setup checklist comes under the header: Foreman's HQ (Restore it from another machine while pristine), Podman, its machine (macOS), the agent image, each harness login, a team, a project, a code repo per project, each with its button ([First run](./first-run.md#the-checklist)). It goes away once every step is done.
+While any setup step is left, the setup checklist comes under the header: Foreman's HQ (always done; Restore from another machine offered while pristine), Podman, its machine (macOS), the agent image, each harness login, a team, a project, a code repo per project, each with its button ([First run](./first-run.md#the-checklist)). It goes away once every step is done.
 
 ## projects.toml needs fixing
 

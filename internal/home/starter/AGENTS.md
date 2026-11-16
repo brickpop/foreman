@@ -1,21 +1,21 @@
 # How this project works
 
-This is the project repo: `project.toml` (the project's config, owned by the CEO) and `wiki/`, the team's knowledge base and task board. Every agent of the project reads the same live files.
+This is the project's HQ, at `$PROJECT_HQ` in every agent's environment: `project.toml` (the project's config, owned by the CEO) beside the team's knowledge base and task board, a wiki that is the HQ itself. Every agent of the project reads the same live files.
 
-**Only the team lead writes the wiki**: edit the files, run `wiki --root project/wiki check`, then `commit()` naming the repo `project` (your code repos keep their changes until you name them). Everyone else adds through `contribute(kind, title, body)` (`finding`, `proposal` or `note`): Foreman files it in `wiki/inbox/` and tells the lead, who turns it into an entry or a task, or drops it. The CEO may tick a checkbox or move a card from Foreman at any time: re-read an entry before editing it.
+**Only the team lead writes the wiki**: edit the files, run `wiki --root "$PROJECT_HQ" check`, then `commit()` naming the repo `hq` (your code repos keep their changes until you name them). Everyone else adds through `contribute(kind, title, body)` (`finding`, `proposal` or `note`): Foreman files it in `inbox/` and tells the lead, who turns it into an entry or a task, or drops it. The CEO may tick a checkbox or move a card from Foreman at any time: re-read an entry before editing it.
 
 ## The wiki
 
-Plain Markdown files with YAML frontmatter, plus a `wiki.toml`, operated with the `wiki` command. From your sandbox, always pass `--root project/wiki`:
+Plain Markdown files with YAML frontmatter, plus a `wiki.toml`, operated with the `wiki` command. From your sandbox, always pass `--root "$PROJECT_HQ"`:
 
 ```sh
-wiki --root project/wiki status                       # what's there, and what's broken
-wiki --root project/wiki search "settlement"          # find before you write
-wiki --root project/wiki read /product/settlement.md  # an entry, frontmatter stripped
-wiki --root project/wiki list --where type=task --where status!=done   # open work
-wiki --root project/wiki backlinks /product/settlement.md              # what points here
-wiki --root project/wiki move /a.md /product/a.md     # move, rewriting every link to it
-wiki --root project/wiki check                        # before every commit()
+wiki --root "$PROJECT_HQ" status                       # what's there, and what's broken
+wiki --root "$PROJECT_HQ" search "settlement"          # find before you write
+wiki --root "$PROJECT_HQ" read /product/settlement.md  # an entry, frontmatter stripped
+wiki --root "$PROJECT_HQ" list --where type=task --where status!=done   # open work
+wiki --root "$PROJECT_HQ" backlinks /product/settlement.md              # what points here
+wiki --root "$PROJECT_HQ" move /a.md /product/a.md     # move, rewriting every link to it
+wiki --root "$PROJECT_HQ" check                        # before every commit()
 ```
 
 Rules that keep it findable:
@@ -29,7 +29,8 @@ Rules that keep it findable:
 ## Structure
 
 ```
-wiki/
+$PROJECT_HQ/
+├── AGENTS.md           # this file (not a wiki entry), beside project.toml
 ├── index.md            # entry point: links to product, backlog, technical debt (and what you add)
 ├── technical-debt.md   # accepted workarounds and limitations, one page (type: note)
 ├── product/            # durable: what the project is, as intended (type: spec)
@@ -42,7 +43,7 @@ wiki/
 └── inbox/              # contributions waiting for the lead (type: note)
 ```
 
-**Optional, created when there is something to put in it** (never empty, never as a placeholder): `research/` for what the team found out (investigations, comparisons of options, measurements, a spike's outcome; `type: note`), `product/glossary.md` for the project's terms, or another folder the project really needs (`discovery/`, `issues/`…). Link each new folder's `index.md` from `wiki/index.md`.
+**Optional, created when there is something to put in it** (never empty, never as a placeholder): `research/` for what the team found out (investigations, comparisons of options, measurements, a spike's outcome; `type: note`), `product/glossary.md` for the project's terms, or another folder the project really needs (`discovery/`, `issues/`…). Link each new folder's `index.md` from the root `index.md`.
 
 **Different lifetimes.** `product/` is durable: it describes the project as intended, and each spec says how much of it is real. `backlog/` is ephemeral: tasks come and go. When a task ships, the knowledge it produced goes into the matching spec (or a research note), and the task is retired. Decisions go into the spec they change, with who and when, not into a folder of their own. Don't make folders for progress (`todo/`, `doing/`): that's what `status` is for.
 
@@ -123,11 +124,11 @@ An epic lives in `backlog/epics/<slug>.md`; its tasks name it in `epic: <slug>`.
 
 ## Finding things
 
-- **What's next?** `wiki --root project/wiki list --where type=task --where status=todo --where priority=quick`, then `priority=high`
+- **What's next?** `wiki --root "$PROJECT_HQ" list --where type=task --where status=todo --where priority=quick`, then `priority=high`
 - **Unscheduled:** `--where type=task --where status=backlog`
 - **In progress, blocked:** `--where type=task --where status=in-progress` (or `status=blocked`)
 - **An epic's work:** `--where epic=invoicing --where status!=done`
 - **What the CEO must decide:** `--where type=task --where tags=decision --where status!=done`
-- **How far is the build:** `wiki --root project/wiki property status --counts --where type=spec`
-- **How does X work:** start at `product/index.md`, or `wiki --root project/wiki search "x"`
-- **Housekeeping** (the lead): `wiki --root project/wiki check`, `orphans` (link them), `unresolved` (links to entries not written yet), done tasks not yet retired, stale and blocked ones.
+- **How far is the build:** `wiki --root "$PROJECT_HQ" property status --counts --where type=spec`
+- **How does X work:** start at `product/index.md`, or `wiki --root "$PROJECT_HQ" search "x"`
+- **Housekeeping** (the lead): `wiki --root "$PROJECT_HQ" check`, `orphans` (link them), `unresolved` (links to entries not written yet), done tasks not yet retired, stale and blocked ones.

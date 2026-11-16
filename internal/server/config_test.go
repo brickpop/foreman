@@ -120,14 +120,21 @@ func (f fakeConfig) SetHidden(_ context.Context, project string, hidden bool) (h
 	return f.changed("SetHidden", project, fmt.Sprint(hidden), "")
 }
 
-// An HQ from before the scaffold: its wiki.toml is missing.
+// An HQ from before the scaffold: its wiki.toml is missing. suite's wiki is
+// still in wiki/, which Scaffold refuses to write beside.
 func (f fakeConfig) Missing(project string) ([]home.Missing, error) {
-	if project != "ledger" {
-		return nil, home.ErrNotFound
+	switch project {
+	case "ledger":
+		return []home.Missing{{File: "wiki.toml", Required: true}}, nil
+	case "suite":
+		return []home.Missing{{File: "wiki.toml", Required: true, From: "wiki/"}}, nil
 	}
-	return []home.Missing{{File: "wiki/wiki.toml", Required: true}}, nil
+	return nil, home.ErrNotFound
 }
 func (f fakeConfig) Scaffold(_ context.Context, project string) error {
+	if project == "suite" {
+		return fmt.Errorf("%w: its wiki is still in wiki/: move it to the HQ's root first", home.ErrInvalid)
+	}
 	_, err := f.Missing(project)
 	return err
 }
@@ -276,7 +283,7 @@ func TestPromptTemplateOfAnAgent(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: c, UI: builtUI})
 	var body map[string]string
 	decodeBody(t, get(t, h, "/api/teams/atlas/agents/mara/prompt"), &body)
-	if !strings.Contains(body["prompt"], "Project: {project}\n") || !strings.Contains(body["prompt"], "{hq}/wiki/backlog/index.md") || !strings.Contains(body["prompt"], "Answer in Catalan.") {
+	if !strings.Contains(body["prompt"], "Project: {project}\n") || !strings.Contains(body["prompt"], "{hq}/backlog/index.md") || !strings.Contains(body["prompt"], "Answer in Catalan.") {
 		t.Errorf("template %q", body["prompt"])
 	}
 	for _, path := range []string{"/api/teams/atlas/agents/ghost/prompt", "/api/teams/nope/agents/mara/prompt"} {
@@ -456,11 +463,19 @@ func TestProjectRoutes(t *testing.T) {
 	// What an HQ lacks, and creating it.
 	var missing []home.Missing
 	decodeBody(t, get(t, h, "/api/projects/ledger/scaffold"), &missing)
-	if len(missing) != 1 || missing[0].File != "wiki/wiki.toml" || !missing[0].Required {
+	if len(missing) != 1 || missing[0].File != "wiki.toml" || !missing[0].Required {
 		t.Errorf("missing %v", missing)
 	}
 	if w := send(http.MethodPost, "/api/projects/ledger/scaffold", ""); w.Code != http.StatusOK {
 		t.Errorf("scaffold: %d %s", w.Code, w.Body)
+	}
+	// A wiki still in wiki/: said, and nothing created beside it.
+	decodeBody(t, get(t, h, "/api/projects/suite/scaffold"), &missing)
+	if len(missing) != 1 || missing[0].From != "wiki/" {
+		t.Errorf("an old layout's missing %v", missing)
+	}
+	if w := send(http.MethodPost, "/api/projects/suite/scaffold", ""); w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "move it") {
+		t.Errorf("scaffold over an old layout: %d %s", w.Code, w.Body)
 	}
 	for _, w := range []*httptest.ResponseRecorder{get(t, h, "/api/projects/nope/scaffold"), send(http.MethodPost, "/api/projects/nope/scaffold", "")} {
 		if w.Code != http.StatusNotFound {

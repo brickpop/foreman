@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -127,9 +128,12 @@ type SettingsFile struct {
 
 // Missing is a scaffold file a project's HQ lacks.
 type Missing struct {
-	File     string `json:"file"`     // in the HQ, e.g. wiki/wiki.toml
+	File     string `json:"file"`     // in the HQ, e.g. backlog/index.md
 	Why      string `json:"why"`      // what goes wrong without it
 	Required bool   `json:"required"` // the wiki can't be read without it
+	// From is the folder the wiki is in, to move to the HQ's root ("wiki/"):
+	// an HQ from before the wiki was at its root. Nothing is created then.
+	From string `json:"from,omitempty"`
 }
 
 // Change says what changed, for the UI to refetch.
@@ -160,12 +164,30 @@ const (
 	instructionsFile = "instructions.md" // in Foreman's HQ
 	settingsFile     = "settings.toml"   // in the home: this machine's settings
 	hqRepo           = "hq"              // a project's HQ's name among its repos
-	wikiDir          = "wiki"            // the wiki bundle, inside a project's HQ
 	logsDir          = "logs"            // the session logs, one folder per instance (<agent>@<project>)
 )
 
-// gitignore keeps the temp files of atomic writes out of Foreman's HQ.
-const gitignore = "*.tmp\n"
+// Foreman's HQ is a wiki at its root, as a project's HQ is
+// (wiki/backlog/wiki-at-root.md): what it starts with besides teams/ and
+// instructions.md. Its board (outcomes/) comes with the Director.
+const (
+	// gitignore keeps the temp files of atomic writes, and the wiki's index,
+	// out of it.
+	gitignore = "*.tmp\n.wiki/\n"
+	hqWiki    = `spec = "0.1"
+
+# Not wiki entries: the CEO's instructions to every agent (the team files are TOML)
+ignore = ["instructions.md"]
+`
+	hqIndex = `---
+okf_version: "0.1"
+---
+
+# Foreman's HQ
+
+What is yours across projects: your teams (` + "`teams/`" + `) and your standing instructions to every agent (` + "`instructions.md`" + `).
+`
+)
 
 // Load finds Foreman's folder (foreman_folder), makes Foreman's HQ if it
 // isn't there yet, then reads every config file and checks every project's
@@ -213,8 +235,8 @@ func homeFolder() (string, error) {
 }
 
 // ensureHQ makes Foreman's HQ a git repo if it isn't one yet: teams/, an
-// empty instructions.md and .gitignore, in a first commit with whatever was
-// put there by hand.
+// empty instructions.md, .gitignore and its wiki's wiki.toml and index.md
+// (none overwritten), in a first commit with whatever was put there by hand.
 func (h *Home) ensureHQ(ctx context.Context) error {
 	// A repo with no commit is one whose making stopped halfway: made again.
 	if _, err := h.git.Resolve(ctx, h.HQ(), "HEAD"); err == nil && topOfRepo(h.HQ()) {
@@ -223,7 +245,8 @@ func (h *Home) ensureHQ(ctx context.Context) error {
 	if err := os.MkdirAll(h.HQ(teamsDir), 0o755); err != nil {
 		return err
 	}
-	for file, content := range map[string]string{".gitignore": gitignore, instructionsFile: ""} {
+	starts := map[string]string{".gitignore": gitignore, instructionsFile: "", "wiki.toml": hqWiki, "index.md": hqIndex}
+	for file, content := range starts {
 		if !exists(h.HQ(file)) {
 			if err := os.WriteFile(h.HQ(file), []byte(content), 0o644); err != nil {
 				return err
@@ -233,7 +256,7 @@ func (h *Home) ensureHQ(ctx context.Context) error {
 	if err := h.git.Init(ctx, h.HQ(), "main"); err != nil {
 		return err
 	}
-	files := []string{".gitignore", instructionsFile}
+	files := slices.Sorted(maps.Keys(starts))
 	if teams, _ := filepath.Glob(h.HQ(teamsDir, "*")); len(teams) > 0 {
 		files = append(files, teamsDir)
 	}
@@ -398,13 +421,14 @@ func (h *Home) Checked(id string) (Project, error) {
 	return h.rescan(id)
 }
 
-// WikiDir is where a project's wiki bundle lives: <its HQ>/wiki.
+// WikiDir is where a project's wiki bundle lives: its HQ, the wiki at its
+// root (wiki/backlog/wiki-at-root.md).
 func (h *Home) WikiDir(id string) (string, error) {
 	p, err := h.Project(id)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(p.Path, wikiDir), nil
+	return p.Path, nil
 }
 
 // Sandbox is the folder of an agent's worktrees on a project

@@ -16,7 +16,7 @@ The home holds this machine's [settings](./global-settings.md) (`settings.toml`,
 |---|---|---|---|
 | **Project record** | `state.db`: its name, its code repos (name, path, root commit), its profile | The UI ([Project settings](../features/project-settings.md), the code repos from [Repos](../features/repos.md#the-list)) | See [Project config → The project record](./project-config.md#the-project-record). |
 | **Project config** | `projects/<project>/hq/project.toml`, in the project's HQ | CEO in their editor | **Read-only** in the UI. Changes by the Chief of Staff come later ([Project config with the Chief of Staff](../../backlog/cos-project-config.md)). See [Project config](./project-config.md). |
-| **Project knowledge base** | `projects/<project>/hq/wiki/` (`wiki.toml`, board, product, ADRs), in the project's HQ | The lead commits through `commit()` (no review); other agents through `contribute`; the CEO in their editor | Read-only prose. Exceptions, as in wikiview: toggling a checkbox, and moving a board card (rewrites one frontmatter field). See [Wiki engine](../architecture/wiki-engine.md). |
+| **Project knowledge base** | `projects/<project>/hq/` (`wiki.toml`, board, product, ADRs), the project's HQ, a wiki at its root | The lead commits through `commit()` (no review); other agents through `contribute`; the CEO in their editor | Read-only prose. Exceptions, as in wikiview: toggling a checkbox, and moving a board card (rewrites one frontmatter field). See [Wiki engine](../architecture/wiki-engine.md). |
 | **Team definitions** | `hq/teams/<team>.toml`, in Foreman's HQ | The UI (one commit per save, the Chief of Staff's proposals included), or the editor | Editable in the UI. Changes write to the file and apply to every running instance on its next turn. See [Team definition](./team-definition.md). |
 | **The CEO's instructions** | `hq/instructions.md`, in Foreman's HQ | The UI (one commit per save), or the editor | Editable in the UI ([Settings](../features/settings.md#instructions-for-every-agent)). Added to every agent's [session prompt](../architecture/session-prompt.md#the-ceos-instructions). |
 | **Global settings** | `~/.foreman/settings.toml`, a plain file | The UI (no commit), or the editor | Editable in the UI. See [Global settings](./global-settings.md). |
@@ -27,7 +27,7 @@ The file watcher reloads `settings.toml`, Foreman's HQ (its `teams/` and `instru
 
 ### Foreman's HQ
 
-`hq/` in Foreman's folder is a git repo, made the first time Foreman starts on the folder: `git init`, a `.gitignore` holding `*.tmp` (the files a save writes before its rename), `teams/` and an empty `instructions.md`, in one commit "Foreman's HQ" (teams put there by hand come in with it). It versions what the CEO owns across machines: the team files and the CEO's instructions; of all the settings, only the instructions travel between machines (the CEO, 2026-11-15). Every save from the UI is **one commit**, and so is every Chief of Staff proposal the CEO confirms: the Chief of Staff never writes here itself ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)). A hand edit is read on reload. Nothing is pushed automatically: the CEO pushes it with their own git (its automatic sync comes with [Portable projects](../../backlog/portable-projects.md), planned).
+`hq/` in Foreman's folder is a git repo, made the first time Foreman starts on the folder: `git init`, a `.gitignore` holding `*.tmp` (the files a save writes before its rename) and `.wiki/` (the wiki's index), `teams/`, an empty `instructions.md`, and a wiki at its root as a project's HQ has (`wiki.toml`, ignoring `instructions.md`, which is no entry; `index.md`), in one commit "Foreman's HQ" (what was put there by hand comes in with it, never overwritten). A start that stopped before that commit finishes it at the next start. Nothing reads its wiki yet: the [Director's board](../../backlog/director-board.md) (`outcomes/`) comes with the Director. It versions what the CEO owns across machines: the team files and the CEO's instructions; of all the settings, only the instructions travel between machines (the CEO, 2026-11-15). Every save from the UI is **one commit**, and so is every Chief of Staff proposal the CEO confirms: the Chief of Staff never writes here itself ([Chief of Staff](../features/chief-of-staff.md#how-it-runs)). A hand edit is read on reload. Nothing is pushed automatically: the CEO pushes it with their own git (its automatic sync comes with [Portable projects](../../backlog/portable-projects.md), planned).
 
 All of Foreman's config files are **TOML**, but `instructions.md`, which is prose. A save rewrites the whole file, so hand-written comments don't survive it; in an HQ, git keeps every earlier version (`settings.toml` keeps none).
 
@@ -59,7 +59,7 @@ What it holds splits by what the CEO keeps: `hq/` and `projects/` are what to ba
 
 ```
 ~/foreman/                 Foreman's folder (foreman_folder)
-├─ hq/                     Foreman's HQ (git)
+├─ hq/                     Foreman's HQ (git, a wiki at its root)
 │  ├─ .gitignore           *.tmp
 │  ├─ instructions.md      the CEO's instructions to every agent
 │  └─ teams/               team definitions (souls + playbooks)

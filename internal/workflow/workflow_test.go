@@ -393,7 +393,7 @@ func TestACommitNamingABadRepoCommitsNothing(t *testing.T) {
 func TestTheLeadCommitsTheHQByName(t *testing.T) {
 	f := newFixture(t)
 	project := filepath.Join(f.root, "ledger", "hq")
-	writeFile(t, filepath.Join(project, "wiki", "board.md"), "# Board\n")
+	writeFile(t, filepath.Join(project, "board.md"), "# Board\n")
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "half.go"), "package half\n")
 	text := f.ok("mara", "commit", commits("hq", "the board"))
 	if text != "Committed hq (main, "+f.git(project, "rev-parse", "HEAD")[:8]+")." {
@@ -494,10 +494,10 @@ func TestContributeFilesANoteAndTellsTheLead(t *testing.T) {
 	f := newFixture(t)
 	project := filepath.Join(f.root, "ledger", "hq")
 	// The lead's unfinished edit in the same checkout stays out of the commit.
-	writeFile(t, filepath.Join(project, "wiki", "board.md"), "unfinished\n")
+	writeFile(t, filepath.Join(project, "board.md"), "unfinished\n")
 	text := f.ok("tove", "contribute", map[string]string{"kind": "finding", "title": "Flaky settle test!", "body": "It fails 1 in 20.", "author": "mara"})
 	// The path on disk: the same for the lead in its container.
-	path := filepath.Join(project, "wiki", "inbox", "2026-10-16-tove-flaky-settle-test.md")
+	path := filepath.Join(project, "inbox", "2026-10-16-tove-flaky-settle-test.md")
 	if text != "Filed "+path+"." {
 		t.Errorf("%q", text)
 	}
@@ -509,7 +509,7 @@ func TestContributeFilesANoteAndTellsTheLead(t *testing.T) {
 	if string(data) != want {
 		t.Errorf("file:\n%s", data)
 	}
-	if show := f.git(project, "show", "--name-only", "--format=%an|%s", "HEAD"); show != "Tove|Contribution: Flaky settle test!\n\nwiki/inbox/2026-10-16-tove-flaky-settle-test.md" {
+	if show := f.git(project, "show", "--name-only", "--format=%an|%s", "HEAD"); show != "Tove|Contribution: Flaky settle test!\n\ninbox/2026-10-16-tove-flaky-settle-test.md" {
 		t.Errorf("commit %q", show)
 	}
 	if status := f.git(project, "status", "--porcelain"); !strings.Contains(status, "board.md") {
@@ -537,7 +537,7 @@ func TestContributeRefusals(t *testing.T) {
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "a\n---\nauthor: mara", "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": strings.Repeat("x", teamtools.MaxTitle+1), "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "x", "body": strings.Repeat("x", teamtools.MaxContribution+1)}, "too_long")
-	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "hq", "wiki", "inbox")); len(entries) != 0 {
+	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "hq", "inbox")); len(entries) != 0 {
 		t.Errorf("a refusal filed %d notes", len(entries))
 	}
 }

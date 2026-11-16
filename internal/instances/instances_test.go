@@ -279,7 +279,7 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 		}
 	}
 	prompt, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
-	if !strings.Contains(string(prompt), "hq/wiki/backlog/index.md, kept by your lead") || strings.Contains(string(prompt), "## Tools") {
+	if !strings.Contains(string(prompt), "hq/backlog/index.md, kept by your lead") || strings.Contains(string(prompt), "## Tools") {
 		t.Errorf("tove's prompt:\n%s", prompt)
 	}
 	f.mu.Lock()
@@ -764,7 +764,7 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 		t.Fatal(err)
 	}
 	given, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
-	if shown != string(given) || !strings.Contains(shown, "hq/wiki/backlog/index.md") {
+	if shown != string(given) || !strings.Contains(shown, "hq/backlog/index.md") {
 		t.Errorf("shown:\n%s\ngiven:\n%s", shown, given)
 	}
 	if _, err := f.m.Prompt(ctx, "nobody@ledger"); err == nil {
@@ -1562,7 +1562,7 @@ func (s *specs) last() runner.Spec {
 // the HQ at its real path: writable for the lead only, its .git
 // read-only for all; the project's files (the inbox read-only, shared
 // writable, both made); and its private harness folder. Nothing else of the
-// machine, nor of the home.
+// machine, nor of the home. PROJECT_HQ names the HQ where it is mounted.
 func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	link := filepath.Join(f.root, "linked-api")
@@ -1612,6 +1612,13 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	f.waitStatus("tove@ledger", Running)
 	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: hq, Target: hq, ReadOnly: true}) {
 		t.Errorf("a member's HQ: %+v", got.Mounts[2])
+	}
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	for _, spec := range rec.got {
+		if !slices.Contains(spec.Env, "PROJECT_HQ="+hq) {
+			t.Errorf("%s's environment has no PROJECT_HQ: %v", spec.Name, spec.Env)
+		}
 	}
 }
 

@@ -10,7 +10,7 @@ epic: director
 
 **Why:** the CEO, 2026-11-05. Today the Chief of Staff is an ad-hoc session that stops a second after the CEO leaves its page ([Chief of Staff → How it runs](../product/features/chief-of-staff.md#how-it-runs)). The [Director](./epics/director.md) waits for leads' reports for hours, so it has to live like an agent: restarted after a crash, put to sleep when quiet, woken by a message, continuing its conversation.
 
-Blocked by [Chief of Staff → Director](./director-rename.md), [One Foreman folder](./foreman-folder.md) and [The wiki at the HQ's root](./wiki-at-root.md) (its mounts and its prompt name those paths), and [Sleep after a quiet spell](./sleep-when-quiet.md).
+Blocked by [Chief of Staff → Director](./director-rename.md), [One Foreman folder](./foreman-folder.md) and [The wiki at the HQ's root](./archive/wiki-at-root.md) (its mounts and its prompt name those paths), and [Sleep after a quiet spell](./sleep-when-quiet.md).
 
 **Decided:**
 

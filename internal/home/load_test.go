@@ -123,7 +123,7 @@ func TestLoadMakesForemansHQWithWhatIsThere(t *testing.T) {
 	if !strings.HasPrefix(log, "Foreman's HQ") || strings.Count(log, "\n\n") != 1 {
 		t.Errorf("not one first commit:\n%s", log)
 	}
-	for _, f := range []string{"teams/atlas.toml", ".gitignore", "instructions.md"} {
+	for _, f := range []string{"teams/atlas.toml", ".gitignore", "instructions.md", "wiki.toml", "index.md"} {
 		if !strings.Contains(log, f) {
 			t.Errorf("%s not committed:\n%s", f, log)
 		}
@@ -137,6 +137,17 @@ func TestLoadMakesForemansHQWithWhatIsThere(t *testing.T) {
 	if out, err := exec.Command("git", "-C", filepath.Join(h.Folder(), "worktrees", "ledger", "mara"), "rev-parse", "--git-dir").CombinedOutput(); err == nil {
 		t.Errorf("a sandbox is inside a repo: %s", out)
 	}
+	// A wiki at its root, as a project's HQ, the instructions not an entry.
+	writeFile(t, h.HQ("instructions.md"), "Be brief.\n")
+	if bin, err := exec.LookPath("wiki"); err == nil {
+		if out, err := exec.Command(bin, "--root", h.HQ(), "check").CombinedOutput(); err != nil || !strings.Contains(string(out), "no issues") {
+			t.Errorf("wiki check: %v\n%s", err, out)
+		}
+		if out, _ := exec.Command(bin, "--root", h.HQ(), "list").CombinedOutput(); strings.Contains(string(out), "instructions") {
+			t.Errorf("instructions.md is an entry:\n%s", out)
+		}
+	}
+	gitOut(t, h.HQ(), "checkout", "--", "instructions.md")
 	// Loading again changes nothing.
 	reload(t, h)
 	if again := gitLog(t, h.HQ()); again != log {
@@ -344,7 +355,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 	writeFile(t, filepath.Join(root, "logs", "x.log"), "churn")
 	writeFile(t, filepath.Join(ledger.Sandbox("mara"), "api", "x"), "churn")
 	writeFile(t, filepath.Join(ledger.HarnessDir("mara"), "claude-code", "x"), "churn")
-	writeFile(t, filepath.Join(ledger.Path, "wiki", "spec.md"), "# Spec\n")
+	writeFile(t, filepath.Join(ledger.Path, "spec.md"), "# Spec\n")
 	gitOut(t, ledger.Path, "add", ".")
 	gitOut(t, ledger.Path, "commit", "--quiet", "-m", "spec")
 	// A folder under projects/ with no record is no project; files are no config.

@@ -124,7 +124,7 @@ func TestBoardsNoneDeclared(t *testing.T) {
 // todo on Backlog stays there and shows on Board too; one at work only on
 // Board; an unscheduled one only on Backlog (the CEO, 2026-10-17).
 func TestTheStartersTaskBoards(t *testing.T) {
-	toml, err := os.ReadFile("../home/starter/wiki/wiki.toml")
+	toml, err := os.ReadFile("../home/starter/wiki.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -29,7 +29,7 @@ The design conversation, consolidated. Each card below carries the detail of its
 
 1. [Sleep after a quiet spell](../sleep-when-quiet.md) (independent: can go first)
 2. [Chief of Staff → Director](../director-rename.md)
-3. [One Foreman folder](../foreman-folder.md), then [The wiki at the HQ's root](../wiki-at-root.md) (in [Install and first run](./install-first-run.md))
+3. [One Foreman folder](../foreman-folder.md), then [The wiki at the HQ's root](../archive/wiki-at-root.md) (in [Install and first run](./install-first-run.md))
 4. [The Director as a standing agent](../director-standing.md)
 5. [The Director and the leads](../director-leads.md)
 6. [The Director's board](../director-board.md)

@@ -484,9 +484,9 @@ function SideSheet({
         <span className="flex min-w-0 items-center gap-3">
           <span
             className="min-w-0 truncate font-mono text-[12.5px] font-normal text-tx3"
-            title={`${repo}/wiki/${path}`}
+            title={`${repo}/${path}`}
           >
-            {repo}/wiki/{path}
+            {repo}/{path}
           </span>
           <Button
             variant="small"

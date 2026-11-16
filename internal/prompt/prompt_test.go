@@ -46,11 +46,11 @@ Own the UI.
 
 ## This assignment
 Project: ledger
-Goal: the "Current goal" line at the top of /home/ceo/foreman/projects/ledger/hq/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
+Goal: the "Current goal" line at the top of /home/ceo/foreman/projects/ledger/hq/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
 Your sandbox: /home/ceo/foreman/worktrees/ledger/tove (your own git worktree of each code repo)
 Branches: none of your own: your worktrees sit on no branch, at main.
 The project's HQ: /home/ceo/foreman/projects/ledger/hq (its one shared checkout, the same for every agent)
-Knowledge base: /home/ceo/foreman/projects/ledger/hq/wiki (read only, by design, not a fault)
+Knowledge base: the HQ itself, a wiki at its root, $PROJECT_HQ in your environment (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
 Files from the CEO: /home/ceo/foreman/projects/ledger/files/inbox (read only, by design: what the CEO gives the team to work with).
 Shared files: /home/ceo/foreman/projects/ledger/files/shared (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)
@@ -105,7 +105,7 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"when the CEO merges (under f/, fix/); the CEO may rename it.",
 		"Before you request a merge, run: npm test",
 		// so the lead never asks a member for what its mount refuses
-		"Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.",
+		"Your teammates can't write it: what they add arrives through contribute() in the HQ's inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -267,7 +267,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove", "")
-	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox}. A code repo", "Code repos: {repo} at {repo path} (default {default}).", `Goal: the "Current goal" line at the top of {hq}/wiki/backlog/index.md`, "The project's HQ: {hq} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox}. A code repo", "Code repos: {repo} at {repo path} (default {default}).", `Goal: the "Current goal" line at the top of {hq}/backlog/index.md`, "The project's HQ: {hq} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -278,7 +278,7 @@ func TestTemplateShowsThePlaceholders(t *testing.T) {
 // lead keeps it and asks the CEO for it when there is none; a member only
 // reads it.
 func TestTheGoalIsInTheWiki(t *testing.T) {
-	at := `Goal: the "Current goal" line at the top of /home/ceo/foreman/projects/ledger/hq/wiki/backlog/index.md, `
+	at := `Goal: the "Current goal" line at the top of /home/ceo/foreman/projects/ledger/hq/backlog/index.md, `
 	for agent, want := range map[string][]string{
 		"mara": {at + "which you keep.", "ask the CEO for it in this session before anything else, then write it there", "update it there and tell your team"},
 		"tove": {at + "kept by your lead.", "your lead tells you what to work on"},

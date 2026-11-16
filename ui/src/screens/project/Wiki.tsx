@@ -74,8 +74,8 @@ export function Wiki() {
       {/* As a repo's page is headed (Repos → a repo), so the two read alike. */}
       <header className="flex flex-col gap-0.5">
         <h1 className="m-0 text-[18px] font-semibold">Knowledge base</h1>
-        <span className="truncate font-mono text-[12.5px] text-tx4" title={`${repo}/wiki`}>
-          {repo}/wiki
+        <span className="truncate font-mono text-[12.5px] text-tx4" title={repo}>
+          {repo}
         </span>
       </header>
       {config.description && (

@@ -100,7 +100,7 @@ func TestNewProjectTakesOverAKeptHQ(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(p.Path, "wiki", "notes.md"), "kept\n")
+	writeFile(t, filepath.Join(p.Path, "notes.md"), "kept\n")
 	gitOut(t, p.Path, "add", "-A")
 	gitOut(t, p.Path, "commit", "--quiet", "-m", "Notes")
 	if err := h.RemoveProject(ctx, "ledger", false, false); err != nil {
@@ -119,7 +119,7 @@ func TestNewProjectTakesOverAKeptHQ(t *testing.T) {
 	if err := h.records.Remove(ctx, "ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if !exists(filepath.Join(p.Path, "wiki", "notes.md")) {
+	if !exists(filepath.Join(p.Path, "notes.md")) {
 		t.Fatal("a refused takeover deleted the kept HQ")
 	}
 	got, created, err := h.NewProject(ctx, "ledger", "")
@@ -439,8 +439,8 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := p.Path
-	gitOut(t, repo, "rm", "--quiet", "-r", "wiki", "AGENTS.md", ".gitignore")
-	writeFile(t, filepath.Join(repo, "wiki", "spec.md"), "# Spec\n")
+	gitOut(t, repo, "rm", "--quiet", "-r", "wiki.toml", "index.md", "product", "backlog", "technical-debt.md", "AGENTS.md", ".gitignore")
+	writeFile(t, filepath.Join(repo, "spec.md"), "# Spec\n")
 	gitOut(t, repo, "add", ".")
 	gitOut(t, repo, "commit", "--quiet", "-m", "agents")
 	got, err := h.Missing("old")
@@ -451,26 +451,26 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	for i, want := range []struct {
 		file     string
 		required bool
-	}{{"wiki/wiki.toml", true}, {"wiki/index.md", true}, {"AGENTS.md", false}, {".gitignore", false}, {"wiki/product/index.md", false}, {"wiki/backlog/index.md", false}, {"wiki/technical-debt.md", false}} {
+	}{{"wiki.toml", true}, {"index.md", true}, {"AGENTS.md", false}, {".gitignore", false}, {"product/index.md", false}, {"backlog/index.md", false}, {"technical-debt.md", false}} {
 		if got[i].File != want.file || got[i].Required != want.required || got[i].Why == "" {
 			t.Errorf("missing[%d] = %+v, want %+v", i, got[i], want)
 		}
 	}
 	// The CEO's own draft index stays: never overwritten.
-	writeFile(t, filepath.Join(repo, "wiki", "index.md"), "# Mine\n")
+	writeFile(t, filepath.Join(repo, "index.md"), "# Mine\n")
 	if err := h.Scaffold(ctx, "old"); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := h.Missing("old"); len(got) != 0 {
 		t.Errorf("still missing %v", got)
 	}
-	if data, _ := os.ReadFile(filepath.Join(repo, "wiki", "index.md")); string(data) != "# Mine\n" {
+	if data, _ := os.ReadFile(filepath.Join(repo, "index.md")); string(data) != "# Mine\n" {
 		t.Errorf("index.md overwritten: %q", data)
 	}
 	if data, _ := os.ReadFile(filepath.Join(repo, "AGENTS.md")); !strings.Contains(string(data), "type: task") {
 		t.Errorf("AGENTS.md = %q", data)
 	}
-	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "HQ: add wiki/wiki.toml, AGENTS.md, .gitignore, wiki/product/index.md, wiki/backlog/index.md, wiki/technical-debt.md\n\n.gitignore\nAGENTS.md\nwiki/backlog/index.md\nwiki/product/index.md\nwiki/technical-debt.md\nwiki/wiki.toml" {
+	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "HQ: add wiki.toml, AGENTS.md, .gitignore, product/index.md, backlog/index.md, technical-debt.md\n\n.gitignore\nAGENTS.md\nbacklog/index.md\nproduct/index.md\ntechnical-debt.md\nwiki.toml" {
 		t.Errorf("commit %q", log)
 	}
 	// Nothing missing: nothing written, nothing committed.
@@ -485,6 +485,48 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 		if err := h.Scaffold(ctx, id); !errors.Is(err, ErrNotFound) {
 			t.Errorf("Scaffold(%q): %v", id, err)
 		}
+	}
+}
+
+// An HQ whose wiki is still in wiki/ (made before the wiki moved to the
+// HQ's root: a clone of an old one) is told to move it, and nothing is
+// created beside it: a second, empty wiki would hide the real one.
+func TestAWikiStillInItsOldFolderIsToldToMove(t *testing.T) {
+	h := loaded(t, nil)
+	p, _, err := h.NewProject(ctx, "old", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := p.Path
+	if err := os.Mkdir(filepath.Join(repo, "wiki"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"wiki.toml", "index.md", "product", "backlog", "technical-debt.md"} {
+		gitOut(t, repo, "mv", f, "wiki/"+f)
+	}
+	gitOut(t, repo, "commit", "--quiet", "-m", "the old layout")
+	got, err := h.Missing("old")
+	if err != nil || len(got) != 1 || got[0].File != "wiki.toml" || !got[0].Required || got[0].From != "wiki/" {
+		t.Fatalf("missing %+v %v", got, err)
+	}
+	head := gitOut(t, repo, "rev-parse", "HEAD")
+	if err := h.Scaffold(ctx, "old"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "move it") {
+		t.Errorf("scaffold over the old layout: %v", err)
+	}
+	if exists(filepath.Join(repo, "wiki.toml")) || gitOut(t, repo, "rev-parse", "HEAD") != head {
+		t.Error("the scaffold wrote beside the old wiki")
+	}
+	// Moved by hand: read at the root, nothing missing.
+	for _, f := range []string{"wiki.toml", "index.md", "product", "backlog", "technical-debt.md"} {
+		gitOut(t, repo, "mv", "wiki/"+f, f)
+	}
+	if got, err := h.Missing("old"); err != nil || len(got) != 0 {
+		t.Errorf("after the move: %+v %v", got, err)
+	}
+	// A wiki/ folder that isn't a wiki bundle is just a folder of the wiki.
+	writeFile(t, filepath.Join(repo, "wiki", "notes.md"), "x")
+	if got, _ := h.Missing("old"); len(got) != 0 {
+		t.Errorf("a plain wiki/ folder: %+v", got)
 	}
 }
 
@@ -523,22 +565,22 @@ func TestNewProjectWikiChecks(t *testing.T) {
 			t.Errorf("%s: %v, unreplaced: %v", f.File, err, strings.Contains(string(data), "{project}"))
 		}
 	}
-	if data, _ := os.ReadFile(filepath.Join(repo, "wiki", "index.md")); !strings.Contains(string(data), "# ledger\n") {
+	if data, _ := os.ReadFile(filepath.Join(repo, "index.md")); !strings.Contains(string(data), "# ledger\n") {
 		t.Errorf("index.md = %q", data)
 	}
 	// The wiki's index, secrets and clutter never show as changes to commit.
-	for _, f := range []string{"wiki/.wiki/index.db", ".env", "wiki/.DS_Store", "wiki/backlog/task.md.swp", ".obsidian/workspace.json"} {
+	for _, f := range []string{".wiki/index.db", ".env", ".DS_Store", "backlog/task.md.swp", ".obsidian/workspace.json"} {
 		writeFile(t, filepath.Join(repo, f), "x")
 	}
-	writeFile(t, filepath.Join(repo, "wiki", "product", "flow.png"), "x")
-	if status := gitOut(t, repo, "status", "--porcelain", "--untracked-files=all"); status != "?? wiki/product/flow.png" {
+	writeFile(t, filepath.Join(repo, "product", "flow.png"), "x")
+	if status := gitOut(t, repo, "status", "--porcelain", "--untracked-files=all"); status != "?? product/flow.png" {
 		t.Errorf("status %q", status)
 	}
 	bin, err := exec.LookPath("wiki")
 	if err != nil {
 		t.Skip("the wiki CLI isn't installed")
 	}
-	if out, err := exec.Command(bin, "--root", filepath.Join(repo, "wiki"), "check").CombinedOutput(); err != nil || !strings.Contains(string(out), "no issues") {
+	if out, err := exec.Command(bin, "--root", repo, "check").CombinedOutput(); err != nil || !strings.Contains(string(out), "no issues") {
 		t.Errorf("wiki check: %v\n%s", err, out)
 	}
 }

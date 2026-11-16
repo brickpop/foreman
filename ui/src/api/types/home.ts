@@ -200,9 +200,14 @@ export interface SettingsFile {
  * Missing is a scaffold file a project's HQ lacks.
  */
 export interface Missing {
-  file: string; // in the HQ, e.g. wiki/wiki.toml
+  file: string; // in the HQ, e.g. backlog/index.md
   why: string; // what goes wrong without it
   required: boolean; // the wiki can't be read without it
+  /**
+   * From is the folder the wiki is in, to move to the HQ's root ("wiki/"):
+   * an HQ from before the wiki was at its root. Nothing is created then.
+   */
+  from?: string;
 }
 /**
  * Change says what changed, for the UI to refetch.

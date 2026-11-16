@@ -212,7 +212,7 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("POST /api/projects/{id}/scaffold", func(w http.ResponseWriter, r *http.Request) {
 		if err := c.Scaffold(r.Context(), r.PathValue("id")); err != nil {
-			writeFound(w, nil, err, "project")
+			writeProject(w, nil, err)
 			return
 		}
 		m, err := c.Missing(r.PathValue("id"))

@@ -421,14 +421,14 @@ var starter embed.FS
 // scaffold is the starter's files in order, each with what goes wrong
 // without it; the wiki can't be read without the required ones.
 var scaffold = []Missing{
-	{"project.toml", "Foreman can't start the project's agents without it", false},
-	{wikiDir + "/wiki.toml", "Foreman can't read the wiki or its boards without it", true},
-	{wikiDir + "/index.md", "the wiki has no home page", true},
-	{"AGENTS.md", "the agents don't know how this project's wiki and tasks work", false},
-	{".gitignore", "the wiki's index and editor files can be committed", false},
-	{wikiDir + "/product/index.md", "the specs have no map", false},
-	{wikiDir + "/backlog/index.md", "the backlog has no entry point", false},
-	{wikiDir + "/technical-debt.md", "technical debt has no page", false},
+	{File: "project.toml", Why: "Foreman can't start the project's agents without it", Required: false},
+	{File: "wiki.toml", Why: "Foreman can't read the wiki or its boards without it", Required: true},
+	{File: "index.md", Why: "the wiki has no home page", Required: true},
+	{File: "AGENTS.md", Why: "the agents don't know how this project's wiki and tasks work", Required: false},
+	{File: ".gitignore", Why: "the wiki's index and editor files can be committed", Required: false},
+	{File: "product/index.md", Why: "the specs have no map", Required: false},
+	{File: "backlog/index.md", Why: "the backlog has no entry point", Required: false},
+	{File: "technical-debt.md", Why: "technical debt has no page", Required: false},
 }
 
 // starterFile is a scaffold file's content for the project.
@@ -457,6 +457,15 @@ func writeScaffold(project, dir string) ([]string, error) {
 	return created, nil
 }
 
+// oldWikiDir is where an HQ kept its wiki before the wiki moved to its root
+// (wiki/backlog/wiki-at-root.md).
+const oldWikiDir = "wiki/"
+
+// oldWiki says whether the HQ at dir still keeps its wiki in wiki/.
+func oldWiki(dir string) bool {
+	return !exists(filepath.Join(dir, "wiki.toml")) && exists(filepath.Join(dir, oldWikiDir, "wiki.toml"))
+}
+
 func exists(path string) bool {
 	_, err := os.Lstat(path)
 	return !errors.Is(err, fs.ErrNotExist)
@@ -470,11 +479,16 @@ func makeFile(path, content string) error {
 }
 
 // Missing lists the scaffold files the project's HQ lacks: deleted, or
-// never there in an HQ made elsewhere.
+// never there in an HQ made elsewhere. An HQ whose wiki is still in wiki/
+// (from before the wiki moved to the HQ's root) lacks only that move: the
+// CEO makes it, as Foreman can't tell what else of theirs is in there.
 func (h *Home) Missing(id string) ([]Missing, error) {
 	p, err := h.Project(id)
 	if err != nil {
 		return nil, err
+	}
+	if oldWiki(p.Path) {
+		return []Missing{{File: "wiki.toml", Why: "the wiki is still in wiki/: Foreman reads it at the HQ's root", Required: true, From: oldWikiDir}}, nil
 	}
 	out := []Missing{}
 	for _, f := range scaffold {
@@ -491,6 +505,9 @@ func (h *Home) Scaffold(ctx context.Context, id string) error {
 	p, err := h.Project(id)
 	if err != nil {
 		return err
+	}
+	if oldWiki(p.Path) {
+		return fmt.Errorf("%w: its wiki is still in %s: move it to the HQ's root first", ErrInvalid, oldWikiDir)
 	}
 	created, err := writeScaffold(id, p.Path)
 	if err != nil || len(created) == 0 {

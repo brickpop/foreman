@@ -31,11 +31,11 @@ function Configuration({ project }: { project: Project }) {
   const folder = where?.folder ?? "~/foreman";
   const tree = [
     `${folder}/`,
-    "├─ hq/                    Foreman's HQ (git): teams, your instructions",
+    "├─ hq/                    Foreman's HQ (git, a wiki): teams, your instructions",
     `├─ projects/${project.id}/`,
-    "│  ├─ hq/                 this project's HQ (git)",
+    "│  ├─ hq/                 this project's HQ (git), its wiki at the root:",
     "│  │  ├─ project.toml     checks, gates",
-    "│  │  └─ wiki/            knowledge base + wiki.toml (boards)",
+    "│  │  └─ wiki.toml, …     knowledge base, boards, AGENTS.md",
     "│  └─ files/              inbox/ from you, shared/ by its agents",
     `└─ worktrees/${project.id}/  one sandbox per agent: a worktree of each repo`,
     `${home}/`,

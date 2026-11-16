@@ -875,7 +875,7 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 		return teamtools.Refusal("too_long", "a body is at most %d characters: split it into separate contributions, one subject each", teamtools.MaxContribution)
 	}
 	hq := t.hq()
-	inbox := filepath.Join(hq.dir, "wiki", "inbox")
+	inbox := filepath.Join(hq.dir, "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		return gitError(err)
 	}
@@ -885,7 +885,7 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 	if err != nil {
 		return gitError(err)
 	}
-	rel := filepath.ToSlash(filepath.Join("wiki", "inbox", file))
+	rel := "inbox/" + file
 	if err := t.w.Git.CommitAs(ctx, hq.dir, "Contribution: "+title, t.author(), rel); err != nil {
 		return gitError(err)
 	}

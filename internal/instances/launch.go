@@ -183,8 +183,12 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err != nil {
 		return nil, err
 	}
+	// PROJECT_HQ names the HQ where it is mounted, the same on the host: the
+	// wiki's root (its AGENTS.md runs `wiki --root "$PROJECT_HQ"`), whatever
+	// the machine's folders (the CEO, 2026-11-16).
+	env := append(slices.Clone(l.Env), "PROJECT_HQ="+project.Path)
 	proc, err := m.Runner.Start(ctx, runner.Spec{
-		Name: m.processName(id), Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: l.Env,
+		Name: m.processName(id), Image: image, Command: l.Command, Dir: inst.SandboxPath, Env: env,
 		Mounts: append(mounts, l.Mounts...),
 		Labels: map[string]string{"foreman.instance": id, "foreman.deployment": dep.ID, HomeLabel: m.Home},
 	})

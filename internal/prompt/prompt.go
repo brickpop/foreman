@@ -197,13 +197,13 @@ func Compose(in Input) string {
 		line("%s", provingTests)
 	}
 	line("The project's HQ: %s (its one shared checkout, the same for every agent)", in.HQ)
-	line("Knowledge base: %s/wiki (%s)", in.HQ, wikiAccess(lead, has))
+	line("Knowledge base: the HQ itself, a wiki at its root, $PROJECT_HQ in your environment (%s)", wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	if lead && len(in.Team.Roster()) > 1 {
 		// Without this, a lead writes cards that tell members to write wiki
 		// files, and a member takes its read-only mount for a fault.
 		if has("contribute") {
-			line("Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.")
+			line("Your teammates can't write it: what they add arrives through contribute() in the HQ's inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.")
 			line("%s", leadReviews)
 		} else {
 			line("Your teammates can't write it: ask them for content, never to write wiki files.")
@@ -570,7 +570,7 @@ func Template(team home.TeamConfig, agent, instructions string) string {
 // wiki's backlog index, which the lead keeps. Pointed to, not copied, since
 // it changes over time while a session runs (the CEO, 2026-10-31).
 func goal(hq string, lead bool) string {
-	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/wiki/backlog/index.md", hq)
+	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/backlog/index.md", hq)
 	if lead {
 		return at + ", which you keep. It changes over time: read it again before planning new work. When it is missing or says none yet, ask the CEO for it in this session before anything else, then write it there. When the CEO changes it, update it there and tell your team."
 	}

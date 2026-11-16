@@ -165,7 +165,7 @@ export interface HomeArea {
   setName(project: string, name: string): Promise<Project>;
   /** Hides a project (out of the sidebar's projects and the Dashboard), or shows it again. */
   setHidden(project: string, hidden: boolean): Promise<Project>;
-  /** The scaffold files the HQ lacks (wiki/wiki.toml…), and creating them. */
+  /** The scaffold files the HQ lacks (wiki.toml…), and creating them. */
   missing(project: string): Promise<Missing[]>;
   scaffold(project: string): Promise<Missing[]>;
   /** Saves one agent's soul in its team file, guarded by the version read. */

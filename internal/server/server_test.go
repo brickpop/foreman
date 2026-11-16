@@ -35,7 +35,7 @@ func (f fakeHome) RecordsProblems() []string {
 	return []string{"ledger.nmae: not a field Foreman knows"}
 }
 func (f fakeHome) Backups() []home.Backup {
-	return []home.Backup{{Project: "ledger", Path: "/home/ceo/foreman/projects/ledger/hq", Problem: "it has no origin"}}
+	return []home.Backup{{Project: "ledger", Path: "/home/ceo/foreman/projects/ledger/hq", Problem: "it has no origin", Command: "git remote add origin"}}
 }
 func (f fakeHome) Restore(_ context.Context, url string) error {
 	switch url {
@@ -74,7 +74,7 @@ func TestEveryRouteGoesThroughTheGuard(t *testing.T) {
 
 func TestHomeSummaryIsTheHomesPath(t *testing.T) {
 	w := get(t, open(builtUI), "/api/home")
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman","projectsProblems":["ledger.nmae: not a field Foreman knows"],"backups":[{"project":"ledger","path":"/home/ceo/foreman/projects/ledger/hq","problem":"it has no origin"}]`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman","projectsProblems":["ledger.nmae: not a field Foreman knows"],"backups":[{"project":"ledger","path":"/home/ceo/foreman/projects/ledger/hq","problem":"it has no origin","command":"git remote add origin"}]`) {
 		t.Errorf("got %d %q", w.Code, w.Body.String())
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/json" {

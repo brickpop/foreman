@@ -35,6 +35,9 @@ type Backup struct {
 	Project string `json:"project"` // "" for Foreman's HQ
 	Path    string `json:"path"`
 	Problem string `json:"problem"`
+	// Command is what sets its origin up, <its URL> to fill in; "" when the
+	// problem isn't a missing origin.
+	Command string `json:"command"`
 }
 
 // Sync brings Foreman's HQ and every project's HQ up to date with its
@@ -43,7 +46,7 @@ type Backup struct {
 // written to projects.toml when it changed (a `git remote add` made since),
 // and Foreman's HQ pushed last, with that commit. What fails is a Backup.
 func (h *Home) Sync(ctx context.Context) {
-	problems := map[string]string{}
+	problems := map[string]Backup{}
 	pulled := h.step(ctx, func(ctx context.Context) error { return h.git.Pull(ctx, h.HQ(), hqBranch) })
 	h.reload()
 
@@ -67,7 +70,7 @@ func (h *Home) Sync(ctx context.Context) {
 			origin := h.git.Origin(ctx, p.Path)
 			mu.Lock()
 			defer mu.Unlock()
-			problems[p.ID] = syncProblem(p.Path, err)
+			problems[p.ID] = synced(p.ID, p.Path, err)
 			origins[p.ID] = origin
 		})
 	}
@@ -82,15 +85,15 @@ func (h *Home) Sync(ctx context.Context) {
 	if pulled == nil || !errors.Is(pulled, git.ErrNoRemote) {
 		pushed = h.step(ctx, func(ctx context.Context) error { return h.git.Push(ctx, h.HQ(), hqBranch) })
 	}
-	problems[""] = syncProblem(h.HQ(), errors.Join(pulled, pushed))
+	problems[""] = synced("", h.HQ(), errors.Join(pulled, pushed))
 
 	h.mu.Lock()
 	h.synced = problems
 	h.publish([]Change{{Kind: "projects"}})
 	h.unlock()
-	for id, problem := range problems {
-		if problem != "" {
-			slog.Warn("an HQ isn't backed up", "project", id, "problem", problem)
+	for id, b := range problems {
+		if b.Problem != "" {
+			slog.Warn("an HQ isn't backed up", "project", id, "problem", b.Problem, "fix", b.Command)
 		}
 	}
 }
@@ -124,21 +127,24 @@ func (h *Home) refreshOrigins(ctx context.Context, origins map[string]string) er
 	})
 }
 
-// syncProblem says why the HQ at dir isn't backed up after a sync's err; ""
-// when it is.
-func syncProblem(dir string, err error) string {
+// synced is the HQ at dir after a sync's err: its Backup, Problem "" when
+// it is backed up.
+func synced(project, dir string, err error) Backup {
 	switch {
 	case err == nil:
-		return ""
+		return Backup{Project: project, Path: dir}
 	case errors.Is(err, git.ErrNoRemote):
-		return noOrigin(dir)
+		return noOrigin(project, dir)
 	}
-	return "not synced with its origin: " + strings.ReplaceAll(err.Error(), "\n", " ")
+	return Backup{Project: project, Path: dir, Problem: "Not synced with its origin: " + strings.ReplaceAll(err.Error(), "\n", " ")}
 }
 
-// noOrigin is the Backup problem of an HQ with no origin: what to run.
-func noOrigin(dir string) string {
-	return fmt.Sprintf("it has no origin: make an empty repo for it, then git -C %q remote add origin <its URL> && git -C %q push -u origin %s. Foreman pushes it at every start and stop from then on", dir, dir, hqBranch)
+// noOrigin is the Backup of an HQ with no origin, with what to run.
+func noOrigin(project, dir string) Backup {
+	return Backup{
+		Project: project, Path: dir, Problem: "It has no origin: nothing backs it up.",
+		Command: fmt.Sprintf("git -C %q remote add origin <its URL> && git -C %q push -u origin %s", dir, dir, hqBranch),
+	}
 }
 
 // Backups lists the HQs not backed up: Foreman's HQ and each project's, as
@@ -147,16 +153,16 @@ func (h *Home) Backups() []Backup {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	out := []Backup{}
-	if problem := h.synced[""]; problem != "" {
-		out = append(out, Backup{Path: h.HQ(), Problem: problem})
+	if b := h.synced[""]; b.Problem != "" {
+		out = append(out, b)
 	}
 	for _, p := range values(h.snap.projects) {
-		problem, synced := h.synced[p.ID]
+		b, synced := h.synced[p.ID]
 		if !synced && h.snap.records.Records[p.ID].HQ == "" && exists(p.Path) {
-			problem = noOrigin(p.Path)
+			b = noOrigin(p.ID, p.Path)
 		}
-		if problem != "" {
-			out = append(out, Backup{Project: p.ID, Path: p.Path, Problem: problem})
+		if b.Problem != "" {
+			out = append(out, b)
 		}
 	}
 	return out

@@ -11,10 +11,10 @@ Plain Markdown files with YAML frontmatter, plus a `wiki.toml`, operated with th
 ```sh
 wiki --root "$PROJECT_HQ" status                       # what's there, and what's broken
 wiki --root "$PROJECT_HQ" search "settlement"          # find before you write
-wiki --root "$PROJECT_HQ" read /product/settlement.md  # an entry, frontmatter stripped
+wiki --root "$PROJECT_HQ" read /spec/settlement.md     # an entry, frontmatter stripped
 wiki --root "$PROJECT_HQ" list --where type=task --where status!=done   # open work
-wiki --root "$PROJECT_HQ" backlinks /product/settlement.md              # what points here
-wiki --root "$PROJECT_HQ" move /a.md /product/a.md     # move, rewriting every link to it
+wiki --root "$PROJECT_HQ" backlinks /spec/settlement.md                 # what points here
+wiki --root "$PROJECT_HQ" move /a.md /spec/a.md        # move, rewriting every link to it
 wiki --root "$PROJECT_HQ" check                        # before every commit()
 ```
 
@@ -22,7 +22,7 @@ Rules that keep it findable:
 
 - **Every entry has a `type`**: `spec`, `task`, `epic` or `note` (`wiki.toml` allows no other). `index.md` files carry none.
 - **One thing per entry**, in one folder, with a lowercase hyphenated file name (`settlement-rules.md`). Similar but distinct things get their own entries, linked to each other.
-- **Link what relates**, with relative Markdown links (`[Settlement](../product/settlement.md)`). An entry nothing links to is lost: link it from its folder's `index.md`.
+- **Link what relates**, with relative Markdown links (`[Settlement](../spec/settlement.md)`). An entry nothing links to is lost: link it from its folder's `index.md`.
 - **Never move a file by hand**: `wiki move` rewrites its links. **Search first**: update the entry that exists rather than write a second one.
 - **Records you'd count or sum** (measurements, invoices) go in one entry as a Markdown table, not one entry each.
 
@@ -31,10 +31,10 @@ Rules that keep it findable:
 ```
 $PROJECT_HQ/
 ├── AGENTS.md           # this file (not a wiki entry), beside project.toml
-├── index.md            # entry point: links to product, backlog, technical debt (and what you add)
+├── index.md            # entry point: links to spec, backlog, technical debt (and what you add)
 ├── technical-debt.md   # accepted workarounds and limitations, one page (type: note)
-├── product/            # durable: what the project is, as intended (type: spec)
-│   └── index.md        # the product map: links every spec
+├── spec/               # durable: what the project is, as intended (type: spec)
+│   └── index.md        # the spec map: links every spec
 ├── backlog/            # ephemeral: the work (type: task)
 │   ├── index.md        # the current goal, and the queries that list the work
 │   ├── <task>.md       # one file per task
@@ -43,9 +43,9 @@ $PROJECT_HQ/
 └── inbox/              # contributions waiting for the lead (type: note)
 ```
 
-**Optional, created when there is something to put in it** (never empty, never as a placeholder): `research/` for what the team found out (investigations, comparisons of options, measurements, a spike's outcome; `type: note`), `product/glossary.md` for the project's terms, or another folder the project really needs (`discovery/`, `issues/`…). Link each new folder's `index.md` from the root `index.md`.
+**Optional, created when there is something to put in it** (never empty, never as a placeholder): `research/` for what the team found out (investigations, comparisons of options, measurements, a spike's outcome; `type: note`), `spec/glossary.md` for the project's terms, or another folder the project really needs (`discovery/`, `issues/`…). Link each new folder's `index.md` from the root `index.md`.
 
-**Different lifetimes.** `product/` is durable: it describes the project as intended, and each spec says how much of it is real. `backlog/` is ephemeral: tasks come and go. When a task ships, the knowledge it produced goes into the matching spec (or a research note), and the task is retired. Decisions go into the spec they change, with who and when, not into a folder of their own. Don't make folders for progress (`todo/`, `doing/`): that's what `status` is for.
+**Different lifetimes.** `spec/` is durable: it describes the project as intended, and each spec says how much of it is real. `backlog/` is ephemeral: tasks come and go. When a task ships, the knowledge it produced goes into the matching spec (or a research note), and the task is retired. Decisions go into the spec they change, with who and when, not into a folder of their own. Don't make folders for progress (`todo/`, `doing/`): that's what `status` is for.
 
 ## Specs
 
@@ -130,5 +130,5 @@ An epic lives in `backlog/epics/<slug>.md`; its tasks name it in `epic: <slug>`.
 - **An epic's work:** `--where epic=invoicing --where status!=done`
 - **What the CEO must decide:** `--where type=task --where tags=decision --where status!=done`
 - **How far is the build:** `wiki --root "$PROJECT_HQ" property status --counts --where type=spec`
-- **How does X work:** start at `product/index.md`, or `wiki --root "$PROJECT_HQ" search "x"`
+- **How does X work:** start at `spec/index.md`, or `wiki --root "$PROJECT_HQ" search "x"`
 - **Housekeeping** (the lead): `wiki --root "$PROJECT_HQ" check`, `orphans` (link them), `unresolved` (links to entries not written yet), done tasks not yet retired, stale and blocked ones.

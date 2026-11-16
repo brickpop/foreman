@@ -457,7 +457,7 @@ var scaffold = []Missing{
 	{File: "index.md", Why: "the wiki has no home page", Required: true},
 	{File: "AGENTS.md", Why: "the agents don't know how this project's wiki and tasks work", Required: false},
 	{File: ".gitignore", Why: "the wiki's index and editor files can be committed", Required: false},
-	{File: "product/index.md", Why: "the specs have no map", Required: false},
+	{File: "spec/index.md", Why: "the specs have no map", Required: false},
 	{File: "backlog/index.md", Why: "the backlog has no entry point", Required: false},
 	{File: "technical-debt.md", Why: "technical debt has no page", Required: false},
 }

@@ -241,4 +241,9 @@ export interface Backup {
   project: string; // "" for Foreman's HQ
   path: string;
   problem: string;
+  /**
+   * Command is what sets its origin up, <its URL> to fill in; "" when the
+   * problem isn't a missing origin.
+   */
+  command: string;
 }

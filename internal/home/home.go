@@ -37,7 +37,7 @@ type Home struct {
 
 	mu      sync.Mutex // guards snap, saves and pending
 	snap    snapshot
-	synced  map[string]string // each HQ's problem after the start's sync, by project ("" Foreman's HQ); "" for none
+	synced  map[string]Backup // each HQ after the start's sync, by project ("" Foreman's HQ); Problem "" for none
 	notify  func(Change)      // set by Watch
 	watcher *fsnotify.Watcher // set by Watch
 	// rewatch: a project was made, its HQ to watch (unlock).

@@ -1,6 +1,7 @@
 package home
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -107,13 +108,15 @@ func TestSyncReportsWhatIsNotBackedUp(t *testing.T) {
 	for _, b := range h.Backups() {
 		got[b.Project] = b
 	}
-	if b := got[""]; b.Path != h.HQ() || !strings.Contains(b.Problem, "no origin") || !strings.Contains(b.Problem, "remote add origin") {
+	// No origin: the command that sets one up, for the HQ's own path.
+	if b := got[""]; b.Path != h.HQ() || !strings.Contains(b.Problem, "no origin") || b.Command != fmt.Sprintf("git -C %q remote add origin <its URL> && git -C %q push -u origin main", h.HQ(), h.HQ()) {
 		t.Errorf("Foreman's HQ: %+v", b)
 	}
-	if b := got["ledger"]; b.Path != ledger.Path || !strings.Contains(b.Problem, "no origin") {
+	if b := got["ledger"]; b.Path != ledger.Path || !strings.Contains(b.Problem, "no origin") || !strings.Contains(b.Command, ledger.Path) {
 		t.Errorf("ledger: %+v", b)
 	}
-	if b := got["relay"]; !strings.Contains(b.Problem, "not synced") || !strings.Contains(b.Problem, "index.md") {
+	// Not synced: git's reason, nothing to copy.
+	if b := got["relay"]; !strings.Contains(b.Problem, "Not synced") || !strings.Contains(b.Problem, "index.md") || b.Command != "" {
 		t.Errorf("relay: %+v", b)
 	}
 	if headOf(t, relay.Path) != ours {

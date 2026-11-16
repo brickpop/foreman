@@ -436,7 +436,7 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 		t.Fatal(err)
 	}
 	repo := p.Path
-	gitOut(t, repo, "rm", "--quiet", "-r", "wiki.toml", "index.md", "product", "backlog", "technical-debt.md", "AGENTS.md", ".gitignore")
+	gitOut(t, repo, "rm", "--quiet", "-r", "wiki.toml", "index.md", "spec", "backlog", "technical-debt.md", "AGENTS.md", ".gitignore")
 	writeFile(t, filepath.Join(repo, "spec.md"), "# Spec\n")
 	gitOut(t, repo, "add", ".")
 	gitOut(t, repo, "commit", "--quiet", "-m", "agents")
@@ -448,7 +448,7 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	for i, want := range []struct {
 		file     string
 		required bool
-	}{{"wiki.toml", true}, {"index.md", true}, {"AGENTS.md", false}, {".gitignore", false}, {"product/index.md", false}, {"backlog/index.md", false}, {"technical-debt.md", false}} {
+	}{{"wiki.toml", true}, {"index.md", true}, {"AGENTS.md", false}, {".gitignore", false}, {"spec/index.md", false}, {"backlog/index.md", false}, {"technical-debt.md", false}} {
 		if got[i].File != want.file || got[i].Required != want.required || got[i].Why == "" {
 			t.Errorf("missing[%d] = %+v, want %+v", i, got[i], want)
 		}
@@ -467,7 +467,7 @@ func TestScaffoldFillsWhatIsMissing(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(repo, "AGENTS.md")); !strings.Contains(string(data), "type: task") {
 		t.Errorf("AGENTS.md = %q", data)
 	}
-	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "HQ: add wiki.toml, AGENTS.md, .gitignore, product/index.md, backlog/index.md, technical-debt.md\n\n.gitignore\nAGENTS.md\nbacklog/index.md\nproduct/index.md\ntechnical-debt.md\nwiki.toml" {
+	if log := gitOut(t, repo, "log", "-1", "--format=%s", "--name-only"); log != "HQ: add wiki.toml, AGENTS.md, .gitignore, spec/index.md, backlog/index.md, technical-debt.md\n\n.gitignore\nAGENTS.md\nbacklog/index.md\nspec/index.md\ntechnical-debt.md\nwiki.toml" {
 		t.Errorf("commit %q", log)
 	}
 	// Nothing missing: nothing written, nothing committed.
@@ -527,8 +527,8 @@ func TestNewProjectWikiChecks(t *testing.T) {
 	for _, f := range []string{".wiki/index.db", ".env", ".DS_Store", "backlog/task.md.swp", ".obsidian/workspace.json"} {
 		writeFile(t, filepath.Join(repo, f), "x")
 	}
-	writeFile(t, filepath.Join(repo, "product", "flow.png"), "x")
-	if status := gitOut(t, repo, "status", "--porcelain", "--untracked-files=all"); status != "?? product/flow.png" {
+	writeFile(t, filepath.Join(repo, "spec", "flow.png"), "x")
+	if status := gitOut(t, repo, "status", "--porcelain", "--untracked-files=all"); status != "?? spec/flow.png" {
 		t.Errorf("status %q", status)
 	}
 	bin, err := exec.LookPath("wiki")

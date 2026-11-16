@@ -30,11 +30,13 @@ import { DeployDialog } from "../components/DeployDialog";
 import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
+import { FolderIcon } from "../components/icons";
 import { AddCard, TeamGrid } from "../components/TeamGrid";
 import { useToast } from "../components/Toasts";
 import {
   Button,
   Card,
+  CopyButton,
   cover,
   Loading,
   PageTitle,
@@ -127,15 +129,40 @@ function NotBackedUp({ backups }: { backups: Backup[] }) {
     <section className="flex flex-col gap-2.5">
       <SectionTitle count={backups.length}>Not backed up</SectionTitle>
       {backups.map((b) => (
-        <p
+        <div
           key={b.path}
-          className="m-0 rounded-lg border border-attn px-3 py-2 text-[13px] break-words text-tx2"
+          className="flex flex-col gap-2 rounded-lg border border-attnLine bg-attnSoft px-3.5 py-3 text-[13px] text-attnTx"
         >
-          <span className="font-semibold text-tx">
-            {b.project === "" ? "Foreman's HQ" : `${projectNameOf(b.project)}'s HQ`}
-          </span>{" "}
-          ({b.path}): {b.problem}
-        </p>
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 font-semibold">
+              {b.project === "" ? "Foreman's HQ" : `${projectNameOf(b.project)}'s HQ`}
+            </span>
+            <span className="min-w-0 truncate font-mono text-[12px]" title={b.path}>
+              {b.path}
+            </span>
+            <CopyButton
+              text={() => b.path}
+              label="Copy its path"
+              icon={<FolderIcon open={false} />}
+            />
+          </div>
+          <p className="m-0 break-words">{b.problem}</p>
+          {b.command && (
+            <>
+              <p className="m-0">
+                Make an empty repo for it (GitHub, GitLab…), then run this with its URL in place of{" "}
+                <span className="font-mono">&lt;its URL&gt;</span>. Foreman pushes it at every
+                start and stop from then on.
+              </p>
+              <div className="flex items-start gap-2 rounded-md bg-term px-2.5 py-2">
+                <code className="min-w-0 flex-1 font-mono text-[12px] break-all text-tx2">
+                  {b.command}
+                </code>
+                <CopyButton text={() => b.command} label="Copy the command" />
+              </div>
+            </>
+          )}
+        </div>
       ))}
     </section>
   );

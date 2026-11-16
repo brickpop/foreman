@@ -39,6 +39,9 @@ type Config interface {
 	// if deleteWorktrees.
 	NewProject(ctx context.Context, name, clone string) (p home.Project, created bool, err error)
 	RemoveProject(ctx context.Context, id string, deleteHQ, deleteWorktrees bool) error
+	// BringHere clones the HQ of a project not on this machine from the
+	// origin its record keeps.
+	BringHere(ctx context.Context, id string) (home.Project, error)
 	// AddRepo adds an existing repo, by its folder, with def as its default
 	// branch ("": main, which it must have); NewRepo creates an empty one at
 	// a new folder, on main, and adds it.
@@ -111,6 +114,10 @@ func configRoutes(mux *http.ServeMux, c Config) {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+	mux.HandleFunc("POST /api/projects/{id}/bring", func(w http.ResponseWriter, r *http.Request) {
+		p, err := c.BringHere(r.Context(), r.PathValue("id"))
+		writeProject(w, p, err)
 	})
 	mux.HandleFunc("PUT /api/projects/{id}/repos/{repo}/name", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {

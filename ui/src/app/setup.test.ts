@@ -22,6 +22,7 @@ describe("setup", () => {
   it("titles name the profile", () => {
     expect(stepTitle(step("profile", "todo", "work"))).toBe("The work profile connected");
     expect(stepTitle(step("init", "failed"))).toBe("Podman can start agents");
+    expect(stepTitle(step("hq", "todo"))).toBe("Foreman's HQ");
   });
 
   it("offers memory in whole GiB within the bounds, and none on a Mac too small", () => {

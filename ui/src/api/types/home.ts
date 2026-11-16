@@ -156,6 +156,12 @@ export interface Project {
   name: string;
   path: string; // its HQ, <folder>/projects/<id>/hq
   /**
+   * Here says its HQ is on this machine. One that isn't (a project from
+   * another machine's records) is brought here with BringHere.
+   */
+  here: boolean;
+  remote: string; // its HQ's origin as projects.toml keeps it, what BringHere clones; "" when it has none
+  /**
    * Files is its folder of files for the agents, <folder>/projects/<id>/files:
    * the CEO's in inbox/, the agents' own in shared/ (FileFolders).
    */

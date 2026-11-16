@@ -4,7 +4,7 @@ package setup
 
 // Step is one row of the setup checklist (wiki/product/features/first-run.md).
 type Step struct {
-	Kind    string       `json:"kind"`              // "podman", "machine", "running", "image", "init", "profile", "team" or "project"
+	Kind    string       `json:"kind"`              // "hq", "podman", "machine", "running", "image", "init", "profile", "team" or "project"
 	Subject string       `json:"subject"`           // the profile (profile) or project (repo); "" otherwise
 	State   string       `json:"state"`             // "done", "todo", "working" or "failed"
 	Detail  string       `json:"detail"`            // what it waits for, or why it failed

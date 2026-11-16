@@ -35,6 +35,9 @@ type Engine interface {
 type Config interface {
 	Teams() []home.Team
 	Projects() []home.Project
+	// Pristine says Foreman's HQ is as its first start made it: it may still
+	// be restored from another machine's.
+	Pristine(ctx context.Context) bool
 }
 
 // Deps is what the checklist reads and the watcher drives.
@@ -266,7 +269,10 @@ func (s *Setup) CreateMachine(ctx context.Context, cpus, memory int) error {
 
 // Steps is the checklist now, in order.
 func (s *Setup) Steps(ctx context.Context) []Step {
-	var steps []Step
+	steps := []Step{{Kind: "hq", State: "done"}}
+	if s.Config.Pristine(ctx) {
+		steps[0] = Step{Kind: "hq", State: "todo", Detail: "New to Foreman: go on below. Coming from another machine: restore your HQ from its git URL"}
+	}
 	if s.Deps.Engine != nil {
 		s.mu.Lock()
 		ready := s.ready

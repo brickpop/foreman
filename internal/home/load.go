@@ -28,6 +28,10 @@ type Project struct {
 	// readable. The id stays: ids, branches and folders are built from it.
 	Name string `json:"name"`
 	Path string `json:"path"` // its HQ, <folder>/projects/<id>/hq
+	// Here says its HQ is on this machine. One that isn't (a project from
+	// another machine's records) is brought here with BringHere.
+	Here   bool   `json:"here"`
+	Remote string `json:"remote"` // its HQ's origin as projects.toml keeps it, what BringHere clones; "" when it has none
 	// Files is its folder of files for the agents, <folder>/projects/<id>/files:
 	// the CEO's in inbox/, the agents' own in shared/ (FileFolders).
 	Files     string        `json:"files"`
@@ -329,13 +333,14 @@ func (h *Home) scan(prev snapshot) snapshot {
 // checked.
 func (h *Home) project(ctx context.Context, id string, r Record, here store.ProjectRecord) Project {
 	p := Project{
-		ID: id, Name: r.DisplayName, Profile: here.Profile, Hidden: r.Hidden, Repos: []Repo{},
+		ID: id, Name: r.DisplayName, Profile: here.Profile, Hidden: r.Hidden, Remote: r.HQ, Repos: []Repo{},
 		Path: filepath.Join(h.projectDir(id), hqDir), Files: filepath.Join(h.projectDir(id), filesDir),
 		worktrees: h.worktrees(id), harness: h.Path(harnessDir, id),
 	}
 	if p.Profile == "" {
 		p.Profile = profiles.Default
 	}
+	p.Here = exists(p.Path)
 	data, err := os.ReadFile(filepath.Join(p.Path, "project.toml"))
 	if err != nil {
 		p.Config, _ = ParseProject(nil)

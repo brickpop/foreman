@@ -10,6 +10,8 @@ export function setupPending(steps: readonly SetupStep[]): boolean {
 /** A step's row title. */
 export function stepTitle(s: SetupStep): string {
   switch (s.kind) {
+    case "hq":
+      return "Foreman's HQ";
     case "podman":
       return "Podman installed";
     case "machine":

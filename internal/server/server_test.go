@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -35,6 +37,15 @@ func (f fakeHome) RecordsProblems() []string {
 func (f fakeHome) Backups() []home.Backup {
 	return []home.Backup{{Project: "ledger", Path: "/home/ceo/foreman/projects/ledger/hq", Problem: "it has no origin"}}
 }
+func (f fakeHome) Restore(_ context.Context, url string) error {
+	switch url {
+	case "used":
+		return fmt.Errorf("%w: Foreman's HQ has teams", home.ErrExists)
+	case "nothing":
+		return fmt.Errorf("%w: git clone: not found", home.ErrInvalid)
+	}
+	return nil
+}
 
 var builtUI = fstest.MapFS{
 	"index.html":    {Data: []byte("<!doctype html><title>Foreman</title>")},
@@ -68,6 +79,23 @@ func TestHomeSummaryIsTheHomesPath(t *testing.T) {
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/json" {
 		t.Errorf("Content-Type %q", ct)
+	}
+}
+
+func TestRestore(t *testing.T) {
+	h := open(builtUI)
+	for body, want := range map[string]string{
+		`{"url":"git@github.com:me/hq.git"}`: "204 ",
+		`{"url":"used"}`:                     `409 {"code":"EXISTS","error":"Foreman's HQ has teams"}`,
+		`{"url":"nothing"}`:                  `400 {"code":"INVALID","error":"git clone: not found"}`,
+		`{"url":""}`:                         `400 {"code":"BAD_REQUEST","error":"expected {url}"}`,
+		`nope`:                               `400 {"code":"BAD_REQUEST","error":"expected {url}"}`,
+	} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/api/home/restore", strings.NewReader(body)))
+		if got := fmt.Sprint(w.Code, " ", strings.TrimSpace(w.Body.String())); got != want {
+			t.Errorf("%s: %s, want %s", body, got, want)
+		}
 	}
 }
 

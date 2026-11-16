@@ -14,6 +14,7 @@ import {
   type ForemanClient,
   type Instance,
   type OpenTarget,
+  type Project,
   type Proposal,
   type Request,
   type Settings,
@@ -91,14 +92,28 @@ export function useBranches(path: string | undefined) {
   });
 }
 
-export function useProjects() {
+/** Every project in projects.toml, those not on this machine included (the
+ * Dashboard brings them here). */
+export function useAllProjects() {
   const c = useClient();
   return useQuery({ queryKey: keys.projects, queryFn: () => c.home.projects() });
 }
 
+const onThisMachine = (projects: Project[]) => projects.filter((p) => p.here);
+
+/** The projects on this machine: the ones every screen shows. */
+export function useProjects() {
+  const c = useClient();
+  return useQuery({
+    queryKey: keys.projects,
+    queryFn: () => c.home.projects(),
+    select: onThisMachine,
+  });
+}
+
 /** A project's shown name by its id (projectName), from the projects read. */
 export function useProjectName(): (id: string) => string {
-  const projects = useProjects().data;
+  const projects = useAllProjects().data;
   return (id) => projectName(projects, id);
 }
 

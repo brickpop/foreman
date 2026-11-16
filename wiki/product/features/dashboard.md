@@ -20,7 +20,7 @@ Width up to 1080px, the page's 24px sides (16px under 760px), 40px between secti
 
 ## Setup checklist
 
-While any setup step is left, the setup checklist comes under the header: Podman, its machine (macOS), the agent image, each harness login, a team, a project, a code repo per project, each with its button ([First run](./first-run.md#the-checklist)). It goes away once every step is done.
+While any setup step is left, the setup checklist comes under the header: Foreman's HQ (Restore it from another machine while pristine), Podman, its machine (macOS), the agent image, each harness login, a team, a project, a code repo per project, each with its button ([First run](./first-run.md#the-checklist)). It goes away once every step is done.
 
 ## projects.toml needs fixing
 
@@ -29,6 +29,10 @@ While `projects.toml` has problems ([Project config → projects.toml](../models
 ## Not backed up
 
 The HQs their origin doesn't back up, one line each (`GET /api/home`, `backups`), after the setup checklist; left out when there are none. Each names the HQ (Foreman's, or the project's), its path, and the problem: **no origin**, with the `git remote add origin …` and `git push -u origin main` to run (Foreman's git config is the CEO's; Foreman has no field for it), or **not synced with its origin**, with git's reason (a conflict, aborted; uncommitted changes in the way; a remote that refused or couldn't be reached). Judged at the start's [sync](../models/home.md#syncing-the-hqs), and for a project made since, by whether it has an origin. A remote added by hand shows at the next start.
+
+## Not on this machine
+
+The projects in `projects.toml` whose HQ isn't on this machine (`here: false`): another machine's, after a [restore](../models/home.md#a-new-machine) or a sync brought their records in, or one whose HQ was deleted here. They are nowhere else in the app (no sidebar row, no card, not deployable), hidden ones included; this section, after the Projects grid and before Teams, lists them by name, left out when there are none. One row each: the name, the HQ's remote (Mono), and **Bring here** (`POST /api/projects/:id/bring`), which clones the HQ into its place, then opens the project's [Repos](./repos.md), where each code repo is located or cloned (**Clone it**). One with no remote recorded (its HQ had no origin where it was made) says so instead of the button: `Its HQ has no origin: push it where it is, then start Foreman there once`. A refused clone shows git's reason under the row.
 
 ## Needs you
 
@@ -44,7 +48,7 @@ Today only review requests are built, so the section doesn't show yet.
 
 ## Projects
 
-One card per project not [hidden](../models/project-config.md#the-project-record) (cards at least 240px wide), by name, as the [sidebar](./app-shell.md#sidebar) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
+One card per project on this machine not [hidden](../models/project-config.md#the-project-record) (cards at least 240px wide), by name, as the [sidebar](./app-shell.md#sidebar) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
 
 - A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right its state as a status pill: `needs you` (`--attn`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
 - Its description (13.5px `--tx3`, two lines, kept at two so cards line up), or `No description yet.`

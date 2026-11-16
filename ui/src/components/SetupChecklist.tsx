@@ -79,6 +79,7 @@ function StepRow({
         {!done && <StepAction step={s} startable={startable} />}
       </div>
       {s.state === "todo" && s.machine && <MachineForm size={s.machine} />}
+      {s.state === "todo" && s.kind === "hq" && <RestoreForm />}
       {(s.state === "working" || s.state === "failed") && s.log && (
         <pre className="m-0 ml-[30px] max-h-36 overflow-auto rounded-lg bg-term px-3 py-2 font-mono text-[12px] whitespace-pre-wrap text-tx3">
           {logTail(s.log)}
@@ -151,6 +152,44 @@ function StepAction({ step: s, startable }: { step: SetupStep; startable: boolea
     default:
       return null;
   }
+}
+
+/** Restore Foreman's HQ from another machine's origin: it replaces the one
+ * the first start made, while nothing was done in it. */
+function RestoreForm() {
+  const client = useClient();
+  const queries = useQueryClient();
+  const [url, setUrl] = useState("");
+  const restore = useMutation({
+    mutationFn: () => client.home.restore(url.trim()),
+    // Everything came with it: teams, instructions, projects.
+    onSuccess: () => queries.invalidateQueries(),
+  });
+  return (
+    <form
+      className="ml-[30px] flex flex-wrap items-center gap-3 text-[13px] text-tx2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (url.trim() && !restore.isPending) restore.mutate();
+      }}
+    >
+      <input
+        aria-label="Your HQ's git URL"
+        placeholder="git@github.com:me/foreman-hq.git"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-3 py-1.5 font-mono text-[13px] text-tx"
+      />
+      <Button type="submit" variant="small" busy={restore.isPending} disabled={!url.trim()}>
+        Restore
+      </Button>
+      <span className="basis-full text-[12.5px] text-tx4">
+        Cloned with your own git, its teams, instructions and projects with it. Your projects then
+        show under Not on this machine, to bring here.
+      </span>
+      {restore.error && <span className="basis-full text-err">{restore.error.message}</span>}
+    </form>
+  );
 }
 
 /** The machine's size, prefilled with half the Mac within the CEO's bounds. */

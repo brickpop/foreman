@@ -5,11 +5,11 @@ import { type Project, useClient } from "../../api/client";
 import { harnessLabel, nameTakenBy, onOtherProfile, projectName, readable } from "../../app/model";
 import {
   keys,
+  useAllProjects,
   useDeployments,
   useHomeFolder,
   useInstances,
   useProfiles,
-  useProjects,
   useTeams,
 } from "../../app/queries";
 import { Confirm } from "../../components/Overlays";
@@ -189,7 +189,8 @@ function ProjectNameField({ project }: { project: Project }) {
   const client = useClient();
   const queries = useQueryClient();
   const toast = useToast();
-  const projects = useProjects().data ?? [];
+  // Every project: one not on this machine still takes its name.
+  const projects = useAllProjects().data ?? [];
   const [draft, setDraft] = useState<string>();
   const value = draft ?? project.name;
   const taken = nameTakenBy(projects, project.id, value);

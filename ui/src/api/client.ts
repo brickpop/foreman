@@ -131,6 +131,9 @@ export type HomeFolder = {
 
 export interface HomeArea {
   folder(): Promise<HomeFolder>;
+  /** Replaces Foreman's HQ, while still as its first start made it, with a
+   * clone of url: another machine's. */
+  restore(url: string): Promise<void>;
   projects(): Promise<Project[]>;
   project(id: string): Promise<Project>;
   teams(): Promise<Team[]>;
@@ -146,6 +149,9 @@ export interface HomeArea {
    * clone (a URL or a local path, with the CEO's own git). created is false
    * when it took over an HQ a removed project left there. */
   newProject(name: string, clone?: string): Promise<{ project: Project; created: boolean }>;
+  /** Clones the HQ of a project not on this machine from the origin its
+   * record keeps; its code repos are then located or cloned on Repos. */
+  bringHere(project: string): Promise<Project>;
   /** Removes a project and its history, keeping its folder: its HQ too when
    * deleteHQ, its agents' worktrees when deleteWorktrees. */
   removeProject(
@@ -440,6 +446,7 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
   return {
     home: {
       folder: () => getJSON("/api/home"),
+      restore: (url) => send("POST", "/api/home/restore", { url }),
       projects: () => getJSON("/api/projects"),
       project: (project) => getJSON(`/api/projects/${id(project)}`),
       teams: () => getJSON("/api/teams"),
@@ -459,6 +466,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         // 201: a new HQ; 200: one taken over.
         return { project: (await r.json()) as Project, created: r.status === 201 };
       },
+      bringHere: async (project) =>
+        (await request("POST", `/api/projects/${id(project)}/bring`)).json() as Promise<Project>,
       removeProject: (project, { deleteHQ, deleteWorktrees }) => {
         const q = new URLSearchParams();
         if (deleteHQ) q.set("deleteHQ", "true");

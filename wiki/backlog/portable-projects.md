@@ -70,11 +70,25 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 - Add a project has no repo picking of its own (a new project opens Repos), so there is nothing to add there; Bring here (part 4) uses Clone it.
 - A clone runs with the home's lock held, as an HQ clone does: the UI waits on it, and other home changes wait meanwhile (bounded by git's own timeouts, none of Foreman's).
 
+## Built in part 4 (Restore, Bring here), 2026-11-16
+
+- `internal/home/restore.go`: `Pristine` (first commit only, clean, no team, no `projects.toml`), `Restore` (cloned into `.hq-restore`, checked: on `main`, holds `instructions.md`, `teams/` or `projects.toml`; the HQ's contents swapped, its folder kept so the watcher still follows it; the start's "no origin" warning cleared), `BringHere` (the HQ cloned from the record's `hq`; nothing left behind on failure).
+- `Project.here` (its HQ on this machine) and `Project.remote` (the record's `hq`). The UI's `useProjects` is the projects here; `useAllProjects` (every record) only for names and the Dashboard's **Not on this machine**.
+- The checklist's first row, **Foreman's HQ**: todo while pristine, with a URL field and **Restore**. `POST /api/home/restore`, `POST /api/projects/:id/bring`.
+- Taken as defaults (say if not):
+  - **No Start fresh button**: going on (a team, a project) is starting fresh; the row turns done by itself.
+  - **Bring here clones the HQ only**, then opens Repos, where each repo is located or cloned one by one (**Clone it**). No "clone every repo" in one go.
+  - **A project whose HQ was deleted here** reads as not on this machine too: off the sidebar, on the Dashboard with Bring here (it was a broken sidebar row).
+  - **Hidden projects not here** are listed with the rest under Not on this machine.
+
 ## Edge cases (accepted)
 
 - A merge conflict in `projects.toml` happens only if two machines changed projects without syncing between them, which one-at-a-time rules out; when it happens it is a sync warning like any other.
 - A code repo's `remote` is read once, when it is added. A repo whose origin changes later keeps the old URL until the CEO edits `projects.toml` (or removes and adds the repo).
 - Removing a project removes its `projects.toml` entry; its HQ's remote is untouched. Bringing it back means adding it again with Clone.
+- **A restore stopped halfway** (Foreman killed between emptying the HQ and moving the clone in) leaves the HQ empty or partial: the next start makes a new HQ over an empty folder, and the CEO restores again; `.hq-restore` is cleared by the next restore. The window is a few renames.
+- **The "A project" step** counts projects not on this machine: after a restore it is done though none is here yet.
+- **A request or a session link to a project not here** opens "No project <id>": its history stays in `state.db` (an HQ deleted by hand), its pages need its HQ.
 - Two remotes with the same path on different hosts (`github.com/me/app`, `gitlab.com/me/app`) map to one folder: the second is used if it is the same repo, refused if not ([Clones: two remotes with the same path](./clones-by-host.md)).
 
 ## Steps
@@ -82,7 +96,7 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 - [x] `projects.toml`: its model and checks, read at start and on reload; every project change writes it (one commit); `state.db`'s project tables keep only path and profile (a migration; the CEO's records go into `projects.toml` through the move script of [One Foreman folder](./foreman-folder.md))
 - [x] sync: on start (fetch, merge, push; a conflict aborted and reported), on stop (push, bounded); the Dashboard's warnings (conflict, not backed up, push failed)
 - [x] clone into `~/foreman/repos/<path>`: the path from the URL, reuse by root commit, refusals; offered beside picking a folder in Bring here, Add a project and Repos → Add
-- [ ] restore: the checklist's first step (Start fresh, Restore from a git URL)
-- [ ] Bring here: projects not on this machine on the Dashboard, the HQ cloned, each repo resolved
-- [ ] specs: home, project-config (the record split between `projects.toml` and `state.db`), persistence, add-project, repos, project-settings, first-run, dashboard, glossary ("never clones" out), security (clone URLs, the CEO's credentials used from Foreman's process)
-- [ ] tests: `projects.toml` round-trips and its problems; a project change makes one commit; an id clash refused; sync on start fast-forwards, aborts a conflict cleanly, pushes what a crash left; stop pushes with a timeout; an HQ with no origin warns; clone path from SSH, HTTPS and subgroup URLs; reuse and refusal at an occupied path; restore from a URL; Bring here with one repo picked and one cloned; a restored machine deploys a team end to end (fake harness)
+- [x] restore: the checklist's first step (Start fresh, Restore from a git URL)
+- [x] Bring here: projects not on this machine on the Dashboard, the HQ cloned, each repo resolved
+- [x] specs: home, project-config (the record split between `projects.toml` and `state.db`), persistence, add-project, repos, project-settings, first-run, dashboard, glossary ("never clones" out), security (clone URLs, the CEO's credentials used from Foreman's process)
+- [ ] tests (all but the last are in: `restore_test.go` covers restore from a URL and Bring here with a repo cloned): `projects.toml` round-trips and its problems; a project change makes one commit; an id clash refused; sync on start fast-forwards, aborts a conflict cleanly, pushes what a crash left; stop pushes with a timeout; an HQ with no origin warns; clone path from SSH, HTTPS and subgroup URLs; reuse and refusal at an occupied path; restore from a URL; Bring here with one repo picked and one cloned; a restored machine deploys a team end to end (fake harness)

@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -26,6 +27,9 @@ type Home interface {
 	RecordsProblems() []string
 	// Backups lists the HQs their origin doesn't back up, and why.
 	Backups() []home.Backup
+	// Restore replaces Foreman's HQ, while still as its first start made it,
+	// with a clone of url: another machine's.
+	Restore(ctx context.Context, url string) error
 }
 
 // Options are the parts the server is assembled from.
@@ -57,6 +61,20 @@ func New(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/home", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root(), Folder: o.Home.Folder(), ProjectsProblems: o.Home.RecordsProblems(), Backups: o.Home.Backups()})
+	})
+	mux.HandleFunc("POST /api/home/restore", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			URL string `json:"url"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil || req.URL == "" {
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {url}")
+			return
+		}
+		if err := o.Home.Restore(r.Context(), req.URL); err != nil {
+			writeProject(w, nil, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)

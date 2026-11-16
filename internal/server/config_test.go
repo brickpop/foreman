@@ -107,6 +107,9 @@ func (f fakeConfig) NewRepo(_ context.Context, project, name, path string) (home
 func (f fakeConfig) CloneRepo(_ context.Context, project, name, remote, def string) (home.Project, error) {
 	return f.changed("CloneRepo", project, name, remote+" default="+def)
 }
+func (f fakeConfig) BringHere(_ context.Context, id string) (home.Project, error) {
+	return f.changed("BringHere", id, "", "")
+}
 func (f fakeConfig) CloneMissingRepo(_ context.Context, project, name string) (home.Project, error) {
 	return f.changed("CloneMissingRepo", project, name, "")
 }
@@ -440,6 +443,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":"/home/ceo/src/web"}`, []string{"LocateRepo", "web", "/home/ceo/src/web"}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","clone":"git@github.com:me/web.git","defaultBranch":"trunk"}`, []string{"CloneRepo", "web", "git@github.com:me/web.git default=trunk"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"clone":true}`, []string{"CloneMissingRepo", "web", ""}},
+		{http.MethodPost, "/api/projects/ledger/bring", ``, []string{"BringHere", "", ""}},
 		{http.MethodDelete, "/api/projects/ledger/repos/web", ``, []string{"RemoveRepo", "web", ""}},
 		{http.MethodPut, "/api/projects/ledger/profile", `{"profile":"work"}`, []string{"SetProfile", "work", ""}},
 		{http.MethodPut, "/api/projects/ledger/name", `{"name":"Ledger v2"}`, []string{"SetName", "Ledger v2", ""}},
@@ -485,6 +489,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodDelete, "/api/projects/ledger/repos/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
 		{http.MethodPost, "/api/projects/nope/repos", `{"name":"x","path":"/x"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPut, "/api/projects/nope/profile", `{"profile":"work"}`, http.StatusNotFound, `"NOT_FOUND"`},
+		{http.MethodPost, "/api/projects/nope/bring", ``, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPost, "/api/projects", `not json`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodPut, "/api/projects/ledger/repos/web", `{"path":`, http.StatusBadRequest, `"BAD_REQUEST"`},
 		{http.MethodGet, "/api/candidates", ``, http.StatusNotFound, `"NOT_FOUND"`},

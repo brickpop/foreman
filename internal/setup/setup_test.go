@@ -101,10 +101,12 @@ func (im *images) Status(context.Context) []runner.ImageStatus {
 type config struct {
 	teams    []home.Team
 	projects []home.Project
+	pristine bool
 }
 
-func (c config) Teams() []home.Team       { return c.teams }
-func (c config) Projects() []home.Project { return c.projects }
+func (c config) Teams() []home.Team            { return c.teams }
+func (c config) Projects() []home.Project      { return c.projects }
+func (c config) Pristine(context.Context) bool { return c.pristine }
 
 type rig struct {
 	*Setup
@@ -164,7 +166,7 @@ func TestPodmanAppearsAfterStartup(t *testing.T) {
 		t.Errorf("before the restore: %s", got)
 	}
 	r.engine.set(func(e *engine) { e.installed, e.running = false, false })
-	if got := kinds(r.Steps(ctx)); got[0] != "podman todo" {
+	if got := kinds(r.Steps(ctx)); got[1] != "podman todo" {
 		t.Errorf("steps %v", got)
 	}
 
@@ -258,7 +260,7 @@ func TestDirectEngine(t *testing.T) {
 	if r.ready != 1 || r.Blocked() != nil {
 		t.Fatalf("ready %d, blocked %v", r.ready, r.Blocked())
 	}
-	if got := kinds(r.Steps(ctx)); !reflect.DeepEqual(got, []string{"profile:default done", "team todo", "project todo"}) {
+	if got := kinds(r.Steps(ctx)); !reflect.DeepEqual(got, []string{"hq done", "profile:default done", "team todo", "project todo"}) {
 		t.Errorf("steps %v", got)
 	}
 }
@@ -279,13 +281,17 @@ func TestSteps(t *testing.T) {
 	}{
 		{"nothing yet: the default profile, a team, a project", config{},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}},
-			[]string{"image todo", "profile:default done", "team todo", "project todo"}},
+			[]string{"hq done", "image todo", "profile:default done", "team todo", "project todo"}},
+		// The HQ first start made: Restore it, or go on.
+		{"a pristine HQ", config{pristine: true},
+			[]profiles.Profile{{Name: "default", Harness: "claude-code", Connected: true}},
+			[]string{"hq todo", "image todo", "profile:default done", "team todo", "project todo"}},
 		// The profiles the projects use: one not connected, one that doesn't exist.
 		{"a project without a repo is no step: a research team needs none",
 			config{teams: []home.Team{team}, projects: []home.Project{
 				{ID: "web", Repos: []home.Repo{{Name: "app", Path: "/home/ceo/app"}}}, {ID: "ledger"}}},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code"}, {Name: "gone"}},
-			[]string{"image todo", "profile:default todo", "profile:gone failed", "team done", "project done"}},
+			[]string{"hq done", "image todo", "profile:default todo", "profile:gone failed", "team done", "project done"}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			s := New(Deps{Images: &images{state: "missing"}, Config: c.config,
@@ -428,7 +434,7 @@ func TestInitStepFollowsTheImages(t *testing.T) {
 	r := newRig(t, &engine{installed: true, running: true})
 	r.Images = twoImages{}
 	got := kinds(r.Steps(ctx))
-	want := []string{"podman done"}
+	want := []string{"hq done", "podman done"}
 	if runtime.GOOS == "darwin" {
 		want = append(want, "machine todo")
 	}

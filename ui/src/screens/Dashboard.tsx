@@ -1,6 +1,7 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
-import type { Backup, Project, Request, Team } from "../api/client";
+import { type Backup, type Project, type Request, type Team, useClient } from "../api/client";
 import {
   agentOf,
   byName,
@@ -12,6 +13,8 @@ import {
 } from "../app/model";
 import { sessionOf } from "../app/project";
 import {
+  keys,
+  useAllProjects,
   useAnswer,
   useDismiss,
   useHomeFolder,
@@ -28,12 +31,14 @@ import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
 import { AddCard, TeamGrid } from "../components/TeamGrid";
+import { useToast } from "../components/Toasts";
 import {
   Button,
   Card,
   cover,
   Loading,
   PageTitle,
+  Panel,
   SectionTitle,
   StatusPill,
 } from "../components/ui";
@@ -45,6 +50,7 @@ export function Dashboard() {
   const requests = useRequests();
   const instances = useInstances();
   const projects = useProjects();
+  const elsewhere = (useAllProjects().data ?? []).filter((p) => !p.here);
   const teams = useTeams();
   const setup = useSetup();
   const home = useHomeFolder().data;
@@ -103,6 +109,7 @@ export function Dashboard() {
           </AddCard>
         </div>
       </Section>
+      {elsewhere.length > 0 && <Elsewhere projects={byName(elsewhere)} />}
       <Section title="Teams">
         <TeamGrid />
       </Section>
@@ -131,6 +138,57 @@ function NotBackedUp({ backups }: { backups: Backup[] }) {
         </p>
       ))}
     </section>
+  );
+}
+
+/** The projects in projects.toml whose HQ isn't on this machine: another
+ * machine's, brought here by cloning their HQ
+ * (wiki/product/features/dashboard.md#not-on-this-machine). */
+function Elsewhere({ projects }: { projects: Project[] }) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <SectionTitle count={projects.length}>Not on this machine</SectionTitle>
+      <Panel>
+        {projects.map((p, i) => (
+          <BringHere key={p.id} project={p} first={i === 0} />
+        ))}
+      </Panel>
+    </section>
+  );
+}
+
+function BringHere({ project: p, first }: { project: Project; first: boolean }) {
+  const client = useClient();
+  const queries = useQueryClient();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const projectNameOf = useProjectName();
+  const bring = useMutation({
+    mutationFn: () => client.home.bringHere(p.id),
+    onSuccess: () => {
+      queries.invalidateQueries({ queryKey: keys.projects });
+      // Its code repos next: each located or cloned there.
+      navigate({ to: "/projects/$project/repos", params: { project: p.id } });
+      toast({ title: `${projectNameOf(p.id)} is here`, body: p.path, color: "var(--ok)" });
+    },
+  });
+  return (
+    <div className={`flex flex-col gap-1 px-4 py-3 ${first ? "" : "border-t border-line"}`}>
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-[14px] font-medium text-tx">{projectNameOf(p.id)}</span>
+          <span className="truncate font-mono text-[12.5px] text-tx3">
+            {p.remote || "Its HQ has no origin: push it where it is, then start Foreman there once"}
+          </span>
+        </span>
+        {p.remote && (
+          <Button variant="small" busy={bring.isPending} onClick={() => bring.mutate()}>
+            Bring here
+          </Button>
+        )}
+      </div>
+      {bring.error && <span className="text-[13px] text-err">{bring.error.message}</span>}
+    </div>
   );
 }
 

@@ -39,6 +39,12 @@ What travels between machines is the HQs ([Portable projects](../../backlog/port
 - A push never forces: one origin refuses (it has commits this HQ hasn't) is a problem until the next start's pull.
 - **Not backed up**: an HQ with no origin, or whose start's sync failed, is listed on the Dashboard with what to do (`GET /api/home`, `backups`).
 
+### A new machine
+
+Foreman on a new machine starts as on any first run, with a new HQ ([Portable projects](../../backlog/portable-projects.md), the CEO, 2026-11-16: there is never a state without an HQ). While that HQ is **pristine** (its first commit only, nothing changed since, no team and no project), the setup checklist offers **Restore** from a git URL ([First run](../features/first-run.md#the-checklist)): the old machine's HQ is cloned with the CEO's own git into `.hq-restore` in Foreman's folder, checked (on `main`, holding `instructions.md`, `teams/` or `projects.toml`), and swapped in for the pristine HQ's contents (the folder stays, so the watcher keeps following it). A failed or refused restore leaves the HQ as it was. An `hq/` copied there by hand before the first start is used as it is.
+
+Its projects then come in as records only, **not on this machine** (`here: false`): their HQ isn't at `projects/<id>/hq`. The [Dashboard](../features/dashboard.md#not-on-this-machine) lists them with **Bring here**, which clones the HQ from the origin `projects.toml` keeps for it (`hq`); each code repo is then missing until it is located or cloned ([Repos](../features/repos.md)). Settings, `state.db`, logins and the agents' conversations stay on the old machine.
+
 All of Foreman's config files are **TOML**, but `instructions.md`, which is prose. A save rewrites the whole file, so hand-written comments don't survive it; in an HQ, git keeps every earlier version (`settings.toml` keeps none).
 
 ## Starting Foreman

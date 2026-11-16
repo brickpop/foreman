@@ -28,6 +28,7 @@ Header: `Setup · N of M done`, then one panel, one row per step. Each row has a
 
 | Step | Shown | To do | Action |
 |---|---|---|---|
+| **Foreman's HQ** | always | while it is pristine (as the first start made it: its first commit only, nothing changed since, no team, no project): `New to Foreman: go on below. Coming from another machine: restore your HQ from its git URL`; done otherwise | a URL field and **Restore** (`POST /api/home/restore`): the HQ is replaced by a clone of the other machine's, with the CEO's own git ([Home → A new machine](../models/home.md#a-new-machine)). Starting fresh needs no click: the first team or project makes the HQ no longer pristine |
 | **Podman installed** | Podman engine | `Install Podman: brew install podman` (macOS) or `sudo dnf install podman (or your distribution's package)` | none: installed outside Foreman, seen within seconds |
 | **Podman machine** | Podman engine, macOS | `Create the Podman machine, where agents run` | the machine form (below); working while it is created, with Podman's output |
 | **Podman running** | Podman engine | waits for the steps above; `The Podman machine is stopped (Start)`; a connection failure shows the error | **Start** when the machine is stopped. While the instances are restored it is working (`Restoring the agents`). |

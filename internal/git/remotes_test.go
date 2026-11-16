@@ -102,3 +102,48 @@ func TestFetchRemotesNeverWaitsOnAPrompt(t *testing.T) {
 		t.Errorf("origin not fetched: %+v", changes)
 	}
 }
+
+// Origin is kept where others read it (projects.toml, pushed with Foreman's
+// HQ): a token in an https URL never goes with it.
+func TestOrigin(t *testing.T) {
+	g, dir, up := upstream(t)
+	if got := g.Origin(ctx, dir); got != up {
+		t.Errorf("a clone: %q, want %q", got, up)
+	}
+	if got := g.Origin(ctx, repo(t)); got != "" {
+		t.Errorf("no origin: %q", got)
+	}
+	if got := g.Origin(ctx, filepath.Join(t.TempDir(), "gone")); got != "" {
+		t.Errorf("no repo: %q", got)
+	}
+	for url, want := range map[string]string{
+		"https://ghp_secret@github.com/acme/api.git":       "https://github.com/acme/api.git",
+		"https://ceo:hunter2@git.example.com/acme/api.git": "https://git.example.com/acme/api.git",
+		"http://ceo:hunter2@localhost:3000/api":            "http://localhost:3000/api",
+		"ssh://git:hunter2@github.com/acme/api.git":        "ssh://git@github.com/acme/api.git",
+		"ssh://git@github.com/acme/api.git":                "ssh://git@github.com/acme/api.git",
+		"git@github.com:acme/api.git":                      "git@github.com:acme/api.git",
+		"https://github.com/acme/api.git":                  "https://github.com/acme/api.git",
+	} {
+		mustRun(t, dir, "remote", "set-url", "origin", url)
+		if got := g.Origin(ctx, dir); got != want {
+			t.Errorf("%s: %q, want %q", url, got, want)
+		}
+	}
+}
+
+// A repo with no folder on this machine must not make git act on the
+// server's own folder.
+func TestNoFolderFails(t *testing.T) {
+	g, dir, _ := upstream(t)
+	t.Chdir(dir) // where git -C "" would act: a repo with main, a commit and a remote
+	if _, err := g.RootCommit(ctx, ""); err == nil {
+		t.Error("RootCommit: no error")
+	}
+	if _, err := g.FetchRemotes(ctx, ""); !errors.Is(err, ErrNoFolder) {
+		t.Errorf("FetchRemotes: %v", err)
+	}
+	if g.HasBranch(ctx, "", "main") {
+		t.Error("HasBranch: true")
+	}
+}

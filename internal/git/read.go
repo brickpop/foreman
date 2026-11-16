@@ -21,6 +21,8 @@ import (
 var (
 	// ErrNoRef means the ref names no commit.
 	ErrNoRef = errors.New("git: no such branch or commit")
+	// ErrNoFolder means a command was given no folder to run in.
+	ErrNoFolder = errors.New("git: no folder given")
 	// ErrNoPath means the path isn't in the commit, or isn't what was asked
 	// (a folder for a file, or the other way round).
 	ErrNoPath = errors.New("git: no such file or folder")

@@ -1,6 +1,6 @@
 ---
 type: task
-status: blocked
+status: in-progress
 priority: high
 tags: [feature]
 epic: install-first-run
@@ -42,6 +42,22 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 - **Restore on a new machine:** while `~/foreman/hq/` doesn't exist, the setup checklist's first step is **Foreman's HQ: Start fresh** (made as [One Foreman folder](./foreman-folder.md) says) **or Restore from a git URL** (cloned there). An `hq/` already in place (copied by hand) is used as it is.
 - **Bring here:** a project in `projects.toml` with no HQ at `projects/<id>/hq/` is **not on this machine**: the Dashboard lists it apart, with **Bring here**. That clones its HQ from `hq` (or takes the folder already there, when it is a git repo), then asks for each code repo, use existing or clone (above). A repo not resolved yet is **missing**, as today, until it is. A project without an `hq` URL can't be brought: it says so.
 
+## Decided while building (the CEO, 2026-11-16)
+
+- **Restore replaces a pristine HQ.** Foreman still makes its HQ at first start ([One Foreman folder](./foreman-folder.md)); while it is untouched (its first commit only, no teams, no projects), the checklist offers Restore from a git URL, which replaces it with the clone. There is never a state without an HQ.
+- **A project's `hq` URL is refreshed at each sync**: on start, Foreman reads each HQ's origin and updates `projects.toml` when it differs (one commit), so a `git remote add` made later is picked up.
+- **No data migration in Foreman**: the CEO's records move into `projects.toml` with the one-off script ([One Foreman folder](./foreman-folder.md)); Foreman reads only the new shape. The schema still changes through numbered SQL files, squashed later (before a release).
+- **Shipped in four parts**, each committed on its own: `projects.toml`; sync; cloning into `repos/`; Restore and Bring here.
+
+## Built in part 1 (`projects.toml`), 2026-11-16
+
+- `internal/home/records.go`: the model, `ParseRecords` (its checks), `changeRecords` (refused while the file has problems; version-guarded write; one commit `Projects: …`). The snapshot holds the records; projects are the records joined with this machine's rows (`store.Projects`: profile, repo paths; rows made on demand). Migration 027 drops the moved columns.
+- A repo with no path here is `repos.<name>: not on this machine yet: Locate it`. Locating and the profile write only the database.
+- `git.Origin` strips an https URL's user and password (a token there would be committed and pushed). `git -C ""` now fails (`ErrNoFolder`) instead of acting on the server's folder: a repo with no path must never run git where Foreman runs.
+- A row with no entry (taken out of `projects.toml` by hand) is cleared, history included, when a new project takes that id.
+- `GET /api/home` has `projectsProblems`; the Dashboard shows them.
+- Left for part 2: the `hq` URL is written when a project is made (from a clone's origin), refreshed at each sync.
+
 ## Edge cases (accepted)
 
 - A merge conflict in `projects.toml` happens only if two machines changed projects without syncing between them, which one-at-a-time rules out; when it happens it is a sync warning like any other.
@@ -51,7 +67,7 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 
 ## Steps
 
-- [ ] `projects.toml`: its model and checks, read at start and on reload; every project change writes it (one commit); `state.db`'s project tables keep only path and profile (a migration; the CEO's records go into `projects.toml` through the move script of [One Foreman folder](./foreman-folder.md))
+- [x] `projects.toml`: its model and checks, read at start and on reload; every project change writes it (one commit); `state.db`'s project tables keep only path and profile (a migration; the CEO's records go into `projects.toml` through the move script of [One Foreman folder](./foreman-folder.md))
 - [ ] sync: on start (fetch, merge, push; a conflict aborted and reported), on stop (push, bounded); the Dashboard's warnings (conflict, not backed up, push failed)
 - [ ] clone into `~/foreman/repos/<path>`: the path from the URL, reuse by root commit, refusals; offered beside picking a folder in Bring here, Add a project and Repos → Add
 - [ ] restore: the checklist's first step (Start fresh, Restore from a git URL)

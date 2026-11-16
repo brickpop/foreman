@@ -21,8 +21,8 @@ import (
 )
 
 // Adding projects and their repos (wiki/product/features/add-project.md). A
-// project is a record in the database and its folder in Foreman's folder,
-// with its HQ; code repos are the CEO's, anywhere in their home folder. Foreman creates a
+// project is a record in projects.toml (records.go), this machine's part of
+// it in the database, and its folder in Foreman's folder, with its HQ; code repos are the CEO's, anywhere in their home folder. Foreman creates a
 // repo only new and empty, with a first commit so its default branch exists
 // (agents' branches start from it).
 
@@ -89,15 +89,24 @@ func (h *Home) NewProject(ctx context.Context, name, clone string) (p Project, c
 		drop()
 		return Project{}, false, err
 	}
-	if err := h.records.Create(ctx, name); err != nil {
+	// A row with no record is a project whose record the CEO took out of
+	// projects.toml by hand: its history isn't this new project's.
+	if err := h.machine.Remove(ctx, name); err != nil && !errors.Is(err, store.ErrNotFound) {
 		drop()
-		if errors.Is(err, store.ErrExists) {
-			return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, name)
-		}
 		return Project{}, false, err
 	}
-	p, err = h.rescan(name)
-	return p, !takeOver, err
+	if err := h.machine.Create(ctx, name); err != nil {
+		drop()
+		return Project{}, false, err
+	}
+	origin := h.git.Origin(ctx, dir)
+	p, err = h.changeRecord(ctx, name, "Projects: add "+name, func(r *Record) { r.HQ = origin })
+	if err != nil {
+		_ = h.machine.Remove(ctx, name)
+		drop()
+		return Project{}, false, err
+	}
+	return p, !takeOver, nil
 }
 
 // canTakeOver says why the folder at dir can't become a new project's HQ as
@@ -168,10 +177,26 @@ func (h *Home) AddRepo(ctx context.Context, project, name, path, def string) (Pr
 	if err != nil {
 		return Project{}, err
 	}
-	if err := h.records.AddRepo(ctx, project, store.RepoRecord{Name: name, Path: filepath.Clean(path), RootCommit: root, Default: def}); err != nil {
+	return h.addRepo(ctx, project, name, filepath.Clean(path), root, def)
+}
+
+// addRepo records a repo checked usable: where it is on this machine, then
+// the rest in projects.toml. Called with h.mu held.
+func (h *Home) addRepo(ctx context.Context, project, name, path, root, def string) (Project, error) {
+	if err := h.machine.SetRepoPath(ctx, project, name, path); err != nil {
 		return Project{}, h.recordError(err)
 	}
-	return h.rescan(project)
+	repo := RepoRecord{Remote: h.git.Origin(ctx, path), RootCommit: root, DefaultBranch: def}
+	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: add %s to %s", name, project), func(r *Record) {
+		if r.Repos == nil {
+			r.Repos = map[string]RepoRecord{}
+		}
+		r.Repos[name] = repo
+	})
+	if err != nil {
+		_ = h.machine.RemoveRepo(ctx, project, name)
+	}
+	return p, err
 }
 
 // NewRepo creates an empty code repo at path, a folder that doesn't exist yet
@@ -209,13 +234,13 @@ func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project
 	}
 	root, def, err := h.usableRepo(ctx, p, "", path, "main")
 	if err == nil {
-		err = h.recordError(h.records.AddRepo(ctx, project, store.RepoRecord{Name: name, Path: path, RootCommit: root, Default: def}))
+		p, err = h.addRepo(ctx, project, name, path, root, def)
 	}
 	if err != nil {
 		_ = os.RemoveAll(path)
 		return Project{}, err
 	}
-	return h.rescan(project)
+	return p, nil
 }
 
 // LocateRepo points a project's repo at its new folder: the same repo (it
@@ -239,7 +264,7 @@ func (h *Home) LocateRepo(ctx context.Context, project, name, path string) (Proj
 	if _, err := h.git.Resolve(ctx, real, want); err != nil {
 		return Project{}, fmt.Errorf("%w: %s is another repo (it hasn't %s's first commit, %.8s)", ErrInvalid, path, name, want)
 	}
-	if err := h.records.MoveRepo(ctx, project, name, filepath.Clean(path)); err != nil {
+	if err := h.machine.SetRepoPath(ctx, project, name, filepath.Clean(path)); err != nil {
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
@@ -250,16 +275,23 @@ func (h *Home) LocateRepo(ctx context.Context, project, name, path string) (Proj
 func (h *Home) RemoveRepo(ctx context.Context, project, name string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
-	if _, ok := h.snap.projects[project]; !ok {
+	p, ok := h.snap.projects[project]
+	if !ok || !slices.ContainsFunc(p.Repos, func(r Repo) bool { return r.Name == name }) {
 		return Project{}, ErrNotFound
 	}
 	if h.deployed != nil && h.deployed(ctx, project) {
 		return Project{}, fmt.Errorf("%w: stop the team on %s before removing %s", ErrDeployed, project, name)
 	}
-	if err := h.records.RemoveRepo(ctx, project, name); err != nil {
-		return Project{}, h.recordError(err)
+	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: remove %s from %s", name, project), func(r *Record) {
+		delete(r.Repos, name)
+	})
+	if err != nil {
+		return Project{}, err
 	}
-	return h.rescan(project)
+	if err := h.machine.RemoveRepo(ctx, project, name); err != nil {
+		return Project{}, err
+	}
+	return p, nil
 }
 
 // SetRepoDefault sets the branch a repo's agents start from and its merges
@@ -280,13 +312,17 @@ func (h *Home) SetRepoDefault(ctx context.Context, project, name, branch string)
 	if git.AgentBranch(branch) {
 		return Project{}, fmt.Errorf("%w: %s is an agent's branch (wt/*, lead/*): agents write it, so it can't be the default", ErrInvalid, branch)
 	}
+	if !p.Repos[i].Ready() {
+		return Project{}, fmt.Errorf("%w: %s has a problem (%s): locate it first", ErrInvalid, name, p.Repos[i].Problem)
+	}
 	if !h.git.HasBranch(ctx, p.Repos[i].Path, branch) {
 		return Project{}, fmt.Errorf("%w: %s has no branch %q", ErrInvalid, name, branch)
 	}
-	if err := h.records.SetRepoDefault(ctx, project, name, branch); err != nil {
-		return Project{}, h.recordError(err)
-	}
-	return h.rescan(project)
+	return h.changeRecord(ctx, project, fmt.Sprintf("Projects: %s's %s defaults to %s", project, name, branch), func(r *Record) {
+		repo := r.Repos[name]
+		repo.DefaultBranch = branch
+		r.Repos[name] = repo
+	})
 }
 
 // SetProfile names the profile a project's agents run on: a profile's name,
@@ -303,7 +339,7 @@ func (h *Home) SetProfile(ctx context.Context, project, profile string) (Project
 	if profile == profiles.Default {
 		profile = ""
 	}
-	if err := h.records.SetProfile(ctx, project, profile); err != nil {
+	if err := h.machine.SetProfile(ctx, project, profile); err != nil {
 		return Project{}, h.recordError(err)
 	}
 	return h.rescan(project)
@@ -317,10 +353,8 @@ func (h *Home) SetHidden(ctx context.Context, project string, hidden bool) (Proj
 	if _, ok := h.snap.projects[project]; !ok {
 		return Project{}, ErrNotFound
 	}
-	if err := h.records.SetHidden(ctx, project, hidden); err != nil {
-		return Project{}, h.recordError(err)
-	}
-	return h.rescan(project)
+	verb := map[bool]string{true: "hide", false: "show"}[hidden]
+	return h.changeRecord(ctx, project, fmt.Sprintf("Projects: %s %s", verb, project), func(r *Record) { r.Hidden = hidden })
 }
 
 // maxProjectName is the most characters a project's display name has.
@@ -345,10 +379,7 @@ func (h *Home) SetName(ctx context.Context, project, name string) (Project, erro
 	if other, ok := h.shownAs(project, shown); ok {
 		return Project{}, fmt.Errorf("%w: project %s shows as %s already", ErrExists, other, shown)
 	}
-	if err := h.records.SetName(ctx, project, name); err != nil {
-		return Project{}, h.recordError(err)
-	}
-	return h.rescan(project)
+	return h.changeRecord(ctx, project, fmt.Sprintf("Projects: name %s %q", project, name), func(r *Record) { r.DisplayName = name })
 }
 
 // usableRepo checks a folder to add as a repo of p (Home.usableFolder)
@@ -584,6 +615,11 @@ func (h *Home) rescan(project string) (Project, error) {
 	old := h.snap
 	h.snap = h.scan(old)
 	h.publish(diff(old, h.snap))
+	return h.found(project)
+}
+
+// found is the project as last scanned. Called with h.mu held.
+func (h *Home) found(project string) (Project, error) {
 	p, ok := h.snap.projects[project]
 	if !ok {
 		return Project{}, ErrNotFound
@@ -639,15 +675,24 @@ func (h *Home) RenameRepo(ctx context.Context, project, name, newName string) (P
 		}
 		moved = append(moved, move{from, to})
 	}
-	if err := h.records.RenameRepo(ctx, project, name, newName); err != nil {
+	if err := h.machine.RenameRepo(ctx, project, name, newName); err != nil {
 		undo()
 		return Project{}, h.recordError(err)
 	}
-	return h.rescan(project)
+	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: rename %s's %s to %s", project, name, newName), func(r *Record) {
+		r.Repos[newName] = r.Repos[name]
+		delete(r.Repos, name)
+	})
+	if err != nil {
+		_ = h.machine.RenameRepo(ctx, project, newName, name)
+		undo()
+		return Project{}, err
+	}
+	return p, nil
 }
 
-// RemoveProject removes a project: its record and its whole history in the
-// database, its session logs and its agents' harness folders. Its folder
+// RemoveProject removes a project: its record in projects.toml (on every
+// machine, then), its whole history in this machine's database, its session logs and its agents' harness folders. Its folder
 // stays, the CEO's files (the CEO, 2026-10-28): its HQ goes only when asked
 // (one never pushed has no other copy), and so do its agents' worktrees (its
 // code repos forget them; their branches stay); its files stay, and a folder
@@ -661,6 +706,14 @@ func (h *Home) RemoveProject(ctx context.Context, id string, deleteHQ, deleteWor
 	}
 	if h.deployed != nil && h.deployed(ctx, id) {
 		return fmt.Errorf("%w: stop the team on %s before removing it", ErrDeployed, id)
+	}
+	// Its record first: refused while projects.toml has problems, before
+	// anything else goes.
+	if err := h.changeRecords(ctx, "Projects: remove "+id, func(records map[string]Record) { delete(records, id) }); err != nil {
+		return err
+	}
+	if err := h.machine.Remove(ctx, p.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+		return err
 	}
 	if deleteWorktrees {
 		if err := os.RemoveAll(p.worktrees); err != nil {
@@ -680,9 +733,6 @@ func (h *Home) RemoveProject(ctx context.Context, id string, deleteHQ, deleteWor
 		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
-	}
-	if err := h.records.Remove(ctx, p.ID); err != nil {
-		return h.recordError(err)
 	}
 	if deleteHQ {
 		if err := os.RemoveAll(p.Path); err != nil {

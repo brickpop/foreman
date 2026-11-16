@@ -146,6 +146,7 @@ type Change struct {
 
 type snapshot struct {
 	projects     map[string]Project
+	records      Records // projects.toml, which the projects are made from
 	teams        map[string]Team
 	settings     SettingsFile
 	instructions Instructions
@@ -193,7 +194,7 @@ What is yours across projects: your teams (` + "`teams/`" + `) and your standing
 // isn't there yet, then reads every config file and checks every project's
 // repos.
 func (h *Home) Load(ctx context.Context, d Deps) error {
-	h.git, h.records, h.deployed = d.Git, d.Projects, d.Deployed
+	h.git, h.machine, h.deployed = d.Git, d.Projects, d.Deployed
 	allowed, err := homeFolder()
 	if err != nil {
 		return err
@@ -269,17 +270,30 @@ func (h *Home) ensureHQ(ctx context.Context) error {
 func (h *Home) scan(prev snapshot) snapshot {
 	s := snapshot{projects: map[string]Project{}, teams: map[string]Team{}}
 	ctx := context.Background()
-	records, err := h.records.List(ctx)
+	s.records = Records{Records: map[string]Record{}, Problems: []string{}}
+	if data, err := os.ReadFile(h.HQ(projectsFile)); err == nil {
+		s.records.Version = Version(data)
+		s.records.Records, s.records.Problems = ParseRecords(data)
+		if len(s.records.Problems) > 0 {
+			s.records.Records = prev.records.Records
+		}
+	}
+	machine, err := h.machine.List(ctx)
 	if err != nil {
 		slog.Error("listing the projects", "err", err)
 		s.projects = prev.projects
-	}
-	for _, r := range records {
-		p := h.project(ctx, r)
-		if old, ok := prev.projects[p.ID]; ok && p.Version != "" && len(p.Problems) > 0 && len(old.Problems) == 0 {
-			p.Config = old.Config
+	} else {
+		here := map[string]store.ProjectRecord{}
+		for _, m := range machine {
+			here[strings.ToLower(m.ID)] = m
 		}
-		s.projects[p.ID] = p
+		for id, r := range s.records.Records {
+			p := h.project(ctx, id, r, here[id])
+			if old, ok := prev.projects[p.ID]; ok && p.Version != "" && len(p.Problems) > 0 && len(old.Problems) == 0 {
+				p.Config = old.Config
+			}
+			s.projects[p.ID] = p
+		}
 	}
 
 	files, _ := filepath.Glob(h.HQ(teamsDir, "*.toml"))
@@ -312,12 +326,14 @@ func (h *Home) scan(prev snapshot) snapshot {
 	return s
 }
 
-// project is a record with its project.toml read and its repos checked.
-func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
+// project is a project's record, with this machine's part of it (here; the
+// zero record when it has none yet), its project.toml read and its repos
+// checked.
+func (h *Home) project(ctx context.Context, id string, r Record, here store.ProjectRecord) Project {
 	p := Project{
-		ID: r.ID, Name: r.Name, Profile: r.Profile, Hidden: r.Hidden, Repos: []Repo{},
-		Path: filepath.Join(h.projectDir(r.ID), hqDir), Files: filepath.Join(h.projectDir(r.ID), filesDir),
-		worktrees: h.worktrees(r.ID), harness: h.Path(harnessDir, r.ID),
+		ID: id, Name: r.DisplayName, Profile: here.Profile, Hidden: r.Hidden, Repos: []Repo{},
+		Path: filepath.Join(h.projectDir(id), hqDir), Files: filepath.Join(h.projectDir(id), filesDir),
+		worktrees: h.worktrees(id), harness: h.Path(harnessDir, id),
 	}
 	if p.Profile == "" {
 		p.Profile = profiles.Default
@@ -330,8 +346,14 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 		p.Version, p.Source = Version(data), string(data)
 		p.Config, p.Problems = ParseProject(data)
 	}
-	for _, rec := range r.Repos {
-		repo := Repo{Name: rec.Name, Path: rec.Path, Default: rec.Default, Problem: h.checkRepo(ctx, rec), root: rec.RootCommit}
+	paths := map[string]string{}
+	for _, m := range here.Repos {
+		paths[strings.ToLower(m.Name)] = m.Path
+	}
+	for _, name := range sortedKeys(r.Repos) {
+		rec := r.Repos[name]
+		path := paths[strings.ToLower(name)]
+		repo := Repo{Name: name, Path: path, Default: rec.DefaultBranch, Problem: h.checkRepo(ctx, path, rec.RootCommit), root: rec.RootCommit}
 		if !repo.Ready() {
 			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.Name, repo.Problem))
 		}
@@ -341,15 +363,19 @@ func (h *Home) project(ctx context.Context, r store.ProjectRecord) Project {
 	return p
 }
 
-// checkRepo says why agents can't use a repo, or "": its folder moved or went,
-// isn't a git repo any more, is now another repo, or left the home folder.
-func (h *Home) checkRepo(ctx context.Context, r store.RepoRecord) string {
-	real, err := h.repoFolder(r.Path)
+// checkRepo says why agents can't use a repo, or "": it isn't on this
+// machine yet, or its folder moved or went, isn't a git repo any more, is
+// now another repo, or left the home folder.
+func (h *Home) checkRepo(ctx context.Context, path, root string) string {
+	if path == "" {
+		return "not on this machine yet: Locate it"
+	}
+	real, err := h.repoFolder(path)
 	if err != nil {
 		return err.Error()
 	}
-	if _, err := h.git.Resolve(ctx, real, r.RootCommit); err != nil {
-		return fmt.Sprintf("%s is another repo now (it hasn't the first commit, %.8s): Locate the right one", r.Path, r.RootCommit)
+	if _, err := h.git.Resolve(ctx, real, root); err != nil {
+		return fmt.Sprintf("%s is another repo now (it hasn't the first commit, %.8s): Locate the right one", path, root)
 	}
 	return ""
 }
@@ -399,6 +425,14 @@ func (h *Home) Projects() []Project {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return values(h.snap.projects)
+}
+
+// RecordsProblems is what is wrong with projects.toml: while it has any,
+// the projects stay as they were last read, and nothing changes them.
+func (h *Home) RecordsProblems() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.snap.records.Problems)
 }
 
 // Project returns one project.
@@ -498,6 +532,9 @@ func diff(old, cur snapshot) []Change {
 		case o.Version != c.Version || !slices.Equal(o.Problems, c.Problems):
 			changes = append(changes, Change{Kind: "project", ID: id, Version: c.Version, Problems: c.Problems})
 		}
+	}
+	if !slices.Equal(old.records.Problems, cur.records.Problems) {
+		projectsChanged = true
 	}
 	if projectsChanged {
 		changes = append(changes, Change{Kind: "projects"})

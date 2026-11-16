@@ -20,6 +20,8 @@ type Home interface {
 	Root() string
 	// Folder is Foreman's folder: its HQ, the projects, the worktrees.
 	Folder() string
+	// RecordsProblems is what is wrong with projects.toml, in Foreman's HQ.
+	RecordsProblems() []string
 }
 
 // Options are the parts the server is assembled from.
@@ -50,7 +52,7 @@ type Options struct {
 func New(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/home", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root(), Folder: o.Home.Folder()})
+		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root(), Folder: o.Home.Folder(), ProjectsProblems: o.Home.RecordsProblems()})
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
@@ -83,6 +85,9 @@ func New(o Options) http.Handler {
 type homeSummary struct {
 	Path   string `json:"path"`   // Foreman's home: its machinery
 	Folder string `json:"folder"` // Foreman's folder: what the CEO owns
+	// ProjectsProblems is what is wrong with projects.toml: the projects stay
+	// as last read, and can't be changed, until the CEO fixes it.
+	ProjectsProblems []string `json:"projectsProblems"`
 }
 
 // ui serves the built SPA: real files as they are, every other path as

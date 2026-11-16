@@ -25,17 +25,17 @@ The blocks:
 
   ```
   ~/foreman/
-  ├─ hq/                    Foreman's HQ (git): teams, your instructions
+  ├─ hq/                    Foreman's HQ (git): teams, your instructions, projects.toml
   ├─ projects/ledger/
   │  ├─ hq/                 this project's HQ (git)
   │  │  ├─ project.toml     checks, gates
-  │  │  └─ wiki/            knowledge base + wiki.toml (boards)
+  │  │  └─ wiki.toml, …     its knowledge base, at the HQ's root (boards)
   │  └─ files/              inbox/ from you, shared/ by its agents
   └─ worktrees/ledger/  one sandbox per agent: a worktree of each repo
   ~/.foreman/
   ├─ settings.toml          this machine's settings
   ├─ harness/ledger/  each agent's harness config and conversations
-  └─ state.db               deployments, sessions, requests (runtime)
+  └─ state.db               profile, repos' paths; deployments, sessions, requests (runtime)
   ```
 
   Foreman's folder is the real one (`foreman_folder`, [Settings → Folders](./settings.md#folders)), Foreman's home too. The code repos are not in it: they are wherever the CEO keeps them, listed in [Repos](./repos.md#the-list) ([Home → Layout](../models/home.md#layout)).

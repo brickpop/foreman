@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"errors"
+	"net/url"
 	"slices"
 	"strings"
 	"syscall"
@@ -93,4 +94,31 @@ func remoteBranches(ctx context.Context, dir string) (map[string]string, error) 
 func (g *CLI) HasRemoteBranch(ctx context.Context, dir, branch string) bool {
 	_, err := run(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/remotes/"+branch)
 	return err == nil
+}
+
+// Origin is where the repo at dir was cloned from, its origin's URL, as one
+// to keep where others read it: without the credentials an https URL may
+// hold (https://<token>@host/…); "" when it has no origin.
+func (g *CLI) Origin(ctx context.Context, dir string) string {
+	out, err := run(ctx, dir, "remote", "get-url", "origin")
+	if err != nil {
+		return ""
+	}
+	return withoutCredentials(strings.TrimSpace(out))
+}
+
+// withoutCredentials drops an http(s) URL's user and password; other URLs
+// (git@host:…, ssh://git@host/…, a path) name only a user, which stays.
+func withoutCredentials(remote string) string {
+	u, err := url.Parse(remote)
+	if err != nil || u.User == nil {
+		return remote
+	}
+	switch u.Scheme {
+	case "http", "https":
+		u.User = nil
+	default:
+		u.User = url.User(u.User.Username())
+	}
+	return u.String()
 }

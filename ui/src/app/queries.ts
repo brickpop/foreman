@@ -159,7 +159,8 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       return [keys.projects, keys.setup, keys.instances];
     }
     case "projects.changed":
-      return [keys.projects, keys.setup, keys.repos, keys.instances];
+      // projects.toml's problems are in the home's summary.
+      return [keys.projects, keys.home, keys.setup, keys.repos, keys.instances];
     case "instance.status":
       return [keys.instances];
     case "deployment.created":

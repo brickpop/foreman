@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/brickpop/foreman/internal/profiles"
 )
 
 func entries(t *testing.T, dir string) []string {
@@ -109,24 +111,19 @@ func TestNewProjectTakesOverAKeptHQ(t *testing.T) {
 	if _, _, err := h.NewProject(ctx, "ledger", p.Path); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "without Clone") {
 		t.Errorf("a clone over it: %v", err)
 	}
-	// A record the snapshot doesn't know yet makes the record step fail.
-	if err := h.records.Create(ctx, "ledger"); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := h.NewProject(ctx, "ledger", ""); !errors.Is(err, ErrExists) {
-		t.Errorf("record taken: %v", err)
-	}
-	if err := h.records.Remove(ctx, "ledger"); err != nil {
-		t.Fatal(err)
-	}
 	if !exists(filepath.Join(p.Path, "notes.md")) {
 		t.Fatal("a refused takeover deleted the kept HQ")
+	}
+	// A row left in the database with no record in projects.toml (the CEO
+	// took it out by hand) is another project's history: it goes.
+	if err := h.machine.SetProfile(ctx, "ledger", "work"); err != nil {
+		t.Fatal(err)
 	}
 	got, created, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if created || got.Path != p.Path || got.Source != p.Source || len(got.Problems) != 0 {
+	if created || got.Path != p.Path || got.Source != p.Source || len(got.Problems) != 0 || got.Profile != profiles.Default {
 		t.Errorf("taken over (created %v) %+v", created, got)
 	}
 	if log := gitOut(t, got.Path, "log", "--format=%s"); log != "Notes\nProject HQ" {

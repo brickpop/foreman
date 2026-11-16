@@ -117,7 +117,9 @@ export type {
 
 /** Foreman's home on this machine (~/.foreman: its machinery) and its folder
  * (~/foreman: what the CEO owns). */
-export type HomeFolder = { path: string; folder: string };
+/** GET /api/home: Foreman's home and folder, and what is wrong with
+ * projects.toml (the projects stay as last read until it is fixed). */
+export type HomeFolder = { path: string; folder: string; projectsProblems: string[] };
 
 export interface HomeArea {
   folder(): Promise<HomeFolder>;

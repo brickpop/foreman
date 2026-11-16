@@ -27,6 +27,9 @@ type fakeHome string
 
 func (f fakeHome) Root() string   { return string(f) }
 func (f fakeHome) Folder() string { return filepath.Join(filepath.Dir(string(f)), "foreman") }
+func (f fakeHome) RecordsProblems() []string {
+	return []string{"ledger.nmae: not a field Foreman knows"}
+}
 
 var builtUI = fstest.MapFS{
 	"index.html":    {Data: []byte("<!doctype html><title>Foreman</title>")},
@@ -55,7 +58,7 @@ func TestEveryRouteGoesThroughTheGuard(t *testing.T) {
 
 func TestHomeSummaryIsTheHomesPath(t *testing.T) {
 	w := get(t, open(builtUI), "/api/home")
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman"`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman","projectsProblems":["ledger.nmae: not a field Foreman knows"]`) {
 		t.Errorf("got %d %q", w.Code, w.Body.String())
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/json" {

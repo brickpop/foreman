@@ -124,8 +124,10 @@ describe("staleKeys", () => {
       keys.setup,
       keys.instances,
     ]);
+    // projects.toml's problems are in the home's summary.
     expect(staleKeys({ type: "projects.changed", data: {} })).toEqual([
       keys.projects,
+      keys.home,
       keys.setup,
       keys.repos,
       keys.instances,

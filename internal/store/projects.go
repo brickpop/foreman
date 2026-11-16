@@ -12,29 +12,24 @@ import (
 // name (in any case) or that path.
 var ErrExists = errors.New("store: already exists")
 
-// Projects is the projects and their repos (wiki/product/models/project-config.md#the-project-record):
-// what makes a project, on this machine. Its rules are in its HQ.
+// Projects is this machine's part of each project
+// (wiki/product/models/project-config.md#the-project-record): its profile,
+// each repo's path, and its history. The rest of its record is in
+// projects.toml, in Foreman's HQ, which travels; its rules are in its HQ.
 type Projects interface {
-	// List returns every project by id, each with its repos by name.
+	// List returns every project this machine has a row for, by id, each
+	// with its repos' paths by name.
 	List(ctx context.Context) ([]ProjectRecord, error)
-	// Create adds a project with no repos. ErrExists if the id is taken.
+	// Create adds a project's row. ErrExists if the id is taken.
 	Create(ctx context.Context, id string) error
-	// SetProfile names the profile its agents run on ("" for the default).
+	// SetProfile names the profile its agents run on ("" for the default),
+	// making its row if this machine has none yet.
 	SetProfile(ctx context.Context, id, profile string) error
-	// SetHidden hides a project, or shows it again.
-	SetHidden(ctx context.Context, id string, hidden bool) error
-	// SetName sets the project's display name ("": shown by its id).
-	SetName(ctx context.Context, id, name string) error
-	// AddRepo adds a repo to the project, with r.Default as its default
-	// branch. ErrExists if the project has that name or that path already.
-	AddRepo(ctx context.Context, project string, r RepoRecord) error
-	// MoveRepo points a repo at a new path (Locate). ErrExists if another
-	// repo of the project has that path.
-	MoveRepo(ctx context.Context, project, name, path string) error
-	// SetRepoDefault sets a repo's default branch. ErrNotFound if there is
-	// no such repo.
-	SetRepoDefault(ctx context.Context, project, name, branch string) error
-	// RemoveRepo takes a repo out of the project.
+	// SetRepoPath records where a repo of the project is on this machine
+	// (added, or located), making the project's row if there is none yet.
+	// ErrExists if another repo of the project has that path.
+	SetRepoPath(ctx context.Context, project, name, path string) error
+	// RemoveRepo forgets a repo's path.
 	RemoveRepo(ctx context.Context, project, name string) error
 	// RenameRepo renames a repo, and moves the project's
 	// open merge requests on it to the new name; closed ones keep the old name. ErrExists if the
@@ -47,25 +42,18 @@ type Projects interface {
 	Remove(ctx context.Context, id string) error
 }
 
-// ProjectRecord is a project as the database keeps it.
+// ProjectRecord is a project as this machine keeps it.
 type ProjectRecord struct {
 	ID        string
-	Name      string // its display name; "" shows it by its id
 	Profile   string
-	Hidden    bool
 	CreatedAt time.Time
 	Repos     []RepoRecord
 }
 
-// RepoRecord is one of a project's repos: a name unique in the project, its
-// folder, its first commit, which only that repo holds, and its default
-// branch, where its agents start from and merges go unless the lead names
-// another branch.
+// RepoRecord is where one of a project's repos is on this machine.
 type RepoRecord struct {
-	Name       string
-	Path       string
-	RootCommit string
-	Default    string
+	Name string
+	Path string
 }
 
 // Projects returns the projects table.
@@ -74,7 +62,7 @@ func (db *DB) Projects() Projects { return projects{db.sql} }
 type projects struct{ db *sql.DB }
 
 func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
-	rows, err := p.db.QueryContext(ctx, "SELECT id, name, profile, hidden, created_at FROM projects ORDER BY id")
+	rows, err := p.db.QueryContext(ctx, "SELECT id, profile, created_at FROM projects ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +71,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var r ProjectRecord
 		var created sql.NullString
-		if err := rows.Scan(&r.ID, &r.Name, &r.Profile, &r.Hidden, &created); err != nil {
+		if err := rows.Scan(&r.ID, &r.Profile, &created); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -98,7 +86,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = p.db.QueryContext(ctx, "SELECT project_id, name, path, root_commit, default_branch FROM project_repos ORDER BY project_id, name")
+	rows, err = p.db.QueryContext(ctx, "SELECT project_id, name, path FROM project_repos ORDER BY project_id, name")
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +94,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var project string
 		var r RepoRecord
-		if err := rows.Scan(&project, &r.Name, &r.Path, &r.RootCommit, &r.Default); err != nil {
+		if err := rows.Scan(&project, &r.Name, &r.Path); err != nil {
 			return nil, err
 		}
 		if i, ok := byID[strings.ToLower(project)]; ok {
@@ -121,42 +109,50 @@ func (p projects) Create(ctx context.Context, id string) error {
 	return unique(err)
 }
 
+// ensure makes the project's row if this machine has none: a project from
+// projects.toml, made on another machine.
+func ensure(ctx context.Context, tx *sql.Tx, id string) error {
+	_, err := tx.ExecContext(ctx, "INSERT OR IGNORE INTO projects (id, created_at) VALUES (?, ?)", id, timeText(time.Now()))
+	return err
+}
+
 func (p projects) SetProfile(ctx context.Context, id, profile string) error {
-	return touched(p.db.ExecContext(ctx, "UPDATE projects SET profile = ? WHERE id = ?", profile, id))
+	return p.inTx(ctx, func(tx *sql.Tx) error {
+		if err := ensure(ctx, tx, id); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "UPDATE projects SET profile = ? WHERE id = ?", profile, id)
+		return err
+	})
 }
 
-func (p projects) SetHidden(ctx context.Context, id string, hidden bool) error {
-	return touched(p.db.ExecContext(ctx, "UPDATE projects SET hidden = ? WHERE id = ?", hidden, id))
-}
-
-func (p projects) SetName(ctx context.Context, id, name string) error {
-	return touched(p.db.ExecContext(ctx, "UPDATE projects SET name = ? WHERE id = ?", name, id))
-}
-
-func (p projects) AddRepo(ctx context.Context, project string, r RepoRecord) error {
-	// No row inserted: no such project.
-	res, err := p.db.ExecContext(ctx, "INSERT INTO project_repos (project_id, name, path, root_commit, default_branch) SELECT id, ?, ?, ?, ? FROM projects WHERE id = ?",
-		r.Name, r.Path, r.RootCommit, r.Default, project)
-	if err != nil {
+func (p projects) SetRepoPath(ctx context.Context, project, name, path string) error {
+	return p.inTx(ctx, func(tx *sql.Tx) error {
+		if err := ensure(ctx, tx, project); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, "INSERT INTO project_repos (project_id, name, path) VALUES (?, ?, ?) ON CONFLICT (project_id, name) DO UPDATE SET path = excluded.path",
+			project, name, path)
 		return unique(err)
-	}
-	return touched(res, nil)
+	})
 }
 
-func (p projects) MoveRepo(ctx context.Context, project, name, path string) error {
-	res, err := p.db.ExecContext(ctx, "UPDATE project_repos SET path = ? WHERE project_id = ? AND name = ?", path, project, name)
+// inTx runs do in a transaction, committed when it returns nil.
+func (p projects) inTx(ctx context.Context, do func(*sql.Tx) error) error {
+	tx, err := p.db.BeginTx(ctx, nil)
 	if err != nil {
-		return unique(err)
+		return err
 	}
-	return touched(res, nil)
-}
-
-func (p projects) SetRepoDefault(ctx context.Context, project, name, branch string) error {
-	return touched(p.db.ExecContext(ctx, "UPDATE project_repos SET default_branch = ? WHERE project_id = ? AND name = ?", branch, project, name))
+	defer func() { _ = tx.Rollback() }()
+	if err := do(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (p projects) RemoveRepo(ctx context.Context, project, name string) error {
-	return touched(p.db.ExecContext(ctx, "DELETE FROM project_repos WHERE project_id = ? AND name = ?", project, name))
+	_, err := p.db.ExecContext(ctx, "DELETE FROM project_repos WHERE project_id = ? AND name = ?", project, name)
+	return err
 }
 
 func (p projects) RenameRepo(ctx context.Context, project, name, newName string) error {

@@ -245,6 +245,11 @@ func command(ctx context.Context, dir string, args ...string) *exec.Cmd {
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 5 * time.Second
+	if dir == "" {
+		// git -C "" works in the server's own folder: a repo with no folder (one
+		// not on this machine yet) must fail, not act on whatever is there.
+		cmd.Err = ErrNoFolder
+	}
 	return cmd
 }
 

@@ -14,6 +14,7 @@ import { sessionOf } from "../app/project";
 import {
   useAnswer,
   useDismiss,
+  useHomeFolder,
   useInstances,
   useProjectName,
   useProjects,
@@ -46,6 +47,7 @@ export function Dashboard() {
   const projects = useProjects();
   const teams = useTeams();
   const setup = useSetup();
+  const problems = useHomeFolder().data?.projectsProblems ?? [];
   const [deploy, setDeploy] = useState(false);
   const [newProject, setNewProject] = useState(false);
   const asks = inbox(requests.data ?? []);
@@ -68,6 +70,12 @@ export function Dashboard() {
           </Button>
         </div>
       </div>
+      {problems.length > 0 && (
+        <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
+          projects.toml, in Foreman's HQ, needs fixing: the projects show as last read, and can't be
+          changed until then. {problems.join(" · ")}
+        </p>
+      )}
       {setup.data && setupPending(setup.data) && <SetupChecklist steps={setup.data} />}
       {asks.length > 0 && (
         <section className="flex flex-col gap-2.5">

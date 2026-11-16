@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -782,85 +781,24 @@ func TestRequests(t *testing.T) {
 
 // --- projects -------------------------------------------------------------------
 
-// A project is hidden and shown again on its own; one never added can't be.
-func TestHideAProject(t *testing.T) {
-	p := open(t).Projects()
-	for _, id := range []string{"ledger", "aragon"} {
-		if err := p.Create(ctx, id); err != nil {
-			t.Fatal(err)
-		}
-	}
-	hidden := func() []bool {
-		list, err := p.List(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var got []bool
-		for _, r := range list {
-			got = append(got, r.Hidden)
-		}
-		return got
-	}
-	if got := hidden(); !slices.Equal(got, []bool{false, false}) {
-		t.Errorf("new projects: %v", got)
-	}
-	if err := p.SetHidden(ctx, "Ledger", true); err != nil {
-		t.Fatal(err)
-	}
-	if got := hidden(); !slices.Equal(got, []bool{false, true}) {
-		t.Errorf("ledger hidden: %v", got)
-	}
-	if err := p.SetHidden(ctx, "ledger", false); err != nil {
-		t.Fatal(err)
-	}
-	if got := hidden(); !slices.Equal(got, []bool{false, false}) {
-		t.Errorf("ledger shown: %v", got)
-	}
-	if err := p.SetHidden(ctx, "nope", true); !errors.Is(err, ErrNotFound) {
-		t.Errorf("no such project: %v", err)
-	}
-}
-
-// A project archived before hidden replaced it stays out of sight.
-func TestAnArchivedProjectIsHidden(t *testing.T) {
-	names, err := fs.Glob(migrationFiles, "migrations/*.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	upTo := func(last string) fstest.MapFS {
-		fsys := fstest.MapFS{}
-		for _, n := range names {
-			body, _ := fs.ReadFile(migrationFiles, n)
-			fsys[n] = &fstest.MapFile{Data: body}
-			if strings.HasPrefix(path.Base(n), last) {
-				break
-			}
-		}
-		return fsys
-	}
-	db := rawDB(t)
-	if err := migrate(ctx, db, upTo("023_")); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.Exec("INSERT INTO projects (id, archived, created_at) VALUES ('ledger', 1, 0), ('aragon', 0, 0)"); err != nil {
+// The records moved to projects.toml: a database from before keeps each
+// project's row, its profile and its repos' paths.
+func TestRecordsLeaveTheDatabase(t *testing.T) {
+	db := migratedTo(t, 26)
+	if _, err := db.Exec(`INSERT INTO projects (id, name, hidden, profile, created_at) VALUES ('ledger', 'The ledger', 1, 'work', '2026-11-01T00:00:00Z');
+		INSERT INTO project_repos (project_id, name, path, root_commit, default_branch) VALUES ('ledger', 'api', '/home/ceo/dev/api', 'c0ffee', 'trunk');`); err != nil {
 		t.Fatal(err)
 	}
 	if err := migrate(ctx, db, migrationFiles); err != nil {
 		t.Fatal(err)
 	}
-	var hidden []string
-	rows, err := db.Query("SELECT id FROM projects WHERE hidden ORDER BY id")
-	if err != nil {
-		t.Fatal(err)
+	list, err := projects{db}.List(ctx)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("%+v %v", list, err)
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var id string
-		_ = rows.Scan(&id)
-		hidden = append(hidden, id)
-	}
-	if !slices.Equal(hidden, []string{"ledger"}) {
-		t.Errorf("hidden %v", hidden)
+	if got := list[0]; got.ID != "ledger" || got.Profile != "work" || got.CreatedAt.IsZero() ||
+		!reflect.DeepEqual(got.Repos, []RepoRecord{{Name: "api", Path: "/home/ceo/dev/api"}}) {
+		t.Errorf("%+v", got)
 	}
 }
 
@@ -878,27 +816,19 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 	if err := p.Create(ctx, "Ledger"); !errors.Is(err, ErrExists) {
 		t.Errorf("a name in another case: %v", err)
 	}
-	app := RepoRecord{Name: "app", Path: "/home/ceo/dev/aragon/app", RootCommit: "c0ffee", Default: "master"}
-	sdk := RepoRecord{Name: "sdk", Path: "/home/ceo/dev/aragon/sdk", RootCommit: "beef", Default: "main"}
+	app := RepoRecord{Name: "app", Path: "/home/ceo/dev/aragon/app"}
+	sdk := RepoRecord{Name: "sdk", Path: "/home/ceo/dev/aragon/sdk"}
 	for _, r := range []RepoRecord{app, sdk} {
-		if err := p.AddRepo(ctx, "aragon", r); err != nil {
+		if err := p.SetRepoPath(ctx, "aragon", r.Name, r.Path); err != nil {
 			t.Fatal(err)
 		}
 	}
 	// One repo in two projects.
-	if err := p.AddRepo(ctx, "ledger", app); err != nil {
+	if err := p.SetRepoPath(ctx, "ledger", app.Name, app.Path); err != nil {
 		t.Errorf("a repo in a second project: %v", err)
 	}
-	for name, r := range map[string]RepoRecord{
-		"a name in another case": {Name: "App", Path: "/elsewhere", RootCommit: "1"},
-		"the same path":          {Name: "app2", Path: app.Path, RootCommit: "c0ffee"},
-	} {
-		if err := p.AddRepo(ctx, "aragon", r); !errors.Is(err, ErrExists) {
-			t.Errorf("%s: %v", name, err)
-		}
-	}
-	if err := p.AddRepo(ctx, "nope", app); !errors.Is(err, ErrNotFound) {
-		t.Errorf("no such project: %v", err)
+	if err := p.SetRepoPath(ctx, "aragon", "app2", app.Path); !errors.Is(err, ErrExists) {
+		t.Errorf("the same path under another name: %v", err)
 	}
 	if err := p.SetProfile(ctx, "aragon", "work"); err != nil {
 		t.Fatal(err)
@@ -907,8 +837,7 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 	if err != nil || len(list) != 2 {
 		t.Fatalf("%v %v", list, err)
 	}
-	aragon := list[0]
-	if aragon.ID != "aragon" || aragon.Profile != "work" || aragon.CreatedAt.IsZero() ||
+	if aragon := list[0]; aragon.ID != "aragon" || aragon.Profile != "work" || aragon.CreatedAt.IsZero() ||
 		!reflect.DeepEqual(aragon.Repos, []RepoRecord{app, sdk}) {
 		t.Errorf("aragon: %+v", aragon)
 	}
@@ -916,40 +845,48 @@ func TestProjectsAndTheirRepos(t *testing.T) {
 		t.Errorf("ledger: %+v", list[1])
 	}
 
-	// A default branch of its own per repo, changed in one project only.
-	if err := p.SetRepoDefault(ctx, "aragon", "app", "trunk"); err != nil {
+	// Located: the same name, in any case, gets the new path, in that
+	// project only.
+	if err := p.SetRepoPath(ctx, "aragon", "APP", "/home/ceo/src/app"); err != nil {
 		t.Fatal(err)
 	}
-	if list, _ := p.List(ctx); list[0].Repos[0].Default != "trunk" || list[0].Repos[1].Default != "main" || list[1].Repos[0].Default != "master" {
-		t.Errorf("after SetRepoDefault: %+v", list)
-	}
-	if err := p.SetRepoDefault(ctx, "aragon", "app", "master"); err != nil {
-		t.Fatal(err)
-	}
-
-	// Locate and remove, each touching only that project's repo.
-	if err := p.MoveRepo(ctx, "aragon", "app", "/home/ceo/src/app"); err != nil {
-		t.Fatal(err)
-	}
-	if err := p.MoveRepo(ctx, "aragon", "app", "/home/ceo/dev/aragon/sdk"); !errors.Is(err, ErrExists) {
+	if err := p.SetRepoPath(ctx, "aragon", "app", sdk.Path); !errors.Is(err, ErrExists) {
 		t.Errorf("onto another repo's path: %v", err)
 	}
 	if err := p.RemoveRepo(ctx, "aragon", "sdk"); err != nil {
 		t.Fatal(err)
 	}
-	for name, err := range map[string]error{
-		"locate a repo that isn't there":        p.MoveRepo(ctx, "aragon", "sdk", "/x"),
-		"remove it again":                       p.RemoveRepo(ctx, "aragon", "sdk"),
-		"a profile for no project":              p.SetProfile(ctx, "nope", "work"),
-		"a default for a repo that isn't there": p.SetRepoDefault(ctx, "aragon", "sdk", "main"),
-	} {
-		if !errors.Is(err, ErrNotFound) {
-			t.Errorf("%s: %v", name, err)
-		}
+	if err := p.RemoveRepo(ctx, "aragon", "sdk"); err != nil {
+		t.Errorf("removed twice, as on a machine that never had it: %v", err)
 	}
 	list, _ = p.List(ctx)
-	if !reflect.DeepEqual(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app", RootCommit: "c0ffee", Default: "master"}}) || !reflect.DeepEqual(list[1].Repos, []RepoRecord{app}) {
+	if !reflect.DeepEqual(list[0].Repos, []RepoRecord{{Name: "app", Path: "/home/ceo/src/app"}}) || !reflect.DeepEqual(list[1].Repos, []RepoRecord{app}) {
 		t.Errorf("after locate and remove: %+v", list)
+	}
+}
+
+// A project made on another machine has no row here until this machine
+// gives it something of its own: a profile, or where a repo is.
+func TestAProjectFromAnotherMachine(t *testing.T) {
+	p := open(t).Projects()
+	if err := p.SetProfile(ctx, "relay", "work"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SetRepoPath(ctx, "ledger", "api", "/home/ceo/dev/api"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.SetProfile(ctx, "ledger", "personal"); err != nil {
+		t.Fatal(err)
+	}
+	list, err := p.List(ctx)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("%+v %v", list, err)
+	}
+	if list[0].ID != "ledger" || list[0].Profile != "personal" || len(list[0].Repos) != 1 || list[1].ID != "relay" || list[1].Profile != "work" {
+		t.Errorf("%+v", list)
+	}
+	if err := p.Create(ctx, "ledger"); !errors.Is(err, ErrExists) {
+		t.Errorf("Create after: %v", err)
 	}
 }
 
@@ -961,8 +898,8 @@ func TestRenameRepo(t *testing.T) {
 	if err := p.Create(ctx, "ledger"); err != nil {
 		t.Fatal(err)
 	}
-	for _, r := range []RepoRecord{{Name: "api", Path: "/h/api", RootCommit: "a"}, {Name: "web", Path: "/h/web", RootCommit: "b"}} {
-		if err := p.AddRepo(ctx, "ledger", r); err != nil {
+	for _, r := range []RepoRecord{{Name: "api", Path: "/h/api"}, {Name: "web", Path: "/h/web"}} {
+		if err := p.SetRepoPath(ctx, "ledger", r.Name, r.Path); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1004,7 +941,7 @@ func TestRemoveDeletesAProjectsHistory(t *testing.T) {
 		if err := p.Create(ctx, id); err != nil {
 			t.Fatal(err)
 		}
-		if err := p.AddRepo(ctx, id, RepoRecord{Name: "api", Path: "/h/" + id, RootCommit: "a"}); err != nil {
+		if err := p.SetRepoPath(ctx, id, "api", "/h/"+id); err != nil {
 			t.Fatal(err)
 		}
 		dep, err := db.Deployments().Deploy(ctx, "atlas", id)
@@ -1084,23 +1021,6 @@ func TestStopReason(t *testing.T) {
 	r, _ := deps.Deploy(ctx, "atlas", "ledger")
 	if r.StopReason != "" {
 		t.Errorf("redeployed with reason %q", r.StopReason)
-	}
-}
-
-// A repo added before migration 004 was on the project's main branch, which
-// defaulted to main: it reads as main.
-func TestARepoFromBeforeItsOwnMainIsOnMain(t *testing.T) {
-	db := migratedTo(t, 3)
-	if _, err := db.Exec(`INSERT INTO projects (id, created_at) VALUES ('ledger', '2026-10-20T00:00:00Z');
-		INSERT INTO project_repos (project_id, name, path, root_commit) VALUES ('ledger', 'app', '/h/app', 'c0ffee')`); err != nil {
-		t.Fatal(err)
-	}
-	if err := migrate(ctx, db, migrationFiles); err != nil {
-		t.Fatal(err)
-	}
-	list, err := projects{db}.List(ctx)
-	if err != nil || len(list) != 1 || len(list[0].Repos) != 1 || list[0].Repos[0].Default != "main" {
-		t.Errorf("%+v %v", list, err)
 	}
 }
 
@@ -1246,14 +1166,11 @@ func TestMergeRequestsFromBeforeTargetsGoToTheDefault(t *testing.T) {
 			t.Errorf("%s into %q, want %q (%v)", id, m.Target, want, err)
 		}
 	}
-	if list, _ := (projects{db}).List(ctx); len(list) != 1 || list[0].Repos[0].Default != "master" {
-		t.Errorf("default branch kept: %+v", list)
-	}
 }
 
 // Before 015 a repo's default branch was a column, its other targets apart,
 // and comments had no target: a comment was read on its merge request's
-// target, and the default branch survives both 015 and 021.
+// target.
 func TestTargetsFromBeforeOneList(t *testing.T) {
 	db := migratedTo(t, 14)
 	const at = "2026-11-01T00:00:00Z"
@@ -1271,18 +1188,13 @@ func TestTargetsFromBeforeOneList(t *testing.T) {
 	if err := migrate(ctx, db, migrationFiles); err != nil {
 		t.Fatal(err)
 	}
-	list, err := projects{db}.List(ctx)
-	if err != nil || len(list) != 1 || list[0].Repos[0].Default != "master" {
-		t.Errorf("%+v %v", list, err)
-	}
 	comments, err := reviewComments{db}.ForReview(ctx, "rev-1")
 	if err != nil || len(comments) != 2 || comments[0].Target != "release" || comments[1].Target != "" {
 		t.Errorf("%+v %v", comments, err)
 	}
 }
 
-// Since 021 there is no list of targets: each repo keeps its default branch
-// (main for one that had no default flagged), the others are forgotten, and
+// Since 021 there is no list of targets: the targets are forgotten, and
 // merge requests keep the branch they go into.
 func TestOnlyTheDefaultBranchOfTheTargets(t *testing.T) {
 	db := migratedTo(t, 20)
@@ -1299,10 +1211,6 @@ func TestOnlyTheDefaultBranchOfTheTargets(t *testing.T) {
 	}
 	if err := migrate(ctx, db, migrationFiles); err != nil {
 		t.Fatal(err)
-	}
-	list, err := projects{db}.List(ctx)
-	if err != nil || len(list) != 1 || list[0].Repos[0].Default != "trunk" || list[0].Repos[1].Default != "main" {
-		t.Errorf("%+v %v", list, err)
 	}
 	if m, err := (mergeRequests{db}).Get(ctx, "mr-1"); err != nil || m.Target != "release" {
 		t.Errorf("into %q (%v)", m.Target, err)

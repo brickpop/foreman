@@ -30,7 +30,7 @@ type Home struct {
 
 	// Set by Load.
 	git      Git
-	records  store.Projects
+	machine  store.Projects // this machine's part of each project (projects.toml has the rest)
 	deployed func(ctx context.Context, project string) bool
 	allowed  string // Foreman's folder and repos must be inside it: the CEO's home folder, its real path
 	start    string // the folder browser opens there: where Foreman was started (inside allowed), its real path
@@ -132,6 +132,8 @@ type Git interface {
 	// Branch is the branch dir's checkout is on; "" when it is detached.
 	Branch(ctx context.Context, dir string) (string, error)
 	HasBranch(ctx context.Context, dir, branch string) bool
+	// Origin is the repo's origin URL, without credentials; "" when none.
+	Origin(ctx context.Context, dir string) string
 }
 
 // Deps is what Load needs besides the home's files.

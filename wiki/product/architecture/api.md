@@ -15,7 +15,7 @@ All endpoints are local-only: Foreman binds `127.0.0.1`. Every request passes th
 The PRD's surface (indicative; names may still change during implementation, this entry is then updated):
 
 ```
-GET    /api/home                              {path, folder}: Foreman's home on this machine and Foreman's folder (real paths)
+GET    /api/home                              {path, folder, projectsProblems}: Foreman's home on this machine and Foreman's folder (real paths), and what is wrong with projects.toml (empty when nothing)
 GET    /api/desktop                           {canOpen}: whether this machine can open folders on its desktop (macOS; Linux with xdg-open and a display); without, the UI shows no Open button
 POST   /api/desktop/open                      {instance} (the agent's folder) | {project, folder: inbox|shared} (the project's files), each made if missing → opens it in the desktop's file manager; the server works out the path, never the browser (204; 400 INVALID; 404 NOT_FOUND; 409 NO_DESKTOP, NOT_A_FOLDER for anything but a real folder: Security → Opening folders)
 GET    /api/projects | /api/projects/:id      the record (id, name, path: its HQ, files, profile, hidden, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
@@ -155,7 +155,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
 | `wiki.changed` | a project wiki's content changed (an entry, `wiki.toml`, or an image its entries link to); only on a real change, by content | `project`, `paths` (entries added, edited or removed, and `wiki.toml`; empty when only a linked image came or went), `versions` (each path's new version, `""` once gone) |
 | `config.changed` | `project.toml`, a team file, settings or the instructions changed (incl. parse errors) | `object` (`project`, `team`, `settings`, `instructions`), `id`, `version` (empty once the file is gone), `problems` |
-| `projects.changed` | projects or their repos appeared, went or changed (a repo added, located, removed, gone missing) | `{}`: refetch the project list |
+| `projects.changed` | projects or their repos appeared, went or changed (a repo added, located, removed, gone missing), or `projects.toml`'s problems changed | `{}`: refetch the project list and `GET /api/home` |
 | `setup.changed` | Podman appeared, started, stopped or failed; the instances were restored; the background image build started or ended | `{}`: refetch the checklist |
 | `cos.proposal` | the Chief of Staff proposed a team (checked), or the one on screen is gone (created, stale, the session ended) | the proposal (`id`, `team`, `current`: the team as it is, null for a new one), or null |
 

@@ -62,7 +62,7 @@ func (h *Home) reload() {
 }
 
 // watchDirs watches every folder whose entries make up the snapshot: the
-// home (settings.toml), Foreman's HQ and its teams/, projects/ and each
+// home (settings.toml), Foreman's HQ (projects.toml) and its teams/, projects/ and each
 // project's folder and HQ. A project's code repos are anywhere, so they are
 // checked on every reload and start, never watched. fsnotify watches a
 // folder's direct entries; adding one twice is harmless.
@@ -104,7 +104,7 @@ func (h *Home) relevant(path string) bool {
 		}
 	}
 	switch path {
-	case h.Path(settingsFile), h.HQ(), h.HQ(instructionsFile), h.HQ(teamsDir):
+	case h.Path(settingsFile), h.HQ(), h.HQ(instructionsFile), h.HQ(projectsFile), h.HQ(teamsDir):
 		return true
 	}
 	if filepath.Dir(path) == h.HQ(teamsDir) {

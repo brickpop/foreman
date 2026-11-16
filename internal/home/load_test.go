@@ -104,7 +104,7 @@ func reload(t *testing.T, h *Home) {
 // startedIn loads h again as if Foreman were started in dir.
 func startedIn(t *testing.T, h *Home, dir string) {
 	t.Helper()
-	if err := h.Load(ctx, Deps{Git: h.git, Projects: h.records, Deployed: h.deployed, Start: dir}); err != nil {
+	if err := h.Load(ctx, Deps{Git: h.git, Projects: h.machine, Deployed: h.deployed, Start: dir}); err != nil {
 		t.Fatal(err)
 	}
 }

@@ -28,7 +28,7 @@ type chiefOfStaff struct {
 	*cos.CoS
 	home     string // Foreman's home: its process is labelled with it
 	dir      string // <home>/cos: its working folder and harness config
-	teamsDir string // <home>/config/teams, read-only
+	teamsDir string // Foreman's HQ's teams/, read-only
 	teams    func() []home.Team
 	profiles profiles.Store
 	adapters map[string]harness.Adapter

@@ -6,11 +6,11 @@ tags: [feature, ui, wiki]
 
 # Wiki reader
 
-The project's **Wiki** section ([Project page](./project-page.md); Overview until 2026-10-31): a reader for the project's wiki bundle (`wiki/` in its project repo, `<workspace>/project/wiki/`), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only (what waits on the CEO is in the [Inbox](./reviews.md#the-inbox)). Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
+The project's **Wiki** section ([Project page](./project-page.md); Overview until 2026-10-31): a reader for the project's wiki bundle (`wiki/` in its [HQ](../models/project-config.md#the-projects-hq), `projects/<id>/hq/wiki/` in Foreman's folder), the team's shared memory. The content is the focus. There is no live status here; the wiki is content only (what waits on the CEO is in the [Inbox](./reviews.md#the-inbox)). Parsing, links and writes are done by the [Wiki engine](../architecture/wiki-engine.md).
 
 ## Header
 
-Headed as a repo's page is ([Repos → A repo's page](./repos.md#a-repos-page); the CEO, 2026-11-02, so the two readers look alike): **`Knowledge base`** (18px, 600), and under it the wiki's folder on this machine, `<project repo>/wiki` (Mono 12.5px `--tx4`, ellipsis, its whole path as its title), the project repo being where it really is (`<workspace>/project`; for a project made before workspaces, `~/.foreman/projects/<name>`).
+Headed as a repo's page is ([Repos → A repo's page](./repos.md#a-repos-page); the CEO, 2026-11-02, so the two readers look alike): **`Knowledge base`** (18px, 600), and under it the wiki's folder on this machine, `<hq>/wiki` (Mono 12.5px `--tx4`, ellipsis, its whole path as its title), the HQ's real path.
 
 ## The description
 
@@ -80,6 +80,6 @@ As wikiview shows it (its `EntryView`; the CEO, 2026-11-02, replacing the `key: 
 
 ## No wiki yet
 
-A project repo can lack the files the reader and the [Board](./board.md) need: one whose files were deleted, or a cloned one that never had them ([Add a project → Effect](./add-project.md#effect)). Then the **Wiki and Board** sections show, instead of the reader or the board (the tree is irrelevant without a wiki; the CEO, 2026-10-17), a dashed placeholder: `This project's wiki isn't set up yet.`, `Foreman reads it once its project repo has:` and each missing file (Mono, `<project>/project/<file>`), then a primary **`Create them`** (`Create it` for one). It writes each missing file of the [scaffold](./add-project.md#effect), never over one that exists, and commits them in the project repo as the CEO (`Project repo: add …`); the wiki appears as the watcher picks it up. `GET` / `POST /api/projects/:id/scaffold` ([API](../architecture/api.md)). Any other failure to read the wiki shows its message, never a blank page.
+An HQ can lack the files the reader and the [Board](./board.md) need: one whose files were deleted, or a cloned one that never had them ([Add a project → Effect](./add-project.md#effect)). Then the **Wiki and Board** sections show, instead of the reader or the board (the tree is irrelevant without a wiki; the CEO, 2026-10-17), a dashed placeholder: `This project's wiki isn't set up yet.`, `Foreman reads it once its HQ has:` and each missing file (Mono, `<hq>/<file>`), then a primary **`Create them`** (`Create it` for one). It writes each missing file of the [scaffold](./add-project.md#effect), never over one that exists, and commits them in the HQ as the CEO (`HQ: add …`); the wiki appears as the watcher picks it up. `GET` / `POST /api/projects/:id/scaffold` ([API](../architecture/api.md)). Any other failure to read the wiki shows its message, never a blank page.
 
 Only the files the wiki can't be read without (`wiki/wiki.toml`, `wiki/index.md`) bring up the placeholder. The rest of the scaffold (`AGENTS.md`, `.gitignore`, `product/index.md`, `backlog/index.md`, `technical-debt.md`) leaves the wiki and the board in place, with a one-line **notice** above them (the CEO, 2026-10-17): each missing file (Mono) and what goes wrong without it (`AGENTS.md is missing: the agents don't know how this project's wiki and tasks work.`), and a **`Create it`** / **`Create them`** button doing the same as the placeholder's. Each missing file's reason comes from the server, with whether it is required.

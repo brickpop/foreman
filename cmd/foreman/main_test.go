@@ -120,9 +120,10 @@ func TestServeUntilReturnsAServingError(t *testing.T) {
 }
 
 // One Foreman per machine: a second one says where the first serves, and
-// touches nothing (no global repo made, no port taken).
+// touches nothing (no Foreman's HQ made, no port taken).
 func TestASecondForemanPointsAtTheFirst(t *testing.T) {
-	home := t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	home, folder := filepath.Join(os.Getenv("HOME"), ".foreman"), filepath.Join(os.Getenv("HOME"), "foreman")
 	first, err := userdata.TakeLock(home)
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +139,7 @@ func TestASecondForemanPointsAtTheFirst(t *testing.T) {
 	if got := out.String(); !strings.Contains(got, "already running") || !strings.Contains(got, "http://127.0.0.1:8888/?token=abc") {
 		t.Errorf("%q", got)
 	}
-	if _, err := os.Stat(filepath.Join(home, "config")); !os.IsNotExist(err) {
-		t.Error("the second one made the global repo")
+	if _, err := os.Stat(folder); !os.IsNotExist(err) {
+		t.Error("the second one made Foreman's folder")
 	}
 }

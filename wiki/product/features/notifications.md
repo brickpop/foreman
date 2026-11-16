@@ -20,7 +20,7 @@ Foreman tells the CEO when something happens, so they don't have to watch the UI
 | A review request is raised (a merge is requested) | "A merge is requested" | `<Lead> requested a merge on <project>` / the entry's title |
 | A review is withdrawn, by its lead or by Foreman ([Reviews → Withdrawn](./reviews.md#withdrawn)) | none: a toast only (nothing waits on the CEO) | `<Lead> withdrew <branch>` (or `Foreman withdrew <branch>`) / `<reason>.`, then ` Your <n> draft comments on it are lost.` when any were; the dot is `--err` then, else `--tx4`. Its click opens the review |
 | An instance becomes `queued`: every session slot is taken, idle agents included (the CEO, 2026-10-18) | none: a toast only | `<Name> is waiting for a session slot` / `Every slot is taken, idle agents included. They start when one frees; the limit is in Settings → Agents.` Its click opens the agent's pane, which says the same with a link to Settings |
-| Foreman stops a deployment on its own, its project gone ([Deployment](../models/deployment.md)) | none: a toast only | `Foreman stopped <Team> on <project>` / the reason (`<project> is gone: all its code repos are missing`, or `…: its project repo, <path>, is gone`). The CEO's own Stop says nothing here |
+| Foreman stops a deployment on its own, its project gone ([Deployment](../models/deployment.md)) | none: a toast only | `Foreman stopped <Team> on <project>` / the reason (`<project> is gone: all its code repos are missing`, or `…: its HQ, <path>, is gone`). The CEO's own Stop says nothing here |
 
 The toggles gate browser notifications only; toasts always show. A tab raises a browser notification only while it is hidden (`document.hidden`); while the CEO is looking at it, its toast says it already.
 

@@ -6,18 +6,18 @@ tags: [feature, ui, home, config, security]
 
 # Settings screen
 
-The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: with no workspace any more, the old `Workspace | Global` split said nothing, both being machine-wide; that workspace was the folder Foreman once ran on, not a [project's workspace](../models/project-config.md#the-workspace)). Each tab is a path, `/settings/teams|agents|git|look|system` (the CEO, 2026-11-02, replacing `/settings?tab=`); `/settings` opens **Teams**, the first, and so does any other tab name, the old `workspace` and `global` included; an old `/settings?tab=<tab>` link opens that tab. The same tab bar as a project's.
+The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: the old `Workspace | Global` split, the workspace being the folder Foreman once ran on, said nothing, both being machine-wide). Each tab is a path, `/settings/teams|agents|look|system` (the CEO, 2026-11-02, replacing `/settings?tab=`); `/settings` opens **Teams**, the first, and so does any other tab name, the old `workspace` and `global` included; an old `/settings?tab=<tab>` link opens that tab. The same tab bar as a project's.
 
 | Tab | Sections |
 |---|---|
 | **Teams** | [Teams](#teams) |
 | **Agents** | [Profiles](#profiles), [Instructions for every agent](#instructions-for-every-agent), [Running agents](#running-agents) |
 | **Notifications & look** | [Notifications](#notifications), [Appearance](#appearance) |
-| **System** | [Home](#home), [Projects](#projects), [Maintenance](#maintenance) |
+| **System** | [Folders](#folders), [Maintenance](#maintenance) |
 
-**Each section says where it is kept**, after its title, in its card's header band (`Global repo`, `--tx4`): **Global repo** (`~/.foreman/config/settings.toml`, [Global settings](../models/global-settings.md): the same on every machine the CEO clones it to), **This machine** (profiles, preferences, image builds, in the home)). Home sets nothing, so it says nothing. When `settings.toml` has problems, a red banner lists them above every tab.
+**Each section says where it is kept**, after its title, in its card's header band (`--tx4`): **Foreman's HQ** (the [instructions](#instructions-for-every-agent), `hq/instructions.md`, the only setting that travels between machines; the CEO, 2026-11-15) or **This machine** (everything else: `~/.foreman/settings.toml`, [Global settings](../models/global-settings.md), a plain file outside git; profiles and image builds, in the home). When `settings.toml` has problems, a red banner lists them above every tab.
 
-Padding `24px 24px 48px`, max 760px, on every Settings page, the team and agent pages included. H1 "Settings"; each section a **titled card** as in [Project settings](./project-settings.md) (the CEO, 2026-11-02): its title (14px, 600) and where it is kept (12.5px `--tx4`) in the header band, then its intro and its rows, a `--line` between them (16px above and below each); 36px between cards. A row (grid `1fr auto`) has a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), except the [instructions](#instructions-for-every-agent) and the [projects folder](#projects), which save on **Save** (Discard drops the edit).
+Padding `24px 24px 48px`, max 760px, on every Settings page, the team and agent pages included. H1 "Settings"; each section a **titled card** as in [Project settings](./project-settings.md) (the CEO, 2026-11-02): its title (14px, 600) and where it is kept (12.5px `--tx4`) in the header band, then its intro and its rows, a `--line` between them (16px above and below each); 36px between cards. A row (grid `1fr auto`) has a title, an explanation and a control. Changes save immediately ([API](../architecture/api.md), `PUT /api/settings`), committing nothing, except the [instructions](#instructions-for-every-agent), which save on **Save** (Discard drops the edit).
 
 ## Teams
 
@@ -25,15 +25,15 @@ The teams, as on the [Dashboard](./dashboard.md#teams), the same cards: one per 
 
 ## Instructions for every agent
 
-On **Agents**, kept in the global repo (`instructions` in [Global settings](../models/global-settings.md)). The CEO's own standing rules for coding agents, the way they'd write them in their `~/.claude/CLAUDE.md` or Pi's `AGENTS.md`, which Foreman's agents never read (they run with a private config dir; the CEO, 2026-10-26). Intro: "Your standing rules, as you'd write them in your own CLAUDE.md or AGENTS.md. Foreman adds them at the end of every agent's session prompt, from its next start. Where they conflict with Foreman's own rules (team tools, git, the wiki), Foreman's win."
+On **Agents**, kept in [Foreman's HQ](../models/home.md#foremans-hq) (`hq/instructions.md`): prose the CEO can also edit in any editor, read again on reload like a team file. The CEO's own standing rules for coding agents, the way they'd write them in their `~/.claude/CLAUDE.md` or Pi's `AGENTS.md`, which Foreman's agents never read (they run with a private config dir; the CEO, 2026-10-26). Intro: "Your standing rules, as you'd write them in your own CLAUDE.md or AGENTS.md. Foreman adds them at the end of every agent's session prompt, from its next start. Where they conflict with Foreman's own rules (team tools, git, the wiki), Foreman's win."
 
-A full-width text field (8 rows, Mono 13px on `--term`, resizable; placeholder `e.g. Write commit messages in English. Prefer small functions.`). Once edited, **`Save`** (primary) and **`Discard`** appear under it: a long text saves as one commit, never mid-sentence (the CEO, 2026-10-28; the other settings save on change). A failed save keeps the text and says why in a toast. A change on disk shows while the field isn't being edited.
+A full-width text field (8 rows, Mono 13px on `--term`, resizable; placeholder `e.g. Write commit messages in English. Prefer small functions.`). Once edited, **`Save`** (primary) and **`Discard`** appear under it: a long text saves as one commit, never mid-sentence ("Instructions: saved in the UI"; the CEO, 2026-10-28; the other settings save on change), through `GET`/`PUT /api/instructions` (`{text, version}`): a save made on a stale version (the file changed since it was read) is refused, as a team's is. A failed save keeps the text and says why in a toast ("Instructions not saved"). A change on disk shows while the field isn't being edited.
 
 Decided (the CEO, 2026-10-28): **one global text**, not per profile (the same rules usually apply whatever the harness; per profile can come later); **written in Foreman**, not copied from the CEO's own files (those carry rules for the CEO's own sessions: Mac paths, tools the container lacks); only the CEO's personal layer (a team's is the soul's job description, a project's its repo's `AGENTS.md`); **team agents only**, not the [Chief of Staff](./chief-of-staff.md), whose prompt is fixed; applied **at an agent's next start**, like a profile change. Where it goes in the prompt: [Session prompt](../architecture/session-prompt.md#the-ceos-instructions).
 
 ## Running agents
 
-On **Agents**, kept in the global repo.
+On **Agents**, kept on this machine.
 
 | Row | Explanation | Control |
 |---|---|---|
@@ -42,21 +42,16 @@ On **Agents**, kept in the global repo.
 | Session logs per agent | Every byte each agent's terminal printed, kept in Foreman's home. Past this size, the oldest go first. | Select `10`, `25`, `50` (default), `100`, `250`, `500`, `1000 MB`, plus the file's own value ([Persistence → Session logs](../architecture/persistence.md#session-logs)) |
 | Run agents in | Containers isolate each agent from your machine. Without them, agents run as plain processes with full access to it. | Segmented `Containers (Podman)` / `Directly (no isolation)`. Choosing Directly asks for confirmation; while agents run directly, a warning stays visible here. **Takes effect when Foreman restarts** (decided 2026-10-15): until then the row says `Restart Foreman to switch` and Maintenance shows the engine still running. `Containers` can't be chosen while Podman isn't installed (on macOS: no machine), and the row says why: Foreman wouldn't start with it ([Global settings](../models/global-settings.md)) |
 
-## Home
+## Folders
 
-On **System**. A fact, not a setting.
+On **System**, kept on this machine. Facts, not settings: two rows, each path read-only (Mono 13px `--tx2`, `GET /api/home`, [Home → Foreman's folder](../models/home.md#foremans-folder)).
 
-| Row | Explanation | Control |
-|---|---|---|
-| Home | Foreman’s folder on this machine: the global repo (teams, settings), the agents’ harness folders (their config and conversations), and its state. Your projects live in their workspaces. | The path (`GET /api/home`, [Home](../models/home.md)), read-only (Mono 13px `--tx2`) |
+| Row | Explanation |
+|---|---|
+| Foreman's folder | "What is yours: Foreman's HQ (teams, your instructions), each project's HQ and files, and the agents' worktrees. To move it, stop Foreman, move the folder, and set foreman_folder in settings.toml." (`foreman_folder`, [Global settings](../models/global-settings.md)) |
+| Home | "Foreman's own machinery on this machine: settings.toml, its state, the logins, and the agents' harness folders (their config and conversations)." |
 
-## Projects
-
-On **System**, kept in the global repo.
-
-| Row | Explanation | Control |
-|---|---|---|
-| Projects folder | New project suggests each project's workspace here, in a folder of its name; you can pick another. ~ is your home folder, on any machine. | A path field (`projects_folder`, [Global settings](../models/global-settings.md)); **Save** and **Discard** appear once it is edited |
+No control changes Foreman's folder (the CEO, 2026-11-15): it is read at start only, so the CEO moves it by hand with Foreman stopped and edits `settings.toml`.
 
 ## Profiles
 
@@ -72,7 +67,7 @@ Under the rows, **`New profile`** turns into a form: `Name` (Mono, placeholder `
 
 ## Notifications
 
-On **Notifications & look**, kept in the global repo.
+On **Notifications & look**, kept on this machine.
 
 - **Browser notifications**: the permission state (raised only while the tab is hidden: when the CEO is looking, the toast says it already), `on` (`--ok`), `blocked` (`--err`), `turn on` (`--attnTx`) or `n/a` (`--tx4`, unsupported browser), and a **`Request`** button shown only when permission can still be requested.
 - Toggles (default on): `An agent needs me`, `An agent finishes`, `A merge is requested` ([Notifications](./notifications.md)).
@@ -100,8 +95,8 @@ A failed build also raises a **blocked** [request](./requests.md), so it reaches
 
 ## Appearance
 
-On **Notifications & look**, kept on this machine. `Theme`: segmented `System` / `Dark` / `Light`, default `System` (follows the operating system's `prefers-color-scheme`, live). One of the CEO's preferences, in `~/.foreman/preferences.toml`, outside the global repo (`GET/PUT /api/preferences`). It shows at once, is put back if the save is refused, and another open tab picks it up when it comes back into focus. The browser keeps a copy only to paint the first frame ([UI state](../models/ui-state.md), [Design system](../design/design-system.md)).
+On **Notifications & look**, kept on this machine. `Theme`: segmented `System` / `Dark` / `Light`, default `System` (follows the operating system's `prefers-color-scheme`, live). A setting (`theme` in `settings.toml`, saved through `PUT /api/settings` like the rest). It shows at once, is put back if the save is refused, and another open tab picks it up when it comes back into focus. The browser keeps a copy only to paint the first frame ([UI state](../models/ui-state.md), [Design system](../design/design-system.md)).
 
-`Accent` (the CEO, 2026-11-02): a swatch per [accent](../design/design-system.md#accents), each a 16px dot in its own color in a 26px ring, the chosen one ringed in it: **blue** (the default), green, purple, teal, orange, pink, amber; named in their tooltips and for screen readers. It colors primary buttons, selection, links and focus; what needs the CEO keeps its own amber (`--attn`). A preference like the theme (`accent` in the same file), shown at once, put back if refused, and copied in the browser for the first frame. A value in the file that isn't one of them reads as blue.
+`Accent` (the CEO, 2026-11-02): a swatch per [accent](../design/design-system.md#accents), each a 16px dot in its own color in a 26px ring, the chosen one ringed in it: **blue** (the default), green, purple, teal, orange, pink, amber; named in their tooltips and for screen readers. It colors primary buttons, selection, links and focus; what needs the CEO keeps its own amber (`--attn`). A setting like the theme (`accent`), shown at once, put back if refused, and copied in the browser for the first frame. A value in the file that isn't one of them reads as blue.
 
-`Terminal font`: a font and a size, for every agent terminal, also a preference (`terminal_font`, `terminal_font_size` in the same file; the CEO, 2026-10-19). Fonts: **JetBrains Mono** (the default; the setting is the terminals' only, the rest of the UI keeps Geist Mono, the CEO, 2026-10-21), **Fira Code**, **Source Code Pro**, all shipped with Foreman (it works offline), and **System monospace** (SF Mono or Menlo on the Mac, nothing to download). A shipped font is fetched only once picked. Sizes 10 to 24 px, default 13. Open terminals switch at once, once the font has loaded (the terminal measures its cells on the font it has). A value in the file that can't be kept (an unknown font, a size out of range) reads as its default; the other values stay. Geist Mono and IBM Plex Mono are no terminal fonts (the CEO, 2026-10-20: fewer fonts, a lighter app), so a file naming them reads as JetBrains Mono.
+`Terminal font`: a font and a size, for every agent terminal, also settings (`terminal_font`, `terminal_font_size`; the CEO, 2026-10-19). Fonts: **JetBrains Mono** (the default; the setting is the terminals' only, the rest of the UI keeps Geist Mono, the CEO, 2026-10-21), **Fira Code**, **Source Code Pro**, all shipped with Foreman (it works offline), and **System monospace** (SF Mono or Menlo on the Mac, nothing to download). A shipped font is fetched only once picked. Sizes 10 to 24 px, default 13. Open terminals switch at once, once the font has loaded (the terminal measures its cells on the font it has). A value in the file that can't be kept (an unknown theme or accent, an unknown font, a size out of range) reads as its default and is reported as a problem; the other values stay. Geist Mono and IBM Plex Mono are no terminal fonts (the CEO, 2026-10-20: fewer fonts, a lighter app), so a file naming them reads as JetBrains Mono.

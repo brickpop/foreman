@@ -11,7 +11,7 @@ import { reviewOf, sections, sessionOf } from "./project";
 import {
   useInstances,
   useLiveEvents,
-  usePreferences,
+  useLook,
   useProjects,
   useRequests,
   useSettings,
@@ -152,7 +152,7 @@ function Sidebar({
   const projects = useProjects();
   const instances = useInstances();
   const requests = useRequests();
-  usePreferences(); // the theme
+  useLook(); // the theme
   const model = sidebarModel(
     byName(projects.data ?? []),
     instances.data ?? [],
@@ -309,7 +309,7 @@ function LiveEvents() {
   const instances = useInstances();
   const projects = useProjects();
   const settings = useSettings();
-  usePreferences(); // the theme
+  useLook(); // the theme
   useLiveEvents((e) => {
     const n = noticeFor(e, teams.data ?? [], instances.data ?? [], projects.data ?? []);
     if (!n) return;

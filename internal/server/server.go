@@ -18,6 +18,8 @@ type Guard interface {
 // Home is what the server needs to know about Foreman's home.
 type Home interface {
 	Root() string
+	// Folder is Foreman's folder: its HQ, the projects, the worktrees.
+	Folder() string
 }
 
 // Options are the parts the server is assembled from.
@@ -35,7 +37,6 @@ type Options struct {
 	Requests     Requests
 	Harnesses    Harnesses
 	Profiles     Profiles
-	Preferences  Preferences
 	Wiki         Wiki
 	Setup        Setup
 	Maintenance  Maintenance
@@ -49,7 +50,7 @@ type Options struct {
 func New(o Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/home", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root()})
+		writeJSON(w, http.StatusOK, homeSummary{Path: o.Home.Root(), Folder: o.Home.Folder()})
 	})
 	agentRoutes(mux, o.Agents)
 	messageRoutes(mux, o.Messages)
@@ -60,7 +61,6 @@ func New(o Options) http.Handler {
 	requestRoutes(mux, o.Requests)
 	harnessRoutes(mux, o.Harnesses)
 	profileRoutes(mux, o.Profiles)
-	preferenceRoutes(mux, o.Preferences)
 	maintenanceRoutes(mux, o.Maintenance)
 	setupRoutes(mux, o.Setup)
 	configRoutes(mux, o.Config)
@@ -81,7 +81,8 @@ func New(o Options) http.Handler {
 
 // homeSummary is the body of GET /api/home.
 type homeSummary struct {
-	Path string `json:"path"`
+	Path   string `json:"path"`   // Foreman's home: its machinery
+	Folder string `json:"folder"` // Foreman's folder: what the CEO owns
 }
 
 // ui serves the built SPA: real files as they are, every other path as

@@ -59,6 +59,16 @@ func codeRepo(t *testing.T, path string) string {
 // own database: .foreman in the CEO's home folder (HOME), a temporary one.
 func loaded(t *testing.T, setup func(root string)) *Home {
 	t.Helper()
+	h, err := load(t, setup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return h
+}
+
+// load is loaded, returning the error Load returned.
+func load(t *testing.T, setup func(root string)) (*Home, error) {
+	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_AUTHOR_NAME", "ceo")
@@ -78,11 +88,11 @@ func loaded(t *testing.T, setup func(root string)) *Home {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if err := h.Load(ctx, Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
-		t.Fatal(err)
-	}
-	return h
+	return h, h.Load(ctx, Deps{Git: git.New(), Projects: db.Projects()})
 }
+
+// hqOf is Foreman's HQ of the home at root, in the default Foreman folder.
+func hqOf(root string) string { return filepath.Join(filepath.Dir(root), "foreman", "hq") }
 
 // reload loads h again, as a restart would.
 func reload(t *testing.T, h *Home) {
@@ -98,35 +108,42 @@ func startedIn(t *testing.T, h *Home, dir string) {
 	}
 }
 
-func TestLoadMakesTheGlobalRepoWithWhatIsThere(t *testing.T) {
+// Foreman's HQ is made on first start, with the teams put there by hand,
+// an empty instructions.md and a .gitignore, in one commit; nothing of the
+// home is in it, and the agents' worktrees are in no repo.
+func TestLoadMakesForemansHQWithWhatIsThere(t *testing.T) {
 	h := loaded(t, func(root string) {
-		writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
+		writeFile(t, filepath.Join(hqOf(root), "teams", "atlas.toml"), teamExample)
 		writeFile(t, filepath.Join(root, "state.db"), "runtime")
 		writeFile(t, filepath.Join(root, "access-token"), "secret")
-		writeFile(t, filepath.Join(root, "projects", "ledger", "project.toml"), "")
-		writeFile(t, filepath.Join(root, "sandboxes", "ledger", "mara", "x"), "")
+		writeFile(t, filepath.Join(filepath.Dir(hqOf(root)), "worktrees", "ledger", "mara", "x"), "")
 	})
-	log := gitLog(t, h.Path("config"))
-	if !strings.Contains(log, "Global repo") || !strings.Contains(log, "teams/atlas.toml") || !strings.Contains(log, ".gitignore") {
-		t.Errorf("first commit:\n%s", log)
+	log := gitLog(t, h.HQ())
+	if !strings.HasPrefix(log, "Foreman's HQ") || strings.Count(log, "\n\n") != 1 {
+		t.Errorf("not one first commit:\n%s", log)
 	}
-	for _, f := range []string{"state.db", "access-token", "projects", "sandboxes"} {
-		if strings.Contains(log, f) {
-			t.Errorf("%s was committed:\n%s", f, log)
+	for _, f := range []string{"teams/atlas.toml", ".gitignore", "instructions.md"} {
+		if !strings.Contains(log, f) {
+			t.Errorf("%s not committed:\n%s", f, log)
 		}
 	}
-	// Nothing else of the home is in a repo: a git command in a sandbox finds
-	// none.
-	if status := gitOut(t, h.Path("config"), "status", "--porcelain", "--untracked-files=all"); status != "" {
+	if data, err := os.ReadFile(h.HQ("instructions.md")); err != nil || len(data) != 0 || h.Instructions().Version == "" {
+		t.Errorf("instructions.md %q %v, read %+v", data, err, h.Instructions())
+	}
+	if status := gitOut(t, h.HQ(), "status", "--porcelain", "--untracked-files=all"); status != "" {
 		t.Errorf("not committed:\n%s", status)
 	}
-	if out, err := exec.Command("git", "-C", h.Path("sandboxes", "ledger", "mara"), "rev-parse", "--git-dir").CombinedOutput(); err == nil {
+	if out, err := exec.Command("git", "-C", filepath.Join(h.Folder(), "worktrees", "ledger", "mara"), "rev-parse", "--git-dir").CombinedOutput(); err == nil {
 		t.Errorf("a sandbox is inside a repo: %s", out)
 	}
 	// Loading again changes nothing.
 	reload(t, h)
-	if again := gitLog(t, h.Path("config")); again != log {
+	if again := gitLog(t, h.HQ()); again != log {
 		t.Errorf("a second load committed:\n%s", again)
+	}
+	// An HQ with no teams yet is made too.
+	if h := loaded(t, nil); gitOut(t, h.HQ(), "log", "--format=%s") != "Foreman's HQ" || !exists(h.HQ("teams")) {
+		t.Error("an empty HQ wasn't made")
 	}
 }
 
@@ -134,7 +151,7 @@ func TestLoadMakesTheGlobalRepoWithWhatIsThere(t *testing.T) {
 // problems; one that is gone is a problem, with the defaults.
 func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 	h := loaded(t, nil)
-	p, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger"))
+	p, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,9 +178,9 @@ func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 // called Mara (the CEO, 2026-11-02: a role is the natural name).
 func TestTeamsShareAgentIdsAndNames(t *testing.T) {
 	h := loaded(t, func(root string) {
-		writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
+		writeFile(t, filepath.Join(hqOf(root), "teams", "atlas.toml"), teamExample)
 		other := strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `name = "Atlas"`, `name = "Orion"`).Replace(teamExample)
-		writeFile(t, filepath.Join(root, "config", "teams", "orion.toml"), other)
+		writeFile(t, filepath.Join(hqOf(root), "teams", "orion.toml"), other)
 	})
 	for _, id := range []string{"atlas", "orion"} {
 		if team, _ := h.Team(id); len(team.Problems) != 0 || team.Config.Agents["mara"].Name != "Mara" {
@@ -188,7 +205,7 @@ func TestSaveTeamWritesCommitsAndGuardsTheVersion(t *testing.T) {
 	if len(changes) != 1 || changes[0].Kind != "team" || changes[0].ID != "atlas" || changes[0].Version != saved.Version {
 		t.Errorf("changes %v", changes)
 	}
-	if log := gitLog(t, h.Path("config")); !strings.Contains(log, "Atlas: saved in the UI\n\nteams/atlas.toml") {
+	if log := gitLog(t, h.HQ()); !strings.Contains(log, "Atlas: saved in the UI\n\nteams/atlas.toml") {
 		t.Errorf("log:\n%s", log)
 	}
 
@@ -207,21 +224,21 @@ func TestSaveTeamWritesCommitsAndGuardsTheVersion(t *testing.T) {
 	if second.Config.Purpose != "Something else" || second.Version == saved.Version {
 		t.Errorf("second save %+v", second)
 	}
-	if n := strings.Count(gitLog(t, h.Path("config")), "Atlas: saved in the UI"); n != 2 {
+	if n := strings.Count(gitLog(t, h.HQ()), "Atlas: saved in the UI"); n != 2 {
 		t.Errorf("%d commits, want 2", n)
 	}
 	// Saving what is already there changes nothing, and makes no empty commit.
 	if _, err := h.SaveTeam(ctx, c, second.Version); err != nil {
 		t.Errorf("unchanged save: %v", err)
 	}
-	if n := strings.Count(gitLog(t, h.Path("config")), "Atlas: saved in the UI"); n != 2 {
+	if n := strings.Count(gitLog(t, h.HQ()), "Atlas: saved in the UI"); n != 2 {
 		t.Errorf("an unchanged save committed: %d commits", n)
 	}
 }
 
 func TestInvalidSavesWriteNothing(t *testing.T) {
 	h := loaded(t, func(root string) {
-		writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
+		writeFile(t, filepath.Join(hqOf(root), "teams", "atlas.toml"), teamExample)
 	})
 	c, _ := ParseTeam("atlas", []byte(teamExample))
 	c.Lead = "ghost"
@@ -238,13 +255,13 @@ func TestInvalidSavesWriteNothing(t *testing.T) {
 	if _, err := h.SaveTeam(ctx, orion, ""); !errors.As(err, &invalid) || !hasProblem(invalid.Problems, "is also mara's name") {
 		t.Errorf("a name twice in a team: %v", err)
 	}
-	if _, err := os.Stat(h.Path("config", "teams", "orion.toml")); err == nil {
+	if _, err := os.Stat(h.HQ("teams", "orion.toml")); err == nil {
 		t.Error("an invalid team was written")
 	}
 	if _, err := h.SaveSettings(ctx, Settings{}, ""); !errors.As(err, &invalid) {
 		t.Errorf("invalid settings: %v", err)
 	}
-	if _, err := os.Stat(h.Path("config", "settings.toml")); err == nil {
+	if _, err := os.Stat(h.Path("settings.toml")); err == nil {
 		t.Error("invalid settings were written")
 	}
 }
@@ -276,12 +293,12 @@ func TestSaveSettings(t *testing.T) {
 }
 
 // The watcher reports what the CEO changes on disk, and ignores Foreman's own
-// churn in the home: the database, the logs, the sandboxes, a project repo's
+// churn in the home: the database, the logs, the sandboxes, an HQ's
 // commits.
 func TestWatchReportsChangesOnDisk(t *testing.T) {
 	h := loaded(t, nil)
 	root := h.Root()
-	ledger, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger"))
+	ledger, _, err := h.NewProject(ctx, "ledger", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,22 +338,26 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 	writeFile(t, filepath.Join(ledger.Path, "wiki", "spec.md"), "# Spec\n")
 	gitOut(t, ledger.Path, "add", ".")
 	gitOut(t, ledger.Path, "commit", "--quiet", "-m", "spec")
-	// A folder under projects/ with no record is no project.
-	writeFile(t, filepath.Join(root, "projects", "stray", "project.toml"), "")
+	// A folder under projects/ with no record is no project; files are no config.
+	writeFile(t, filepath.Join(h.Folder(), "projects", "stray", "hq", "project.toml"), "")
+	writeFile(t, filepath.Join(ledger.Files, "inbox", "brief.md"), "x")
 	quiet()
 
 	writeFile(t, filepath.Join(ledger.Path, "project.toml"), "checks = \"make\"")
 	expect(Change{Kind: "project", ID: "ledger"})
 
-	writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
+	writeFile(t, filepath.Join(hqOf(root), "teams", "atlas.toml"), teamExample)
 	expect(Change{Kind: "team", ID: "atlas"})
 
-	writeFile(t, filepath.Join(root, "config", "settings.toml"), "port = 9000")
+	writeFile(t, filepath.Join(root, "settings.toml"), "port = 9000")
 	expect(Change{Kind: "settings"})
+
+	writeFile(t, h.HQ("instructions.md"), "Be brief.\n")
+	expect(Change{Kind: "instructions"})
 
 	// A project made after the watch started is watched too, and a repo added
 	// is told at once.
-	relay, _, err := h.NewProject(ctx, "relay", "", workspace("relay"))
+	relay, _, err := h.NewProject(ctx, "relay", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,7 +374,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 // a team id that isn't one folder name. Another team's agents are no concern.
 func TestCheckTeam(t *testing.T) {
 	h := loaded(t, func(root string) {
-		writeFile(t, filepath.Join(root, "config", "teams", "atlas.toml"), teamExample)
+		writeFile(t, filepath.Join(hqOf(root), "teams", "atlas.toml"), teamExample)
 	})
 	c, _ := ParseTeam("atlas", []byte(teamExample))
 	if p := h.CheckTeam(c); len(p) != 0 {
@@ -371,26 +392,8 @@ func TestCheckTeam(t *testing.T) {
 	if p := h.CheckTeam(orion); len(p) != 0 {
 		t.Errorf("atlas's agents in orion: %v", p)
 	}
-	if _, err := os.Stat(h.Path("config", "teams", "orion.toml")); err == nil {
+	if _, err := os.Stat(h.HQ("teams", "orion.toml")); err == nil {
 		t.Error("checking wrote the team")
-	}
-}
-
-// A global repo from an older Foreman gets the newer ignore lines, once,
-// keeping the CEO's own.
-func TestAnOlderGlobalRepoIgnoresWhatNewerOnesDo(t *testing.T) {
-	h := loaded(t, nil)
-	writeFile(t, h.Path("config", ".gitignore"), "state.db*\nlogs/\nmy-notes.txt")
-	for range 2 {
-		reload(t, h)
-	}
-	data, _ := os.ReadFile(h.Path("config", ".gitignore"))
-	got := string(data)
-	if !strings.HasPrefix(got, "state.db*\nlogs/\nmy-notes.txt\n") || strings.Count(got, "*.tmp") != 1 || strings.Count(got, "logs/") != 1 {
-		t.Errorf(".gitignore:\n%s", got)
-	}
-	if n := strings.Count(gitLog(t, h.Path("config")), "Ignore Foreman's runtime files"); n != 1 {
-		t.Errorf("%d commits of it, want 1", n)
 	}
 }
 
@@ -439,7 +442,7 @@ func TestTheSubscriberCanReadTheHome(t *testing.T) {
 	}
 	expect(3, "a save in the UI")
 	// A change by hand, through the watcher.
-	writeFile(t, filepath.Join(root, "config", "settings.toml"), "max_sessions = 5\n")
+	writeFile(t, filepath.Join(root, "settings.toml"), "max_sessions = 5\n")
 	expect(5, "an edit on disk")
 	done := make(chan struct{})
 	go func() { h.Teams(); close(done) }()
@@ -450,59 +453,68 @@ func TestTheSubscriberCanReadTheHome(t *testing.T) {
 	}
 }
 
-// The CEO's instructions survive a save and a reload exactly, Markdown with
-// quotes, backslashes and a TOML-looking line included, and are written as a
-// multi-line string, readable in the file.
-func TestSettingsKeepTheInstructions(t *testing.T) {
+// The CEO's instructions are instructions.md in Foreman's HQ: a save keeps
+// them exactly, version-guarded, in one commit; settings.toml never holds
+// them; a hand edit is read on reload.
+func TestInstructions(t *testing.T) {
 	h := loaded(t, nil)
-	s := DefaultSettings()
-	s.Instructions = "# Rules\n- Say \"done\" only when tests pass.\n- Paths like C:\\tmp and `'''` stay.\n\"\"\"\nport = 1\n"
-	if _, err := h.SaveSettings(ctx, s, ""); err != nil {
-		t.Fatal(err)
-	}
-	if got := h.Settings().Settings; got.Instructions != s.Instructions || got.Port != 8888 {
-		t.Errorf("read back %q, port %d", got.Instructions, got.Port)
-	}
-	data, err := os.ReadFile(h.config(settingsFile))
+	text := "# Rules\n- Say \"done\" only when tests pass.\n- Paths like C:\\tmp and `'''` stay.\n\"\"\"\nport = 1\n"
+	got, err := h.SaveInstructions(ctx, text, h.Instructions().Version)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "instructions = \"\"\"\n# Rules\n") {
-		t.Errorf("not multi-line:\n%s", data)
+	if got.Text != text || got != h.Instructions() {
+		t.Errorf("saved %+v, read %+v", got, h.Instructions())
 	}
-	parsed, problems := ParseSettings(data)
-	if len(problems) > 0 || parsed.Instructions != s.Instructions {
-		t.Errorf("parsed %q, %v", parsed.Instructions, problems)
+	if data, _ := os.ReadFile(h.HQ("instructions.md")); string(data) != text {
+		t.Errorf("file %q", data)
 	}
-	s.Instructions = ""
-	if data, _ := encode(s); strings.Contains(string(data), "instructions") {
-		t.Errorf("empty instructions written:\n%s", data)
+	if !strings.HasPrefix(gitLog(t, h.HQ()), "Instructions: saved in the UI\n\ninstructions.md") {
+		t.Errorf("not committed:\n%s", gitLog(t, h.HQ()))
+	}
+	if exists(h.Path("settings.toml")) {
+		t.Error("settings.toml was written")
+	}
+	if _, err := h.SaveInstructions(ctx, "stale", "0000"); !errors.Is(err, ErrConflict) {
+		t.Errorf("a stale version: %v", err)
+	}
+	writeFile(t, h.HQ("instructions.md"), "By hand.\n")
+	reload(t, h)
+	if h.Instructions().Text != "By hand.\n" {
+		t.Errorf("after a hand edit %+v", h.Instructions())
 	}
 }
 
-// Whatever the CEO types reads back exactly: runs of quotes (one closing the
-// string early), a quote last, backslashes, CRLF, tabs, control characters.
-func TestInstructionsRoundTrip(t *testing.T) {
-	for _, text := range []string{
-		`a "quote" last"`, `""`, `"""`, `""""`, `x""""""y`, `ends with \`, `\n is not a newline`,
-		"line\r\nwindows", "tab\there", "bell\x07 del\x7f", "\n\nleading blank lines", "trailing\n\n",
-		"unicode: català, 日本語, 🙂",
+// Settings are this machine's: settings.toml in the home, in no repo, the
+// look of the UI included; a save rewrites them, fields the UI doesn't show
+// (foreman_folder) kept, and refuses a look Foreman doesn't have.
+func TestSettingsStayOnThisMachine(t *testing.T) {
+	h := loaded(t, func(root string) {
+		writeFile(t, filepath.Join(root, "settings.toml"), "foreman_folder = \"~/f\"\n")
+	})
+	s := h.Settings().Settings
+	s.Theme, s.Accent, s.TerminalFont, s.TerminalFontSize = "dark", "teal", "fira-code", 15
+	if _, err := h.SaveSettings(ctx, s, h.Settings().Version); err != nil {
+		t.Fatal(err)
+	}
+	reload(t, h)
+	if got := h.Settings().Settings; got != s || got.ForemanFolder != "~/f" {
+		t.Errorf("read back %+v", got)
+	}
+	if _, err := exec.Command("git", "-C", h.Root(), "rev-parse", "--git-dir").CombinedOutput(); err == nil {
+		t.Error("the home is in a repo")
+	}
+	for name, edit := range map[string]func(*Settings){
+		"theme":              func(s *Settings) { s.Theme = "sepia" },
+		"accent":             func(s *Settings) { s.Accent = "red" },
+		"terminal_font":      func(s *Settings) { s.TerminalFont = "comic" },
+		"terminal_font_size": func(s *Settings) { s.TerminalFontSize = MaxFontSize + 1 },
 	} {
-		s := DefaultSettings()
-		s.Instructions = text
-		data, err := encodeSettings(s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, problems := ParseSettings(data)
-		if len(problems) > 0 || got.Instructions != text {
-			t.Errorf("%q came back %q, %v:\n%s", text, got.Instructions, problems, data)
+		bad := s
+		edit(&bad)
+		var invalid *InvalidError
+		if _, err := h.SaveSettings(ctx, bad, h.Settings().Version); !errors.As(err, &invalid) || !strings.HasPrefix(invalid.Problems[0], name+":") {
+			t.Errorf("%s: %v", name, err)
 		}
 	}
-}
-
-// workspace is where the tests make project name: the default projects
-// folder, in the test's home folder.
-func workspace(name string) string {
-	return filepath.Join(os.Getenv("HOME"), "workspace", "foreman", name)
 }

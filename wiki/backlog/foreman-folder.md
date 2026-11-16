@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: in-progress
 priority: high
 tags: [feature]
 epic: install-first-run
@@ -41,18 +41,29 @@ epic: install-first-run
 - **Foreman's HQ is made on first start** (`git init`, a first commit): `teams/`, an empty `instructions.md`, and the wiki scaffold at its root ([The wiki at the HQ's root](./wiki-at-root.md)).
 - **`foreman_folder`**: a setting in `~/.foreman/settings.toml` (renaming `projects_folder`), default `~/foreman`, kept as a `~` path; Foreman derives every path from it and the project's id, no per-project workspace (its column goes). The `~/workspace/foreman` default goes. **No UI for it** (the CEO, 2026-11-15): Settings → System → Projects folder goes; the CEO edits the file with Foreman stopped and moves the folder by hand. `just dev` and the tests set their own. The reserved-folder check becomes this one folder.
 
+## In progress (2026-11-15)
+
+The CEO holds the upgrade: their own Foreman stays on the build before this card until the move script runs, after all three cards; `just dev` homes meanwhile. Taken as the obvious defaults (say if not):
+
+- **Instructions** keep their editor in Settings → Agents, which saves `hq/instructions.md` through its own endpoint (`GET`/`PUT /api/instructions`, version-guarded, one commit each); a hand edit is read on reload like a team file.
+- **All of `preferences.toml`** moves into `settings.toml`: theme, accent, terminal font and its size.
+- **`foreman_folder`** is read at start only (a change takes effect at the next start); after `~` it must be absolute, inside `$HOME`, and neither inside Foreman's home nor around it. Otherwise Foreman doesn't start, saying why.
+- **No code repo in `hq/`, `projects/` or `worktrees/`**; `repos/` is where clones go ([Portable projects](./portable-projects.md)), so a repo there is fine.
+- **Removing a project:** its HQ goes only when asked, `files/` stays, `worktrees/<id>/` goes only when asked; `projects/<id>/` and `worktrees/<id>/` go when left empty.
+
 ## Steps
 
-- [ ] paths: `foreman_folder` (no UI); Foreman's HQ, each project's `hq/`, `files/`, `repos/`, `worktrees/` derived from it; the workspace column dropped
-- [ ] the global repo replaced by Foreman's HQ: teams, `instructions.md`, `settings.toml` out of git, the watcher
-- [ ] `preferences.toml` merged into `settings.toml`: `theme` and `accent` fields, one API, Settings → Appearance saving through it
-- [ ] the rename "project repo" → "HQ": code, UI, the `commit` tool's `hq`, the sandbox mount, the session prompt
-- [ ] the New project dialog loses its Workspace field (and [Restructure the New project dialog](./new-project-dialog.md) its workspace **Change**)
-- [ ] a missing worktree is made again at the agent's start (its git record pruned first)
-- [ ] Clean up's `Also remove worktrees with uncommitted work` option (the request carries it; the result lists what it removed with its uncommitted files)
-- [ ] the workspace migration goes (the CEO's projects move with the script below): `home.Migrate`, `POST /api/projects/{id}/migrate`, the Project settings offer, the adapters' conversation movers (`harness.Mover`), the old layout's paths (`projectsDir`, `sandboxesDir`, `legacyHarn`, the legacy branch of `Home.layout` and `Project.HarnessDir`), the launch's removal of the old `<sandbox>/project` mount point, their tests, and both items in [Technical debt](../technical-debt.md#the-workspace-migration)
-- [ ] specs: home, global-settings, ui-state (preferences), api, team-definition, project-config, add-project, project-settings, project-team (Clean up), sandboxes-and-git, session-prompt, team-tools (`commit`), harness-adapters (Moving conversations goes), settings, first-run, glossary
-- [ ] tests: the paths; Foreman's HQ made on first start; instructions read from `instructions.md`; theme and accent round-trip through `settings.toml`; a deleted worktree made again; Clean up with and without the uncommitted option
+- [x] paths: `foreman_folder` (no UI; a read-only Folders section in Settings → System); Foreman's HQ, each project's `hq/`, `files/`, `worktrees/` derived from it; the workspace column dropped (migration 026)
+- [x] the global repo replaced by Foreman's HQ: teams, `instructions.md` (`GET`/`PUT /api/instructions`), `settings.toml` out of git, the watcher
+- [x] `preferences.toml` merged into `settings.toml`: theme, accent, terminal font and size; one API, Settings → Notifications & look saving through it
+- [x] the rename "project repo" → "HQ": code, UI, the `commit` tool's `hq`, the repos API's `hq`, the session prompt (`{hq}`)
+- [x] the New project dialog loses its Workspace field
+- [x] a missing worktree is made again when its agent opens the repo (`Prepare` prunes git's record first; `TestADeletedWorktreeIsOpenedAgain`)
+- [x] Clean up's `Also remove worktrees with uncommitted work` option: `{uncommitted}` in the request; the changes kept under `refs/foreman/cleaned/` (`git.Discard`) before the worktree goes; the result lists the files and the ref
+- [x] the workspace migration goes: `home.Migrate` and its route, the Project settings offer, `harness.Mover`, the old layout's paths, `RepairWorktrees`, the old mount point's removal, their tests, both technical-debt items
+- [x] `just dev`: its own Foreman folder beside its home (`.dev/<harness>-folder`); README
+- [x] specs: home, global-settings, ui-state, api, team-definition, project-config, add-project, project-settings, project-team (Clean up), sandboxes-and-git, session-prompt, team-tools (`commit`), harness-adapters, settings, first-run, glossary
+- [x] tests: the paths and the folder's checks; Foreman's HQ made on first start; instructions read from and saved to `instructions.md`; the look round-trips through `settings.toml`; a deleted worktree opened again; Clean up with and without the uncommitted option
 
 ## Moving the CEO's setup: a script, not shipped
 

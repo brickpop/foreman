@@ -112,8 +112,11 @@ describe("staleKeys", () => {
     expect(staleKeys({ type: "config.changed", data: { object: "settings" } })).toEqual([
       keys.settings,
       keys.setup,
+    ]);
+    // The CEO's instructions are part of every prompt.
+    expect(staleKeys({ type: "config.changed", data: { object: "instructions" } })).toEqual([
+      keys.instructions,
       ["prompt"],
-      ["workspace"],
       keys.instances,
     ]);
     expect(staleKeys({ type: "config.changed", data: { object: "project" } })).toEqual([

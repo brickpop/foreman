@@ -10,7 +10,7 @@ import type * as wiki from "./wiki";
  */
 export interface Repo {
   name: string;
-  project: boolean; // the project repo (project/), listed last
+  hq: boolean; // the project's HQ, listed last
   defaultBranch: string;
   branches: Branch[]; // the default first, then newest commit first
   idle: Idle[]; // the agents' worktrees of it on no branch, by agent

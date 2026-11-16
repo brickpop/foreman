@@ -34,11 +34,11 @@ func (f *fakeDesktop) Open(dir string) error {
 	return nil
 }
 
-// withDesktop serves a project ledger whose workspace is ws, with its agent
+// withDesktop serves a project ledger whose folders are in ws, with its agent
 // tove.
 func withDesktop(d *fakeDesktop, ws string) http.Handler {
 	agents := &fakeAgents{list: []store.Instance{{ID: "tove@ledger", SandboxPath: filepath.Join(ws, "agents", "tove")}}}
-	config := fakeConfig{projects: []home.Project{{ID: "ledger", Files: filepath.Join(ws, "files")}, {ID: "legacy"}}}
+	config := fakeConfig{projects: []home.Project{{ID: "ledger", Files: filepath.Join(ws, "files")}}}
 	return New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Agents: agents, Config: config, Desktop: d, UI: builtUI})
 }
 
@@ -105,7 +105,6 @@ func TestOpenRefuses(t *testing.T) {
 		{"neither", `{}`, &fakeDesktop{can: true}, http.StatusBadRequest, "INVALID"},
 		{"a path", `{"path":"/etc"}`, &fakeDesktop{can: true}, http.StatusBadRequest, "INVALID"},
 		{"not JSON", `nope`, &fakeDesktop{can: true}, http.StatusBadRequest, "INVALID"},
-		{"legacy project", `{"project":"legacy","folder":"inbox"}`, &fakeDesktop{can: true}, http.StatusConflict, "NO_FILES"},
 		{"refused by the opener", `{"instance":"tove@ledger"}`, &fakeDesktop{can: true, refuse: filepath.Join(ws, "agents", "tove")}, http.StatusConflict, "NOT_A_FOLDER"},
 	} {
 		w := send(withDesktop(tc.desk, ws), "POST", "/api/desktop/open", tc.body)

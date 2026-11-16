@@ -9,7 +9,7 @@ import {
   useEntry,
   useMissing,
   useMoveCard,
-  useProjectRepo,
+  useProjectHQ,
   useTeams,
   useTick,
 } from "../../app/queries";
@@ -452,7 +452,7 @@ function SideSheet({
   path?: string;
   onClose: () => void;
 }) {
-  const repo = useProjectRepo(project);
+  const repo = useProjectHQ(project);
   const navigate = useNavigate();
   const toast = useToast();
   const entry = useEntry(project, path ?? "");

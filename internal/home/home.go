@@ -1,9 +1,10 @@
-// Package home is Foreman's home on this machine
-// (wiki/product/models/home.md): the global repo (teams, settings.toml), the
-// projects (records in the database, each with its workspace: its project
-// repo and its agents' sandboxes), the access token. It loads and validates the config files,
-// checks each project's repos, saves version-guarded with one commit each,
-// and watches its files change on disk.
+// Package home is Foreman on this machine (wiki/product/models/home.md): its
+// home (~/.foreman: settings.toml, the access token, the harness folders) and
+// its folder (~/foreman: Foreman's HQ with the teams and the CEO's
+// instructions, each project's HQ and files, the agents' worktrees), and the
+// projects (records in the database). It loads and validates the config
+// files, checks each project's repos, saves version-guarded (in an HQ, one
+// commit each), and watches its files change on disk.
 package home
 
 import (
@@ -22,24 +23,23 @@ import (
 
 const tokenFile = "access-token"
 
-// Home is Foreman's home: ~/.foreman, or --home.
+// Home is Foreman's home, ~/.foreman (or --home), and its folder.
 type Home struct {
-	root string // absolute
+	root   string // absolute
+	folder string // Foreman's folder, a real path (Folder); set by Load
 
 	// Set by Load.
 	git      Git
 	records  store.Projects
 	deployed func(ctx context.Context, project string) bool
-	allowed  string // workspaces and repos must be inside it: the CEO's home folder, its real path
+	allowed  string // Foreman's folder and repos must be inside it: the CEO's home folder, its real path
 	start    string // the folder browser opens there: where Foreman was started (inside allowed), its real path
-	// conversations carries an agent's conversations over to its sandbox's new path (Deps.Conversations).
-	conversations func(dir, from, to string) error
 
 	mu      sync.Mutex // guards snap, saves and pending
 	snap    snapshot
 	notify  func(Change)      // set by Watch
 	watcher *fsnotify.Watcher // set by Watch
-	// rewatch: a project was made or moved, its project repo to watch (unlock).
+	// rewatch: a project was made, its HQ to watch (unlock).
 	rewatch bool
 	// pending are the changes to tell the subscriber once h.mu is released
 	// (unlock): never under it, since the subscriber may read the home.
@@ -74,7 +74,7 @@ func (h *Home) AccessToken(rotate bool) (string, error) {
 }
 
 // AgentSecret signs the agent link's tokens (internal/agentlink), generated on
-// first use. Kept under credentials/, outside the global repo.
+// first use. Kept under credentials/.
 func (h *Home) AgentSecret() ([]byte, error) {
 	if err := os.MkdirAll(h.Path("credentials"), 0o700); err != nil {
 		return nil, err
@@ -111,9 +111,9 @@ func secret(path string, rotate bool) (string, error) {
 	return token, nil
 }
 
-// Git is what the home needs of git: the global repo and the project repos
-// it makes (wiki/product/models/home.md#the-global-repo), and telling a
-// project's repos apart.
+// Git is what the home needs of git: the HQs it makes and commits to
+// (wiki/product/models/home.md#foremans-hq), and telling a project's repos
+// apart.
 type Git interface {
 	Init(ctx context.Context, dir, branch string) error
 	Commit(ctx context.Context, dir, message string, files ...string) error
@@ -132,8 +132,6 @@ type Git interface {
 	// Branch is the branch dir's checkout is on; "" when it is detached.
 	Branch(ctx context.Context, dir string) (string, error)
 	HasBranch(ctx context.Context, dir, branch string) bool
-	// RepairWorktrees tells repo where its worktrees moved to (a migration).
-	RepairWorktrees(ctx context.Context, repo string, worktrees ...string) error
 }
 
 // Deps is what Load needs besides the home's files.
@@ -147,8 +145,4 @@ type Deps struct {
 	// there (it can go up to the CEO's home folder), or at the CEO's home
 	// folder when it is outside that, or empty.
 	Start string
-	// Conversations carries an agent's conversations over when its sandbox
-	// moves from one path to another (a migration): each harness files them by
-	// working folder, in the harness folder dir. Nil: they aren't carried.
-	Conversations func(dir, from, to string) error
 }

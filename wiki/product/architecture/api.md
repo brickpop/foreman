@@ -15,14 +15,13 @@ All endpoints are local-only: Foreman binds `127.0.0.1`. Every request passes th
 The PRD's surface (indicative; names may still change during implementation, this entry is then updated):
 
 ```
-GET    /api/home                              {path}: Foreman's home on this machine
+GET    /api/home                              {path, folder}: Foreman's home on this machine and Foreman's folder (real paths)
 GET    /api/desktop                           {canOpen}: whether this machine can open folders on its desktop (macOS; Linux with xdg-open and a display); without, the UI shows no Open button
-POST   /api/desktop/open                      {instance} (the agent's folder) | {project, folder: inbox|shared} (the project's files), each made if missing → opens it in the desktop's file manager; the server works out the path, never the browser (204; 400 INVALID; 404 NOT_FOUND; 409 NO_DESKTOP, NO_FILES for a project made before workspaces, NOT_A_FOLDER for anything but a real folder: Security → Opening folders)
-GET    /api/projects | /api/projects/:id      the record (name, workspace, profile, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
-POST   /api/projects                          {name, clone?, workspace} → New: the record, the workspace (made if missing) and its project repo at <workspace>/project, with a starter wiki; with clone (a git URL or a local path), its project repo cloned with the CEO's own git; or a project repo a removed project left there taken over (201 made or cloned, 200 taken over; 400 INVALID, with git's message for a failed clone; 409 EXISTS)
-DELETE /api/projects/:id                      ?deleteRepo=true&deleteWorktrees=true → remove the project: its record, session logs, harness folders and history; its workspace stays, its project repo only with deleteRepo, its agents' worktrees only with deleteWorktrees (204; 409 DEPLOYED)
-POST   /api/projects/:id/migrate              {workspace} → legacy: move a project made before workspaces into one, its agents' conversations carried over (400 INVALID, 409 EXISTS, 409 DEPLOYED)
-POST   /api/projects/:id/repos                {name, path, defaultBranch?, new?} → add an existing code repo at path, with its default branch (main when it has one, else the `defaultBranch` given, one of its branches), or with new, create an empty one on main at a path that doesn't exist yet (400 INVALID, 409 EXISTS)
+POST   /api/desktop/open                      {instance} (the agent's folder) | {project, folder: inbox|shared} (the project's files), each made if missing → opens it in the desktop's file manager; the server works out the path, never the browser (204; 400 INVALID; 404 NOT_FOUND; 409 NO_DESKTOP, NOT_A_FOLDER for anything but a real folder: Security → Opening folders)
+GET    /api/projects | /api/projects/:id      the record (id, name, path: its HQ, files, profile, hidden, code repos with path and root commit), config (parsed), version, problems (`repos.<name>: …` for a missing or changed repo); deployments join with the Instance manager
+POST   /api/projects                          {name, clone?} → New: the record, its files folders and its HQ at <folder>/projects/<id>/hq, with project.toml and a starter wiki; with clone (a git URL or a local path), its HQ cloned with the CEO's own git; or an HQ a removed project left there taken over as it is (201 made or cloned, 200 taken over; 400 INVALID, with git's message for a failed clone; 409 EXISTS)
+DELETE /api/projects/:id                      ?deleteHQ=true&deleteWorktrees=true → remove the project: its record, session logs, harness folders and history; its files stay, its HQ only with deleteHQ, its agents' worktrees (<folder>/worktrees/<id>/) only with deleteWorktrees; projects/<id>/ and worktrees/<id>/ go when left empty (204; 409 DEPLOYED)
+POST   /api/projects/:id/repos                {name, path, defaultBranch?, new?} → add an existing code repo at path, with its default branch (main when it has one, else the `defaultBranch` given, one of its branches), or with new, create an empty one on main at a path that doesn't exist yet (400 INVALID, also for the name `hq`, the HQ's, and for a folder in one of Foreman's own, through a symlink too; 409 EXISTS)
 PUT    /api/projects/:id/repos/:repo          {path} → Locate: the repo's new path, which must hold its root commit (400 INVALID)
 PUT    /api/projects/:id/repos/:repo/name     {name} → rename it; agents' worktrees move, open merge requests follow (400 INVALID, 409 EXISTS, 409 DEPLOYED)
 PUT    /api/projects/:id/repos/:repo/default  {branch} → its default branch, one it has but an agent's: agents start from it, merges go to it unless the lead names another branch; it just sets it, open merge requests keep the branch they go into (400 INVALID)
@@ -30,17 +29,16 @@ DELETE /api/projects/:id/repos/:repo          remove it from the project; its fo
 PUT    /api/projects/:id/profile              {profile} → the profile its agents run on; empty means default (400 INVALID)
 PUT    /api/projects/:id/name                 {name} → its display name, any words, one line, at most 80 characters ("" shows its id readable); the id stays; allowed while a team is deployed (400 INVALID, 409 EXISTS when another project shows as that already)
 PUT    /api/projects/:id/hidden               {hidden} → hides the project (out of the sidebar's projects, into More, and off the Dashboard) or shows it again; nothing else changes
-GET    /api/projects/:id/repos                the code repos, then the project repo, each with its default branch, branches (ahead of the default, uncommitted changes, the agent with it checked out) and idle (the agents' worktrees of it on no branch)
+GET    /api/projects/:id/repos                the code repos, then the HQ (`hq: true`, named `hq`), each with its default branch, branches (ahead of the default, uncommitted changes, the agent with it checked out) and idle (the agents' worktrees of it on no branch)
 GET    /api/projects/:id/repos/:repo/tree     ?ref=&path= a folder at a ref, folders first
 GET    /api/projects/:id/repos/:repo/file     ?ref=&path= a file at a ref: {path, size, text, binary, tooLarge, markdown, frontmatter, body, links, headings} (over 1 MB: no text; a .md or .markdown file has its frontmatter apart, as the wiki reader's fields, body is its text without it, links its internal links resolved against the commit ({raw, to, anchor, exists, folder, image, outside}: relative from its folder, root-absolute from the nearest wiki.toml above it, else the repo root) and headings their ids)
 GET    /api/projects/:id/repos/:repo/image    ?ref=&path= an image file at a ref (the wiki's image types, up to 10 MB; a symlink never), under the wiki images' headers; 404 for anything else
 GET    /api/projects/:id/repos/:repo/log      ?ref=&skip=[&all=1] a page of history (with all, every branch's, the ref unread), newest first: {commits, next, total} (total: the commits it holds in all), 50 commits, each with its parents; 404 NOT_FOUND for an unknown project, repo, ref or path
-GET    /api/projects/:id/scaffold             the scaffold files the project repo lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
-GET    /api/folders                           ?path=&project= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, home, repo, added?, foreman?, entries: [{name, path, repo, foreman?}]}; foreman: what Foreman's own folder it is (the projects folder, a workspace); added: with a project, its repo this folder already is, by real path (400 INVALID outside $HOME, 404 for an unknown project)
-GET    /api/folders/workspace                 ?name= where a project named name would go: {path, folder, folderExists} (the projects folder, ~ expanded; path is the folder itself while name isn't a valid one)
+GET    /api/projects/:id/scaffold             the scaffold files the project's HQ lacks (`["wiki/index.md", "wiki/wiki.toml"]`); POST creates them, never overwriting, commits them as the CEO, and answers what is still missing
+GET    /api/folders                           ?path=&project= a folder for picking repos, inside $HOME (none: the folder Foreman was started in): {path, home, repo, added?, foreman?, entries: [{name, path, repo, foreman?}]}; foreman: what Foreman's own folder it is (Foreman's HQ, Foreman's projects, the agents' worktrees: never a code repo's); added: with a project, its repo this folder already is, by real path (400 INVALID outside $HOME, 404 for an unknown project)
 GET    /api/folders/branches                  ?path= a repo folder's branches, to pick its default branch: {branches, current} (current: its checkout's, "" when detached; 400 INVALID outside $HOME or inside Foreman's home)
 
-GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)| /api/teams/:id            definitions, with version and problems
+GET    /api/teams | /api/teams/:id            definitions, with version and problems; `order` lists the agents in the file's order (the `agents` map loses it)
 PUT    /api/teams/:id/agents/:agent           {soul, version}: saves one soul in the team file (version-guarded) → the team
 
 POST   /api/cos                              {opener}: starts the Chief of Staff's session, or types the opener into the running one → {terminal: "cos", proposal: the one on screen or null}; 409 NOT_READY (Podman), 409 NOT_CONNECTED (the default profile)
@@ -55,8 +53,6 @@ GET    /api/instances                         the instances of the active deploy
 GET    /api/instances/:id/prompt              {prompt}: the session prompt, exactly as composed for the harness
 GET    /api/teams/:id/agents/:agent/prompt    {prompt}: the template before any deployment, {placeholders} for its parts
 WS     /ws/pty/:instance                      bidirectional PTY bytes + resize
-(line input: sent through the PTY WebSocket, as the same raw bytes typing would produce; no separate endpoint)
-POST   /api/instances/:id/restart
 POST   /api/instances/:id/wake            starts an asleep instance, or a stopped one of an active deployment (Start again); both pick up their conversation (204; any other status is left as it is)
 POST   /api/instances/:id/restart         stops a running instance (starting, running, idle, awaiting) and starts it again on its project's profile as it is now, continuing its conversation unless the harness changed (204; any other status is left as it is; 404; 409 NOT_READY)
 POST   /api/instances/:id/line            {text}: types the CEO's line into the session and sends it (204; 409 NOT_RUNNING)
@@ -69,7 +65,7 @@ POST   /api/requests/:id/dismiss              closes it unanswered, telling the 
 GET    /api/messages?deployment=              message log
 GET    /api/activity?deployment=              [&before=<cursor>] a page of a deployment's team traffic, messages and actions together, newest first: {items: [{message} | {action}], next}, 50 items; 400 BAD_REQUEST without a deployment or for a bad cursor
 GET    /api/pipeline?project=                 work items and merge requests (open, and merged in the last 7 days)
-POST   /api/projects/:id/cleanup                removes what agents running nowhere left on the project, only what is safe → {removed, kept} ([Project deployment → Earlier teams](../features/project-deployment.md#earlier-teams))
+POST   /api/projects/:id/cleanup              {uncommitted} (body required) → removes what agents running nowhere left on the project, only what is safe, and with uncommitted their worktrees with uncommitted work too, each one's changes first kept under refs/foreman/cleaned/<time>/<agent>/<repo> (its entry in removed then carries files and backup) → {removed, kept} ([Project team → Earlier teams](../features/project-team.md#earlier-teams))
 GET    /api/projects/:id/branch-cleanup  what the branch cleanup offers in the project's code repos, read side by side, by repo then branch → [{repo, branch, agents, state (merged, superseded, unmerged), supersededBy?, legacy, stays?}] ([Repos → Branch cleanup](../features/repos.md#branch-cleanup))
 POST   /api/projects/:id/branch-cleanup  {branches: [{repo, branch}]} → {removed, kept}: deletes the pick, each in its repo, checked again; what stays, stays (one in a repo the project hasn't, or a missing one, is kept, with why)
 GET    /api/reviews?project=<id>              a project's open reviews and its 20 decided last (by when), newest first, with their merge requests and status, without comments (Review); 400 without project
@@ -81,18 +77,15 @@ DELETE /api/reviews/:id/comments/:comment     deletes a draft; 204; 409 SENT
 POST   /api/reviews/:id/changes               {note}: Request changes: the drafts and the note to the lead in one message; 204; 400 INVALID (neither)
 POST   /api/reviews/:id/merge                 {heads: {<repo>: <commit>}, landing?}: merges each repo named, at the commit the CEO read, its full hash, against its target onto where it lands: landing (the CEO's name, any but an agent's; its target's own name lands on it), else the lead's, else the target (Pipeline and merges → Where a merge goes); 204; 400 INVALID, nothing merged (a bad landing name, or one that is a branch at another commit than a repo's target); 409 NOT_MERGED says, per repo, why one didn't (a conflict: the lead is told to merge its target in; the CEO's checkout in the way; the branch moved since that commit), the others merged; 409 NOT_OPEN
 POST   /api/reviews/:id/dismiss               {note, dropBranches, stopTeam}: stops the team first when asked (an error dismisses nothing), ends it unmerged in every repo open, drops its branches (kept under refs/foreman/dismissed/) when asked, and tells a lead whose team keeps working to stop, with the note if any → {kept: [{repo, branch, why}]}, the branches it couldn't drop (a git error); 400 INVALID to drop the branches of a team left running; 409 NOT_OPEN
-POST   /api/repos/global/sync                 Sync: fetch, merge in and push the global repo's main (stops on a conflict)
-POST   /api/projects/:id/sync                 Sync: fetch, merge in and push the project repo's main (stops on a conflict)
 
 GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry: its Markdown and lookup tables (Wiki engine → Rendering; reading it marks it seen); every board with its cards. An entry whose frontmatter can't be read carries frontmatterError (on its tree node and its entry), and each board lists those under its path in unread [{path, label, error}], never as cards
 GET    /api/wiki/:project/image/:path         an image an entry links to, inside the wiki (Wiki engine → Rendering); 404 for anything else
 PUT    /api/wiki/:project/checkbox/:path      {line, done, version}: 204; 409 CONFLICT when the entry changed, 400 INVALID when there's no checkbox on that line, 500 INTERNAL when the write fails
 PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to value, and lane when not empty; 204; 409 CONFLICT, 400 INVALID (no status, a lane on a board without lanes, a card with no frontmatter such as an index.md), 404 when the card isn't on that board, 422 REFUSED when the wiki library refuses the write (a frontmatter it can't edit safely), with its reason
 
-GET    /api/settings | PUT /api/settings       settings, version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid
-| PUT /api/settings       settings, version, problems
+GET    /api/settings | PUT /api/settings       this machine's settings (~/.foreman/settings.toml, the look included: theme, accent, terminalFont, terminalFontSize), version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid; nothing is committed
+GET    /api/instructions | PUT /api/instructions  the CEO's instructions to every agent, Foreman's HQ's instructions.md: {text, version} (version "" while the file doesn't exist); PUT sends {text, version}: 409 on a stale version; one commit each
 GET    /api/harnesses                         the supported harnesses: their command, newline keystroke, and how a profile connects (login: a terminal; endpoint: a form)
-GET    /api/preferences | PUT /api/preferences  the CEO's preferences, the same for every project: {theme, accent, terminalFont, terminalFontSize} (theme: system, dark or light; accent: blue, green, purple, teal, orange, pink or amber; terminalFont: jetbrains-mono, fira-code, source-code-pro or system; terminalFontSize: 10 to 24; 400 INVALID). A PUT changes the fields it names; the rest stay
 GET    /api/profiles                          the CEO's profiles (each a harness and its credentials, shared by every project): name, harness, connected; default first
 POST   /api/profiles                          {name, harness} → 201 the profile, with no login yet (400 INVALID: a bad name or an unsupported harness; 409 EXISTS)
 DELETE /api/profiles/:name                    deletes it and its login, ending its login terminal (204; 400 INVALID for default; 404)
@@ -138,7 +131,7 @@ Resource ids: project = its name (unique in any case); team = team id; instance 
 
 ## Version-guarded writes
 
-Every file-backed object the UI can change (wiki entry, team definition, settings) is served with a `version` (a content hash). Writes send the version they were based on:
+Every file-backed object the UI can change (wiki entry, team definition, settings, instructions) is served with a `version` (a content hash). Writes send the version they were based on:
 - matching version → write, respond with the new version;
 - different version → `409 VERSION_CONFLICT` with the current version; the UI shows an error and reloads the object. Never last-writer-wins.
 
@@ -161,7 +154,7 @@ Wiki writes are carried out by the [wiki engine](./wiki-engine.md) (single-field
 | `team.action` | an agent called a git tool | the action |
 | `pipeline.changed` | a work item changes stage or checks, or a merge request is created, changes checks, gets a PR or changes state | the work item or merge request |
 | `wiki.changed` | a project wiki's content changed (an entry, `wiki.toml`, or an image its entries link to); only on a real change, by content | `project`, `paths` (entries added, edited or removed, and `wiki.toml`; empty when only a linked image came or went), `versions` (each path's new version, `""` once gone) |
-| `config.changed` | `project.toml`, a team file or settings changed (incl. parse errors) | `object` (`project`, `team`, `settings`), `id`, `version` (empty once the file is gone), `problems` |
+| `config.changed` | `project.toml`, a team file, settings or the instructions changed (incl. parse errors) | `object` (`project`, `team`, `settings`, `instructions`), `id`, `version` (empty once the file is gone), `problems` |
 | `projects.changed` | projects or their repos appeared, went or changed (a repo added, located, removed, gone missing) | `{}`: refetch the project list |
 | `setup.changed` | Podman appeared, started, stopped or failed; the instances were restored; the background image build started or ended | `{}`: refetch the checklist |
 | `cos.proposal` | the Chief of Staff proposed a team (checked), or the one on screen is gone (created, stale, the session ended) | the proposal (`id`, `team`, `current`: the team as it is, null for a new one), or null |
@@ -178,4 +171,4 @@ The notifier also derives browser notifications and toasts from these events on 
 - A viewer that falls more than 1024 output chunks behind is dropped, so a slow tab never stalls the agent. The server closes it with code `1013` (try again later); the client reconnects at once, clears its screen and receives a fresh snapshot. Other disconnects are retried with a backoff from 250 ms up to 5 s. After the `exit` message the server closes normally (`1000`) and the client doesn't reconnect.
 - The upgrade request passes the same Origin and token checks as the HTTP API: browsers do not apply the same-origin policy to WebSockets.
 
-`POST /api/instances/:id/input` is the line-input alternative (mobile or paste): the text plus Enter is written to the PTY as the same raw bytes typing would produce. Foreman attaches no side effects to either path ([Sessions](../features/sessions.md#talking-to-the-team)).
+`POST /api/instances/:id/line` is the line-input alternative (mobile or paste): the text plus Enter is written to the PTY as the same raw bytes typing would produce. Foreman attaches no side effects to either path ([Sessions](../features/sessions.md#talking-to-the-team)).

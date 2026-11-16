@@ -511,11 +511,11 @@ func TestAPrivateSubmoduleTheCEOHasntCheckedOut(t *testing.T) {
 	}
 }
 
-// moved puts a worktree one folder deeper, as moving a project into its
-// workspace did, and tells its repo (git worktree repair, as Migrate does).
+// moved puts a worktree one folder deeper, as moving a project by hand does,
+// and tells its repo (git worktree repair, as Prepare does).
 func moved(t *testing.T, r, wt string) string {
 	t.Helper()
-	to := filepath.Join(t.TempDir(), "workspace", "agents", "tove", "api")
+	to := filepath.Join(t.TempDir(), "worktrees", "ledger", "tove", "api")
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		t.Fatal(err)
 	}

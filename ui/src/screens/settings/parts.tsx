@@ -7,7 +7,7 @@ import { GroupCard } from "../../components/ui";
 // What every Settings tab is built from: a section, a row, and saving.
 
 /** Where a section's settings are kept. */
-export const inGlobalRepo = "Global repo";
+export const inHQ = "Foreman’s HQ";
 export const onThisMachine = "This machine";
 
 /** Saves a change to the settings read last; a failure says why and the screen

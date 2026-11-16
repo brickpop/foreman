@@ -14,10 +14,10 @@ import {
   type ForemanClient,
   type Instance,
   type OpenTarget,
-  type Preferences,
   type Proposal,
   type Request,
   type Settings,
+  type SettingsFile,
   type Soul,
   type Team,
   useClient,
@@ -45,7 +45,7 @@ export const keys = {
   requests: ["requests"],
   harnesses: ["harnesses"],
   profiles: ["profiles"],
-  preferences: ["preferences"],
+  instructions: ["instructions"],
   maintenance: ["maintenance"],
   setup: ["setup"],
   messages: ["messages"],
@@ -102,9 +102,8 @@ export function useProjectName(): (id: string) => string {
   return (id) => projectName(projects, id);
 }
 
-/** Where a project's repo is on disk, for showing paths: <workspace>/project
- * (in the home, projects/<id>, for one made before workspaces). */
-export function useProjectRepo(project: string): string {
+/** Where a project's HQ is on disk, for showing paths. */
+export function useProjectHQ(project: string): string {
   return useProjects().data?.find((p) => p.id === project)?.path ?? "";
 }
 
@@ -118,12 +117,18 @@ export function useSettings() {
   return useQuery({ queryKey: keys.settings, queryFn: () => c.home.settings() });
 }
 
+/** The CEO's instructions for every agent (instructions.md in Foreman's HQ). */
+export function useInstructions() {
+  const c = useClient();
+  return useQuery({ queryKey: keys.instructions, queryFn: () => c.home.instructions() });
+}
+
 export function useHarnesses() {
   const c = useClient();
   return useQuery({ queryKey: keys.harnesses, queryFn: () => c.harnesses.list() });
 }
 
-/** The CEO's profiles, with their state. Kept outside the global repo, so no
+/** The CEO's profiles, with their state. Kept outside Foreman's HQ, so no
  * event says they changed: what changes them here refetches them. */
 export function useProfiles() {
   const c = useClient();
@@ -147,10 +152,10 @@ export function staleKeys(e: Event): readonly (readonly string[])[] {
       const object = (e.data as { object?: string }).object;
       // Each is part of the agents' prompts: which runs are behind changes too.
       if (object === "team") return [keys.teams, ["prompt"], keys.setup, keys.instances];
-      // The settings choose the engine, which the checklist checks, and hold
-      // the CEO's instructions, part of every prompt, and the projects folder.
-      if (object === "settings")
-        return [keys.settings, keys.setup, ["prompt"], ["workspace"], keys.instances];
+      // The settings choose the engine, which the checklist checks.
+      if (object === "settings") return [keys.settings, keys.setup];
+      // The CEO's instructions are part of every prompt.
+      if (object === "instructions") return [keys.instructions, ["prompt"], keys.instances];
       return [keys.projects, keys.setup, keys.instances];
     }
     case "projects.changed":
@@ -321,7 +326,7 @@ export function useMessages(deployment: string) {
   });
 }
 
-/** The scaffold files the project repo lacks: under the wiki's key, so its files appearing refresh it. */
+/** The scaffold files the HQ lacks: under the wiki's key, so its files appearing refresh it. */
 export function useMissing(project: string) {
   const c = useClient();
   return useQuery({
@@ -647,7 +652,7 @@ export function useCleanUp(project: string) {
   const c = useClient();
   const queries = useQueryClient();
   return useMutation({
-    mutationFn: () => c.pipeline.cleanUp(project),
+    mutationFn: (uncommitted: boolean) => c.pipeline.cleanUp(project, uncommitted),
     onSettled: () => queries.invalidateQueries({ queryKey: keys.repos }),
   });
 }
@@ -699,33 +704,34 @@ export function useRepoLog(project: string, repo: string, ref: string, all = fal
   });
 }
 
-/** The CEO's preferences, applied as they arrive: on load, and when this tab
- * comes back into focus after another tab changed them. */
-export function usePreferences() {
-  const c = useClient();
-  const prefs = useQuery({ queryKey: keys.preferences, queryFn: () => c.preferences.get() });
+/** The look of the UI and its terminal (settings), applied as it arrives:
+ * on load, and when another tab or a hand edit changed it. */
+export function useLook(): Settings | undefined {
+  const look = useSettings().data?.settings;
+  const theme = look?.theme;
+  const accent = look?.accent;
+  // Nothing until the settings are read: the first frame keeps this browser's copy.
   useEffect(() => {
-    if (!prefs.data) return;
-    applyTheme(asTheme(prefs.data.theme));
-    applyAccent(asAccent(prefs.data.accent));
-  }, [prefs.data]);
-  return prefs;
+    if (theme === undefined || accent === undefined) return;
+    applyTheme(asTheme(theme));
+    applyAccent(asAccent(accent));
+  }, [theme, accent]);
+  return look;
 }
 
-/** Saves some of the preferences (the theme, the accent, the terminal font):
- * shown at once (usePreferences applies them, open terminals follow), and
- * put back if refused. */
-export function useSavePreferences() {
-  const c = useClient();
+/** The settings that make the look. */
+export type Look = Pick<Settings, "theme" | "accent" | "terminalFont" | "terminalFontSize">;
+
+/** Saves part of the look: shown at once (useLook applies it, open terminals
+ * follow), and put back if refused, the settings read again. */
+export function useSaveLook() {
   const queries = useQueryClient();
-  return useMutation({
-    mutationFn: (p: Partial<Preferences>) => c.preferences.save(p),
-    onMutate: (p) => {
-      const before = queries.getQueryData<Preferences>(keys.preferences);
-      if (before) queries.setQueryData(keys.preferences, { ...before, ...p });
-      return before;
-    },
-    onError: (_e, _p, before) => queries.setQueryData(keys.preferences, before),
-    onSettled: () => queries.invalidateQueries({ queryKey: keys.preferences }),
-  });
+  const save = useSaveSettings();
+  return (p: Partial<Look>) => {
+    queries.setQueryData<SettingsFile>(
+      keys.settings,
+      (f) => f && { ...f, settings: { ...f.settings, ...p } },
+    );
+    return save((s) => ({ ...s, ...p }));
+  };
 }

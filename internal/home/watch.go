@@ -43,7 +43,7 @@ func (h *Home) Watch(ctx context.Context, notify func(Change)) error {
 				}
 			case <-timer:
 				timer = nil
-				// Watch new folders (a new project repo) before reading them: a change made
+				// Watch new folders (a new project's HQ) before reading them: a change made
 				// in between would otherwise go unnoticed.
 				h.watchDirs(watcher)
 				h.reload()
@@ -62,19 +62,20 @@ func (h *Home) reload() {
 }
 
 // watchDirs watches every folder whose entries make up the snapshot: the
-// home, the global repo, teams/, and each project repo, in its workspace
-// (legacy: projects/ and each folder in it). A project's code repos are
-// anywhere, so they are checked on every reload and start, never watched.
-// fsnotify watches a folder's direct entries; adding one twice is harmless.
+// home (settings.toml), Foreman's HQ and its teams/, projects/ and each
+// project's folder and HQ. A project's code repos are anywhere, so they are
+// checked on every reload and start, never watched. fsnotify watches a
+// folder's direct entries; adding one twice is harmless.
 func (h *Home) watchDirs(watcher *fsnotify.Watcher) {
-	dirs := []string{h.root, h.config(), h.config(teamsDir), h.Path(projectsDir)}
-	entries, _ := os.ReadDir(h.Path(projectsDir))
+	projects := filepath.Join(h.folder, projectsDir)
+	dirs := []string{h.root, h.HQ(), h.HQ(teamsDir), projects}
+	entries, _ := os.ReadDir(projects)
 	for _, e := range entries {
 		if e.IsDir() {
-			dirs = append(dirs, h.Path(projectsDir, e.Name()))
+			dirs = append(dirs, filepath.Join(projects, e.Name()))
 		}
 	}
-	dirs = append(dirs, h.projectRepos()...)
+	dirs = append(dirs, h.projectHQs()...)
 	for _, d := range dirs {
 		if _, err := os.Stat(d); err == nil {
 			_ = watcher.Add(d)
@@ -82,8 +83,8 @@ func (h *Home) watchDirs(watcher *fsnotify.Watcher) {
 	}
 }
 
-// projectRepos are the projects' project repos.
-func (h *Home) projectRepos() []string {
+// projectHQs are the projects' HQs.
+func (h *Home) projectHQs() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	var dirs []string
@@ -96,24 +97,20 @@ func (h *Home) projectRepos() []string {
 // relevant says whether a file event can change the snapshot. The home also
 // holds state.db and the logs, which change all the time.
 func (h *Home) relevant(path string) bool {
-	for _, repo := range h.projectRepos() {
-		// a project repo going, its project.toml
-		if path == repo || path == filepath.Join(repo, "project.toml") {
+	for _, hq := range h.projectHQs() {
+		// an HQ going, its project.toml
+		if path == hq || path == filepath.Join(hq, "project.toml") {
 			return true
 		}
 	}
-	rel, err := filepath.Rel(h.root, path)
-	if err != nil {
-		return false
+	switch path {
+	case h.Path(settingsFile), h.HQ(), h.HQ(instructionsFile), h.HQ(teamsDir):
+		return true
 	}
-	parts := strings.Split(rel, string(filepath.Separator))
-	switch {
-	case parts[0] == configDir:
-		// config/, its settings.toml, teams/ and its files
-		return len(parts) == 1 || rel == filepath.Join(configDir, settingsFile) || parts[1] == teamsDir
-	case parts[0] == projectsDir:
-		// legacy: projects/, a project repo appearing or going, its project.toml
-		return len(parts) <= 2 || (len(parts) == 3 && parts[2] == "project.toml")
+	if filepath.Dir(path) == h.HQ(teamsDir) {
+		return true
 	}
-	return false
+	// projects/, a project's folder or its HQ appearing or going
+	rel, err := filepath.Rel(filepath.Join(h.folder, projectsDir), path)
+	return err == nil && !strings.HasPrefix(rel, "..") && len(strings.Split(rel, string(filepath.Separator))) <= 2
 }

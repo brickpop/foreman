@@ -15,15 +15,15 @@ epic: install-first-run
 - **Nothing asks for a profile.** A new project gets the default profile without saying so ([Add a project → Effect](../product/features/add-project.md#effect), step 5). The only place to choose one is [Project settings](../product/features/project-settings.md) (`ProfileChoice`), which the CEO has to know to look for.
 - **The overall flow is unclear.** The project is created in step 1, before its repos. The project (its Wiki) opens behind the dialog while step 2 is still open. **Later** and **Done** both just close the dialog.
 
-Was blocked by [Project workspaces](./archive/project-workspaces.md), built 2026-10-28: step 1 already has a typed **Workspace** field (following the name, `GET /api/folders/workspace`); this card was to add its **Change**; [One Foreman folder](./foreman-folder.md) removes the field instead (every project's folder is `~/foreman/projects/<id>/`), and [Portable projects](./portable-projects.md) adds Clone beside picking a repo.
+Was blocked by [Project workspaces](./archive/project-workspaces.md), built 2026-10-28: step 1 already has a typed **Workspace** field (following the name, `GET /api/folders/workspace`); this card was to add its **Change**; [One Foreman folder](./foreman-folder.md) removed the field instead (2026-11-15: every project's folder is `~/foreman/projects/<id>/`), and [Portable projects](./portable-projects.md) adds Clone beside picking a repo.
 
 ## Decided (the CEO, 2026-11-04), replacing step 2 below
 
-The dialog is one step: once the project is created it closes and the project's [Repos](../product/features/repos.md) page opens, which already is the list of its repos (name, path, default branch, Remove) with **Add a repo**. Built 2026-11-04, with the one-step repo form and the breadcrumb browser ([Add a project → Picking repos](../product/features/add-project.md#picking-repos)). Left in this card: the workspace's folder browser, the profile in step 1, and repos already added greyed in the browser's list (the folder shown already greys **Add repo**, 2026-11-04).
+The dialog is one step: once the project is created it closes and the project's [Repos](../product/features/repos.md) page opens, which already is the list of its repos (name, path, default branch, Remove) with **Add a repo**. Built 2026-11-04, with the one-step repo form and the breadcrumb browser ([Add a project → Picking repos](../product/features/add-project.md#picking-repos)). Left in this card: the profile in step 1, and repos already added greyed in the browser's list (the folder shown already greys **Add repo**, 2026-11-04).
 
 ## Decided (the CEO, 2026-10-28)
 
-- **Two steps.** Step 1, **New project**: the name, the **workspace** (pre-filled `<projects folder>/<name>`, editable; offers to create the projects folder when it's missing), the project repo (New | Clone, always into `<workspace>/project/`), and the **profile** (a select, default preselected, with its harness and connected state, as in Project settings). **Create project**.
+- **Two steps.** Step 1, **New project**: the name, the **HQ** (New | Clone, always into `~/foreman/projects/<id>/hq/`; the workspace this step first had went with [One Foreman folder](./foreman-folder.md)), and the **profile** (a select, default preselected, with its harness and connected state, as in Project settings). **Create project**.
 - Step 2, **`<name>`: code repos**: a real list of the project's repos (name, path, main branch, **Remove**), then **+ Add a repo**, which opens the add form (`AddRepo`, shared with Project settings) under the list. Each repo is checked by the server as it's added. One button: **Done: open `<name>`**.
 - **Repos already in the project** show in the folder browser greyed and marked `added`, and opening one says it's added, with **Add repo** off; the server marks them by real path, so a symlink to one counts.
 - **The project (its Wiki) opens when the dialog closes** (Done, or closing step 2), not behind it at creation. Cancel in step 1 opens nothing.
@@ -31,8 +31,7 @@ The dialog is one step: once the project is created it closes and the project's 
 ```
 ── New project ─────────────────────────────────────
 Project name  [ledger            ]
-Workspace     [~/workspace/foreman/ledger] [Change]
-Project repo  (New) Clone
+HQ            (New) Clone
 Profile       [default · Claude Code ▾] connected
                          [Cancel] [Create project]
 

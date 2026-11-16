@@ -13,7 +13,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 ## Part 1: set up
 
 **1. Start Foreman.** `foreman`. It prints the URL with the access token and opens the browser (a second `foreman` would only print and open the same URL).
-- *Under the hood:* Home & config (opens or creates the home `~/.foreman` and takes its lock; the global repo `config/`: `git init` and its `.gitignore`; the access token); Web server (listens on 127.0.0.1:8888, access guard swaps the URL token for a cookie); Instance manager (re-attaches to agent containers still running from last time: none yet); Execution engine (Podman service started if needed: `podman system service` on Linux, `podman machine start` on macOS).
+- *Under the hood:* Home & config (opens or creates the home `~/.foreman` and takes its lock; reads `foreman_folder` from `settings.toml` and makes Foreman's folder `~/foreman`; Foreman's HQ `~/foreman/hq/`: `git init`, its `.gitignore`, `teams/` and an empty `instructions.md`, one commit; the access token); Web server (listens on 127.0.0.1:8888, access guard swaps the URL token for a cookie); Instance manager (re-attaches to agent containers still running from last time: none yet); Execution engine (Podman service started if needed: `podman system service` on Linux, `podman machine start` on macOS).
 
 **2. Prepare the agent images.** Settings → System → Maintenance shows Base and Harnesses `not built yet`. The CEO presses **Refresh** (or the first deploy does it).
 - *Under the hood:* Image builder (Podman): builds `localhost/foreman/base`, then `…/harness` (Claude Code, Pi…); a project layer is a transparent tag. Build logs stream to the page; the Event bus pushes the state changes.
@@ -21,17 +21,17 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **3. Log in to Claude Code.** Settings → Agents → Profiles → `default` (Claude Code) → **Connect**, or the same button on the Dashboard's setup checklist. A dialog shows a terminal running `claude /login`; the CEO completes the browser sign-in. Once: every project on `default` uses it.
 - *Under the hood:* a one-off **login container**: Execution engine starts it from the harness image with the profile's folder (`~/.foreman/profiles/default/`) mounted read-write; a Terminal streams it into the dialog exactly like any session. When it exits, Settings shows `connected`.
 
-**4. Add the project.** Sidebar → **+ New project** asks for a name, `ledger`, and a project repo: **New**. Its Repos page opens: **Add a repo**, the CEO opens `~/dev/ledger-api` in the folder browser → **Add repo** ([Add a project](./features/add-project.md)).
-- *Under the hood:* Home & config stores the project record (`POST /api/projects`) and creates the project repo `~/workspace/foreman/ledger/project/`: `git init`, `project.toml`, `AGENTS.md` and a starter `wiki/` with `index.md` and `wiki.toml` (one Backlog board), as its first commit. Adding `ledger-api` (`POST /api/projects/ledger/repos`) checks it is a git repo with a commit, inside the CEO's home folder, and keeps its path and root commit on the record. The sidebar updates through the Event bus (`projects.changed`).
+**4. Add the project.** Sidebar → **+ New project** asks for a name, `ledger`, and its HQ: **New**. Its Repos page opens: **Add a repo**, the CEO opens `~/dev/ledger-api` in the folder browser → **Add repo** ([Add a project](./features/add-project.md)).
+- *Under the hood:* Home & config stores the project record (`POST /api/projects`) and creates the project's HQ `~/foreman/projects/ledger/hq/`: `git init`, `project.toml`, `AGENTS.md` and a starter `wiki/` with `index.md` and `wiki.toml` (one Backlog board), as its first commit, and its files folder `~/foreman/projects/ledger/files/` (`inbox/`, `shared/`). Adding `ledger-api` (`POST /api/projects/ledger/repos`) checks it is a git repo with a commit, inside the CEO's home folder, and keeps its path and root commit on the record. The sidebar updates through the Event bus (`projects.changed`).
 
 **5. Read the project.** Sidebar → **ledger** opens its **Wiki** (no team yet), which shows the wiki's `index.md`; **Board** shows the Backlog board (empty); **Settings** shows `project.toml` read-only.
-- *Under the hood:* Wiki block (the agentic-wiki engine reads the bundle `~/workspace/foreman/ledger/project/wiki/`; markdown rendered on the server; links resolved by the engine).
+- *Under the hood:* Wiki block (the agentic-wiki engine reads the bundle `~/foreman/projects/ledger/hq/wiki/`; markdown rendered on the server; links resolved by the engine).
 
 **6. Create a team.** Dashboard (or Settings → Teams) → **+ New team** opens the Chief of Staff page, its terminal full width. The CEO types "A team to build features for ledger", answers its questions, and the preview opens beside the terminal: Atlas, its playbook, a tab per member (lead, two engineers). **Adjust team** → "make Ilya a reviewer" → a new preview → **Create Atlas**.
-- *Under the hood:* the Chief of Staff is an ad-hoc session like the login container (Harness adapter, Terminal, Execution engine), not an agent of a deployment, on the `default` profile, with `config/teams/` mounted read-only. Its one tool, `propose_team`, is checked by Home & config and pushed to the page (`cos.proposal`). **Create Atlas** makes Home & config write `config/teams/atlas.toml`, one commit in the global repo; the file watcher picks it up and Atlas shows on the Dashboard and in Settings → Teams.
+- *Under the hood:* the Chief of Staff is an ad-hoc session like the login container (Harness adapter, Terminal, Execution engine), not an agent of a deployment, on the `default` profile, with Foreman's HQ's `teams/` mounted read-only. Its one tool, `propose_team`, is checked by Home & config and pushed to the page (`cos.proposal`). **Create Atlas** makes Home & config write `~/foreman/hq/teams/atlas.toml`, one commit in Foreman's HQ; the file watcher picks it up and Atlas shows on the Dashboard and in Settings → Teams.
 
 **7. Tune an agent.** Team → Members → Tove → the Agent page: the CEO changes her personality. "Saved. Applies on every project."
-- *Under the hood:* Home & config writes the team file (version-guarded against concurrent edits) and commits it: one commit per save in the global repo.
+- *Under the hood:* Home & config writes the team file (version-guarded against concurrent edits) and commits it: one commit per save in Foreman's HQ.
 
 ## Part 2: put the team to work
 
@@ -39,11 +39,11 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 
 **8. Deploy.** Team → **Deploy to a project** → `ledger` → **Deploy**. The goal isn't asked: it is ledger's, in its wiki's `backlog/index.md`, none yet.
 - *Under the hood:* the deployment is stored (State store). Instance manager `Ensure(deployment)`, for each member:
-  1. Nothing checked out yet: each agent opens `ledger-api` the first time it needs it (`open`, or a `switch` or `merge` that needs it), a worktree at `~/workspace/foreman/ledger/agents/<agent>/ledger-api` (`git worktree add` on the host), idle on no branch until it switches to a topic.
+  1. Nothing checked out yet: each agent opens `ledger-api` the first time it needs it (`open`, or a `switch` or `merge` that needs it), a worktree at `~/foreman/worktrees/ledger/<agent>/ledger-api` (`git worktree add` on the host), idle on no branch until it switches to a topic.
   2. Image builder `Ensure(ledger)` → the image ledger's agents run on (`localhost/foreman/harness` while every project shares one).
   3. Harness adapter `Launch`: the session prompt (soul + team + project, pointing to the goal in the wiki) as the instance's `CLAUDE.md`, the MCP config pointing at `foreman-agent`, the hooks config.
   4. Agent link: registers the instance's token.
-  5. Execution engine `Start`: the container with its worktree (rw) and `ledger-api/.git` (read-only: agents read git, Foreman writes it) at their host paths, the live project repo `~/workspace/foreman/ledger/project/` at its path too (rw for Mara, the lead, read-only for the others), its private config, the shared login file, `~/.gitconfig` (ro).
+  5. Execution engine `Start`: the container with its worktree (rw) and `ledger-api/.git` (read-only: agents read git, Foreman writes it) at their host paths, the live project's HQ `~/foreman/projects/ledger/hq/` at its path too (rw for Mara, the lead, read-only for the others), the project's `files/inbox` (ro) and `files/shared` (rw), its private config, the shared login file, `~/.gitconfig` (ro).
   6. Terminal: created on the process; status `starting` → `idle` on the first hook.
   7. **Kickoff:** only Mara, the lead, starts now, with no opening message. The CEO opens ledger's Session and writes to her; finding no goal in the wiki, she asks for it first ("Add idempotency keys to POST /settle"), writes it in `backlog/index.md` and plans from it. Tove and the other members are `asleep`: no container runs until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)).
 
@@ -53,8 +53,8 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 **10. Talk to the lead.** The CEO types into Mara's terminal: "Use the existing request-id header; keep the API backwards compatible."
 - *Under the hood:* keystrokes go raw, Web server → Terminal `Input` → the container's terminal. No Foreman logic in between.
 
-**11. The lead plans in the wiki.** Mara reads `project/wiki/` and the code, creates the card `project/wiki/backlog/LED-44.md` (a task: status `todo`, assignee `tove`) and commits it with `commit()`. (The lead writes the knowledge base; everyone else contributes through `contribute`.)
-- *Under the hood:* the agent edits files in the live project repo, mounted read-write for her (its `.git` read-only), and calls `commit()`, which Foreman runs on the host; Foreman's file watcher notices; the Wiki block re-reads; the Event bus updates the Board and the "changed" dot in the reader.
+**11. The lead plans in the wiki.** Mara reads `hq/wiki/` and the code, creates the card `hq/wiki/backlog/LED-44.md` (a task: status `todo`, assignee `tove`) and commits it with `commit()`. (The lead writes the knowledge base; everyone else contributes through `contribute`.)
+- *Under the hood:* the agent edits files in the live project's HQ, mounted read-write for her (its `.git` read-only), and calls `commit()`, which Foreman runs on the host; Foreman's file watcher notices; the Wiki block re-reads; the Event bus updates the Board and the "changed" dot in the reader.
 
 **12. The lead delegates.** Mara calls the team tool `ask(tove, "Take LED-44 …")`.
 - *Under the hood:* the harness → `foreman-agent mcp` (stdio) → the agent port → Agent link (the token says `mara@ledger`) → Messaging: message `msg-41` queued for `tove@ledger`; `ask` returns `msg-41` at once, Mara keeps working. "Mara asked Tove" shows in the project's Activity (UI only).
@@ -101,10 +101,10 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 - *Under the hood:* Home & config (team file) → Instance manager → Messaging delivery; the Harness adapter regenerates `CLAUDE.md` for the next start.
 
 **26. Change project config safely.** *Later: how a Chief of Staff change to `project.toml` is approved is open ([Project config with the Chief of Staff](../backlog/cos-project-config.md)); below is the earlier proposal.* Project → Settings → **Change with Chief of Staff** → "Ask me before any new dependency". A review appears in the project's Inbox.
-- *Under the hood:* the Chief of Staff edits `project.toml` on a branch `foreman/config-1` of the project repo `~/workspace/foreman/ledger/project/` (never in the live checkout) → `request_merge` → a review request (Merge to main, or Reject).
+- *Under the hood:* the Chief of Staff edits `project.toml` on a branch `foreman/config-1` of the project's HQ `~/foreman/projects/ledger/hq/` (never in the live checkout) → `request_merge` → a review request (Merge to main, or Reject).
 
 **27. Wiki and board.** In Wiki, the CEO ticks a checkbox in a standup note; on the Board, drags LED-51 to "In progress".
-- *Under the hood:* the Wiki block's version-guarded single-line writes (`SetCheckbox`, `SetField`); agents see the change at once in the live project repo they all mount.
+- *Under the hood:* the Wiki block's version-guarded single-line writes (`SetCheckbox`, `SetField`); agents see the change at once in the live project's HQ they all mount.
 
 ## Part 4: stop and resume
 
@@ -119,7 +119,7 @@ Cast: the CEO; Foreman's home `~/.foreman`; project `ledger` (code repo `ledger-
 | # | Gap | Proposal (to decide) |
 |---|---|---|
 | G1 | ~~**Kickoff**~~ | **Resolved** (2026-10-15): only the lead starts on deploy, its harness launched with the goal as its opening message (still an interactive session); the other members sleep until they have work ([Agent runtime → Lazy starts](./architecture/agent-runtime.md#lazy-starts)). Since 2026-10-31 no opening message: the goal is the project's, in its wiki, and the lead asks the CEO for it when there is none ([Session prompt](./architecture/session-prompt.md)) |
-| G2 | ~~**How the Chief of Staff runs**~~ | **Resolved** (2026-10-18): an ad-hoc session like the login container, on the `default` profile, with its own folder and `config/teams/` read-only; it proposes with `propose_team` and Foreman writes on the CEO's click, one commit, no branch or review ([Chief of Staff → How it runs](./features/chief-of-staff.md#how-it-runs)) |
-| G3 | ~~**Who writes cards**~~ | **Resolved** by the CEO's repo model: the lead writes the knowledge base (the live project repo), and commit through `commit()` (no review); everyone else contributes through `contribute` ([Sandboxes and git policy](./architecture/sandboxes-and-git.md#project-knowledge-base)) |
+| G2 | ~~**How the Chief of Staff runs**~~ | **Resolved** (2026-10-18): an ad-hoc session like the login container, on the `default` profile, with its own folder and the team files read-only; it proposes with `propose_team` and Foreman writes on the CEO's click, one commit, no branch or review ([Chief of Staff → How it runs](./features/chief-of-staff.md#how-it-runs)) |
+| G3 | ~~**Who writes cards**~~ | **Resolved** by the CEO's repo model: the lead writes the knowledge base (the live project's HQ), and commit through `commit()` (no review); everyone else contributes through `contribute` ([Sandboxes and git policy](./architecture/sandboxes-and-git.md#project-knowledge-base)) |
 | G4 | ~~**Screen after a Foreman restart**~~ | **Resolved** (2026-10-14): a container still running is resumed (Foreman re-attaches and rebuilds the screen by replaying the session log into a fresh emulator); a container that is gone gets a new terminal session ([Agent runtime → Restarts](./architecture/agent-runtime.md#restarts)) |
 | G5 | ~~**Git as a core block**~~ | **Resolved** by the CEO's decision to give git its own epic: Git is core block 8 in [Building blocks](./architecture/building-blocks.md#8-git-git), its `Prepare` (a worktree per agent) arriving in epic 1 and its merge plumbing with the [Git epic](../backlog/epics/git.md) |

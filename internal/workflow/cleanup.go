@@ -25,17 +25,23 @@ type Cleaned struct {
 	What   string `json:"what"`   // "worktree" or "branch"
 	Branch string `json:"branch"` // the branch, or the worktree's
 	Why    string `json:"why,omitempty"`
+	// Of a worktree removed with changes not committed (CleanUp's
+	// uncommitted): those files, and the ref they are kept under a while.
+	Files  []string `json:"files,omitempty"`
+	Backup string   `json:"backup,omitempty"`
 }
 
 // CleanUp removes, on a project, what the agents of earlier teams left
 // (wiki/product/features/project-team.md#earlier-teams): only what is
 // safe. A worktree goes when it holds nothing not committed (git refuses
-// otherwise) and no merge is under way; a wt/<project>/<agent>/* branch goes
+// otherwise), or with uncommitted, its changes first kept under
+// refs/foreman/cleaned/ for a while (the CEO, 2026-11-05: their choice, off
+// by default); never while a merge is under way. A wt/<project>/<agent>/* branch goes
 // when all of it has landed (landed) and nothing has it checked out,
 // its head kept under refs/foreman/cleaned/ for a while. An agent running on
 // this project is left alone; one running on another is not, as its branches
 // there carry that project. Everything else is kept, and listed with why.
-func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, error) {
+func (w *Workflow) CleanUp(ctx context.Context, projectID string, uncommitted bool) (Cleanup, error) {
 	p, err := w.Config.Project(projectID)
 	if err != nil {
 		return Cleanup{}, err
@@ -88,7 +94,11 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 				keep(c, "a merge is under way in it")
 				continue
 			}
-			switch err := w.Git.RemoveWorktree(ctx, r.Path, dir); {
+			err := w.Git.RemoveWorktree(ctx, r.Path, dir)
+			if errors.Is(err, git.ErrUncommitted) && uncommitted {
+				c.Files, c.Backup, err = w.removeUncommitted(ctx, r.Path, dir, agent+"/"+r.Name)
+			}
+			switch {
 			case errors.Is(err, git.ErrUncommitted):
 				keep(c, "it holds changes not committed")
 			case err != nil:
@@ -132,4 +142,20 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string) (Cleanup, erro
 		})
 	}
 	return out, nil
+}
+
+// removeUncommitted removes a worktree that holds changes not committed:
+// first listed, then kept under a backup ref (git.Discard), so nothing is
+// lost for a while. A change git can't keep (in a submodule, say) keeps the
+// worktree: ErrUncommitted.
+func (w *Workflow) removeUncommitted(ctx context.Context, repo, dir, path string) ([]string, string, error) {
+	files, err := w.Git.Uncommitted(ctx, dir)
+	if err != nil {
+		return nil, "", err
+	}
+	backup := git.BackupRef("cleaned", w.Now(), path)
+	if _, err := w.Git.Discard(ctx, dir, backup); err != nil {
+		return nil, "", err
+	}
+	return files, backup, w.Git.RemoveWorktree(ctx, repo, dir)
 }

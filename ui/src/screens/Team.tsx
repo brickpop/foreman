@@ -212,7 +212,7 @@ function File({ team }: { team: TeamData }) {
   return (
     <section className="flex flex-col gap-3">
       <span className="font-mono text-[12.5px] text-tx3">
-        {home.data?.path ?? "~/.foreman"}/config/teams/{team.id}.toml
+        {home.data?.folder ?? "~/foreman"}/hq/teams/{team.id}.toml
       </span>
       <pre className="m-0 overflow-x-auto rounded-[10px] border border-line bg-term p-3.5 font-mono text-[12.5px] leading-[1.6] text-tx2">
         {team.source}

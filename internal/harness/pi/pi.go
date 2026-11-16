@@ -402,20 +402,3 @@ func number(v any) int {
 	f, _ := v.(float64)
 	return int(f)
 }
-
-// sessionFolder is Pi's folder of a working folder's conversations
-// (sessions/<it>), as Pi 1.3.0 names it: --<path without its leading slash,
-// each / \ and : made a dash>--.
-func sessionFolder(path string) string {
-	return "--" + strings.NewReplacer("/", "-", `\`, "-", ":", "-").Replace(strings.TrimPrefix(path, "/")) + "--"
-}
-
-var _ harness.Mover = Adapter{}
-
-// MoveConversations renames the working folder's conversations from from to
-// to. A conversation keeps its old working folder in its first line, which Pi
-// doesn't check when it continues one from its own folder.
-func (Adapter) MoveConversations(dir, from, to string) error {
-	sessions := filepath.Join(ConfigDir(dir), "sessions")
-	return harness.Rename(filepath.Join(sessions, sessionFolder(from)), filepath.Join(sessions, sessionFolder(to)))
-}

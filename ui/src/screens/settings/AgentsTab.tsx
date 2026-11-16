@@ -2,21 +2,27 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { type Settings as SettingsData, useClient } from "../../api/client";
 import { harnessLabel, profileName } from "../../app/model";
-import { keys, useHarnesses, useMaintenance, useProfiles } from "../../app/queries";
+import {
+  keys,
+  useHarnesses,
+  useInstructions,
+  useMaintenance,
+  useProfiles,
+} from "../../app/queries";
 import { logCapChoices, stuckChoices, withCurrent } from "../../app/settings";
 import { ConnectDialog } from "../../components/ConnectDialog";
 import { Confirm } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { Button, Segmented } from "../../components/ui";
-import { inGlobalRepo, onThisMachine, Row, Section, useSave } from "./parts";
+import { inHQ, onThisMachine, Row, Section, useSave } from "./parts";
 
 /** Settings → Agents: the profiles agents run on, what every agent is told, and how they run. */
 export function AgentsTab({ settings }: { settings?: SettingsData }) {
   return (
     <>
       <ProfilesSection />
-      {settings && <InstructionsSection settings={settings} />}
+      <InstructionsSection />
       {settings && <RunningSection settings={settings} />}
     </>
   );
@@ -27,7 +33,7 @@ function RunningSection({ settings }: { settings: SettingsData }) {
   const engine = useMaintenance();
   const [confirm, setConfirm] = useState(false);
   return (
-    <Section label="Running agents" kept={inGlobalRepo}>
+    <Section label="Running agents" kept={onThisMachine}>
       <Row
         title="Running sessions at once"
         explanation="Extra sessions wait in a queue until a slot frees up."
@@ -298,49 +304,53 @@ function NewProfile({
   );
 }
 
-/** The CEO's standing instructions: added to every agent's session prompt,
- * at its next start. Saved on Save, one commit each, never mid-sentence. */
-function InstructionsSection({ settings }: { settings: SettingsData }) {
-  const save = useSave();
+/** The CEO's standing instructions (instructions.md in Foreman's HQ): added
+ * to every agent's session prompt, at its next start. Saved on Save, one
+ * commit each, never mid-sentence. */
+function InstructionsSection() {
+  const client = useClient();
+  const queries = useQueryClient();
+  const toast = useToast();
+  const saved = useInstructions().data;
   // undefined: not edited, the saved text shows (and follows a change on disk).
   const [draft, setDraft] = useState<string>();
-  const [saving, setSaving] = useState(false);
-  const changed = draft !== undefined && draft !== settings.instructions;
-  // Once saved, the draft goes when the refetched settings hold it, not
+  const save = useMutation({
+    mutationFn: (text: string) => client.home.saveInstructions(text, saved?.version ?? ""),
+    onSuccess: (i) => queries.setQueryData(keys.instructions, i),
+    onError: (e) => {
+      toast({ title: "Instructions not saved", body: e.message, color: "var(--err)" });
+      queries.invalidateQueries({ queryKey: keys.instructions });
+    },
+  });
+  const changed = saved !== undefined && draft !== undefined && draft !== saved.text;
+  // Once saved, the draft goes when the instructions read hold it, not
   // before: the old text would flash back meanwhile.
   // biome-ignore lint/correctness/useExhaustiveDependencies: on the saved text only
   useEffect(() => {
-    if (draft === settings.instructions) setDraft(undefined);
-  }, [settings.instructions]);
+    if (draft === saved?.text) setDraft(undefined);
+  }, [saved?.text]);
   return (
     <Section
       label="Instructions for every agent"
-      kept={inGlobalRepo}
+      kept={inHQ}
       intro="Your standing rules, as you'd write them in your own CLAUDE.md or AGENTS.md. Foreman adds them at the end of every agent's session prompt, from its next start. Where they conflict with Foreman's own rules (team tools, git, the wiki), Foreman's win."
     >
       <div className="flex flex-col gap-2">
         <textarea
           rows={8}
-          value={draft ?? settings.instructions}
+          value={draft ?? saved?.text ?? ""}
           onChange={(e) => setDraft(e.target.value)}
+          disabled={!saved}
           placeholder="e.g. Write commit messages in English. Prefer small functions."
           aria-label="Instructions for every agent"
           className="w-full resize-y rounded-[8px] border border-line2 bg-term px-3 py-2 font-mono text-[13px] text-tx placeholder:text-tx4"
         />
         {changed && (
           <div className="flex gap-2">
-            <Button
-              variant="primary"
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true);
-                await save((s) => ({ ...s, instructions: draft }));
-                setSaving(false);
-              }}
-            >
+            <Button variant="primary" disabled={save.isPending} onClick={() => save.mutate(draft)}>
               Save
             </Button>
-            <Button disabled={saving} onClick={() => setDraft(undefined)}>
+            <Button disabled={save.isPending} onClick={() => setDraft(undefined)}>
               Discard
             </Button>
           </div>

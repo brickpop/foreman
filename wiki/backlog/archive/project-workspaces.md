@@ -48,7 +48,7 @@ epic: install-first-run
 - **Remove:** keeps the workspace; `deleteWorktrees` and `deleteRepo` options; harness folders and logs go.
 - **UI:** New project's Workspace field (`GET /api/folders/workspace`), Project settings' Workspace block (Copy) or Move offer, Remove's worktrees checkbox, Settings → System → Projects folder.
 - **Tests:** home (layout, rules, takeover, remove, browse bounds, migrate: worktrees work and survive a prune, uncommitted work kept, conversations hook, harness folders moved, refusals, a failure puts everything back), harness (each mover, the rollback across adapters), instances (the harness folder mounted, 0700), server routes, UI client.
-- Known edges: [Technical debt → Project workspaces](../../technical-debt.md#project-workspaces-known-edges) and [→ The workspace migration](../../technical-debt.md#the-workspace-migration).
+- Known edges: [Technical debt → Foreman's folder](../../technical-debt.md#foremans-folder-known-edges) (the workspaces and their migration went with [One Foreman folder](../foreman-folder.md)).
 
 ## Steps
 

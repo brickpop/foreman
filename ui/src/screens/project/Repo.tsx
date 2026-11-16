@@ -71,9 +71,7 @@ export function Repo() {
         >
           ←
         </Link>
-        <h1 className="m-0 text-[18px] font-semibold">
-          {repo?.project ? "Project repo" : readable(name)}
-        </h1>
+        <h1 className="m-0 text-[18px] font-semibold">{repo?.hq ? "HQ" : readable(name)}</h1>
         <span className="font-mono text-[12.5px] text-tx4">{name}/</span>
       </div>
       {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}

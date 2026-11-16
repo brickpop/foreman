@@ -207,6 +207,30 @@ func (g *CLI) Detached(ctx context.Context, dir string) ([]string, error) {
 	return trees, nil
 }
 
+// Uncommitted lists the files the worktree holds not committed: changed,
+// staged, deleted or new (each file of a new folder), not ignored ones; a
+// renamed file by its new name. By path, as git sorts them.
+func (g *CLI) Uncommitted(ctx context.Context, worktree string) ([]string, error) {
+	out, err := run(ctx, worktree, "status", "--porcelain", "-z", "--untracked-files=all")
+	if err != nil {
+		return nil, err
+	}
+	var files []string
+	entries := strings.Split(strings.TrimSuffix(out, "\x00"), "\x00")
+	for i := 0; i < len(entries); i++ {
+		e := entries[i]
+		if len(e) < 4 {
+			continue
+		}
+		files = append(files, e[3:])
+		// A rename or copy is followed by the name it had.
+		if e[0] == 'R' || e[0] == 'C' {
+			i++
+		}
+	}
+	return files, nil
+}
+
 // RecentBranches lists the repo's branches by their last commit, newest
 // first (by name when two were committed at the same second).
 func (g *CLI) RecentBranches(ctx context.Context, dir string) ([]string, error) {

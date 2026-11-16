@@ -343,25 +343,6 @@ func TestGitConfigMount(t *testing.T) {
 	}
 }
 
-// A moved sandbox's conversations follow it, under the folder Pi 1.3.0 names
-// for the new working folder.
-func TestMoveConversations(t *testing.T) {
-	a, s := setup(t)
-	sessions := filepath.Join(ConfigDir(s.Dir), "sessions")
-	if err := a.MoveConversations(s.Dir, "/a", "/b"); err != nil {
-		t.Errorf("nothing to move: %v", err)
-	}
-	if err := os.MkdirAll(filepath.Join(sessions, "--Users-ceo-.foreman-sandboxes-ledger-mara--"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := a.MoveConversations(s.Dir, "/Users/ceo/.foreman/sandboxes/ledger/mara", "/Users/ceo/workspace/foreman/ledger/agents/mara"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(sessions, "--Users-ceo-workspace-foreman-ledger-agents-mara--")); err != nil {
-		t.Error("the conversations didn't move")
-	}
-}
-
 // A dialog's title is what it asks; nothing else asks.
 func TestAsks(t *testing.T) {
 	a := Adapter{}

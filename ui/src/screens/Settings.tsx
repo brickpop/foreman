@@ -9,9 +9,8 @@ import { SystemTab } from "./settings/SystemTab";
 
 // Settings (wiki/product/features/settings.md), in tabs by topic, one file
 // each under settings/, and the teams' pages, each a path under it. Each
-// section says where it is kept: the global repo's settings.toml, the same on
-// every machine you clone it to, or this machine only. Every change saves at
-// once.
+// section says where it is kept: Foreman's HQ (the instructions), or this
+// machine only (settings.toml, the rest). Every change saves at once.
 
 /** Every Settings page's frame: one width, tabs and team pages alike. */
 export function SettingsFrame() {
@@ -53,7 +52,7 @@ export function Settings() {
       {tab === "teams" && <TeamGrid />}
       {tab === "agents" && <AgentsTab settings={s} />}
       {tab === "look" && <LookTab settings={s} />}
-      {tab === "system" && <SystemTab settings={s} />}
+      {tab === "system" && <SystemTab />}
     </>
   );
 }

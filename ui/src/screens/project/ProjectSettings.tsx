@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { type Project, useClient } from "../../api/client";
@@ -26,37 +26,28 @@ export function ProjectSettings() {
 }
 
 function Configuration({ project }: { project: Project }) {
-  const home = useHomeFolder().data?.path ?? "~/.foreman";
-  const tree = (
-    project.workspace
-      ? [
-          `${project.workspace}/`,
-          "├─ project/           project repo (git)",
-          "│  ├─ project.toml    checks, gates",
-          "│  └─ wiki/           knowledge base + wiki.toml (boards)",
-          "└─ agents/            one sandbox per agent: a worktree of each repo",
-          `${home}/`,
-          "├─ config/            global repo (git): teams, settings",
-          `├─ harness/${project.id}/  each agent's harness config and conversations`,
-          "└─ state.db           deployments, sessions, requests (runtime)",
-        ]
-      : [
-          `${home}/`,
-          "├─ config/              global repo (git): teams, settings",
-          "├─ projects/",
-          `│  └─ ${project.id}/`,
-          "│     ├─ project.toml    checks, gates",
-          "│     └─ wiki/           knowledge base + wiki.toml (boards)",
-          "├─ sandboxes/",
-          `│  └─ ${project.id}/      one git worktree per agent, per repo`,
-          "└─ state.db             deployments, sessions, requests (runtime)",
-        ]
-  ).join("\n");
+  const where = useHomeFolder().data;
+  const home = where?.path ?? "~/.foreman";
+  const folder = where?.folder ?? "~/foreman";
+  const tree = [
+    `${folder}/`,
+    "├─ hq/                    Foreman's HQ (git): teams, your instructions",
+    `├─ projects/${project.id}/`,
+    "│  ├─ hq/                 this project's HQ (git)",
+    "│  │  ├─ project.toml     checks, gates",
+    "│  │  └─ wiki/            knowledge base + wiki.toml (boards)",
+    "│  └─ files/              inbox/ from you, shared/ by its agents",
+    `└─ worktrees/${project.id}/  one sandbox per agent: a worktree of each repo`,
+    `${home}/`,
+    "├─ settings.toml          this machine's settings",
+    `├─ harness/${project.id}/  each agent's harness config and conversations`,
+    "└─ state.db               deployments, sessions, requests (runtime)",
+  ].join("\n");
   return (
     <section className="flex max-w-[760px] flex-col gap-6 px-6 pt-6 pb-12">
       <GroupCard title="General">
         <ProjectNameField project={project} />
-        <Workspace project={project} />
+        <Folders project={project} folder={folder} />
         <ProfileChoice project={project} />
         <HideProject project={project} />
       </GroupCard>
@@ -112,7 +103,7 @@ function Configuration({ project }: { project: Project }) {
             {project.path}/project.toml · read-only
           </span>
           <p className="m-0 text-[13.5px] text-tx2">
-            This file is config, committed in the project repo. Edit it in your editor.
+            This file is config, committed in the HQ. Edit it in your editor.
           </p>
           {project.problems.length > 0 && (
             <p className="m-0 rounded-lg border border-err px-3 py-2 text-[13px] text-err">
@@ -134,7 +125,7 @@ function Configuration({ project }: { project: Project }) {
           {[
             [
               "Team definition",
-              "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.",
+              "Lives once, in Foreman's HQ: souls, job descriptions and the playbook. You can deploy it to as many projects as you like.",
             ],
             [
               "Deployment",
@@ -163,73 +154,28 @@ function Configuration({ project }: { project: Project }) {
   );
 }
 
-/** The project's workspace, its folder of the CEO's, to copy; or, for a
- * project made before workspaces, the offer to move it into one (legacy:
- * wiki/backlog/remove-workspace-migration.md). */
-function Workspace({ project }: { project: Project }) {
-  const client = useClient();
-  const queries = useQueryClient();
-  const toast = useToast();
-  const [edited, setEdited] = useState<string>();
-  const suggestion = useQuery({
-    queryKey: ["workspace", project.id],
-    queryFn: () => client.home.suggestWorkspace(project.id),
-    enabled: !project.workspace,
-  }).data;
-  const target = edited ?? suggestion?.path ?? "";
-  const migrate = useMutation({
-    mutationFn: () => client.home.migrate(project.id, target.trim()),
-    onSuccess: (p) => {
-      queries.invalidateQueries({ queryKey: keys.projects });
-      toast({
-        title: `${projectName([p], p.id)} moved`,
-        body: `Into ${p.workspace}.`,
-        color: "var(--ok)",
-      });
-    },
-    onError: (e: Error) =>
-      toast({ title: "Project not moved", body: e.message, color: "var(--err)" }),
-  });
-  if (project.workspace) {
-    return (
-      <Block title="Workspace">
-        <span className="flex items-center gap-3">
+/** Where the project's HQ and its agents' worktrees are, to copy. */
+function Folders({ project, folder }: { project: Project; folder: string }) {
+  const worktrees = `${folder}/worktrees/${project.id}`;
+  return (
+    <Block title="Folders">
+      {[
+        { label: "HQ", path: project.path },
+        { label: "Worktrees", path: worktrees },
+      ].map((f) => (
+        <span key={f.label} className="flex items-center gap-3">
+          <span className="w-[76px] text-[13px] text-tx4">{f.label}</span>
           <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-tx2 select-text">
-            {project.workspace}
+            {f.path}
           </span>
-          <Button variant="small" onClick={() => navigator.clipboard.writeText(project.workspace)}>
+          <Button variant="small" onClick={() => navigator.clipboard.writeText(f.path)}>
             Copy
           </Button>
         </span>
-        <span className="text-[13.5px] text-tx3">
-          Its project repo, and in agents/ each agent's worktrees: look at and run their code there.
-          Editing while an agent works turns into its uncommitted changes.
-        </span>
-      </Block>
-    );
-  }
-  return (
-    <Block title="Move into a workspace">
-      <span className="text-[13.5px] text-tx2">
-        This project lives in Foreman's home. Moved into a folder of yours, its project repo and its
-        agents' worktrees are where you can find them and run their code. Uncommitted work and
-        conversations come along. Stop the teams on it first.
-      </span>
-      <input
-        value={target}
-        onChange={(e) => setEdited(e.target.value)}
-        aria-label="Workspace"
-        spellCheck={false}
-        className="rounded-lg border border-line2 bg-term px-3 py-2 font-mono text-[13px] text-tx"
-      />
-      <span>
-        <Button
-          variant="small"
-          disabled={!target.trim() || migrate.isPending}
-          onClick={() => migrate.mutate()}
-        >
-          {migrate.isPending ? "Moving…" : "Move"}
-        </Button>
+      ))}
+      <span className="text-[13.5px] text-tx3">
+        Its HQ holds its wiki and project.toml. In its worktrees, one folder per agent: look at and
+        run their code there. Editing while an agent works turns into its uncommitted changes.
       </span>
     </Block>
   );
@@ -381,7 +327,7 @@ function HideProject({ project }: { project: Project }) {
   );
 }
 
-/** Removes the project and its history; its project repo folder and its agents' worktrees
+/** Removes the project and its history; its HQ and its agents' worktrees
  * only when asked. Never while a team is deployed on it: stopped first. */
 function RemoveProject({ project }: { project: Project }) {
   const client = useClient();
@@ -392,10 +338,10 @@ function RemoveProject({ project }: { project: Project }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [deleteRepo, setDeleteRepo] = useState(false);
+  const [deleteHQ, setDeleteHQ] = useState(false);
   const [deleteWorktrees, setDeleteWorktrees] = useState(false);
   const remove = useMutation({
-    mutationFn: () => client.home.removeProject(project.id, { deleteRepo, deleteWorktrees }),
+    mutationFn: () => client.home.removeProject(project.id, { deleteHQ, deleteWorktrees }),
     onSuccess: () => {
       queries.invalidateQueries({ queryKey: keys.projects });
       navigate({ to: "/" });
@@ -413,14 +359,14 @@ function RemoveProject({ project }: { project: Project }) {
       <span className="text-[13.5px] text-tx2">
         {running.length > 0
           ? `Stop ${names.join(", ")} on it first (its Team section).`
-          : "Its record and its history go. Its workspace stays. Your code repos keep their branches."}
+          : "Its record and its history go. Its HQ and files stay. Your code repos keep their branches."}
       </span>
       <span>
         <Button
           variant="small"
           disabled={running.length > 0 || remove.isPending}
           onClick={() => {
-            setDeleteRepo(false);
+            setDeleteHQ(false);
             setDeleteWorktrees(false);
             setOpen(true);
           }}
@@ -431,7 +377,7 @@ function RemoveProject({ project }: { project: Project }) {
       <Confirm
         open={open}
         title={`Remove ${projectName([project], project.id)}?`}
-        body="Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its workspace, your code repos and their branches stay."
+        body="Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its files, your code repos and their branches stay."
         action="Remove"
         onConfirm={() => remove.mutate()}
         onClose={() => setOpen(false)}
@@ -451,14 +397,14 @@ function RemoveProject({ project }: { project: Project }) {
         <label className="flex items-start gap-2 text-[13.5px] text-tx2">
           <input
             type="checkbox"
-            checked={deleteRepo}
-            onChange={(e) => setDeleteRepo(e.target.checked)}
+            checked={deleteHQ}
+            onChange={(e) => setDeleteHQ(e.target.checked)}
             className="mt-1"
           />
           <span>
-            Also delete its project repo folder, <span className="font-mono">{project.path}</span>:
-            its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, it's taken
-            over by a new project in the same workspace.
+            Also delete its HQ, <span className="font-mono">{project.path}</span>: its wiki and
+            project.toml. Unless you pushed it, it has no other copy. Kept, a new project of the
+            same name takes it over.
           </span>
         </label>
       </Confirm>

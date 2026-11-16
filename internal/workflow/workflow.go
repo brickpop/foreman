@@ -60,6 +60,7 @@ type Git interface {
 	PruneBackups(ctx context.Context, dir string, before time.Time) error
 	Worktrees(ctx context.Context, dir string) (map[string]string, error)
 	RemoveWorktree(ctx context.Context, repo, worktree string) error
+	Uncommitted(ctx context.Context, worktree string) ([]string, error)
 	Diff(ctx context.Context, dir, target, branch string) (string, error)
 	Compare(ctx context.Context, dir, from, to string, lines int, paths ...string) (string, error)
 	Resolve(ctx context.Context, dir, ref string) (string, error)
@@ -160,7 +161,7 @@ var definitions = []agentlink.Tool{
 			`"from":{"type":"string","description":"Only for a new branch: where its work starts, e.g. release/2.0, a teammate's branch or a commit; best where it will be merged into, or the review shows what it brings along"}`, "branch")},
 	{Name: "commit", Description: "Commit everything you changed in each repo you name, on the branch checked out there, with that repo's message (git is read-only for you); repos you don't name are left as they are. After a merge with conflicts, committing a repo concludes its merge once no conflict markers are left.",
 		InputSchema: object(`"commits":{"type":"array","minItems":1,"description":"One commit per repo","items":{"type":"object","properties":{`+
-			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; project for the project repo (the lead only)"},`+
+			`"repo":{"type":"string","description":"The repo's folder in your sandbox, e.g. api; hq for the project's HQ (the lead only)"},`+
 			`"message":{"type":"string","description":"The commit message"}},"required":["repo","message"]}}`, "commits")},
 	{Name: "merge", Description: "Merge any branch (the CEO's, the lead's, a teammate's, or a remote's that fetch() brought, e.g. origin/main) into yours, in every repo that has it, opening those not open. Not while you're on no branch: switch first. Conflict markers stay in the files: resolve them, then commit those repos to finish the merge, or abort_merge() to back out.",
 		InputSchema: object(`"branch":{"type":"string","description":"The branch to merge in, e.g. main"}`, "branch")},
@@ -330,7 +331,7 @@ type tool struct {
 	act     *store.TeamAction
 }
 
-// repo is one of the caller's worktrees, or the live project repo.
+// repo is one of the caller's worktrees, or the project's live HQ.
 type repo struct{ name, dir string }
 
 // worktrees are the caller's worktrees.
@@ -413,8 +414,8 @@ func (t tool) idle(ctx context.Context, repos []repo, what string) (agentlink.Re
 	return agentlink.Result{}, true
 }
 
-func (t tool) projectRepo() repo {
-	return repo{"project", t.project.Path}
+func (t tool) hq() repo {
+	return repo{"hq", t.project.Path}
 }
 
 // author is the caller, as its commits name it.
@@ -629,11 +630,11 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 }
 
 // committable are the repos the caller may commit, by name: its worktrees,
-// and for the lead the live project repo.
+// and for the lead the project's live HQ.
 func (t tool) committable() map[string]repo {
 	repos := t.worktrees()
 	if t.c.Lead {
-		repos = append(repos, t.projectRepo())
+		repos = append(repos, t.hq())
 	}
 	byName := map[string]repo{}
 	for _, r := range repos {
@@ -672,7 +673,7 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 	}
 	var code []repo
 	for _, a := range asked {
-		if a.Repo != t.projectRepo().name {
+		if a.Repo != t.hq().name {
 			code = append(code, repos[a.Repo])
 		}
 	}
@@ -873,8 +874,8 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 	case teamtools.TooLong(body, teamtools.MaxContribution):
 		return teamtools.Refusal("too_long", "a body is at most %d characters: split it into separate contributions, one subject each", teamtools.MaxContribution)
 	}
-	project := t.projectRepo()
-	inbox := filepath.Join(project.dir, "wiki", "inbox")
+	hq := t.hq()
+	inbox := filepath.Join(hq.dir, "wiki", "inbox")
 	if err := os.MkdirAll(inbox, 0o755); err != nil {
 		return gitError(err)
 	}
@@ -885,10 +886,10 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 		return gitError(err)
 	}
 	rel := filepath.ToSlash(filepath.Join("wiki", "inbox", file))
-	if err := t.w.Git.CommitAs(ctx, project.dir, "Contribution: "+title, t.author(), rel); err != nil {
+	if err := t.w.Git.CommitAs(ctx, hq.dir, "Contribution: "+title, t.author(), rel); err != nil {
 		return gitError(err)
 	}
-	path := filepath.Join(project.dir, rel)
+	path := filepath.Join(hq.dir, rel)
 	if !t.c.Lead {
 		if _, err := t.w.Messages.Send(ctx, store.TeamMessage{DeploymentID: t.c.Deployment.ID, FromInstance: t.c.Instance.ID,
 			ToInstance: t.c.LeadInstance(), Kind: "contribute", Body: title + ", in " + path + ".", ArtifactRef: path}); err != nil {

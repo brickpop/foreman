@@ -644,8 +644,7 @@ function IconButton({
 
 /** The folders the header opens on the desktop, at its right end: the shown
  * agent's (its worktrees), then the project's files, the inbox last (the
- * CEO, 2026-11-06). Only where Foreman's machine can open folders; a project
- * made before workspaces has no files. */
+ * CEO, 2026-11-06). Only where Foreman's machine can open folders. */
 function OpenFolders({ shown }: { shown: Instance }) {
   const project = useProject();
   const canOpen = useCanOpen();
@@ -654,17 +653,15 @@ function OpenFolders({ shown }: { shown: Instance }) {
   const folders: { label: string; path: string; target: OpenTarget }[] = [
     { label: "Agent folder", path: shown.sandboxPath, target: { instance: shown.id } },
   ];
-  if (project.files) {
-    for (const [folder, label] of [
-      [FilesShared, "Shared files"],
-      [FilesInbox, "File inbox"],
-    ] as const) {
-      folders.push({
-        label,
-        path: `${project.files}/${folder}`,
-        target: { project: project.id, folder },
-      });
-    }
+  for (const [folder, label] of [
+    [FilesShared, "Shared files"],
+    [FilesInbox, "File inbox"],
+  ] as const) {
+    folders.push({
+      label,
+      path: `${project.files}/${folder}`,
+      target: { project: project.id, folder },
+    });
   }
   return (
     <span className="ml-auto flex shrink-0 items-center gap-1.5">

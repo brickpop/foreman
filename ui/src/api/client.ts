@@ -10,12 +10,12 @@ import type {
   FilesShared,
   Folder,
   FolderEntry,
+  Instructions,
   Missing,
   Project,
   Settings,
   SettingsFile,
   Soul,
-  Suggestion,
   Team,
 } from "./types/home";
 import type { Draft } from "./types/messaging";
@@ -42,7 +42,6 @@ import type {
   TeamMessage,
   WorkItem,
 } from "./types/store";
-import type { Preferences } from "./types/userdata";
 import type { Board, Card, Entry, Field, Node, Unread } from "./types/wiki";
 import type {
   BranchPick,
@@ -86,13 +85,13 @@ export type {
   HarnessStatus,
   ImageStatus,
   Instance,
+  Instructions,
   LogPage,
   MachineSize,
   Maintenance,
   MergeRequest,
   Missing,
   Node,
-  Preferences,
   Profile,
   Project,
   Proposal,
@@ -108,7 +107,6 @@ export type {
   SettingsFile,
   SetupStep,
   Soul,
-  Suggestion,
   Team,
   TeamAction,
   TeamMessage,
@@ -117,8 +115,9 @@ export type {
   WorkItem,
 };
 
-/** Foreman's home folder on this machine (~/.foreman). */
-export type HomeFolder = { path: string };
+/** Foreman's home on this machine (~/.foreman: its machinery) and its folder
+ * (~/foreman: what the CEO owns). */
+export type HomeFolder = { path: string; folder: string };
 
 export interface HomeArea {
   folder(): Promise<HomeFolder>;
@@ -129,24 +128,19 @@ export interface HomeArea {
   settings(): Promise<SettingsFile>;
   /** Saves settings.toml, guarded by the version read. */
   saveSettings(settings: Settings, version: string): Promise<SettingsFile>;
-  /** Creates a project in workspace, and its project repo there: new (a
-   * starter wiki), or cloned from clone (a URL or a local path, with the CEO's
-   * own git). created is false when it took over a project repo a removed
-   * project left there. */
-  newProject(
-    name: string,
-    workspace: string,
-    clone?: string,
-  ): Promise<{ project: Project; created: boolean }>;
-  /** Where a project named name would go: in the projects folder. */
-  suggestWorkspace(name: string): Promise<Suggestion>;
-  /** Moves a project made before workspaces into workspace (legacy). */
-  migrate(project: string, workspace: string): Promise<Project>;
-  /** Removes a project and its history, keeping its workspace: its project
-   * repo too when deleteRepo, its agents' worktrees when deleteWorktrees. */
+  /** The CEO's instructions for every agent: instructions.md in Foreman's HQ. */
+  instructions(): Promise<Instructions>;
+  /** Saves them, guarded by the version read: one commit in Foreman's HQ. */
+  saveInstructions(text: string, version: string): Promise<Instructions>;
+  /** Creates a project and its HQ: new (a starter wiki), or cloned from
+   * clone (a URL or a local path, with the CEO's own git). created is false
+   * when it took over an HQ a removed project left there. */
+  newProject(name: string, clone?: string): Promise<{ project: Project; created: boolean }>;
+  /** Removes a project and its history, keeping its folder: its HQ too when
+   * deleteHQ, its agents' worktrees when deleteWorktrees. */
   removeProject(
     project: string,
-    opts: { deleteRepo: boolean; deleteWorktrees: boolean },
+    opts: { deleteHQ: boolean; deleteWorktrees: boolean },
   ): Promise<void>;
   /** Adds an existing repo by its folder, with that default branch (none:
    * main, which it must have); newRepo creates an empty one at a new folder,
@@ -171,7 +165,7 @@ export interface HomeArea {
   setName(project: string, name: string): Promise<Project>;
   /** Hides a project (out of the sidebar's projects and the Dashboard), or shows it again. */
   setHidden(project: string, hidden: boolean): Promise<Project>;
-  /** The scaffold files the project repo lacks (wiki/wiki.toml…), and creating them. */
+  /** The scaffold files the HQ lacks (wiki/wiki.toml…), and creating them. */
   missing(project: string): Promise<Missing[]>;
   scaffold(project: string): Promise<Missing[]>;
   /** Saves one agent's soul in its team file, guarded by the version read. */
@@ -233,13 +227,6 @@ export interface ProfilesArea {
   models(name: string, url: string, apiKey: string): Promise<string[]>;
 }
 
-/** The CEO's preferences (the theme, the terminal font), on this machine. */
-export interface PreferencesArea {
-  get(): Promise<Preferences>;
-  /** Changes the fields given; the others stay. */
-  save(p: Partial<Preferences>): Promise<Preferences>;
-}
-
 export interface MaintenanceArea {
   /** The engine's state and its images. */
   status(): Promise<Maintenance>;
@@ -276,7 +263,8 @@ export interface PipelineArea {
   list(project: string): Promise<Pipeline>;
   /** Removes what agents no longer running left on the project, only what
    * is safe; says what it removed and what it kept, with why. */
-  cleanUp(project: string): Promise<Cleanup>;
+  /** uncommitted: worktrees holding changes not committed go too, the changes kept aside. */
+  cleanUp(project: string, uncommitted: boolean): Promise<Cleanup>;
   /** What the branch cleanup offers in the project's code repos: the agents'
    * branches and legacy ones, and the CEO's merged or superseded ones, each
    * with its repo, where its work stands and what keeps it. */
@@ -361,7 +349,7 @@ export interface EventsArea {
 
 /** A project's repos, read-only, as committed (the Repos section). */
 export interface ReposArea {
-  /** The code repos, then the project repo, each with its branches. */
+  /** The code repos, then the HQ, each with its branches. */
   list(project: string): Promise<Repo[]>;
   /** A folder at a ref ("" is the root). */
   tree(project: string, repo: string, ref: string, path: string): Promise<TreeEntry[]>;
@@ -392,7 +380,6 @@ export interface ForemanClient {
   agents: AgentsArea;
   harnesses: HarnessesArea;
   profiles: ProfilesArea;
-  preferences: PreferencesArea;
   maintenance: MaintenanceArea;
   setup: SetupArea;
   requests: RequestsArea;
@@ -442,20 +429,19 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/settings", { settings, version })
         ).json() as Promise<SettingsFile>,
-      newProject: async (name, workspace, clone) => {
-        const r = await request("POST", "/api/projects", { name, clone, workspace });
-        // 201: a new project repo; 200: one taken over.
+      instructions: () => getJSON("/api/instructions"),
+      saveInstructions: async (text, version) =>
+        (
+          await request("PUT", "/api/instructions", { text, version })
+        ).json() as Promise<Instructions>,
+      newProject: async (name, clone) => {
+        const r = await request("POST", "/api/projects", { name, clone });
+        // 201: a new HQ; 200: one taken over.
         return { project: (await r.json()) as Project, created: r.status === 201 };
       },
-      suggestWorkspace: (name) =>
-        getJSON(`/api/folders/workspace?${new URLSearchParams({ name })}`),
-      migrate: async (project, workspace) =>
-        (
-          await request("POST", `/api/projects/${id(project)}/migrate`, { workspace })
-        ).json() as Promise<Project>,
-      removeProject: (project, { deleteRepo, deleteWorktrees }) => {
+      removeProject: (project, { deleteHQ, deleteWorktrees }) => {
         const q = new URLSearchParams();
-        if (deleteRepo) q.set("deleteRepo", "true");
+        if (deleteHQ) q.set("deleteHQ", "true");
         if (deleteWorktrees) q.set("deleteWorktrees", "true");
         return send("DELETE", `/api/projects/${id(project)}${q.size ? `?${q}` : ""}`);
       },
@@ -545,10 +531,6 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     harnesses: {
       list: () => getJSON("/api/harnesses"),
     },
-    preferences: {
-      get: () => getJSON("/api/preferences"),
-      save: async (p) => (await request("PUT", "/api/preferences", p)).json(),
-    },
     profiles: {
       list: () => getJSON("/api/profiles"),
       create: async (name, harness) =>
@@ -591,8 +573,10 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
     },
     pipeline: {
       list: (project) => getJSON(`/api/pipeline?project=${id(project)}`),
-      cleanUp: async (project) =>
-        (await request("POST", `/api/projects/${id(project)}/cleanup`)).json() as Promise<Cleanup>,
+      cleanUp: async (project, uncommitted) =>
+        (
+          await request("POST", `/api/projects/${id(project)}/cleanup`, { uncommitted })
+        ).json() as Promise<Cleanup>,
       cleanupBranches: (project) => getJSON(`/api/projects/${id(project)}/branch-cleanup`),
       deleteBranches: async (project, branches) =>
         (

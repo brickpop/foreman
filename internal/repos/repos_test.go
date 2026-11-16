@@ -24,7 +24,7 @@ func (c config) Project(id string) (home.Project, error) {
 	if id != "ledger" {
 		return home.Project{}, home.ErrNotFound
 	}
-	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "project"), Config: home.ProjectConfig{},
+	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "hq"), Config: home.ProjectConfig{},
 		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api"), Default: "trunk"}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
 }
 
@@ -50,7 +50,7 @@ func write(t *testing.T, path, content string) {
 	}
 }
 
-// fixture: ledger with code repo api (main is trunk) and its project repo;
+// fixture: ledger with code repo api (main is trunk) and its HQ;
 // tove works on wt/tove/x in a worktree, one commit ahead and an edit not
 // committed; ivo has api open on no branch, with an edit, and mara with none;
 // outside.txt sits beside the repos.
@@ -79,11 +79,11 @@ func fixture(t *testing.T) Browser {
 	write(t, filepath.Join(root, "ledger", ".sandboxes", "ivo", "api", "idea.txt"), "not committed\n")
 	// The CEO's own, elsewhere: nobody's.
 	gitIn(t, api, "worktree", "add", "--quiet", "--detach", filepath.Join(root, "ceo-api"), "trunk")
-	project := filepath.Join(root, "ledger", "project")
+	project := filepath.Join(root, "ledger", "hq")
 	gitIn(t, root, "init", "--quiet", "--initial-branch=main", project)
 	write(t, filepath.Join(project, "project.toml"), "project = \"ledger\"\n")
 	gitIn(t, project, "add", ".")
-	gitIn(t, project, "commit", "--quiet", "-m", "Project repo")
+	gitIn(t, project, "commit", "--quiet", "-m", "Project HQ")
 	write(t, filepath.Join(root, "ledger", "outside.txt"), "secret\n")
 	return Browser{Config: config{root}, Git: git.New()}
 }
@@ -94,7 +94,7 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 || list[0].Name != "api" || list[0].Project || list[1].Name != "project" || !list[1].Project {
+	if len(list) != 2 || list[0].Name != "api" || list[0].HQ || list[1].Name != "hq" || !list[1].HQ {
 		t.Fatalf("repos %+v", list)
 	}
 	api := list[0]
@@ -112,7 +112,7 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 		t.Errorf("idle %+v, want %+v", api.Idle, want)
 	}
 	if list[1].Idle == nil || len(list[1].Idle) != 0 {
-		t.Errorf("the project repo's idle: %#v, want empty", list[1].Idle)
+		t.Errorf("the HQ's idle: %#v, want empty", list[1].Idle)
 	}
 	if _, err := b.Repos(ctx, "nope"); !errors.Is(err, home.ErrNotFound) {
 		t.Errorf("unknown project: %v", err)
@@ -143,9 +143,9 @@ func TestFilesAsCommitted(t *testing.T) {
 	if f, _ := b.File(ctx, "ledger", "api", "trunk", "big.txt"); !f.TooLarge || f.Text != "" || f.Size != FileLimit+1 {
 		t.Errorf("large: too large %v, %d bytes of text, size %d", f.TooLarge, len(f.Text), f.Size)
 	}
-	entries, err := b.Tree(ctx, "ledger", "project", "main", "")
+	entries, err := b.Tree(ctx, "ledger", "hq", "main", "")
 	if err != nil || len(entries) != 1 || entries[0].Name != "project.toml" {
-		t.Errorf("project repo %+v %v", entries, err)
+		t.Errorf("HQ %+v %v", entries, err)
 	}
 	page, err := b.Log(ctx, "ledger", "api", "wt/tove/x", false, 0)
 	if err != nil || len(page.Commits) != 2 || page.Commits[0].Subject != "x" || page.Next != 0 || page.Total != 2 {

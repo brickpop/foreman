@@ -6,7 +6,7 @@ tags: [model, ui, wiki, runtime]
 
 # UI state
 
-Small pieces of CEO-facing state that Foreman keeps in `state.db` so they survive reloads: read markers for the wiki, and UI preferences.
+Small pieces of CEO-facing state that Foreman keeps in `state.db` so they survive reloads: read markers for the wiki, and the UI's key/value state (`ui_prefs`).
 
 ## Schema
 
@@ -19,7 +19,7 @@ Table `read_markers`: what the CEO has seen in each wiki, for the "changed since
 
 An entry shows a changed dot when its current version differs from `last_seen_version`, or it has no marker. Whatever the [Wiki reader](../features/wiki-reader.md) displays counts as seen, including the `index.md` shown when the Overview opens; the marker stores the version seen, so any later change re-lights the dot. When a project is added, every existing entry is marked as seen, so a new project doesn't start with every entry dotted.
 
-Table `ui_prefs`: key/value preferences.
+Table `ui_prefs`: key/value UI state.
 
 | Field | Type | Required | Default | Constraints | Notes |
 |---|---|---|---|---|---|
@@ -28,4 +28,4 @@ Table `ui_prefs`: key/value preferences.
 
 Known keys: `session_agent` (each project's last agent shown in its [Session](../features/sessions.md#the-url), so `/projects/<project>/session` with no agent comes back to it; kept only while the app runs until this table exists), `last_screen`.
 
-Preferences live here, not in the browser, so they follow the CEO across browsers. They sit in `state.db` beside the deployments they name. The **theme** is not here (the CEO, 2026-10-18): it names nothing in the state, so it is one of the CEO's preferences, `theme` in `~/.foreman/preferences.toml` (`system` default, `dark` or `light`; `GET/PUT /api/preferences`, [Settings → Appearance](../features/settings.md#appearance)), and so is the **accent** (`accent`, `blue` default; 2026-11-02). The browser keeps a copy of each only to paint the first frame before the server answers (no flash on load); the file stays the source of truth. Built 2026-10-18.
+These live here, not in the browser, so they follow the CEO across browsers. They sit in `state.db` beside the deployments they name. The look is not here (the CEO, 2026-10-18): it names nothing in the state, so the **theme**, the **accent** and the terminal's font and size are [settings](./global-settings.md) (`theme`, `accent`, `terminal_font`, `terminal_font_size` in `~/.foreman/settings.toml`; `GET`/`PUT /api/settings`, [Settings → Appearance](../features/settings.md#appearance); a separate preferences file merged into settings on 2026-11-08). The browser keeps a copy of the theme and the accent only to paint the first frame before the server answers (no flash on load); the file stays the source of truth.

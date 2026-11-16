@@ -1,6 +1,6 @@
 // The terminal's fonts (wiki/product/features/settings.md#appearance), one of
-// the CEO's preferences. The ids are the ones the server accepts
-// (userdata.TerminalFonts). They are the terminal's only: the rest of the UI
+// this machine's settings. The ids are the ones the server accepts
+// (home.TerminalFonts). They are the terminal's only: the rest of the UI
 // keeps Geist Mono (the CEO, 2026-10-21). JetBrains Mono, the default, comes
 // with the terminal; each other font is fetched only once it is picked, so
 // unused ones cost nothing.

@@ -11,7 +11,7 @@ epic: install-first-run
 **Why:** today a new workspace works only if the CEO already knows what agents need, and each missing piece shows up as a refusal: Foreman doesn't start without Podman, the agent image builds for minutes on the first deploy, a harness login is found through the Deploy dialog's Connect row, and the engine, `--fake-harness` and `just dev`'s workspaces can contradict each other (the CEO hit that on 2026-10-16). Replaces the "First-run onboarding" idea of 2026-10-15.
 
 **Defaults** (confirmed by the CEO, 2026-10-16):
-- **Foreman always starts**, whatever is missing, and says what is missing in the UI rather than at the terminal. Only a busy port or an unreadable home stops it.
+- **Foreman always starts**, whatever is missing, and says what is missing in the UI rather than at the terminal. Only a busy port, an unreadable home or an unusable Foreman folder (`foreman_folder`: outside the home folder, or overlapping Foreman's home) stops it.
 - **The engine is Podman**, never switched on its own. `direct` stays an explicit setting for development, with its warning. Foreman notices Podman once it is installed or its machine is running, with no restart.
 - **On macOS, Foreman offers to create and start the Podman machine** (one button, with Podman's own output shown), since that is the step people miss.
 - **The agent image builds in the background as soon as Podman is ready**, not on the first deploy; its progress shows in the checklist and in Settings → System → Maintenance.

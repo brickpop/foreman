@@ -9,7 +9,7 @@ import (
 )
 
 // ProjectsChanged looks for active deployments whose project is gone
-// (home.Project.Gone: its project repo deleted, or every code repo missing)
+// (home.Project.Gone: its HQ deleted, or every code repo missing)
 // and gives each such project Recheck to come back (a move or a git
 // operation in progress); still gone then, its deployments stop, with the
 // reason (wiki/product/models/deployment.md#lifecycle). Called when the

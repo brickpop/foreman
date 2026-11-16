@@ -22,8 +22,8 @@ const FileLimit = 1 << 20
 // logPage is how many commits a page of history holds.
 const logPage = 50
 
-// projectRepo is the project repo's folder, listed among the repos.
-const projectRepo = "project"
+// hq is the project's HQ's name, listed among the repos.
+const hq = "hq"
 
 // markdown names the files shown rendered, their frontmatter apart.
 var markdown = regexp.MustCompile(`(?i)\.(md|markdown)$`)
@@ -72,7 +72,7 @@ func (b Browser) dir(project, repo string) (string, string, error) {
 }
 
 // Repos lists the project's code repos agents can use (a missing one is a
-// problem shown on the project), then its project repo, each with its
+// problem shown on the project), then its HQ, each with its
 // branches: the default first, then the others by name.
 func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 	p, err := b.Config.Project(project)
@@ -86,7 +86,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 			names = append(names, r.Name)
 		}
 	}
-	for _, name := range append(names, projectRepo) {
+	for _, name := range append(names, hq) {
 		dir, def, err := b.dir(project, name)
 		if err != nil {
 			return nil, err
@@ -99,7 +99,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, Repo{Name: name, Project: name == projectRepo, Default: def, Branches: branches, Idle: idle})
+		list = append(list, Repo{Name: name, HQ: name == hq, Default: def, Branches: branches, Idle: idle})
 	}
 	return list, nil
 }

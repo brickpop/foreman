@@ -42,20 +42,6 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** a fix in wikiview doesn't reach Foreman until copied again.
 - **Fix:** wikiview exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import wikiview's building blocks](./backlog/wikiview-upstream.md).
 
-## The workspace migration
-
-- **State:** Foreman moves a project made before workspaces out of `~/.foreman/projects/` and `~/.foreman/sandboxes/` into its workspace (`home.Migrate`, `POST /api/projects/{id}/migrate`, the "Move into a workspace" offer in Project settings), worktrees repaired and the agents' conversations carried over (`harness.Mover` in the Claude Code and Pi adapters); so it still knows the old layout's paths (`projectsDir`, `sandboxesDir`, `legacyHarn`, the legacy branch of `Home.layout` and `Project.HarnessDir`, the watcher's `projects/`).
-- **Why:** only the CEO's existing projects need it: Foreman has no other users yet (the CEO, 2026-10-28).
-- **Impact:** code, a route and a UI offer kept for a one-off move; the old paths stay named in the code. Its known edges, accepted for a one-off: the moves are renames, so a workspace on another file system than the home is refused by the OS (`EXDEV`, "invalid cross-device link") and nothing moves; a stopped deployment's instance rows keep their old `sandbox_path` until a redeploy writes new ones (nothing reads them meanwhile: a start uses the row a deploy just wrote); a conversation folder Claude Code named with a hash (a path over 200 characters) can't be carried over, so the move is refused; and a failed undo (a rename back that fails too) is ignored, leaving that folder where it got to.
-- **Fix:** removed by [One Foreman folder](./backlog/foreman-folder.md); the CEO's projects move with its one-off script.
-
-## The old project mount point
-
-- **State:** until 2026-11-02 the project repo was mounted in each container at `<sandbox>/project`, so every sandbox a launch made holds an empty `project/` folder. Each launch removes it when empty (`os.Remove` in `instances/launch.go`), since the project repo is now mounted at its real path.
-- **Why:** sandboxes made before then would keep a confusing empty folder, which an agent may take for the project repo.
-- **Impact:** one line run at every launch; a sandbox never launched again keeps its folder (Clean up removes the worktrees, not it).
-- **Fix:** removed by [One Foreman folder](./backlog/foreman-folder.md), whose script moves every worktree.
-
 ## Old team files' `look`
 
 - **State:** a team file still carrying a member's `[agents.<id>.look]` table (avatars, removed 2026-11-02) loads: `retiredLook` in `internal/home/config.go` keeps it out of the problems, and the next save drops it ([Agent soul](./product/models/agent-soul.md#schema)).
@@ -104,14 +90,15 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Fix:** the Claude Code integration tests (`just test-claude`) start a fresh session on each Claude Code update and fail on a new dialog. If dialogs keep coming, check the screen for the prompt before typing.
 
 
-## Project workspaces: known edges
+## Foreman's folder: known edges
 
-- **State** (from [Project workspaces](./backlog/archive/project-workspaces.md), 2026-10-28):
-  - **Worktrees kept on remove:** removing a project without its worktrees leaves them in `<workspace>/agents/`, their records in each code repo, so those branches can't be deleted while checked out there, and a new project in the same workspace reuses the folders as they are.
-  - **A workspace inside an enclosing git repo** (`~/workspace` a repo itself) is refused only when that repo is a code repo of some project; otherwise git run there on the host (the Direct engine) sees the enclosing repo. In a container it isn't mounted.
-  - **The workspace is typed, not browsed** in New project and in the move offer: the folder browser lists repos to add, not a place for a new folder.
-- **Why:** the card landed the layout; the dialog and the clean-up have cards of their own.
-- **Fix:** the folder browser picks the workspace in [Restructure the New project dialog](./backlog/new-project-dialog.md). Deployment's [Clean up](./product/features/project-team.md#earlier-teams) (2026-11-02) cleans a live project's earlier teams' worktrees; a removed project's kept worktrees still have no action in Foreman: the CEO deletes the folders, and `git worktree prune` in each repo forgets them.
+- **State** (from [Project workspaces](./backlog/archive/project-workspaces.md), 2026-10-28, and [One Foreman folder](./backlog/foreman-folder.md), 2026-11-15):
+  - **Worktrees kept on remove:** removing a project without its worktrees leaves them in `worktrees/<project>/`, their records in each code repo, so those branches can't be deleted while checked out there, and a new project of the same id reuses the folders as they are.
+  - **A Foreman folder inside an enclosing git repo** (a home folder kept in git, say) isn't refused: git run there on the host (the Direct engine) sees the enclosing repo wherever Foreman's own repos are missing. In a container it isn't mounted.
+  - **Clean up's uncommitted option** keeps the changes git can see (`git.Discard`): files ignored by the repo go with the worktree, and a worktree whose changes are inside a submodule stays, listed as holding changes not committed. The kept changes are pruned with the other backups after 30 days, with nothing in the UI to bring them back: `git show <ref>` or `git checkout <ref> -- <file>` by hand.
+  - **`foreman_folder` is read at start only**, and moving the folder is by hand: Foreman doesn't notice a change until it restarts, and refuses to start on a folder outside the home folder or overlapping its own home.
+- **Why:** each is rare, or a deliberate trade next to what the cards had to land.
+- **Fix:** a removed project's kept worktrees get an action in Foreman (or are pruned with it); the folder check refusing an enclosing repo; a restore of a cleaned-up worktree's changes from the UI, if the CEO ever needs one.
 
 ## Projects as records: known edges
 

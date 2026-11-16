@@ -21,7 +21,7 @@ func (e *InvalidError) Error() string {
 	return "invalid: " + strings.Join(e.Problems, "; ")
 }
 
-// SaveTeam writes a team file and commits it to the global repo. version
+// SaveTeam writes a team file and commits it to Foreman's HQ. version
 // is the one read ("" for a new team). It returns the saved team.
 func (h *Home) SaveTeam(ctx context.Context, c TeamConfig, version string) (Team, error) {
 	h.mu.Lock()
@@ -33,37 +33,45 @@ func (h *Home) SaveTeam(ctx context.Context, c TeamConfig, version string) (Team
 	if err != nil {
 		return Team{}, err
 	}
-	rel := filepath.Join(teamsDir, c.Team+".toml")
-	name := c.Name
-	if err := h.write(ctx, rel, version, data, name+": saved in the UI"); err != nil {
+	if err := h.write(ctx, h.HQ(teamsDir, c.Team+".toml"), version, data, c.Name+": saved in the UI"); err != nil {
 		return Team{}, err
 	}
 	return h.snap.teams[c.Team], nil
 }
 
-// SaveSettings writes settings.toml and commits it. version is the one read
-// ("" while the file doesn't exist). It returns the new version.
+// SaveSettings writes settings.toml, this machine's, in no repo. version is
+// the one read ("" while the file doesn't exist). It returns the new version.
 func (h *Home) SaveSettings(ctx context.Context, s Settings, version string) (string, error) {
 	h.mu.Lock()
 	defer h.unlock()
 	if p := s.validate(); len(p) > 0 {
 		return "", &InvalidError{p}
 	}
-	data, err := encodeSettings(s)
+	data, err := encode(s)
 	if err != nil {
 		return "", err
 	}
-	if err := h.write(ctx, settingsFile, version, data, "Settings: saved in the UI"); err != nil {
+	if err := h.write(ctx, h.Path(settingsFile), version, data, ""); err != nil {
 		return "", err
 	}
 	return h.snap.settings.Version, nil
 }
 
-// write replaces a file under .foreman/ if it is still at version, commits
-// it, then reloads and queues the changes for the subscriber. Called with
-// h.mu held, released with unlock.
-func (h *Home) write(ctx context.Context, rel, version string, data []byte, message string) error {
-	path := h.config(rel)
+// SaveInstructions writes Foreman's HQ's instructions.md and commits it.
+// version is the one read. It returns them as saved.
+func (h *Home) SaveInstructions(ctx context.Context, text, version string) (Instructions, error) {
+	h.mu.Lock()
+	defer h.unlock()
+	if err := h.write(ctx, h.HQ(instructionsFile), version, []byte(text), "Instructions: saved in the UI"); err != nil {
+		return Instructions{}, err
+	}
+	return h.snap.instructions, nil
+}
+
+// write replaces a file if it is still at version, commits it to Foreman's
+// HQ with message (none for ""), then reloads and queues the changes for the
+// subscriber. Called with h.mu held, released with unlock.
+func (h *Home) write(ctx context.Context, path, version string, data []byte, message string) error {
 	current, err := os.ReadFile(path)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
@@ -92,8 +100,15 @@ func (h *Home) write(ctx context.Context, rel, version string, data []byte, mess
 	old := h.snap
 	h.snap = h.scan(old)
 	h.publish(diff(old, h.snap))
-	if err := h.git.Commit(ctx, h.config(), message, rel); err != nil {
-		return fmt.Errorf("saved, but not committed to the global repo: %w", err)
+	if message == "" {
+		return nil
+	}
+	rel, err := filepath.Rel(h.HQ(), path)
+	if err != nil {
+		return err
+	}
+	if err := h.git.Commit(ctx, h.HQ(), message, rel); err != nil {
+		return fmt.Errorf("saved, but not committed to Foreman's HQ: %w", err)
 	}
 	return nil
 }
@@ -104,7 +119,7 @@ func (h *Home) publish(changes []Change) {
 	if h.notify != nil {
 		h.pending = append(h.pending, changes...)
 	}
-	// A project made or moved has a project repo to watch now (unlock).
+	// A project made has an HQ to watch now (unlock).
 	if slices.ContainsFunc(changes, func(c Change) bool { return c.Kind == "projects" || c.Kind == "project" }) {
 		h.rewatch = true
 	}

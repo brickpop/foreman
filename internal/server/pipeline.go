@@ -13,7 +13,7 @@ type Pipeline interface {
 	Pipeline(ctx context.Context, project string) (workflow.Pipeline, error)
 	// CleanUp removes what agents no longer running left on a project, only
 	// what is safe, and says what it kept (home.ErrNotFound: no such project).
-	CleanUp(ctx context.Context, project string) (workflow.Cleanup, error)
+	CleanUp(ctx context.Context, project string, uncommitted bool) (workflow.Cleanup, error)
 	// CleanupBranches lists the branches of the project's code repos the CEO
 	// may delete (the Repos section's branch cleanup); DeleteBranches deletes
 	// the pick (home.ErrNotFound: no such project).
@@ -36,7 +36,13 @@ func pipelineRoutes(mux *http.ServeMux, p Pipeline) {
 		writeJSON(w, http.StatusOK, list)
 	})
 	mux.HandleFunc("POST /api/projects/{id}/cleanup", func(w http.ResponseWriter, r *http.Request) {
-		done, err := p.CleanUp(r.Context(), r.PathValue("id"))
+		var req struct {
+			Uncommitted bool `json:"uncommitted"`
+		}
+		if !decode(w, r, &req, "expected {uncommitted}") {
+			return
+		}
+		done, err := p.CleanUp(r.Context(), r.PathValue("id"), req.Uncommitted)
 		writeFound(w, done, err, "project")
 	})
 	mux.HandleFunc("GET /api/projects/{id}/branch-cleanup", func(w http.ResponseWriter, r *http.Request) {

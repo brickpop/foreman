@@ -48,14 +48,12 @@ describe("httpClient", () => {
     });
   });
 
-  it("saves only the preferences it is given", async () => {
-    const saved = { theme: "dark", terminalFont: "fira-code", terminalFontSize: 14 };
+  it("saves the instructions against the version they were read at", async () => {
+    const saved = { text: "Be brief.", version: "v2" };
     const calls = stubFetch(200, saved);
-    expect(await httpClient("http://x").preferences.save({ terminalFont: "fira-code" })).toEqual(
-      saved,
-    );
-    expect(calls[0]).toMatchObject({ url: "http://x/api/preferences", method: "PUT" });
-    expect(JSON.parse(calls[0].body ?? "")).toEqual({ terminalFont: "fira-code" });
+    expect(await httpClient("http://x").home.saveInstructions("Be brief.", "v1")).toEqual(saved);
+    expect(calls[0]).toMatchObject({ url: "http://x/api/instructions", method: "PUT" });
+    expect(JSON.parse(calls[0].body ?? "")).toEqual({ text: "Be brief.", version: "v1" });
   });
 
   it("connects a profile and returns the login terminal", async () => {
@@ -220,7 +218,7 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("sets a project's profile and name, scaffolds its project repo and hides it", async () => {
+  it("sets a project's profile and name, scaffolds its HQ and hides it", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
     await client.home.setProfile("my project", "work");
@@ -237,27 +235,21 @@ describe("httpClient", () => {
     ]);
   });
 
-  it("creates a project in its workspace, migrates one, and removes one with what was asked", async () => {
+  it("creates a project, new or cloned, and removes one with what was asked", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
-    await client.home.newProject("cal", "/home/ceo/workspace/foreman/cal");
-    await client.home.suggestWorkspace("my cal");
-    await client.home.migrate("my project", "/home/ceo/w/p");
-    await client.home.removeProject("a", { deleteRepo: false, deleteWorktrees: false });
-    await client.home.removeProject("b", { deleteRepo: true, deleteWorktrees: true });
+    await client.home.newProject("cal");
+    await client.home.newProject("ops", "git@github.com:me/ops-hq.git");
+    await client.home.removeProject("a", { deleteHQ: false, deleteWorktrees: false });
+    await client.home.removeProject("b", { deleteHQ: true, deleteWorktrees: true });
     await client.home.folders();
     await client.home.folders("/home/ceo/My Repos", "cal");
     await client.home.folders(undefined, "cal");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
-      [
-        "POST",
-        "http://x/api/projects",
-        { name: "cal", workspace: "/home/ceo/workspace/foreman/cal" },
-      ],
-      ["GET", "http://x/api/folders/workspace?name=my+cal", undefined],
-      ["POST", "http://x/api/projects/my%20project/migrate", { workspace: "/home/ceo/w/p" }],
+      ["POST", "http://x/api/projects", { name: "cal" }],
+      ["POST", "http://x/api/projects", { name: "ops", clone: "git@github.com:me/ops-hq.git" }],
       ["DELETE", "http://x/api/projects/a", undefined],
-      ["DELETE", "http://x/api/projects/b?deleteRepo=true&deleteWorktrees=true", undefined],
+      ["DELETE", "http://x/api/projects/b?deleteHQ=true&deleteWorktrees=true", undefined],
       ["GET", "http://x/api/folders", undefined],
       ["GET", "http://x/api/folders?path=%2Fhome%2Fceo%2FMy+Repos&project=cal", undefined],
       ["GET", "http://x/api/folders?project=cal", undefined],
@@ -360,6 +352,17 @@ describe("httpClient", () => {
     const calls = stubFetch(200, { workItems: [], mergeRequests: [] });
     await httpClient("http://x").pipeline.list("my project");
     expect(calls[0].url).toBe("http://x/api/pipeline?project=my%20project");
+  });
+
+  it("cleans up a project, saying whether uncommitted work goes too", async () => {
+    const calls = stubFetch(200, { removed: [], kept: [] });
+    const c = httpClient("http://x");
+    await c.pipeline.cleanUp("my project", false);
+    await c.pipeline.cleanUp("my project", true);
+    expect(calls.map((c) => [c.method, c.url, JSON.parse(c.body ?? "")])).toEqual([
+      ["POST", "http://x/api/projects/my%20project/cleanup", { uncommitted: false }],
+      ["POST", "http://x/api/projects/my%20project/cleanup", { uncommitted: true }],
+    ]);
   });
 
   it("writes the wiki with the version it read", async () => {

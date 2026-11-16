@@ -91,8 +91,8 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	write(t, filepath.Join(api, "README"), "hello\n", 0o644)
 	gitRun(t, "-C", api, "add", "README")
 	gitRun(t, "-C", api, "commit", "--quiet", "-m", "first")
-	write(t, hm.Path("config", "teams", "atlas.toml"), teamFile, 0o644)
-	write(t, hm.Path("config", "settings.toml"), fmt.Sprintf("max_sessions = %d\n", maxSessions), 0o644)
+	write(t, filepath.Join(root, "foreman", "hq", "teams", "atlas.toml"), teamFile, 0o644)
+	write(t, hm.Path("settings.toml"), fmt.Sprintf("max_sessions = %d\n", maxSessions), 0o644)
 	db, err := store.Open(ctx, hm.Path("state.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -101,7 +101,7 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	if err := hm.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := hm.NewProject(ctx, "ledger", "", filepath.Join(root, "workspace", "ledger")); err != nil {
+	if _, _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api, ""); err != nil {
@@ -279,7 +279,7 @@ func TestDeployStartsTheLeadAndMembersWhenWoken(t *testing.T) {
 		}
 	}
 	prompt, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
-	if !strings.Contains(string(prompt), "project/wiki/backlog/index.md, kept by your lead") || strings.Contains(string(prompt), "## Tools") {
+	if !strings.Contains(string(prompt), "hq/wiki/backlog/index.md, kept by your lead") || strings.Contains(string(prompt), "## Tools") {
 		t.Errorf("tove's prompt:\n%s", prompt)
 	}
 	f.mu.Lock()
@@ -335,7 +335,7 @@ func TestDeployRefusals(t *testing.T) {
 	// The project's profile decides what its agents run on: one that doesn't
 	// exist, one whose harness isn't supported, one not connected; each
 	// refused before anything is created.
-	write(t, f.hm.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.HQ("teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
@@ -386,7 +386,7 @@ func TestDeployRefusals(t *testing.T) {
 // refused, and the team stays free to work on other projects.
 func TestDeployReplacesTheTeamOnTheProject(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	write(t, f.hm.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.HQ("teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
@@ -492,7 +492,7 @@ func TestStopWhileStarting(t *testing.T) {
 		t.Errorf("a stopped instance kept its terminal: %v", err)
 	}
 	// Its one slot is free: another deployment's lead starts.
-	write(t, f.hm.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.HQ("teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
@@ -764,7 +764,7 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 		t.Fatal(err)
 	}
 	given, _ := os.ReadFile(f.hm.Path("harness", "ledger", "tove", "fake", "PROMPT.md"))
-	if shown != string(given) || !strings.Contains(shown, "project/wiki/backlog/index.md") {
+	if shown != string(given) || !strings.Contains(shown, "hq/wiki/backlog/index.md") {
 		t.Errorf("shown:\n%s\ngiven:\n%s", shown, given)
 	}
 	if _, err := f.m.Prompt(ctx, "nobody@ledger"); err == nil {
@@ -772,12 +772,11 @@ func TestPromptIsWhatTheHarnessGot(t *testing.T) {
 	}
 }
 
-// The CEO's instructions (Settings) reach the harness at the next start.
+// The CEO's instructions (Foreman's HQ's instructions.md) reach the harness
+// at the next start.
 func TestTheCEOsInstructionsReachTheHarness(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	s := f.hm.Settings()
-	s.Settings.Instructions = "Answer in Catalan."
-	if _, err := f.hm.SaveSettings(ctx, s.Settings, s.Version); err != nil {
+	if _, err := f.hm.SaveInstructions(ctx, "Answer in Catalan.", f.hm.Instructions().Version); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
@@ -999,7 +998,7 @@ func (g *failingSync) SyncSubmodules(_ context.Context, dir string, recursive bo
 // fetched doesn't keep the agent from starting.
 func TestAStartChecksOutTheSubmodulesOrGoesWithout(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	write(t, filepath.Join(f.root, "workspace", "ledger", "project", "project.toml"), "recursive_submodules = true\n", 0o644)
+	write(t, filepath.Join(f.root, "foreman", "projects", "ledger", "hq", "project.toml"), "recursive_submodules = true\n", 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
@@ -1056,7 +1055,7 @@ func closeOnce(c chan struct{}) {
 }
 
 // A project with no code repo (a research team's) deploys: its agents work in
-// the project repo, and the lead's prompt offers commit but no git tools.
+// the HQ, and the lead's prompt offers commit but no git tools.
 func TestDeployAProjectWithoutRepos(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
 	f.deps.Agent = AgentLink{Host: "/bin/foreman-agent", Path: "/opt/foreman/foreman-agent", URL: "http://h:8889",
@@ -1522,7 +1521,7 @@ func TestRedeployContinues(t *testing.T) {
 	stop("atlas")
 
 	// Another team whose lead is also mara: the same harness folder.
-	write(t, f.hm.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.HQ("teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
@@ -1560,7 +1559,7 @@ func (s *specs) last() runner.Spec {
 
 // An agent gets its sandbox, each repo's .git read-only at its real path
 // (which its worktree's link names, a symlinked repo folder included), and
-// the project repo at its real path: writable for the lead only, its .git
+// the HQ at its real path: writable for the lead only, its .git
 // read-only for all; the project's files (the inbox read-only, shared
 // writable, both made); and its private harness folder. Nothing else of the
 // machine, nor of the home.
@@ -1576,26 +1575,22 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	rec := &specs{}
 	f.deps.Runner = rec
 	f.m = New(f.deps)
-	// The empty mount point an earlier launch left.
-	if err := os.MkdirAll(filepath.Join(f.hm.Sandbox("ledger", "mara"), "project"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
 		t.Fatal(err)
 	}
 	f.waitStatus("mara@ledger", Running)
 	realAPI, _ := filepath.EvalSymlinks(filepath.Join(f.root, "dev", "ledger-api"))
-	project := filepath.Join(f.root, "workspace", "ledger", "project")
+	hq := filepath.Join(f.root, "foreman", "projects", "ledger", "hq")
 	mara := f.hm.Sandbox("ledger", "mara")
 	harnessDir := f.hm.Path("harness", "ledger", "mara")
-	inbox := filepath.Join(f.root, "workspace", "ledger", "files", "inbox")
-	shared := filepath.Join(f.root, "workspace", "ledger", "files", "shared")
+	inbox := filepath.Join(f.root, "foreman", "projects", "ledger", "files", "inbox")
+	shared := filepath.Join(f.root, "foreman", "projects", "ledger", "files", "shared")
 	want := []runner.Mount{
 		{Source: mara, Target: mara},
 		{Source: filepath.Join(realAPI, ".git"), Target: filepath.Join(realAPI, ".git"), ReadOnly: true},
 		// At its real path, as everything else: no mount point in the sandbox.
-		{Source: project, Target: project},
-		{Source: filepath.Join(project, ".git"), Target: filepath.Join(project, ".git"), ReadOnly: true},
+		{Source: hq, Target: hq},
+		{Source: filepath.Join(hq, ".git"), Target: filepath.Join(hq, ".git"), ReadOnly: true},
 		{Source: inbox, Target: inbox, ReadOnly: true},
 		{Source: shared, Target: shared},
 		{Source: harnessDir, Target: harnessDir},
@@ -1608,9 +1603,6 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 			t.Errorf("%s isn't made before its mount: %v", dir, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(mara, "project")); !os.IsNotExist(err) {
-		t.Errorf("a project/ folder in the sandbox: %v", err)
-	}
 	if info, err := os.Stat(harnessDir); err != nil || info.Mode().Perm() != 0o700 {
 		t.Errorf("the harness folder is readable by others: %v", info.Mode())
 	}
@@ -1618,8 +1610,8 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.waitStatus("tove@ledger", Running)
-	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: project, Target: project, ReadOnly: true}) {
-		t.Errorf("a member's project repo: %+v", got.Mounts[2])
+	if got := rec.last(); got.Mounts[2] != (runner.Mount{Source: hq, Target: hq, ReadOnly: true}) {
+		t.Errorf("a member's HQ: %+v", got.Mounts[2])
 	}
 }
 
@@ -1668,13 +1660,13 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 // collides. Stopped on one, it starts again on the other all the same.
 func TestATeamWorksOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, _, err := f.hm.NewProject(ctx, "suite", "", filepath.Join(f.root, "workspace", "suite")); err != nil {
+	if _, _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api"), ""); err != nil {
 		t.Fatal(err)
 	}
-	write(t, f.hm.Path("config", "teams", "orion.toml"),
+	write(t, f.hm.HQ("teams", "orion.toml"),
 		strings.NewReplacer(`team = "atlas"`, `team = "orion"`, `"Atlas"`, `"Orion"`, "mara", "nora", "Mara", "Nora", "tove", "ivo", "Tove", "Ivo").Replace(teamFile), 0o644)
 	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects()}); err != nil {
 		t.Fatal(err)
@@ -2122,9 +2114,7 @@ func TestAChangeLeavesLiveAgentsBehindUntilTheyStartAgain(t *testing.T) {
 	}
 
 	// The CEO's instructions are part of the prompt too.
-	s := f.hm.Settings()
-	s.Settings.Instructions = "Answer in Catalan."
-	if _, err := f.hm.SaveSettings(ctx, s.Settings, s.Version); err != nil {
+	if _, err := f.hm.SaveInstructions(ctx, "Answer in Catalan.", f.hm.Instructions().Version); err != nil {
 		t.Fatal(err)
 	}
 	if got := behind(); !got["mara@ledger"] {

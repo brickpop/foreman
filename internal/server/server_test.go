@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -24,7 +25,8 @@ func (closedGuard) Wrap(http.Handler) http.Handler {
 
 type fakeHome string
 
-func (f fakeHome) Root() string { return string(f) }
+func (f fakeHome) Root() string   { return string(f) }
+func (f fakeHome) Folder() string { return filepath.Join(filepath.Dir(string(f)), "foreman") }
 
 var builtUI = fstest.MapFS{
 	"index.html":    {Data: []byte("<!doctype html><title>Foreman</title>")},
@@ -53,7 +55,7 @@ func TestEveryRouteGoesThroughTheGuard(t *testing.T) {
 
 func TestHomeSummaryIsTheHomesPath(t *testing.T) {
 	w := get(t, open(builtUI), "/api/home")
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman"`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"path":"/home/ceo/.foreman","folder":"/home/ceo/foreman"`) {
 		t.Errorf("got %d %q", w.Code, w.Body.String())
 	}
 	if ct := w.Header().Get("Content-Type"); ct != "application/json" {

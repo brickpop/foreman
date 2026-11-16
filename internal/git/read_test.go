@@ -296,3 +296,37 @@ func TestSurvives(t *testing.T) {
 		t.Errorf("a bad branch: %v", err)
 	}
 }
+
+// Every file not committed is listed, whatever its state, by the name it has
+// now: a rename once, a new folder file by file, spaces and quotes as they
+// are; ignored files and committed ones never.
+func TestUncommitted(t *testing.T) {
+	g, _, tree := readFixture(t)
+	write(t, filepath.Join(tree, ".gitignore"), "*.log\n")
+	mustRun(t, tree, "add", ".gitignore")
+	mustRun(t, tree, "commit", "--quiet", "-m", "ignore logs")
+	if files, err := g.Uncommitted(ctx, tree); err != nil || !slices.Equal(files, []string{"notes.md"}) {
+		t.Fatalf("an edit: %q %v", files, err)
+	}
+	mustRun(t, tree, "mv", "README", "READ ME \"now\"")
+	if err := os.Remove(filepath.Join(tree, "src", "app.go")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(tree, "new", "deep", "a.txt"), "x")
+	write(t, filepath.Join(tree, "debug.log"), "x")
+	write(t, filepath.Join(tree, "staged.txt"), "x")
+	mustRun(t, tree, "add", "staged.txt")
+	files, err := g.Uncommitted(ctx, tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(files)
+	if want := []string{"READ ME \"now\"", "new/deep/a.txt", "notes.md", "src/app.go", "staged.txt"}; !slices.Equal(files, want) {
+		t.Errorf("got  %q\nwant %q", files, want)
+	}
+	mustRun(t, tree, "add", "--all")
+	mustRun(t, tree, "commit", "--quiet", "-m", "all")
+	if files, err := g.Uncommitted(ctx, tree); err != nil || len(files) != 0 {
+		t.Errorf("all committed: %q %v", files, err)
+	}
+}

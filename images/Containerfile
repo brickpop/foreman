@@ -2,7 +2,7 @@
 # as localhost/foreman/harness (wiki/product/architecture/tech-stack.md#agent-images).
 # A basic Debian box (adapted from pclaude's Dockerfile, github.com/brickpop/pclaude):
 # Node, Bun, Go, Python 3 with uv (no pip or venv: uv covers both), just, the wiki CLI and common shell tools; anything more specialised
-# comes from a workspace or project override later. The harnesses (Claude Code,
+# comes from a project override later. The harnesses (Claude Code,
 # Pi, Codex) are installed last, so updating them reuses every layer above.
 # foreman-agent joins with the agent link.
 

@@ -1,9 +1,6 @@
-// Package userdata is what Foreman keeps for the CEO on this machine outside
-// the global repo: the profiles, the preferences and the
-// agent images' build state. It lives in Foreman's home, ~/.foreman, on macOS
-// and Linux alike (the CEO, 2026-10-20), which also holds the lock that keeps
-// Foreman to one server per machine
-// (wiki/backlog/epics/projects-anywhere.md).
+// Package userdata finds Foreman's home on this machine, ~/.foreman, on
+// macOS and Linux alike (the CEO, 2026-10-20), and holds the lock that keeps
+// Foreman to one server per machine (wiki/backlog/epics/projects-anywhere.md).
 package userdata
 
 import (

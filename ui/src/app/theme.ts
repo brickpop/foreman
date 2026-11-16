@@ -1,13 +1,13 @@
 // The theme and the accent (wiki/product/features/settings.md#appearance):
 // System follows the operating system live (styles.css, light-dark() over
 // color-scheme); Dark and Light set data-theme; the accent sets data-accent.
-// Both are the CEO's preferences (GET/PUT /api/preferences); this browser
+// Both are this machine's settings (GET/PUT /api/settings); this browser
 // keeps a copy only to paint the first frame in them, before the server answers.
 
 export type Theme = "system" | "dark" | "light";
 
 /** The accents styles.css defines, the default first (the server's list too:
- * internal/userdata). */
+ * home.Accents). */
 export const accents = ["blue", "green", "purple", "teal", "orange", "pink", "amber"] as const;
 
 export type Accent = (typeof accents)[number];

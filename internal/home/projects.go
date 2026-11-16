@@ -21,8 +21,8 @@ import (
 )
 
 // Adding projects and their repos (wiki/product/features/add-project.md). A
-// project is a record in the database and a workspace, with its project repo;
-// code repos are the CEO's, anywhere in their home folder. Foreman creates a
+// project is a record in the database and its folder in Foreman's folder,
+// with its HQ; code repos are the CEO's, anywhere in their home folder. Foreman creates a
 // repo only new and empty, with a first commit so its default branch exists
 // (agents' branches start from it).
 
@@ -35,15 +35,14 @@ var (
 	ErrDeployed = errors.New("home: a team is deployed on the project")
 )
 
-// NewProject creates a project with no repos yet, in workspace (a folder of
-// the CEO's, made if missing, Home.checkWorkspace): its record, and its
-// project repo at <workspace>/project, new (project.toml and a starter wiki,
-// in one first commit) or cloned from clone (a URL or a local path, as the
-// CEO's git can reach it). The name is a slug (validProjectName) and must be
-// new, in any case. A project repo already at <workspace>/project (a removed
-// project's, kept) is taken over as it is. Nothing this call made is left
-// behind if a step fails. created is false for a takeover.
-func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p Project, created bool, err error) {
+// NewProject creates a project with no repos yet: its record, and its HQ at
+// <folder>/projects/<name>/hq, new (project.toml and a starter wiki, in one
+// first commit) or cloned from clone (a URL or a local path, as the CEO's git
+// can reach it). The name is a slug (validProjectName) and must be new, in
+// any case. An HQ already there (a removed project's, kept) is taken over as
+// it is. Nothing this call made is left behind if a step fails. created is
+// false for a takeover.
+func (h *Home) NewProject(ctx context.Context, name, clone string) (p Project, created bool, err error) {
 	h.mu.Lock()
 	defer h.unlock()
 	if !validProjectName(name) {
@@ -55,12 +54,9 @@ func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p
 	if other, ok := h.shownAs(name, readable(name)); ok {
 		return Project{}, false, fmt.Errorf("%w: project %s shows as %s already: pick another name, or rename it first", ErrExists, other, readable(name))
 	}
-	ws, err := h.checkWorkspace(name, workspace)
-	if err != nil {
-		return Project{}, false, err
-	}
-	dir, _, _ := h.layout(name, ws)
-	create := h.createProjectRepo
+	folder := h.projectDir(name)
+	dir := filepath.Join(folder, hqDir)
+	create := h.createHQ
 	if clone != "" {
 		create = func(ctx context.Context, _, dir string) error {
 			if err := h.git.Clone(ctx, clone, dir); err != nil {
@@ -76,7 +72,7 @@ func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p
 		}
 		create = func(context.Context, string, string) error { return nil }
 	}
-	made, err := makeDir(ws)
+	made, err := makeDir(folder)
 	if err != nil {
 		return Project{}, false, err
 	}
@@ -93,7 +89,7 @@ func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p
 		drop()
 		return Project{}, false, err
 	}
-	if err := h.records.Create(ctx, name, ws); err != nil {
+	if err := h.records.Create(ctx, name); err != nil {
 		drop()
 		if errors.Is(err, store.ErrExists) {
 			return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, name)
@@ -104,8 +100,8 @@ func (h *Home) NewProject(ctx context.Context, name, clone, workspace string) (p
 	return p, !takeOver, err
 }
 
-// canTakeOver says why the folder at dir can't become a new project's repo
-// as it is: a clone asked for, or not a git repo's top folder of its own.
+// canTakeOver says why the folder at dir can't become a new project's HQ as
+// it is: a clone asked for, or not a git repo's top folder of its own.
 func canTakeOver(dir, clone string) error {
 	info, err := os.Lstat(dir)
 	switch {
@@ -114,7 +110,7 @@ func canTakeOver(dir, clone string) error {
 	case clone != "":
 		return fmt.Errorf("%w: %s is there already: create the project without Clone to take it over, or move it away", ErrExists, dir)
 	case !info.IsDir() || !topOfRepo(dir):
-		return fmt.Errorf("%w: %s is there already and isn't a git repo: move it away, or pick another workspace", ErrExists, dir)
+		return fmt.Errorf("%w: %s is there already and isn't a git repo: move it away, or pick another name", ErrExists, dir)
 	}
 	return nil
 }
@@ -141,9 +137,9 @@ func (h *Home) projectNamed(name string) (string, bool) {
 	return "", false
 }
 
-// createProjectRepo makes dir the project repo: the scaffold (project.toml
-// and a starter wiki), in one first commit.
-func (h *Home) createProjectRepo(ctx context.Context, project, dir string) error {
+// createHQ makes dir a project's HQ: the scaffold (project.toml and a
+// starter wiki), in one first commit.
+func (h *Home) createHQ(ctx context.Context, project, dir string) error {
 	created, err := writeScaffold(project, dir)
 	if err != nil {
 		return err
@@ -151,7 +147,7 @@ func (h *Home) createProjectRepo(ctx context.Context, project, dir string) error
 	if err := h.git.Init(ctx, dir, "main"); err != nil {
 		return err
 	}
-	return h.git.Commit(ctx, dir, "Project repo", created...)
+	return h.git.Commit(ctx, dir, "Project HQ", created...)
 }
 
 // AddRepo adds an existing repo to a project, under name: path is its top
@@ -414,7 +410,7 @@ func (h *Home) recordError(err error) error {
 	return err
 }
 
-// starter is the scaffold: what a project repo holds besides project.toml,
+// starter is the scaffold: what a project's HQ holds besides project.toml,
 // laid out as in the repo, "{project}" standing for the project's name
 // (wiki/product/features/add-project.md#effect). The wiki follows the
 // conventions its AGENTS.md describes.
@@ -473,8 +469,8 @@ func makeFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-// Missing lists the scaffold files the project's repo lacks: deleted, or
-// never there in a project repo made elsewhere.
+// Missing lists the scaffold files the project's HQ lacks: deleted, or
+// never there in an HQ made elsewhere.
 func (h *Home) Missing(id string) ([]Missing, error) {
 	p, err := h.Project(id)
 	if err != nil {
@@ -489,7 +485,7 @@ func (h *Home) Missing(id string) ([]Missing, error) {
 	return out, nil
 }
 
-// Scaffold writes the scaffold files the project's repo lacks and commits
+// Scaffold writes the scaffold files the project's HQ lacks and commits
 // them, by the CEO's identity. It never overwrites a file.
 func (h *Home) Scaffold(ctx context.Context, id string) error {
 	p, err := h.Project(id)
@@ -500,7 +496,7 @@ func (h *Home) Scaffold(ctx context.Context, id string) error {
 	if err != nil || len(created) == 0 {
 		return err
 	}
-	return h.git.Commit(ctx, p.Path, "Project repo: add "+strings.Join(created, ", "), created...)
+	return h.git.Commit(ctx, p.Path, "HQ: add "+strings.Join(created, ", "), created...)
 }
 
 var nameRule = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$`)
@@ -527,21 +523,21 @@ func readable(id string) string {
 	return string(unicode.ToUpper(r)) + words[size:]
 }
 
-// validProjectName is the rule for a new project's name: a slug, since it is
-// its workspace's folder and how it reads is made from it (the UI's readable;
+// validProjectName is the rule for a new project's name: a slug, since it
+// names its folders and how it reads is made from it (the UI's readable;
 // the CEO, 2026-11-02). A project named before keeps its name.
 func validProjectName(name string) bool {
 	return len(name) <= 63 && slug.MatchString(name)
 }
 
 // checkRepoName refuses a name a repo of p can't have: one Foreman couldn't
-// create as a folder, the project repo's, or one p has, in any case.
+// create as a folder, the HQ's, or one p has, in any case.
 func checkRepoName(p Project, name string) error {
 	switch {
 	case !validName(name):
 		return fmt.Errorf("%w: a repo name is %s", ErrInvalid, nameRules)
-	case strings.EqualFold(name, projectRepo):
-		return fmt.Errorf("%w: %q is the project repo's name", ErrInvalid, name)
+	case strings.EqualFold(name, hqRepo):
+		return fmt.Errorf("%w: %q is the HQ's name", ErrInvalid, name)
 	}
 	for _, r := range p.Repos {
 		if strings.EqualFold(r.Name, name) {
@@ -610,7 +606,7 @@ func (h *Home) RenameRepo(ctx context.Context, project, name, newName string) (P
 			_ = h.git.MoveWorktree(ctx, repo.Path, m.to, m.from)
 		}
 	}
-	agents, _ := os.ReadDir(p.agents)
+	agents, _ := os.ReadDir(p.worktrees)
 	for _, a := range agents {
 		from, to := filepath.Join(p.Sandbox(a.Name()), name), filepath.Join(p.Sandbox(a.Name()), newName)
 		if !exists(from) {
@@ -634,12 +630,12 @@ func (h *Home) RenameRepo(ctx context.Context, project, name, newName string) (P
 }
 
 // RemoveProject removes a project: its record and its whole history in the
-// database, its session logs and its agents' harness folders. Its workspace
-// stays, the CEO's files (the CEO, 2026-10-28): its agents' worktrees go
-// only when asked (its code repos forget them; their branches stay), and its
-// project repo only when asked (one never pushed has no other copy); an
-// empty workspace goes too. Never while a team is deployed on it.
-func (h *Home) RemoveProject(ctx context.Context, id string, deleteRepo, deleteWorktrees bool) error {
+// database, its session logs and its agents' harness folders. Its folder
+// stays, the CEO's files (the CEO, 2026-10-28): its HQ goes only when asked
+// (one never pushed has no other copy), and so do its agents' worktrees (its
+// code repos forget them; their branches stay); its files stay, and a folder
+// left empty goes. Never while a team is deployed on it.
+func (h *Home) RemoveProject(ctx context.Context, id string, deleteHQ, deleteWorktrees bool) error {
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[id]
@@ -650,7 +646,7 @@ func (h *Home) RemoveProject(ctx context.Context, id string, deleteRepo, deleteW
 		return fmt.Errorf("%w: stop the team on %s before removing it", ErrDeployed, id)
 	}
 	if deleteWorktrees {
-		if err := os.RemoveAll(p.agents); err != nil {
+		if err := os.RemoveAll(p.worktrees); err != nil {
 			return err
 		}
 		for _, r := range p.Repos {
@@ -663,10 +659,7 @@ func (h *Home) RemoveProject(ctx context.Context, id string, deleteRepo, deleteW
 	}
 	// Private to Foreman: session logs are per instance, <agent>@<project>.
 	private, _ := filepath.Glob(h.Path(logsDir, "*@"+p.ID))
-	if p.harness != "" {
-		private = append(private, p.harness)
-	}
-	for _, dir := range private {
+	for _, dir := range append(private, p.harness) {
 		if err := os.RemoveAll(dir); err != nil {
 			return err
 		}
@@ -674,13 +667,17 @@ func (h *Home) RemoveProject(ctx context.Context, id string, deleteRepo, deleteW
 	if err := h.records.Remove(ctx, p.ID); err != nil {
 		return h.recordError(err)
 	}
-	if deleteRepo {
+	if deleteHQ {
 		if err := os.RemoveAll(p.Path); err != nil {
 			return err
 		}
 	}
-	if p.Workspace != "" {
-		_ = os.Remove(p.Workspace) // only when empty
+	// Each only when empty.
+	for _, f := range FileFolders {
+		_ = os.Remove(filepath.Join(p.Files, f))
+	}
+	for _, dir := range []string{p.worktrees, p.Files, h.projectDir(p.ID)} {
+		_ = os.Remove(dir)
 	}
 	old := h.snap
 	h.snap = h.scan(old)

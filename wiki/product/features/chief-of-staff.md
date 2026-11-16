@@ -6,7 +6,7 @@ tags: [feature, ui, agents, teams]
 
 # Chief of Staff
 
-Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Creating teams is its main job: a deployed team is usually amended by its own lead, who has the context of the conversation with the CEO ([Team definition → Proposals](../models/team-definition.md#proposals)). Amending through the CoS stays allowed, and is the only way for a team that isn't deployed (the CEO, 2026-11-02). Nothing else: it raises no requests, appears on no Dashboard, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in the [global repo](../models/home.md#the-global-repo), only on the CEO's click.
+Foreman's built-in agent for **teams**: it creates a team from what the CEO describes, hires into a team, and refines its members. Creating teams is its main job: a deployed team is usually amended by its own lead, who has the context of the conversation with the CEO ([Team definition → Proposals](../models/team-definition.md#proposals)). Amending through the CoS stays allowed, and is the only way for a team that isn't deployed (the CEO, 2026-11-02). Nothing else: it raises no requests, appears on no Dashboard, and takes no part in the agents' workflow (the CEO, 2026-10-18). Talking to it is synchronous: the CEO opens its page, talks to it in its terminal, and confirms what it proposes. **It proposes; Foreman writes**, one commit in [Foreman's HQ](../models/home.md#foremans-hq), only on the CEO's click.
 
 ## How it runs
 
@@ -17,11 +17,11 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 - **Its conversation carries over:** its private harness config directory is in `~/.foreman/cos/`, so the next visit continues where the last one ended (Claude Code: `--continue`). The opening line is given on every visit, a continued one too (Claude Code: `--continue "<line>"`; to check on a real login).
 - **Its id is `cos`**, on the agent port and for its terminal (`/ws/pty/cos`); an agent's is `agent@project`, so they never clash. Its process is named, and labelled with the home (`foreman.home`), like the agents'.
 - **Mounts, and nothing else:**
-  - `~/.foreman/cos/` → read-write: its working folder and its harness config (outside the global repo);
-  - `~/.foreman/config/teams/` → **read-only**: it reads the current team files like any files;
+  - `~/.foreman/cos/` → read-write: its working folder and its harness config (in Foreman's home, outside Foreman's HQ);
+  - Foreman's HQ's `teams/` (`~/foreman/hq/teams/`) → **read-only**: it reads the current team files like any files;
   - the profile's login file, and `foreman-agent` (its tool and hooks), as for any agent.
 
-  Never the rest of the home (secrets, `state.db`, logs, settings, projects, sandboxes), never a code repo, never the CEO's own harness config.
+  Never the rest of the home (secrets, `state.db`, logs, settings), never Foreman's folder beyond `hq/teams/` (the projects' HQs and files, the worktrees), never a code repo, never the CEO's own harness config.
 - **Its prompt:** who it is, the team file format and its invariants, the roles' [default job descriptions](../models/agent-soul.md#default-job-descriptions), the names already used in any team, and its one tool. It is composed at each start (`internal/cos`), so the names it lists are those of that moment; the files it reads stay current.
 
 ## Its tool

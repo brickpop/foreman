@@ -6,7 +6,7 @@ tags: [model, teams, agents, config]
 
 # Team definition
 
-`~/.foreman/config/teams/<team>.toml`, in the [global repo](./home.md#the-global-repo): a reusable roster of [agent souls](./agent-soul.md) plus the team's playbook and escalation rules. One definition can be [deployed](./deployment.md) to any number of projects; every deployment uses the same souls and the same playbook. Foreman owns these files: the UI ([Team page](../features/team-page.md), [Agent page](../features/agent-page.md)), the [Chief of Staff](../features/chief-of-staff.md) and a deployed team's lead (their [proposals](#proposals), written by Foreman on the CEO's click) and the CEO's editor all write them. A change applies to each instance at its next start; the CEO can [reload](#reload) a deployment to apply it at once.
+`hq/teams/<team>.toml` in [Foreman's folder](./home.md#foremans-folder) (`~/foreman/hq/teams/`), in [Foreman's HQ](./home.md#foremans-hq): a reusable roster of [agent souls](./agent-soul.md) plus the team's playbook and escalation rules. One definition can be [deployed](./deployment.md) to any number of projects; every deployment uses the same souls and the same playbook. Foreman owns these files: the UI ([Team page](../features/team-page.md), [Agent page](../features/agent-page.md)), the [Chief of Staff](../features/chief-of-staff.md) and a deployed team's lead (their [proposals](#proposals), written by Foreman on the CEO's click) and the CEO's editor all write them. A change applies to each instance at its next start; the CEO can [reload](#reload) a deployment to apply it at once.
 
 ## Example
 
@@ -87,7 +87,7 @@ Each example carries a full roster with job descriptions, a playbook and an esca
 
 ## Writes
 
-The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in the global repo, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff and the lead never write the file: they propose, and the CEO's click on the proposal is a UI write like any other, version-guarded against the file it was drafted from ([Proposals](#proposals)).
+The UI, the Chief of Staff and the CEO's editor can all write the same file. Every UI write carries the version it read (a content hash) and is refused on mismatch, like wiki writes. Each UI save rewrites the whole file and is **one commit** in Foreman's HQ, so hand-written comments don't survive a save (the agents keep the file's order, and everything is written flush left), and git keeps every earlier version ([Persistence](../architecture/persistence.md#team-file-writes)). The Chief of Staff and the lead never write the file: they propose, and the CEO's click on the proposal is a UI write like any other, version-guarded against the file it was drafted from ([Proposals](#proposals)).
 
 ## Proposals
 

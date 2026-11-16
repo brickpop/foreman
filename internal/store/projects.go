@@ -13,15 +13,12 @@ import (
 var ErrExists = errors.New("store: already exists")
 
 // Projects is the projects and their repos (wiki/product/models/project-config.md#the-project-record):
-// what makes a project, on this machine. Its rules are in its project repo.
+// what makes a project, on this machine. Its rules are in its HQ.
 type Projects interface {
 	// List returns every project by id, each with its repos by name.
 	List(ctx context.Context) ([]ProjectRecord, error)
-	// Create adds a project with no repos, in its workspace. ErrExists if the
-	// id is taken.
-	Create(ctx context.Context, id, workspace string) error
-	// SetWorkspace moves the project to a workspace (a migration).
-	SetWorkspace(ctx context.Context, id, workspace string) error
+	// Create adds a project with no repos. ErrExists if the id is taken.
+	Create(ctx context.Context, id string) error
 	// SetProfile names the profile its agents run on ("" for the default).
 	SetProfile(ctx context.Context, id, profile string) error
 	// SetHidden hides a project, or shows it again.
@@ -56,7 +53,6 @@ type ProjectRecord struct {
 	Name      string // its display name; "" shows it by its id
 	Profile   string
 	Hidden    bool
-	Workspace string // "": in Foreman's home, made before workspaces
 	CreatedAt time.Time
 	Repos     []RepoRecord
 }
@@ -78,7 +74,7 @@ func (db *DB) Projects() Projects { return projects{db.sql} }
 type projects struct{ db *sql.DB }
 
 func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
-	rows, err := p.db.QueryContext(ctx, "SELECT id, name, profile, hidden, workspace, created_at FROM projects ORDER BY id")
+	rows, err := p.db.QueryContext(ctx, "SELECT id, name, profile, hidden, created_at FROM projects ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +83,7 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	for rows.Next() {
 		var r ProjectRecord
 		var created sql.NullString
-		if err := rows.Scan(&r.ID, &r.Name, &r.Profile, &r.Hidden, &r.Workspace, &created); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.Profile, &r.Hidden, &created); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -120,17 +116,13 @@ func (p projects) List(ctx context.Context) ([]ProjectRecord, error) {
 	return list, rows.Err()
 }
 
-func (p projects) Create(ctx context.Context, id, workspace string) error {
-	_, err := p.db.ExecContext(ctx, "INSERT INTO projects (id, workspace, created_at) VALUES (?, ?, ?)", id, workspace, timeText(time.Now()))
+func (p projects) Create(ctx context.Context, id string) error {
+	_, err := p.db.ExecContext(ctx, "INSERT INTO projects (id, created_at) VALUES (?, ?)", id, timeText(time.Now()))
 	return unique(err)
 }
 
 func (p projects) SetProfile(ctx context.Context, id, profile string) error {
 	return touched(p.db.ExecContext(ctx, "UPDATE projects SET profile = ? WHERE id = ?", profile, id))
-}
-
-func (p projects) SetWorkspace(ctx context.Context, id, workspace string) error {
-	return touched(p.db.ExecContext(ctx, "UPDATE projects SET workspace = ? WHERE id = ?", workspace, id))
 }
 
 func (p projects) SetHidden(ctx context.Context, id string, hidden bool) error {

@@ -18,6 +18,7 @@ import {
   readmeOf,
   reposWith,
   shownAt,
+  uncommittedWork,
   worktrees,
 } from "./repos";
 
@@ -83,7 +84,7 @@ describe("worktrees", () => {
   const repos = [
     {
       name: "api",
-      project: false,
+      hq: false,
       defaultBranch: "main",
       branches: [
         branch("main"),
@@ -95,7 +96,7 @@ describe("worktrees", () => {
     },
     {
       name: "web",
-      project: false,
+      hq: false,
       defaultBranch: "trunk",
       branches: [branch("trunk"), branch("wt/tove/LED-44", { agent: "tove" })],
       idle: [
@@ -104,8 +105,8 @@ describe("worktrees", () => {
       ],
     },
     {
-      name: "project",
-      project: true,
+      name: "hq",
+      hq: true,
       defaultBranch: "main",
       branches: [branch("main")],
       idle: [],
@@ -125,6 +126,18 @@ describe("worktrees", () => {
       ["mara", ["api:lead/atlas/integration"], ["web"]],
       ["tove", ["api:wt/tove/LED-44", "web:wt/tove/LED-44"], []],
     ]);
+  });
+
+  it("names the worktrees holding uncommitted work, on a branch or on none", () => {
+    expect(uncommittedWork(worktrees(repos))).toEqual(["ivo's web", "tove's api"]);
+    // A branch's ahead commits are committed work: not listed.
+    const committed = repos.map((r) => ({
+      ...r,
+      branches: r.branches.map((b) => ({ ...b, uncommitted: false })),
+      idle: r.idle.map((t) => ({ ...t, uncommitted: false })),
+    }));
+    expect(uncommittedWork(worktrees(committed))).toEqual([]);
+    expect(uncommittedWork([])).toEqual([]);
   });
 
   it("gives the branch an agent is on, once however many repos it spans", () => {
@@ -158,7 +171,7 @@ describe("worktrees", () => {
       ),
     }));
     expect(names(branchPlaces(busyWeb, "wt/tove/LED-44"))).toEqual([["web"], ["api"]]);
-    // Never the project repo, and nowhere for a branch no repo has.
+    // Never the HQ, and nowhere for a branch no repo has.
     expect(names(branchPlaces(repos, "main"))).toEqual([[], ["api"]]);
     expect(names(branchPlaces(repos, "nope"))).toEqual([[], []]);
   });

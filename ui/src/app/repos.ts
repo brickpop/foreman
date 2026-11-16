@@ -72,6 +72,18 @@ export function worktrees(repos: Repo[]): Worktree[] {
   return [...by.values()].sort((a, b) => a.agent.localeCompare(b.agent));
 }
 
+/** The repos where each worktree holds changes not committed, as "agent's
+ * repo": what Clean up removes only when asked. In the worktrees' order,
+ * each's in its repos'. */
+export function uncommittedWork(trees: Worktree[]): string[] {
+  return trees.flatMap((w) =>
+    [
+      ...w.branches.filter((b) => b.branch.uncommitted).map((b) => b.repo),
+      ...w.idle.filter((t) => t.uncommitted).map((t) => t.repo),
+    ].map((repo) => `${w.agent}'s ${repo}`),
+  );
+}
+
 /** The branch an agent has checked out: one, since `switch` moves all its
  * repos together; each different one, should they ever differ. None while
  * idle or with no repo open. */
@@ -90,7 +102,7 @@ export function branchPlaces(
   branch: string,
 ): { changed: BranchPlace[]; unchanged: BranchPlace[] } {
   const places = repos.flatMap((r) => {
-    const b = !r.project && r.branches.find((x) => x.name === branch);
+    const b = !r.hq && r.branches.find((x) => x.name === branch);
     return b ? [{ repo: r.name, ahead: b.ahead, uncommitted: b.uncommitted }] : [];
   });
   const work = (p: BranchPlace) => p.ahead > 0 || p.uncommitted;
@@ -226,7 +238,7 @@ export const cleanupSections: CleanupSection[] = [
   {
     key: "stray",
     title: "In stray worktrees",
-    note: "checked out in a folder no agent of any project has (an old workspace's, one since deleted): picked, that worktree is removed first, unless it holds changes not committed.",
+    note: "checked out in a folder no agent of any project has (one moved or deleted by hand): picked, that worktree is removed first, unless it holds changes not committed.",
     folded: true,
   },
 ];

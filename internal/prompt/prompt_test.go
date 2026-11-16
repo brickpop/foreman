@@ -31,7 +31,7 @@ var every = []string{"ask", "reply", "read_message", "open", "switch", "commit",
 
 func input(agent string, tools []string) Input {
 	return Input{
-		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/workspace/ledger/agents/" + agent, ProjectRepo: "/home/ceo/workspace/ledger/project", Files: "/home/ceo/workspace/ledger/files", Tools: tools,
+		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/foreman/worktrees/ledger/" + agent, HQ: "/home/ceo/foreman/projects/ledger/hq", Files: "/home/ceo/foreman/projects/ledger/files", Tools: tools,
 		Repos:  []home.Repo{{Name: "api", Path: "/home/ceo/dev/api", Default: "main"}},
 		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}, LandingPrefixes: []string{"f/", "fix/"}},
 	}
@@ -46,15 +46,15 @@ Own the UI.
 
 ## This assignment
 Project: ledger
-Goal: the "Current goal" line at the top of /home/ceo/workspace/ledger/project/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
-Your sandbox: /home/ceo/workspace/ledger/agents/tove (your own git worktree of each code repo)
+Goal: the "Current goal" line at the top of /home/ceo/foreman/projects/ledger/hq/wiki/backlog/index.md, kept by your lead. It changes over time: read it again before each new piece of work. While there is none yet, your lead tells you what to work on.
+Your sandbox: /home/ceo/foreman/worktrees/ledger/tove (your own git worktree of each code repo)
 Branches: none of your own: your worktrees sit on no branch, at main.
-Project repo: /home/ceo/workspace/ledger/project (the project's one shared checkout, the same for every agent)
-Knowledge base: /home/ceo/workspace/ledger/project/wiki (read only, by design, not a fault)
+The project's HQ: /home/ceo/foreman/projects/ledger/hq (its one shared checkout, the same for every agent)
+Knowledge base: /home/ceo/foreman/projects/ledger/hq/wiki (read only, by design, not a fault)
 It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.
-Files from the CEO: /home/ceo/workspace/ledger/files/inbox (read only, by design: what the CEO gives the team to work with).
-Shared files: /home/ceo/workspace/ledger/files/shared (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)
-Read /home/ceo/workspace/ledger/project/AGENTS.md first: how this project's wiki and tasks work.
+Files from the CEO: /home/ceo/foreman/projects/ledger/files/inbox (read only, by design: what the CEO gives the team to work with).
+Shared files: /home/ceo/foreman/projects/ledger/files/shared (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)
+Read /home/ceo/foreman/projects/ledger/hq/AGENTS.md first: how this project's wiki and tasks work.
 
 ## Your team on ledger
 - Mara, Team Lead (lead)
@@ -94,10 +94,10 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"# You are Mara, Team Lead on team Atlas\nCalm, decisive.\n",
 		"Break the goal into cards on the board. Assign cards and review every handoff before integrating. You are the only member who requests merges into the CEO's branches", // the role's default job
 		"Branches: lead/ledger/atlas/<topic>, as many as you need. Switch to one (or make it) with switch(branch, from). Between pieces of work your repos sit on no branch, at their default branch: switch to a topic before you commit or merge (edits made meanwhile come along to a new topic).",
-		"Your sandbox: /home/ceo/workspace/ledger/agents/mara. A code repo is checked out there, as <sandbox>/<repo>, only once you open it: open(repo), or switch, merge or set_submodule opening what they need. Before working in a repo, open it.",
+		"Your sandbox: /home/ceo/foreman/worktrees/ledger/mara. A code repo is checked out there, as <sandbox>/<repo>, only once you open it: open(repo), or switch, merge or set_submodule opening what they need. Before working in a repo, open it.",
 		"open(repo)                          Check a code repo out in your sandbox, the first time you need its",
 		"Code repos: api at /home/ceo/dev/api (default main). Read one you haven't opened through its git, no checkout needed: git -C <its path> log main, show main:<file>, grep -n <text> main.",
-		"(read and write: edit, then commit its repo, project)",
+		"(read and write: edit, then commit its repo, hq)",
 		"- Mara, Team Lead (lead: integrates, requests merges)\n",
 		"## Tools (from Foreman)\n",
 		"request_merge(branch, title, body, entry, into, land)\n                                    Ask the CEO to merge one of your lead/ledger/atlas/* branches into into,",
@@ -105,7 +105,7 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"when the CEO merges (under f/, fix/); the CEO may rename it.",
 		"Before you request a merge, run: npm test",
 		// so the lead never asks a member for what its mount refuses
-		"Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.",
+		"Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -267,7 +267,7 @@ func TestRoleLabels(t *testing.T) {
 // Before any deployment the prompt keeps the deployment's parts as placeholders.
 func TestTemplateShowsThePlaceholders(t *testing.T) {
 	got := Template(atlas, "tove", "")
-	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox}. A code repo", "Code repos: {repo} at {repo path} (default {default}).", `Goal: the "Current goal" line at the top of {project repo}/wiki/backlog/index.md`, "Project repo: {project repo} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
+	for _, want := range []string{"Project: {project}\n", "Your sandbox: {sandbox}. A code repo", "Code repos: {repo} at {repo path} (default {default}).", `Goal: the "Current goal" line at the top of {hq}/wiki/backlog/index.md`, "The project's HQ: {hq} (", "Files from the CEO: {files}/inbox (", "Shared files: {files}/shared (", "- {gates}", "run: {checks}", "# You are Tove, Engineer on team Atlas"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
@@ -278,7 +278,7 @@ func TestTemplateShowsThePlaceholders(t *testing.T) {
 // lead keeps it and asks the CEO for it when there is none; a member only
 // reads it.
 func TestTheGoalIsInTheWiki(t *testing.T) {
-	at := `Goal: the "Current goal" line at the top of /home/ceo/workspace/ledger/project/wiki/backlog/index.md, `
+	at := `Goal: the "Current goal" line at the top of /home/ceo/foreman/projects/ledger/hq/wiki/backlog/index.md, `
 	for agent, want := range map[string][]string{
 		"mara": {at + "which you keep.", "ask the CEO for it in this session before anything else, then write it there", "update it there and tell your team"},
 		"tove": {at + "kept by your lead.", "your lead tells you what to work on"},
@@ -314,7 +314,7 @@ func TestTheDefaultBranchOfEachRepo(t *testing.T) {
 
 // A project with no code repo (a research team's) leaves out what only code
 // needs: branches, worktrees, git rules and the git tools. The lead still
-// commits the project repo, by name.
+// commits the HQ, by name.
 func TestAProjectWithNoCodeRepo(t *testing.T) {
 	for _, agent := range []string{"mara", "ilya"} {
 		lead := agent == "mara"
@@ -323,7 +323,7 @@ func TestAProjectWithNoCodeRepo(t *testing.T) {
 		// From the assignment on: a built-in role's job text is the team's to choose
 		full := Compose(in)
 		got := full[strings.Index(full, "## This assignment"):]
-		for _, gone := range []string{"Branches:", "worktree", "## Git", "switch(", "handoff(", "request_merge(", "fetch(", "Tests bound for a merge"} {
+		for _, gone := range []string{"Branches:", " worktree", "## Git", "switch(", "handoff(", "request_merge(", "fetch(", "Tests bound for a merge"} {
 			if strings.Contains(got, gone) {
 				t.Errorf("%s: %q in\n%s", agent, gone, got)
 			}
@@ -331,7 +331,7 @@ func TestAProjectWithNoCodeRepo(t *testing.T) {
 		if !strings.Contains(got, "This project has no code repo: its work is its knowledge base.") {
 			t.Errorf("%s: not told there is no code repo:\n%s", agent, got)
 		}
-		if commits := strings.Contains(got, "commit the project\nrepo only through commit(), naming project."); commits != lead {
+		if commits := strings.Contains(got, "commit the project's\nHQ only through commit(), naming hq."); commits != lead {
 			t.Errorf("%s: commit note %v, want %v", agent, commits, lead)
 		}
 	}
@@ -401,15 +401,5 @@ func TestTheCEOsInstructionsComeLast(t *testing.T) {
 	}
 	if got := Template(atlas, "tove", "Be brief."); !strings.HasSuffix(got, "\nBe brief.\n") {
 		t.Errorf("the template leaves them out:\n%s", got)
-	}
-}
-
-// A project without files (one made before workspaces) has no lines about
-// them: a path that isn't mounted would send the agent looking for nothing.
-func TestNoFilesNoLines(t *testing.T) {
-	in := input("tove", every)
-	in.Files = ""
-	if got := Compose(in); strings.Contains(got, "Files from the CEO") || strings.Contains(got, "Shared files") {
-		t.Errorf("files lines without files:\n%s", got)
 	}
 }

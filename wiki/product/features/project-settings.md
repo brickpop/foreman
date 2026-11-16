@@ -12,7 +12,7 @@ The project's **Settings** section ([Project page](./project-page.md)): its conf
 
 Padding `24px 24px 48px`. One column, at most 760px wide, of four [cards](../design/design-system.md#surfaces), 24px apart (the CEO, 2026-11-02: grouped, it was "pure non-structure"). Each card is titled in its header band (600 14px), its blocks one under another with a `--line` between them, each block's title a small label (13px 500 `--tx4`):
 
-1. **General**: Name, Workspace, Profile, then Visibility.
+1. **General**: Name, Folders, Profile, then Visibility.
 2. **Rules**, `project.toml` after the title (12.5px `--tx4`, as Settings says where each card is kept): What comes to you, Merges, then the file itself ("The file").
 3. **How it works**, **collapsed** at first (a `›` in its header turns down when open; the CEO: reference text, out of the way): Where things live, then How work flows.
 4. **Danger zone**, its border and title in `--err`: Remove.
@@ -20,40 +20,28 @@ Padding `24px 24px 48px`. One column, at most 760px wide, of four [cards](../des
 The blocks:
 
 - **"Name"** (the CEO, 2026-11-04): the project's [display name](../models/project-config.md#the-project-record) in a field (13.5px, placeholder its readable id, at most 80 characters); once changed, **`Cancel`** and **`Save`** (Enter too); a name another project shows already says "Another project shows as <name> already: pick another name." (`--err`) with Save off, as the server refuses it. "How it shows everywhere; empty, it shows as <Readable id>. Its id, <id>, stays: its folder, its agents' branches and its links are built from it." A refusal is a toast "Name not saved" with the reason.
-- **"Workspace"** (the CEO, 2026-10-28): the workspace's path (Mono 13px `--tx2`, selectable) and **`Copy`**, then "Its project repo, and in agents/ each agent's worktrees: look at and run their code there. Editing while an agent works turns into its uncommitted changes." ([Project config → The workspace](../models/project-config.md#the-workspace)).
-  For a project made before workspaces, **"Move into a workspace"** instead (legacy): "This project lives in Foreman's home. Moved into a folder of yours, its project repo and its agents' worktrees are where you can find them and run their code. Uncommitted work and conversations come along. Stop the teams on it first.", a path field pre-filled `<projects folder>/<project>`, and **`Move`** (`Moving…` while it runs; `POST /api/projects/:id/migrate`). Done, the toast "<project> moved" ("Into <workspace>."); a refusal is a toast "Project not moved" with the reason.
+- **"Folders"** (the CEO, 2026-10-28; its HQ and worktrees since 2026-11-15): two rows, **HQ** (`projects/<id>/hq`) and **Worktrees** (`worktrees/<id>`), each its label (13px `--tx4`), its path (Mono 13px `--tx2`, selectable) and **`Copy`**, then "Its HQ holds its wiki and project.toml. In its worktrees, one folder per agent: look at and run their code there. Editing while an agent works turns into its uncommitted changes." ([Project config → The project's folder](../models/project-config.md#the-projects-folder)).
 - **"Where things live"**: the project's files, explained (Mono 13px / 1.7 `<pre>`), with the real paths and this project's name:
 
   ```
-  ~/workspace/foreman/ledger/
-  ├─ project/           project repo (git)
-  │  ├─ project.toml    checks, gates
-  │  └─ wiki/           knowledge base + wiki.toml (boards)
-  └─ agents/            one sandbox per agent: a worktree of each repo
+  ~/foreman/
+  ├─ hq/                    Foreman's HQ (git): teams, your instructions
+  ├─ projects/ledger/
+  │  ├─ hq/                 this project's HQ (git)
+  │  │  ├─ project.toml     checks, gates
+  │  │  └─ wiki/            knowledge base + wiki.toml (boards)
+  │  └─ files/              inbox/ from you, shared/ by its agents
+  └─ worktrees/ledger/  one sandbox per agent: a worktree of each repo
   ~/.foreman/
-  ├─ config/            global repo (git): teams, settings
+  ├─ settings.toml          this machine's settings
   ├─ harness/ledger/  each agent's harness config and conversations
-  └─ state.db           deployments, sessions, requests (runtime)
+  └─ state.db               deployments, sessions, requests (runtime)
   ```
 
-  A project made before workspaces shows the home's tree as it was:
-
-  ```
-  ~/.foreman/
-  ├─ config/              global repo (git): teams, settings
-  ├─ projects/
-  │  └─ <project>/
-  │     ├─ project.toml    checks, gates
-  │     └─ wiki/           knowledge base + wiki.toml (boards)
-  ├─ sandboxes/
-  │  └─ <project>/      one git worktree per agent, per repo
-  └─ state.db             deployments, sessions, requests (runtime)
-  ```
-
-  The code repos are not in it: they are wherever the CEO keeps them, listed in [Repos](./repos.md#the-list) ([Home → Layout](../models/home.md#layout)).
+  Foreman's folder is the real one (`foreman_folder`, [Settings → Folders](./settings.md#folders)), Foreman's home too. The code repos are not in it: they are wherever the CEO keeps them, listed in [Repos](./repos.md#the-list) ([Home → Layout](../models/home.md#layout)).
 
 - **"How work flows"**: four items, title (600) and body (`--tx2`, line-height 1.55):
-  - **Team definition**: "Lives once on this machine, in the global repo: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
+  - **Team definition**: "Lives once on this machine, in Foreman's HQ: souls, job descriptions and the playbook. You can deploy it to as many projects as you like."
   - **Deployment**: "A team on this project, one at most. It’s runtime state kept by Foreman, not config. It gets its own sessions, worktrees and message channel. Agents in two deployments never mix."
   - **Session prompt**: "Generated per agent per deployment: soul plus roster, tools, playbook and this project’s gates. Open any agent to read the exact prompt."
   - **Enforced by Foreman**: "Routes ask, reply, handoff, contribute and escalate between sessions. Tracks handoffs (Team → In flight), wakes requesters when replies land, sends escalations to the Dashboard, and only lets the lead request merges."
@@ -67,8 +55,8 @@ The blocks:
   - Finding: "A challenge team rates something high severity. You decide who fixes it, and when."
   - Blocked: "Raised by Foreman, not an agent: a session crashed, hit a rate limit, or has been stuck for 20 minutes."
 - **"Merges"**: "You merge requested branches into their target from their review, in the Inbox; Foreman does the merge. Nothing is pushed: you push with your own git."
-- **"The file"** (`project.toml`): a row with `<workspace>/project/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the project repo. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
-- **"Remove this project"** (last): "Its record and its history go. Its workspace stays. Your code repos keep their branches."; while a team is deployed on it, "Stop <teams> on it first (its Team section)." with the button disabled. **`Remove project`** asks first: "Remove <project>?", "Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its workspace, your code repos and their branches stay.", with two checkboxes, off at each opening: "Also delete its agents' worktrees, their uncommitted work included. Their branches stay in your code repos." and "Also delete its project repo folder, <path>: its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, it's taken over by a new project in the same workspace." Removing opens the Dashboard with the toast "<project> removed"; a refusal is a toast "Project not removed" ([Add a project → Removing a project](./add-project.md#removing-a-project)).
+- **"The file"** (`project.toml`): a row with `<hq>/project.toml · read-only` (the real path, Mono 12.5px `--tx3`). Below: "This file is config, committed in the HQ. Edit it in your editor." (`Change with Chief of Staff` comes later: [Project config with the Chief of Staff](../../backlog/cos-project-config.md).) Then the file's actual content in a selectable `<pre>`, exactly as on disk ([Project config](../models/project-config.md)).
+- **"Remove this project"** (last): "Its record and its history go. Its HQ and files stay. Your code repos keep their branches."; while a team is deployed on it, "Stop <teams> on it first (its Team section)." with the button disabled. **`Remove project`** asks first: "Remove <project>?", "Its record and its history (deployments, messages, requests, merge requests, session logs, its agents' conversations) go for good. Its files, your code repos and their branches stay.", with two checkboxes, off at each opening: "Also delete its agents' worktrees, their uncommitted work included. Their branches stay in your code repos." and "Also delete its HQ, <path>: its wiki and project.toml. Unless you pushed it, it has no other copy. Kept, a new project of the same name takes it over." Removing opens the Dashboard with the toast "<project> removed"; a refusal is a toast "Project not removed" ([Add a project → Removing a project](./add-project.md#removing-a-project)).
 
 
 Everything in this block is read-only but the profile, the code repos and Remove. Changes to `project.toml` on disk show within about 1 s. An invalid file shows an error banner naming the field ([Project config](../models/project-config.md#invalid-config)).

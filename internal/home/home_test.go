@@ -3,7 +3,6 @@ package home
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -103,7 +102,7 @@ func TestAccessTokenRegeneratedWhenEmpty(t *testing.T) {
 }
 
 // The agent link's secret survives restarts (running containers keep their
-// tokens), is private, differs from the access token, and stays out of git.
+// tokens), is private, and differs from the access token.
 func TestAgentSecret(t *testing.T) {
 	h, err := Open(t.TempDir())
 	if err != nil {
@@ -121,8 +120,5 @@ func TestAgentSecret(t *testing.T) {
 	info, err := os.Stat(h.Path("credentials", "agent-link"))
 	if err != nil || info.Mode().Perm() != 0o600 {
 		t.Errorf("secret file: %v %v", info, err)
-	}
-	if strings.HasPrefix(h.Path("credentials"), h.config()) {
-		t.Error("credentials/ is inside the global repo")
 	}
 }

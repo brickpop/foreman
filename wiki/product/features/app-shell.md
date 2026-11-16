@@ -27,7 +27,7 @@ Screens: [Dashboard](./dashboard.md); a [Project](./project-page.md), with its s
 3. **Footer** (padding `12px 10px`, top border):
    - **Settings row**: "Settings" (the address it once showed, `localhost:<port>`, went on 2026-11-02: the browser's address bar has it). Opens [Settings](./settings.md); active on every Settings page, the team and agent pages included.
 
-Data: projects and teams from the [home](../models/home.md) (the projects' records and project repos, the global repo's team files), deployments from the runtime state ([Deployment](../models/deployment.md)); the Inbox badge and the dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
+Data: projects and teams from the [home](../models/home.md) (the projects' records and HQs, the team files in Foreman's HQ), deployments from the runtime state ([Deployment](../models/deployment.md)); the Inbox badge and the dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
 
 ## Overlays
 
@@ -52,7 +52,7 @@ In-app mirrors of [notifications](./notifications.md), shown regardless of brows
 | New request | `<Name> needs you on <project>` | the request summary | `--attn` |
 | Deployed | `<Team> deployed to <project>` | `<N> new sessions starting.` (opens the lead's session) | `--ok` |
 | Stopped | `<Team> stopped on <project>` | `Worktrees are kept. Other deployments keep running.` (opens the project's Team) | `--tx4` |
-| Project created | `<id> created` | `Made its project repo at <path>, with project.toml and a starter wiki.`, `Cloned its project repo into <path>.`, or `Took over the project repo left at <path>, as it was.` | `--ok` |
+| Project created | `<id> created` | `Made its HQ at <path>, with project.toml and a starter wiki.`, `Cloned its HQ into <path>.`, or `Took over the HQ left at <path>, as it was.` | `--ok` |
 | Project removed | `<id> removed` | none | `--tx4` |
 | Stopped by Foreman (its project is gone) | `Foreman stopped <Team> on <project>` | the reason, e.g. `ledger is gone: all its code repos are missing` (opens the Dashboard) | `--err` |
 | Config review resolved | `project.toml` | `Config change merged to main.` (`--ok`) or `Config change rejected.` (`--tx4`) | |

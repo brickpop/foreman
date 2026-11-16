@@ -167,8 +167,8 @@ export function RepoIcon({ size = "size-3.5" }: { size?: string }) {
   );
 }
 
-/** A folder with a mark inside: one of Foreman's own (the projects folder, a
- * workspace), in the folder browser. */
+/** A folder with a mark inside: one of Foreman's own (its HQ, projects/,
+ * worktrees/), in the folder browser. */
 export function ForemanFolderIcon({ size = "size-3.5" }: { size?: string }) {
   return (
     <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>

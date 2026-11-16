@@ -13,7 +13,7 @@ epic: director
 **Idea, to settle when it's picked up:**
 - The sidebar's **Teams** label links to a Teams page: one row per team (members, where it's deployed), and the team's actions.
 - **New team**, **Hire** and **Refine** open the Chief of Staff from there, on the CEO's explicit click, never by arriving on the page.
-- **Delete a team**: refused while it's deployed (stop it first); otherwise one commit removing `teams/<team>.toml` from the global repo, so git keeps it. What becomes of its stopped deployments' history is to decide.
+- **Delete a team**: refused while it's deployed (stop it first); otherwise one commit removing `teams/<team>.toml` from Foreman's HQ, so git keeps it. What becomes of its stopped deployments' history is to decide.
 - Whether `+ New team` stays in the sidebar, pointing at the page instead.
 
 - [ ] the page, the sidebar link, the Chief of Staff on a click

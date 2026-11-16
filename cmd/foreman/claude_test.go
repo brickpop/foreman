@@ -115,8 +115,8 @@ func startClaudeHome(t *testing.T, profile string) *claudeHome {
 	home := filepath.Join(root, "home")
 	app := filepath.Join(root, "app")
 	files := map[string]string{
-		"home/config/settings.toml": "engine = \"podman\"\n",
-		"home/config/teams/itest.toml": "team = \"itest\"\nname = \"Itest\"\nlead = \"lena\"\n\n" +
+		"home/settings.toml": "engine = \"podman\"\nforeman_folder = \"" + filepath.Join(root, "folder") + "\"\n",
+		"folder/hq/teams/itest.toml": "team = \"itest\"\nname = \"Itest\"\nlead = \"lena\"\n\n" +
 			"[agents.lena]\nname = \"Lena\"\nrole = \"team_lead\"\nharness = \"claude-code\"\n\n" +
 			"[agents.milo]\nname = \"Milo\"\nrole = \"engineer\"\nharness = \"claude-code\"\n",
 		"app/README.md": "# app\n",
@@ -166,7 +166,7 @@ func startClaudeHome(t *testing.T, profile string) *claudeHome {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	c.post("/api/projects", map[string]string{"name": "proj", "workspace": filepath.Join(root, "workspace")})
+	c.post("/api/projects", map[string]string{"name": "proj"})
 	c.post("/api/projects/proj/repos", map[string]string{"name": "app", "path": app})
 	c.put("/api/projects/proj/profile", map[string]string{"profile": profile})
 	// Foreman serves before Podman answers: agents start once the checklist

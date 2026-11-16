@@ -192,8 +192,8 @@ func (w *Workflow) sharing(project home.Project, name string) []shared {
 
 // checkedOut says who has branch checked out: an agent ("tove", or
 // "tove@suite" on another project), the CEO's own checkout ("you"), or a
-// stray worktree, one in no project's agents' sandboxes (an old workspace's,
-// a folder since deleted), named by its folder. "" when none has it.
+// stray worktree, one in no project's agents' sandboxes (moved by hand, a
+// folder since deleted), named by its folder. "" when none has it.
 func (w *Workflow) checkedOut(b branchRepo, branch string) (who, stray string) {
 	dir, ok := b.trees[branch]
 	switch {

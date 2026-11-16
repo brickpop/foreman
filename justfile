@@ -13,7 +13,7 @@ help:
 setup:
     cd ui && bun install
 
-# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, its home in .dev/real. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, its home in .dev/fake. Each starts with team dev-team (Tic leads, Tac and Toe) and project DevProject (one code repo, some-app, in .dev/<harness>-repos). A home given second is used instead (it must be on the engine its harness needs)
+# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, its home in .dev/real and its Foreman folder in .dev/real-folder. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake and .dev/fake-folder. Each starts with team dev-team (Tic leads, Tac and Toe) and project DevProject (one code repo, some-app, in .dev/<harness>-repos). A home given second is used instead (it must be on the engine its harness needs)
 [group('dev')]
 dev harness="real" home="":
     #!/usr/bin/env bash
@@ -22,14 +22,18 @@ dev harness="real" home="":
     # One home per harness, so each is always on the engine it needs. Its own
     # home, so it runs beside your own Foreman (one per home).
     home="{{home}}"; [ -n "$home" ] || home=".dev/{{harness}}"
-    mkdir -p "$home/config"
+    mkdir -p "$home"
     home="$(cd "$home" && pwd)"
+    # Its own Foreman folder (HQ, projects, worktrees) beside the home, never
+    # your ~/foreman.
+    folder="$(dirname "$home")/$(basename "$home")-folder"
     # A new home: the fake harness runs as host processes (no Podman machine
     # to start); Claude Code runs in Podman.
     engine=direct; [ "{{harness}}" = real ] && engine=podman
-    settings="$home/config/settings.toml"
-    [ -f "$settings" ] || echo "engine = \"$engine\"" > "$settings"
-    teams="$home/config/teams"
+    settings="$home/settings.toml"
+    [ -f "$settings" ] || printf '%s\n' "engine = \"$engine\"" "foreman_folder = \"$folder\"" > "$settings"
+    # Foreman makes its HQ around what is there at its first start.
+    teams="$folder/hq/teams"
     if [ ! -d "$teams" ]; then
         mkdir -p "$teams"
         printf '%s\n' 'team = "dev-team"' 'name = "DevTeam"' 'lead = "tic"' '' \

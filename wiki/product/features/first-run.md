@@ -6,11 +6,11 @@ tags: [feature, ui, setup]
 
 # First run
 
-A new home works out of the box: `foreman`, with no folder and no question, makes `~/.foreman` ([Home](../models/home.md#starting-foreman)). Foreman starts whatever is missing, says what's left on [Dashboard](./dashboard.md), and reaches Podman as soon as it's there. There's no flag, setting or command to know beforehand, and nothing to discover by hitting a refusal. The defaults were confirmed by the CEO on 2026-10-16 ([First run card](../../backlog/first-run.md)).
+A new home works out of the box: `foreman`, with no folder and no question, makes `~/.foreman` and Foreman's folder, `~/foreman`, with Foreman's HQ in it (`git init`, `teams/`, an empty `instructions.md`, one commit "Foreman's HQ") ([Home](../models/home.md#starting-foreman)). Foreman starts whatever is missing, says what's left on [Dashboard](./dashboard.md), and reaches Podman as soon as it's there. There's no flag, setting or command to know beforehand, and nothing to discover by hitting a refusal. The defaults were confirmed by the CEO on 2026-10-16 ([First run card](../../backlog/first-run.md)).
 
 ## Foreman always starts
 
-- Only a busy port, an unreadable home or a folder argument stops `foreman`; a second `foreman` prints the first one's URL instead. Podman missing, stopped or failing is a checklist row, not a startup error.
+- Only a busy port, an unreadable home, a folder argument or a `foreman_folder` that can't be used (not inside `$HOME`, inside Foreman's home or around it; [Global settings](../models/global-settings.md)) stops `foreman`, saying why; a second `foreman` prints the first one's URL instead. Podman missing, stopped or failing is a checklist row, not a startup error.
 - **The engine is Podman**, and is never switched on its own. `direct` stays an explicit development setting ([Global settings](../models/global-settings.md)).
 - **The watcher** (the setup block, `internal/setup`) reaches Podman at launch, then checks every 3 seconds, and at once after the CEO's Start or a machine creation ([The Podman service](../architecture/session-runner.md#the-podman-service)).
   - At launch it starts a stopped macOS machine, as Foreman always has. Later checks never do, so a machine the CEO stopped stays stopped until they press **Start**.

@@ -12,9 +12,10 @@ epic: terminal-multiplexer
 
 **Done when:** `@testing-library/react` and `happy-dom` are dev dependencies (Bun), vitest runs component tests under `just test`, and the first ones exist:
 - the Team page's deployment card opens the project's Session, and its project name opens the project's Wiki;
-- the New project dialog sends `clone` only with Clone, and goes on to its repos once created; its workspace follows the name (`<projects folder>/<name>`) until edited, and says when the projects folder will be created;
-- Project settings: the workspace's Copy; for a project made before workspaces, the "Move into a workspace" offer pre-filled and sent; Remove sends `deleteWorktrees` and `deleteRepo` only when ticked, both unticked at each opening;
-- Settings → System → Projects folder: Save and Discard only once edited, as the instructions;
+- the New project dialog sends `clone` only with Clone, and goes on to its repos once created;
+- Project settings: the Folders' Copy; Remove sends `deleteWorktrees` and `deleteHQ` only when ticked, both unticked at each opening;
+- Deployment's Clean up: the uncommitted option shows only when a worktree holds uncommitted work, is unticked at each opening, and is sent as ticked;
+- Settings → Agents → Instructions: Save and Discard only once edited;
 - Settings → Instructions for every agent: Save and Discard appear only once the text differs; a failed save keeps the text; once saved, the field shows it (no flash of the old text) and follows a change on disk while not edited;
 - Deploy a team: an archived project reads `<id> (archived)`, Deploy stays disabled while it is chosen, and the row's Unarchive sends `setArchived(id, false)` then enables Deploy;
 - the repo picker (`AddRepo`): a repo folder's name follows it until edited, a plain folder's new repo is that folder plus the name typed, a name typed for one kind of folder is dropped on the other; a pasted path refused leaves the browser where it was.

@@ -124,12 +124,9 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 		}
 		mounts = append(mounts, runner.Mount{Source: filepath.Join(real, ".git"), Target: filepath.Join(real, ".git"), ReadOnly: true})
 	}
-	// The live project repo, writable for the lead only; its .git read-only for
-	// all. At its real path, as everything else: a path an agent names is one
-	// the CEO can open (the CEO, 2026-11-02).
-	// Its old mount point in the sandbox, from before: gone when empty (temporary,
-	// wiki/technical-debt.md#the-old-project-mount-point).
-	_ = os.Remove(filepath.Join(inst.SandboxPath, "project"))
+	// The project's HQ, live, writable for the lead only; its .git read-only
+	// for all. At its real path, as everything else: a path an agent names is
+	// one the CEO can open (the CEO, 2026-11-02).
 	mounts = append(mounts, runner.Mount{Source: project.Path, Target: project.Path, ReadOnly: !lead})
 	if _, err := os.Stat(filepath.Join(project.Path, ".git")); err == nil {
 		mounts = append(mounts, runner.Mount{Source: filepath.Join(project.Path, ".git"), Target: filepath.Join(project.Path, ".git"), ReadOnly: true})
@@ -140,12 +137,10 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	if err := project.MakeFiles(); err != nil {
 		return nil, err
 	}
-	if project.Files != "" {
-		inbox, shared := filepath.Join(project.Files, home.FilesInbox), filepath.Join(project.Files, home.FilesShared)
-		mounts = append(mounts,
-			runner.Mount{Source: inbox, Target: inbox, ReadOnly: true},
-			runner.Mount{Source: shared, Target: shared})
-	}
+	inbox, shared := filepath.Join(project.Files, home.FilesInbox), filepath.Join(project.Files, home.FilesShared)
+	mounts = append(mounts,
+		runner.Mount{Source: inbox, Target: inbox, ReadOnly: true},
+		runner.Mount{Source: shared, Target: shared})
 
 	// The harness's own files, private, outside the sandbox.
 	dir := project.HarnessDir(inst.AgentID)
@@ -203,9 +198,9 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 // compose is an instance's session prompt: launch writes it, Prompt shows it.
 func (m *Manager) compose(inst store.Instance, dep store.Deployment, team home.Team, project home.Project) string {
 	return prompt.Compose(prompt.Input{
-		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, ProjectRepo: project.Path, Files: project.Files, Config: project.Config, Repos: project.Repos,
+		Agent: inst.AgentID, Team: team.Config, Project: project.ID, Sandbox: inst.SandboxPath, HQ: project.Path, Files: project.Files, Config: project.Config, Repos: project.Repos,
 		Tools:        m.tools(inst.AgentID == team.Config.Lead, len(project.Repos) > 0),
-		Instructions: m.Config.Settings().Settings.Instructions,
+		Instructions: m.Config.Instructions().Text,
 	})
 }
 

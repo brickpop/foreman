@@ -73,7 +73,7 @@ func TestBrowse(t *testing.T) {
 func TestTheHomeFolderBoundsAddingRepos(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	startedIn(t, h, filepath.Join(home, "dev"))
@@ -103,7 +103,7 @@ func TestTheHomeFolderBoundsAddingRepos(t *testing.T) {
 func TestBrowseSaysWhatTheProjectHasAdded(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
 	app := codeRepo(t, filepath.Join(home, "dev", "app"))
@@ -128,16 +128,19 @@ func TestBrowseSaysWhatTheProjectHasAdded(t *testing.T) {
 	}
 }
 
-// Foreman's own folders show for what they are: the projects folder and each
-// workspace (the project repo in it is a git repo, never a code repo).
+// Foreman's own folders show for what they are: its HQ, projects/ and
+// worktrees/ (their repos are never code repos); repos/, where the code
+// repos it clones go, is not one of them.
 func TestBrowseMarksForemansFolders(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(home, "workspace", "notes"), 0o755); err != nil {
-		t.Fatal(err)
+	for _, dir := range []string{"repos", "worktrees"} {
+		if err := os.MkdirAll(filepath.Join(h.Folder(), dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	marks := func(path string) string {
 		f, err := h.Browse(path, "")
@@ -150,41 +153,46 @@ func TestBrowseMarksForemansFolders(t *testing.T) {
 		}
 		return f.Foreman + " | " + strings.Join(got, ", ")
 	}
-	if got := marks(filepath.Join(home, "workspace")); got != " | foreman=Foreman's projects folder, notes=" {
-		t.Errorf("above the projects folder: %q", got)
+	if got := marks(home); got != " | foreman=" {
+		t.Errorf("the home folder: %q", got)
 	}
-	if got := marks(filepath.Join(home, "workspace", "foreman")); got != "Foreman's projects folder | ledger=Ledger's workspace" {
-		t.Errorf("the projects folder: %q", got)
+	if got := marks(h.Folder()); got != " | hq=Foreman's HQ, projects=Foreman's projects, repos=, worktrees=the agents' worktrees" {
+		t.Errorf("Foreman's folder: %q", got)
 	}
 	// Through a symlink, the same folder.
-	if err := os.Symlink(workspace("ledger"), filepath.Join(home, "ws")); err != nil {
+	if err := os.Symlink(filepath.Join(h.Folder(), "projects"), filepath.Join(home, "p")); err != nil {
 		t.Fatal(err)
 	}
-	if f, err := h.Browse(filepath.Join(home, "ws"), ""); err != nil || f.Foreman != "Ledger's workspace" {
-		t.Errorf("a workspace through a symlink: %+v %v", f, err)
+	if f, err := h.Browse(filepath.Join(home, "p"), ""); err != nil || f.Foreman != "Foreman's projects" {
+		t.Errorf("projects/ through a symlink: %+v %v", f, err)
 	}
 }
 
 // No code repo goes in Foreman's own folders, whichever way it comes (added,
 // created, located; through a symlink too): the server refuses what the
-// browser never offers.
+// browser never offers. One in repos/ is fine.
 func TestNoCodeRepoInForemansFolders(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", "", workspace("ledger")); err != nil {
+	ledger, _, err := h.NewProject(ctx, "ledger", "")
+	if err != nil {
 		t.Fatal(err)
 	}
-	projectRepo := filepath.Join(workspace("ledger"), "project")
-	stray := codeRepo(t, filepath.Join(home, "workspace", "foreman", "stray"))
-	if err := os.Symlink(projectRepo, filepath.Join(home, "link")); err != nil {
+	strays := []string{
+		ledger.Path,
+		codeRepo(t, filepath.Join(h.Folder(), "projects", "stray")),
+		codeRepo(t, filepath.Join(h.Folder(), "worktrees", "stray")),
+		codeRepo(t, h.HQ("stray")),
+	}
+	if err := os.Symlink(ledger.Path, filepath.Join(home, "link")); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{projectRepo, stray, filepath.Join(home, "link")} {
+	for _, path := range append(strays, filepath.Join(home, "link")) {
 		if _, err := h.AddRepo(ctx, "ledger", "x", path, ""); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "Foreman's own") {
 			t.Errorf("added %s: %v", path, err)
 		}
 	}
-	for _, path := range []string{filepath.Join(workspace("ledger"), "fresh"), filepath.Join(home, "workspace", "foreman", "fresh")} {
+	for _, path := range []string{filepath.Join(h.Folder(), "projects", "ledger", "fresh"), filepath.Join(h.Folder(), "worktrees", "fresh"), h.HQ("fresh")} {
 		if _, err := h.NewRepo(ctx, "ledger", "fresh", path); !errors.Is(err, ErrInvalid) || exists(path) {
 			t.Errorf("created %s: %v", path, err)
 		}
@@ -193,10 +201,13 @@ func TestNoCodeRepoInForemansFolders(t *testing.T) {
 	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
 		t.Fatalf("a repo of the CEO's: %v", err)
 	}
-	if _, err := h.LocateRepo(ctx, "ledger", "api", projectRepo); !errors.Is(err, ErrInvalid) {
-		t.Errorf("located in a workspace: %v", err)
+	if _, err := h.LocateRepo(ctx, "ledger", "api", ledger.Path); !errors.Is(err, ErrInvalid) {
+		t.Errorf("located in an HQ: %v", err)
 	}
 	if _, err := h.NewRepo(ctx, "ledger", "web", filepath.Join(home, "dev", "web")); err != nil {
 		t.Errorf("a new repo of the CEO's: %v", err)
+	}
+	if _, err := h.AddRepo(ctx, "ledger", "app", codeRepo(t, filepath.Join(h.Folder(), "repos", "me", "app")), ""); err != nil {
+		t.Errorf("a repo in repos/: %v", err)
 	}
 }

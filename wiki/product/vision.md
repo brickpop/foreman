@@ -8,7 +8,7 @@ tags: [architecture, home]
 
 Foreman is a self-hosted server and web UI. It lets one person (the **CEO**) run several **teams of AI coding agents** across several **projects** on their own machine.
 
-- Foreman keeps everything of its own in one folder, its **[home](./models/home.md)** (`~/.foreman`). A **[project](./models/project-config.md)** is a record there plus a [project repo](./models/project-config.md#the-project-repo) (its rules and its wiki).
+- Foreman keeps what the CEO owns in one folder, **[Foreman's folder](./models/home.md#foremans-folder)** (`~/foreman`): [Foreman's HQ](./models/home.md#foremans-hq) (the teams and the CEO's instructions), the projects and the agents' worktrees; its own machinery stays in its **[home](./models/home.md)** (`~/.foreman`). A **[project](./models/project-config.md)** is a record plus its [HQ](./models/project-config.md#the-projects-hq) (its rules and its wiki).
 - A project names one or more **git repositories**, wherever the CEO keeps them, and has a **wiki** (a folder of Markdown files that acts as the project's shared memory, see [Wiki engine](./architecture/wiki-engine.md)).
 - A **[team](./models/team-definition.md)** is a reusable definition: a roster of [agents](./models/agent-soul.md), each with a personality, skills and a job description, plus a playbook for how they work together.
 - A team is **[deployed](./models/deployment.md)** onto a project, which has one team at most and keeps its goal in its wiki. One team can be deployed on many projects at the same time. Each deployment runs its own sessions.

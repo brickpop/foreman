@@ -16,7 +16,7 @@ export function repoName(path: string): string {
 }
 
 /** A new project's name from what the CEO typed: a slug, as the server
- * requires (it is the workspace's folder; readable makes how it shows):
+ * requires (it names its folders; readable makes how it shows):
  * lowercase letters and digits, accents dropped, anything else one hyphen,
  * at most 63. "My Café" is my-cafe; "" when nothing is left. */
 export function projectSlug(typed: string): string {
@@ -35,11 +35,11 @@ export function inside(folder: string, name: string): string {
   return `${folder.replace(/\/+$/, "")}/${name}`;
 }
 
-/** The "created" toast's body: what became the new project's repo. */
+/** The "created" toast's body: what became the new project's HQ. */
 export function createdBody(created: boolean, cloned: boolean, path: string): string {
-  if (!created) return `Took over the project repo left at ${path}, as it was.`;
-  if (cloned) return `Cloned its project repo into ${path}.`;
-  return `Made its project repo at ${path}, with project.toml and a starter wiki.`;
+  if (!created) return `Took over the HQ left at ${path}, as it was.`;
+  if (cloned) return `Cloned its HQ into ${path}.`;
+  return `Made its HQ at ${path}, with project.toml and a starter wiki.`;
 }
 
 /** The default branch to send when adding an existing repo: none when it has

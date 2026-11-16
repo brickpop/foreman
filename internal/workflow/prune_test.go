@@ -372,7 +372,7 @@ func TestCleanupNeverOffersLongLivedBranches(t *testing.T) {
 }
 
 // A branch checked out in a stray worktree (no project's agent's, not the
-// CEO's checkout: an old workspace's, or a folder since deleted) is listed with
+// CEO's checkout: one moved by hand, or a folder since deleted) is listed with
 // it; picked, the worktree goes first, unless it holds work not committed. An
 // agent's prune() never touches one.
 func TestCleanupStrayWorktrees(t *testing.T) {

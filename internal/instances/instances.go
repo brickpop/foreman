@@ -66,6 +66,8 @@ type Config interface {
 	Checked(id string) (home.Project, error)
 	Team(id string) (home.Team, error)
 	Settings() home.SettingsFile
+	// Instructions are the CEO's instructions for every agent.
+	Instructions() home.Instructions
 }
 
 // Deps are the blocks the manager is assembled from.

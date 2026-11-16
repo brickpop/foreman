@@ -39,15 +39,13 @@ describe("inside", () => {
 });
 
 describe("createdBody", () => {
-  const path = "/Users/ceo/.foreman/projects/ledger";
-  it("says a taken-over repo was kept as it was, whatever was asked", () => {
-    expect(createdBody(false, false, path)).toBe(
-      `Took over the project repo left at ${path}, as it was.`,
-    );
+  const path = "/Users/ceo/foreman/projects/ledger/hq";
+  it("says a taken-over HQ was kept as it was, whatever was asked", () => {
+    expect(createdBody(false, false, path)).toBe(`Took over the HQ left at ${path}, as it was.`);
   });
 
-  it("tells a clone from a new repo", () => {
-    expect(createdBody(true, true, path)).toBe(`Cloned its project repo into ${path}.`);
+  it("tells a clone from a new HQ", () => {
+    expect(createdBody(true, true, path)).toBe(`Cloned its HQ into ${path}.`);
     expect(createdBody(true, false, path)).toContain("with project.toml and a starter wiki");
   });
 });

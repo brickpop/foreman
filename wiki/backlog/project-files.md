@@ -12,13 +12,13 @@ epic: workflow
 
 ## Decided (the CEO, 2026-11-06)
 
-- **One `files/` per project**, in its workspace: `<workspace>/files/`, kept across teams and deployments. Two folders in it (`inbox` is fine scoped there; the project's Inbox section and `project/wiki/inbox/` keep their meaning):
+- **One `files/` per project**, beside its HQ: `~/foreman/projects/<id>/files/` (was `<workspace>/files/` until [One Foreman folder](./foreman-folder.md)), kept across teams and deployments. Two folders in it (`inbox` is fine scoped there; the project's Inbox section and the wiki's `inbox/` keep their meaning):
   - **`files/inbox/`**: the CEO's files for the agents. Read-only for every agent.
   - **`files/shared/`**: the agents' persistent data, read and written by every agent of the project. Not git: no history.
 - **The session prompt** tells each agent where both are and what each is for (data later work needs goes in `shared/`; knowledge still goes in the wiki).
 - **Open on the desktop**: Foreman opens a folder with the host's `open` (macOS) or `xdg-open` (Linux, with a display). Where it can't, no Open button shows at all.
 - **Session header**, at its right end, three labelled buttons alike, a click opening that folder: **`Agent folder ↗`** (the shown agent's), **`Shared files ↗`**, **`File inbox ↗`** last. They replaced the agent's folder copy button and its Open icon: nothing copies the path any more (the CEO, 2026-11-06). Each folder is made if missing.
-- A project made before workspaces (legacy) has no `files/`: [One Foreman folder](./foreman-folder.md) ends that case.
+- Every project has its `files/` (since [One Foreman folder](./foreman-folder.md), 2026-11-15: the legacy projects without one are gone).
 
 ## Safety
 
@@ -29,10 +29,10 @@ epic: workflow
 
 ## Steps
 
-- [x] spec: [Sandboxes and git policy](../product/architecture/sandboxes-and-git.md) (layout, mounts), [Project config → The workspace](../product/models/project-config.md#the-workspace), [Session prompt](../product/architecture/session-prompt.md), [Sessions](../product/features/sessions.md) (header), [API](../product/architecture/api.md), [Security](../product/architecture/security.md)
+- [x] spec: [Sandboxes and git policy](../product/architecture/sandboxes-and-git.md) (layout, mounts), [Project config → The project's folder](../product/models/project-config.md#the-projects-folder), [Session prompt](../product/architecture/session-prompt.md), [Sessions](../product/features/sessions.md) (header), [API](../product/architecture/api.md), [Security](../product/architecture/security.md)
 - [x] server: `desktop` package (detects `open` / `xdg-open` + display; opens a directory); tests
 - [x] server: `files/inbox` and `files/shared` made at each agent start and mounted (inbox ro, shared rw); tests
 - [x] server: `GET /api/desktop` ({canOpen}), `POST /api/desktop/open` ({instance} or {project, folder}); tests
 - [x] prompt: the two folders in This assignment; tests
 - [x] ui: the three buttons in the Session header, shown only with `canOpen`; client test
-- [ ] the CEO tries it on macOS and on Fedora: the three buttons open Finder / the file manager; inside an agent, `touch <workspace>/files/inbox/x` fails and `files/shared/x` works; the prompt (Session → prompt) names both. Then fold this card into the specs and delete it
+- [ ] the CEO tries it on macOS and on Fedora: the three buttons open Finder / the file manager; inside an agent, `touch ~/foreman/projects/<id>/files/inbox/x` fails and `files/shared/x` works; the prompt (Session → prompt) names both. Then fold this card into the specs and delete it

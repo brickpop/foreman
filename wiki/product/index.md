@@ -11,11 +11,11 @@ Foreman's product definition. Every entry carries a `status` (`planned` / `parti
 
 Files Foreman reads or owns, and the runtime state it keeps.
 
-- [Home](./models/home.md): `~/.foreman`, its layout and the config / state / content split
-- [Project config](./models/project-config.md): the project record and `project.toml`
-- [Team definition](./models/team-definition.md) (`config/teams/<team>.toml`)
+- [Home](./models/home.md): `~/.foreman` and Foreman's folder `~/foreman` (Foreman's HQ), their layout and the config / state / content split
+- [Project config](./models/project-config.md): the project record, its folder, its HQ and `project.toml`
+- [Team definition](./models/team-definition.md) (`hq/teams/<team>.toml`)
 - [Agent soul](./models/agent-soul.md)
-- [Global settings](./models/global-settings.md) (`config/settings.toml`)
+- [Global settings](./models/global-settings.md) (`~/.foreman/settings.toml`)
 - Runtime state (`state.db`)
   - [Deployment](./models/deployment.md)
   - [Instance](./models/instance.md)
@@ -24,7 +24,7 @@ Files Foreman reads or owns, and the runtime state it keeps.
   - [Work item](./models/work-item.md): an agent's branch on its way to the lead
   - [Merge request](./models/merge-request.md): the lead's proposal to merge into one of the CEO's branches
   - [Review](./models/review.md): the CEO's review of a lead branch, with its comments to the lead
-  - [UI state](./models/ui-state.md): read markers and UI preferences
+  - [UI state](./models/ui-state.md): read markers and the UI's key/value state
 
 ## Features
 

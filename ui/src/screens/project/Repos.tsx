@@ -17,7 +17,7 @@ import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
 // code repo, wherever it is on disk, each opening its own page (Repo), with
-// what keeps agents from using it; then its project repo. Added, created,
+// what keeps agents from using it; then its HQ. Added, created,
 // located, renamed, removed and given their default branch here, from each
 // card's ⋯ menu; renaming and removing wait until no team is deployed.
 
@@ -31,7 +31,7 @@ export function Repos() {
   const client = useClient();
   const queries = useQueryClient();
   const toast = useToast();
-  // The branches, and the project repo, from the repos read.
+  // The branches, and the HQ, from the repos read.
   const read = useRepos(project.id);
   const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
   const [adding, setAdding] = useState(false);
@@ -45,7 +45,7 @@ export function Repos() {
       toast({ title: "Repos not changed", body: e.message, color: "var(--err)" }),
   });
   const readOf = (name: string) => read.data?.find((r) => r.name === name);
-  const projectRepo = read.data?.find((r) => r.project);
+  const hq = read.data?.find((r) => r.hq);
   const open = (what: Changing["what"], repo: string) => {
     if (what === "rename") setRenameTo(repo);
     setChanging({ what, repo });
@@ -70,10 +70,10 @@ export function Repos() {
           />
         ))}
         {read.isPending && <Loading rows={2} />}
-        {projectRepo && (
-          <Frame project={project.id} name={projectRepo.name} title="Project repo">
+        {hq && (
+          <Frame project={project.id} name={hq.name} title="HQ">
             <span className="text-[12.5px] text-tx4">project.toml and the wiki</span>
-            <span className="text-[12.5px] text-tx3">{count(projectRepo)}</span>
+            <span className="text-[12.5px] text-tx3">{count(hq)}</span>
           </Frame>
         )}
       </div>

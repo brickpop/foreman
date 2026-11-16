@@ -13,7 +13,7 @@ import (
 )
 
 // fixture writes files under a fresh project folder's wiki, commits them in
-// its project repo, and returns the Wikis reading it as project "p".
+// its HQ, and returns the Wikis reading it as project "p".
 func fixture(t *testing.T, files map[string]string) (*Wikis, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "p", "project", "wiki")

@@ -43,8 +43,8 @@ Label "In flight" with the subtitle `worktree → lead → target`. One panel li
 
 **Open merge requests** ([Merge request](../models/merge-request.md)), after the work items:
 
-- Its review's title (the lead's; with `PR #<n>` after it once a PR exists) (500), then `<Lead> · <repo> · <branch> → <target>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<target>` is where that merge request goes: the repo's default branch unless the lead named another branch, here and on every Merge button.
-- The stage chip `merge requested` (or `PR open`), **`Review`** (opens its [review](./reviews.md)), and **`Open PR ↗`** (once a PR exists) or **`Session`**.
+- Its review's title (the lead's) (500), then `<Lead> · <repo> · <branch> → <target>`, `· checks <status>` once checks have run, and the note (`--err` when it conflicts). `<target>` is where that merge request goes: the repo's default branch unless the lead named another branch, here and on every Merge button.
+- The stage chip `merge requested`, **`Review`** (opens its [review](./reviews.md)), and **`Session`**.
 - Under it, a compact line per work item it carries (indented 16px): the board card title, the branch (Mono `--tx4`), the author's name (`--tx4`).
 
 Entries of a stopped [deployment](../models/deployment.md) stay listed with a `stopped` chip (`--tx4`) instead of the Session button.

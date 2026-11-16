@@ -32,7 +32,7 @@ func TestCleanUpRemovesOnlyWhatIsSafe(t *testing.T) {
 	f.git(api, "branch", "wt/ledger/tove/led-1", "HEAD")
 	f.git(api, "reset", "-q", "--hard", "HEAD~1")
 
-	got, err := f.w.CleanUp(ctx, "ledger")
+	got, err := f.w.CleanUp(ctx, "ledger", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,12 +76,63 @@ func TestCleanUpRemovesOnlyWhatIsSafe(t *testing.T) {
 	}
 }
 
+// Asked to, Clean up removes worktrees holding changes not committed too,
+// saying which files, each kept under refs/foreman/cleaned/ where git can
+// bring it back. A running agent's stay, uncommitted or not.
+func TestCleanUpRemovesUncommittedWorkWhenAsked(t *testing.T) {
+	f := newFixture(t)
+	f.teams.instances = []store.Instance{{ID: "mara@ledger", AgentID: "mara", DeploymentID: "atlas@ledger"}}
+	web := filepath.Join(f.root, "ledger", "web")
+	writeFile(t, filepath.Join(f.wt("tove", "web"), "notes", "draft.txt"), "not committed\n")
+	writeFile(t, filepath.Join(f.wt("mara", "web"), "lead.txt"), "the lead's\n")
+	f.ok("ivo", "open", map[string]string{"repo": "web"})
+	writeFile(t, filepath.Join(f.wt("ivo", "web"), "idea.txt"), "idle, not committed\n")
+
+	got, err := f.w.CleanUp(ctx, "ledger", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byAgent := map[string]Cleaned{}
+	for _, c := range got.Removed {
+		if c.What == "worktree" && c.Repo == "web" {
+			byAgent[c.Agent] = c
+		}
+	}
+	for agent, file := range map[string]string{"tove": "notes/draft.txt", "ivo": "idea.txt"} {
+		c := byAgent[agent]
+		if !reflect.DeepEqual(c.Files, []string{file}) || !strings.HasPrefix(c.Backup, "refs/foreman/cleaned/") || !strings.HasSuffix(c.Backup, "/"+agent+"/web") {
+			t.Errorf("%s's web: %+v", agent, c)
+			continue
+		}
+		if _, err := os.Stat(f.wt(agent, "web")); !os.IsNotExist(err) {
+			t.Errorf("%s's web worktree is still there: %v", agent, err)
+		}
+		if kept := f.git(web, "show", c.Backup+":"+file); !strings.Contains(kept, "not committed") {
+			t.Errorf("%s's %s isn't kept: %q", agent, file, kept)
+		}
+	}
+	for _, c := range append(got.Removed, got.Kept...) {
+		if c.Agent == "mara" {
+			t.Errorf("the running lead's: %+v", c)
+		}
+	}
+	if data, _ := os.ReadFile(filepath.Join(f.wt("mara", "web"), "lead.txt")); string(data) != "the lead's\n" {
+		t.Errorf("the running lead's work: %q", data)
+	}
+	// Clean worktrees go as they always do, with nothing to list.
+	for _, c := range got.Removed {
+		if c.What == "worktree" && c.Repo == "api" && (c.Files != nil || c.Backup != "") {
+			t.Errorf("a clean worktree: %+v", c)
+		}
+	}
+}
+
 // An agent running on another project doesn't hold what it left here: its
 // branches here carry this project, so they're this project's to clean.
 func TestCleanUpIgnoresAgentsRunningElsewhere(t *testing.T) {
 	f := newFixture(t)
 	f.teams.instances = []store.Instance{{ID: "mara@suite", AgentID: "mara", DeploymentID: "atlas@suite"}}
-	got, err := f.w.CleanUp(ctx, "ledger")
+	got, err := f.w.CleanUp(ctx, "ledger", false)
 	if err != nil {
 		t.Fatal(err)
 	}

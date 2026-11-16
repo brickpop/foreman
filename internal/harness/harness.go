@@ -6,7 +6,6 @@ package harness
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -143,48 +142,4 @@ func GitConfig(path string) []runner.Mount {
 		return nil
 	}
 	return []runner.Mount{{Source: path, Target: containerHome + "/.gitconfig", ReadOnly: true}}
-}
-
-// Mover is an adapter whose harness files its conversations by working
-// folder (Claude Code, Pi): it carries an instance's over when its sandbox
-// moves, so the agent continues where it was. Legacy: only a project's
-// migration to its workspace moves a sandbox
-// (wiki/backlog/remove-workspace-migration.md).
-type Mover interface {
-	// MoveConversations renames, in the harness folder dir, the conversations
-	// of working folder from to those of to; none is fine.
-	MoveConversations(dir, from, to string) error
-}
-
-// MoveConversations carries an instance's conversations over in each
-// adapter's harness that files them by working folder; on a failure, those
-// carried already go back.
-func MoveConversations(adapters map[string]Adapter, dir, from, to string) error {
-	var moved []Mover
-	for _, a := range adapters {
-		m, ok := a.(Mover)
-		if !ok {
-			continue
-		}
-		if err := m.MoveConversations(dir, from, to); err != nil {
-			for _, back := range moved {
-				_ = back.MoveConversations(dir, to, from)
-			}
-			return err
-		}
-		moved = append(moved, m)
-	}
-	return nil
-}
-
-// Rename renames a harness's folder of conversations, from to to: none is
-// fine, a folder at to already is refused (it would merge two agents').
-func Rename(from, to string) error {
-	if _, err := os.Stat(from); errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if _, err := os.Stat(to); err == nil {
-		return fmt.Errorf("%s is there already", to)
-	}
-	return os.Rename(from, to)
 }

@@ -103,18 +103,21 @@ Every arrow, in words:
 │  foreman-agent ──────────── tcp: host.containers.internal:<agent port>, token ──────┼──▶ Agent link
 │                                                                                     │
 │  Mounts                                                                             │
-│   ~/workspace/foreman/ledger/agents/tove/ledger-api  Tove's worktree, rw            │
+│   ~/foreman/worktrees/ledger/tove/ledger-api  Tove's worktree, rw                   │
 │   ~/dev/ledger-api/.git                  the repo every worktree shares, ro         │
-│   ~/workspace/foreman/ledger/agents/tove/project  the live project repo             │
-│                                          (project.toml, wiki), from ../../project:  │
+│   ~/foreman/projects/ledger/hq           the project's HQ, one live checkout        │
+│                                          (project.toml, wiki):                      │
 │                                          rw for the lead, else ro                   │
 │                                          (its .git ro for every agent)              │
+│   ~/foreman/projects/ledger/files/inbox  the CEO's files for the team, ro           │
+│   ~/foreman/projects/ledger/files/shared  the team's shared files, rw               │
 │   ~/.foreman/harness/ledger/tove  its harness folder: $CLAUDE_CONFIG_DIR, its       │
 │                          prompt, MCP + hooks config, history, memory (rw)           │
 │   …/profiles/<name>/     the project's profile's login file (the CEO's; rw)         │
 │   ~/.gitconfig           ro, if it exists                                           │
 │  Never mounted: the rest of ~ (~/.ssh, ~/.config, …), the rest of ~/.foreman/       │
-│  (credentials, state, teams), the CEO's working files, other agents' worktrees      │
+│  (credentials, state), Foreman's HQ (teams), the CEO's working files,               │
+│  other agents' worktrees                                                            │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -273,7 +276,7 @@ type Workflow interface {
 }
 ```
 
-Built so far (`internal/workflow`): `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the live project repo), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in `project/wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
+Built so far (`internal/workflow`): `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the project's HQ), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in the HQ's `wiki/inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
 
 Details: [Requests](../features/requests.md), [Pipeline and merges](../features/pipeline-and-merges.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and merge requests](./protocol.md#work-items-and-merge-requests).
 
@@ -285,7 +288,7 @@ Everything Foreman does with repositories on the agents' behalf, on the host. Ea
 type Git interface {
     Prepare(instance, repo, branch) (path string, err error) // the instance's worktree of the repo, made when it opens it: on branch, or idle on none
     Switch(instance, repo, branch, from) error       // switch its worktree to the branch, made from from (any branch or commit; else the default branch) if missing
-    Commit(instance, repo, message) (commit string, err error) // everything changed in its worktree (or the live project repo, for its writers), on its branch, authored as the agent
+    Commit(instance, repo, message) (commit string, err error) // everything changed in its worktree (or the project's HQ, for its writers), on its branch, authored as the agent
     Merge(instance, repo, branch) (conflicts []string, err error) // merge a branch into its worktree; conflicts stay as markers
     AbortMerge(instance, repo) error                 // back out of an unfinished merge
     Prune(instance, repo) error                      // its deployment ended: delete its wt/* branches already merged
@@ -304,22 +307,23 @@ No open risk here: standard techniques. Each is still behind its own interface.
 
 ### Home & config (`home`)
 
-The [home](../models/home.md) and what the CEO owns in it: the [global repo](../models/home.md#the-global-repo) (team files, settings), the projects' [records](../models/project-config.md#the-project-record) (kept in the State store) and each project's [project repo](../models/project-config.md#the-project-repo) (`project.toml`); the checks of the code repos (on load, on every reload and before each start); and the file watcher that notices changes. All TOML.
+The [home](../models/home.md) (this machine's settings) and what the CEO owns in [Foreman's folder](../models/home.md#foremans-folder): [Foreman's HQ](../models/home.md#foremans-hq) (team files, the instructions), the projects' [records](../models/project-config.md#the-project-record) (kept in the State store) and each [project's HQ](../models/project-config.md#the-projects-hq) (`project.toml`); the checks of the code repos (on load, on every reload and before each start); and the file watcher that notices changes. All TOML.
 
 ```go
 type Dashboard interface {
     Projects() []Project;  Project(id) (Project, error)
     Checked(id) (Project, error)                     // the project with its code repos checked now (before a start)
-    NewProject(name) (Project, error)                // the record and its project repo: project.toml and a starter wiki
+    NewProject(name, clone) (Project, error)         // the record, its files and its HQ: new (project.toml and a starter wiki), cloned, or one left there taken over
     AddRepo(project, name, path) (Project, error)    // an existing code repo; NewRepo makes an empty one at path
     LocateRepo(project, name, path) (Project, error) // a moved repo: the new path must hold its root commit
     RemoveRepo(project, name) (Project, error)       // refused while a team is deployed on the project
     SetProfile(project, profile) (Project, error)
-    Sandbox(project, agent) string                   // <workspace>/agents/<agent>
+    Sandbox(project, agent) string                   // <folder>/worktrees/<project>/<agent>
     Teams() []Team;        Team(id) (Team, error)
     SaveTeam(TeamConfig, version) (Team, error)      // version-guarded; one commit per save
-    Settings() SettingsFile; SaveSettings(Settings, version) (newVersion, error)
-    Watch(ctx, notify func(Change)) error            // file watcher: the global repo, projects/, each project.toml (wiki and Containerfiles join with their cards)
+    Settings() SettingsFile; SaveSettings(Settings, version) (newVersion, error) // settings.toml, no commit
+    Instructions() Instructions; SaveInstructions(text, version) (Instructions, error) // Foreman's HQ's instructions.md, one commit per save
+    Watch(ctx, notify func(Change)) error            // file watcher: Foreman's HQ (teams/, instructions.md), settings.toml, projects/, each project's HQ (wiki and Containerfiles join with their cards)
 }
 ```
 
@@ -329,7 +333,7 @@ Details: [Home](../models/home.md), [Project config](../models/project-config.md
 
 ### Wiki (`wiki`)
 
-Reads project wikis through the agentic-wiki engine; renders entries for the reader; edits one line at a time. The lead writes the wiki as plain files in the live project repo, and commit them through `commit()`; Foreman only reads it, plus the CEO's checkbox ticks and card moves and the `contribute` notes it files in `inbox/`, each committed on its own (one commit per write).
+Reads project wikis through the agentic-wiki engine; renders entries for the reader; edits one line at a time. The lead writes the wiki as plain files in the project's HQ, and commit them through `commit()`; Foreman only reads it, plus the CEO's checkbox ticks and card moves and the `contribute` notes it files in `inbox/`, each committed on its own (one commit per write).
 
 ```go
 type Wiki interface {
@@ -345,7 +349,7 @@ Details: [Wiki engine](./wiki-engine.md).
 
 ### State store (`store`)
 
-Runtime state in `state.db` (SQLite): deployments, instances, messages, requests, work items, merge requests, read markers, UI preferences. Each block owns its own tables and reaches them only through its own store interface (`store.Deployments`, `store.Messages`, …); no block reads another's tables.
+Runtime state in `state.db` (SQLite): deployments, instances, messages, requests, work items, merge requests, read markers and `ui_prefs` ([UI state](../models/ui-state.md)). Each block owns its own tables and reaches them only through its own store interface (`store.Deployments`, `store.Messages`, …); no block reads another's tables.
 
 Details: [Persistence](./persistence.md).
 
@@ -456,7 +460,7 @@ A–E are proven before the blocks that depend on them are built: one small expe
 
 - `internal/runner` + `runner/direct` + `runner/podman`: the Execution engine and its Direct and Podman implementations, each with its image builder; `images/`: the embedded Containerfile.
 - `internal/terminal`: the Terminal block (one process, its log, its views). Its snapshot is the log's tail until `internal/screen` is wired in ([Terminal fidelity](../../backlog/terminal-fidelity.md)).
-- `internal/home`: Home & config (`home.Dashboard`): the home's layout (its lock is `internal/userdata`'s), the projects' records (with `store.Projects`) and their code repos' checks, `project.toml`, team files and settings (TOML, validated), the global repo, version-guarded saves (one commit each), the file watcher, New project, and adding, creating, locating and removing code repos.
+- `internal/home`: Home & config (`home.Dashboard`): the home's layout (its lock is `internal/userdata`'s), the projects' records (with `store.Projects`) and their code repos' checks, `project.toml`, team files and settings (TOML, validated; the look's lists, `home.Accents` and `home.TerminalFonts`, too), the instructions, Foreman's folder and Foreman's HQ (made on first start), version-guarded saves (one commit each in an HQ; settings uncommitted), the file watcher, New project, and adding, creating, locating and removing code repos.
 - `internal/events`: the Event bus; `internal/git`: Foreman's own git, the Git block so far: `Init`, `Commit` and `CommitAs` (named files only), `Prepare(repo, worktree, branch, base)` (on branch, or detached at base for none; the instance-level `Prepare(instance, repo)` above wraps it with the Instance manager; it repairs a worktree whose repo was located elsewhere), `RootCommit`; and, on a worktree, `Switch`, `CommitAll` (finishes a merge once no conflict markers are left), `Merge` (conflicts left as markers), `Merging`, `AbortMerge`, `Clean`, `Branch`, `HasBranch`, `Ahead`. Workflow names the worktree, so the instance-level signatures above are Workflow's view.
 - `internal/instances`: the Instance manager.
 - `internal/setup`: the setup checklist and the engine's watcher: reaches Podman whenever it is there, restores the instances the first time, builds the agent image in the background, and holds deploying and waking until then ([First run](../features/first-run.md)).

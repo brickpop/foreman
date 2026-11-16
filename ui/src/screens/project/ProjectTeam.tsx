@@ -11,7 +11,7 @@ import {
   useStoppedDeployments,
   useTeams,
 } from "../../app/queries";
-import { type Worktree, worktrees } from "../../app/repos";
+import { uncommittedWork, type Worktree, worktrees } from "../../app/repos";
 import { rosterOrder } from "../../app/sessions";
 import { DeployDialog } from "../../components/DeployDialog";
 import { StopIcon } from "../../components/icons";
@@ -249,7 +249,9 @@ function AgentRow({
 
 /** The worktrees earlier teams' agents left, kept by their Stop so a redeploy
  * resumes them. Clean up removes only what is safe (a worktree with nothing
- * uncommitted, a wt/<project>/ branch a target holds) and lists what it kept, with why. */
+ * uncommitted, a wt/<project>/ branch a target holds) and lists what it kept, with why;
+ * worktrees with uncommitted work too when asked, the box off at each opening
+ * (the CEO, 2026-11-05), then listing the files they held. */
 function EarlierTeams({
   project,
   left,
@@ -264,11 +266,16 @@ function EarlierTeams({
   const clean = useCleanUp(project);
   const toast = useToast();
   const [asking, setAsking] = useState(false);
-  const [kept, setKept] = useState<Cleaned[]>([]);
+  const [uncommitted, setUncommitted] = useState(false);
+  const [done, setDone] = useState<{ kept: Cleaned[]; discarded: Cleaned[] }>({
+    kept: [],
+    discarded: [],
+  });
+  const unsaved = uncommittedWork(left);
   const run = () =>
-    clean.mutate(undefined, {
+    clean.mutate(uncommitted, {
       onSuccess: (done) => {
-        setKept(done.kept);
+        setDone({ kept: done.kept, discarded: done.removed.filter((c) => c.backup) });
         toast({
           title:
             done.removed.length > 0
@@ -292,7 +299,13 @@ function EarlierTeams({
             Their worktrees stay after a Stop, so a redeploy picks them up.
           </span>
         </span>
-        <Button disabled={clean.isPending} onClick={() => setAsking(true)}>
+        <Button
+          disabled={clean.isPending}
+          onClick={() => {
+            setUncommitted(false);
+            setAsking(true);
+          }}
+        >
           Clean up
         </Button>
       </div>
@@ -308,10 +321,24 @@ function EarlierTeams({
           />
         ))}
       </Panel>
-      {kept.length > 0 && (
+      {done.discarded.length > 0 && (
+        <div className="flex flex-col gap-1 text-[13px] text-tx3">
+          <span>Removed with their uncommitted work by the last clean up:</span>
+          {done.discarded.map((c) => (
+            <span key={`${c.agent} ${c.repo}`}>
+              <span className="font-mono text-[12.5px] text-tx2">
+                {c.agent}'s {c.repo}: {c.files?.join(", ")}
+              </span>
+              . Kept a while under{" "}
+              <span className="font-mono text-[12.5px] text-tx2 select-text">{c.backup}</span>.
+            </span>
+          ))}
+        </div>
+      )}
+      {done.kept.length > 0 && (
         <div className="flex flex-col gap-1 text-[13px] text-tx3">
           <span>Kept by the last clean up:</span>
-          {kept.map((c) => (
+          {done.kept.map((c) => (
             <span key={`${c.agent} ${c.repo} ${c.what} ${c.branch}`}>
               <span className="font-mono text-[12.5px] text-tx2">
                 {c.repo} {c.what === "branch" ? c.branch : `${c.agent}'s worktree`}
@@ -328,7 +355,22 @@ function EarlierTeams({
         body="Removes their worktrees that hold nothing uncommitted, and their wt/<project>/ branches whose work is all merged (kept aside a while, recoverable by hand). Everything else stays, and is listed with why."
         action="Clean up"
         onConfirm={run}
-      />
+      >
+        {unsaved.length > 0 && (
+          <label className="flex items-start gap-2 text-[13.5px] text-tx2">
+            <input
+              type="checkbox"
+              checked={uncommitted}
+              onChange={(e) => setUncommitted(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Also remove worktrees with uncommitted work: {unsaved.join(", ")}. Their changes are
+              kept aside a while, recoverable by hand.
+            </span>
+          </label>
+        )}
+      </Confirm>
     </section>
   );
 }

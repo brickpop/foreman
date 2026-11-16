@@ -17,11 +17,16 @@ func (fakePipeline) Pipeline(_ context.Context, project string) (workflow.Pipeli
 	return workflow.Pipeline{WorkItems: []store.WorkItem{{ID: "wi-1", Branch: "wt/tove/" + project}}, MergeRequests: []store.MergeRequest{}}, nil
 }
 
-func (fakePipeline) CleanUp(_ context.Context, project string) (workflow.Cleanup, error) {
+// CleanUp: ledger's tove's worktree goes, with its draft only when asked.
+func (fakePipeline) CleanUp(_ context.Context, project string, uncommitted bool) (workflow.Cleanup, error) {
 	if project != "ledger" {
 		return workflow.Cleanup{}, home.ErrNotFound
 	}
-	return workflow.Cleanup{Removed: []workflow.Cleaned{{Agent: "tove", Repo: "api", What: "worktree", Branch: "wt/tove/main"}}}, nil
+	c := workflow.Cleaned{Agent: "tove", Repo: "api", What: "worktree", Branch: "wt/tove/main"}
+	if uncommitted {
+		c.Files = []string{"draft.txt"}
+	}
+	return workflow.Cleanup{Removed: []workflow.Cleaned{c}}, nil
 }
 
 // CleanupBranches and DeleteBranches: ledger has repo api.
@@ -85,12 +90,19 @@ func TestPipeline(t *testing.T) {
 	if w := send(h, "GET", "/api/pipeline", ""); w.Code != http.StatusBadRequest {
 		t.Errorf("without a project: %d", w.Code)
 	}
-	var done workflow.Cleanup
-	decodeBody(t, send(h, "POST", "/api/projects/ledger/cleanup", ""), &done)
-	if len(done.Removed) != 1 || done.Removed[0].Agent != "tove" {
-		t.Errorf("cleanup %+v", done)
+	for body, files := range map[string]int{`{}`: 0, `{"uncommitted":false}`: 0, `{"uncommitted":true}`: 1} {
+		var done workflow.Cleanup
+		decodeBody(t, send(h, "POST", "/api/projects/ledger/cleanup", body), &done)
+		if len(done.Removed) != 1 || done.Removed[0].Agent != "tove" || len(done.Removed[0].Files) != files {
+			t.Errorf("cleanup with %s: %+v", body, done)
+		}
 	}
-	if w := send(h, "POST", "/api/projects/nope/cleanup", ""); w.Code != http.StatusNotFound {
+	for _, body := range []string{"", `{"uncommitted":"yes"}`} {
+		if w := send(h, "POST", "/api/projects/ledger/cleanup", body); w.Code != http.StatusBadRequest {
+			t.Errorf("cleanup with %q: %d", body, w.Code)
+		}
+	}
+	if w := send(h, "POST", "/api/projects/nope/cleanup", "{}"); w.Code != http.StatusNotFound {
 		t.Errorf("cleanup of no project: %d", w.Code)
 	}
 	// The CEO decides in a review: the merge request's own decisions are gone.

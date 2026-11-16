@@ -43,4 +43,4 @@ One row per agent (grid `1fr auto`, padding `14px 6px`), lead first; a click ope
 
 ## File
 
-The path `<home>/config/teams/<id>.toml` (the home's real path, e.g. `~/.foreman/config/teams/atlas.toml`, in the [global repo](../models/home.md#the-global-repo)) and the file's actual content in a read-only `<pre>`, exactly as on disk ([Team definition](../models/team-definition.md)).
+The path `<folder>/hq/teams/<id>.toml` (Foreman's folder's real path, e.g. `~/foreman/hq/teams/atlas.toml`, in [Foreman's HQ](../models/home.md#foremans-hq)) and the file's actual content in a read-only `<pre>`, exactly as on disk ([Team definition](../models/team-definition.md)).

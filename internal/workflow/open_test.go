@@ -120,3 +120,33 @@ func TestMergeOpensWhatHasTheBranch(t *testing.T) {
 		t.Errorf("not merged: %q", got)
 	}
 }
+
+// worktrees/ is what can go (wiki/backlog/foreman-folder.md): a worktree
+// folder deleted by hand is opened again, on the branch the agent's other
+// worktrees are on, git's record of the old one pruned so the branch is free;
+// with all of them gone the agent opens idle, and its branch, untouched,
+// takes it back.
+func TestADeletedWorktreeIsOpenedAgain(t *testing.T) {
+	f := newFixture(t)
+	writeFile(t, filepath.Join(f.wt("tove", "web"), "lost.txt"), "not committed\n")
+	if err := os.RemoveAll(f.wt("tove", "web")); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.ok("tove", "open", map[string]string{"repo": "web"}); !strings.Contains(got, "on wt/ledger/tove/main") {
+		t.Errorf("open: %q", got)
+	}
+	if b := f.git(f.wt("tove", "web"), "branch", "--show-current"); b != "wt/ledger/tove/main" {
+		t.Errorf("web is on %q", b)
+	}
+
+	if err := os.RemoveAll(filepath.Dir(f.wt("tove", "api"))); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.ok("tove", "open", map[string]string{"repo": "api"}); !strings.Contains(got, "idle on no branch") {
+		t.Errorf("open with no worktree left: %q", got)
+	}
+	f.ok("tove", "switch", map[string]string{"branch": "wt/ledger/tove/main"})
+	if b := f.git(f.wt("tove", "api"), "branch", "--show-current"); b != "wt/ledger/tove/main" {
+		t.Errorf("api is on %q after the switch", b)
+	}
+}

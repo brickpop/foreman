@@ -75,10 +75,6 @@ func desktopRoutes(mux *http.ServeMux, d Desktop, agents Agents, config Config) 
 				writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())
 				return
 			}
-			if p.Files == "" {
-				writeError(w, http.StatusConflict, "NO_FILES", req.Project+" has no files folder: move it into a workspace first")
-				return
-			}
 			// Made on first use too: before any agent has started.
 			if err := p.MakeFiles(); err != nil {
 				writeError(w, http.StatusInternalServerError, "INTERNAL", err.Error())

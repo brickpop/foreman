@@ -23,7 +23,7 @@ var ErrInvalid = errors.New("wiki: invalid write")
 // edit safely, or that wouldn't read back the same. The error says why.
 var ErrRefused = errors.New("wiki: write refused")
 
-// Git commits Foreman's writes in the project repo (implemented by git.CLI).
+// Git commits Foreman's writes in the project's HQ (implemented by git.CLI).
 // Paths are relative to dir, which is inside the repo.
 type Git interface {
 	// Commit commits exactly these files, by the CEO's git identity.

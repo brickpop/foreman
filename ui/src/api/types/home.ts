@@ -23,8 +23,8 @@ export interface FolderEntry {
   path: string;
   repo: boolean; // a git repo's top folder (its own .git folder): one that can be added
   /**
-   * Foreman's own folder (the projects folder, a project's workspace): what
-   * it is. Not opened: its repos (project repos, worktrees) aren't code repos.
+   * Foreman's own folder (its HQ, projects/, worktrees/): what it is. Not
+   * opened: its repos (HQs, worktrees) aren't code repos.
    */
   foreman?: string;
 }
@@ -105,15 +105,32 @@ export interface Settings {
   engine: string;
   stuckAfterMinutes: number /* int */;
   logCapMb: number /* int */;
-  projectsFolder: string;
+  /**
+   * ForemanFolder holds what the CEO owns (Home.Folder): Foreman's HQ, the
+   * projects, the cloned repos, the agents' worktrees. Read at start only;
+   * it has no field in Settings (the CEO, 2026-11-15).
+   */
+  foremanFolder: string;
   notifications: Notifications;
   /**
-   * Instructions are the CEO's standing instructions for every agent, added
-   * to each session prompt (wiki/product/architecture/session-prompt.md).
-   * Written as a multi-line string (encodeSettings).
+   * The look of the UI and its terminal (Settings → Notifications & look).
    */
-  instructions: string;
+  theme: string; // system, dark or light
+  accent: string; // one of Accents: the UI's accent color (its styles.css)
+  /**
+   * TerminalFont is one of TerminalFonts; the UI ships each but system.
+   */
+  terminalFont: string;
+  terminalFontSize: number /* int */; // px, MinFontSize to MaxFontSize
 }
+/**
+ * The terminal's font sizes, in px.
+ */
+export const MinFontSize = 10;
+/**
+ * The terminal's font sizes, in px.
+ */
+export const MaxFontSize = 24;
 /**
  * Notifications are the browser notification switches.
  */
@@ -124,11 +141,17 @@ export interface Notifications {
 }
 
 //////////
+// source: folder.go
+
+export const FilesInbox = "inbox"; // the CEO's files for the agents: read-only for them
+export const FilesShared = "shared"; // the agents' data that outlives a task and a team: every agent writes it
+
+//////////
 // source: load.go
 
 /**
  * Project is a project of this machine: its record (its name, its repos, its
- * profile, whether it is hidden) and its project repo's project.toml.
+ * profile, whether it is hidden) and its HQ's project.toml.
  */
 export interface Project {
   id: string;
@@ -137,17 +160,10 @@ export interface Project {
    * readable. The id stays: ids, branches and folders are built from it.
    */
   name: string;
-  path: string; // its project repo, <workspace>/project
+  path: string; // its HQ, <folder>/projects/<id>/hq
   /**
-   * Workspace is its folder (the CEO's): the project repo and the agents'
-   * sandboxes. "" for a project made before workspaces, still in Foreman's
-   * home until migrated (legacy).
-   */
-  workspace: string;
-  /**
-   * Files is its folder of files for the agents, <workspace>/files: the
-   * CEO's in inbox/, the agents' own in shared/ (FileFolders). "" for a
-   * legacy project, which has none.
+   * Files is its folder of files for the agents, <folder>/projects/<id>/files:
+   * the CEO's in inbox/, the agents' own in shared/ (FileFolders).
    */
   files: string;
   profile: string; // the profile its agents run on: its own, else the default
@@ -187,10 +203,10 @@ export interface SettingsFile {
   problems: string[];
 }
 /**
- * Missing is a scaffold file a project repo lacks.
+ * Missing is a scaffold file a project's HQ lacks.
  */
 export interface Missing {
-  file: string; // in the project repo, e.g. wiki/wiki.toml
+  file: string; // in the HQ, e.g. wiki/wiki.toml
   why: string; // what goes wrong without it
   required: boolean; // the wiki can't be read without it
 }
@@ -198,23 +214,17 @@ export interface Missing {
  * Change says what changed, for the UI to refetch.
  */
 export interface Change {
-  object: string; // "projects" (a project or repo appeared, went or changed), "project", "team" or "settings"
+  object: string; // "projects" (a project or repo appeared, went or changed), "project", "team", "settings" or "instructions"
   id?: string; // the project or team, for "project" and "team"
   version?: string; // the file's new version ("" once it is gone)
   problems?: string[]; // what is wrong with it now
 }
-
-//////////
-// source: workspace.go
-
-export const FilesInbox = "inbox"; // the CEO's files for the agents: read-only for them
-export const FilesShared = "shared"; // the agents' data that outlives a task and a team: every agent writes it
 /**
- * Suggestion is a new project's workspace as New project pre-fills it:
- * <projects folder>/<name>.
+ * Instructions is Foreman's HQ's instructions.md: the CEO's standing
+ * instructions for every agent, added to each session prompt
+ * (wiki/product/architecture/session-prompt.md).
  */
-export interface Suggestion {
-  path: string; // the workspace; the projects folder when the name isn't a valid one (yet)
-  folder: string; // the projects folder, ~ expanded
-  folderExists: boolean; // false: creating the project creates it too
+export interface Instructions {
+  text: string;
+  version: string; // "" while the file doesn't exist
 }

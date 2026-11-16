@@ -1,14 +1,14 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useState } from "react";
-import type { Preferences, Settings as SettingsData } from "../../api/client";
+import type { Settings as SettingsData } from "../../api/client";
 import { permission } from "../../app/notifications";
-import { usePreferences, useSavePreferences } from "../../app/queries";
+import { type Look, useLook, useSaveLook } from "../../app/queries";
 import { type Accent, accents, asAccent, asTheme } from "../../app/theme";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
 import { terminalFont, terminalFontSizes, terminalFonts } from "../../components/terminalFonts";
 import { Button, Loading, Segmented, Switch } from "../../components/ui";
-import { inGlobalRepo, onThisMachine, Row, Section, useSave } from "./parts";
+import { onThisMachine, Row, Section, useSave } from "./parts";
 
 /** Settings → Notifications & look. */
 export function LookTab({ settings }: { settings?: SettingsData }) {
@@ -37,7 +37,7 @@ function NotificationsSection({ settings }: { settings: SettingsData }) {
     { key: "mergeRequested", label: "A merge is requested" },
   ];
   return (
-    <Section label="Notifications" kept={inGlobalRepo}>
+    <Section label="Notifications" kept={onThisMachine}>
       <Row
         title="Browser notifications"
         explanation="Shown while Foreman isn’t the tab you’re looking at. In-app toasts always show."
@@ -76,15 +76,15 @@ function NotificationsSection({ settings }: { settings: SettingsData }) {
   );
 }
 
-/** The theme, the accent and the terminal's font: the CEO's preferences. */
+/** The theme, the accent and the terminal's font: settings of this machine. */
 function AppearanceSection() {
-  const prefs = usePreferences().data;
-  const save = useSavePreferences();
+  const prefs = useLook();
+  const save = useSaveLook();
   const toast = useToast();
-  const change = (p: Partial<Preferences>, what: string) =>
-    save.mutate(p, {
-      onError: (e) => toast({ title: `${what} not saved`, body: e.message, color: "var(--err)" }),
-    });
+  const change = (p: Partial<Look>, what: string) =>
+    save(p).catch((e: Error) =>
+      toast({ title: `${what} not saved`, body: e.message, color: "var(--err)" }),
+    );
   return (
     <Section label="Appearance" kept={onThisMachine}>
       {prefs ? (
@@ -154,8 +154,8 @@ function TerminalFontRow({
   prefs,
   onChange,
 }: {
-  prefs: Preferences;
-  onChange: (p: Partial<Preferences>) => void;
+  prefs: Look;
+  onChange: (p: Partial<Look>) => void;
 }) {
   return (
     <Row

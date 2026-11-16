@@ -25,8 +25,8 @@ type FolderEntry struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Repo bool   `json:"repo"` // a git repo's top folder (its own .git folder): one that can be added
-	// Foreman's own folder (the projects folder, a project's workspace): what
-	// it is. Not opened: its repos (project repos, worktrees) aren't code repos.
+	// Foreman's own folder (its HQ, projects/, worktrees/): what it is. Not
+	// opened: its repos (HQs, worktrees) aren't code repos.
 	Foreman string `json:"foreman,omitempty"`
 }
 
@@ -88,21 +88,15 @@ func (h *Home) Browse(path, project string) (Folder, error) {
 	return f, nil
 }
 
-// reserved maps Foreman's own folders, by real path, to what each is: the
-// projects folder, and each project's workspace. Called with h.mu held.
+// reserved maps Foreman's own folders, by real path, to what each is: those
+// of its folder that are Foreman's, all but repos/ (where the code repos it
+// clones go). Called with h.mu held.
 func (h *Home) reserved() map[string]string {
-	m := map[string]string{}
-	if folder, err := expandHome(h.snap.settings.Settings.ProjectsFolder); err == nil {
-		if real, err := filepath.EvalSymlinks(folder); err == nil {
-			m[real] = "Foreman's projects folder"
-		}
+	return map[string]string{
+		h.HQ():                                "Foreman's HQ",
+		filepath.Join(h.folder, projectsDir):  "Foreman's projects",
+		filepath.Join(h.folder, worktreesDir): "the agents' worktrees",
 	}
-	for _, p := range h.snap.projects {
-		if real, err := filepath.EvalSymlinks(p.Workspace); p.Workspace != "" && err == nil {
-			m[real] = p.Shown() + "'s workspace"
-		}
-	}
-	return m
 }
 
 // outsideForemans refuses a code repo's folder (real) in one of Foreman's own

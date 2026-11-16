@@ -69,17 +69,6 @@ The same hooks also say **what** an agent is doing, as one line for the CEO on [
 
 Claude Code's, as built: `SessionStart` → `Started`; `UserPromptSubmit` → `Working on “<the message>”`; `PreToolUse` → the tool and what it works on (`Bash: <command>`, `Reading` / `Editing` / `Writing <path>`, relative to the sandbox when inside it, `Searching for <pattern>`, `Fetching <url>`, `Subagent: <description>`, `Asked you a question`, `Team tool: <tool>` for Foreman's, `<server>: <tool>` for another MCP server's, else the tool's name); `Notification` of a `permission_prompt` → `Waiting for a permission`; `Stop` → `Finished its turn`. A tool's result (`PostToolUse`) leaves the line on the tool.
 
-## Moving conversations
-
-Claude Code and Pi file each conversation under its working folder's path, so an agent whose sandbox moves (only a project's [move into its workspace](../models/project-config.md#the-workspace), legacy) would find none to continue. An adapter whose harness does so implements `harness.Mover`: `MoveConversations(dir, from, to)` renames, in the instance's harness folder, the conversations of `from` to those of `to`. Every such adapter's is called; if one fails, those done go back, and the move is undone. A folder already at `to` is refused (it would merge two agents'). Read from each harness's own code (2026-10-28):
-
-- **Claude Code**: `projects/<path, every character but a letter or a digit made ->`, and the path's entry in `.claude.json` (its history, the trust given) moves too. Past 200 characters Claude Code cuts the name and adds a hash of its own, which Foreman can't predict: such a move is refused.
-- **Pi 1.3.0**: `sessions/--<path without its leading slash, each / \ : made ->--`. A conversation keeps its old working folder in its first line, which Pi doesn't check when continuing one from its own folder.
-
-Codex files its conversations by date and finds them by the working folder recorded inside, and its adapter isn't a `Mover`: no new code for a legacy path (the CEO, 2026-11-06). A Codex agent whose sandbox moves starts fresh.
-
-Legacy: it goes with the migration ([One Foreman folder](../../backlog/foreman-folder.md)).
-
 ## Pi
 
 Built 2026-10-18 ([Pi as a second harness](../../backlog/pi-harness.md)), probed on Pi 1.3.0 (`@earendil-works/pi-coding-agent`, installed in the agent image after Claude Code).

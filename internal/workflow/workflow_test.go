@@ -37,7 +37,7 @@ var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 }}
 
 // config is the home: projects in root/<id>, each with its repos api and web
-// and its project repo beside them. web's default branch is trunk, so every
+// and its HQ beside them. web's default branch is trunk, so every
 // test also checks that each repo's own is used.
 type config struct {
 	root string
@@ -47,7 +47,7 @@ func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
 	repos := []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
 	config, _ := home.ParseProject(nil) // a project.toml with nothing set: the defaults
-	return home.Project{ID: id, Path: filepath.Join(dir, "project"), Repos: repos, Config: config}, nil
+	return home.Project{ID: id, Path: filepath.Join(dir, "hq"), Repos: repos, Config: config}, nil
 }
 
 func (c config) Sandbox(project, agent string) string {
@@ -137,7 +137,7 @@ func newFixture(t *testing.T) *fixture {
 	root := t.TempDir()
 	g := git.New()
 	g.FetchProtocols = []string{"file"} // the tests' submodules are local repos
-	for _, r := range []string{"api", "web", "project"} {
+	for _, r := range []string{"api", "web", "hq"} {
 		dir := filepath.Join(root, "ledger", r)
 		if err := os.MkdirAll(filepath.Join(dir, "wiki"), 0o755); err != nil {
 			t.Fatal(err)
@@ -373,7 +373,7 @@ func TestACommitNamingABadRepoCommitsNothing(t *testing.T) {
 		code string
 	}{
 		{commits("api", "cal", "nope", "x"), "unknown_repo"},
-		{commits("api", "cal", "project", "x"), "unknown_repo"}, // a member's project repo is read-only
+		{commits("api", "cal", "hq", "x"), "unknown_repo"}, // a member's HQ is read-only
 		{commits("api", "cal", "../api", "x"), "unknown_repo"},
 		{commits("api", "cal", "api", "again"), "repeated_repo"},
 		{commits("api", "cal", "web", ""), "empty"},
@@ -388,19 +388,19 @@ func TestACommitNamingABadRepoCommitsNothing(t *testing.T) {
 	}
 }
 
-// The lead commits the live project repo on main when it names it, and only
+// The lead commits the live HQ on main when it names it, and only
 // then: its code worktrees keep their changes.
-func TestTheLeadCommitsTheProjectRepoByName(t *testing.T) {
+func TestTheLeadCommitsTheHQByName(t *testing.T) {
 	f := newFixture(t)
-	project := filepath.Join(f.root, "ledger", "project")
+	project := filepath.Join(f.root, "ledger", "hq")
 	writeFile(t, filepath.Join(project, "wiki", "board.md"), "# Board\n")
 	writeFile(t, filepath.Join(f.wt("mara", "api"), "half.go"), "package half\n")
-	text := f.ok("mara", "commit", commits("project", "the board"))
-	if text != "Committed project (main, "+f.git(project, "rev-parse", "HEAD")[:8]+")." {
+	text := f.ok("mara", "commit", commits("hq", "the board"))
+	if text != "Committed hq (main, "+f.git(project, "rev-parse", "HEAD")[:8]+")." {
 		t.Errorf("%q", text)
 	}
 	if who := f.git(project, "log", "-1", "--format=%an|%s"); who != "Mara|the board" {
-		t.Errorf("project repo HEAD: %q", who)
+		t.Errorf("HQ HEAD: %q", who)
 	}
 	if status := f.git(f.wt("mara", "api"), "status", "--porcelain"); status != "?? half.go" {
 		t.Errorf("api, not named, was committed: %q", status)
@@ -492,7 +492,7 @@ func TestHandoffRefusals(t *testing.T) {
 
 func TestContributeFilesANoteAndTellsTheLead(t *testing.T) {
 	f := newFixture(t)
-	project := filepath.Join(f.root, "ledger", "project")
+	project := filepath.Join(f.root, "ledger", "hq")
 	// The lead's unfinished edit in the same checkout stays out of the commit.
 	writeFile(t, filepath.Join(project, "wiki", "board.md"), "unfinished\n")
 	text := f.ok("tove", "contribute", map[string]string{"kind": "finding", "title": "Flaky settle test!", "body": "It fails 1 in 20.", "author": "mara"})
@@ -537,7 +537,7 @@ func TestContributeRefusals(t *testing.T) {
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "a\n---\nauthor: mara", "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": strings.Repeat("x", teamtools.MaxTitle+1), "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "x", "body": strings.Repeat("x", teamtools.MaxContribution+1)}, "too_long")
-	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "project", "wiki", "inbox")); len(entries) != 0 {
+	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "hq", "wiki", "inbox")); len(entries) != 0 {
 		t.Errorf("a refusal filed %d notes", len(entries))
 	}
 }

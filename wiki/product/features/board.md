@@ -28,7 +28,7 @@ Several boards can sit over one folder (e.g. "Sprint 07" by priority, and "Findi
 
 ## Layout
 
-Body padding `24px 24px 48px`, like every project section. Boards are declared in `wiki.toml`: while the project repo lacks it, the section shows the [No wiki yet](./wiki-reader.md#no-wiki-yet) placeholder instead.
+Body padding `24px 24px 48px`, like every project section. Boards are declared in `wiki.toml`: while the HQ lacks it, the section shows the [No wiki yet](./wiki-reader.md#no-wiki-yet) placeholder instead.
 
 - **Toolbar**: the **board switcher** (segmented, one button per declared board; the one shown in the accent, as every segmented control), only when there are several. No view of `wiki.toml` here (the CEO, 2026-11-02): the file is in the wiki, like any other.
 - **Grid**: each column 240–320px (the CEO, 2026-10-17), narrowing towards 240px as the screen does, then scrolling horizontally; never wider than 320px, so a wide screen leaves room on the right rather than stretching the cards.
@@ -49,5 +49,5 @@ Body padding `24px 24px 48px`, like every project section. Boards are declared i
 
 Fixed right, `min(460px, 100vw)` ([App shell](./app-shell.md#overlays)).
 
-- Header: the entry's path on disk, `<workspace>/project/wiki/<path>` (Mono 12.5px `--tx3`; cut with an ellipsis when long, whole on hover), **`Open in wiki`** (small outline, never wrapped or squeezed; opens the entry in the [Wiki reader](./wiki-reader.md)) and `×`.
+- Header: the entry's path on disk, `<hq>/wiki/<path>` (Mono 12.5px `--tx3`; cut with an ellipsis when long, whole on hover), **`Open in wiki`** (small outline, never wrapped or squeezed; opens the entry in the [Wiki reader](./wiki-reader.md)) and `×`.
 - Body (padding `20px 22px 32px`, gap 12): the [frontmatter](./wiki-reader.md#frontmatter), then the rendered entry at sheet sizes (H1 22px, H2 15px, paragraphs 14.5px). Checkboxes are tickable, exactly as in the reader.

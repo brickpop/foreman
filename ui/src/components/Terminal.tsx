@@ -7,7 +7,7 @@ import "@fontsource-variable/jetbrains-mono";
 import { type Ref, useEffect, useImperativeHandle, useRef } from "react";
 import { useClient } from "../api/client";
 import type { PtyConnection } from "../api/pty";
-import { usePreferences } from "../app/queries";
+import { useLook } from "../app/queries";
 import { resolvedColor } from "../app/theme";
 import { type Fitter, fitter } from "./terminalFit";
 import { loadTerminalFont } from "./terminalFonts";
@@ -49,7 +49,7 @@ export function Terminal({
   const xterm = useRef<XTerm | null>(null);
   const connection = useRef<PtyConnection | null>(null);
   const fit = useRef<Fitter | null>(null);
-  const prefs = usePreferences().data;
+  const prefs = useLook();
   const font = prefs?.terminalFont;
   const fontSize = prefs?.terminalFontSize ?? 13;
 
@@ -168,7 +168,7 @@ export function Terminal({
   }, [font, fontSize, instance]);
 
   // The colors follow the theme and the accent as they change: watched on the
-  // page itself, which a preferences effect (Shell's, after this one) or the
+  // page itself, which a look effect (Shell's, after this one) or the
   // operating system (System) changes.
   useEffect(() => {
     const paint = () => {

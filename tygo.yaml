@@ -4,7 +4,7 @@
 packages:
   - path: github.com/brickpop/foreman/internal/home
     output_path: ui/src/api/types/home.ts
-    include_files: [config.go, load.go, browse.go, workspace.go]
+    include_files: [config.go, load.go, browse.go, folder.go]
   - path: github.com/brickpop/foreman/internal/events
     output_path: ui/src/api/types/events.ts
     include_files: [event.go]
@@ -45,9 +45,6 @@ packages:
       import type * as wiki from "./wiki";
   - path: github.com/brickpop/foreman/internal/profiles
     output_path: ui/src/api/types/profiles.ts
-    include_files: [types.go]
-  - path: github.com/brickpop/foreman/internal/userdata
-    output_path: ui/src/api/types/userdata.ts
     include_files: [types.go]
   - path: github.com/brickpop/foreman/internal/cos
     output_path: ui/src/api/types/cos.ts

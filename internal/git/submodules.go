@@ -201,7 +201,7 @@ func submoduleNames(ctx context.Context, dir string) (map[string]string, error) 
 // relative paths (the submodule's .git file, the data's core.worktree), so a
 // move of the worktree breaks them and `worktree repair` leaves them: every
 // git command in the worktree then fails (found 2026-10-30, after a project
-// moved into its workspace). Nested submodules too.
+// moved into its workspace, a layout since gone). Nested submodules too.
 //
 // It runs on the host, and .gitmodules is the agent's to edit: it only ever
 // rewrites a submodule's existing .git file, inside the worktree and through

@@ -191,16 +191,25 @@ func TestSettingsDefaultsAndProblems(t *testing.T) {
 	if s.Port != 9000 || !hasProblem(p, "listen: not a field Foreman knows") {
 		t.Errorf("listen left over: %+v %v", s, p)
 	}
+	// A look the UI doesn't have reads as its default, its problem said; the
+	// others stay as set.
+	s, p = ParseSettings([]byte("theme = \"dark\"\naccent = \"chartreuse\"\nterminal_font = \"geist-mono\"\nterminal_font_size = 99"))
+	if s.Theme != "dark" || s.Accent != "blue" || s.TerminalFont != "jetbrains-mono" || s.TerminalFontSize != 13 || len(p) != 3 {
+		t.Errorf("a bad look: %+v %v", s, p)
+	}
 	for name, tc := range map[string]struct{ toml, want string }{
-		"port":                         {`port = 70000`, "port"},
-		"sessions":                     {`max_sessions = 0`, "max_sessions"},
-		"engine":                       {`engine = "docker"`, "engine"},
-		"harnesses":                    {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: not a field Foreman knows"},
-		"stuck":                        {`stuck_after_minutes = 0`, "stuck_after_minutes"},
-		"log cap":                      {`log_cap_mb = -1`, "log_cap_mb"},
-		"a forge (removed 2026-11-15)": {"[global_forge]\nkind = \"none\"", "global_forge.kind: not a field Foreman knows"},
-		"unknown":                      {`theme = "dark"`, "theme: not a field Foreman knows"},
-		"wrong type":                   {`port = "8888"`, "port"},
+		"port":                            {`port = 70000`, "port"},
+		"sessions":                        {`max_sessions = 0`, "max_sessions"},
+		"engine":                          {`engine = "docker"`, "engine"},
+		"harnesses":                       {"[harnesses.claude-code]\ncommand = \"x\"", "harnesses.claude-code.command: not a field Foreman knows"},
+		"stuck":                           {`stuck_after_minutes = 0`, "stuck_after_minutes"},
+		"log cap":                         {`log_cap_mb = -1`, "log_cap_mb"},
+		"a forge (removed 2026-11-15)":    {"[global_forge]\nkind = \"none\"", "global_forge.kind: not a field Foreman knows"},
+		"unknown":                         {`colour = "dark"`, "colour: not a field Foreman knows"},
+		"a theme Foreman lacks":           {`theme = "sepia"`, "theme"},
+		"instructions (moved 2026-11-15)": {`instructions = "x"`, "instructions: not a field Foreman knows"},
+		"projects_folder (renamed)":       {`projects_folder = "~/w"`, "projects_folder: not a field Foreman knows"},
+		"wrong type":                      {`port = "8888"`, "port"},
 	} {
 		if _, p := ParseSettings([]byte(tc.toml)); !hasProblem(p, tc.want) {
 			t.Errorf("%s: problems %v, want one with %q", name, p, tc.want)

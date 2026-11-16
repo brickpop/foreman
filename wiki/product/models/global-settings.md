@@ -6,7 +6,7 @@ tags: [model, config, home]
 
 # Global settings
 
-`~/.foreman/config/settings.toml`, in the [global repo](./home.md#the-global-repo): per-machine settings, not shared with anyone. Edited through [Settings](../features/settings.md); each save is one commit.
+`~/.foreman/settings.toml`, a plain file in Foreman's [home](./home.md), in no repo: this machine's settings, not shared with anyone (the CEO, 2026-11-08). It can't live in [Foreman's folder](./home.md#foremans-folder), since it names it. Edited through [Settings](../features/settings.md) (`GET`/`PUT /api/settings`); a save rewrites the file and commits nothing. The CEO's preferences (the look) are settings too: there is no separate preferences file (the CEO, 2026-11-08).
 
 ## Schema
 
@@ -20,9 +20,16 @@ tags: [model, config, home]
 | `notifications.needs_me` | Boolean | | `true` | | "An agent needs me" ([Notifications](../features/notifications.md)) |
 | `notifications.finishes` | Boolean | | `true` | | "An agent finishes" |
 | `notifications.merge_requested` | Boolean | | `true` | | "A merge is requested" |
-| `instructions` | String (Markdown) | | empty | | The CEO's standing instructions, added at the end of every team agent's [session prompt](../architecture/session-prompt.md#the-ceos-instructions) at its next start; set in [Settings](../features/settings.md#instructions-for-every-agent). Foreman writes it as a multi-line string (`"""`), so it reads as typed |
+| `theme` | String | | `system` | enum: `system`, `dark`, `light` | The UI's theme ([Settings → Appearance](../features/settings.md#appearance)). The browser keeps a copy only to paint the first frame before the server answers; the file stays the source of truth |
+| `accent` | String | | `blue` | enum: `blue`, `green`, `purple`, `teal`, `orange`, `pink`, `amber` | The UI's accent color; first-frame copy as for `theme` |
+| `terminal_font` | String | | `jetbrains-mono` | enum: `jetbrains-mono`, `fira-code`, `source-code-pro`, `system` | The terminal's font; `system` is the operating system's monospace |
+| `terminal_font_size` | Number | | `13` | 10–24 | The terminal's font size, in px |
+| `foreman_folder` | String (path) | | `~/foreman` | `~`, `~/…` or an absolute path; after `~`, inside `$HOME`, neither inside Foreman's home nor around it | [Foreman's folder](./home.md#foremans-folder): Foreman's HQ, the projects, the agents' worktrees. Kept as a `~` path. Read at start only: a change takes effect at the next start, and one Foreman can't use stops the start, saying why. No UI changes it (the CEO, 2026-11-15): Settings → System shows it read-only; the CEO moves the folder by hand with Foreman stopped and edits the file |
 
-| `projects_folder` | String (path) | | `~/workspace/foreman` | `~`, `~/…` or an absolute path | Where New project suggests a project's [workspace](./project-config.md#the-workspace), `<projects folder>/<name>`; created with the first project made in it. Kept as a `~` path, so it carries to another machine. Set in [Settings → System](../features/settings.md#projects) |
+An invalid `theme`, `accent`, `terminal_font` or `terminal_font_size` reads as its default, the problem still reported, so the UI always gets a look it has.
+
+The CEO's standing instructions to every agent are not a setting: they are `instructions.md` in [Foreman's HQ](./home.md#foremans-hq), the one part of the setup that travels between machines (the CEO, 2026-11-15).
+
 There is no harness command setting (decided 2026-10-15): Foreman builds the agent image, so each harness runs its own command (`claude`, …); a `[harnesses]` table is reported as a field Foreman doesn't know. Field names are a proposal; the PRD names the contents ("listen, limits, harness commands, notifications"), not the keys; there is no `listen` (the CEO, 2026-10-30: Foreman stays on this machine).
 
 ## Invariants

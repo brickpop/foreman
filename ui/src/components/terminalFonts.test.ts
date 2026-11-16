@@ -5,7 +5,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("terminal fonts", () => {
   it("offers exactly the fonts and sizes the server accepts", () => {
-    // userdata.TerminalFonts, MinFontSize and MaxFontSize: a font the server
+    // home.TerminalFonts, MinFontSize and MaxFontSize: a font the server
     // refuses would fail to save; one it accepts but this list lacks would
     // show as JetBrains Mono.
     expect(terminalFonts.map((f) => f.id)).toEqual([
@@ -19,7 +19,7 @@ describe("terminal fonts", () => {
 
   it("falls back to JetBrains Mono for an unknown, retired or missing font", () => {
     expect(terminalFont("comic-sans").id).toBe("jetbrains-mono");
-    // Offered before 2026-10-20: a preferences.toml may still name them.
+    // Offered before 2026-10-20: a settings.toml may still name them.
     expect(terminalFont("geist-mono").id).toBe("jetbrains-mono");
     expect(terminalFont("ibm-plex-mono").id).toBe("jetbrains-mono");
     expect(terminalFont(undefined).id).toBe("jetbrains-mono");

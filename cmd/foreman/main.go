@@ -126,10 +126,7 @@ func run(args []string, stdout io.Writer) error {
 	}
 	// The folder browser opens where Foreman was started.
 	start, _ := os.Getwd()
-	// Set below: a project's migration carries its agents' conversations over.
-	var adapters map[string]harness.Adapter
-	conversations := func(dir, from, to string) error { return harness.MoveConversations(adapters, dir, from, to) }
-	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start, Conversations: conversations}); err != nil {
+	if err := h.Load(ctx, home.Deps{Git: gitCLI, Projects: state.Projects(), Deployed: deployed, Start: start}); err != nil {
 		return err
 	}
 	// Read once the settings are loaded; a change of the port or the engine
@@ -196,7 +193,7 @@ func run(args []string, stdout io.Writer) error {
 		hostAlias = ""
 	}
 	claude := claudecode.Adapter{GitConfig: homeGitConfig()}
-	adapters = map[string]harness.Adapter{
+	adapters := map[string]harness.Adapter{
 		"claude-code": claude,
 		"pi":          pi.Adapter{GitConfig: homeGitConfig(), HostAlias: hostAlias},
 		"codex":       codex.Adapter{GitConfig: homeGitConfig()},
@@ -401,7 +398,6 @@ func run(args []string, stdout io.Writer) error {
 		Requests:     flow,
 		Harnesses:    login,
 		Profiles:     login,
-		Preferences:  userdata.PreferencesIn(userDir),
 		Wiki:         wikis,
 		Setup:        checklist,
 		Maintenance:  maintenanceOf(running, engineRunner, engineImages, podman.Installed),

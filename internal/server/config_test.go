@@ -17,10 +17,11 @@ import (
 )
 
 type fakeConfig struct {
-	projects []home.Project
-	teams    []home.Team
-	settings home.SettingsFile
-	removed  *[]string // RemoveProject's calls, when set
+	projects     []home.Project
+	teams        []home.Team
+	settings     home.SettingsFile
+	instructions home.Instructions
+	removed      *[]string // RemoveProject's calls, when set
 }
 
 func (f fakeConfig) Projects() []home.Project { return f.projects }
@@ -45,6 +46,10 @@ func (f fakeConfig) Settings() home.SettingsFile { return f.settings }
 func (f fakeConfig) SaveSettings(context.Context, home.Settings, string) (string, error) {
 	return "", nil
 }
+func (f fakeConfig) Instructions() home.Instructions { return f.instructions }
+func (f fakeConfig) SaveInstructions(context.Context, string, string) (home.Instructions, error) {
+	return home.Instructions{}, nil
+}
 func (f fakeConfig) SaveTeam(context.Context, home.TeamConfig, string) (home.Team, error) {
 	return home.Team{}, nil
 }
@@ -52,29 +57,19 @@ func (f fakeConfig) SaveTeam(context.Context, home.TeamConfig, string) (home.Tea
 // The project routes answer by name: "bad" is invalid, "taken" exists, "busy"
 // is deployed; the project they return says what was called, in Problems.
 // NewProject takes over "kept".
-func (f fakeConfig) NewProject(_ context.Context, name, clone, workspace string) (home.Project, bool, error) {
-	p, err := f.changed("NewProject", "", name, clone+" ws="+workspace)
+func (f fakeConfig) NewProject(_ context.Context, name, clone string) (home.Project, bool, error) {
+	p, err := f.changed("NewProject", "", name, clone)
 	return p, name != "kept", err
 }
 func (f fakeConfig) RenameRepo(_ context.Context, project, name, newName string) (home.Project, error) {
 	return f.changed("RenameRepo", project, newName, name)
 }
-func (f fakeConfig) RemoveProject(_ context.Context, id string, deleteRepo, deleteWorktrees bool) error {
+func (f fakeConfig) RemoveProject(_ context.Context, id string, deleteHQ, deleteWorktrees bool) error {
 	_, err := f.changed("RemoveProject", "", id, "")
 	if err == nil && f.removed != nil {
-		*f.removed = append(*f.removed, fmt.Sprint(id, " deleteRepo=", deleteRepo, " deleteWorktrees=", deleteWorktrees))
+		*f.removed = append(*f.removed, fmt.Sprint(id, " deleteHQ=", deleteHQ, " deleteWorktrees=", deleteWorktrees))
 	}
 	return err
-}
-
-func (f fakeConfig) Migrate(_ context.Context, id, workspace string) (home.Project, error) {
-	return f.changed("Migrate", id, workspace, "")
-}
-
-// SuggestWorkspace puts a project in /home/ceo/workspace/foreman, which
-// doesn't exist.
-func (f fakeConfig) SuggestWorkspace(name string) (home.Suggestion, error) {
-	return home.Suggestion{Path: "/home/ceo/workspace/foreman/" + name, Folder: "/home/ceo/workspace/foreman"}, nil
 }
 
 // Browse lists /home/ceo/dev (the start folder) and below; anything else is
@@ -125,7 +120,7 @@ func (f fakeConfig) SetHidden(_ context.Context, project string, hidden bool) (h
 	return f.changed("SetHidden", project, fmt.Sprint(hidden), "")
 }
 
-// A project repo from before the scaffold: its wiki.toml is missing.
+// An HQ from before the scaffold: its wiki.toml is missing.
 func (f fakeConfig) Missing(project string) ([]home.Missing, error) {
 	if project != "ledger" {
 		return nil, home.ErrNotFound
@@ -152,9 +147,10 @@ func (f fakeConfig) changed(call, project, name, path string) (home.Project, err
 }
 
 var config = fakeConfig{
-	projects: []home.Project{{ID: "ledger", Repos: []home.Repo{{Name: "ledger-api", Path: "/home/ceo/dev/ledger-api"}}, Version: "v1", Problems: []string{"checks: x"}}},
-	teams:    []home.Team{{ID: "atlas", Config: home.TeamConfig{Name: "Atlas"}}},
-	settings: home.SettingsFile{Settings: home.DefaultSettings(), Version: "v2"},
+	projects:     []home.Project{{ID: "ledger", Repos: []home.Repo{{Name: "ledger-api", Path: "/home/ceo/dev/ledger-api"}}, Version: "v1", Problems: []string{"checks: x"}}},
+	teams:        []home.Team{{ID: "atlas", Config: home.TeamConfig{Name: "Atlas"}}},
+	settings:     home.SettingsFile{Settings: home.DefaultSettings(), Version: "v2"},
+	instructions: home.Instructions{Text: "Answer in Catalan.\n", Version: "v4"},
 }
 
 func withConfig(bus Events) http.Handler {
@@ -280,7 +276,7 @@ func TestPromptTemplateOfAnAgent(t *testing.T) {
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: c, UI: builtUI})
 	var body map[string]string
 	decodeBody(t, get(t, h, "/api/teams/atlas/agents/mara/prompt"), &body)
-	if !strings.Contains(body["prompt"], "Project: {project}\n") || !strings.Contains(body["prompt"], "{project repo}/wiki/backlog/index.md") {
+	if !strings.Contains(body["prompt"], "Project: {project}\n") || !strings.Contains(body["prompt"], "{hq}/wiki/backlog/index.md") || !strings.Contains(body["prompt"], "Answer in Catalan.") {
 		t.Errorf("template %q", body["prompt"])
 	}
 	for _, path := range []string{"/api/teams/atlas/agents/ghost/prompt", "/api/teams/nope/agents/mara/prompt"} {
@@ -290,12 +286,49 @@ func TestPromptTemplateOfAnAgent(t *testing.T) {
 	}
 }
 
-// savingConfig is a config whose settings can be saved.
+// savingConfig is a config whose settings and instructions can be saved.
 type savingConfig struct {
 	fakeConfig
-	saved  *home.Settings
-	team   *home.TeamConfig
-	refuse error
+	saved        *home.Settings
+	team         *home.TeamConfig
+	instructions *string
+	refuse       error
+}
+
+func (s savingConfig) SaveInstructions(_ context.Context, text, version string) (home.Instructions, error) {
+	if s.refuse != nil {
+		return home.Instructions{}, s.refuse
+	}
+	*s.instructions = text
+	return home.Instructions{Text: text, Version: "v5"}, nil
+}
+
+// The instructions save as typed, an empty text included; a stale version
+// is a conflict, and a body without the text is refused, never read as
+// clearing them.
+func TestSaveInstructions(t *testing.T) {
+	var saved string
+	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: savingConfig{fakeConfig: config, instructions: &saved}, UI: builtUI})
+	var got home.Instructions
+	decodeBody(t, get(t, h, "/api/instructions"), &got)
+	if got != config.instructions {
+		t.Errorf("read %+v", got)
+	}
+	for _, text := range []string{"# Rules\n\nBe brief.\n", ""} {
+		body, _ := json.Marshal(map[string]string{"text": text, "version": "v4"})
+		w := send(h, "PUT", "/api/instructions", string(body))
+		if decodeBody(t, w, &got); w.Code != http.StatusOK || saved != text || got.Version != "v5" {
+			t.Errorf("save %q: %d %+v, saved %q", text, w.Code, got, saved)
+		}
+	}
+	saved = "kept"
+	if w := send(h, "PUT", "/api/instructions", `{"version":"v4"}`); w.Code != http.StatusBadRequest || saved != "kept" {
+		t.Errorf("no text: %d", w.Code)
+	}
+	h = New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: savingConfig{fakeConfig: config, refuse: home.ErrConflict}, UI: builtUI})
+	if w := send(h, "PUT", "/api/instructions", `{"text":"x","version":"v1"}`); w.Code != http.StatusConflict {
+		t.Errorf("stale: %d %s", w.Code, w.Body)
+	}
 }
 
 // SaveTeam records what it was given, as the home would save it.
@@ -393,8 +426,7 @@ func TestProjectRoutes(t *testing.T) {
 		method, path, body string
 		call               []string
 	}{
-		{http.MethodPost, "/api/projects", `{"name":"aragon","workspace":"/home/ceo/w/aragon"}`, []string{"NewProject", "aragon", " ws=/home/ceo/w/aragon"}},
-		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"/home/ceo/w/ledger"}`, []string{"Migrate", "/home/ceo/w/ledger", ""}},
+		{http.MethodPost, "/api/projects", `{"name":"aragon"}`, []string{"NewProject", "aragon", ""}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default="}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","defaultBranch":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default=master"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `{"branch":"master"}`, []string{"SetRepoDefault", "master", "web"}},
@@ -406,7 +438,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/name", `{"name":""}`, []string{"SetName", "", ""}},
 		{http.MethodPut, "/api/projects/ledger/hidden", `{"hidden":true}`, []string{"SetHidden", "true", ""}},
 		{http.MethodPut, "/api/projects/ledger/hidden", `{"hidden":false}`, []string{"SetHidden", "false", ""}},
-		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git","workspace":"/w"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git ws=/w"}},
+		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"site"}`, []string{"RenameRepo", "site", "web"}},
 	} {
 		var p home.Project
@@ -415,13 +447,13 @@ func TestProjectRoutes(t *testing.T) {
 			t.Errorf("%s %s: called %v, want %v", tc.method, tc.path, p.Problems, tc.call)
 		}
 	}
-	// A new project repo is created (201); one left there is taken over (200).
+	// A new HQ is created (201); one left there is taken over (200).
 	for name, status := range map[string]int{"aragon": http.StatusCreated, "kept": http.StatusOK} {
 		if w := send(http.MethodPost, "/api/projects", `{"name":"`+name+`"}`); w.Code != status {
 			t.Errorf("new project %s: %d, want %d", name, w.Code, status)
 		}
 	}
-	// What a project repo lacks, and creating it.
+	// What an HQ lacks, and creating it.
 	var missing []home.Missing
 	decodeBody(t, get(t, h, "/api/projects/ledger/scaffold"), &missing)
 	if len(missing) != 1 || missing[0].File != "wiki/wiki.toml" || !missing[0].Required {
@@ -457,9 +489,9 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/name", `{}`, http.StatusBadRequest, `"BAD_REQUEST"`},   // never a missing field read as clearing it
 		{http.MethodPut, "/api/projects/nope/name", `{"name":"x"}`, http.StatusNotFound, `"NOT_FOUND"`},
 		{http.MethodPut, "/api/projects/nope/hidden", `{"hidden":true}`, http.StatusNotFound, `"NOT_FOUND"`},
-		{http.MethodPost, "/api/projects/nope/migrate", `{"workspace":"/w"}`, http.StatusNotFound, `"NOT_FOUND"`},
-		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"busy"}`, http.StatusConflict, `"DEPLOYED"`},
-		{http.MethodPost, "/api/projects/ledger/migrate", `{`, http.StatusBadRequest, `"BAD_REQUEST"`},
+		{http.MethodPost, "/api/projects/ledger/migrate", `{"workspace":"/w"}`, http.StatusNotFound, ``}, // gone with workspaces
+		{http.MethodGet, "/api/folders/workspace?name=x", ``, http.StatusNotFound, ``},
+		{http.MethodGet, "/api/preferences", ``, http.StatusNotFound, ``}, // merged into the settings
 	} {
 		if w := send(tc.method, tc.path, tc.body); w.Code != tc.status || !strings.Contains(w.Body.String(), tc.want) {
 			t.Errorf("%s %s %s: %d %s", tc.method, tc.path, tc.body, w.Code, w.Body)
@@ -467,22 +499,22 @@ func TestProjectRoutes(t *testing.T) {
 	}
 }
 
-// Removing a project answers 204, its project repo and its agents' worktrees
-// deleted only when asked; a new project's workspace is suggested;
-// the browser lists a folder, the start folder when none is given.
+// Removing a project answers 204, its HQ and its agents' worktrees deleted
+// only when asked; the browser lists a folder, the start folder when none is
+// given.
 func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
 	var removed []string
 	c := config
 	c.removed = &removed
 	h := New(Options{Guard: openGuard{}, Home: fakeHome("/home/ceo/.foreman"), Config: c, UI: builtUI})
-	for _, path := range []string{"/api/projects/ledger", "/api/projects/relay?deleteRepo=true", "/api/projects/books?deleteWorktrees=true"} {
+	for _, path := range []string{"/api/projects/ledger", "/api/projects/relay?deleteHQ=true", "/api/projects/books?deleteWorktrees=true"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, path, nil))
 		if w.Code != http.StatusNoContent {
 			t.Errorf("DELETE %s: %d %s", path, w.Code, w.Body)
 		}
 	}
-	if strings.Join(removed, ", ") != "ledger deleteRepo=false deleteWorktrees=false, relay deleteRepo=true deleteWorktrees=false, books deleteRepo=false deleteWorktrees=true" {
+	if strings.Join(removed, ", ") != "ledger deleteHQ=false deleteWorktrees=false, relay deleteHQ=true deleteWorktrees=false, books deleteHQ=false deleteWorktrees=true" {
 		t.Errorf("removed %v", removed)
 	}
 	for path, want := range map[string]string{"/api/folders": "/home/ceo/dev", "/api/folders?path=/home/ceo/dev/aragon": "/home/ceo/dev/aragon"} {
@@ -495,11 +527,6 @@ func TestRemoveProjectAndBrowseRoutes(t *testing.T) {
 	var added home.Folder
 	if decodeBody(t, get(t, h, "/api/folders?path=/home/ceo/dev/app&project=ledger"), &added); added.Added != "api" {
 		t.Errorf("for a project: %+v", added)
-	}
-	var s home.Suggestion
-	decodeBody(t, get(t, h, "/api/folders/workspace?name=books"), &s)
-	if s.Path != "/home/ceo/workspace/foreman/books" || s.FolderExists {
-		t.Errorf("suggestion %+v", s)
 	}
 	var b home.Branches
 	decodeBody(t, get(t, h, "/api/folders/branches?path=/home/ceo/dev/poc"), &b)

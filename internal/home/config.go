@@ -74,18 +74,39 @@ type Soul struct {
 
 // Settings is settings.toml. Absent fields keep their defaults.
 type Settings struct {
-	Port              int           `toml:"port" json:"port"`
-	MaxSessions       int           `toml:"max_sessions" json:"maxSessions"`
-	Engine            string        `toml:"engine" json:"engine"`
-	StuckAfterMinutes int           `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
-	LogCapMB          int           `toml:"log_cap_mb" json:"logCapMb"`
-	ProjectsFolder    string        `toml:"projects_folder" json:"projectsFolder"`
-	Notifications     Notifications `toml:"notifications" json:"notifications"`
-	// Instructions are the CEO's standing instructions for every agent, added
-	// to each session prompt (wiki/product/architecture/session-prompt.md).
-	// Written as a multi-line string (encodeSettings).
-	Instructions string `toml:"instructions,omitempty" json:"instructions"`
+	Port              int    `toml:"port" json:"port"`
+	MaxSessions       int    `toml:"max_sessions" json:"maxSessions"`
+	Engine            string `toml:"engine" json:"engine"`
+	StuckAfterMinutes int    `toml:"stuck_after_minutes" json:"stuckAfterMinutes"`
+	LogCapMB          int    `toml:"log_cap_mb" json:"logCapMb"`
+	// ForemanFolder holds what the CEO owns (Home.Folder): Foreman's HQ, the
+	// projects, the cloned repos, the agents' worktrees. Read at start only;
+	// it has no field in Settings (the CEO, 2026-11-15).
+	ForemanFolder string        `toml:"foreman_folder" json:"foremanFolder"`
+	Notifications Notifications `toml:"notifications" json:"notifications"`
+	// The look of the UI and its terminal (Settings → Notifications & look).
+	Theme  string `toml:"theme" json:"theme"`   // system, dark or light
+	Accent string `toml:"accent" json:"accent"` // one of Accents: the UI's accent color (its styles.css)
+	// TerminalFont is one of TerminalFonts; the UI ships each but system.
+	TerminalFont     string `toml:"terminal_font" json:"terminalFont"`
+	TerminalFontSize int    `toml:"terminal_font_size" json:"terminalFontSize"` // px, MinFontSize to MaxFontSize
 }
+
+var themes = []string{"system", "dark", "light"}
+
+// Accents are the UI's accent colors, the default first (the UI's accents
+// lists the same ids).
+var Accents = []string{"blue", "green", "purple", "teal", "orange", "pink", "amber"}
+
+// TerminalFonts are the terminal's fonts (the UI's terminalFonts lists the
+// same ids); system is the operating system's monospace.
+var TerminalFonts = []string{"jetbrains-mono", "fira-code", "source-code-pro", "system"}
+
+// The terminal's font sizes, in px.
+const (
+	MinFontSize = 10
+	MaxFontSize = 24
+)
 
 // Notifications are the browser notification switches.
 type Notifications struct {
@@ -99,8 +120,9 @@ func DefaultSettings() Settings {
 	return Settings{
 		Port: 8888, MaxSessions: 12, Engine: "podman",
 		StuckAfterMinutes: 20, LogCapMB: 50,
-		ProjectsFolder: "~/workspace/foreman",
-		Notifications:  Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
+		ForemanFolder: "~/foreman",
+		Notifications: Notifications{NeedsMe: true, Finishes: true, MergeRequested: true},
+		Theme:         "system", Accent: Accents[0], TerminalFont: TerminalFonts[0], TerminalFontSize: 13,
 	}
 }
 
@@ -139,7 +161,7 @@ func decode(data []byte, v any, retired ...func(toml.Key) bool) (toml.MetaData, 
 }
 
 // ParseProject parses a project.toml: the project's rules, which travel with
-// its project repo (its name and repos are this machine's, in the database).
+// its HQ (its name and repos are this machine's, in the database).
 func ParseProject(data []byte) (ProjectConfig, []string) {
 	var c ProjectConfig
 	md, p := decode(data, &c)
@@ -254,11 +276,26 @@ func (s Soul) validate(at, id string) problems {
 	return p
 }
 
-// ParseSettings parses settings.toml over the defaults.
+// ParseSettings parses settings.toml over the defaults. A look the UI
+// doesn't have (a hand edit gone wrong, a font no longer offered) reads as
+// its default, its problem still reported: the UI applies the look as it
+// comes.
 func ParseSettings(data []byte) (Settings, []string) {
-	s := DefaultSettings()
+	s, def := DefaultSettings(), DefaultSettings()
 	_, p := decode(data, &s)
 	p = append(p, s.validate()...)
+	if !slices.Contains(themes, s.Theme) {
+		s.Theme = def.Theme
+	}
+	if !slices.Contains(Accents, s.Accent) {
+		s.Accent = def.Accent
+	}
+	if !slices.Contains(TerminalFonts, s.TerminalFont) {
+		s.TerminalFont = def.TerminalFont
+	}
+	if s.TerminalFontSize < MinFontSize || s.TerminalFontSize > MaxFontSize {
+		s.TerminalFontSize = def.TerminalFontSize
+	}
 	return s, p
 }
 
@@ -279,14 +316,26 @@ func (s Settings) validate() problems {
 	if s.LogCapMB <= 0 {
 		p.add("log_cap_mb: must be more than 0")
 	}
-	if f := s.ProjectsFolder; f != "~" && !strings.HasPrefix(f, "~/") && !filepath.IsAbs(f) {
-		p.add("projects_folder: %q must be an absolute path or start with ~/", f)
+	if f := s.ForemanFolder; f != "~" && !strings.HasPrefix(f, "~/") && !filepath.IsAbs(f) {
+		p.add("foreman_folder: %q must be an absolute path or start with ~/", f)
+	}
+	if !slices.Contains(themes, s.Theme) {
+		p.add("theme: %q is not one of %s", s.Theme, strings.Join(themes, ", "))
+	}
+	if !slices.Contains(Accents, s.Accent) {
+		p.add("accent: %q is not one of %s", s.Accent, strings.Join(Accents, ", "))
+	}
+	if !slices.Contains(TerminalFonts, s.TerminalFont) {
+		p.add("terminal_font: %q is not one of %s", s.TerminalFont, strings.Join(TerminalFonts, ", "))
+	}
+	if s.TerminalFontSize < MinFontSize || s.TerminalFontSize > MaxFontSize {
+		p.add("terminal_font_size: %d is not %d to %d", s.TerminalFontSize, MinFontSize, MaxFontSize)
 	}
 	return p
 }
 
 // encode renders v as TOML. A save rewrites the whole file: comments written
-// by hand don't survive it; the global repo keeps the earlier versions.
+// by hand don't survive it; Foreman's HQ keeps a team file's earlier versions.
 func encode(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := toml.NewEncoder(&buf)
@@ -371,44 +420,4 @@ func (c TeamConfig) Roster() []string {
 		add(id)
 	}
 	return ids
-}
-
-// encodeSettings renders settings.toml, the instructions as a multi-line
-// string, so their Markdown reads as written: the TOML library writes every
-// string on one line, with \n escapes.
-func encodeSettings(s Settings) ([]byte, error) {
-	text := s.Instructions
-	s.Instructions = ""
-	out, err := encode(s)
-	if err != nil || text == "" {
-		return out, err
-	}
-	key := []byte("instructions = " + multiline(text) + "\n")
-	// A top-level key goes before the first table, or it would be the table's.
-	if i := bytes.Index(out, []byte("\n[")); i >= 0 {
-		return slices.Concat(out[:i+1], key, out[i+1:]), nil
-	}
-	return append(out, key...), nil
-}
-
-// multiline is s as a TOML multi-line basic string: backslashes and the
-// control characters TOML refuses escaped, and quotes too wherever they could
-// close it.
-func multiline(s string) string {
-	var b strings.Builder
-	b.WriteString("\"\"\"\n")
-	for i, r := range s {
-		switch {
-		case r == '\\':
-			b.WriteString(`\\`)
-		case r == '"' && (strings.HasPrefix(s[i:], `"""`) || i == len(s)-1):
-			b.WriteString(`\"`)
-		case r < 0x20 && r != '\n' && r != '\t' || r == 0x7f:
-			fmt.Fprintf(&b, `\u%04X`, r)
-		default:
-			b.WriteRune(r)
-		}
-	}
-	b.WriteString(`"""`)
-	return b.String()
 }

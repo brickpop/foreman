@@ -1,7 +1,7 @@
 import { useNavigate, useRouterState, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import type { Node } from "../../api/client";
-import { useEntry, useMissing, useProjectRepo, useTick, useTree } from "../../app/queries";
+import { useEntry, useMissing, useProjectHQ, useTick, useTree } from "../../app/queries";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { TreeIcon, WarningIcon } from "../../components/icons";
 import { useToast } from "../../components/Toasts";
@@ -16,7 +16,7 @@ import { useProject } from "../Project";
 export function Wiki() {
   const { id: project, config } = useProject();
   const { entry } = useSearch({ from: "/projects/$project/wiki" });
-  const repo = useProjectRepo(project);
+  const repo = useProjectHQ(project);
   const navigate = useNavigate();
   const toast = useToast();
   // The tree is always shown; under 760px it folds behind Files, closed by

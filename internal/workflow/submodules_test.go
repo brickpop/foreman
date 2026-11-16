@@ -145,7 +145,7 @@ func TestSetSubmoduleRefusalsInTheTool(t *testing.T) {
 		args  map[string]string
 		code  string
 	}{
-		{"mara", map[string]string{"repo": "project", "path": "lib/x", "ref": "v1", "url": url}, "unknown_repo"},
+		{"mara", map[string]string{"repo": "hq", "path": "lib/x", "ref": "v1", "url": url}, "unknown_repo"},
 		{"tove", map[string]string{"repo": "api", "path": "", "ref": "v1"}, "empty"},
 		{"tove", map[string]string{"repo": "api", "path": "lib/forge-std", "ref": ""}, "empty"},
 		{"tove", map[string]string{"repo": "api", "path": "../web", "ref": "v1"}, "bad_path"},

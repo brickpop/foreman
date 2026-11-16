@@ -15,14 +15,14 @@ import (
 
 // Input is everything a session prompt is made of.
 type Input struct {
-	Agent       string          // the agent's id in Team.Agents
-	Team        home.TeamConfig // souls, roster, playbook
-	Project     string          // the project's id
-	Sandbox     string          // the agent's sandbox, at the same path on the host and in its container
-	ProjectRepo string          // the project repo, at the same path on the host and in its container
-	Files       string          // the project's files (inbox/, shared/), at the same path on the host and in its container; "" for none
-	Config      home.ProjectConfig
-	Repos       []home.Repo // the project's code repos, each with its default branch
+	Agent   string          // the agent's id in Team.Agents
+	Team    home.TeamConfig // souls, roster, playbook
+	Project string          // the project's id
+	Sandbox string          // the agent's sandbox, at the same path on the host and in its container
+	HQ      string          // the project's HQ, at the same path on the host and in its container
+	Files   string          // the project's files (inbox/, shared/), at the same path on the host and in its container
+	Config  home.ProjectConfig
+	Repos   []home.Repo // the project's code repos, each with its default branch
 	// Tools are the team tools Foreman offers this agent (Offered): the prompt
 	// describes those and no others. Without ask, it describes working alone,
 	// the CEO relaying; without commit, git is read-only and the CEO reviews.
@@ -178,7 +178,7 @@ func Compose(in Input) string {
 	line("")
 	line("## This assignment")
 	line("Project: %s", in.Project)
-	line("Goal: %s", goal(in.ProjectRepo, lead))
+	line("Goal: %s", goal(in.HQ, lead))
 	if code {
 		if has("open") {
 			line("Your sandbox: %s. A code repo is checked out there, as <sandbox>/<repo>, only once you open it: open(repo), or switch, merge or set_submodule opening what they need. Before working in a repo, open it.", in.Sandbox)
@@ -196,14 +196,14 @@ func Compose(in Input) string {
 	if has("commit") && code {
 		line("%s", provingTests)
 	}
-	line("Project repo: %s (the project's one shared checkout, the same for every agent)", in.ProjectRepo)
-	line("Knowledge base: %s/wiki (%s)", in.ProjectRepo, wikiAccess(lead, has))
+	line("The project's HQ: %s (its one shared checkout, the same for every agent)", in.HQ)
+	line("Knowledge base: %s/wiki (%s)", in.HQ, wikiAccess(lead, has))
 	line("It is the project's live wiki, not a copy: the whole team reads the same files, so what is written there is shared at once.")
 	if lead && len(in.Team.Roster()) > 1 {
 		// Without this, a lead writes cards that tell members to write wiki
 		// files, and a member takes its read-only mount for a fault.
 		if has("contribute") {
-			line("Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit project.")
+			line("Your teammates can't write it: what they add arrives through contribute() in wiki/inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.")
 			line("%s", leadReviews)
 		} else {
 			line("Your teammates can't write it: ask them for content, never to write wiki files.")
@@ -212,10 +212,8 @@ func Compose(in Input) string {
 	if !lead && has("contribute") {
 		line("%s", memberReviews)
 	}
-	if in.Files != "" {
-		line("%s", files(in.Files))
-	}
-	line("Read %s/AGENTS.md first: how this project's wiki and tasks work.", in.ProjectRepo)
+	line("%s", files(in.Files))
+	line("Read %s/AGENTS.md first: how this project's wiki and tasks work.", in.HQ)
 	line("")
 	line("## Your team on %s", in.Project)
 	for _, id := range in.Team.Roster() {
@@ -415,7 +413,7 @@ func persisting(leadOfTeam bool, has func(string) bool) string {
 func wikiAccess(lead bool, has func(string) bool) string {
 	switch {
 	case lead && has("commit"):
-		return "read and write: edit, then commit its repo, project"
+		return "read and write: edit, then commit its repo, hq"
 	case lead:
 		return "read and write"
 	case has("contribute"):
@@ -459,8 +457,8 @@ func tools(in Input, lead bool, has func(string) bool) string {
 		notes += "Git is read-only for you (status, diff, log, blame work); branch, commit\n" +
 			"and merge only through switch(), commit() and merge().\n"
 	case has("commit"):
-		notes += "Git is read-only for you (status, diff, log, blame work); commit the project\n" +
-			"repo only through commit(), naming project.\n"
+		notes += "Git is read-only for you (status, diff, log, blame work); commit the project's\n" +
+			"HQ only through commit(), naming hq.\n"
 	}
 	if has("read_message") {
 		notes += "Messages arrive in this session as one line, \"Message msg-N from <name> (<kind>): …\".\n" +
@@ -560,7 +558,7 @@ func instruction(s home.Soul, merges bool) string {
 // CEO's instructions are already known, so they show as they are.
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
-		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", ProjectRepo: "{project repo}", Files: "{files}",
+		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", HQ: "{hq}", Files: "{files}",
 		Repos:        []home.Repo{{Name: "{repo}", Path: "{repo path}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead, true),
@@ -571,8 +569,8 @@ func Template(team home.TeamConfig, agent, instructions string) string {
 // goal says where the project's goal is: the "Current goal" line of its
 // wiki's backlog index, which the lead keeps. Pointed to, not copied, since
 // it changes over time while a session runs (the CEO, 2026-10-31).
-func goal(projectRepo string, lead bool) string {
-	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/wiki/backlog/index.md", projectRepo)
+func goal(hq string, lead bool) string {
+	at := fmt.Sprintf("the \"Current goal\" line at the top of %s/wiki/backlog/index.md", hq)
 	if lead {
 		return at + ", which you keep. It changes over time: read it again before planning new work. When it is missing or says none yet, ask the CEO for it in this session before anything else, then write it there. When the CEO changes it, update it there and tell your team."
 	}
@@ -581,7 +579,7 @@ func goal(projectRepo string, lead bool) string {
 
 // files says where the project's files are: the CEO's for the team, and the
 // team's own, which outlast a task and a team
-// (wiki/product/models/project-config.md#the-workspace).
+// (wiki/product/models/project-config.md#the-projects-folder).
 func files(dir string) string {
 	return fmt.Sprintf("Files from the CEO: %s/%s (read only, by design: what the CEO gives the team to work with).\n", dir, home.FilesInbox) +
 		fmt.Sprintf("Shared files: %s/%s (every agent of the project reads and writes it, and it outlasts your tasks and this team: keep there the data later work needs, such as downloads, datasets or generated assets. Knowledge goes in the wiki, code in your branches.)", dir, home.FilesShared)

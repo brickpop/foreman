@@ -21,6 +21,12 @@ export interface Cleaned {
   what: string; // "worktree" or "branch"
   branch: string; // the branch, or the worktree's
   why?: string;
+  /**
+   * Of a worktree removed with changes not committed (CleanUp's
+   * uncommitted): those files, and the ref they are kept under a while.
+   */
+  files?: string[];
+  backup?: string;
 }
 
 //////////

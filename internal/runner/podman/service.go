@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -231,12 +232,23 @@ func answers(socket string) bool {
 	return true
 }
 
+// podmanOutput runs the podman CLI in a session of its own (detached).
 func podmanOutput(ctx context.Context, args ...string) (string, error) {
-	out, err := exec.CommandContext(ctx, "podman", args...).CombinedOutput()
+	out, err := detached(exec.CommandContext(ctx, "podman", args...)).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("podman %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// detached runs cmd in a session of its own. `podman machine start` (and
+// `init --now`) leave the VM and gvproxy in the process group they were
+// started from: Foreman's, in the CEO's terminal, whose Ctrl-C would then
+// stop the machine with Foreman, and every other tool's containers with it.
+// Foreman never stops the machine (machineSocket).
+func detached(cmd *exec.Cmd) *exec.Cmd {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return cmd
 }
 
 // MachineBounds is the size a new Podman machine may have (the CEO's rule,
@@ -307,8 +319,8 @@ func (r *Runner) CreateMachine(ctx context.Context, cpus, memory int) error {
 	}
 	r.machine = machineJob{running: true}
 	r.mu.Unlock()
-	cmd := exec.Command("podman", "machine", "init", "--now",
-		"--cpus", strconv.Itoa(cpus), "--memory", strconv.Itoa(memory*1024))
+	cmd := detached(exec.Command("podman", "machine", "init", "--now",
+		"--cpus", strconv.Itoa(cpus), "--memory", strconv.Itoa(memory*1024)))
 	cmd.Stdout = r.machineLog()
 	cmd.Stderr = cmd.Stdout
 	if err := cmd.Start(); err != nil {

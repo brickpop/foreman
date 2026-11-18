@@ -105,7 +105,7 @@ func TestLeadPromptWithTeamTools(t *testing.T) {
 		"when the CEO merges (under f/, fix/); the CEO may rename it.",
 		"Before you request a merge, run: npm test",
 		// so the lead never asks a member for what its mount refuses
-		"Your teammates can't write it: what they add arrives through contribute() in the HQ's inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.",
+		"Your teammates can't write it: what they add arrives through contribute(), a draft in the project's shared files under contributions/: file what is worth keeping in the wiki, then delete the draft. Ask them for content, never to write wiki files or commit hq.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
@@ -346,7 +346,7 @@ func TestTheLeadsLessons(t *testing.T) {
 	lead, member := Compose(input("mara", Offered(true, true))), Compose(input("ilya", Offered(false, true)))
 	brief := "When the CEO must decide, bring a brief that stands alone: the question in plain words, who it affects, the options with their consequences, and your recommendation."
 	for _, want := range []string{
-		"by its author through contribute(), or by you the moment it arrives. To pass one on, link its entry: never retype it, and never present a summary as the full text.",
+		"by you: the moment it arrives, from its author's contribute() or a message. To pass one on, link its entry: never retype it, and never present a summary as the full text.",
 		"## The CEO\nThe CEO talks to you. Break requests down and delegate with ask().\nAgree the scope with the CEO before building anything it didn't ask for.\n" + brief,
 		"then call request_merge again. Best, a lead branch holds one topic: merge in that topic's hand-offs, and another topic's branch only when the work needs it (its review then shows both). Prefer few merge requests open at once,",
 		"When the work justifies more (separate pieces, something urgent), send them; when you hold finished work back instead, tell the CEO what waits.",
@@ -358,7 +358,7 @@ func TestTheLeadsLessons(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"goes in through contribute(): then point to the entry it files, never retype it.\n",
+		"goes in through contribute(), for the lead to file in the wiki: then point to that entry, never retype it.\n",
 		"Never push. Best, a card's branch starts from where the lead says its work goes (the default branch unless told) and holds that card's work: merge in another card's branch (an audit's, a proof's) only when the work needs it. To reuse just a test from one, copy it in (git show <branch>:<file>).\n",
 		"Tests bound for a merge assert correct behaviour only.",
 	} {

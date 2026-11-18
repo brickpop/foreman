@@ -2,7 +2,7 @@
 
 This is the project's HQ, at `$PROJECT_HQ` in every agent's environment: `project.toml` (the project's config, owned by the CEO) beside the team's knowledge base and task board, a wiki that is the HQ itself. Every agent of the project reads the same live files.
 
-**Only the team lead writes the wiki**: edit the files, run `wiki --root "$PROJECT_HQ" check`, then `commit()` naming the repo `hq` (your code repos keep their changes until you name them). Everyone else adds through `contribute(kind, title, body)` (`finding`, `proposal` or `note`): Foreman files it in `inbox/` and tells the lead, who turns it into an entry or a task, or drops it. The CEO may tick a checkbox or move a card from Foreman at any time: re-read an entry before editing it.
+**Only the team lead writes the wiki**: edit the files, run `wiki --root "$PROJECT_HQ" check`, then `commit()` naming the repo `hq` (your code repos keep their changes until you name them). Everyone else adds through `contribute(kind, title, body)` (`finding`, `proposal` or `note`): Foreman saves it as a draft in the project's shared files, under `contributions/` (not in the wiki), and tells the lead, who turns it into an entry or a task, or drops it. The CEO may tick a checkbox or move a card from Foreman at any time: re-read an entry before editing it.
 
 ## The wiki
 
@@ -35,12 +35,11 @@ $PROJECT_HQ/
 ├── technical-debt.md   # accepted workarounds and limitations, one page (type: note)
 ├── spec/               # durable: what the project is, as intended (type: spec)
 │   └── index.md        # the spec map: links every spec
-├── backlog/            # ephemeral: the work (type: task)
-│   ├── index.md        # the current goal, and the queries that list the work
-│   ├── <task>.md       # one file per task
-│   ├── epics/          # groups of tasks, in order (type: epic)
-│   └── archive/        # retired work worth keeping
-└── inbox/              # contributions waiting for the lead (type: note)
+└── backlog/            # ephemeral: the work (type: task)
+    ├── index.md        # the current goal, and the queries that list the work
+    ├── <task>.md       # one file per task
+    ├── epics/          # groups of tasks, in order (type: epic)
+    └── archive/        # retired work worth keeping
 ```
 
 **Optional, created when there is something to put in it** (never empty, never as a placeholder): `research/` for what the team found out (investigations, comparisons of options, measurements, a spike's outcome; `type: note`), `spec/glossary.md` for the project's terms, or another folder the project really needs (`discovery/`, `issues/`…). Link each new folder's `index.md` from the root `index.md`.
@@ -115,7 +114,7 @@ An epic lives in `backlog/epics/<slug>.md`; its tasks name it in `epic: <slug>`.
 
 ## Lifecycle
 
-1. **Capture**: a new task in `backlog/` with `status: backlog` and a `priority`. Contributions in `inbox/` become tasks, specs, research notes, or nothing; then delete them.
+1. **Capture**: a new task in `backlog/` with `status: backlog` and a `priority`. Contributions (the drafts in the shared files' `contributions/`) become tasks, specs, research notes, or nothing; then delete the draft.
 2. **Schedule**: the lead moves it to `todo` when it's next.
 3. **Work**: `in-progress`, ticking its steps, through review; `blocked`, with its `Blocked by` line, while it can't move.
 4. **Finish**: update the specs it touched (and their `status`), set `done`, then retire the task: delete it (git keeps it; remove links to it first, `wiki backlinks` finds them), or `wiki move` it to `backlog/archive/` when a browsable record is worth keeping.

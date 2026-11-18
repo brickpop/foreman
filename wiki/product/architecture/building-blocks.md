@@ -78,7 +78,7 @@ Every arrow, in words:
 | Web server | Event bus | Stream live events to the browser |
 | Workflow | Messaging | Deliver answers, notices ("main moved") to agents |
 | Workflow | Git | Switch, commit and merge in an agent's worktrees for its tool calls; check a hand-off branch, detect integration; on the CEO's actions, merge into one of the CEO's branches (Git epic) |
-| Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` notes into the project's inbox; team files changed by the Chief of Staff's tools |
+| Workflow | Home & config, Wiki | Gates and checks from `project.toml`; `contribute` drafts into the project's shared files; team files changed by the Chief of Staff's tools |
 | Messaging | Instance manager | Deliver a message when the recipient is idle; start a stopped recipient |
 | Agent link | Messaging | `ask`, `reply`, `handoff` tool calls |
 | Agent link | Workflow | `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard`, `set_submodule`, `escalate`, `handoff`, `contribute`, `request_merge`, and the Chief of Staff's tools |
@@ -266,7 +266,7 @@ Details: [Team tools](./team-tools.md), [Team message](../models/team-message.md
 
 ### 7. Workflow (`workflow`)
 
-Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on the Dashboard (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a note in the project's HQ's `inbox/` and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's decisions on a review (Merge, Request changes, Close) → Git and Messaging; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
+Gives events their meaning: `switch`, `commit` and `merge` → git writes in the caller's worktrees, through Git; `escalate` and harnesses waiting for the CEO → a [request](../features/requests.md) on the Dashboard (and its answer back); `handoff` → a [work item](../models/work-item.md); `contribute` → a draft in the project's shared files and a notice to the lead; `request_merge` → checks and a [merge request](../models/merge-request.md) with its review; the CEO's decisions on a review (Merge, Request changes, Close) → Git and Messaging; project gates; crashes → blocked requests; the Chief of Staff's tools → team files and config changes, on a branch that comes back through `request_merge`.
 
 ```go
 type Workflow interface {
@@ -276,7 +276,7 @@ type Workflow interface {
 }
 ```
 
-Built so far (`internal/workflow`): `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the project's HQ), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a note in the HQ's `inbox/`, committed as the agent, and a notice to the lead). Requests, gates and merges come later.
+Built so far (`internal/workflow`): `open`, `switch`, `commit`, `merge`, `abort_merge`, `discard` and `set_submodule` in the caller's worktrees, keeping submodules at the branch's pins ([Sandboxes and git policy → Submodules](./sandboxes-and-git.md#submodules)) (and, for the lead's `commit`, the project's HQ), each authored as the agent (`<Name> <agent.invalid>`); `handoff` (refuses uncommitted work, checks the branch, sends the hand-off through Messaging; checks and work items come with the Git epic); `contribute` (a draft in the project files' `shared/contributions/`, not committed, and a notice to the lead). Requests, gates and merges come later.
 
 Details: [Requests](../features/requests.md), [Pipeline and merges](../features/pipeline-and-merges.md). Schema: [Protocol → Requests](./protocol.md#requests), [work items and merge requests](./protocol.md#work-items-and-merge-requests).
 
@@ -333,7 +333,7 @@ Details: [Home](../models/home.md), [Project config](../models/project-config.md
 
 ### Wiki (`wiki`)
 
-Reads project wikis through the agentic-wiki engine; renders entries for the reader; edits one line at a time. The lead writes the wiki as plain files in the project's HQ, and commit them through `commit()`; Foreman only reads it, plus the CEO's checkbox ticks and card moves and the `contribute` notes it files in `inbox/`, each committed on its own (one commit per write).
+Reads project wikis through the agentic-wiki engine; renders entries for the reader; edits one line at a time. The lead writes the wiki as plain files in the project's HQ, and commit them through `commit()`; Foreman only reads it, plus the CEO's checkbox ticks and card moves, each committed on its own (one commit per write).
 
 ```go
 type Wiki interface {

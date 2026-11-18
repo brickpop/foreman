@@ -203,7 +203,7 @@ func Compose(in Input) string {
 		// Without this, a lead writes cards that tell members to write wiki
 		// files, and a member takes its read-only mount for a fault.
 		if has("contribute") {
-			line("Your teammates can't write it: what they add arrives through contribute() in the HQ's inbox/, for you to file. Ask them for content, never to write wiki files or commit hq.")
+			line("Your teammates can't write it: what they add arrives through contribute(), a draft in the project's shared files under contributions/: file what is worth keeping in the wiki, then delete the draft. Ask them for content, never to write wiki files or commit hq.")
 			line("%s", leadReviews)
 		} else {
 			line("Your teammates can't write it: ask them for content, never to write wiki files.")
@@ -390,9 +390,9 @@ const provingTests = "Tests bound for a merge assert correct behaviour only. A t
 // leadReviews and memberReviews keep anything up for review or a decision
 // whole, in one place everyone can read.
 const (
-	leadReviews = "Anything up for review or a decision (a design, a gate review) is filed in the wiki: by its author through contribute(), or by you the moment it arrives. " +
+	leadReviews = "Anything up for review or a decision (a design, a gate review) is filed in the wiki, by you: the moment it arrives, from its author's contribute() or a message. " +
 		"To pass one on, link its entry: never retype it, and never present a summary as the full text."
-	memberReviews = "What you put up for review or a decision (a design, a gate review) goes in through contribute(): then point to the entry it files, never retype it."
+	memberReviews = "What you put up for review or a decision (a design, a gate review) goes in through contribute(), for the lead to file in the wiki: then point to that entry, never retype it."
 )
 
 // persisting says that worktrees outlive a session: a deployment resumes

@@ -35,4 +35,5 @@ epic: workflow
 - [x] server: `GET /api/desktop` ({canOpen}), `POST /api/desktop/open` ({instance} or {project, folder}); tests
 - [x] prompt: the two folders in This assignment; tests
 - [x] ui: the three buttons in the Session header, shown only with `canOpen`; client test
+- [x] contributions (the CEO, 2026-11-18): `contribute()` saves a draft in `files/shared/contributions/`, uncommitted, and still tells the lead, who files it in the wiki or drops it; the HQ's `inbox/` is gone from the starter (`AGENTS.md`, `wiki.toml`), the prompt and the specs ([Team tools](../product/architecture/team-tools.md#tools)), so `inbox/` means only the CEO's files. Existing projects keep their HQ `inbox/` and the old `AGENTS.md` wording until migrated by hand; tests
 - [ ] the CEO tries it on macOS and on Fedora: the three buttons open Finder / the file manager; inside an agent, `touch ~/foreman/projects/<id>/files/inbox/x` fails and `files/shared/x` works; the prompt (Session → prompt) names both. Then fold this card into the specs and delete it

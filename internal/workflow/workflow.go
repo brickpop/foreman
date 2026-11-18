@@ -2,7 +2,7 @@
 // Today it holds the team tools that write git and the knowledge base for an
 // agent: switch, commit, merge and abort_merge in its own worktrees, handoff
 // (a message naming a committed branch, which Foreman records) and contribute
-// (a note in the project's wiki inbox).
+// (a draft for the lead, in the project's shared files).
 // Agents can't write git themselves: each repo's .git is read-only for them
 // (wiki/product/architecture/sandboxes-and-git.md#agents-and-git).
 package workflow
@@ -40,7 +40,6 @@ type Git interface {
 	Name(ctx context.Context, dir, branch string) error
 	Prepare(ctx context.Context, repo, worktree, branch, base string) error
 	CommitAll(ctx context.Context, dir, message string, by git.Author) (string, error)
-	CommitAs(ctx context.Context, dir, message string, by git.Author, files ...string) error
 	Merge(ctx context.Context, dir, branch string, by git.Author) ([]string, error)
 	Merging(ctx context.Context, dir string) (bool, error)
 	AbortMerge(ctx context.Context, dir string) error
@@ -178,7 +177,7 @@ var definitions = []agentlink.Tool{
 		InputSchema: object(`"teammate":{"type":"string","description":"A teammate's name or id"},`+
 			`"branch":{"type":"string","description":"wt/<project>/<you>/<topic>"},`+
 			`"summary":{"type":"string","description":"The outcome: what was done, decisions, what is left open, how it was checked"}`, "teammate", "branch", "summary")},
-	{Name: "contribute", Description: "Add a finding, a proposal or a note to the project's knowledge base without writing it yourself: Foreman files it in the wiki's inbox and tells the lead.",
+	{Name: "contribute", Description: "Add a finding, a proposal or a note to the project's knowledge base without writing it yourself: Foreman saves it in the project's shared files, under contributions/, and tells the lead, who files it in the wiki.",
 		InputSchema: object(`"kind":{"type":"string","enum":["finding","proposal","note"]},`+
 			`"title":{"type":"string","description":"A short title"},`+
 			`"body":{"type":"string","description":"The contribution, in Markdown"}`, "kind", "title", "body")},
@@ -863,6 +862,10 @@ func (t tool) handoff(ctx context.Context, teammate, branch, summary string) age
 
 var kinds = []string{"finding", "proposal", "note"}
 
+// Contributions is the folder of the project's shared files that contribute
+// writes to.
+const Contributions = "contributions"
+
 func (t tool) contribute(ctx context.Context, kind, title, body string) agentlink.Result {
 	switch {
 	case !slices.Contains(kinds, kind):
@@ -874,22 +877,19 @@ func (t tool) contribute(ctx context.Context, kind, title, body string) agentlin
 	case teamtools.TooLong(body, teamtools.MaxContribution):
 		return teamtools.Refusal("too_long", "a body is at most %d characters: split it into separate contributions, one subject each", teamtools.MaxContribution)
 	}
-	hq := t.hq()
-	inbox := filepath.Join(hq.dir, "inbox")
-	if err := os.MkdirAll(inbox, 0o755); err != nil {
+	// A draft for the lead to file in the wiki or drop, so not in git: the
+	// project's shared files, which every agent reads (the CEO, 2026-11-18).
+	dir := filepath.Join(t.project.Files, home.FilesShared, Contributions)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return gitError(err)
 	}
 	content := fmt.Sprintf("---\ntype: note\nkind: %s\nauthor: %s\ndeployment: %s\n---\n\n# %s\n\n%s\n",
 		kind, t.c.Instance.AgentID, t.c.Deployment.ID, title, body)
-	file, err := create(inbox, fmt.Sprintf("%s-%s-%s", t.w.Now().Format("2006-01-02"), t.c.Instance.AgentID, slug(title)), content)
+	file, err := create(dir, fmt.Sprintf("%s-%s-%s", t.w.Now().Format("2006-01-02"), t.c.Instance.AgentID, slug(title)), content)
 	if err != nil {
 		return gitError(err)
 	}
-	rel := "inbox/" + file
-	if err := t.w.Git.CommitAs(ctx, hq.dir, "Contribution: "+title, t.author(), rel); err != nil {
-		return gitError(err)
-	}
-	path := filepath.Join(hq.dir, rel)
+	path := filepath.Join(dir, file)
 	if !t.c.Lead {
 		if _, err := t.w.Messages.Send(ctx, store.TeamMessage{DeploymentID: t.c.Deployment.ID, FromInstance: t.c.Instance.ID,
 			ToInstance: t.c.LeadInstance(), Kind: "contribute", Body: title + ", in " + path + ".", ArtifactRef: path}); err != nil {

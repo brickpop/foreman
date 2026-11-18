@@ -47,7 +47,7 @@ func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
 	repos := []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
 	config, _ := home.ParseProject(nil) // a project.toml with nothing set: the defaults
-	return home.Project{ID: id, Path: filepath.Join(dir, "hq"), Repos: repos, Config: config}, nil
+	return home.Project{ID: id, Path: filepath.Join(dir, "hq"), Files: filepath.Join(dir, "files"), Repos: repos, Config: config}, nil
 }
 
 func (c config) Sandbox(project, agent string) string {
@@ -490,14 +490,13 @@ func TestHandoffRefusals(t *testing.T) {
 	}
 }
 
-func TestContributeFilesANoteAndTellsTheLead(t *testing.T) {
+func TestContributeSavesADraftAndTellsTheLead(t *testing.T) {
 	f := newFixture(t)
-	project := filepath.Join(f.root, "ledger", "hq")
-	// The lead's unfinished edit in the same checkout stays out of the commit.
-	writeFile(t, filepath.Join(project, "board.md"), "unfinished\n")
+	hq := filepath.Join(f.root, "ledger", "hq")
+	head := f.git(hq, "rev-parse", "HEAD")
 	text := f.ok("tove", "contribute", map[string]string{"kind": "finding", "title": "Flaky settle test!", "body": "It fails 1 in 20.", "author": "mara"})
 	// The path on disk: the same for the lead in its container.
-	path := filepath.Join(project, "inbox", "2026-10-16-tove-flaky-settle-test.md")
+	path := filepath.Join(f.root, "ledger", "files", "shared", "contributions", "2026-10-16-tove-flaky-settle-test.md")
 	if text != "Filed "+path+"." {
 		t.Errorf("%q", text)
 	}
@@ -509,19 +508,23 @@ func TestContributeFilesANoteAndTellsTheLead(t *testing.T) {
 	if string(data) != want {
 		t.Errorf("file:\n%s", data)
 	}
-	if show := f.git(project, "show", "--name-only", "--format=%an|%s", "HEAD"); show != "Tove|Contribution: Flaky settle test!\n\ninbox/2026-10-16-tove-flaky-settle-test.md" {
-		t.Errorf("commit %q", show)
+	// A draft, not knowledge: the HQ is untouched, neither committed nor written.
+	if f.git(hq, "rev-parse", "HEAD") != head {
+		t.Error("the HQ got a commit")
 	}
-	if status := f.git(project, "status", "--porcelain"); !strings.Contains(status, "board.md") {
-		t.Errorf("the lead's edit was swept in: %q", status)
+	if status := f.git(hq, "status", "--porcelain"); status != "" {
+		t.Errorf("the HQ changed: %q", status)
 	}
 	if len(f.m.sent) != 1 || f.m.sent[0].ToInstance != "mara@ledger" || f.m.sent[0].Kind != "contribute" ||
 		f.m.sent[0].Body != "Flaky settle test!, in "+path+"." || f.m.sent[0].ArtifactRef != path {
 		t.Errorf("sent %+v", f.m.sent)
 	}
-	// The same title again gets its own file.
+	// The same title again gets its own file, never over the first.
 	if text := f.ok("tove", "contribute", map[string]string{"kind": "note", "title": "Flaky settle test", "body": "Again."}); !strings.HasSuffix(text, "flaky-settle-test-2.md.") {
 		t.Errorf("%q", text)
+	}
+	if data, _ := os.ReadFile(path); string(data) != want {
+		t.Errorf("the first was overwritten:\n%s", data)
 	}
 	// The lead's own contribution tells no one.
 	f.ok("mara", "contribute", map[string]string{"kind": "proposal", "title": "Use decimal", "body": "x"})
@@ -537,7 +540,7 @@ func TestContributeRefusals(t *testing.T) {
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "a\n---\nauthor: mara", "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": strings.Repeat("x", teamtools.MaxTitle+1), "body": "x"}, "too_long")
 	f.refused("tove", "contribute", map[string]string{"kind": "note", "title": "x", "body": strings.Repeat("x", teamtools.MaxContribution+1)}, "too_long")
-	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "hq", "inbox")); len(entries) != 0 {
+	if entries, _ := os.ReadDir(filepath.Join(f.root, "ledger", "files", "shared", "contributions")); len(entries) != 0 {
 		t.Errorf("a refusal filed %d notes", len(entries))
 	}
 }

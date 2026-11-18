@@ -86,6 +86,7 @@ Blocked by [Remove the forge](./archive/remove-forge.md), [One Foreman folder](.
 - A merge conflict in `projects.toml` happens only if two machines changed projects without syncing between them, which one-at-a-time rules out; when it happens it is a sync warning like any other.
 - A code repo's `remote` is read once, when it is added. A repo whose origin changes later keeps the old URL until the CEO edits `projects.toml` (or removes and adds the repo).
 - Removing a project removes its `projects.toml` entry; its HQ's remote is untouched. Bringing it back means adding it again with Clone.
+- **A clone has no submodules checked out** (`git.Clone` doesn't recurse), so a private submodule can't reach the agents from a repo Foreman cloned: [Submodules, everywhere Foreman touches a repo](./submodules-everywhere.md).
 - **A restore stopped halfway** (Foreman killed between emptying the HQ and moving the clone in) leaves the HQ empty or partial: the next start makes a new HQ over an empty folder, and the CEO restores again; `.hq-restore` is cleared by the next restore. The window is a few renames.
 - **The "A project" step** counts projects not on this machine: after a restore it is done though none is here yet.
 - **A request or a session link to a project not here** opens "No project <id>": its history stays in `state.db` (an HQ deleted by hand), its pages need its HQ.

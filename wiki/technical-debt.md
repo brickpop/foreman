@@ -98,6 +98,12 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
   - **Why:** each is rare, or a deliberate trade next to what the cards had to land.
 - **Fix:** a removed project's kept worktrees get an action in Foreman (or are pruned with it); Clean up's gaps in their card.
 
+## Submodules: known edges
+
+- **State** (2026-11-16): Foreman's clones (`repos/`) don't check submodules out, so a private one can't reach the agents from a repo Foreman cloned; renaming a repo fails while an agent's worktree of it has one checked out; a forced worktree removal can lose a commit made only inside its submodule.
+- **Why:** the operations added since [Submodules in worktrees](./backlog/submodules-in-worktrees.md) were built without submodules in their tests.
+- **Fix:** [Submodules, everywhere Foreman touches a repo](./backlog/submodules-everywhere.md).
+
 ## Projects as records: known edges
 
 - **State** (from [Projects as records](./backlog/archive/projects-as-records.md), 2026-10-20):

@@ -29,7 +29,7 @@ const field =
 type Props = { project: Project; onAdded: (p: Project) => void };
 
 export function AddRepo(props: Props) {
-  const [from, setFrom] = useState<"folder" | "clone">("folder");
+  const [from, setFrom] = useState<"clone" | "folder">("clone");
   return (
     <div className="flex flex-col gap-3">
       <Segmented
@@ -37,8 +37,8 @@ export function AddRepo(props: Props) {
         value={from}
         onChange={setFrom}
         options={[
-          { value: "folder", label: "A folder" },
           { value: "clone", label: "Clone from a URL" },
+          { value: "folder", label: "A folder" },
         ]}
       />
       {from === "folder" ? <FromFolder {...props} /> : <FromClone {...props} />}
@@ -70,7 +70,7 @@ function FromClone({ project, onAdded }: Props) {
     <div className="flex flex-col gap-3">
       <Field
         label="URL"
-        hint="Cloned with your git (your SSH keys, credential helper) into Foreman's folder, repos/ and the URL's path (me/ledger-api). A clone already there is used as it is. Its default branch is main, or the remote's when it has no main."
+        hint="Cloned with your git (your SSH keys, credential helper) into Foreman's folder, repos/ and the URL's path (me/ledger-api). Foreman reuses an existing clone there if its origin matches the URL you enter. Its default branch is main, or the remote's when it has no main."
       >
         {(input) => (
           <input

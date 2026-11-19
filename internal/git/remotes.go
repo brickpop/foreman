@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"syscall"
@@ -116,6 +119,113 @@ func (g *CLI) Origin(ctx context.Context, dir string) string {
 		return ""
 	}
 	return WithoutCredentials(strings.TrimSpace(out))
+}
+
+// MatchOrigin checks the configured fetch URL and the destinations Git would
+// use for this checkout and for a fresh clone from its parent directory.
+func (g *CLI) MatchOrigin(ctx context.Context, dir, remote string) error {
+	out, err := run(ctx, dir, "config", "--null", "--get-all", "remote.origin.url")
+	if err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && exit.ExitCode() == 1 {
+			return errors.New("has no origin")
+		}
+		return errors.New("has an unreadable origin")
+	}
+	configured := strings.TrimSuffix(out, "\x00")
+	if strings.ContainsRune(configured, '\x00') {
+		return errors.New("has multiple origin URLs: configure a single fetch URL before sharing it")
+	}
+	if configured == "" {
+		return errors.New("has no origin")
+	}
+	if originHasCredentials(configured) {
+		return errors.New("has credentials in its origin: move them to a host credential helper before sharing this checkout")
+	}
+	if WithoutCredentials(configured) != WithoutCredentials(remote) && !sameGitHubRepo(configured, remote) {
+		return errors.New("holds another repo")
+	}
+
+	// These commands expand insteadOf without contacting the remote.
+	fetch, err := run(ctx, dir, "remote", "get-url", "origin")
+	if err != nil {
+		return errors.New("has an unreadable effective origin")
+	}
+	clone, err := run(ctx, filepath.Dir(dir), "ls-remote", "--get-url", "--", remote)
+	if err != nil {
+		return errors.New("cannot verify the clone URL after Git rewrites")
+	}
+	// A clone initializes its destination before fetching. A gitdir include
+	// there can rewrite the submitted URL differently than in its parent.
+	atDestination, err := run(ctx, dir, "ls-remote", "--get-url", "--", remote)
+	if err != nil || atDestination != clone {
+		return errors.New("cannot verify the clone URL across destination-specific Git rewrites")
+	}
+	fetch = strings.TrimSuffix(fetch, "\n")
+	clone = strings.TrimSuffix(clone, "\n")
+	if fetch == configured && clone == remote {
+		return nil
+	}
+	// Relative filesystem destinations have different working directories.
+	prefix, _, colon := strings.Cut(fetch, ":")
+	relative := !filepath.IsAbs(fetch) && (!colon || strings.Contains(prefix, "/"))
+	if relative || (fetch != clone && !sameGitHubRepo(fetch, clone)) {
+		return errors.New("uses a different destination after Git URL rewrites")
+	}
+	return nil
+}
+
+func originHasCredentials(remote string) bool {
+	scheme, rest, ok := strings.Cut(remote, "://")
+	if !ok {
+		return false
+	}
+	authority, _, _ := strings.Cut(rest, "/")
+	user, _, hasUser := strings.Cut(authority, "@")
+	return hasUser && (strings.EqualFold(scheme, "https") || strings.EqualFold(scheme, "http") || strings.Contains(user, ":"))
+}
+
+func sameGitHubRepo(a, b string) bool {
+	path := githubRepoPath(a)
+	return path != "" && path == githubRepoPath(b)
+}
+
+var githubPath = regexp.MustCompile(`^[a-zA-Z0-9-]+/[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$`)
+
+// githubRepoPath recognizes the two-part paths of standard GitHub clone
+// URLs. Other servers can give the same path different meanings over
+// different transports or with different SSH users.
+func githubRepoPath(remote string) string {
+	if strings.IndexFunc(remote, func(r rune) bool { return r > 127 }) >= 0 {
+		return ""
+	}
+	var path string
+	scpHost, scpPath, _ := strings.Cut(remote, ":")
+	if host, ok := strings.CutPrefix(scpHost, "git@"); ok && strings.EqualFold(host, "github.com") {
+		path = scpPath
+	} else {
+		u, err := url.Parse(remote)
+		if err != nil || strings.ContainsAny(remote, "?#") || strings.Count(remote, "@") > 1 {
+			return ""
+		}
+		var defaultPort string
+		switch {
+		case strings.HasPrefix(remote, "https://"):
+			defaultPort = ":443"
+		case strings.HasPrefix(remote, "ssh://git@"):
+			defaultPort = ":22"
+		default:
+			return ""
+		}
+		if !strings.EqualFold(u.Host, "github.com") && !strings.EqualFold(u.Host, "github.com"+defaultPort) {
+			return ""
+		}
+		path = strings.TrimPrefix(u.EscapedPath(), "/")
+	}
+	if !githubPath.MatchString(path) || strings.Contains(path, "..") {
+		return ""
+	}
+	return strings.TrimSuffix(path, ".git")
 }
 
 // WithoutCredentials is a remote URL as it may be kept or shown: an http(s)

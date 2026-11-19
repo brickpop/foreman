@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/brickpop/foreman/internal/git"
 )
 
 // Cloning code repos (wiki/backlog/portable-projects.md): besides a folder
@@ -51,7 +49,7 @@ func (h *Home) cloneDir(remote string) (string, error) {
 
 // clone makes dir a clone of remote, unless dir holds it already: a repo
 // with root as its first commit, or, when root is "" (a repo being added),
-// remote as its origin. Anything else there is refused, never touched.
+// an origin that matches remote. Anything else there is refused, never touched.
 // undo removes what this call made.
 func (h *Home) clone(ctx context.Context, remote, dir, root string) (undo func(), err error) {
 	if exists(dir) {
@@ -62,8 +60,10 @@ func (h *Home) clone(ctx context.Context, remote, dir, root string) (undo func()
 			if _, err := h.git.Resolve(ctx, dir, root); err != nil {
 				return nil, fmt.Errorf("%w: %s holds another repo (it hasn't the first commit, %.8s): move it away, or pick a folder instead", ErrExists, dir, root)
 			}
-		case h.git.Origin(ctx, dir) != git.WithoutCredentials(remote):
-			return nil, fmt.Errorf("%w: %s holds another repo (from %s): move it away, or pick a folder instead", ErrExists, dir, h.git.Origin(ctx, dir))
+		default:
+			if err := h.git.MatchOrigin(ctx, dir, remote); err != nil {
+				return nil, fmt.Errorf("%w: %s %s. To use a separate checkout, clone into another folder and select A folder", ErrExists, dir, err)
+			}
 		}
 		return func() {}, nil
 	}

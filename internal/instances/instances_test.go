@@ -1557,6 +1557,42 @@ func (s *specs) last() runner.Spec {
 	return s.got[len(s.got)-1]
 }
 
+// Refusing a managed checkout keeps its Git config out of the new team's mounts.
+func TestCredentialBearingCloneIsNotMountedForAnotherProject(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	dir := filepath.Join(f.hm.Folder(), "repos", "agentic-wiki", "something")
+	gitRun(t, "clone", "--quiet", filepath.Join(f.root, "dev", "ledger-api"), dir)
+	const origin = "https://fixture:fake-token@github.com/agentic-wiki/something.git"
+	gitRun(t, "-C", dir, "config", "remote.origin.url", origin)
+	for _, remote := range []string{origin, "git@github.com:agentic-wiki/something"} {
+		_, err := f.hm.CloneRepo(ctx, "ledger", "Something", remote, "")
+		if !errors.Is(err, home.ErrExists) || !strings.Contains(err.Error(), "credential") || strings.Contains(err.Error(), "fake-token") {
+			t.Fatalf("reuse: %v", err)
+		}
+	}
+	rec := &specs{}
+	f.deps.Runner = rec
+	f.m = New(f.deps)
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	config, err := filepath.EvalSymlinks(filepath.Join(dir, ".git", "config"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mount := range rec.last().Mounts {
+		source, err := filepath.EvalSymlinks(mount.Source)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rel, err := filepath.Rel(source, config)
+		if err != nil || filepath.IsLocal(rel) {
+			t.Fatalf("credential-bearing Git config reachable through mount %+v", mount)
+		}
+	}
+}
+
 // An agent gets its sandbox, each repo's .git read-only at its real path
 // (which its worktree's link names, a symlinked repo folder included), and
 // the HQ at its real path: writable for the lead only, its .git

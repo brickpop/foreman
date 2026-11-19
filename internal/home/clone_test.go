@@ -107,7 +107,7 @@ func TestCloneRepo(t *testing.T) {
 	other := filepath.Join(h.Folder(), "repos", "acme", "web")
 	codeRepo(t, other)
 	served(t, root, "acme/web.git", "main")
-	if _, err := h.CloneRepo(ctx, "ledger", "web", "https://git.example.invalid/acme/web.git", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "another repo") {
+	if _, err := h.CloneRepo(ctx, "ledger", "web", "https://git.example.invalid/acme/web.git", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "no origin") {
 		t.Errorf("another repo there: %v", err)
 	}
 	if !exists(filepath.Join(other, "README.md")) {
@@ -134,6 +134,114 @@ func TestCloneRepo(t *testing.T) {
 	}
 	if _, err := h.CloneRepo(ctx, "nope", "x", url, ""); !errors.Is(err, ErrNotFound) {
 		t.Errorf("no such project: %v", err)
+	}
+}
+
+func TestCloneRepoChecksDestinationGitConfig(t *testing.T) {
+	const origin = "git@github.com:agentic-wiki/something"
+	const requested = "https://github.com/agentic-wiki/something.git"
+	h := loaded(t, nil)
+	for _, project := range []string{"first", "second"} {
+		if _, _, err := h.NewProject(ctx, project, "", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := filepath.Join(h.Folder(), "repos", "agentic-wiki", "something")
+	codeRepo(t, dir)
+	gitOut(t, dir, "config", "remote.origin.url", origin)
+	t.Setenv("GIT_ALLOW_PROTOCOL", "file")
+	if _, err := h.CloneRepo(ctx, "first", "Something", origin, ""); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "README.md"), "pending edits")
+	config := filepath.Join(t.TempDir(), "gitconfig")
+	t.Setenv("GIT_CONFIG_GLOBAL", config)
+	rules := filepath.Join(t.TempDir(), "rewrites")
+	gitOut(t, dir, "config", "--file", rules, "url.https://mirror.invalid/something.insteadOf", requested)
+	gitOut(t, dir, "config", "--file", config, "includeIf.gitdir:"+filepath.Join(dir, ".git")+".path", rules)
+
+	if _, err := h.CloneRepo(ctx, "second", "Shared", requested, ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "rewrite") {
+		t.Fatalf("destination-specific rewrite: %v", err)
+	}
+	records := readRecords(t, h)
+	if len(records["first"].Repos) != 1 || records["first"].Repos["something"].Remote != origin || len(records["second"].Repos) != 0 {
+		t.Fatal("refused reuse changed project associations")
+	}
+	if got := gitOut(t, dir, "config", "--get", "remote.origin.url"); got != origin {
+		t.Fatalf("saved origin changed to %q", got)
+	}
+	if edits, err := os.ReadFile(filepath.Join(dir, "README.md")); err != nil || string(edits) != "pending edits" {
+		t.Fatalf("checkout edits: %q, %v", edits, err)
+	}
+}
+
+func TestCloneRepoReusesGitHubOrigin(t *testing.T) {
+	for _, tc := range []struct {
+		name, origin, requested, recorded string
+		remove                            bool
+	}{
+		{"while attached", "git@github.com:agentic-wiki/something", "git@github.com:agentic-wiki/something.git", "git@github.com:agentic-wiki/something", false},
+		{"after removal", "https://github.com/agentic-wiki/something.git", "ssh://git@github.com/agentic-wiki/something", "https://github.com/agentic-wiki/something.git", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := loaded(t, nil)
+			source := served(t, t.TempDir(), "something", "main")
+			config := filepath.Join(t.TempDir(), "gitconfig")
+			rewrite := "[url \"" + source + "\"]\n\tinsteadOf = " + tc.origin + "\n"
+			writeFile(t, config, rewrite)
+			t.Setenv("GIT_CONFIG_GLOBAL", config)
+			t.Setenv("GIT_ALLOW_PROTOCOL", "file")
+
+			for _, id := range []string{"first", "second"} {
+				if _, _, err := h.NewProject(ctx, id, "", ""); err != nil {
+					t.Fatal(err)
+				}
+			}
+			p, err := h.CloneRepo(ctx, "first", "Something", tc.origin, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := filepath.Join(h.Folder(), "repos", "agentic-wiki", "something")
+			if len(p.Repos) != 1 || p.Repos[0].Path != dir {
+				t.Fatalf("first project: %+v", p.Repos)
+			}
+			writeFile(t, filepath.Join(dir, "README.md"), "local edits\n")
+			if _, err := h.CloneRepo(ctx, "second", "Shared", tc.requested, ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "rewrite") {
+				t.Fatalf("different rewrite destinations: %v", err)
+			}
+			writeFile(t, config, rewrite+"\tinsteadOf = "+tc.requested+"\n")
+			if _, err := h.CloneRepo(ctx, "second", "Other Host", "https://git.example.invalid/agentic-wiki/something.git", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "holds another repo") || strings.Contains(err.Error(), "fake-token") {
+				t.Errorf("same path on another host: %v, want credential-free refusal", err)
+			}
+			if _, err := h.CloneRepo(ctx, "first", "Duplicate", tc.requested, ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "first's repo") {
+				t.Errorf("same project: %v, want duplicate folder refusal", err)
+			}
+			if tc.remove {
+				if p, err := h.RemoveRepo(ctx, "first", "something"); err != nil || len(p.Repos) != 0 {
+					t.Fatalf("remove: %+v, %v", p.Repos, err)
+				}
+			}
+			p, err = h.CloneRepo(ctx, "second", "Shared", tc.requested, "")
+			if err != nil || len(p.Repos) != 1 || p.Repos[0].Path != dir || !p.Repos[0].Ready() {
+				t.Fatalf("reuse: %+v, %v", p.Repos, err)
+			}
+			if got, err := os.ReadFile(filepath.Join(dir, "README.md")); err != nil || string(got) != "local edits\n" {
+				t.Errorf("local edits: %q, %v", got, err)
+			}
+			if got := gitOut(t, dir, "config", "--get", "remote.origin.url"); got != tc.origin {
+				t.Errorf("saved origin changed: %q", got)
+			}
+			record := readRecords(t, h)["second"].Repos["shared"]
+			if record.RootCommit != gitOut(t, source, "rev-parse", "HEAD") || record.Remote != tc.recorded {
+				t.Errorf("shared repo record: %+v", record)
+			}
+			if !tc.remove {
+				p, _ := h.Project("first")
+				if len(p.Repos) != 1 || p.Repos[0].Path != dir || !p.Repos[0].Ready() {
+					t.Errorf("first project after reuse: %+v", p.Repos)
+				}
+			}
+		})
 	}
 }
 
@@ -166,6 +274,11 @@ default_branch = "main"
 	}
 	if p.Repos[0].ID != "api" || p.Repos[0].Path != filepath.Join(h.Folder(), "repos", "acme", "api") || !p.Repos[0].Ready() {
 		t.Errorf("%+v", p.Repos[0])
+	}
+	// Locate by cloning can reuse a checkout whose origin has changed.
+	gitOut(t, p.Repos[0].Path, "remote", "set-url", "origin", "https://another.example.invalid/acme/api.git")
+	if _, err := h.CloneMissingRepo(ctx, "ledger", "api"); err != nil {
+		t.Errorf("reuse by first commit: %v", err)
 	}
 	if _, err := h.CloneMissingRepo(ctx, "ledger", "web"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no remote") {
 		t.Errorf("no remote recorded: %v", err)

@@ -135,6 +135,8 @@ type Git interface {
 	HasBranch(ctx context.Context, dir, branch string) bool
 	// Origin is the repo's origin URL, without credentials; "" when none.
 	Origin(ctx context.Context, dir string) string
+	// MatchOrigin verifies whether a managed checkout can be shared for remote.
+	MatchOrigin(ctx context.Context, dir, remote string) error
 	// Pull brings origin's branch into dir's checkout, never over
 	// uncommitted changes, aborting a conflict (git.ErrNoRemote: no origin).
 	Pull(ctx context.Context, dir, branch string) error

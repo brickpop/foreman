@@ -29,7 +29,7 @@ export interface Node {
 /**
  * Entry is one entry, for the reader: its Markdown exactly as on disk, and
  * lookup tables for what the browser must not work out itself (the engine's
- * rules), as wikiview serves it.
+ * rules), as WikiShell serves it.
  */
 export interface Entry {
   path: string;

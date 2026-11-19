@@ -35,12 +35,12 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** Foreman's process must reach the signer: an SSH agent (`SSH_AUTH_SOCK`) or a GPG agent with a cached passphrase, or a pinentry that can ask without a terminal (pinentry-mac does). Started where it can't (a service with no agent), every Merge and every wiki save fails with git's error until the key is reachable; a GPG pinentry that waits on a terminal holds the request until it is cancelled.
 - **Fix:** a check when Foreman starts that signing works when the config asks for it, shown on the dashboard's health with git's reason, so a failing setup is found before a merge; when it is first seen.
 
-## Copies of wikiview's building blocks
+## Copies of WikiShell's building blocks
 
-- **State:** Foreman renders wikis as [wikiview](https://github.com/agentic-wiki/wikiview) does ([Wiki engine → Rendering](./product/architecture/wiki-engine.md#rendering)) and holds copies from wikiview v0.13.0: the readable-name rule (`internal/wiki/copied.go`), the board layout (`ordered` and its `knownOrder` table in `internal/wiki/board.go`) and the callout plugin (`ui/src/app/callout.ts`); `ui/src/components/Markdown.tsx` is adapted from its renderer, and `ui/src/components/Frontmatter.tsx` from its `EntryView` (2026-11-02). Heading ids, link destinations, frontmatter references and titles come from the engine (`Heading.ID`, `index.Read`'s links, `Entry.FrontmatterRefs`, `Entry.Title`, wiki v0.17.0).
-- **Why:** wikiview's Go code is under `internal/` and its UI isn't a package, so Foreman can't import either (the CEO, 2026-10-17: copy now, upstream later). wikiview ships no LICENSE file either.
-- **Impact:** a fix in wikiview doesn't reach Foreman until copied again.
-- **Fix:** wikiview exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import wikiview's building blocks](./backlog/wikiview-upstream.md).
+- **State:** Foreman renders wikis as [WikiShell](https://github.com/agentic-wiki/wiki-shell) does ([Wiki engine → Rendering](./product/architecture/wiki-engine.md#rendering)) and holds copies from WikiShell v0.13.0: the readable-name rule (`internal/wiki/copied.go`), the board layout (`ordered` and its `knownOrder` table in `internal/wiki/board.go`) and the callout plugin (`ui/src/app/callout.ts`); `ui/src/components/Markdown.tsx` is adapted from its renderer, and `ui/src/components/Frontmatter.tsx` from its `EntryView` (2026-11-02). Heading ids, link destinations, frontmatter references and titles come from the engine (`Heading.ID`, `index.Read`'s links, `Entry.FrontmatterRefs`, `Entry.Title`, wiki v0.17.0).
+- **Why:** WikiShell's Go code is under `internal/` and its UI isn't a package, so Foreman can't import either (the CEO, 2026-10-17: copy now, upstream later). WikiShell ships no LICENSE file either.
+- **Impact:** a fix in WikiShell doesn't reach Foreman until copied again.
+- **Fix:** WikiShell exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import WikiShell's building blocks](./backlog/wikishell-upstream.md).
 
 ## Old team files' `look`
 
@@ -57,14 +57,14 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
   - every entry read reads its file from disk (body, version), and finds its backlinks over the whole index;
   - reading an entry refetches the tree (its "seen" dots), so a `wiki.changed` loads the tree twice.
   - On macOS, fsnotify (kqueue) holds a file handle per watched folder and file, so a very large wiki uses as many handles, and could reach the process's open-file limit.
-- **Why:** the simplest correct design, as wikiview runs it; wikis are expected to hold hundreds of entries, not tens of thousands. Nothing has been measured yet.
+- **Why:** the simplest correct design, as WikiShell runs it; wikis are expected to hold hundreds of entries, not tens of thousands. Nothing has been measured yet.
 - **Impact:** none seen at this size; it grows linearly with the wiki, per change and per image.
-- **Fix:** measure on a large wiki first (a generated one of 5k entries). Then, as needed: an incremental refresh contributed upstream to the engine (the spec's rule), a linked-files set kept with each rebuild (wikiview keeps one) for the image check, and the tree refetched only when the dots change.
+- **Fix:** measure on a large wiki first (a generated one of 5k entries). Then, as needed: an incremental refresh contributed upstream to the engine (the spec's rule), a linked-files set kept with each rebuild (WikiShell keeps one) for the image check, and the tree refetched only when the dots change.
 
 ## Wiki reading: known edges
 
 - **State:**
-  - **Debounce window:** for up to ~200 ms after an edit, an entry's body is read fresh while its links, headings and checkbox lines come from the previous index, so they may disagree until the rebuild (wikiview has the same window).
+  - **Debounce window:** for up to ~200 ms after an edit, an entry's body is read fresh while its links, headings and checkbox lines come from the previous index, so they may disagree until the rebuild (WikiShell has the same window).
   - **A broken wiki reads as none:** a wiki whose `wiki.toml` can't be read (caught mid-write, say) is served as "no wiki" until its next change.
   - **Image symlink race:** the image route resolves symlinks and checks the result is inside the wiki before serving it; an agent with write access could swap a symlink in between. Theoretical: the window is microseconds and the lead's container already holds the wiki.
 - **Why:** each is rare or short-lived, and fixing it now costs more than it saves.

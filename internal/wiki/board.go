@@ -12,7 +12,7 @@ import (
 )
 
 // declaration is one [[tool.wikiview.board]] of wiki.toml, the keys Foreman
-// reads of wikiview's (wiki/product/features/board.md#board-declaration).
+// reads of WikiShell's (wiki/product/features/board.md#board-declaration).
 type declaration struct {
 	ID      string   `toml:"id"`
 	Path    string   `toml:"path"`
@@ -26,8 +26,8 @@ type declaration struct {
 	filters []index.PropFilter
 }
 
-// knownKeys are a board's keys: Foreman's, and wikiview's blockers, which
-// Foreman doesn't show but a wiki shared with wikiview may set.
+// knownKeys are a board's keys: Foreman's, and WikiShell's blockers, which
+// Foreman doesn't show but a wiki shared with WikiShell may set.
 var knownKeys = []string{"id", "path", "name", "where", "status", "columns", "lane", "lanes", "blockers"}
 
 // Boards are the boards declared in the project wiki's wiki.toml, with their
@@ -117,7 +117,7 @@ func declarations(idx *index.Index) ([]declaration, [][]string, error) {
 	return tool.Board, problems, nil
 }
 
-// build lays a board out as wikiview does: the declared columns in order,
+// build lays a board out as WikiShell does: the declared columns in order,
 // then every other status found, each its own column, then the cards with
 // none ("") when there are some. Lanes alike. No card is ever left out.
 func build(idx *index.Index, d declaration) Board {
@@ -159,7 +159,7 @@ func build(idx *index.Index, d declaration) Board {
 }
 
 // knownOrder is how common vocabularies read, for values no declaration
-// orders (wikiview's table): "high, low, medium" isn't a priority order.
+// orders (WikiShell's table): "high, low, medium" isn't a priority order.
 var knownOrder = map[string][]string{
 	"status":   {"backlog", "todo", "next", "in-progress", "doing", "in-review", "review", "blocked", "done", "cancelled", "archived"},
 	"priority": {"urgent", "high", "medium", "low"},

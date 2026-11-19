@@ -8,12 +8,12 @@ epic: terminal-multiplexer
 
 # Wiki reader: anchors into other entries, and frontmatter links
 
-**Why:** two gaps left when the Wiki block shipped (2026-10-17), both from wikiview's reader, which has them ([Wiki reader](../product/features/wiki-reader.md)):
+**Why:** two gaps left when the Wiki block shipped (2026-10-17), both from WikiShell's reader, which has them ([Wiki reader](../product/features/wiki-reader.md)):
 
 - A link to another entry's `#anchor` opens that entry at its top: the anchor is dropped. It should scroll to the heading, whose id the server already sends.
-- Frontmatter values that name an entry (`epic: /backlog/epics/x.md`, `blockers: [...]`) show as plain text. wikiview makes any `.md` value that resolves to an entry a link, resolved by the engine (`ResolveLink`), never by the browser.
+- Frontmatter values that name an entry (`epic: /backlog/epics/x.md`, `blockers: [...]`) show as plain text. WikiShell makes any `.md` value that resolves to an entry a link, resolved by the engine (`ResolveLink`), never by the browser.
 
 **Done when:** both work in the reader and the board's side sheet; tests cover them.
 
 - [x] cross-entry anchors: open the entry, then scroll to the heading (2026-11-05: the URL's `#`, as a repo's file; no test, the UI tests have no DOM: [UI component tests](./ui-component-tests.md))
-- [ ] frontmatter references: the server sends them resolved (as wikiview's `frontmatterRefs`), the chips link them
+- [ ] frontmatter references: the server sends them resolved (as WikiShell's `frontmatterRefs`), the chips link them

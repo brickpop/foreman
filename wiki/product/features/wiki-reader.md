@@ -36,7 +36,7 @@ Sticky (top 16px). The whole bundle at any depth: in each folder, `index.md` fir
 
 As a repo's file is shown: the entry's path in the wiki (Mono 12.5px `--tx2`, ellipsis) stays at the top of the view while it scrolls, then the entry in a panel (padding `20px 24px`), gap 14 inside. Opens `index.md` by default.
 
-No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as wikiview has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them, and a link to another entry's heading (`x.md#heading`, from the reader or a board card's sheet) opens that entry scrolled to it (the URL's `#heading`, so Back and a shared link keep it; 2026-11-05). Reloading the entry (a tick) doesn't scroll again.
+No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side, as WikiShell has, only if it ever proves needed). Headings still take the engine's ids, so `#anchor` links scroll to them, and a link to another entry's heading (`x.md#heading`, from the reader or a board card's sheet) opens that entry scrolled to it (the URL's `#heading`, so Back and a shared link keep it; 2026-11-05). Reloading the entry (a tick) doesn't scroll again.
 
 1. **[Frontmatter](#frontmatter)**, folded to one line at first. A `title` field isn't among it: it is the page's H1, above the body (the CEO, 2026-10-21: a card's body doesn't repeat it). An entry with both a `title` and a body H1 shows both.
 2. **Body** rendered from Markdown:
@@ -62,14 +62,14 @@ No "On this page" list (the CEO, 2026-10-17: removed; a heading map at the side,
 
 ## Frontmatter
 
-As wikiview shows it (its `EntryView`; the CEO, 2026-11-02, replacing the `key: value` chips): a panel above the body (`--panel`, `--line` border, radius 8, 12.5px), the same everywhere a Markdown file shows, in the reader, the board's card sheet and a repo's file ([Repos](./repos.md#a-repos-page)).
+As WikiShell shows it (its `EntryView`; the CEO, 2026-11-02, replacing the `key: value` chips): a panel above the body (`--panel`, `--line` border, radius 8, 12.5px), the same everywhere a Markdown file shows, in the reader, the board's card sheet and a repo's file ([Repos](./repos.md#a-repos-page)).
 
 - **Folded** (at first): a chevron, then one line of the values without their keys, split by ` · ` and clipped, never wrapped. Empty fields are left out; a field naming several entries shows their count (`2 blocked_by`).
 - **Open**: `Properties`, then a grid of keys (`--tx4`, never colored: color is for what can be clicked) and values. An empty field says `(nothing)`; `tags` are chips, each with its colored dot (one color per tag, from its name, the same everywhere); any other list is a chip per value; a scalar is text, clipped with its whole value as its tooltip.
 - **A value naming an entry** (a reference, as the engine reads one: it ends in `.md`, relative to the entry or from the wiki's root with a leading `/`, and an entry exists there) shows that entry's title, underlined in `--accTx`, and opens it; the value as written is its tooltip. One climbing above the wiki, or naming no entry, is plain text. A repo's file names no entries: its values are all text.
-- **Open or folded** is remembered in the browser (not per entry, not on the server): it opens as the CEO last left it. Not built from wikiview: the folded line floating the grid over the text on hover.
-- **A header that couldn't be read** (not valid YAML, or past the library's limits) gives no fields. Above the body, which still renders, the amber notice (`--attnLine` border, `--attnSoft` tint, `--attnTx` text, as every amber notice) says so: `This entry's frontmatter couldn't be read: <reason>. Fix it, then run wiki check.` The reason is the library's, as wikiview shows it. A repo's Markdown file shows the same notice, saying `This file's` instead of `This entry's`.
-- **Not shown**: the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in wikiview; the CEO, 2026-10-17) and the engine's own keys (a leading `_`). The fields are in key order: the engine keeps no file order.
+- **Open or folded** is remembered in the browser (not per entry, not on the server): it opens as the CEO last left it. Not built from WikiShell: the folded line floating the grid over the text on hover.
+- **A header that couldn't be read** (not valid YAML, or past the library's limits) gives no fields. Above the body, which still renders, the amber notice (`--attnLine` border, `--attnSoft` tint, `--attnTx` text, as every amber notice) says so: `This entry's frontmatter couldn't be read: <reason>. Fix it, then run wiki check.` The reason is the library's, as WikiShell shows it. A repo's Markdown file shows the same notice, saying `This file's` instead of `This entry's`.
+- **Not shown**: the root `index.md`'s `okf_version` (the format's bookkeeping, hidden as in WikiShell; the CEO, 2026-10-17) and the engine's own keys (a leading `_`). The fields are in key order: the engine keeps no file order.
 
 ## Behaviour
 

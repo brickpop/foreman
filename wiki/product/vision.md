@@ -73,7 +73,7 @@ Roles with default job descriptions (used by the Chief of Staff and the example 
 - Multi-user, auth, roles beyond CEO.
 - Cloning or provisioning repos from the UI.
 - An in-app diff viewer and inline review comments.
-- Wiki graph view, table views and "read later" (wikiview has graph and read later; they can be adopted later).
+- Wiki graph view, table views and "read later" (WikiShell has graph and read later; they can be adopted later).
 - Cost and token budgets per deployment.
 - Scheduling (cron-style recurring goals), standup automation beyond what a member's job description asks for.
 - Cross-deployment messaging (deliberately disallowed).

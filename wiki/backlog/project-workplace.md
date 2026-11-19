@@ -18,7 +18,7 @@ epic: workflow
 - **Session**: the deployment's page as it was, its header slimmed (no Team / Reviews / Board links, no Deployment menu: the sidebar is the way around). No team: an empty state with Deploy.
 - **Inbox** (was Reviews, now per project): the reviews needing the CEO, the project's other requests (Needs you, from Overview), what waits on the lead, the last done. A review opens inside it (`← Inbox`). Merge, Request changes and Dismiss go back to the Inbox; the Merge toast opens the session.
 - **Wiki** (was Overview): the wiki reader; the project's path and description head it (the big project header goes).
-- **Board** keeps its name (it is wikiview's `board`, one word for one or several). **Repos** (was Repositories).
+- **Board** keeps its name (it is WikiShell's `board`, one word for one or several). **Repos** (was Repositories).
 - **Deployment** (replaces Worktrees): the team on the project, its members (each opening its session), their worktrees, the work in flight and merged; Stop, and Deploy (replacing). Project settings lose their "Teams on this project" section to it.
 - **Activity**: the session's Activity panel goes; the section holds it all: the timeline on the left, the "who calls whom" map on the right filtering it, older sessions below.
 - **Dashboard**: At work goes. A card per project (its team and state; opens Session, or Wiki without a team), then a card per team.

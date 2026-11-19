@@ -4,7 +4,7 @@ import { summary, tagColor } from "../app/frontmatter";
 import { Chevron } from "./icons";
 
 // A frontmatter above its Markdown (wiki/product/features/wiki-reader.md#frontmatter),
-// as wikiview shows it (its ui/src/views/EntryView.tsx, adapted): folded, one
+// as WikiShell shows it (its ui/src/views/EntryView.tsx, adapted): folded, one
 // line of its values; open, its keys and values in a grid. For a wiki entry
 // and a repo's Markdown file alike.
 

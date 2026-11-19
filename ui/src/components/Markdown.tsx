@@ -4,7 +4,7 @@ import remarkGfm from "remark-gfm";
 import type { Entry, RepoLink } from "../api/client";
 import { remarkCallout } from "../app/callout";
 
-// Markdown, rendered in the browser the way wikiview does it (its
+// Markdown, rendered in the browser the way WikiShell does it (its
 // ui/src/markdown/Markdown.tsx, v0.13.0, adapted): a wiki entry, or a repo's
 // file. The server's rules arrive as data and are applied by lookup, never
 // re-derived: a link resolves by its href in links, a heading takes its id

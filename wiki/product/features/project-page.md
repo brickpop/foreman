@@ -26,7 +26,7 @@ The page has no header of its own: its sections are listed in the [sidebar](./ap
 
 Each path is under `/projects/<project>/`, and each section is its own route, so the URL is the view: Back, a reload and a shared link show the same section. **`/projects/<project>`** opens **Session** while a team is on the project, **Wiki** otherwise (the URL is replaced, so Back doesn't return to it). Switching projects starts each section fresh.
 
-The names: **Inbox** (was Reviews, which also took the project's other requests from Overview), **Wiki** (was Overview), **Repos** (was Repositories), **Team** (replaced Deployment, which replaced Worktrees, and Activity). **Board** keeps its name: it is wikiview's `board`, one word for one board or several (the CEO, 2026-10-31).
+The names: **Inbox** (was Reviews, which also took the project's other requests from Overview), **Wiki** (was Overview), **Repos** (was Repositories), **Team** (replaced Deployment, which replaced Worktrees, and Activity). **Board** keeps its name: it is WikiShell's `board`, one word for one board or several (the CEO, 2026-10-31).
 
 ## Layout
 

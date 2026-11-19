@@ -1,6 +1,6 @@
 import type { Blockquote, Nodes, Root } from "mdast";
 
-// Copied from wikiview v0.13.0 (ui/src/markdown/callout.ts), whose UI isn't a
+// Copied from WikiShell v0.13.0 (ui/src/markdown/callout.ts), whose UI isn't a
 // package Foreman can import (wiki/technical-debt.md).
 
 /**

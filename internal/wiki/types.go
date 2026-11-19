@@ -20,7 +20,7 @@ type Node struct {
 
 // Entry is one entry, for the reader: its Markdown exactly as on disk, and
 // lookup tables for what the browser must not work out itself (the engine's
-// rules), as wikiview serves it.
+// rules), as WikiShell serves it.
 type Entry struct {
 	Path        string  `json:"path"`
 	Title       string  `json:"title"`

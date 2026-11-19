@@ -1,8 +1,8 @@
 package wiki
 
-// Copied from wikiview v0.13.0 (internal/server/entry.go), whose Go code is
+// Copied from WikiShell v0.13.0 (internal/server/entry.go), whose Go code is
 // internal and can't be imported: the readable-name rule, presentation the
-// wiki library leaves to its callers. It goes when wikiview exports it
+// wiki library leaves to its callers. It goes when WikiShell exports it
 // (wiki/technical-debt.md).
 
 import (

@@ -318,7 +318,7 @@ func backlinks(idx *index.Index, e *index.Entry) []Backlink {
 // fields is an entry's frontmatter as the reader shows it, by key, each
 // field's values without empty ones (FieldList). Not shown: the index's own
 // keys (leading underscore), and okf_version, the format's bookkeeping on the
-// root index.md (wikiview hides it too). With idx, a value that names an
+// root index.md (WikiShell hides it too). With idx, a value that names an
 // existing entry (Entry.FrontmatterRefs) links to it, with its title; a repo
 // file's frontmatter (idx nil) is text.
 func fields(e *index.Entry, idx *index.Index) []Field {

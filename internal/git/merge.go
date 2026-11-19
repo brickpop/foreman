@@ -1,6 +1,7 @@
 package git
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"os/exec"
@@ -28,6 +29,8 @@ var (
 	// ErrBranchExists means a branch of that name is there already: nothing
 	// was changed.
 	ErrBranchExists = errors.New("git: the branch exists")
+	// ErrOtherBranch means a worktree is no longer on the branch it was read on.
+	ErrOtherBranch = errors.New("git: the worktree is on another branch")
 )
 
 // Squash puts what branch changes against target onto onto as one new commit
@@ -239,6 +242,85 @@ func (g *CLI) DeleteBranch(ctx context.Context, dir, branch, backup string) erro
 	}
 	_, err = run(ctx, dir, "update-ref", "-d", "refs/heads/"+branch, head)
 	return err
+}
+
+// Free is a worktree to free from a branch: Tree, a worktree of the repo at
+// Repo.
+type Free struct{ Repo, Tree string }
+
+// TreeError is why FreeBranch changed nothing, about one of its worktrees.
+type TreeError struct {
+	Tree string
+	Err  error
+}
+
+func (e *TreeError) Error() string { return e.Tree + ": " + e.Err.Error() }
+func (e *TreeError) Unwrap() error { return e.Err }
+
+// FreeBranch detaches each worktree (one per repo) from branch, at the commit
+// it is on (its files, index and changes not committed untouched), and
+// deletes branch in each repo, its head first kept under backup (a
+// BackupRef). All of it runs holding every repo's lock (Locked), still called
+// first, once. Nothing changes if still fails, or a worktree isn't on branch
+// (ErrOtherBranch) or is in a merge (ErrMerging), both as a TreeError. If a
+// step fails, everything done is undone: the branch restored, the worktree
+// checked out on it again, the backup removed.
+func (g *CLI) FreeBranch(ctx context.Context, frees []Free, branch, backup string, still func() error) error {
+	if !ValidBranch(ctx, branch) || !strings.HasPrefix(backup, "refs/foreman/") || len(frees) == 0 {
+		return ErrBadBranch
+	}
+	repos := make([]string, len(frees))
+	for i, f := range frees {
+		repos[i] = f.Repo
+	}
+	return g.Locked(ctx, repos, func() error {
+		if err := still(); err != nil {
+			return err
+		}
+		heads := make([]string, len(frees))
+		for i, f := range frees {
+			on, err := run(ctx, f.Tree, "branch", "--show-current")
+			switch {
+			case err != nil:
+				return &TreeError{f.Tree, err}
+			case strings.TrimSpace(on) != branch:
+				return &TreeError{f.Tree, ErrOtherBranch}
+			}
+			if merging, err := g.Merging(ctx, f.Tree); err != nil || merging {
+				return &TreeError{f.Tree, cmp.Or(err, ErrMerging)}
+			}
+			if heads[i], err = g.Resolve(ctx, f.Repo, "refs/heads/"+branch); err != nil {
+				return &TreeError{f.Tree, err}
+			}
+		}
+		// Each step done, to undo in reverse on a failure.
+		var undos []func()
+		step := func(f Free, undo func(), dir string, args ...string) error {
+			if _, err := run(ctx, dir, args...); err != nil {
+				for _, u := range slices.Backward(undos) {
+					u()
+				}
+				return &TreeError{f.Tree, err}
+			}
+			undos = append(undos, undo)
+			return nil
+		}
+		for i, f := range frees {
+			reattach := func() { _, _ = run(ctx, f.Tree, "checkout", "--quiet", branch) }
+			unbackup := func() { _, _ = run(ctx, f.Repo, "update-ref", "-d", backup) }
+			restore := func() { _, _ = run(ctx, f.Repo, "update-ref", "refs/heads/"+branch, heads[i]) }
+			if err := step(f, reattach, f.Tree, "checkout", "--quiet", "--detach"); err != nil {
+				return err
+			}
+			if err := step(f, unbackup, f.Repo, "update-ref", backup, heads[i]); err != nil {
+				return err
+			}
+			if err := step(f, restore, f.Repo, "update-ref", "-d", "refs/heads/"+branch, heads[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // diffCmd starts a `git diff` whose output is the same whatever the repo's or

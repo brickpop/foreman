@@ -22,7 +22,7 @@ type Cleanup struct {
 type Cleaned struct {
 	Agent  string `json:"agent"`
 	Repo   string `json:"repo"`
-	What   string `json:"what"`   // "worktree" or "branch"
+	What   string `json:"what"`   // "worktree", "branch", or "detached": a worktree left idle at its commit (the branch cleanup's free)
 	Branch string `json:"branch"` // the branch, or the worktree's
 	Why    string `json:"why,omitempty"`
 	// Of a worktree removed with changes not committed (CleanUp's

@@ -40,12 +40,14 @@ var atlas = home.Team{ID: "atlas", Config: home.TeamConfig{
 // and its HQ beside them. web's default branch is trunk, so every
 // test also checks that each repo's own is used.
 type config struct {
-	root string
+	root     string
+	problems map[string]string // a repo's problem, by repo id
 }
 
 func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
-	repos := []home.Repo{{ID: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {ID: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
+	repos := []home.Repo{{ID: "api", Path: filepath.Join(dir, "api"), Default: "main", Problem: c.problems["api"]},
+		{ID: "web", Path: filepath.Join(dir, "web"), Default: "trunk", Problem: c.problems["web"]}}
 	config, _ := home.ParseProject(nil) // a project.toml with nothing set: the defaults
 	return home.Project{ID: id, Path: filepath.Join(dir, "hq"), Files: filepath.Join(dir, "files"), Repos: repos, Config: config}, nil
 }
@@ -118,13 +120,15 @@ func (t *teams) Stop(_ context.Context, deployment string) error {
 }
 
 type fixture struct {
-	t      *testing.T
-	root   string
-	w      *Workflow
-	m      *messages
-	teams  *teams
-	db     *store.DB
-	events []events.Event
+	t     *testing.T
+	root  string
+	w     *Workflow
+	m     *messages
+	teams *teams
+	db    *store.DB
+	// problems gives a repo of ledger a problem, by repo id.
+	problems map[string]string
+	events   []events.Event
 }
 
 // newFixture: project ledger with code repos api and web and the project
@@ -167,8 +171,8 @@ func newFixture(t *testing.T) *fixture {
 	if _, err := db.Deployments().Deploy(ctx, "atlas", "ledger"); err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{t: t, root: root, m: m, db: db, teams: &teams{running: map[string]bool{"atlas@ledger": true}}}
-	f.w = New(Deps{Git: g, Config: config{root}, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
+	f := &fixture{t: t, root: root, m: m, db: db, teams: &teams{running: map[string]bool{"atlas@ledger": true}}, problems: map[string]string{}}
+	f.w = New(Deps{Git: g, Config: config{root, f.problems}, Messages: m, Teams: f.teams, Now: now, WorkItems: db.WorkItems(),
 		MergeRequests: db.MergeRequests(), Wiki: entries{"backlog/led-44.md": "Export invoices"}, Actions: db.Actions(), Requests: db.Requests(),
 		Reviews: db.Reviews(), ReviewComments: db.ReviewComments(),
 		Publish: func(e events.Event) { f.events = append(f.events, e) }})

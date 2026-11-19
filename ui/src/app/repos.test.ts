@@ -6,6 +6,7 @@ import {
   branchOwner,
   branchPlaces,
   bytes,
+  cleanupDone,
   cleanupGroups,
   cleanupPick,
   cleanupSections,
@@ -14,7 +15,7 @@ import {
   folderPage,
   graph,
   matching,
-  pickKey,
+  pickedBranches,
   placeLine,
   readmeOf,
   reposWith,
@@ -322,7 +323,12 @@ describe("cleanupGroups", () => {
     stays?: string,
     stray?: string,
     repo = "api",
-  ) => ({ repo, branch, agents, state, legacy: false, stays, stray });
+    free?: string,
+  ) => ({ repo, branch, agents, state, legacy: false, stays, stray, free });
+  // An inactive agent's branch, free in each repo it has it checked out.
+  const free = (branch: string, state: string, repo: string, agent = "ana") =>
+    b(branch, true, state, undefined, undefined, repo, agent);
+  const keys = (rows: { key: string }[]) => rows.map((r) => r.key);
   const list = [
     b("feature/done", false, "merged"),
     b("feature/done", false, "merged", undefined, undefined, "web"),
@@ -333,6 +339,9 @@ describe("cleanupGroups", () => {
     b("wt/p/tove/wip", true, "unmerged"),
     b("wt/p/tove/main", true, "merged", "checked out by tove"),
     b("release/2", false, "merged", "an open review merges into it"),
+    free("wt/p/ana/done", "merged", "api"),
+    free("wt/p/ana/done", "merged", "web"),
+    free("wt/p/ana/old", "superseded", "api"),
     b(
       "wt/leady/doc",
       true,
@@ -341,18 +350,36 @@ describe("cleanupGroups", () => {
       "/old/agents/leady/api",
     ),
   ];
-  it("puts what loses nothing first (the agents' then the CEO's), then unmerged work, then strays; those that stay apart", () => {
+  it("puts what loses nothing first (the agents' then the CEO's), then inactive agents' branches, unmerged work, strays; those that stay apart", () => {
     const { groups, staying } = cleanupGroups(list);
-    expect(groups.map((g) => [g.key, g.on, g.branches.map(pickKey)])).toEqual([
+    expect(groups.map((g) => [g.key, g.on, keys(g.rows)])).toEqual([
       ["agents-merged", true, ["api:wt/p/tove/done", "api:wt/tove/old"]],
       ["agents-superseded", true, ["api:wt/p/tove/draft"]],
       ["yours-merged", true, ["api:feature/done", "web:feature/done"]],
       ["yours-superseded", true, ["api:feature/base"]],
+      // Nothing is freed unasked: off at first, one row for every repo ana has it in.
+      ["free-merged", false, ["ana:wt/p/ana/done"]],
+      ["free-superseded", false, ["ana:wt/p/ana/old"]],
       ["unmerged", false, ["api:wt/p/tove/wip"]],
       // In a stray worktree, merged or not: its worktree goes too, so never ticked at first.
       ["stray", false, ["api:wt/leady/doc"]],
     ]);
-    expect(staying.map(pickKey)).toEqual(["api:wt/p/tove/main", "api:release/2"]);
+    expect(keys(staying)).toEqual(["api:wt/p/tove/main", "api:release/2"]);
+  });
+  it("sends a free row as every repo it stands for, and other rows as their own", () => {
+    const rows = cleanupGroups(list).groups.flatMap((g) => g.rows);
+    expect(pickedBranches(rows, new Set(["ana:wt/p/ana/done", "api:feature/base"]))).toEqual([
+      { repo: "api", branch: "feature/base" },
+      { repo: "api", branch: "wt/p/ana/done" },
+      { repo: "web", branch: "wt/p/ana/done" },
+    ]);
+  });
+  it("keeps two agents' frees of one branch name apart", () => {
+    const rows = cleanupGroups([
+      free("wt/p/x/main", "merged", "api", "ana"),
+      free("wt/p/x/main", "merged", "web", "ivo"),
+    ]).groups.flatMap((g) => g.rows);
+    expect(keys(rows)).toEqual(["ana:wt/p/x/main", "ivo:wt/p/x/main"]);
   });
   it("follows the sections' order, folding the ones that may lose work", () => {
     const order = cleanupSections.map((s) => s.key);
@@ -379,5 +406,53 @@ describe("cleanupGroups", () => {
       "yours-merged",
     ]);
     expect(cleanupGroups([])).toEqual({ groups: [], staying: [] });
+  });
+});
+
+describe("cleanupDone", () => {
+  const c = (what: string, repo: string, branch: string, agent = "", why = "") => ({
+    agent,
+    repo,
+    what,
+    branch,
+    why,
+  });
+  it("counts the branches only, and says which worktrees went idle, by agent, repos as they show", () => {
+    const done = cleanupDone(
+      {
+        removed: [
+          c("detached", "api", "wt/p/tove/x", "tove"),
+          c("branch", "api", "wt/p/tove/x"),
+          c("detached", "web", "wt/p/tove/x", "tove"),
+          c("branch", "web", "wt/p/tove/x"),
+          c("detached", "api", "wt/p/ana/y", "ana"),
+          c("branch", "api", "wt/p/ana/y"),
+          c("worktree", "api", "wt/leady/doc"),
+          c("branch", "api", "wt/leady/doc"),
+        ],
+        kept: [],
+      },
+      readable,
+    );
+    expect(done.title).toBe("4 branches deleted");
+    expect(done.body).toBe(
+      "Left idle at the same commit: tove's Api, Web worktrees; ana's Api worktree.\nForeman keeps a copy of each for 30 days.",
+    );
+  });
+  it("lists what was kept and why, the 30-day copy last", () => {
+    const done = cleanupDone(
+      {
+        removed: [c("branch", "api", "feature/done")],
+        kept: [
+          c("branch", "api", "wt/p/tove/x", "", "tove started meanwhile"),
+          c("branch", "web", "wt/p/tove/x", "", "tove started meanwhile"),
+        ],
+      },
+      readable,
+    );
+    expect(done.title).toBe("1 branch deleted");
+    expect(done.body).toBe(
+      "Kept: Api wt/p/tove/x (tove started meanwhile), Web wt/p/tove/x (tove started meanwhile).\nForeman keeps a copy of each for 30 days.",
+    );
   });
 });

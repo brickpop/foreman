@@ -1,25 +1,27 @@
 import { useState } from "react";
-import type { CleanupBranch } from "../api/client";
 import { plural } from "../app/model";
 import { useCleanupBranches, useDeleteBranches, useRepoName } from "../app/queries";
 import {
   type CleanupGroup,
+  type CleanupRow,
   type CleanupSection,
+  cleanupDone,
   cleanupGroups,
   cleanupPick,
   cleanupSections,
-  pickKey,
+  pickedBranches,
 } from "../app/repos";
 import { Chevron } from "./icons";
 import { Modal } from "./Overlays";
-import { RepoName } from "./RepoName";
 import { useToast } from "./Toasts";
 import { Button, Empty, Spinner } from "./ui";
 
 // A project's branch cleanup (wiki/product/features/repos.md#branch-cleanup): the branches of
 // all its code repos in groups, the safest to delete first, each ticked or unticked at once; the
-// merged and superseded ones (the agents', then the CEO's) ticked at first. One that can't go is
-// listed apart, with why. Foreman keeps a copy of each deleted branch for 30 days.
+// merged and superseded ones (the agents', then the CEO's) ticked at first. A branch an inactive
+// agent has checked out is one row for all its repos: picked, its worktrees are detached at the
+// same commit first. One that can't go is listed apart, with why. Foreman keeps a copy of each
+// deleted branch for 30 days.
 
 export function BranchCleanup({ project }: { project: string }) {
   const [open, setOpen] = useState(false);
@@ -48,26 +50,22 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
     }
     setTicked(next);
   };
+  // Each row picked counts one branch per repo it stands for, as the server counts them.
+  const picked = pickedBranches(
+    groups.flatMap((g) => g.rows),
+    pick,
+  );
   const run = () =>
-    remove.mutate(
-      (branches.data ?? [])
-        .filter((b) => pick.has(pickKey(b)))
-        .map(({ repo, branch }) => ({ repo, branch })),
-      {
-        onSuccess: (done) => {
-          toast({
-            title: `${plural(done.removed.length, "branch", "branches")} deleted`,
-            body:
-              done.kept.length > 0
-                ? `Kept: ${done.kept.map((k) => `${repoName.name(k.repo)} ${k.branch} (${k.why})`).join(", ")}.`
-                : "Foreman keeps a copy of each for 30 days.",
-            color: done.kept.length > 0 ? "var(--attn)" : "var(--ok)",
-          });
-          onClose();
-        },
-        onError: (e) => toast({ title: "Not deleted", body: e.message, color: "var(--err)" }),
+    remove.mutate(picked, {
+      onSuccess: (done) => {
+        toast({
+          ...cleanupDone(done, repoName.name),
+          color: done.kept.length > 0 ? "var(--attn)" : "var(--ok)",
+        });
+        onClose();
       },
-    );
+      onError: (e) => toast({ title: "Not deleted", body: e.message, color: "var(--err)" }),
+    });
   return (
     <Modal open onClose={onClose} title="Clean up branches" width={640}>
       <div className="flex flex-col gap-4">
@@ -99,8 +97,8 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
               <div className="flex flex-col gap-1">
                 <h3 className="m-0 text-[13px] font-semibold text-tx2">Staying</h3>
                 <div className="flex flex-col rounded-lg border border-line">
-                  {staying.map((b) => (
-                    <Row key={pickKey(b)} project={project} b={b} />
+                  {staying.map((r) => (
+                    <Row key={r.key} project={project} row={r} />
                   ))}
                 </div>
               </div>
@@ -109,8 +107,13 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
         )}
         <div className="flex justify-end gap-2">
           <Button onClick={onClose}>Cancel</Button>
-          <Button variant="danger" disabled={pick.size === 0} busy={remove.isPending} onClick={run}>
-            {remove.isPending ? "Deleting" : "Delete"} {plural(pick.size, "branch", "branches")}
+          <Button
+            variant="danger"
+            disabled={picked.length === 0}
+            busy={remove.isPending}
+            onClick={run}
+          >
+            {remove.isPending ? "Deleting" : "Delete"} {plural(picked.length, "branch", "branches")}
           </Button>
         </div>
       </div>
@@ -135,7 +138,7 @@ function Section({
 }) {
   const [open, setOpen] = useState(!folded);
   if (groups.length === 0) return null;
-  const names = groups.flatMap((g) => g.branches.map(pickKey));
+  const names = groups.flatMap((g) => g.rows.map((r) => r.key));
   const ticked = names.filter((n) => pick.has(n)).length;
   return (
     <div className="flex flex-col gap-1">
@@ -155,7 +158,7 @@ function Section({
       {open && (
         <div className="flex flex-col rounded-lg border border-line">
           {groups.map((g) => {
-            const names = g.branches.map(pickKey);
+            const names = g.rows.map((r) => r.key);
             const count = names.filter((n) => pick.has(n)).length;
             return (
               <div key={g.key} className="flex flex-col border-b border-line last:border-b-0">
@@ -172,13 +175,13 @@ function Section({
                   <span className="text-tx3">({names.length})</span>
                   <span className="ml-auto text-[12px] text-tx3">{g.hint}</span>
                 </label>
-                {g.branches.map((b) => (
+                {g.rows.map((r) => (
                   <Row
-                    key={pickKey(b)}
+                    key={r.key}
                     project={project}
-                    b={b}
-                    on={pick.has(pickKey(b))}
-                    onTick={(on) => onTick([pickKey(b)], on)}
+                    row={r}
+                    on={pick.has(r.key)}
+                    onTick={(on) => onTick([r.key], on)}
                   />
                 ))}
               </div>
@@ -190,31 +193,42 @@ function Section({
   );
 }
 
-/** One branch: ticked or not, or with why it stays (no checkbox then). */
+/** One row: its repos and branch, ticked or not, or with why it stays (no checkbox then). An
+ * inactive agent's branch names whose worktrees go idle. */
 function Row({
   project,
-  b,
+  row: { branch: b, picks },
   on = false,
   onTick,
 }: {
   project: string;
-  b: CleanupBranch;
+  row: CleanupRow;
   on?: boolean;
   onTick?: (on: boolean) => void;
 }) {
+  const repoName = useRepoName(project);
   const by = b.supersededBy ?? [];
+  const repos = picks.map((p) => repoName.name(p.repo));
   // A label only around a checkbox: a staying row has none.
   const Line = onTick ? "label" : "div";
   return (
     <Line
       className={`flex items-center gap-2.5 border-t border-line py-1.5 pr-3 first:border-t-0 ${onTick ? "pl-8 text-tx2 hover:bg-hover" : "pl-3 text-tx4"}`}
     >
-      {onTick && <input type="checkbox" checked={on} onChange={(e) => onTick(e.target.checked)} />}
-      <RepoName
-        project={project}
-        id={b.repo}
+      {onTick && (
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => onTick(e.target.checked)}
+          className="shrink-0"
+        />
+      )}
+      <span
         className="max-w-[30%] shrink-0 truncate text-[12px] text-tx4"
-      />
+        title={picks.map((p) => repoName.title(p.repo)).join(", ")}
+      >
+        {repos.length > 2 ? `${repos[0]} +${repos.length - 1}` : repos.join(", ")}
+      </span>
       <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]" title={b.branch}>
         {b.branch}
       </span>
@@ -234,6 +248,11 @@ function Row({
             {by.length > 1 && ` +${by.length - 1}`}
           </span>
         )
+      )}
+      {b.free && (
+        <span className="min-w-0 shrink truncate text-[12px] text-tx3" title={b.free}>
+          {b.free}'s {repos.length === 1 ? "worktree" : "worktrees"}
+        </span>
       )}
     </Line>
   );

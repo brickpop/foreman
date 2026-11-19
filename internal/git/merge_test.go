@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -598,5 +599,162 @@ func TestSquashOntoALanding(t *testing.T) {
 	}
 	if err := g.Squash(ctx, dir, "main", "-x", "lead/atlas/x", head, "x"); !errors.Is(err, ErrBadBranch) {
 		t.Errorf("a bad landing: %v", err)
+	}
+}
+
+// freeFixture is two repos, each with a worktree on branch, one commit ahead
+// of main, holding a staged and an unstaged change.
+func freeFixture(t *testing.T, branch string) (*CLI, []Free) {
+	t.Helper()
+	g := New()
+	var frees []Free
+	for _, name := range []string{"api", "web"} {
+		dir := repo(t)
+		write(t, filepath.Join(dir, "README"), name+"\n")
+		if err := g.Commit(ctx, dir, "first", "README"); err != nil {
+			t.Fatal(err)
+		}
+		tree := filepath.Join(t.TempDir(), name)
+		mustRun(t, dir, "worktree", "add", "-q", "-b", branch, tree)
+		write(t, filepath.Join(tree, "done.go"), "package done\n")
+		mustRun(t, tree, "add", "done.go")
+		mustRun(t, tree, "commit", "-q", "-m", "done")
+		write(t, filepath.Join(tree, "staged.md"), "staged\n")
+		mustRun(t, tree, "add", "staged.md")
+		write(t, filepath.Join(tree, "README"), "edited\n")
+		frees = append(frees, Free{Repo: dir, Tree: tree})
+	}
+	return g, frees
+}
+
+// FreeBranch detaches every worktree at the commit it is on, its changes
+// kept, and deletes the branch in every repo, backed up.
+func TestFreeBranch(t *testing.T) {
+	const branch = "wt/ledger/tove/x"
+	g, frees := freeFixture(t, branch)
+	heads := map[string]string{}
+	for _, f := range frees {
+		heads[f.Tree] = mustRun(t, f.Tree, "rev-parse", "HEAD")
+	}
+	backup := BackupRef("cleaned", time.Now(), branch)
+	stillCalls := 0
+	if err := g.FreeBranch(ctx, frees, branch, backup, func() error { stillCalls++; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if stillCalls != 1 {
+		t.Errorf("still called %d times", stillCalls)
+	}
+	for _, f := range frees {
+		if on := mustRun(t, f.Tree, "branch", "--show-current"); on != "" {
+			t.Errorf("%s still on %q", f.Tree, on)
+		}
+		if head := mustRun(t, f.Tree, "rev-parse", "HEAD"); head != heads[f.Tree] {
+			t.Errorf("%s moved to %s", f.Tree, head)
+		}
+		if status := mustRun(t, f.Tree, "status", "--porcelain"); status != "M README\nA  staged.md" {
+			t.Errorf("%s changes: %q", f.Tree, status)
+		}
+		if g.HasBranch(ctx, f.Repo, branch) {
+			t.Errorf("%s still has the branch", f.Repo)
+		}
+		if kept := mustRun(t, f.Repo, "rev-parse", backup); kept != heads[f.Tree] {
+			t.Errorf("%s backup at %s", f.Repo, kept)
+		}
+	}
+}
+
+// unchanged checks nothing a refused or undone FreeBranch touched changed.
+func unchanged(t *testing.T, g *CLI, frees []Free, branch string, heads map[string]string) {
+	t.Helper()
+	for _, f := range frees {
+		if on := mustRun(t, f.Tree, "branch", "--show-current"); on != heads[f.Tree+":on"] {
+			t.Errorf("%s on %q", f.Tree, on)
+		}
+		if head := mustRun(t, f.Repo, "rev-parse", "refs/heads/"+branch); head != heads[f.Repo] {
+			t.Errorf("%s: the branch at %s", f.Repo, head)
+		}
+		if refs := mustRun(t, f.Repo, "for-each-ref", "--format=%(refname)", "refs/foreman/cleaned/"); refs != "" {
+			t.Errorf("%s: a backup left: %q", f.Repo, refs)
+		}
+		if status := mustRun(t, f.Tree, "status", "--porcelain"); status != heads[f.Tree+":status"] {
+			t.Errorf("%s changes: %q, were %q", f.Tree, status, heads[f.Tree+":status"])
+		}
+	}
+}
+
+// Refused, nothing changes: still says no, a worktree on another branch, a
+// merge under way. A failure in the second repo undoes the first.
+func TestFreeBranchChangesNothingWhenRefused(t *testing.T) {
+	const branch = "wt/ledger/tove/x"
+	stillNo := errors.New("tove started meanwhile")
+	for _, tc := range []struct {
+		name  string
+		setup func(t *testing.T, frees []Free)
+		still error
+		want  error
+	}{
+		{"still says no", func(*testing.T, []Free) {}, stillNo, stillNo},
+		{"on another branch", func(t *testing.T, frees []Free) {
+			mustRun(t, frees[1].Tree, "checkout", "-q", "-b", "wt/ledger/tove/y")
+		}, nil, ErrOtherBranch},
+		{"a merge under way", func(t *testing.T, frees []Free) {
+			other := filepath.Join(t.TempDir(), "other")
+			mustRun(t, frees[1].Repo, "worktree", "add", "-q", "-b", "side", other, "main")
+			write(t, filepath.Join(other, "done.go"), "package other\n")
+			mustRun(t, other, "add", "done.go")
+			mustRun(t, other, "commit", "-q", "-m", "other")
+			mustRun(t, frees[1].Tree, "stash", "-q")
+			if _, err := run(ctx, frees[1].Tree, "-c", "user.name=t", "-c", "user.email=t@t", "merge", "side"); err == nil {
+				t.Fatal("the merge didn't conflict")
+			}
+		}, nil, ErrMerging},
+		{"the second repo fails", func(t *testing.T, frees []Free) {
+			// A ref where the backup's would go: update-ref fails there.
+			mustRun(t, frees[1].Repo, "update-ref", "refs/foreman/cleaned/x/y", "main")
+		}, nil, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g, frees := freeFixture(t, branch)
+			tc.setup(t, frees)
+			heads := map[string]string{}
+			for _, f := range frees {
+				heads[f.Repo] = mustRun(t, f.Repo, "rev-parse", "refs/heads/"+branch)
+				heads[f.Tree+":on"] = mustRun(t, f.Tree, "branch", "--show-current")
+				heads[f.Tree+":status"] = mustRun(t, f.Tree, "status", "--porcelain")
+			}
+			err := g.FreeBranch(ctx, frees, branch, "refs/foreman/cleaned/x", func() error { return tc.still })
+			if err == nil || (tc.want != nil && !errors.Is(err, tc.want)) {
+				t.Fatalf("%v, want %v", err, tc.want)
+			}
+			if tc.name == "the second repo fails" {
+				mustRun(t, frees[1].Repo, "update-ref", "-d", "refs/foreman/cleaned/x/y")
+			}
+			unchanged(t, g, frees, branch, heads)
+		})
+	}
+}
+
+// Two callers naming the same repos in opposite orders never wait on each
+// other in a circle.
+func TestLockedInAnyOrder(t *testing.T) {
+	g := New()
+	a, b := repo(t), repo(t)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		var wg sync.WaitGroup
+		for i := range 50 {
+			repos := []string{a, b}
+			if i%2 == 1 {
+				repos = []string{b, a}
+			}
+			wg.Go(func() { _ = g.Locked(ctx, repos, func() error { return nil }) })
+		}
+		wg.Wait()
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("deadlocked")
 	}
 }

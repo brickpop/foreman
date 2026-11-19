@@ -51,6 +51,17 @@ const (
 	Stopped  = "stopped"
 )
 
+// AtWork says whether an instance of that status is at work: up, or on its
+// way up (queued, starting). Asleep (never started too) and stopped are not.
+// The one place a status is read as at work or not.
+func AtWork(status string) bool {
+	switch status {
+	case Queued, Starting, Running, Idle, Awaiting:
+		return true
+	}
+	return false
+}
+
 // Git is what instances need of the Git block: a worktree per code repo,
 // with its submodules.
 type Git interface {

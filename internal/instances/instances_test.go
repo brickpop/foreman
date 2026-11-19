@@ -2336,3 +2336,61 @@ func TestHeadline(t *testing.T) {
 		t.Errorf("cut to %d characters", utf8.RuneCountInString(title))
 	}
 }
+
+func TestAtWork(t *testing.T) {
+	for status, want := range map[string]bool{
+		Queued: true, Starting: true, Running: true, Idle: true, Awaiting: true,
+		Asleep: false, Stopped: false, "": false,
+	} {
+		if AtWork(status) != want {
+			t.Errorf("AtWork(%q) = %v", status, !want)
+		}
+	}
+}
+
+// preparing records each instance's status as the store holds it when its
+// worktree is prepared.
+type preparing struct {
+	Git
+	db   *store.DB
+	mu   sync.Mutex
+	seen map[string]string
+}
+
+func (p *preparing) Prepare(ctx context.Context, repo, worktree, branch, base string) error {
+	id := filepath.Base(filepath.Dir(worktree)) + "@ledger"
+	inst, _ := p.db.Instances().Get(ctx, id)
+	p.mu.Lock()
+	p.seen[id] = inst.Status
+	p.mu.Unlock()
+	return p.Git.Prepare(ctx, repo, worktree, branch, base)
+}
+
+// A start (the lead's, on deploy) and a wake (a teammate's) set the status in
+// the store before a worktree is prepared: the branch cleanup, holding the
+// repo's lock, sees the agent at work, or the start finds the worktree freed.
+func TestAStartIsAtWorkBeforeItsWorktreesArePrepared(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	p := &preparing{Git: f.deps.Git, db: f.db, seen: map[string]string{}}
+	f.deps.Git = p
+	f.m = New(f.deps)
+	api := filepath.Join(f.root, "dev", "ledger-api")
+	for _, agent := range []string{"mara", "tove"} {
+		gitRun(t, "-C", api, "worktree", "add", "--quiet", "--detach", filepath.Join(f.hm.Sandbox("ledger", agent), "ledger-api"))
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	if err := f.m.Wake(ctx, "tove@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("tove@ledger", Running)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, id := range []string{"mara@ledger", "tove@ledger"} {
+		if !AtWork(p.seen[id]) {
+			t.Errorf("%s prepared while %q", id, p.seen[id])
+		}
+	}
+}

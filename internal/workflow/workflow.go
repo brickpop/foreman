@@ -53,6 +53,7 @@ type Git interface {
 	MoveBranch(ctx context.Context, dir, branch, from, to string) error
 	DropBranch(ctx context.Context, dir, branch, backup, def string) error
 	DeleteBranch(ctx context.Context, dir, branch, backup string) error
+	FreeBranch(ctx context.Context, frees []git.Free, branch, backup string, still func() error) error
 	Discard(ctx context.Context, worktree, backup string) (bool, error)
 	Freshen(ctx context.Context, worktree, def string) (bool, error)
 	Detached(ctx context.Context, dir string) ([]string, error)

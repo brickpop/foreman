@@ -18,7 +18,7 @@ export interface Cleanup {
 export interface Cleaned {
   agent: string;
   repo: string;
-  what: string; // "worktree" or "branch"
+  what: string; // "worktree", "branch", or "detached": a worktree left idle at its commit (the branch cleanup's free)
   branch: string; // the branch, or the worktree's
   why?: string;
   /**
@@ -81,6 +81,13 @@ export interface CleanupBranch {
    * removed first, unless it holds changes not committed.
    */
   stray?: string;
+  /**
+   * Free is the agent of the project, not at work, whose worktree has it
+   * checked out: picked with its siblings (the rows of the same agent and
+   * branch in other repos), each worktree is detached first, at the same
+   * commit (freeable). Set only when Stays is "".
+   */
+  free?: string;
 }
 /**
  * BranchPick is a branch of one of a project's code repos, picked to delete.

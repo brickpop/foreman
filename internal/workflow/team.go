@@ -8,6 +8,7 @@ import (
 
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/home"
+	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/prompt"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
@@ -63,10 +64,10 @@ func (t tool) team(ctx context.Context) agentlink.Result {
 // stopped it.
 func (w *Workflow) status(inst store.Instance) string {
 	s := inst.Status
-	if inst.Status == "stopped" && inst.StopReason != "" {
+	if inst.Status == instances.Stopped && inst.StopReason != "" {
 		s += " (" + inst.StopReason + ")"
 	}
-	if inst.Doing != nil && inst.Status != "stopped" && inst.Status != "asleep" {
+	if inst.Doing != nil && inst.Status != instances.Stopped && inst.Status != instances.Asleep {
 		s += ", last report " + ago(w.Now().Sub(inst.Doing.At))
 	}
 	return s + "."

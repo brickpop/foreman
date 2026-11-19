@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/brickpop/foreman/internal/agentlink"
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/home"
+	"github.com/brickpop/foreman/internal/instances"
 	"github.com/brickpop/foreman/internal/store"
 	"github.com/brickpop/foreman/internal/teamtools"
 )
@@ -56,6 +58,13 @@ type CleanupBranch struct {
 	// project's agent's, not the CEO's checkout): picked, that worktree is
 	// removed first, unless it holds changes not committed.
 	Stray string `json:"stray,omitempty"`
+	// Free is the agent of the project, not at work, whose worktree has it
+	// checked out: picked with its siblings (the rows of the same agent and
+	// branch in other repos), each worktree is detached first, at the same
+	// commit (freeable). Set only when Stays is "".
+	Free string `json:"free,omitempty"`
+
+	agent, tree, reviewed string // the project's agent that has it checked out, where, and what review keeps it
 }
 
 // standing is where branch's work stands (Merged, Superseded, Unmerged), with
@@ -329,7 +338,105 @@ func (w *Workflow) CleanupBranches(ctx context.Context, projectID string) ([]Cle
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
-	return append([]CleanupBranch{}, slices.Concat(lists...)...), nil
+	list := append([]CleanupBranch{}, slices.Concat(lists...)...)
+	return list, w.freeable(ctx, p, list)
+}
+
+// freeable sets, for each branch an agent of the project has checked out,
+// Free when the cleanup can free it, else Stays with why not: the agent is at
+// work, or in one of the repos where it has the branch checked out (its
+// siblings, in the project's order) the repo has a problem, the branch isn't
+// merged nor superseded, a review keeps it, or a merge is under way.
+func (w *Workflow) freeable(ctx context.Context, p home.Project, list []CleanupBranch) error {
+	for i := range list {
+		if list[i].agent == "" || list[i].Free != "" || list[i].Stays != "" {
+			continue // not the project's agent's, or its group done
+		}
+		agent, branch := list[i].agent, list[i].Branch
+		group := map[string]*CleanupBranch{}
+		for j := range list {
+			if list[j].agent == agent && list[j].Branch == branch {
+				group[list[j].Repo] = &list[j]
+			}
+		}
+		why, err := w.whyNotFree(ctx, p, agent, branch, group)
+		if err != nil {
+			return err
+		}
+		for _, row := range group {
+			row.Free, row.Stays = agent, ""
+			if why != "" {
+				row.Free, row.Stays = "", "checked out by "+agent+", "+why
+			}
+		}
+	}
+	return nil
+}
+
+func (w *Workflow) whyNotFree(ctx context.Context, p home.Project, agent, branch string, group map[string]*CleanupBranch) (string, error) {
+	status, at, err := w.atWork(ctx, p.ID, agent)
+	switch {
+	case err != nil:
+		return "", err
+	case at:
+		return "who is " + status, nil
+	}
+	for _, r := range p.Repos {
+		row, ok := group[r.ID]
+		switch {
+		case !r.Ready():
+			if w.holds(ctx, p, agent, r, branch) {
+				return r.ID + " has a problem", nil
+			}
+		case !ok:
+		case row.State != Merged && row.State != Superseded:
+			return "not merged in " + r.ID, nil
+		case row.reviewed != "":
+			return "a review keeps it in " + r.ID, nil
+		default:
+			merging, err := w.Git.Merging(ctx, row.tree)
+			if err != nil {
+				return "", err
+			}
+			if merging {
+				return "a merge under way in " + r.ID, nil
+			}
+		}
+	}
+	return "", nil
+}
+
+// projectAgent says whether checkedOut named an agent of the project itself
+// (tove, not tove@suite, you, or a stray worktree).
+func projectAgent(who string) bool {
+	return who != "" && who != "you" && !strings.Contains(who, "@")
+}
+
+// atWork is the status of the agent's instance on the project, and whether it
+// is at work (instances.AtWork): "" and false when no active deployment of
+// the project has it.
+func (w *Workflow) atWork(ctx context.Context, project, agent string) (string, bool, error) {
+	insts, err := w.Teams.List(ctx)
+	if err != nil {
+		return "", false, err
+	}
+	for _, inst := range insts {
+		if inst.ID == agent+"@"+project {
+			return inst.Status, instances.AtWork(inst.Status), nil
+		}
+	}
+	return "", false, nil
+}
+
+// holds says whether the agent's worktree of r, a repo with a problem, may
+// have branch checked out: on it, or unreadable (its repo missing).
+func (w *Workflow) holds(ctx context.Context, p home.Project, agent string, r home.Repo, branch string) bool {
+	dir := filepath.Join(w.Config.Sandbox(p.ID, agent), r.ID)
+	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
+		return false
+	}
+	on, err := w.Git.Branch(ctx, dir)
+	return err != nil || on == branch
 }
 
 func (w *Workflow) cleanupIn(ctx context.Context, p home.Project, r home.Repo) ([]CleanupBranch, error) {
@@ -348,9 +455,15 @@ func (w *Workflow) cleanupIn(ctx context.Context, p home.Project, r home.Repo) (
 		if why != "" {
 			continue
 		}
-		_, stray := w.checkedOut(b, name)
-		list = append(list, CleanupBranch{Repo: r.ID, Branch: name, Agents: git.AgentBranch(name), State: state,
-			SupersededBy: by, Legacy: legacy, Stays: w.stays(b, name), Stray: stray})
+		who, stray := w.checkedOut(b, name)
+		row := CleanupBranch{Repo: r.ID, Branch: name, Agents: git.AgentBranch(name), State: state,
+			SupersededBy: by, Legacy: legacy, Stray: stray}
+		if projectAgent(who) {
+			row.agent, row.tree, row.reviewed = who, b.trees[name], reviewed(b, name)
+		} else {
+			row.Stays = w.stays(b, name)
+		}
+		list = append(list, row)
 	}
 	return list, nil
 }
@@ -371,6 +484,9 @@ func (w *Workflow) DeleteBranches(ctx context.Context, projectID string, picks [
 		return Cleanup{}, err
 	}
 	var out Cleanup
+	if picks, err = w.freePicks(ctx, p, picks, &out); err != nil {
+		return out, err
+	}
 	for _, r := range p.Repos {
 		var names []string
 		for _, pick := range picks {
@@ -428,6 +544,136 @@ func (w *Workflow) deleteIn(ctx context.Context, p home.Project, r home.Repo, br
 		w.pruneBackups(ctx, r.Path)
 	}
 	return nil
+}
+
+// freePicks frees the picks an agent of the project has checked out
+// (freeHeld), by agent and branch, and returns the others.
+func (w *Workflow) freePicks(ctx context.Context, p home.Project, picks []BranchPick, out *Cleanup) ([]BranchPick, error) {
+	repos := map[string]branchRepo{}
+	for _, r := range p.Repos {
+		if r.Ready() {
+			b, err := w.branchRepo(ctx, p, r)
+			if err != nil {
+				return nil, err
+			}
+			repos[r.ID] = b
+		}
+	}
+	type held struct{ agent, branch string }
+	picked := map[held]map[string]bool{} // the repos picked, by agent and branch
+	var order []held
+	var rest []BranchPick
+	for _, pick := range picks {
+		who := ""
+		if b, ok := repos[pick.Repo]; ok {
+			who, _ = w.checkedOut(b, pick.Branch)
+		}
+		if !projectAgent(who) {
+			rest = append(rest, pick)
+			continue
+		}
+		k := held{who, pick.Branch}
+		if picked[k] == nil {
+			picked[k] = map[string]bool{}
+			order = append(order, k)
+		}
+		picked[k][pick.Repo] = true
+	}
+	for _, k := range order {
+		w.freeHeld(ctx, p, repos, k.agent, k.branch, picked[k], out)
+	}
+	return rest, nil
+}
+
+// errStarted is still's refusal: the agent is at work again.
+var errStarted = errors.New("started meanwhile")
+
+// freeHeld detaches the agent's worktrees from branch and deletes it, in every
+// repo where the agent has it checked out (its siblings) or in none: each
+// checked again, then all at once under the repos' locks, the agent checked
+// not at work there (git.FreeBranch). Each worktree left idle is in
+// out.Removed next to its branch; when it can't, every sibling is kept with
+// one why.
+func (w *Workflow) freeHeld(ctx context.Context, p home.Project, repos map[string]branchRepo, agent, branch string, picked map[string]bool, out *Cleanup) {
+	var siblings []home.Repo
+	for _, r := range p.Repos {
+		b, ok := repos[r.ID]
+		if who, _ := w.checkedOut(b, branch); (ok && who == agent) || (!ok && w.holds(ctx, p, agent, r, branch)) {
+			siblings = append(siblings, r)
+		}
+	}
+	keep := func(why string) {
+		for _, r := range siblings {
+			out.Kept = append(out.Kept, Cleaned{Repo: r.ID, What: "branch", Branch: branch, Why: why})
+		}
+	}
+	var ids []string
+	for _, r := range siblings {
+		ids = append(ids, r.ID)
+	}
+	var frees []git.Free
+	for _, r := range siblings {
+		if !r.Ready() {
+			keep(r.ID + " has a problem")
+			return
+		}
+	}
+	for _, r := range siblings {
+		if !picked[r.ID] {
+			keep("pick it in every repo " + agent + " has it: " + strings.Join(ids, ", "))
+			return
+		}
+	}
+	for _, r := range siblings {
+		b := repos[r.ID]
+		state, _ := w.standing(ctx, p, r.ID, r.Path, branch)
+		if _, why := w.offered(p, r, branch, state); why != "" {
+			keep(why)
+			return
+		}
+		if state != Merged && state != Superseded {
+			keep("no longer merged in " + r.ID)
+			return
+		}
+		if reviewed(b, branch) != "" {
+			keep("a review keeps it in " + r.ID)
+			return
+		}
+		frees = append(frees, git.Free{Repo: r.Path, Tree: b.trees[branch]})
+	}
+	still := func() error {
+		_, at, err := w.atWork(ctx, p.ID, agent)
+		if err == nil && at {
+			err = errStarted
+		}
+		return err
+	}
+	err := w.Git.FreeBranch(ctx, frees, branch, git.BackupRef("cleaned", w.Now(), branch), still)
+	var tree *git.TreeError
+	switch {
+	case errors.Is(err, errStarted):
+		keep(agent + " started meanwhile")
+	case errors.As(err, &tree):
+		i := slices.IndexFunc(frees, func(f git.Free) bool { return f.Tree == tree.Tree })
+		repo := siblings[max(i, 0)].ID
+		switch {
+		case errors.Is(tree.Err, git.ErrOtherBranch):
+			keep(agent + "'s worktree of " + repo + " is on another branch now")
+		case errors.Is(tree.Err, git.ErrMerging):
+			keep("a merge is under way in " + agent + "'s worktree of " + repo)
+		default:
+			keep(tree.Err.Error())
+		}
+	case err != nil:
+		keep(err.Error())
+	default:
+		for _, r := range siblings {
+			out.Removed = append(out.Removed,
+				Cleaned{Repo: r.ID, What: "branch", Branch: branch},
+				Cleaned{Agent: agent, Repo: r.ID, What: "detached", Branch: branch})
+			w.pruneBackups(ctx, r.Path)
+		}
+	}
 }
 
 // unstray removes the stray worktree that has branch checked out, if one does

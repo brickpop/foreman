@@ -66,7 +66,9 @@ export function Toasts({ children }: { children: ReactNode }) {
               />
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-[13.5px] font-semibold">{t.title}</span>
-                <span className="text-[13px] leading-[1.4] text-tx2">{t.body}</span>
+                <span className="text-[13px] leading-[1.4] whitespace-pre-line text-tx2">
+                  {t.body}
+                </span>
               </span>
             </button>
             {/* Dismisses without going anywhere. */}

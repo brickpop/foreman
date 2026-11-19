@@ -8,9 +8,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -36,19 +38,46 @@ func New() *CLI { return &CLI{repos: map[string]*sync.Mutex{}} }
 
 // lock serializes the commands on one repo, named by its common git dir.
 func (g *CLI) lock(ctx context.Context, dir string) func() {
-	key := dir
-	if common, err := run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil {
-		key = strings.TrimSpace(common)
+	m := g.mutex(repoKey(ctx, dir))
+	m.Lock()
+	return m.Unlock
+}
+
+// Locked runs fn holding every repo's lock at once: each repo named by its
+// common git dir, each once, sorted, so two callers never wait on each other
+// in a circle. The one way to act on several repos as one step. Inside fn,
+// git runs through run, never through a method that locks.
+func (g *CLI) Locked(ctx context.Context, repos []string, fn func() error) error {
+	keys := map[string]bool{}
+	for _, dir := range repos {
+		keys[repoKey(ctx, dir)] = true
 	}
+	for _, key := range slices.Sorted(maps.Keys(keys)) {
+		m := g.mutex(key)
+		m.Lock()
+		defer m.Unlock()
+	}
+	return fn()
+}
+
+// repoKey names the repo dir is in (a worktree's too) by its common git dir.
+func repoKey(ctx context.Context, dir string) string {
+	if common, err := run(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil {
+		return strings.TrimSpace(common)
+	}
+	return dir
+}
+
+// mutex is the lock of the repo named key.
+func (g *CLI) mutex(key string) *sync.Mutex {
 	g.mu.Lock()
+	defer g.mu.Unlock()
 	m, ok := g.repos[key]
 	if !ok {
 		m = &sync.Mutex{}
 		g.repos[key] = m
 	}
-	g.mu.Unlock()
-	m.Lock()
-	return m.Unlock
+	return m
 }
 
 // run runs git in dir. Hooks and the fsmonitor are always off: a repo's hooks

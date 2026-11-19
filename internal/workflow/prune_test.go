@@ -227,6 +227,9 @@ func TestCleanupBranchesAndDelete(t *testing.T) {
 		if len(b.SupersededBy) > 0 {
 			line += " by " + strings.Join(b.SupersededBy, ",")
 		}
+		if b.Free != "" {
+			line += " free " + b.Free
+		}
 		if b.Stays != "" {
 			line += " (" + b.Stays + ")"
 		}
@@ -235,9 +238,9 @@ func TestCleanupBranchesAndDelete(t *testing.T) {
 	want := []string{
 		"feature/base superseded yours by wt/ledger/tove/on-base",
 		"feature/done merged yours",
-		"lead/ledger/atlas/integration merged (checked out by mara)",
+		"lead/ledger/atlas/integration merged (checked out by mara, a review keeps it in api)",
 		"release/2 merged yours (an open review merges into it)",
-		"wt/ledger/tove/main merged (checked out by tove)",
+		"wt/ledger/tove/main merged free tove",
 		"wt/ledger/tove/old unmerged",
 		"wt/ledger/tove/older superseded by wt/ledger/tove/older-final",
 		"wt/ledger/tove/older-final unmerged",
@@ -263,11 +266,13 @@ func TestCleanupBranchesAndDelete(t *testing.T) {
 		t.Errorf("removed %q, want %q", line(done.Removed), want)
 	}
 	if want := []string{
+		// tove, not at work, has it checked out in web too: picked in api only, it stays in both.
+		"wt/ledger/tove/main pick it in every repo tove has it: api, web",
+		"wt/ledger/tove/main pick it in every repo tove has it: api, web",
 		"-x no such branch",
 		"feature/wip not merged",
 		"main the default branch",
 		"release/2 an open review merges into it",
-		"wt/ledger/tove/main checked out by tove",
 		"wt/ledger/tove/none no such branch",
 		"wt/suite/tove/x another project's",
 	}; !reflect.DeepEqual(line(done.Kept), want) {
@@ -527,5 +532,223 @@ func TestMergedInAnotherProject(t *testing.T) {
 	}
 	if _, ok := states["stable"]; ok {
 		t.Error("suite's default was offered")
+	}
+}
+
+// toveMain is tove's home branch in the fixture, checked out in its
+// worktrees of api and web, merged in both.
+const toveMain = "wt/ledger/tove/main"
+
+// rowsOf are the cleanup's rows of branch, in the project's order, read as
+// "<repo> free <agent>" or "<repo> (<stays>)".
+func (f *fixture) rowsOf(branch string) []string {
+	f.t.Helper()
+	list, err := f.w.CleanupBranches(ctx, "ledger")
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	var out []string
+	for _, b := range list {
+		switch {
+		case b.Branch != branch:
+		case b.Free != "" && b.Stays == "":
+			out = append(out, b.Repo+" free "+b.Free)
+		default:
+			out = append(out, b.Repo+" ("+b.Stays+")")
+		}
+	}
+	return out
+}
+
+// mergeUnderWay leaves tove's worktree of repo in a merge not committed yet,
+// its branch where it was.
+func (f *fixture) mergeUnderWay(repo string) {
+	f.t.Helper()
+	dir := filepath.Join(f.root, "ledger", repo)
+	f.git(dir, "branch", "side", mainOf(repo))
+	side := filepath.Join(f.t.TempDir(), "side")
+	f.git(dir, "worktree", "add", "-q", side, "side")
+	writeFile(f.t, filepath.Join(side, "side.md"), "side\n")
+	f.git(side, "add", ".")
+	f.git(side, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "side")
+	f.git(f.wt("tove", repo), "-c", "user.name=t", "-c", "user.email=t@t", "merge", "--no-commit", "--no-ff", "-q", "side")
+}
+
+// An agent of the project not at work frees its merged branches: in every
+// repo where it has one checked out, or in none, saying why.
+func TestCleanupOffersToFreeABranch(t *testing.T) {
+	at := func(status string) func(f *fixture) {
+		return func(f *fixture) {
+			f.teams.instances = []store.Instance{{ID: "tove@ledger", DeploymentID: "atlas@ledger", AgentID: "tove", Status: status}}
+		}
+	}
+	for _, tc := range []struct {
+		name  string
+		setup func(f *fixture)
+		want  []string
+	}{
+		{"no deployment", func(*fixture) {}, []string{"api free tove", "web free tove"}},
+		{"stopped", at("stopped"), []string{"api free tove", "web free tove"}},
+		{"asleep", at("asleep"), []string{"api free tove", "web free tove"}},
+		{"running", at("running"), []string{"api (checked out by tove, who is running)", "web (checked out by tove, who is running)"}},
+		{"idle", at("idle"), []string{"api (checked out by tove, who is idle)", "web (checked out by tove, who is idle)"}},
+		{"queued", at("queued"), []string{"api (checked out by tove, who is queued)", "web (checked out by tove, who is queued)"}},
+		{"not merged in a sibling", func(f *fixture) {
+			writeFile(f.t, filepath.Join(f.wt("tove", "web"), "wip.md"), "wip\n")
+			f.git(f.wt("tove", "web"), "add", ".")
+			f.git(f.wt("tove", "web"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "wip")
+		}, []string{"api (checked out by tove, not merged in web)", "web (checked out by tove, not merged in web)"}},
+		{"under review in a sibling", func(f *fixture) {
+			if _, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger",
+				Repo: "web", Branch: toveMain, Target: "trunk", State: store.MergeOpen}); err != nil {
+				f.t.Fatal(err)
+			}
+		}, []string{"api (checked out by tove, a review keeps it in web)", "web (checked out by tove, a review keeps it in web)"}},
+		{"a merge under way", func(f *fixture) { f.mergeUnderWay("api") },
+			[]string{"api (checked out by tove, a merge under way in api)", "web (checked out by tove, a merge under way in api)"}},
+		{"a sibling with a problem", func(f *fixture) { f.problems["web"] = "missing" },
+			[]string{"api (checked out by tove, web has a problem)"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			tc.setup(f)
+			if got := f.rowsOf(toveMain); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got  %q\nwant %q", got, tc.want)
+			}
+		})
+	}
+
+	// A worktree git can't read is an error, never a reason made up.
+	f := newFixture(t)
+	if err := os.Remove(filepath.Join(f.wt("tove", "web"), ".git")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.w.CleanupBranches(ctx, "ledger"); err == nil {
+		t.Error("an unreadable worktree: no error")
+	}
+
+	// Another project's agent keeps its branch, as before.
+	f = newFixture(t)
+	api := filepath.Join(f.root, "ledger", "api")
+	f.git(api, "worktree", "add", "-q", "-b", "wt/ledger/tove/elsewhere", filepath.Join(f.root, "suite", ".sandboxes", "tove", "core"), "main")
+	if got := f.rowsOf("wt/ledger/tove/elsewhere"); !reflect.DeepEqual(got, []string{"api (checked out by tove@suite)"}) {
+		t.Errorf("another project's agent: %q", got)
+	}
+}
+
+// Picked in every repo, a free branch goes: each worktree detached at its
+// commit, with its changes, the branch deleted (backed up), and the next
+// start finds the repos idle. Otherwise nothing changes, and every sibling is
+// kept with one why.
+func TestCleanupFreesABranch(t *testing.T) {
+	both := []BranchPick{{Repo: "api", Branch: toveMain}, {Repo: "web", Branch: toveMain}}
+	f := newFixture(t)
+	heads := map[string]string{}
+	for _, r := range []string{"api", "web"} {
+		heads[r] = f.git(f.wt("tove", r), "rev-parse", "HEAD")
+		writeFile(t, filepath.Join(f.wt("tove", r), "notes.md"), "half a thought\n")
+	}
+	done, err := f.w.DeleteBranches(ctx, "ledger", both)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Cleaned{
+		{Repo: "api", What: "branch", Branch: toveMain}, {Agent: "tove", Repo: "api", What: "detached", Branch: toveMain},
+		{Repo: "web", What: "branch", Branch: toveMain}, {Agent: "tove", Repo: "web", What: "detached", Branch: toveMain},
+	}
+	if !reflect.DeepEqual(done.Removed, want) || len(done.Kept) != 0 {
+		t.Errorf("removed %+v, kept %+v", done.Removed, done.Kept)
+	}
+	g := git.New()
+	for _, r := range []string{"api", "web"} {
+		dir, wt := filepath.Join(f.root, "ledger", r), f.wt("tove", r)
+		if on := f.git(wt, "branch", "--show-current"); on != "" || f.git(wt, "rev-parse", "HEAD") != heads[r] {
+			t.Errorf("%s: on %q", r, on)
+		}
+		if data, _ := os.ReadFile(filepath.Join(wt, "notes.md")); string(data) != "half a thought\n" {
+			t.Errorf("%s: the changes went", r)
+		}
+		if g.HasBranch(ctx, dir, toveMain) || f.git(dir, "for-each-ref", "--format=%(objectname)", "refs/foreman/cleaned/") != heads[r] {
+			t.Errorf("%s: the branch not deleted, or not kept", r)
+		}
+		if err := g.Prepare(ctx, dir, wt, "", mainOf(r)); err != nil {
+			t.Fatal(err)
+		}
+		if on, _ := g.Branch(ctx, wt); on != "" {
+			t.Errorf("%s: the next start found it on %q", r, on)
+		}
+	}
+
+	for _, tc := range []struct {
+		name  string
+		setup func(f *fixture)
+		picks []BranchPick
+		why   string
+	}{
+		{"a sibling missing", func(*fixture) {}, both[:1], "pick it in every repo tove has it: api, web"},
+		{"started meanwhile", func(f *fixture) {
+			f.teams.instances = []store.Instance{{ID: "tove@ledger", DeploymentID: "atlas@ledger", AgentID: "tove", Status: "starting"}}
+		}, both, "tove started meanwhile"},
+		{"a merge under way", func(f *fixture) { f.mergeUnderWay("web") }, both, "a merge is under way in tove's worktree of web"},
+		{"no longer merged", func(f *fixture) {
+			writeFile(f.t, filepath.Join(f.wt("tove", "web"), "wip.md"), "wip\n")
+			f.git(f.wt("tove", "web"), "add", ".")
+			f.git(f.wt("tove", "web"), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "wip")
+		}, both, "no longer merged in web"},
+		{"a sibling with a problem now", func(f *fixture) { f.problems["web"] = "missing" }, both[:1], "web has a problem"},
+		{"under review in a sibling", func(f *fixture) {
+			if _, err := f.db.MergeRequests().Save(ctx, store.MergeRequest{ProjectID: "ledger", DeploymentID: "atlas@ledger",
+				Repo: "web", Branch: toveMain, Target: "trunk", State: store.MergeOpen}); err != nil {
+				f.t.Fatal(err)
+			}
+		}, both, "a review keeps it in web"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t)
+			tc.setup(f)
+			done, err := f.w.DeleteBranches(ctx, "ledger", tc.picks)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(done.Removed) != 0 || len(done.Kept) == 0 {
+				t.Fatalf("removed %+v, kept %+v", done.Removed, done.Kept)
+			}
+			for _, c := range done.Kept {
+				if c.Why != tc.why || c.Branch != toveMain {
+					t.Errorf("kept %+v, want why %q", c, tc.why)
+				}
+			}
+			for _, r := range []string{"api", "web"} {
+				if on := f.git(f.wt("tove", r), "branch", "--show-current"); on != toveMain {
+					t.Errorf("%s: on %q", r, on)
+				}
+			}
+			if refs := f.git(filepath.Join(f.root, "ledger", "api"), "for-each-ref", "refs/foreman/cleaned/"); refs != "" {
+				t.Errorf("a backup of what stayed: %q", refs)
+			}
+		})
+	}
+}
+
+// GET and POST read the agent's siblings the same way: a branch checked out
+// in web by the CEO, not by tove, is no sibling of tove's in api.
+func TestFreeingAgreesWithTheList(t *testing.T) {
+	f := newFixture(t)
+	web := filepath.Join(f.root, "ledger", "web")
+	f.git(f.wt("tove", "web"), "checkout", "-q", "--detach")
+	f.git(web, "checkout", "-q", toveMain)
+	if got, want := f.rowsOf(toveMain), []string{"api free tove", "web (checked out in your checkout)"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got  %q\nwant %q", got, want)
+	}
+	done, err := f.w.DeleteBranches(ctx, "ledger", []BranchPick{{Repo: "api", Branch: toveMain}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Cleaned{{Repo: "api", What: "branch", Branch: toveMain}, {Agent: "tove", Repo: "api", What: "detached", Branch: toveMain}}
+	if !reflect.DeepEqual(done.Removed, want) || len(done.Kept) != 0 {
+		t.Errorf("removed %+v, kept %+v", done.Removed, done.Kept)
+	}
+	if on := f.git(web, "branch", "--show-current"); on != toveMain {
+		t.Errorf("your checkout of web is on %q", on)
 	}
 }

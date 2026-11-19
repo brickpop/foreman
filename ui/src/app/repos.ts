@@ -1,4 +1,4 @@
-import type { CleanupBranch, Repo, RepoBranch, Team } from "../api/client";
+import type { Cleanup, CleanupBranch, Repo, RepoBranch, Team } from "../api/client";
 import { agentOf, plural } from "./model";
 
 // The Repos section's model (wiki/product/features/repos.md).
@@ -213,12 +213,45 @@ export function placeLine(p: BranchPlace): string {
   return work.filter(Boolean).join(" · ") || "nothing new";
 }
 
-/** A branch of the branch cleanup, by its repo and name: what a pick holds. */
-export const pickKey = (b: CleanupBranch) => `${b.repo}:${b.branch}`;
+/** One row of the branch cleanup, what the CEO ticks: a branch in one repo;
+ * or an inactive agent's branch in every repo that agent has it checked out,
+ * which are freed together or not at all. */
+export type CleanupRow = {
+  /** What a pick holds. */
+  key: string;
+  /** The branch as its first repo has it: its name, state and why it stays. */
+  branch: CleanupBranch;
+  /** Every repo it stands for, each sent on Delete. */
+  picks: CleanupBranch[];
+};
+
+/** The branch cleanup's rows, in the order the branches came: one per branch
+ * and repo, except a free one's siblings (the same free agent and branch),
+ * which are one row. */
+export function cleanupRows(branches: CleanupBranch[]): CleanupRow[] {
+  const rows = new Map<string, CleanupRow>();
+  for (const b of branches) {
+    const key = b.free ? `${b.free}:${b.branch}` : `${b.repo}:${b.branch}`;
+    const row = rows.get(key);
+    if (row) row.picks.push(b);
+    else rows.set(key, { key, branch: b, picks: [b] });
+  }
+  return [...rows.values()];
+}
+
+/** What Delete sends for the rows picked: every repo of each. */
+export function pickedBranches(
+  rows: CleanupRow[],
+  pick: Set<string>,
+): { repo: string; branch: string }[] {
+  return rows
+    .filter((r) => pick.has(r.key))
+    .flatMap((r) => r.picks.map(({ repo, branch }) => ({ repo, branch })));
+}
 
 /** One section of the branch cleanup: its groups, folded or open at first. */
 export type CleanupSection = {
-  key: "agents" | "yours" | "unmerged" | "stray";
+  key: "agents" | "yours" | "free" | "unmerged" | "stray";
   title: string;
   note?: string;
   /** Folded at first: those whose deletion may lose work (the CEO, 2026-11-13). */
@@ -232,6 +265,12 @@ export const cleanupSections: CleanupSection[] = [
     key: "yours",
     title: "Your branches, merged",
     note: "Deleted here only: a copy upstream stays.",
+    folded: false,
+  },
+  {
+    key: "free",
+    title: "Checked out by agents not at work",
+    note: "Picked, the agent's worktrees go idle at the same commit. Nothing in them is lost.",
     folded: false,
   },
   { key: "unmerged", title: "Agents' branches, not merged", folded: true },
@@ -251,12 +290,13 @@ export type CleanupGroup = {
   hint: string;
   /** Ticked at first. */
   on: boolean;
-  branches: CleanupBranch[];
+  rows: CleanupRow[];
 };
 
-type Kind = Omit<CleanupGroup, "key" | "branches"> & { state?: string };
+type Kind = Omit<CleanupGroup, "key" | "rows"> & { state?: string };
 
-// Ticked at first exactly where deleting loses nothing: merged or superseded, in no stray worktree.
+// Ticked at first exactly where deleting loses nothing: merged or superseded, in no stray
+// worktree, checked out by no agent (the CEO: nothing is freed unasked).
 const groupKinds: Kind[] = [
   { section: "agents", state: "merged", label: "Merged", hint: "nothing lost", on: true },
   {
@@ -274,6 +314,14 @@ const groupKinds: Kind[] = [
     hint: "all of it is in an agent's branch",
     on: true,
   },
+  { section: "free", state: "merged", label: "Merged", hint: "nothing lost", on: false },
+  {
+    section: "free",
+    state: "superseded",
+    label: "Superseded",
+    hint: "all of it is in another branch",
+    on: false,
+  },
   { section: "unmerged", label: "Not merged", hint: "work only here", on: false },
   {
     section: "stray",
@@ -284,9 +332,11 @@ const groupKinds: Kind[] = [
 ];
 
 /** The section a branch is offered in, if any: one checked out in a stray worktree in its own,
- * whatever its work; one that stays otherwise, none. The CEO's unmerged ones are never offered. */
+ * whatever its work; one an inactive agent of this project can free, in its own; one that
+ * stays otherwise, none. The CEO's unmerged ones are never offered. */
 function sectionOf(b: CleanupBranch): CleanupSection["key"] | undefined {
   if (b.stray) return "stray";
+  if (b.free) return "free";
   if (b.stays) return undefined;
   if (!b.agents) return "yours";
   return b.state === "unmerged" ? "unmerged" : "agents";
@@ -294,25 +344,58 @@ function sectionOf(b: CleanupBranch): CleanupSection["key"] | undefined {
 
 /** The branch cleanup's groups (wiki/product/features/repos.md#branch-cleanup), in order and
  * without the empty ones: merged and superseded first, the agents' then the CEO's, ticked, as
- * deleting them loses nothing; then the agents' unmerged work and those in stray worktrees,
- * off. Branches that can't go are apart, in staying. */
+ * deleting them loses nothing; then those inactive agents have checked out, off; then the
+ * agents' unmerged work and those in stray worktrees, off. Branches that can't go are apart,
+ * in staying. */
 export function cleanupGroups(branches: CleanupBranch[]): {
   groups: CleanupGroup[];
-  staying: CleanupBranch[];
+  staying: CleanupRow[];
 } {
+  const rows = cleanupRows(branches);
   const groups = groupKinds
     .map(({ state, ...k }) => ({
       ...k,
       key: state ? `${k.section}-${state}` : k.section,
-      branches: branches.filter(
-        (b) => sectionOf(b) === k.section && (state === undefined || b.state === state),
+      rows: rows.filter(
+        (r) =>
+          sectionOf(r.branch) === k.section && (state === undefined || r.branch.state === state),
       ),
     }))
-    .filter((g) => g.branches.length > 0);
-  return { groups, staying: branches.filter((b) => sectionOf(b) === undefined) };
+    .filter((g) => g.rows.length > 0);
+  return { groups, staying: rows.filter((r) => sectionOf(r.branch) === undefined) };
 }
 
-/** What the branch cleanup ticks at first: the branches of the groups on. */
+/** What the branch cleanup ticks at first: the rows of the groups on. */
 export function cleanupPick(groups: CleanupGroup[]): Set<string> {
-  return new Set(groups.filter((g) => g.on).flatMap((g) => g.branches.map(pickKey)));
+  return new Set(groups.filter((g) => g.on).flatMap((g) => g.rows.map((r) => r.key)));
+}
+
+/** The branch cleanup's toast after a Delete: how many branches went, then, one line each
+ * and only those that apply, the worktrees left idle (by agent), what was kept and why, and
+ * the 30-day copy; each repo as name shows it. */
+export function cleanupDone(
+  done: Cleanup,
+  name: (repo: string) => string,
+): { title: string; body: string } {
+  const branches = done.removed.filter((c) => c.what === "branch").length;
+  const idle = new Map<string, string[]>();
+  for (const c of done.removed.filter((c) => c.what === "detached")) {
+    idle.set(c.agent, [...(idle.get(c.agent) ?? []), name(c.repo)]);
+  }
+  const lines = [
+    idle.size > 0 &&
+      `Left idle at the same commit: ${[...idle]
+        .map(
+          ([agent, repos]) =>
+            `${agent}'s ${repos.join(", ")} ${repos.length === 1 ? "worktree" : "worktrees"}`,
+        )
+        .join("; ")}.`,
+    done.kept.length > 0 &&
+      `Kept: ${done.kept.map((k) => `${name(k.repo)} ${k.branch} (${k.why})`).join(", ")}.`,
+    "Foreman keeps a copy of each for 30 days.",
+  ];
+  return {
+    title: `${plural(branches, "branch", "branches")} deleted`,
+    body: lines.filter(Boolean).join("\n"),
+  };
 }

@@ -145,10 +145,15 @@ export interface HomeArea {
   instructions(): Promise<Instructions>;
   /** Saves them, guarded by the version read: one commit in Foreman's HQ. */
   saveInstructions(text: string, version: string): Promise<Instructions>;
-  /** Creates a project and its HQ: new (a starter wiki), or cloned from
-   * clone (a URL or a local path, with the CEO's own git). created is false
-   * when it took over an HQ a removed project left there. */
-  newProject(name: string, clone?: string): Promise<{ project: Project; created: boolean }>;
+  /** Creates project id (a slug) and its HQ: new (a starter wiki), or cloned
+   * from clone (a URL or a local path, with the CEO's own git). name is how it
+   * shows, the words the CEO typed. created is false when it took over an HQ a
+   * removed project left there. */
+  newProject(
+    id: string,
+    name: string,
+    clone?: string,
+  ): Promise<{ project: Project; created: boolean }>;
   /** Clones the HQ of a project not on this machine from the origin its
    * record keeps; its code repos are then located or cloned on Repos. */
   bringHere(project: string): Promise<Project>;
@@ -463,8 +468,8 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
         (
           await request("PUT", "/api/instructions", { text, version })
         ).json() as Promise<Instructions>,
-      newProject: async (name, clone) => {
-        const r = await request("POST", "/api/projects", { name, clone });
+      newProject: async (id, name, clone) => {
+        const r = await request("POST", "/api/projects", { id, name, clone });
         // 201: a new HQ; 200: one taken over.
         return { project: (await r.json()) as Project, created: r.status === 201 };
       },

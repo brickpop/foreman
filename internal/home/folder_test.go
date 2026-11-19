@@ -29,7 +29,7 @@ func TestForemanFolder(t *testing.T) {
 		if h.Folder() != want || h.HQ() != filepath.Join(want, "hq") || !topOfRepo(h.HQ()) {
 			t.Errorf("absolute %v: folder %s, HQ %s", absolute, h.Folder(), h.HQ())
 		}
-		p, _, err := h.NewProject(ctx, "ledger", "")
+		p, _, err := h.NewProject(ctx, "ledger", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,7 +66,7 @@ func TestAnUnusableForemanFolderStopsTheStart(t *testing.T) {
 // MakeFiles makes their two folders, keeping what is in them.
 func TestProjectFiles(t *testing.T) {
 	h := loaded(t, nil)
-	p, _, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

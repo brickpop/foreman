@@ -73,7 +73,7 @@ func TestCloneRepo(t *testing.T) {
 	api := served(t, root, "acme/api.git", "main")
 	served(t, root, "acme/legacy.git", "trunk")
 	for _, id := range []string{"ledger", "relay"} {
-		if _, _, err := h.NewProject(ctx, id, ""); err != nil {
+		if _, _, err := h.NewProject(ctx, id, "", ""); err != nil {
 			t.Fatal(err)
 		}
 	}

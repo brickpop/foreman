@@ -242,8 +242,8 @@ export interface Backup {
   path: string;
   problem: string;
   /**
-   * Command is what sets its origin up, <its URL> to fill in; "" when the
-   * problem isn't a missing origin.
+   * Command is what sets its origin up, one step per line, <its URL> to
+   * fill in; "" when the problem isn't a missing origin.
    */
   command: string;
 }

@@ -171,7 +171,7 @@ func TestLoadMakesForemansHQWithWhatIsThere(t *testing.T) {
 // problems; one that is gone is a problem, with the defaults.
 func TestABrokenProjectFileKeepsItsLastGoodConfig(t *testing.T) {
 	h := loaded(t, nil)
-	p, _, err := h.NewProject(ctx, "ledger", "")
+	p, _, err := h.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestSaveSettings(t *testing.T) {
 func TestWatchReportsChangesOnDisk(t *testing.T) {
 	h := loaded(t, nil)
 	root := h.Root()
-	ledger, _, err := h.NewProject(ctx, "ledger", "")
+	ledger, _, err := h.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -377,7 +377,7 @@ func TestWatchReportsChangesOnDisk(t *testing.T) {
 
 	// A project made after the watch started is watched too, and a repo added
 	// is told at once.
-	relay, _, err := h.NewProject(ctx, "relay", "")
+	relay, _, err := h.NewProject(ctx, "relay", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

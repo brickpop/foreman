@@ -13,7 +13,7 @@ help:
 setup:
     cd ui && bun install
 
-# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, its home in .dev/real and its Foreman folder in .dev/real-folder. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake and .dev/fake-folder. Each starts with team dev-team (Tic leads, Tac and Toe) and project DevProject (one code repo, some-app, in .dev/<harness>-repos). A home given second is used instead (it must be on the engine its harness needs)
+# Run Foreman with the UI rebuilt on every change (reload the page to see it). `just dev`: Claude Code on Podman, its home in .dev/real and its Foreman folder in .dev/real-folder. `just dev fake`: the fake harness (a stand-in that echoes, for staging cases without spending tokens) on the Direct engine, in .dev/fake and .dev/fake-folder. Each starts with team dev-team (Tic leads, Tac and Toe) and project dev-project (one code repo, some-app, in .dev/<harness>-repos). A home given second is used instead (it must be on the engine its harness needs)
 [group('dev')]
 dev harness="real" home="":
     #!/usr/bin/env bash
@@ -79,7 +79,7 @@ dev harness="real" home="":
         done
     fi
     # Projects are records, made through the API: once the server answers,
-    # DevProject is created with some-app, unless it exists.
+    # dev-project is created with some-app, unless it exists.
     (
         for _ in $(seq 300); do
             sleep 0.2
@@ -88,11 +88,11 @@ dev harness="real" home="":
             [ -n "$base" ] && [ -n "$token" ] || continue
             api() { curl -sf -H "Authorization: Bearer $token" -H "Content-Type: application/json" "$@"; }
             api -o /dev/null "$base/api/home" || continue
-            api -o /dev/null "$base/api/projects/DevProject" && exit 0
-            api -o /dev/null -X POST "$base/api/projects" -d '{"name":"DevProject"}' &&
-                api -o /dev/null -X POST "$base/api/projects/DevProject/repos" -d "{\"name\":\"some-app\",\"path\":\"$app\"}" &&
+            api -o /dev/null "$base/api/projects/dev-project" && exit 0
+            api -o /dev/null -X POST "$base/api/projects" -d '{"id":"dev-project"}' &&
+                api -o /dev/null -X POST "$base/api/projects/dev-project/repos" -d "{\"name\":\"some-app\",\"path\":\"$app\"}" &&
                 exit 0
-            echo "just dev: couldn't create DevProject through the API" >&2
+            echo "just dev: couldn't create dev-project through the API" >&2
             exit 1
         done
     ) &

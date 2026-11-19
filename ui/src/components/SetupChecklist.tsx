@@ -174,7 +174,9 @@ function RestoreForm() {
         if (url.trim() && !restore.isPending) restore.mutate();
       }}
     >
-      <span className="basis-full">Coming from another machine? Restore your HQ from its git URL.</span>
+      <span className="basis-full">
+        Coming from another machine? Restore your HQ from its git URL.
+      </span>
       <input
         aria-label="Your HQ's git URL"
         placeholder="git@github.com:me/foreman-hq.git"

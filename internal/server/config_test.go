@@ -57,9 +57,9 @@ func (f fakeConfig) SaveTeam(context.Context, home.TeamConfig, string) (home.Tea
 // The project routes answer by name: "bad" is invalid, "taken" exists, "busy"
 // is deployed; the project they return says what was called, in Problems.
 // NewProject takes over "kept".
-func (f fakeConfig) NewProject(_ context.Context, name, clone string) (home.Project, bool, error) {
-	p, err := f.changed("NewProject", "", name, clone)
-	return p, name != "kept", err
+func (f fakeConfig) NewProject(_ context.Context, id, name, clone string) (home.Project, bool, error) {
+	p, err := f.changed("NewProject", "", id, name+" clone="+clone)
+	return p, id != "kept", err
 }
 func (f fakeConfig) RenameRepo(_ context.Context, project, name, newName string) (home.Project, error) {
 	return f.changed("RenameRepo", project, newName, name)
@@ -435,7 +435,8 @@ func TestProjectRoutes(t *testing.T) {
 		method, path, body string
 		call               []string
 	}{
-		{http.MethodPost, "/api/projects", `{"name":"aragon"}`, []string{"NewProject", "aragon", ""}},
+		{http.MethodPost, "/api/projects", `{"id":"aragon"}`, []string{"NewProject", "aragon", " clone="}},
+		{http.MethodPost, "/api/projects", `{"id":"aragon","name":"Aragon · DAO"}`, []string{"NewProject", "aragon", "Aragon · DAO clone="}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default="}},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"web","path":"/home/ceo/dev/web","defaultBranch":"master"}`, []string{"AddRepo", "web", "/home/ceo/dev/web default=master"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/default", `{"branch":"master"}`, []string{"SetRepoDefault", "master", "web"}},
@@ -450,7 +451,7 @@ func TestProjectRoutes(t *testing.T) {
 		{http.MethodPut, "/api/projects/ledger/name", `{"name":""}`, []string{"SetName", "", ""}},
 		{http.MethodPut, "/api/projects/ledger/hidden", `{"hidden":true}`, []string{"SetHidden", "true", ""}},
 		{http.MethodPut, "/api/projects/ledger/hidden", `{"hidden":false}`, []string{"SetHidden", "false", ""}},
-		{http.MethodPost, "/api/projects", `{"name":"aragon","clone":"git@github.com:aragon/project.git"}`, []string{"NewProject", "aragon", "git@github.com:aragon/project.git"}},
+		{http.MethodPost, "/api/projects", `{"id":"aragon","clone":"git@github.com:aragon/project.git"}`, []string{"NewProject", "aragon", " clone=git@github.com:aragon/project.git"}},
 		{http.MethodPut, "/api/projects/ledger/repos/web/name", `{"name":"site"}`, []string{"RenameRepo", "site", "web"}},
 	} {
 		var p home.Project
@@ -461,7 +462,7 @@ func TestProjectRoutes(t *testing.T) {
 	}
 	// A new HQ is created (201); one left there is taken over (200).
 	for name, status := range map[string]int{"aragon": http.StatusCreated, "kept": http.StatusOK} {
-		if w := send(http.MethodPost, "/api/projects", `{"name":"`+name+`"}`); w.Code != status {
+		if w := send(http.MethodPost, "/api/projects", `{"id":"`+name+`"}`); w.Code != status {
 			t.Errorf("new project %s: %d, want %d", name, w.Code, status)
 		}
 	}
@@ -484,7 +485,7 @@ func TestProjectRoutes(t *testing.T) {
 		status             int
 		want               string
 	}{
-		{http.MethodPost, "/api/projects", `{"name":"bad"}`, http.StatusBadRequest, `{"code":"INVALID","error":"a repo name is lowercase"}`},
+		{http.MethodPost, "/api/projects", `{"id":"bad"}`, http.StatusBadRequest, `{"code":"INVALID","error":"a repo name is lowercase"}`},
 		{http.MethodPost, "/api/projects/ledger/repos", `{"name":"taken","path":"/x"}`, http.StatusConflict, `{"code":"EXISTS","error":"ledger has a repo taken already"}`},
 		{http.MethodDelete, "/api/projects/ledger/repos/busy", ``, http.StatusConflict, `{"code":"DEPLOYED","error":"stop the team on ledger before removing busy"}`},
 		{http.MethodPost, "/api/projects/nope/repos", `{"name":"x","path":"/x"}`, http.StatusNotFound, `"NOT_FOUND"`},

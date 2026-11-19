@@ -246,16 +246,20 @@ describe("httpClient", () => {
   it("creates a project, new or cloned, and removes one with what was asked", async () => {
     const calls = stubFetch(200, { id: "cal" });
     const client = httpClient("http://x");
-    await client.home.newProject("cal");
-    await client.home.newProject("ops", "git@github.com:me/ops-hq.git");
+    await client.home.newProject("cal", "Cal");
+    await client.home.newProject("ops", "Ops HQ", "git@github.com:me/ops-hq.git");
     await client.home.removeProject("a", { deleteHQ: false, deleteWorktrees: false });
     await client.home.removeProject("b", { deleteHQ: true, deleteWorktrees: true });
     await client.home.folders();
     await client.home.folders("/home/ceo/My Repos", "cal");
     await client.home.folders(undefined, "cal");
     expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
-      ["POST", "http://x/api/projects", { name: "cal" }],
-      ["POST", "http://x/api/projects", { name: "ops", clone: "git@github.com:me/ops-hq.git" }],
+      ["POST", "http://x/api/projects", { id: "cal", name: "Cal" }],
+      [
+        "POST",
+        "http://x/api/projects",
+        { id: "ops", name: "Ops HQ", clone: "git@github.com:me/ops-hq.git" },
+      ],
       ["DELETE", "http://x/api/projects/a", undefined],
       ["DELETE", "http://x/api/projects/b?deleteHQ=true&deleteWorktrees=true", undefined],
       ["GET", "http://x/api/folders", undefined],

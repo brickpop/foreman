@@ -27,10 +27,10 @@ import {
 } from "../app/queries";
 import { setupPending } from "../app/setup";
 import { DeployDialog } from "../components/DeployDialog";
+import { FolderIcon } from "../components/icons";
 import { NewProject } from "../components/NewProject";
 import { RequestPanel } from "../components/RequestPanel";
 import { SetupChecklist } from "../components/SetupChecklist";
-import { FolderIcon } from "../components/icons";
 import { AddCard, TeamGrid } from "../components/TeamGrid";
 import { useToast } from "../components/Toasts";
 import {
@@ -152,8 +152,8 @@ function NotBackedUp({ backups }: { backups: Backup[] }) {
               <>
                 {" "}
                 Make an empty repo for it (GitHub, GitLab…), then run this with its URL in place of{" "}
-                <span className="font-mono">&lt;its URL&gt;</span>. Foreman pushes it at every
-                start and stop from then on.
+                <span className="font-mono">&lt;its URL&gt;</span>. Foreman pushes it at every start
+                and stop from then on.
               </>
             )}
           </p>

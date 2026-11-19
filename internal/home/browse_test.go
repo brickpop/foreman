@@ -73,7 +73,7 @@ func TestBrowse(t *testing.T) {
 func TestTheHomeFolderBoundsAddingRepos(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	startedIn(t, h, filepath.Join(home, "dev"))
@@ -103,7 +103,7 @@ func TestTheHomeFolderBoundsAddingRepos(t *testing.T) {
 func TestBrowseSaysWhatTheProjectHasAdded(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	app := codeRepo(t, filepath.Join(home, "dev", "app"))
@@ -134,7 +134,7 @@ func TestBrowseSaysWhatTheProjectHasAdded(t *testing.T) {
 func TestBrowseMarksForemansFolders(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	for _, dir := range []string{"repos", "worktrees"} {
@@ -174,7 +174,7 @@ func TestBrowseMarksForemansFolders(t *testing.T) {
 func TestNoCodeRepoInForemansFolders(t *testing.T) {
 	h := loaded(t, nil)
 	home := os.Getenv("HOME")
-	ledger, _, err := h.NewProject(ctx, "ledger", "")
+	ledger, _, err := h.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -87,7 +87,7 @@ func readRecords(t *testing.T, h *Home) map[string]Record {
 // machine's part.
 func TestTheRecordsTravelInProjectsToml(t *testing.T) {
 	h := loaded(t, nil)
-	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	api := codeRepo(t, "dev/api")
@@ -113,7 +113,7 @@ func TestTheRecordsTravelInProjectsToml(t *testing.T) {
 	}
 	// A project cloned from another's HQ records where it came from.
 	ledger, _ := h.Project("ledger")
-	if _, _, err := h.NewProject(ctx, "relay", ledger.Path); err != nil {
+	if _, _, err := h.NewProject(ctx, "relay", "", ledger.Path); err != nil {
 		t.Fatal(err)
 	}
 
@@ -197,7 +197,7 @@ func TestARecordFromAnotherMachine(t *testing.T) {
 // nothing writes over it until it is fixed.
 func TestABrokenProjectsToml(t *testing.T) {
 	h := loaded(t, nil)
-	if _, _, err := h.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := h.RecordsProblems(); got == nil || len(got) != 0 {
@@ -214,7 +214,7 @@ func TestABrokenProjectsToml(t *testing.T) {
 	if _, err := h.SetName(ctx, "ledger", "The ledger"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "fix it first") {
 		t.Errorf("a change over a broken file: %v", err)
 	}
-	if _, _, err := h.NewProject(ctx, "relay", ""); !errors.Is(err, ErrInvalid) {
+	if _, _, err := h.NewProject(ctx, "relay", "", ""); !errors.Is(err, ErrInvalid) {
 		t.Errorf("a new project over a broken file: %v", err)
 	}
 	if exists(filepath.Join(h.Folder(), "projects", "relay")) {

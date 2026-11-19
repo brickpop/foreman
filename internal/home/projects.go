@@ -38,23 +38,29 @@ var (
 // NewProject creates a project with no repos yet: its record, and its HQ at
 // <folder>/projects/<name>/hq, new (project.toml and a starter wiki, in one
 // first commit) or cloned from clone (a URL or a local path, as the CEO's git
-// can reach it). The name is a slug (validProjectName) and must be new, in
-// any case. An HQ already there (a removed project's, kept) is taken over as
-// it is. Nothing this call made is left behind if a step fails. created is
-// false for a takeover.
-func (h *Home) NewProject(ctx context.Context, name, clone string) (p Project, created bool, err error) {
+// can reach it). The id is a slug (validProjectName) and must be new, in
+// any case. name is the display name, as SetName takes it: kept only when it
+// reads otherwise than the id made readable. An HQ already there (a removed
+// project's, kept) is taken over as it is. Nothing this call made is left
+// behind if a step fails. created is false for a takeover.
+func (h *Home) NewProject(ctx context.Context, id, name, clone string) (p Project, created bool, err error) {
 	h.mu.Lock()
 	defer h.unlock()
-	if !validProjectName(name) {
-		return Project{}, false, fmt.Errorf("%w: a project name is lowercase letters, digits and single hyphens (my-portfolio), at most 63", ErrInvalid)
+	if !validProjectName(id) {
+		return Project{}, false, fmt.Errorf("%w: a project id is lowercase letters, digits and single hyphens (my-portfolio), at most 63", ErrInvalid)
 	}
-	if existing, ok := h.projectNamed(name); ok {
+	name, err = displayName(id, name)
+	if err != nil {
+		return Project{}, false, err
+	}
+	if existing, ok := h.projectNamed(id); ok {
 		return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
 	}
-	if other, ok := h.shownAs(name, readable(name)); ok {
-		return Project{}, false, fmt.Errorf("%w: project %s shows as %s already: pick another name, or rename it first", ErrExists, other, readable(name))
+	shown := cmp.Or(name, readable(id))
+	if other, ok := h.shownAs(id, shown); ok {
+		return Project{}, false, fmt.Errorf("%w: project %s shows as %s already: pick another name, or rename it first", ErrExists, other, shown)
 	}
-	folder := h.projectDir(name)
+	folder := h.projectDir(id)
 	dir := filepath.Join(folder, hqDir)
 	create := h.createHQ
 	if clone != "" {
@@ -85,24 +91,27 @@ func (h *Home) NewProject(ctx context.Context, name, clone string) (p Project, c
 			_ = os.RemoveAll(dir)
 		}
 	}
-	if err := create(ctx, name, dir); err != nil {
+	if err := create(ctx, id, dir); err != nil {
 		drop()
 		return Project{}, false, err
 	}
 	// A row with no record is a project whose record the CEO took out of
 	// projects.toml by hand: its history isn't this new project's.
-	if err := h.machine.Remove(ctx, name); err != nil && !errors.Is(err, store.ErrNotFound) {
+	if err := h.machine.Remove(ctx, id); err != nil && !errors.Is(err, store.ErrNotFound) {
 		drop()
 		return Project{}, false, err
 	}
-	if err := h.machine.Create(ctx, name); err != nil {
+	if err := h.machine.Create(ctx, id); err != nil {
 		drop()
 		return Project{}, false, err
 	}
 	origin := h.git.Origin(ctx, dir)
-	p, err = h.changeRecord(ctx, name, "Projects: add "+name, func(r *Record) { r.HQ = origin })
+	p, err = h.changeRecord(ctx, id, "Projects: add "+id, func(r *Record) {
+		r.HQ = origin
+		r.DisplayName = name
+	})
 	if err != nil {
-		_ = h.machine.Remove(ctx, name)
+		_ = h.machine.Remove(ctx, id)
 		drop()
 		return Project{}, false, err
 	}
@@ -360,15 +369,12 @@ func (h *Home) SetHidden(ctx context.Context, project string, hidden bool) (Proj
 // maxProjectName is the most characters a project's display name has.
 const maxProjectName = 80
 
-// SetName gives a project its display name, any words (trimmed), "" to show
-// it by its id again. Only how it shows changes, so a team may be deployed.
+// SetName gives a project its display name, any words (displayName), "" to
+// show it by its id again. Only how it shows changes, so a team may be deployed.
 func (h *Home) SetName(ctx context.Context, project, name string) (Project, error) {
-	name = strings.TrimSpace(name)
-	if utf8.RuneCountInString(name) > maxProjectName {
-		return Project{}, fmt.Errorf("%w: a project's name has at most %d characters", ErrInvalid, maxProjectName)
-	}
-	if strings.ContainsFunc(name, unicode.IsControl) {
-		return Project{}, fmt.Errorf("%w: a project's name is one line of text", ErrInvalid)
+	name, err := displayName(project, name)
+	if err != nil {
+		return Project{}, err
 	}
 	h.mu.Lock()
 	defer h.unlock()
@@ -380,6 +386,23 @@ func (h *Home) SetName(ctx context.Context, project, name string) (Project, erro
 		return Project{}, fmt.Errorf("%w: project %s shows as %s already", ErrExists, other, shown)
 	}
 	return h.changeRecord(ctx, project, fmt.Sprintf("Projects: name %s %q", project, name), func(r *Record) { r.DisplayName = name })
+}
+
+// displayName checks project id's display name, as the CEO typed it: one
+// line of at most maxProjectName characters. It returns it trimmed, or ""
+// when it reads as the id made readable, so the record keeps no copy of it.
+func displayName(id, name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if utf8.RuneCountInString(name) > maxProjectName {
+		return "", fmt.Errorf("%w: a project's name has at most %d characters", ErrInvalid, maxProjectName)
+	}
+	if strings.ContainsFunc(name, unicode.IsControl) {
+		return "", fmt.Errorf("%w: a project's name is one line of text", ErrInvalid)
+	}
+	if name == readable(id) {
+		return "", nil
+	}
+	return name, nil
 }
 
 // usableRepo checks a folder to add as a repo of p (Home.usableFolder)

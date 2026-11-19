@@ -313,7 +313,7 @@ The [home](../models/home.md) (this machine's settings) and what the CEO owns in
 type Dashboard interface {
     Projects() []Project;  Project(id) (Project, error)
     Checked(id) (Project, error)                     // the project with its code repos checked now (before a start)
-    NewProject(name, clone) (Project, error)         // the record, its files and its HQ: new (project.toml and a starter wiki), cloned, or one left there taken over
+    NewProject(id, name, clone) (Project, created bool, error) // the record, its files and its HQ: new (project.toml and a starter wiki), cloned, or one left there taken over
     AddRepo(project, name, path) (Project, error)    // an existing code repo; NewRepo makes an empty one at path
     LocateRepo(project, name, path) (Project, error) // a moved repo: the new path must hold its root commit
     RemoveRepo(project, name) (Project, error)       // refused while a team is deployed on the project

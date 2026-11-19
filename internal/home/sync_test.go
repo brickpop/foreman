@@ -36,7 +36,7 @@ func headOf(t *testing.T, dir string) string { return gitOut(t, dir, "rev-parse"
 // origin.
 func TestSyncBringsInAndPushes(t *testing.T) {
 	h := loaded(t, nil)
-	ledger, _, err := h.NewProject(ctx, "ledger", "")
+	ledger, _, err := h.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,11 +89,11 @@ func TestSyncBringsInAndPushes(t *testing.T) {
 // conflict leaves the HQ as it was.
 func TestSyncReportsWhatIsNotBackedUp(t *testing.T) {
 	h := loaded(t, nil)
-	ledger, _, err := h.NewProject(ctx, "ledger", "")
+	ledger, _, err := h.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	relay, _, err := h.NewProject(ctx, "relay", "")
+	relay, _, err := h.NewProject(ctx, "relay", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,10 +127,10 @@ func TestSyncReportsWhatIsNotBackedUp(t *testing.T) {
 	}
 
 	// Made since the sync: listed while it has no origin; a clone has one.
-	if _, _, err := h.NewProject(ctx, "fresh", ""); err != nil {
+	if _, _, err := h.NewProject(ctx, "fresh", "", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.NewProject(ctx, "copy", hq); err != nil {
+	if _, _, err := h.NewProject(ctx, "copy", "", hq); err != nil {
 		t.Fatal(err)
 	}
 	got = map[string]Backup{}

@@ -33,11 +33,12 @@ type Config interface {
 	// SaveTeam writes a team file if still at version; returns the saved team.
 	SaveTeam(ctx context.Context, c home.TeamConfig, version string) (home.Team, error)
 	// NewProject creates a project with its HQ, new or cloned from clone (a
-	// URL or a local path), and no code repo yet; created is false when it
+	// URL or a local path), and no code repo yet: id is its slug, name its
+	// display name ("": shown by its id); created is false when it
 	// took over an HQ left there. RemoveProject removes one and its history,
 	// keeping its folder: its HQ only if deleteHQ, its agents' worktrees only
 	// if deleteWorktrees.
-	NewProject(ctx context.Context, name, clone string) (p home.Project, created bool, err error)
+	NewProject(ctx context.Context, id, name, clone string) (p home.Project, created bool, err error)
 	RemoveProject(ctx context.Context, id string, deleteHQ, deleteWorktrees bool) error
 	// BringHere clones the HQ of a project not on this machine from the
 	// origin its record keeps.
@@ -92,14 +93,15 @@ func configRoutes(mux *http.ServeMux, c Config) {
 	})
 	mux.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
+			ID    string `json:"id"`
 			Name  string `json:"name"`
 			Clone string `json:"clone"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12)).Decode(&req); err != nil {
-			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {name, clone?}")
+			writeError(w, http.StatusBadRequest, "BAD_REQUEST", "expected {id, name?, clone?}")
 			return
 		}
-		p, created, err := c.NewProject(r.Context(), req.Name, req.Clone)
+		p, created, err := c.NewProject(r.Context(), req.ID, req.Name, req.Clone)
 		if err == nil && created {
 			// 201 tells a new HQ from one taken over (200).
 			writeJSON(w, http.StatusCreated, p)

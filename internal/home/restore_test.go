@@ -18,11 +18,11 @@ func TestRestoreAndBringHere(t *testing.T) {
 	served(t, root, "acme/api.git", "main")
 	trunk := served(t, root, "acme/trunk.git", "trunk")
 
-	ledger, _, err := old.NewProject(ctx, "ledger", "")
+	ledger, _, err := old.NewProject(ctx, "ledger", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := old.NewProject(ctx, "relay", ""); err != nil {
+	if _, _, err := old.NewProject(ctx, "relay", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	hq := backedBy(t, ledger.Path)

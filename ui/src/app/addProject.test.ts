@@ -5,6 +5,7 @@ import {
   defaultToSend,
   folderCrumbs,
   inside,
+  newProjectHint,
   projectSlug,
   repoName,
 } from "./addProject";
@@ -127,5 +128,18 @@ describe("folderCrumbs", () => {
       { name: "srv", path: "/srv" },
       { name: "a", path: "/srv/a" },
     ]);
+  });
+});
+
+describe("newProjectHint", () => {
+  it("shows the id the typed words make, and the words, trimmed, as how it shows", () => {
+    expect(newProjectHint("  My Café! ")).toBe(
+      "Its id: my-cafe, in projects/my-cafe/ of Foreman’s folder. It shows as “My Café!”.",
+    );
+  });
+
+  it("explains what the words become while they make no id", () => {
+    expect(newProjectHint("")).toContain("Any words");
+    expect(newProjectHint("!!!")).toContain("Any words");
   });
 });

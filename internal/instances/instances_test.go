@@ -101,7 +101,7 @@ func newFixture(t *testing.T, script string, maxSessions int) *fixture {
 	if err := hm.Load(ctx, home.Deps{Git: git.New(), Projects: db.Projects()}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := hm.NewProject(ctx, "ledger", ""); err != nil {
+	if _, _, err := hm.NewProject(ctx, "ledger", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := hm.AddRepo(ctx, "ledger", "ledger-api", api, ""); err != nil {
@@ -1667,7 +1667,7 @@ func TestAMovedRepoStopsItsAgentsUntilLocated(t *testing.T) {
 // collides. Stopped on one, it starts again on the other all the same.
 func TestATeamWorksOnTwoProjectsSharingARepo(t *testing.T) {
 	f := newFixture(t, keepsRunning, 12)
-	if _, _, err := f.hm.NewProject(ctx, "suite", ""); err != nil {
+	if _, _, err := f.hm.NewProject(ctx, "suite", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.hm.AddRepo(ctx, "suite", "api", filepath.Join(f.root, "dev", "ledger-api"), ""); err != nil {

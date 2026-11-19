@@ -29,7 +29,7 @@ export function cloneName(url: string): string {
 }
 
 /** A new project's name from what the CEO typed: a slug, as the server
- * requires (it names its folders; readable makes how it shows):
+ * requires (it names its folders; the typed words are how it shows):
  * lowercase letters and digits, accents dropped, anything else one hyphen,
  * at most 63. "My Café" is my-cafe; "" when nothing is left. */
 export function projectSlug(typed: string): string {
@@ -41,6 +41,14 @@ export function projectSlug(typed: string): string {
     .replace(/^-+/, "")
     .slice(0, 63)
     .replace(/-+$/, "");
+}
+
+/** The New project dialog's hint under the name: the id and folder the typed
+ * words make, and how the project will show (those words, trimmed). */
+export function newProjectHint(typed: string): string {
+  const id = projectSlug(typed);
+  if (!id) return "Any words: they become its id and its folder, in lowercase with hyphens.";
+  return `Its id: ${id}, in projects/${id}/ of Foreman’s folder. It shows as “${typed.trim()}”.`;
 }
 
 /** A new folder's path, name inside folder. */

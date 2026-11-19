@@ -32,7 +32,7 @@ var every = []string{"ask", "reply", "read_message", "open", "switch", "commit",
 func input(agent string, tools []string) Input {
 	return Input{
 		Agent: agent, Team: atlas, Project: "ledger", Sandbox: "/home/ceo/foreman/worktrees/ledger/" + agent, HQ: "/home/ceo/foreman/projects/ledger/hq", Files: "/home/ceo/foreman/projects/ledger/files", Tools: tools,
-		Repos:  []home.Repo{{Name: "api", Path: "/home/ceo/dev/api", Default: "main"}},
+		Repos:  []home.Repo{{ID: "api", Path: "/home/ceo/dev/api", Default: "main"}},
 		Config: home.ProjectConfig{Checks: "npm test", AlwaysAskCEO: []string{"new dependency"}, LandingPrefixes: []string{"f/", "fix/"}},
 	}
 }
@@ -149,7 +149,7 @@ func TestOptionalSectionsAreLeftOut(t *testing.T) {
 	in := input("ilya", nil)
 	in.Team.Playbook = nil
 	in.Config = home.ProjectConfig{}
-	in.Repos = []home.Repo{{Name: "api", Default: "trunk"}}
+	in.Repos = []home.Repo{{ID: "api", Default: "trunk"}}
 	got := Compose(in)
 	for _, absent := range []string{"## Playbook", "## Always escalate", "run:"} {
 		if strings.Contains(got, absent) {
@@ -301,8 +301,8 @@ func TestTheDefaultBranchOfEachRepo(t *testing.T) {
 		repos []home.Repo
 		want  string
 	}{
-		{[]home.Repo{{Name: "api", Default: "main"}, {Name: "web", Default: "main"}}, "sit on no branch, at main."},
-		{[]home.Repo{{Name: "poc", Default: "master"}, {Name: "web", Default: "main"}}, "sit on no branch, at master in poc, main in web."},
+		{[]home.Repo{{ID: "api", Default: "main"}, {ID: "web", Default: "main"}}, "sit on no branch, at main."},
+		{[]home.Repo{{ID: "poc", Default: "master"}, {ID: "web", Default: "main"}}, "sit on no branch, at master in poc, main in web."},
 	} {
 		in := input("tove", nil)
 		in.Repos = tc.repos

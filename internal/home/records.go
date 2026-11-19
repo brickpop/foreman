@@ -6,8 +6,6 @@ import (
 	"maps"
 	"regexp"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/brickpop/foreman/internal/git"
 )
@@ -32,6 +30,7 @@ type Record struct {
 
 // RepoRecord is one of a project's code repos, wherever it is.
 type RepoRecord struct {
+	DisplayName string `toml:"display_name,omitempty"` // "" shows the id readable
 	// Remote is its origin when it was added, where a new machine can clone
 	// it from; "" when it had none.
 	Remote        string `toml:"remote,omitempty"`
@@ -65,8 +64,8 @@ func ParseRecords(data []byte) (map[string]Record, []string) {
 			p.add("%s: the same id as %s, in another case", id, ids[strings.ToLower(id)])
 		}
 		ids[strings.ToLower(id)] = id
-		if utf8.RuneCountInString(r.DisplayName) > maxProjectName || strings.ContainsFunc(r.DisplayName, unicode.IsControl) {
-			p.add("%s.display_name: one line of at most %d characters", id, maxProjectName)
+		if _, err := displayName(id, r.DisplayName); err != nil {
+			p.add("%s.display_name: %s", id, sentence(err))
 		}
 		names := map[string]string{}
 		for _, name := range sortedKeys(r.Repos) {
@@ -81,6 +80,9 @@ func ParseRecords(data []byte) (map[string]Record, []string) {
 				p.add("%s: the same name as %s, in another case", at, names[strings.ToLower(name)])
 			}
 			names[strings.ToLower(name)] = name
+			if _, err := displayName(name, repo.DisplayName); err != nil {
+				p.add("%s.display_name: %s", at, sentence(err))
+			}
 			if !commitHash.MatchString(repo.RootCommit) {
 				p.add("%s.root_commit: a commit's full hash", at)
 			}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -61,8 +62,8 @@ func (f fakeConfig) NewProject(_ context.Context, id, name, clone string) (home.
 	p, err := f.changed("NewProject", "", id, name+" clone="+clone)
 	return p, id != "kept", err
 }
-func (f fakeConfig) RenameRepo(_ context.Context, project, name, newName string) (home.Project, error) {
-	return f.changed("RenameRepo", project, newName, name)
+func (f fakeConfig) RenameRepo(_ context.Context, project, repo, name string) (home.Project, error) {
+	return f.changed("RenameRepo", project, name, repo)
 }
 func (f fakeConfig) RemoveProject(_ context.Context, id string, deleteHQ, deleteWorktrees bool) error {
 	_, err := f.changed("RemoveProject", "", id, "")
@@ -156,7 +157,7 @@ func (f fakeConfig) changed(call, project, name, path string) (home.Project, err
 }
 
 var config = fakeConfig{
-	projects:     []home.Project{{ID: "ledger", Repos: []home.Repo{{Name: "ledger-api", Path: "/home/ceo/dev/ledger-api"}}, Version: "v1", Problems: []string{"checks: x"}}},
+	projects:     []home.Project{{ID: "ledger", Repos: []home.Repo{{ID: "ledger-api", Name: "Ledger API", Path: "/home/ceo/dev/ledger-api"}}, Version: "v1", Problems: []string{"checks: x"}}},
 	teams:        []home.Team{{ID: "atlas", Config: home.TeamConfig{Name: "Atlas"}}},
 	settings:     home.SettingsFile{Settings: home.DefaultSettings(), Version: "v2"},
 	instructions: home.Instructions{Text: "Answer in Catalan.\n", Version: "v4"},
@@ -182,6 +183,12 @@ func TestConfigEndpoints(t *testing.T) {
 	decodeBody(t, get(t, h, "/api/projects"), &projects)
 	if len(projects) != 1 || projects[0]["id"] != "ledger" || projects[0]["version"] != "v1" || projects[0]["problems"] == nil {
 		t.Errorf("projects %v", projects)
+	}
+	// A repo is {id, name, …}, as a project is: agents get the id only.
+	if repos := projects[0]["repos"].([]any); len(repos) != 1 || !reflect.DeepEqual(repos[0], map[string]any{
+		"id": "ledger-api", "name": "Ledger API", "path": "/home/ceo/dev/ledger-api", "defaultBranch": "", "remote": "", "problem": "",
+	}) {
+		t.Errorf("repos %v", repos)
 	}
 	var team map[string]any
 	decodeBody(t, get(t, h, "/api/teams/atlas"), &team)

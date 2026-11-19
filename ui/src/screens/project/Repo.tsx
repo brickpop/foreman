@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useRouterState, useSearch } from "@tansta
 import { useEffect, useRef, useState } from "react";
 import { type RepoBranch, type Repo as RepoInfo, useClient } from "../../api/client";
 import { withoutTitle } from "../../app/frontmatter";
-import { projectName, readable, when } from "../../app/model";
+import { projectName, repoName, repoTitle, when } from "../../app/model";
 import {
   useDeploymentOn,
   useRepoFile,
@@ -44,12 +44,12 @@ type Open = (link: ResolvedLink) => void;
 export function Repo() {
   const project = useProject();
   const repos = useRepos(project.id);
-  const { repo: name } = useParams({ from: "/projects/$project/repos/$repo" });
+  const { repo: id } = useParams({ from: "/projects/$project/repos/$repo" });
   const search = useSearch({ from: "/projects/$project/repos/$repo" });
   const navigate = useNavigate({ from: "/projects/$project/repos/$repo" });
   const list = repos.data ?? [];
-  const repo = list.find((r) => r.name === name);
-  const at = shownAt(list, name, search.branch);
+  const repo = list.find((r) => r.id === id);
+  const at = shownAt(list, id, search.branch);
   // Each is a step Back returns from (the CEO, 2026-11-02): another branch, a
   // file, the history.
   const go = (next: typeof search) => navigate({ search: (s) => ({ ...s, ...next }) });
@@ -71,14 +71,19 @@ export function Repo() {
         >
           ←
         </Link>
-        <h1 className="m-0 text-[18px] font-semibold">{repo?.hq ? "HQ" : readable(name)}</h1>
-        <span className="font-mono text-[12.5px] text-tx4">{name}/</span>
+        <h1
+          title={repoTitle(project, id)}
+          className="m-0 min-w-0 truncate text-[18px] font-semibold"
+        >
+          {repoName(project, id)}
+        </h1>
+        <span className="font-mono text-[12.5px] text-tx4">{id}/</span>
       </div>
       {repos.isError && <p className="m-0 text-[13px] text-err">{repos.error.message}</p>}
       {repos.isPending && <Loading rows={6} />}
       {repos.data && !repo && (
         <Empty>
-          {projectName([project], project.id)} has no repo {name}.
+          {projectName([project], project.id)} has no repo {id}.
         </Empty>
       )}
       {repo && at && (

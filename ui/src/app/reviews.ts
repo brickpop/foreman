@@ -101,9 +101,10 @@ export function dismissLabel(choice: DismissChoice, note: string): string {
   return choice.tells && note.trim() ? "Dismiss and send" : "Dismiss now";
 }
 
-/** The branches a dismissal kept, and why, one line each. */
-export function keptLines(dismissed: Dismissed): string {
-  return dismissed.kept.map((k) => `${k.branch} in ${k.repo}: ${k.why}.`).join("\n");
+/** The branches a dismissal kept, and why, one line each, each repo as name
+ * shows it. */
+export function keptLines(dismissed: Dismissed, name: (repo: string) => string): string {
+  return dismissed.kept.map((k) => `${k.branch} in ${name(k.repo)}: ${k.why}.`).join("\n");
 }
 
 /** A review's status as the screens say it. */

@@ -45,7 +45,8 @@ type Config interface {
 	BringHere(ctx context.Context, id string) (home.Project, error)
 	// AddRepo adds an existing repo, by its folder, with def as its default
 	// branch ("": main, which it must have); NewRepo creates an empty one at
-	// a new folder, on main, and adds it.
+	// a new folder, on main, and adds it. name is any words: the repo's id is
+	// made from it, in add, new and clone alike.
 	AddRepo(ctx context.Context, project, name, path, def string) (home.Project, error)
 	NewRepo(ctx context.Context, project, name, path string) (home.Project, error)
 	// CloneRepo adds a repo cloned from remote into Foreman's repos/;
@@ -56,9 +57,10 @@ type Config interface {
 	// repo out of the project (refused while a team is deployed on it).
 	LocateRepo(ctx context.Context, project, name, path string) (home.Project, error)
 	RemoveRepo(ctx context.Context, project, name string) (home.Project, error)
-	// RenameRepo renames a repo, its agents' worktrees with it (refused while
-	// a team is deployed on the project).
-	RenameRepo(ctx context.Context, project, name, newName string) (home.Project, error)
+	// RenameRepo gives repo a new name, and the id made from it: when the id
+	// changes, its agents' worktrees move with it (refused while a team is
+	// deployed on the project).
+	RenameRepo(ctx context.Context, project, repo, name string) (home.Project, error)
 	// SetRepoDefault sets a repo's default branch, one it has.
 	SetRepoDefault(ctx context.Context, project, name, branch string) (home.Project, error)
 	// Browse lists a folder for picking repos, inside the

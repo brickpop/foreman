@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Repo, RepoBranch, Team } from "../api/client";
+import { readable } from "./model";
 import {
   branchesOf,
   branchOwner,
@@ -83,7 +84,7 @@ describe("worktrees", () => {
     ({ name, ahead: 0, uncommitted: false, agent: "", ...more }) as RepoBranch;
   const repos = [
     {
-      name: "api",
+      id: "api",
       hq: false,
       defaultBranch: "main",
       branches: [
@@ -95,7 +96,7 @@ describe("worktrees", () => {
       idle: [{ agent: "ivo", uncommitted: false }],
     },
     {
-      name: "web",
+      id: "web",
       hq: false,
       defaultBranch: "trunk",
       branches: [branch("trunk"), branch("wt/tove/LED-44", { agent: "tove" })],
@@ -105,7 +106,7 @@ describe("worktrees", () => {
       ],
     },
     {
-      name: "hq",
+      id: "hq",
       hq: true,
       defaultBranch: "main",
       branches: [branch("main")],
@@ -129,15 +130,15 @@ describe("worktrees", () => {
   });
 
   it("names the worktrees holding uncommitted work, on a branch or on none", () => {
-    expect(uncommittedWork(worktrees(repos))).toEqual(["ivo's web", "tove's api"]);
+    expect(uncommittedWork(worktrees(repos), readable)).toEqual(["ivo's Web", "tove's Api"]);
     // A branch's ahead commits are committed work: not listed.
     const committed = repos.map((r) => ({
       ...r,
       branches: r.branches.map((b) => ({ ...b, uncommitted: false })),
       idle: r.idle.map((t) => ({ ...t, uncommitted: false })),
     }));
-    expect(uncommittedWork(worktrees(committed))).toEqual([]);
-    expect(uncommittedWork([])).toEqual([]);
+    expect(uncommittedWork(worktrees(committed), readable)).toEqual([]);
+    expect(uncommittedWork([], readable)).toEqual([]);
   });
 
   it("gives the branch an agent is on, once however many repos it spans", () => {
@@ -167,7 +168,7 @@ describe("worktrees", () => {
     const busyWeb = repos.map((r) => ({
       ...r,
       branches: r.branches.map((b) =>
-        b.agent === "tove" ? { ...b, ahead: 0, uncommitted: r.name === "web" } : b,
+        b.agent === "tove" ? { ...b, ahead: 0, uncommitted: r.id === "web" } : b,
       ),
     }));
     expect(names(branchPlaces(busyWeb, "wt/tove/LED-44"))).toEqual([["web"], ["api"]]);

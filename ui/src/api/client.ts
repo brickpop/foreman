@@ -165,7 +165,8 @@ export interface HomeArea {
   ): Promise<void>;
   /** Adds an existing repo by its folder, with that default branch (none:
    * main, which it must have); newRepo creates an empty one at a new folder,
-   * on main. */
+   * on main. name is how it shows, any words: the server makes its id from
+   * it (slug), here and in cloneRepo and renameRepo. */
   addRepo(project: string, name: string, path: string, defaultBranch?: string): Promise<Project>;
   newRepo(project: string, name: string, path: string): Promise<Project>;
   /** Adds a repo cloned from remote into Foreman's repos/<its URL's path>
@@ -177,13 +178,15 @@ export interface HomeArea {
     remote: string,
     defaultBranch?: string,
   ): Promise<Project>;
-  cloneMissingRepo(project: string, name: string): Promise<Project>;
+  cloneMissingRepo(project: string, repo: string): Promise<Project>;
   /** Sets a repo's default branch, one it has. */
-  setRepoDefault(project: string, name: string, branch: string): Promise<Project>;
+  setRepoDefault(project: string, repo: string, branch: string): Promise<Project>;
   /** Points a missing repo at its new folder (the same repo). */
-  locateRepo(project: string, name: string, path: string): Promise<Project>;
-  renameRepo(project: string, name: string, newName: string): Promise<Project>;
-  removeRepo(project: string, name: string): Promise<Project>;
+  locateRepo(project: string, repo: string, path: string): Promise<Project>;
+  /** Gives a repo another name; its id follows the name, and the answer
+   * carries the repo under its new id. */
+  renameRepo(project: string, repo: string, name: string): Promise<Project>;
+  removeRepo(project: string, repo: string): Promise<Project>;
   /** A folder for picking repos, inside the CEO's home folder; none: the
    * folder Foreman was started in. With a project, which of its repos the
    * folder already is. */
@@ -497,27 +500,25 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
             defaultBranch,
           })
         ).json() as Promise<Project>,
-      cloneMissingRepo: async (project, name) =>
+      cloneMissingRepo: async (project, repo) =>
         (
-          await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}`, { clone: true })
+          await request("PUT", `/api/projects/${id(project)}/repos/${id(repo)}`, { clone: true })
         ).json() as Promise<Project>,
-      setRepoDefault: async (project, name, branch) =>
+      setRepoDefault: async (project, repo, branch) =>
         (
-          await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}/default`, { branch })
+          await request("PUT", `/api/projects/${id(project)}/repos/${id(repo)}/default`, { branch })
         ).json() as Promise<Project>,
-      locateRepo: async (project, name, path) =>
+      locateRepo: async (project, repo, path) =>
         (
-          await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}`, { path })
+          await request("PUT", `/api/projects/${id(project)}/repos/${id(repo)}`, { path })
         ).json() as Promise<Project>,
-      renameRepo: async (project, name, newName) =>
+      renameRepo: async (project, repo, name) =>
         (
-          await request("PUT", `/api/projects/${id(project)}/repos/${id(name)}/name`, {
-            name: newName,
-          })
+          await request("PUT", `/api/projects/${id(project)}/repos/${id(repo)}/name`, { name })
         ).json() as Promise<Project>,
-      removeRepo: async (project, name) =>
+      removeRepo: async (project, repo) =>
         (
-          await request("DELETE", `/api/projects/${id(project)}/repos/${id(name)}`)
+          await request("DELETE", `/api/projects/${id(project)}/repos/${id(repo)}`)
         ).json() as Promise<Project>,
       folders: (path, project) => {
         const q = new URLSearchParams();

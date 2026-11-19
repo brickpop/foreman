@@ -40,7 +40,7 @@ func (config) Team(id string) (home.Team, error) {
 
 // Project: every project has a code repo, so every tool is offered.
 func (config) Project(id string) (home.Project, error) {
-	return home.Project{ID: id, Repos: []home.Repo{{Name: "api", Default: "main"}}}, nil
+	return home.Project{ID: id, Repos: []home.Repo{{ID: "api", Default: "main"}}}, nil
 }
 
 // sessions records what is typed into each instance and who was woken.

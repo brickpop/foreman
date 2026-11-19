@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/brickpop/foreman/internal/profiles"
+	"github.com/brickpop/foreman/internal/store"
 )
 
 func entries(t *testing.T, dir string) []string {
@@ -85,6 +86,14 @@ func TestNewProject(t *testing.T) {
 	} {
 		if _, _, err := h.NewProject(ctx, name, "", ""); !errors.Is(err, want) {
 			t.Errorf("%q: %v, want %v", name, err, want)
+		}
+	}
+	for id, says := range map[string]string{
+		"dev-project": "Another project has the id dev-project already: pick another name.",
+		"a b":         "A project id is lowercase letters, digits and single hyphens, at most 63 characters (my-portfolio).",
+	} {
+		if _, _, err := h.NewProject(ctx, id, "", ""); err == nil || sentence(err) != says {
+			t.Errorf("%q: %v, want %q", id, err, says)
 		}
 	}
 	if got := entries(t, filepath.Dir(dir)); !slices.Equal(got, []string{"dev-project"}) {
@@ -202,14 +211,15 @@ func TestAddRepo(t *testing.T) {
 		}
 	}
 	app, sdk := codeRepo(t, "dev/aragon/app"), codeRepo(t, "dev/aragon/sdk")
-	if _, err := h.AddRepo(ctx, "aragon", "app", app, ""); err != nil {
+	// The id is made from the name; a name that reads as it is kept as "".
+	if _, err := h.AddRepo(ctx, "aragon", " App ", app, ""); err != nil {
 		t.Fatal(err)
 	}
-	p, err := h.AddRepo(ctx, "aragon", "sdk", sdk+"/", "")
+	p, err := h.AddRepo(ctx, "aragon", "SDK", sdk+"/", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(p.Repos, []Repo{{Name: "app", Path: app, Default: "main", root: gitOut(t, app, "rev-parse", "HEAD")}, {Name: "sdk", Path: sdk, Default: "main", root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
+	if !reflect.DeepEqual(p.Repos, []Repo{{ID: "app", Path: app, Default: "main", root: gitOut(t, app, "rev-parse", "HEAD")}, {ID: "sdk", Name: "SDK", Path: sdk, Default: "main", root: gitOut(t, sdk, "rev-parse", "HEAD")}}) || len(p.Problems) != 0 {
 		t.Errorf("aragon %+v", p)
 	}
 	if p, err := h.AddRepo(ctx, "app-only", "app", app, ""); err != nil || len(p.Repos) != 1 {
@@ -234,10 +244,13 @@ func TestAddRepo(t *testing.T) {
 		want             error
 		says             string
 	}{
-		{"the same name", "app", codeRepo(t, "dev/other"), ErrExists, "aragon has a repo app"},
-		{"in another case", "App", codeRepo(t, "dev/other2"), ErrExists, "aragon has a repo app"},
-		{"the HQ's name", "HQ", codeRepo(t, "dev/p"), ErrInvalid, "the HQ's name"},
-		{"a name that isn't a folder", "a/b", codeRepo(t, "dev/q"), ErrInvalid, "a repo name is"},
+		{"the same id", "app", codeRepo(t, "dev/other"), ErrExists, "Another repo has the id app already: pick another name."},
+		{"the same id, from other words", "APP!", codeRepo(t, "dev/other2"), ErrExists, "Another repo has the id app already: pick another name."},
+		{"the HQ's id", " hq ", codeRepo(t, "dev/p"), ErrInvalid, "“HQ” is the project’s HQ: pick another name."},
+		{"no letter or digit", "日本!", codeRepo(t, "dev/q"), ErrInvalid, "A repo's name needs a letter or digit (a–z, 0–9): its id is made from them."},
+		{"no name", "  ", codeRepo(t, "dev/q2"), ErrInvalid, "needs a letter or digit"},
+		{"too long", strings.Repeat("a", maxDisplayName+1), codeRepo(t, "dev/q3"), ErrInvalid, "A name has at most 80 characters."},
+		{"two lines", "a\nb", codeRepo(t, "dev/q4"), ErrInvalid, "A name is one line."},
 		{"the same folder", "app2", app, ErrExists, "aragon's repo app"},
 		{"the same folder by a symlink", "app2", link, ErrExists, "aragon's repo app"},
 		{"a relative path", "rel", "dev/aragon/app", ErrInvalid, "not an absolute path"},
@@ -605,7 +618,7 @@ func TestRenameRepo(t *testing.T) {
 		t.Errorf("while deployed: %v", err)
 	}
 	deployed = false
-	for newName, want := range map[string]error{"WEB": ErrExists, "hq": ErrInvalid, "a/b": ErrInvalid} {
+	for newName, want := range map[string]error{"WEB": ErrExists, "hq": ErrInvalid, "!!!": ErrInvalid} {
 		if _, err := h.RenameRepo(ctx, "ledger", "api", newName); !errors.Is(err, want) {
 			t.Errorf("onto %q: %v", newName, err)
 		}
@@ -840,12 +853,12 @@ func TestSetName(t *testing.T) {
 	if p, _ := h.Project("ledger"); p.Name != "Ledger · v2 (EUR)" || !exists(p.Path) {
 		t.Errorf("after a restart: %+v", p)
 	}
-	for _, bad := range []string{strings.Repeat("é", maxProjectName+1), "two\nlines", "tab\there"} {
+	for _, bad := range []string{strings.Repeat("é", maxDisplayName+1), "two\nlines", "tab\there"} {
 		if _, err := h.SetName(ctx, "ledger", bad); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
-	if p, err := h.SetName(ctx, "ledger", strings.Repeat("é", maxProjectName)); err != nil || p.Name == "" {
+	if p, err := h.SetName(ctx, "ledger", strings.Repeat("é", maxDisplayName)); err != nil || p.Name == "" {
 		t.Errorf("at the limit, in characters not bytes: %v", err)
 	}
 	if p, err := h.SetName(ctx, "ledger", " Ledger "); err != nil || p.Name != "" {
@@ -877,7 +890,7 @@ func TestNewProjectKeepsItsName(t *testing.T) {
 	if p, _, err := h.NewProject(ctx, "ledger", "Ledger", ""); err != nil || p.Name != "" {
 		t.Errorf("its id made readable: %+v %v", p, err)
 	}
-	for _, bad := range []string{strings.Repeat("é", maxProjectName+1), "two\nlines"} {
+	for _, bad := range []string{strings.Repeat("é", maxDisplayName+1), "two\nlines"} {
 		if _, _, err := h.NewProject(ctx, "bad", bad, ""); !errors.Is(err, ErrInvalid) {
 			t.Errorf("%q: %v", bad, err)
 		}
@@ -930,7 +943,7 @@ func TestProjectNamesAreUnique(t *testing.T) {
 	if p, err := h.SetName(ctx, "big-ledger", "Ledger"); err != nil || p.Name != "Ledger" {
 		t.Errorf("a name freed: %+v %v", p, err)
 	}
-	if _, err := h.SetName(ctx, "ledger", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "big-ledger shows as Ledger already") {
+	if _, err := h.SetName(ctx, "ledger", ""); !errors.Is(err, ErrExists) || err.Error() != "home: exists: Another project shows as “Ledger” already: pick another name." {
 		t.Errorf("back to its id, which reads as another's name: %v", err)
 	}
 	if _, _, err := h.NewProject(ctx, "ledger-eur", "", ""); err != nil {
@@ -951,7 +964,7 @@ func TestProjectNamesAreUnique(t *testing.T) {
 	if _, err := h.SetName(ctx, "ledger", "Old ledger"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := h.NewProject(ctx, "old-ledger", "", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "ledger shows as Old ledger already") {
+	if _, _, err := h.NewProject(ctx, "old-ledger", "", ""); !errors.Is(err, ErrExists) || !strings.Contains(err.Error(), "Another project shows as “Old ledger” already") {
 		t.Errorf("a new project reading as another's name: %v", err)
 	}
 }
@@ -962,5 +975,186 @@ func TestReadable(t *testing.T) {
 		if got := readable(id); got != want {
 			t.Errorf("%q: %q, want %q", id, got, want)
 		}
+	}
+}
+
+// slug follows testdata/slugs.json, the table the UI's slug is tested
+// against too, and every id it makes is a valid repo name.
+func TestSlug(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "slugs.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []struct{ Words, Slug string }
+	if err := json.Unmarshal(data, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range cases {
+		got := slug(c.Words)
+		if got != c.Slug {
+			t.Errorf("slug(%q) = %q, want %q", c.Words, got, c.Slug)
+		}
+		if got != "" && !validName(got) {
+			t.Errorf("slug(%q) = %q, not a valid repo name", c.Words, got)
+		}
+	}
+}
+
+// repoOf is p's repo id, the zero repo if none.
+func repoOf(p Project, id string) Repo {
+	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.ID == id })
+	if i < 0 {
+		return Repo{}
+	}
+	return p.Repos[i]
+}
+
+// editRecords changes a project's repos in projects.toml as a sync with
+// another machine would bring them, this machine's rows and worktrees left
+// as they are, and reloads.
+func editRecords(t *testing.T, h *Home, project string, change func(repos map[string]RepoRecord)) {
+	t.Helper()
+	records := readRecords(t, h)
+	change(records[project].Repos)
+	data, err := encode(records)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, h.HQ(projectsFile), string(data))
+	h.reload()
+}
+
+// Renaming an older repo to an id in another case only (Ledger to ledger)
+// moves its worktrees in two steps, which a Mac's filesystem needs, and
+// carries its open merge requests along.
+func TestRenameRepoChangingCaseOnly(t *testing.T) {
+	h, db, err := loadWithDB(t, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := h.NewProject(ctx, "books", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	api := codeRepo(t, "dev/api")
+	if _, err := h.AddRepo(ctx, "books", "api", api, ""); err != nil {
+		t.Fatal(err)
+	}
+	olderRepo(t, h, "books", "api", "Ledger")
+	sandboxWorktree(t, h, "books", "mara", "Ledger", api)
+	mrs := db.MergeRequests()
+	open, _ := mrs.Save(ctx, store.MergeRequest{ProjectID: "books", AuthorInstance: "mara@books", Repo: "Ledger", Branch: "lead/atlas/integration"})
+
+	p, err := h.RenameRepo(ctx, "books", "Ledger", "Ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := repoOf(p, "ledger"); r.Path != api || r.Name != "" || len(p.Repos) != 1 {
+		t.Errorf("renamed: %+v", p.Repos)
+	}
+	sandbox := h.Sandbox("books", "mara")
+	moved := filepath.Join(sandbox, "ledger")
+	if names := entries(t, sandbox); !slices.Equal(names, []string{"ledger"}) || gitOut(t, moved, "branch", "--show-current") != "wt/mara/main" {
+		t.Errorf("mara's worktrees: %v", names)
+	}
+	real, err := filepath.EvalSymlinks(moved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if list := gitOut(t, api, "worktree", "list", "--porcelain"); !strings.Contains(list, "worktree "+real+"\n") {
+		t.Errorf("the repo doesn't know the moved worktree:\n%s", list)
+	}
+	if got, _ := mrs.Get(ctx, open.ID); got.Repo != "ledger" {
+		t.Errorf("the open merge request is on %q", got.Repo)
+	}
+	if repos := readRecords(t, h)["books"].Repos; len(repos) != 1 || repos["ledger"].RootCommit == "" {
+		t.Errorf("projects.toml: %+v", repos)
+	}
+}
+
+// A repo's id is made from its name. Repos added before keep their ids and
+// show them readable; no repo is added showing as one of them, and renaming
+// one gives it an id made from its name. A rename that keeps the id changes
+// only how the repo shows. No rename while a team is deployed.
+func TestRepoNames(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	api, web := codeRepo(t, "dev/api"), codeRepo(t, "dev/web")
+	for name, path := range map[string]string{"api": api, "web": web} {
+		if _, err := h.AddRepo(ctx, "ledger", name, path, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// As added before: Ledger_API and Web.
+	for from, to := range map[string]string{"api": "Ledger_API", "web": "Web"} {
+		if err := h.machine.RenameRepo(ctx, "ledger", from, to); err != nil {
+			t.Fatal(err)
+		}
+	}
+	editRecords(t, h, "ledger", func(repos map[string]RepoRecord) {
+		for from, to := range map[string]string{"api": "Ledger_API", "web": "Web"} {
+			r := repos[from]
+			r.DisplayName = ""
+			repos[to] = r
+			delete(repos, from)
+		}
+	})
+	if p, _ := h.Project("ledger"); len(p.Problems) != 0 || p.Repos[0].ID != "Ledger_API" || p.Repos[0].Shown() != "Ledger API" {
+		t.Fatalf("an older repo: %+v", p)
+	}
+	other := codeRepo(t, "dev/other")
+	if _, err := h.AddRepo(ctx, "ledger", "Ledger API", other, ""); err == nil || sentence(err) != "Another repo shows as “Ledger API” already: pick another name." {
+		t.Errorf("showing as an older repo: %v", err)
+	}
+	// The id the words make is named, though the older one is Web.
+	if _, err := h.AddRepo(ctx, "ledger", "web!", other, ""); err == nil || sentence(err) != "Another repo has the id web already: pick another name." {
+		t.Errorf("an older id in another case: %v", err)
+	}
+
+	old := sandboxWorktree(t, h, "ledger", "mara", "Ledger_API", api)
+	deployed := true
+	h.deployed = func(context.Context, string) bool { return deployed }
+	for _, name := range []string{"Ledger API", "Ledger_API"} {
+		if _, err := h.RenameRepo(ctx, "ledger", "Ledger_API", name); !errors.Is(err, ErrDeployed) || sentence(err) != "Stop the team on this project first to rename a repo." {
+			t.Errorf("renamed to %q while deployed: %v", name, err)
+		}
+	}
+	if _, err := h.RemoveRepo(ctx, "ledger", "Web"); !errors.Is(err, ErrDeployed) || sentence(err) != "Stop the team on this project first to remove a repo." {
+		t.Errorf("removed while deployed: %v", err)
+	}
+	deployed = false
+
+	p, err := h.RenameRepo(ctx, "ledger", "Ledger_API", "Ledger API")
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved := filepath.Join(h.Sandbox("ledger", "mara"), "ledger-api")
+	if r := repoOf(p, "ledger-api"); r.Name != "Ledger API" || r.Path != api || exists(old) || !exists(moved) {
+		t.Errorf("an older repo renamed: %+v", p.Repos)
+	}
+	p, err = h.RenameRepo(ctx, "ledger", "ledger-api", "  Ledger api ")
+	if r := repoOf(p, "ledger-api"); err != nil || r.Path != api || r.Name != "" || !exists(moved) {
+		t.Errorf("renamed, keeping its id: %+v %v", p.Repos, err)
+	}
+	if got := readRecords(t, h)["ledger"].Repos["ledger-api"].DisplayName; got != "" {
+		t.Errorf("the name kept as %q", got)
+	}
+
+	// A change of case only moves its worktrees too.
+	sandboxWorktree(t, h, "ledger", "mara", "Web", web)
+	p, err = h.RenameRepo(ctx, "ledger", "Web", "Web")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lower := filepath.Join(h.Sandbox("ledger", "mara"), "web")
+	if r := repoOf(p, "web"); r.Path != web || r.Name != "" || gitOut(t, lower, "branch", "--show-current") != "wt/mara/main" {
+		t.Errorf("Web renamed to web: %+v", p.Repos)
+	}
+	if names := entries(t, h.Sandbox("ledger", "mara")); !slices.Equal(names, []string{"ledger-api", "web"}) {
+		t.Errorf("mara's worktrees: %v", names)
 	}
 }

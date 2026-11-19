@@ -603,3 +603,83 @@ describe("nameTakenBy", () => {
     expect(nameTakenBy([...projects, { id: "x", name: "Ledger" }], "ledger", "")).toBe("Ledger");
   });
 });
+
+import slugCases from "../../../internal/home/testdata/slugs.json";
+import { repoName, repoNameRefusal, repoTitle, slug } from "./model";
+
+describe("slug", () => {
+  // The server's table too (internal/home): the hint never disagrees with it.
+  it.each(slugCases)("makes $words into $slug", ({ words, slug: want }) => {
+    expect(slug(words)).toBe(want);
+  });
+
+  it("is never longer than 63", () => {
+    expect(slug("x".repeat(80))).toHaveLength(63);
+  });
+});
+
+describe("repoName", () => {
+  const project = {
+    repos: [
+      { id: "ledger-api", name: "Ledger API" },
+      { id: "Ledger_web", name: "" },
+    ],
+  };
+  it("is the repo's name, else its id made readable", () => {
+    expect(repoName(project, "ledger-api")).toBe("Ledger API");
+    expect(repoName(project, "Ledger_web")).toBe("Ledger web");
+  });
+  it("reads the HQ as HQ, and an id the project no longer has as words", () => {
+    expect(repoName(project, "hq")).toBe("HQ");
+    expect(repoName(project, "old-api")).toBe("Old api");
+    expect(repoName(undefined, "ledger-api")).toBe("Ledger api");
+  });
+  it("tells two that read the same apart by the id in the tooltip", () => {
+    const twins = {
+      repos: [
+        { id: "foo-bar", name: "" },
+        { id: "foo_bar", name: "" },
+      ],
+    };
+    expect(repoTitle(twins, "foo-bar")).toBe("Foo bar · foo-bar");
+    expect(repoTitle(twins, "foo_bar")).toBe("Foo bar · foo_bar");
+  });
+});
+
+describe("repoNameRefusal", () => {
+  const project = {
+    repos: [
+      { id: "ledger-api", name: "Ledger API" },
+      { id: "Ledger_web", name: "" },
+      { id: "docs", name: "Handbook" },
+      { id: "Tools", name: "Toolbox" },
+    ],
+  };
+  it("refuses the id of another repo, in any case", () => {
+    expect(repoNameRefusal(project, "Ledger.API")).toBe(
+      "Another repo has the id ledger-api already: pick another name.",
+    );
+    expect(repoNameRefusal(project, "tools!")).toBe(
+      "Another repo has the id tools already: pick another name.",
+    );
+  });
+  it("refuses what another repo shows as, an older id's readable name too", () => {
+    expect(repoNameRefusal(project, " handbook ")).toBe(
+      "Another repo shows as “Handbook” already: pick another name.",
+    );
+    // Ledger_web shows as "Ledger web"; these words make ledger-web, another id.
+    expect(repoNameRefusal(project, "Ledger Web")).toBe(
+      "Another repo shows as “Ledger web” already: pick another name.",
+    );
+  });
+  it("refuses the HQ's id", () => {
+    expect(repoNameRefusal(project, "HQ")).toBe("“HQ” is the project’s HQ: pick another name.");
+    expect(repoNameRefusal(project, "-hq-")).toBe("“HQ” is the project’s HQ: pick another name.");
+  });
+  it("leaves out the repo being renamed, and words that make no id yet", () => {
+    expect(repoNameRefusal(project, "Ledger api", "ledger-api")).toBeUndefined();
+    expect(repoNameRefusal(project, "Handbook", "docs")).toBeUndefined();
+    expect(repoNameRefusal(project, "!!!")).toBeUndefined();
+    expect(repoNameRefusal(project, "Ledger CLI")).toBeUndefined();
+  });
+});

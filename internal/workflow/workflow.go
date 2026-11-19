@@ -341,9 +341,9 @@ func (t tool) worktrees() []repo { return worktreesIn(t.project, t.c.Instance.Sa
 func worktreesIn(project home.Project, sandbox string) []repo {
 	var repos []repo
 	for _, r := range project.Repos {
-		dir := filepath.Join(sandbox, r.Name)
+		dir := filepath.Join(sandbox, r.ID)
 		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
-			repos = append(repos, repo{r.Name, dir})
+			repos = append(repos, repo{r.ID, dir})
 		}
 	}
 	return repos
@@ -353,7 +353,7 @@ func worktreesIn(project home.Project, sandbox string) []repo {
 func (t tool) unopened() []home.Repo {
 	var out []home.Repo
 	for _, r := range t.project.Repos {
-		if _, err := os.Stat(filepath.Join(t.c.Instance.SandboxPath, r.Name, ".git")); err != nil {
+		if _, err := os.Stat(filepath.Join(t.c.Instance.SandboxPath, r.ID, ".git")); err != nil {
 			out = append(out, r)
 		}
 	}
@@ -375,9 +375,9 @@ func (t tool) current(ctx context.Context) string {
 // repo's default when the repo lacks it), or detached at the default for ""
 // (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo).
 func (t tool) open(ctx context.Context, r home.Repo, branch string) (repo, error) {
-	wt := repo{r.Name, filepath.Join(t.c.Instance.SandboxPath, r.Name)}
-	if err := t.w.Git.Prepare(ctx, r.Path, wt.dir, branch, t.project.Default(r.Name)); err != nil {
-		return wt, fmt.Errorf("opening %s: %w", r.Name, err)
+	wt := repo{r.ID, filepath.Join(t.c.Instance.SandboxPath, r.ID)}
+	if err := t.w.Git.Prepare(ctx, r.Path, wt.dir, branch, t.project.Default(r.ID)); err != nil {
+		return wt, fmt.Errorf("opening %s: %w", r.ID, err)
 	}
 	return wt, nil
 }
@@ -387,7 +387,7 @@ func (t tool) open(ctx context.Context, r home.Repo, branch string) (repo, error
 func (t tool) stillClosed() string {
 	var names []string
 	for _, r := range t.unopened() {
-		names = append(names, r.Name)
+		names = append(names, r.ID)
 	}
 	if len(names) == 0 {
 		return ""
@@ -502,17 +502,17 @@ func names(repos []repo) string {
 // openRepo is the open tool: the caller's worktree of a code repo, on the
 // branch its other worktrees are on, or detached at the default while idle.
 func (t tool) openRepo(ctx context.Context, name string) agentlink.Result {
-	i := slices.IndexFunc(t.project.Repos, func(r home.Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(t.project.Repos, func(r home.Repo) bool { return r.ID == name })
 	if i < 0 {
 		var all []string
 		for _, r := range t.project.Repos {
-			all = append(all, r.Name)
+			all = append(all, r.ID)
 		}
 		return teamtools.Refusal("unknown_repo", "%q isn't a code repo of this project: they are %s", name, strings.Join(all, ", "))
 	}
 	r := t.project.Repos[i]
-	dir := filepath.Join(t.c.Instance.SandboxPath, r.Name)
-	if !slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.Name == name }) {
+	dir := filepath.Join(t.c.Instance.SandboxPath, r.ID)
+	if !slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.ID == name }) {
 		on, _ := t.w.Git.Branch(ctx, dir)
 		return agentlink.Result{Text: fmt.Sprintf("%s is open already, at %s, %s.", name, dir, onBranch(on))}
 	}
@@ -613,8 +613,8 @@ func (t tool) switchTo(ctx context.Context, branch, from string) agentlink.Resul
 			return gitError(err)
 		}
 		repos = append(repos, wt)
-		opened = append(opened, r.Name)
-		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.Name, Branch: branch})
+		opened = append(opened, r.ID)
+		t.act.Repos = append(t.act.Repos, store.ActionRepo{Repo: r.ID, Branch: branch})
 	}
 	text := fmt.Sprintf("Switched %s to %s.", names(repos), branch)
 	if len(created) > 0 {
@@ -656,7 +656,7 @@ func (t tool) commit(ctx context.Context) agentlink.Result {
 		a := &asked[i]
 		a.Message = withoutAttribution(a.Message)
 		if _, ok := repos[a.Repo]; !ok {
-			if slices.ContainsFunc(t.unopened(), func(r home.Repo) bool { return r.Name == a.Repo }) {
+			if slices.ContainsFunc(t.unopened(), func(r home.Repo) bool { return r.ID == a.Repo }) {
 				return teamtools.Refusal("not_open", "%s isn't open, so nothing changed there: open(%s) to work in it", a.Repo, a.Repo)
 			}
 			names := slices.Sorted(maps.Keys(repos))
@@ -761,16 +761,16 @@ func (t tool) merge(ctx context.Context, branch string) agentlink.Result {
 	for _, r := range t.project.Repos {
 		switch {
 		case t.w.Git.HasBranch(ctx, r.Path, branch):
-			refs[r.Name] = "refs/heads/" + branch
+			refs[r.ID] = "refs/heads/" + branch
 		case t.w.Git.HasRemoteBranch(ctx, r.Path, branch):
-			refs[r.Name] = "refs/remotes/" + branch
+			refs[r.ID] = "refs/remotes/" + branch
 		default:
 			continue
 		}
-		if slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.Name == r.Name }) {
+		if slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.ID == r.ID }) {
 			closed = append(closed, r)
 		} else {
-			repos = append(repos, repo{r.Name, filepath.Join(t.c.Instance.SandboxPath, r.Name)})
+			repos = append(repos, repo{r.ID, filepath.Join(t.c.Instance.SandboxPath, r.ID)})
 		}
 	}
 	if len(repos) == 0 && len(closed) == 0 {
@@ -1024,12 +1024,12 @@ func (t tool) discard(ctx context.Context, asked []string) agentlink.Result {
 // (adding it from url first), committed on its branch, or staged during a
 // merge (wiki/product/architecture/sandboxes-and-git.md#submodules).
 func (t tool) setSubmodule(ctx context.Context, name, path, ref, url string) agentlink.Result {
-	i := slices.IndexFunc(t.project.Repos, func(r home.Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(t.project.Repos, func(r home.Repo) bool { return r.ID == name })
 	switch {
 	case i < 0:
 		var all []string
 		for _, r := range t.project.Repos {
-			all = append(all, r.Name)
+			all = append(all, r.ID)
 		}
 		return teamtools.Refusal("unknown_repo", "%q isn't one of your code repos: yours are %s", name, strings.Join(all, ", "))
 	case path == "" || ref == "":
@@ -1042,7 +1042,7 @@ func (t tool) setSubmodule(ctx context.Context, name, path, ref, url string) age
 		return teamtools.Refusal("no_branch", "you're on no branch (idle): switch(<topic>) first, then set the submodule")
 	}
 	r := repo{name, filepath.Join(t.c.Instance.SandboxPath, name)}
-	if slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.Name == name }) {
+	if slices.ContainsFunc(t.unopened(), func(u home.Repo) bool { return u.ID == name }) {
 		var err error
 		if r, err = t.open(ctx, t.project.Repos[i], into); err != nil {
 			return gitError(err)

@@ -1,7 +1,21 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import type { ActionRepo, TeamAction } from "../api/client";
+import { type ActionRepo, ClientContext, type ForemanClient, type TeamAction } from "../api/client";
+import { keys } from "../app/queries";
 import { ActionRow } from "./TeamActivity";
+
+// The projects as read: ledger's repos, one with a name. Nothing is fetched.
+const queries = new QueryClient();
+queries.setQueryData(keys.projects, [
+  {
+    id: "ledger",
+    repos: [
+      { id: "api", name: "Ledger API" },
+      { id: "project", name: "" },
+    ],
+  },
+]);
 
 const repo = (r: Partial<ActionRepo>): ActionRepo => ({
   repo: "api",
@@ -25,7 +39,13 @@ const commit = (repos: ActionRepo[], error = ""): TeamAction => ({
 });
 
 const text = (a: TeamAction) =>
-  renderToStaticMarkup(<ActionRow action={a} name={() => "Tove"} />).replace(/<[^>]+>/g, "");
+  renderToStaticMarkup(
+    <ClientContext.Provider value={{} as ForemanClient}>
+      <QueryClientProvider client={queries}>
+        <ActionRow action={a} name={() => "Tove"} />
+      </QueryClientProvider>
+    </ClientContext.Provider>,
+  ).replace(/<[^>]+>/g, "");
 
 // Each repo of a commit has its own message (protocol.md#commit).
 describe("a commit's row", () => {
@@ -35,14 +55,14 @@ describe("a commit's row", () => {
     expect(got.match(/cal v0/g)).toHaveLength(1);
   });
 
-  it("names several repos, each line with its message", () => {
+  it("names several repos as they show, each line with its message", () => {
     const got = text(
       commit([
         repo({ message: "cal v1", commit: "1a2b3c4d5e" }),
         repo({ repo: "project", branch: "main", message: "the board", commit: "5e6f7a8b9c" }),
       ]),
     );
-    expect(got).toContain("committed api, project");
+    expect(got).toContain("committed Ledger API, Project");
     expect(got).toContain("1a2b3c4“cal v1”");
     expect(got).toContain("5e6f7a8“the board”");
   });

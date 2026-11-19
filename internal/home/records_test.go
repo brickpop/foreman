@@ -19,6 +19,7 @@ hidden = true
 hq = "git@github.com:acme/ledger-hq.git"
 
 [ledger.repos.api]
+display_name = "Ledger API"
 remote = "git@github.com:acme/api.git"
 root_commit = "` + root40 + `"
 default_branch = "trunk"
@@ -28,7 +29,7 @@ default_branch = "trunk"
 	records, problems := ParseRecords([]byte(good))
 	want := map[string]Record{
 		"ledger": {DisplayName: "The ledger", Hidden: true, HQ: "git@github.com:acme/ledger-hq.git", Repos: map[string]RepoRecord{
-			"api": {Remote: "git@github.com:acme/api.git", RootCommit: root40, DefaultBranch: "trunk"},
+			"api": {DisplayName: "Ledger API", Remote: "git@github.com:acme/api.git", RootCommit: root40, DefaultBranch: "trunk"},
 		}},
 		"relay": {Repos: map[string]RepoRecord{}},
 	}
@@ -47,8 +48,9 @@ default_branch = "trunk"
 		{"a field Foreman doesn't know", "[ledger]\nname = \"x\"\n", "ledger.name: not a field"},
 		{"an id that isn't a slug", "[Ledger]\n", "Ledger: not a project id"},
 		{"an id that is a path", "[\"../x\"]\n", "../x: not a project id"},
-		{"a long display name", "[ledger]\ndisplay_name = \"" + strings.Repeat("x", maxProjectName+1) + "\"\n", "ledger.display_name"},
-		{"a display name of two lines", "[ledger]\ndisplay_name = \"a\\nb\"\n", "ledger.display_name"},
+		{"a long display name", "[ledger]\ndisplay_name = \"" + strings.Repeat("x", maxDisplayName+1) + "\"\n", "ledger.display_name"},
+		{"a display name of two lines", "[ledger]\ndisplay_name = \"a\\nb\"\n", "ledger.display_name: A name is one line."},
+		{"a repo's long display name", repo("api", root40, "main") + "display_name = \"" + strings.Repeat("x", maxDisplayName+1) + "\"\n", "ledger.repos.api.display_name: A name has at most 80 characters."},
 		{"a repo name that isn't a folder", "[ledger.repos.\"a/b\"]\nroot_commit = \"" + root40 + "\"\ndefault_branch = \"main\"\n", "a repo name is"},
 		{"the HQ's name", repo("HQ", root40, "main"), "the HQ's name"},
 		{"two repos in different cases", repo("api", root40, "main") + repo("API", root40, "main"), "the same name as"},
@@ -105,7 +107,7 @@ func TestTheRecordsTravelInProjectsToml(t *testing.T) {
 	if _, err := h.SetRepoDefault(ctx, "ledger", "api", "trunk"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.RenameRepo(ctx, "ledger", "api", "ledger-api"); err != nil {
+	if _, err := h.RenameRepo(ctx, "ledger", "api", "Ledger API"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.SetProfile(ctx, "ledger", "work"); err != nil {
@@ -120,7 +122,7 @@ func TestTheRecordsTravelInProjectsToml(t *testing.T) {
 	root := gitOut(t, api, "rev-list", "--max-parents=0", "HEAD")
 	want := map[string]Record{
 		"ledger": {DisplayName: "The ledger", Hidden: true, Repos: map[string]RepoRecord{
-			"ledger-api": {Remote: "https://github.com/acme/api.git", RootCommit: root, DefaultBranch: "trunk"},
+			"ledger-api": {DisplayName: "Ledger API", Remote: "https://github.com/acme/api.git", RootCommit: root, DefaultBranch: "trunk"},
 		}},
 		"relay": {HQ: ledger.Path, Repos: map[string]RepoRecord{}},
 	}

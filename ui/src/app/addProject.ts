@@ -2,24 +2,19 @@
 // (wiki/product/features/add-project.md).
 
 import type { Branches } from "../api/client";
+import { readable, slug } from "./model";
 
-/** A repo's default name, from its folder: the folder's own name, made to
- * follow the server's rule (letters, digits, dots, hyphens and underscores,
- * starting with a letter or digit, at most 63, no ".."). "" when nothing is left. */
-export function repoName(path: string): string {
-  const base = path.replace(/\/+$/, "").split("/").pop() ?? "";
-  return base
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
-    .replace(/\.{2,}/g, ".")
-    .replace(/^[^A-Za-z0-9]+/, "")
-    .slice(0, 63);
+/** A repo's default name, from its folder: the folder's own name as words
+ * that make its id (foreman_ui is "Foreman ui"). "" when nothing is left. */
+export function nameFromFolder(path: string): string {
+  return readable(slug(path.replace(/\/+$/, "").split("/").pop() ?? ""));
 }
 
 /** A cloned repo's default name, from its URL: the last part of its path
- * without .git (git@github.com:me/ledger-api.git is ledger-api), as
- * repoName makes it. */
+ * without .git (git@github.com:me/ledger-api.git is "Ledger api"), as
+ * nameFromFolder makes it. */
 export function cloneName(url: string): string {
-  return repoName(
+  return nameFromFolder(
     url
       .trim()
       .replace(/\/+$/, "")
@@ -28,25 +23,31 @@ export function cloneName(url: string): string {
   );
 }
 
-/** A new project's name from what the CEO typed: a slug, as the server
- * requires (it names its folders; the typed words are how it shows):
- * lowercase letters and digits, accents dropped, anything else one hyphen,
- * at most 63. "My Café" is my-cafe; "" when nothing is left. */
-export function projectSlug(typed: string): string {
-  return typed
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .slice(0, 63)
-    .replace(/-+$/, "");
+/** What words make a repo's id, for the hints under its Name: "Its id: <id>.
+ * It shows as “<words>”." Undefined while they make no id. */
+export function repoIdLine(words: string): string | undefined {
+  const id = slug(words);
+  return id ? `Its id: ${id}. It shows as “${words.trim()}”.` : undefined;
 }
+
+/** The rename hint: whether the repo's id changes with the words. Unchanged
+ * words (shown, how the repo shows now) change nothing, even for an older id
+ * that isn't their slug (Ledger_API showing as "Ledger API"). */
+export function renameHint(id: string, words: string, shown: string): string {
+  if (words.trim() === shown) return `Its id stays ${id}.`;
+  const next = slug(words);
+  if (!next) return anyWords;
+  if (next === id) return `Its id stays ${id}.`;
+  return `Its id becomes ${next}: agents' worktrees and open merge requests follow.`;
+}
+
+/** The repo hint while the words make no id yet. */
+export const anyWords = "Any words: they become its id, in lowercase with hyphens.";
 
 /** The New project dialog's hint under the name: the id and folder the typed
  * words make, and how the project will show (those words, trimmed). */
 export function newProjectHint(typed: string): string {
-  const id = projectSlug(typed);
+  const id = slug(typed);
   if (!id) return "Any words: they become its id and its folder, in lowercase with hyphens.";
   return `Its id: ${id}, in projects/${id}/ of Foreman’s folder. It shows as “${typed.trim()}”.`;
 }

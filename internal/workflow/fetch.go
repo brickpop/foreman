@@ -41,7 +41,7 @@ func (t tool) fetch(ctx context.Context) agentlink.Result {
 		case len(changes) == 0:
 			each = append(each, "up to date")
 		}
-		lines = append(lines, r.Name+": "+strings.Join(each, ", "))
+		lines = append(lines, r.ID+": "+strings.Join(each, ", "))
 	}
 	text := strings.Join(lines, "\n")
 	if moved {

@@ -306,6 +306,27 @@ describe("httpClient", () => {
     ]);
   });
 
+  it("sends a repo's name as the words typed, and names a repo by its id", async () => {
+    const calls = stubFetch(200, { id: "ledger" });
+    const client = httpClient("http://x");
+    await client.home.newRepo("ledger", "Ledger API", "/h/dev/ledger-api");
+    await client.home.cloneRepo("ledger", "Web app", "git@github.com:me/web.git");
+    await client.home.renameRepo("ledger", "Ledger_API", "Ledger API");
+    expect(calls.map((c) => [c.method, c.url, c.body && JSON.parse(c.body)])).toEqual([
+      [
+        "POST",
+        "http://x/api/projects/ledger/repos",
+        { name: "Ledger API", path: "/h/dev/ledger-api", new: true },
+      ],
+      [
+        "POST",
+        "http://x/api/projects/ledger/repos",
+        { name: "Web app", clone: "git@github.com:me/web.git" },
+      ],
+      ["PUT", "http://x/api/projects/ledger/repos/Ledger_API/name", { name: "Ledger API" }],
+    ]);
+  });
+
   it("comments on and decides a review", async () => {
     const calls = stubFetch(204, undefined);
     const c = httpClient("http://x");

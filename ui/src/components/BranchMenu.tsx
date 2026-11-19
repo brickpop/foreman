@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { type BranchPlace, placeLine } from "../app/repos";
 import { Chevron } from "./icons";
+import { RepoName } from "./RepoName";
 import { CopyButton } from "./ui";
 
 // A branch as a menu of the repos that have it (the Session's header,
@@ -113,7 +114,7 @@ function Place({
         search={{ branch }}
         className={item}
       >
-        <span className="min-w-0 flex-1 truncate">{p.repo}</span>
+        <RepoName project={project} id={p.repo} className="min-w-0 flex-1 truncate" />
         <span className="shrink-0 text-[12px] text-tx4">{placeLine(p)}</span>
       </Link>
     </Menu.Item>

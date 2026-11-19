@@ -7,7 +7,7 @@ import (
 
 // Repo is one of a project's repos, with its branches.
 type Repo struct {
-	Name     string   `json:"name"`
+	ID       string   `json:"id"`
 	HQ       bool     `json:"hq"` // the project's HQ, listed last
 	Default  string   `json:"defaultBranch"`
 	Branches []Branch `json:"branches"` // the default first, then newest commit first

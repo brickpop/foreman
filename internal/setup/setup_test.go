@@ -289,7 +289,7 @@ func TestSteps(t *testing.T) {
 		// The profiles the projects use: one not connected, one that doesn't exist.
 		{"a project without a repo is no step: a research team needs none",
 			config{teams: []home.Team{team}, projects: []home.Project{
-				{ID: "web", Repos: []home.Repo{{Name: "app", Path: "/home/ceo/app"}}}, {ID: "ledger"}}},
+				{ID: "web", Repos: []home.Repo{{ID: "app", Path: "/home/ceo/app"}}}, {ID: "ledger"}}},
 			[]profiles.Profile{{Name: "default", Harness: "claude-code"}, {Name: "gone"}},
 			[]string{"hq done", "image todo", "profile:default todo", "profile:gone failed", "team done", "project done"}},
 	} {

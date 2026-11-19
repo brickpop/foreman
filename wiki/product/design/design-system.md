@@ -185,6 +185,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 ## Form controls
 
 - **Text input / textarea**: `--term` background, 1px `--line2`, radius 7–9, padding `7–10px 10–12px`, `--tx`. Textareas resize vertically.
+- **Field** (`Field` in `components/ui.tsx`, the one pattern for a labelled input or choice: a text input, a `Select`, a `Segmented`): the label (500 13px, `--tx4`), the input, then its hint (12.5px, `--tx4`) and, when the input is refused, the reason (12.5px, `--err`). The hint and the reason sit outside the label, linked to the input with `aria-describedby`; a refusal sets `aria-invalid`. Both wrap anywhere, so a long id fits on a phone. A refusal from the server shows over the form's button, with `role="alert"`, and clears when a field changes.
 - **Toggle switch**: track 34×20, radius 10, `--acc` on, `--line3` off. Knob 16×16 `#fff` at `top: 2px`, `left: 2px` (off) or `16px` (on), 0.15s transition.
 - **Stepper**: two 28×28 outline buttons `−` and `+` around the value (Mono 500 14px, min-width 28px, centered).
 - **Color swatch**: 22×22, radius 6. Selected ring `box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--tx)`.

@@ -45,7 +45,7 @@ type config struct {
 
 func (c config) Project(id string) (home.Project, error) {
 	dir := filepath.Join(c.root, id)
-	repos := []home.Repo{{Name: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {Name: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
+	repos := []home.Repo{{ID: "api", Path: filepath.Join(dir, "api"), Default: "main"}, {ID: "web", Path: filepath.Join(dir, "web"), Default: "trunk"}}
 	config, _ := home.ParseProject(nil) // a project.toml with nothing set: the defaults
 	return home.Project{ID: id, Path: filepath.Join(dir, "hq"), Files: filepath.Join(dir, "files"), Repos: repos, Config: config}, nil
 }
@@ -58,7 +58,7 @@ func (c config) Sandbox(project, agent string) string {
 // repo, core, is ledger's api (one folder in two projects), its default stable.
 func (c config) Projects() []home.Project {
 	p, _ := c.Project("ledger")
-	s := home.Project{ID: "suite", Repos: []home.Repo{{Name: "core", Path: p.Repos[0].Path, Default: "stable"}}}
+	s := home.Project{ID: "suite", Repos: []home.Repo{{ID: "core", Path: p.Repos[0].Path, Default: "stable"}}}
 	return []home.Project{p, s}
 }
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { CleanupBranch } from "../api/client";
 import { plural } from "../app/model";
-import { useCleanupBranches, useDeleteBranches } from "../app/queries";
+import { useCleanupBranches, useDeleteBranches, useRepoName } from "../app/queries";
 import {
   type CleanupGroup,
   type CleanupSection,
@@ -12,6 +12,7 @@ import {
 } from "../app/repos";
 import { Chevron } from "./icons";
 import { Modal } from "./Overlays";
+import { RepoName } from "./RepoName";
 import { useToast } from "./Toasts";
 import { Button, Empty, Spinner } from "./ui";
 
@@ -33,6 +34,7 @@ export function BranchCleanup({ project }: { project: string }) {
 function CleanupDialog({ project, onClose }: { project: string; onClose: () => void }) {
   const branches = useCleanupBranches(project);
   const remove = useDeleteBranches(project);
+  const repoName = useRepoName(project);
   const toast = useToast();
   const { groups, staying } = cleanupGroups(branches.data ?? []);
   // Undefined until the CEO ticks something: the groups on at first.
@@ -57,7 +59,7 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
             title: `${plural(done.removed.length, "branch", "branches")} deleted`,
             body:
               done.kept.length > 0
-                ? `Kept: ${done.kept.map((k) => `${k.repo} ${k.branch} (${k.why})`).join(", ")}.`
+                ? `Kept: ${done.kept.map((k) => `${repoName.name(k.repo)} ${k.branch} (${k.why})`).join(", ")}.`
                 : "Foreman keeps a copy of each for 30 days.",
             color: done.kept.length > 0 ? "var(--attn)" : "var(--ok)",
           });
@@ -86,6 +88,7 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
             {cleanupSections.map((s) => (
               <Section
                 key={s.key}
+                project={project}
                 section={s}
                 groups={groups.filter((g) => g.section === s.key)}
                 pick={pick}
@@ -97,7 +100,7 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
                 <h3 className="m-0 text-[13px] font-semibold text-tx2">Staying</h3>
                 <div className="flex flex-col rounded-lg border border-line">
                   {staying.map((b) => (
-                    <Row key={pickKey(b)} b={b} />
+                    <Row key={pickKey(b)} project={project} b={b} />
                   ))}
                 </div>
               </div>
@@ -118,11 +121,13 @@ function CleanupDialog({ project, onClose }: { project: string; onClose: () => v
 /** One section: each group with its own checkbox over its rows. A folded section shows only
  * its title, its count, and how many of it are ticked. */
 function Section({
+  project,
   section: { title, note, folded },
   groups,
   pick,
   onTick,
 }: {
+  project: string;
   section: CleanupSection;
   groups: CleanupGroup[];
   pick: Set<string>;
@@ -170,6 +175,7 @@ function Section({
                 {g.branches.map((b) => (
                   <Row
                     key={pickKey(b)}
+                    project={project}
                     b={b}
                     on={pick.has(pickKey(b))}
                     onTick={(on) => onTick([pickKey(b)], on)}
@@ -186,10 +192,12 @@ function Section({
 
 /** One branch: ticked or not, or with why it stays (no checkbox then). */
 function Row({
+  project,
   b,
   on = false,
   onTick,
 }: {
+  project: string;
   b: CleanupBranch;
   on?: boolean;
   onTick?: (on: boolean) => void;
@@ -202,7 +210,11 @@ function Row({
       className={`flex items-center gap-2.5 border-t border-line py-1.5 pr-3 first:border-t-0 ${onTick ? "pl-8 text-tx2 hover:bg-hover" : "pl-3 text-tx4"}`}
     >
       {onTick && <input type="checkbox" checked={on} onChange={(e) => onTick(e.target.checked)} />}
-      <span className="shrink-0 font-mono text-[12px] text-tx4">{b.repo}</span>
+      <RepoName
+        project={project}
+        id={b.repo}
+        className="max-w-[30%] shrink-0 truncate text-[12px] text-tx4"
+      />
       <span className="min-w-0 flex-1 truncate font-mono text-[12.5px]" title={b.branch}>
         {b.branch}
       </span>

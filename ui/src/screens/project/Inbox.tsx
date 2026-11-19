@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { Review, Team } from "../../api/client";
 import { agentOf, inbox, when } from "../../app/model";
 import { reviewOf } from "../../app/project";
-import { useRequests, useReviews, useTeams } from "../../app/queries";
+import { useRepoName, useRequests, useReviews, useTeams } from "../../app/queries";
 import { reviewGroups, statusLabel } from "../../app/reviews";
 import { Empty, Loading, Panel, SectionTitle } from "../../components/ui";
 import { useProject } from "../Project";
@@ -61,7 +61,8 @@ export function Inbox() {
 
 function ReviewRow({ review: v, teams }: { review: Review; teams: Team[] }) {
   const lead = agentOf(teams, v.deploymentId, v.lead);
-  const repos = v.mergeRequests.map((m) => m.repo).join(", ");
+  const repoName = useRepoName(v.projectId);
+  const repos = v.mergeRequests.map((m) => repoName.name(m.repo)).join(", ");
   return (
     <Link
       {...reviewOf(v.projectId, v.id)}

@@ -9,7 +9,7 @@ import type * as wiki from "./wiki";
  * Repo is one of a project's repos, with its branches.
  */
 export interface Repo {
-  name: string;
+  id: string;
   hq: boolean; // the project's HQ, listed last
   defaultBranch: string;
   branches: Branch[]; // the default first, then newest commit first

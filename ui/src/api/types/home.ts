@@ -178,7 +178,8 @@ export interface Project {
  * Repo is one of a project's code repos, anywhere on disk.
  */
 export interface Repo {
-  name: string; // unique in the project
+  id: string; // made from its name when added or renamed; unique in the project, in any case; agents see only this
+  name: string; // its display name, for people only; "" shows the id readable
   path: string; // absolute
   defaultBranch: string; // agents start from it, merges go to it unless the lead names another branch
   remote: string; // where it can be cloned from (its origin when added); "" when unknown

@@ -234,6 +234,11 @@ func (m *Manager) stop(ctx context.Context, deploymentID, reason string) error {
 	}
 	dep.Status = store.DeploymentStopped
 	m.publish("deployment.stopped", dep)
+	// A rescan follows what waited for the team to stop: a repo renamed on
+	// another machine (home.Home.follow).
+	if _, err := m.Config.Checked(dep.ProjectID); err != nil {
+		slog.Warn("checking a stopped deployment's project", "project", dep.ProjectID, "err", err)
+	}
 	m.startQueued() // its slots go to whoever waits
 	return nil
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Deployment, MergeRequest, Review, ReviewComment, Team } from "../api/client";
+import { readable } from "./model";
 import {
   commentAt,
   decidedAs,
@@ -228,16 +229,19 @@ describe("Dismiss", () => {
     );
   });
 
-  it("says which branches stayed, and why", () => {
-    expect(keptLines({ kept: [] })).toBe("");
+  it("says which branches stayed, and why, each repo as it shows", () => {
+    expect(keptLines({ kept: [] }, readable)).toBe("");
     expect(
-      keptLines({
-        kept: [
-          { repo: "api", branch: "lead/ledger/atlas/x", why: "changes in the way" },
-          { repo: "web", branch: "wt/ledger/tove/y", why: "busy" },
-        ],
-      }),
-    ).toBe("lead/ledger/atlas/x in api: changes in the way.\nwt/ledger/tove/y in web: busy.");
+      keptLines(
+        {
+          kept: [
+            { repo: "api", branch: "lead/ledger/atlas/x", why: "changes in the way" },
+            { repo: "web", branch: "wt/ledger/tove/y", why: "busy" },
+          ],
+        },
+        readable,
+      ),
+    ).toBe("lead/ledger/atlas/x in Api: changes in the way.\nwt/ledger/tove/y in Web: busy.");
   });
 });
 

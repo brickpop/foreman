@@ -15,6 +15,10 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
+
 	"github.com/brickpop/foreman/internal/git"
 	"github.com/brickpop/foreman/internal/profiles"
 	"github.com/brickpop/foreman/internal/store"
@@ -47,18 +51,18 @@ func (h *Home) NewProject(ctx context.Context, id, name, clone string) (p Projec
 	h.mu.Lock()
 	defer h.unlock()
 	if !validProjectName(id) {
-		return Project{}, false, fmt.Errorf("%w: a project id is lowercase letters, digits and single hyphens (my-portfolio), at most 63", ErrInvalid)
+		return Project{}, false, refuse(ErrInvalid, "A project id is lowercase letters, digits and single hyphens, at most 63 characters (my-portfolio).")
 	}
 	name, err = displayName(id, name)
 	if err != nil {
 		return Project{}, false, err
 	}
 	if existing, ok := h.projectNamed(id); ok {
-		return Project{}, false, fmt.Errorf("%w: project %s already exists", ErrExists, existing)
+		return Project{}, false, refuse(ErrExists, "Another project has the id %s already: pick another name.", existing)
 	}
 	shown := cmp.Or(name, readable(id))
-	if other, ok := h.shownAs(id, shown); ok {
-		return Project{}, false, fmt.Errorf("%w: project %s shows as %s already: pick another name, or rename it first", ErrExists, other, shown)
+	if h.shownAs(id, shown) {
+		return Project{}, false, projectShownAs(shown)
 	}
 	folder := h.projectDir(id)
 	dir := filepath.Join(folder, hqDir)
@@ -118,6 +122,25 @@ func (h *Home) NewProject(ctx context.Context, id, name, clone string) (p Projec
 	return p, !takeOver, nil
 }
 
+// refuse is a refusal the CEO reads as it is, in the API's error and the
+// UI: one full sentence, saying what to do when there is something to do
+// (wiki/product/architecture/api.md#error-format). kind is ErrInvalid,
+// ErrExists or ErrDeployed.
+func refuse(kind error, format string, args ...any) error {
+	return fmt.Errorf("%w: %s", kind, fmt.Sprintf(format, args...))
+}
+
+// sentence is an error's text as people read it, without its kind
+// (ErrInvalid, ErrExists, ErrDeployed).
+func sentence(err error) string {
+	for _, kind := range []error{ErrInvalid, ErrExists, ErrDeployed} {
+		if errors.Is(err, kind) {
+			return strings.TrimPrefix(err.Error(), kind.Error()+": ")
+		}
+	}
+	return err.Error()
+}
+
 // canTakeOver says why the folder at dir can't become a new project's HQ as
 // it is: a clone asked for, or not a git repo's top folder of its own.
 func canTakeOver(dir, clone string) error {
@@ -134,16 +157,21 @@ func canTakeOver(dir, clone string) error {
 }
 
 // projectNamed finds a project named name in any case. Called with h.mu held.
-// shownAs finds the project, other than id, that shows as shown (its
-// display name, else its id made readable), in any case: two projects never
-// read the same (the CEO, 2026-11-04).
-func (h *Home) shownAs(id, shown string) (string, bool) {
+// shownAs says whether a project other than id shows as shown (its display
+// name, else its id made readable), in any case: two projects never read the
+// same (the CEO, 2026-11-04).
+func (h *Home) shownAs(id, shown string) bool {
 	for _, p := range h.snap.projects {
 		if p.ID != id && strings.EqualFold(p.Shown(), shown) {
-			return p.ID, true
+			return true
 		}
 	}
-	return "", false
+	return false
+}
+
+// projectShownAs is the refusal of a project that would show as another.
+func projectShownAs(shown string) error {
+	return refuse(ErrExists, "Another project shows as “%s” already: pick another name.", shown)
 }
 
 func (h *Home) projectNamed(name string) (string, bool) {
@@ -168,10 +196,10 @@ func (h *Home) createHQ(ctx context.Context, project, dir string) error {
 	return h.git.Commit(ctx, dir, "Project HQ", created...)
 }
 
-// AddRepo adds an existing repo to a project, under name: path is its top
-// folder, which agents can use (Home.repoFolder), with a commit, and
-// not in the project already, with def as its default branch (usableRepo). A
-// repo may be in several projects.
+// AddRepo adds an existing repo to a project, named name (its id made from
+// it, repoName): path is its top folder, which agents can use
+// (Home.repoFolder), with a commit, and not in the project already, with def
+// as its default branch (usableRepo). A repo may be in several projects.
 func (h *Home) AddRepo(ctx context.Context, project, name, path, def string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -179,37 +207,39 @@ func (h *Home) AddRepo(ctx context.Context, project, name, path, def string) (Pr
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	if err := checkRepoName(p, name); err != nil {
+	id, name, err := repoName(p, "", name)
+	if err != nil {
 		return Project{}, err
 	}
 	root, def, err := h.usableRepo(ctx, p, "", path, def)
 	if err != nil {
 		return Project{}, err
 	}
-	return h.addRepo(ctx, project, name, filepath.Clean(path), root, def)
+	return h.addRepo(ctx, project, id, name, filepath.Clean(path), root, def)
 }
 
-// addRepo records a repo checked usable: where it is on this machine, then
-// the rest in projects.toml. Called with h.mu held.
-func (h *Home) addRepo(ctx context.Context, project, name, path, root, def string) (Project, error) {
-	if err := h.machine.SetRepoPath(ctx, project, name, path); err != nil {
+// addRepo records a repo checked usable, id and display name checked by
+// repoName: where it is on this machine, then the rest in projects.toml.
+// Called with h.mu held.
+func (h *Home) addRepo(ctx context.Context, project, id, name, path, root, def string) (Project, error) {
+	if err := h.machine.SetRepoPath(ctx, project, id, path); err != nil {
 		return Project{}, h.recordError(err)
 	}
-	repo := RepoRecord{Remote: h.git.Origin(ctx, path), RootCommit: root, DefaultBranch: def}
-	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: add %s to %s", name, project), func(r *Record) {
+	repo := RepoRecord{DisplayName: name, Remote: h.git.Origin(ctx, path), RootCommit: root, DefaultBranch: def}
+	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: add %s to %s", id, project), func(r *Record) {
 		if r.Repos == nil {
 			r.Repos = map[string]RepoRecord{}
 		}
-		r.Repos[name] = repo
+		r.Repos[id] = repo
 	})
 	if err != nil {
-		_ = h.machine.RemoveRepo(ctx, project, name)
+		_ = h.machine.RemoveRepo(ctx, project, id)
 	}
 	return p, err
 }
 
 // NewRepo creates an empty code repo at path, a folder that doesn't exist yet
-// in one that does, on main, and adds it to the project.
+// in one that does, on main, and adds it to the project, named name.
 func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -217,7 +247,8 @@ func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	if err := checkRepoName(p, name); err != nil {
+	id, name, err := repoName(p, "", name)
+	if err != nil {
 		return Project{}, err
 	}
 	if !filepath.IsAbs(path) {
@@ -243,7 +274,7 @@ func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project
 	}
 	root, def, err := h.usableRepo(ctx, p, "", path, "main")
 	if err == nil {
-		p, err = h.addRepo(ctx, project, name, path, root, def)
+		p, err = h.addRepo(ctx, project, id, name, path, root, def)
 	}
 	if err != nil {
 		_ = os.RemoveAll(path)
@@ -252,8 +283,32 @@ func (h *Home) NewRepo(ctx context.Context, project, name, path string) (Project
 	return p, nil
 }
 
+// renameWaits refuses to locate the project's repo id (LocateRepo,
+// CloneMissingRepo) while its rename made on another machine waits for the
+// team here to stop: located, the rename would never be followed (follow).
+// Called with h.mu held.
+func (h *Home) renameWaits(ctx context.Context, project, id string) error {
+	if h.deployed == nil || !h.deployed(ctx, project) {
+		return nil
+	}
+	rows, err := h.machine.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.ID != project {
+			continue
+		}
+		if m, ok := h.renamedRow(ctx, h.snap.records.Records[project], row.Repos, id); ok {
+			return waitingRename(m.Name)
+		}
+	}
+	return nil
+}
+
 // LocateRepo points a project's repo at its new folder: the same repo (it
-// holds the repo's first commit), which agents can use.
+// holds the repo's first commit), which agents can use. Refused while a rename
+// made on another machine waits for the team here to stop.
 func (h *Home) LocateRepo(ctx context.Context, project, name, path string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -261,9 +316,12 @@ func (h *Home) LocateRepo(ctx context.Context, project, name, path string) (Proj
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.ID == name })
 	if i < 0 {
 		return Project{}, ErrNotFound
+	}
+	if err := h.renameWaits(ctx, project, name); err != nil {
+		return Project{}, err
 	}
 	want := p.Repos[i].root
 	real, err := h.usableFolder(p, name, path)
@@ -285,11 +343,11 @@ func (h *Home) RemoveRepo(ctx context.Context, project, name string) (Project, e
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[project]
-	if !ok || !slices.ContainsFunc(p.Repos, func(r Repo) bool { return r.Name == name }) {
+	if !ok || !slices.ContainsFunc(p.Repos, func(r Repo) bool { return r.ID == name }) {
 		return Project{}, ErrNotFound
 	}
 	if h.deployed != nil && h.deployed(ctx, project) {
-		return Project{}, fmt.Errorf("%w: stop the team on %s before removing %s", ErrDeployed, project, name)
+		return Project{}, refuse(ErrDeployed, "Stop the team on this project first to remove a repo.")
 	}
 	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: remove %s from %s", name, project), func(r *Record) {
 		delete(r.Repos, name)
@@ -314,7 +372,7 @@ func (h *Home) SetRepoDefault(ctx context.Context, project, name, branch string)
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.ID == name })
 	if i < 0 {
 		return Project{}, ErrNotFound
 	}
@@ -366,8 +424,9 @@ func (h *Home) SetHidden(ctx context.Context, project string, hidden bool) (Proj
 	return h.changeRecord(ctx, project, fmt.Sprintf("Projects: %s %s", verb, project), func(r *Record) { r.Hidden = hidden })
 }
 
-// maxProjectName is the most characters a project's display name has.
-const maxProjectName = 80
+// maxDisplayName is the most characters a display name has, a project's or a
+// repo's.
+const maxDisplayName = 80
 
 // SetName gives a project its display name, any words (displayName), "" to
 // show it by its id again. Only how it shows changes, so a team may be deployed.
@@ -382,22 +441,23 @@ func (h *Home) SetName(ctx context.Context, project, name string) (Project, erro
 		return Project{}, ErrNotFound
 	}
 	shown := cmp.Or(name, readable(project))
-	if other, ok := h.shownAs(project, shown); ok {
-		return Project{}, fmt.Errorf("%w: project %s shows as %s already", ErrExists, other, shown)
+	if h.shownAs(project, shown) {
+		return Project{}, projectShownAs(shown)
 	}
 	return h.changeRecord(ctx, project, fmt.Sprintf("Projects: name %s %q", project, name), func(r *Record) { r.DisplayName = name })
 }
 
-// displayName checks project id's display name, as the CEO typed it: one
-// line of at most maxProjectName characters. It returns it trimmed, or ""
-// when it reads as the id made readable, so the record keeps no copy of it.
+// displayName is the one rule for display names, a project's or a repo's:
+// it checks the name the CEO typed for id, one line of at most
+// maxDisplayName characters, and returns it trimmed, or "" when it reads as
+// the id made readable, so the record keeps no copy of it.
 func displayName(id, name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if utf8.RuneCountInString(name) > maxProjectName {
-		return "", fmt.Errorf("%w: a project's name has at most %d characters", ErrInvalid, maxProjectName)
+	if utf8.RuneCountInString(name) > maxDisplayName {
+		return "", refuse(ErrInvalid, "A name has at most %d characters.", maxDisplayName)
 	}
 	if strings.ContainsFunc(name, unicode.IsControl) {
-		return "", fmt.Errorf("%w: a project's name is one line of text", ErrInvalid)
+		return "", refuse(ErrInvalid, "A name is one line.")
 	}
 	if name == readable(id) {
 		return "", nil
@@ -446,8 +506,8 @@ func (h *Home) usableFolder(p Project, name, path string) (string, error) {
 		return "", err
 	}
 	for _, r := range p.Repos {
-		if other, err := filepath.EvalSymlinks(r.Path); err == nil && other == real && r.Name != name {
-			return "", fmt.Errorf("%w: %s is %s's repo %s already", ErrExists, path, p.ID, r.Name)
+		if other, err := filepath.EvalSymlinks(r.Path); err == nil && other == real && r.ID != name {
+			return "", fmt.Errorf("%w: %s is %s's repo %s already", ErrExists, path, p.ID, r.ID)
 		}
 	}
 	return real, nil
@@ -577,25 +637,71 @@ func readable(id string) string {
 	return string(unicode.ToUpper(r)) + words[size:]
 }
 
+// slug makes an id from any words, the one rule Foreman has for it (the UI's
+// slug is its twin; testdata/slugs.json keeps both in step): accents
+// dropped, lowercase, each run of anything but a-z and 0-9 one hyphen, at
+// most 63 characters. Letters that don't decompose (æ, ø, ß) are dropped,
+// not transliterated. "" when no letter or digit is left.
+func slug(words string) string {
+	words, _, _ = transform.String(transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn))), words)
+	var b strings.Builder
+	for _, r := range strings.ToLower(words) {
+		switch {
+		case 'a' <= r && r <= 'z' || '0' <= r && r <= '9':
+			b.WriteRune(r)
+		case !strings.HasSuffix(b.String(), "-"):
+			b.WriteByte('-')
+		}
+	}
+	id := strings.Trim(b.String(), "-")
+	if len(id) > 63 {
+		id = strings.TrimRight(id[:63], "-")
+	}
+	return id
+}
+
 // validProjectName is the rule for a new project's name: a slug, since it
 // names its folders and how it reads is made from it (the UI's readable;
 // the CEO, 2026-11-02). A project named before keeps its name.
 func validProjectName(name string) bool {
-	return len(name) <= 63 && slug.MatchString(name)
+	return len(name) <= 63 && slugRule.MatchString(name)
 }
 
-// checkRepoName refuses a name a repo of p can't have: one Foreman couldn't
-// create as a folder, the HQ's, or one p has, in any case.
-func checkRepoName(p Project, name string) error {
-	switch {
-	case !validName(name):
-		return fmt.Errorf("%w: a repo name is %s", ErrInvalid, nameRules)
-	case strings.EqualFold(name, hqRepo):
-		return fmt.Errorf("%w: %q is the HQ's name", ErrInvalid, name)
+// repoName checks the name the CEO gives a repo of p, self being the repo
+// renamed ("" for a new one), and returns the repo's id, made from it (slug),
+// and its display name (displayName). Two repos of a project never have the
+// same id, nor show the same, in any case: the id check alone misses a repo
+// added before ids were made from names (Ledger_API shows as Ledger API).
+func repoName(p Project, self, name string) (id, display string, err error) {
+	id = slug(name)
+	if display, err = displayName(id, name); err != nil {
+		return "", "", err
+	}
+	if err := checkRepoID(p, self, id); err != nil {
+		return "", "", err
+	}
+	shown := cmp.Or(display, readable(id))
+	for _, r := range p.Repos {
+		if r.ID != self && strings.EqualFold(r.Shown(), shown) {
+			return "", "", refuse(ErrExists, "Another repo shows as “%s” already: pick another name.", r.Shown())
+		}
+	}
+	return id, display, nil
+}
+
+// checkRepoID refuses an id made from a repo's name that a repo of p can't
+// have: none (no letter or digit), the HQ's, or another repo's (not self's),
+// in any case.
+func checkRepoID(p Project, self, id string) error {
+	switch id {
+	case "":
+		return refuse(ErrInvalid, "A repo's name needs a letter or digit (a–z, 0–9): its id is made from them.")
+	case hqRepo:
+		return refuse(ErrInvalid, "“HQ” is the project’s HQ: pick another name.")
 	}
 	for _, r := range p.Repos {
-		if strings.EqualFold(r.Name, name) {
-			return fmt.Errorf("%w: %s has a repo %s already", ErrExists, p.ID, r.Name)
+		if r.ID != self && strings.EqualFold(r.ID, id) {
+			return refuse(ErrExists, "Another repo has the id %s already: pick another name.", id)
 		}
 	}
 	return nil
@@ -633,68 +739,100 @@ func (h *Home) found(project string) (Project, error) {
 	return p, nil
 }
 
-// RenameRepo renames one of a project's repos, and moves each agent's
-// worktree of it to the new name, so stopped deployments keep their work.
-// Refused while a team is deployed on the project, and while the repo is
+// RenameRepo gives one of a project's repos a new name, and the id made from
+// it (repoName). When the id changes, each agent's worktree of it moves and
+// open merge requests follow (moveRepo), so stopped deployments keep their
+// work; otherwise only its display name changes. Refused while a team is
+// deployed on the project, and, when the id changes, while the repo is
 // missing (its worktrees can only be moved by the repo itself).
-func (h *Home) RenameRepo(ctx context.Context, project, name, newName string) (Project, error) {
+func (h *Home) RenameRepo(ctx context.Context, project, repo, name string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
 	p, ok := h.snap.projects[project]
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.ID == repo })
 	if i < 0 {
 		return Project{}, ErrNotFound
 	}
 	if h.deployed != nil && h.deployed(ctx, project) {
-		return Project{}, fmt.Errorf("%w: stop the team on %s before renaming %s", ErrDeployed, project, name)
+		return Project{}, refuse(ErrDeployed, "Stop the team on this project first to rename a repo.")
 	}
-	if err := checkRepoName(p, newName); err != nil {
+	id, name, err := repoName(p, repo, name)
+	if err != nil {
 		return Project{}, err
 	}
-	repo := p.Repos[i]
-	if repo.Problem != "" {
-		return Project{}, fmt.Errorf("%w: %s can't be renamed while it has a problem (%s): locate it first", ErrInvalid, name, repo.Problem)
+	rename := func(r *Record) {
+		rec := r.Repos[repo]
+		rec.DisplayName = name
+		delete(r.Repos, repo)
+		r.Repos[id] = rec
 	}
+	if id == repo {
+		return h.changeRecord(ctx, project, fmt.Sprintf("Projects: name %s's %s %q", project, repo, name), rename)
+	}
+	path := p.Repos[i].Path
+	if problem := p.Repos[i].Problem; problem != "" {
+		return Project{}, refuse(ErrInvalid, "%s has a problem (%s): locate it first, then rename it.", repo, problem)
+	}
+	if err := h.moveRepo(ctx, p, path, repo, id, "then rename again."); err != nil {
+		return Project{}, err
+	}
+	renamed, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: rename %s's %s to %s", project, repo, id), rename)
+	if err != nil {
+		_ = h.moveRepo(ctx, p, path, id, repo, "then rename again.")
+		return Project{}, err
+	}
+	return renamed, nil
+}
+
+// moveRepo moves this machine's part of p's repo at path from id from to id
+// to: each agent's worktree of it, then its row in the database, with the
+// open merge requests on it. A worktree in the way refuses it, saying what
+// to do then. On a failure, what moved goes back. It never
+// touches projects.toml: a rename here writes it (RenameRepo), and a rename
+// made on another machine brought it (follow). Called with h.mu held.
+func (h *Home) moveRepo(ctx context.Context, p Project, path, from, to, then string) error {
 	type move struct{ from, to string }
 	var moved []move
+	// A change of case only is two moves, as on a Mac's filesystem the
+	// new name is the old folder.
+	mv := func(from, to string) error {
+		if !strings.EqualFold(from, to) {
+			return h.git.MoveWorktree(ctx, path, from, to)
+		}
+		if err := h.git.MoveWorktree(ctx, path, from, to+".renaming"); err != nil {
+			return err
+		}
+		return h.git.MoveWorktree(ctx, path, to+".renaming", to)
+	}
 	undo := func() {
 		for _, m := range slices.Backward(moved) {
-			_ = h.git.MoveWorktree(ctx, repo.Path, m.to, m.from)
+			_ = mv(m.to, m.from)
 		}
 	}
 	agents, _ := os.ReadDir(p.worktrees)
 	for _, a := range agents {
-		from, to := filepath.Join(p.Sandbox(a.Name()), name), filepath.Join(p.Sandbox(a.Name()), newName)
-		if !exists(from) {
+		src, dst := filepath.Join(p.Sandbox(a.Name()), from), filepath.Join(p.Sandbox(a.Name()), to)
+		if !exists(src) {
 			continue
 		}
-		if exists(to) {
+		if exists(dst) && !strings.EqualFold(src, dst) {
 			undo()
-			return Project{}, fmt.Errorf("%w: %s is in the way", ErrExists, to)
+			return refuse(ErrExists, "%s is in the way: move it, %s", dst, then)
 		}
-		if err := h.git.MoveWorktree(ctx, repo.Path, from, to); err != nil {
+		if err := mv(src, dst); err != nil {
 			undo()
-			return Project{}, err
+			return err
 		}
-		moved = append(moved, move{from, to})
+		moved = append(moved, move{src, dst})
 	}
-	if err := h.machine.RenameRepo(ctx, project, name, newName); err != nil {
+	if err := h.machine.RenameRepo(ctx, p.ID, from, to); err != nil {
 		undo()
-		return Project{}, h.recordError(err)
+		return h.recordError(err)
 	}
-	p, err := h.changeRecord(ctx, project, fmt.Sprintf("Projects: rename %s's %s to %s", project, name, newName), func(r *Record) {
-		r.Repos[newName] = r.Repos[name]
-		delete(r.Repos, name)
-	})
-	if err != nil {
-		_ = h.machine.RenameRepo(ctx, project, newName, name)
-		undo()
-		return Project{}, err
-	}
-	return p, nil
+	return nil
 }
 
 // RemoveProject removes a project: its record in projects.toml (on every

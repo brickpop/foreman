@@ -84,7 +84,7 @@ func (h *Home) clone(ctx context.Context, remote, dir, root string) (undo func()
 	return undo, nil
 }
 
-// CloneRepo adds a repo to a project, under name, cloned from remote into
+// CloneRepo adds a repo to a project, named name (repoName), cloned from remote into
 // repos/ (or the clone already there), with def as its default branch: for
 // "", main when it has one, else the branch the remote's checkout is on.
 func (h *Home) CloneRepo(ctx context.Context, project, name, remote, def string) (Project, error) {
@@ -94,7 +94,8 @@ func (h *Home) CloneRepo(ctx context.Context, project, name, remote, def string)
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	if err := checkRepoName(p, name); err != nil {
+	id, name, err := repoName(p, "", name)
+	if err != nil {
 		return Project{}, err
 	}
 	dir, err := h.cloneDir(remote)
@@ -110,7 +111,7 @@ func (h *Home) CloneRepo(ctx context.Context, project, name, remote, def string)
 	}
 	root, def, err := h.usableRepo(ctx, p, "", dir, def)
 	if err == nil {
-		p, err = h.addRepo(ctx, project, name, dir, root, def)
+		p, err = h.addRepo(ctx, project, id, name, dir, root, def)
 	}
 	if err != nil {
 		undo()
@@ -121,7 +122,8 @@ func (h *Home) CloneRepo(ctx context.Context, project, name, remote, def string)
 
 // CloneMissingRepo locates a project's repo by cloning it from the remote
 // its record keeps (a repo not on this machine yet): into repos/, or the
-// clone already there when it is the same repo.
+// clone already there when it is the same repo. Refused while a rename made
+// on another machine waits (renameWaits).
 func (h *Home) CloneMissingRepo(ctx context.Context, project, name string) (Project, error) {
 	h.mu.Lock()
 	defer h.unlock()
@@ -129,9 +131,12 @@ func (h *Home) CloneMissingRepo(ctx context.Context, project, name string) (Proj
 	if !ok {
 		return Project{}, ErrNotFound
 	}
-	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(p.Repos, func(r Repo) bool { return r.ID == name })
 	if i < 0 {
 		return Project{}, ErrNotFound
+	}
+	if err := h.renameWaits(ctx, project, name); err != nil {
+		return Project{}, err
 	}
 	remote := h.snap.records.Records[project].Repos[name].Remote
 	if remote == "" {

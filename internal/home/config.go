@@ -127,7 +127,7 @@ func DefaultSettings() Settings {
 }
 
 var (
-	slug      = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	slugRule  = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	snakeCase = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 )
 
@@ -220,7 +220,7 @@ func (c TeamConfig) validate(id string) problems {
 		p.add("team: required")
 	case c.Team != id:
 		p.add("team: %q must equal the file name %q", c.Team, id)
-	case !slug.MatchString(c.Team):
+	case !slugRule.MatchString(c.Team):
 		p.add("team: %q must be a slug (lowercase, digits, hyphens)", c.Team)
 	}
 	if strings.TrimSpace(c.Name) == "" {
@@ -257,7 +257,7 @@ func (c TeamConfig) validate(id string) problems {
 
 func (s Soul) validate(at, id string) problems {
 	var p problems
-	if !slug.MatchString(id) {
+	if !slugRule.MatchString(id) {
 		p.add("%s: the agent id must be a slug (lowercase, digits, hyphens)", at)
 	}
 	if strings.TrimSpace(s.Name) == "" {

@@ -297,7 +297,7 @@ func Compose(in Input) string {
 func repoList(repos []home.Repo) string {
 	var each []string
 	for _, r := range repos {
-		each = append(each, fmt.Sprintf("%s at %s (default %s)", r.Name, r.Path, r.Default))
+		each = append(each, fmt.Sprintf("%s at %s (default %s)", r.ID, r.Path, r.Default))
 	}
 	return strings.Join(each, "; ")
 }
@@ -316,7 +316,7 @@ func defaults(repos []home.Repo) string {
 	var each []string
 	same := true
 	for _, r := range repos {
-		each = append(each, r.Default+" in "+r.Name)
+		each = append(each, r.Default+" in "+r.ID)
 		same = same && r.Default == repos[0].Default
 	}
 	switch {
@@ -559,7 +559,7 @@ func instruction(s home.Soul, merges bool) string {
 func Template(team home.TeamConfig, agent, instructions string) string {
 	return Compose(Input{
 		Agent: agent, Team: team, Project: "{project}", Sandbox: "{sandbox}", HQ: "{hq}", Files: "{files}",
-		Repos:        []home.Repo{{Name: "{repo}", Path: "{repo path}", Default: "{default}"}},
+		Repos:        []home.Repo{{ID: "{repo}", Path: "{repo path}", Default: "{default}"}},
 		Config:       home.ProjectConfig{Checks: "{checks}", AlwaysAskCEO: []string{"{gates}"}},
 		Tools:        Offered(agent == team.Lead, true),
 		Instructions: instructions,

@@ -86,7 +86,7 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string, uncommitted bo
 				continue
 			}
 			agents[agent] = true
-			c := Cleaned{Agent: agent, Repo: r.Name, What: "worktree", Branch: branch}
+			c := Cleaned{Agent: agent, Repo: r.ID, What: "worktree", Branch: branch}
 			if merging, err := w.Git.Merging(ctx, dir); err != nil {
 				keep(c, err.Error())
 				continue
@@ -96,7 +96,7 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string, uncommitted bo
 			}
 			err := w.Git.RemoveWorktree(ctx, r.Path, dir)
 			if errors.Is(err, git.ErrUncommitted) && uncommitted {
-				c.Files, c.Backup, err = w.removeUncommitted(ctx, r.Path, dir, agent+"/"+r.Name)
+				c.Files, c.Backup, err = w.removeUncommitted(ctx, r.Path, dir, agent+"/"+r.ID)
 			}
 			switch {
 			case errors.Is(err, git.ErrUncommitted):
@@ -114,12 +114,12 @@ func (w *Workflow) CleanUp(ctx context.Context, projectID string, uncommitted bo
 				return out, err
 			}
 			for _, b := range branches {
-				c := Cleaned{Agent: agent, Repo: r.Name, What: "branch", Branch: b}
+				c := Cleaned{Agent: agent, Repo: r.ID, What: "branch", Branch: b}
 				if _, checkedOut := trees[b]; checkedOut {
 					keep(c, "it is checked out")
 					continue
 				}
-				if !w.landed(ctx, p, r.Name, r.Path, b) {
+				if !w.landed(ctx, p, r.ID, r.Path, b) {
 					keep(c, "not all of it is merged")
 					continue
 				}

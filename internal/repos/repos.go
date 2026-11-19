@@ -85,7 +85,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 	var names []string
 	for _, r := range p.Repos {
 		if r.Ready() {
-			names = append(names, r.Name)
+			names = append(names, r.ID)
 		}
 	}
 	for _, name := range append(names, hq) {
@@ -101,7 +101,7 @@ func (b Browser) Repos(ctx context.Context, project string) ([]Repo, error) {
 		if err != nil {
 			return nil, err
 		}
-		list = append(list, Repo{Name: name, HQ: name == hq, Default: def, Branches: branches, Idle: idle})
+		list = append(list, Repo{ID: name, HQ: name == hq, Default: def, Branches: branches, Idle: idle})
 	}
 	return list, nil
 }

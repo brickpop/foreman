@@ -67,7 +67,7 @@ func (h *Home) Browse(path, project string) (Folder, error) {
 	f := Folder{Path: real, Home: h.allowed, Repo: topOfRepo(real), Foreman: reserved[real], Entries: []FolderEntry{}}
 	for _, r := range repos {
 		if other, err := filepath.EvalSymlinks(r.Path); err == nil && other == real {
-			f.Added = r.Name
+			f.Added = r.ID
 		}
 	}
 	for _, e := range entries {

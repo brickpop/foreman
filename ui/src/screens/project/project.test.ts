@@ -88,29 +88,29 @@ describe("Changes", () => {
     ]);
   });
 
-  it("writes a merge request's link line", () => {
+  it("writes a merge request's link line, its repo as it shows", () => {
     const mr = {
       repo: "web",
       branch: "lead/ledger/atlas/integration",
       target: "main",
       checksStatus: "pass",
     } as MergeRequest;
-    expect(linkLine(mr)).toBe("web · lead/ledger/atlas/integration → main · checks pass");
-    expect(linkLine({ ...mr, conflicting: true })).toBe(
-      "web · lead/ledger/atlas/integration → main · conflicts with main",
+    expect(linkLine(mr, "Web")).toBe("Web · lead/ledger/atlas/integration → main · checks pass");
+    expect(linkLine({ ...mr, conflicting: true }, "Web")).toBe(
+      "Web · lead/ledger/atlas/integration → main · conflicts with main",
     );
-    expect(linkLine({ ...mr, checksStatus: "" })).toBe(
-      "web · lead/ledger/atlas/integration → main",
+    expect(linkLine({ ...mr, checksStatus: "" }, "Web")).toBe(
+      "Web · lead/ledger/atlas/integration → main",
     );
-    expect(linkLine({ ...mr, checksStatus: "running", target: "develop" })).toBe(
-      "web · lead/ledger/atlas/integration → develop · checks running",
+    expect(linkLine({ ...mr, checksStatus: "running", target: "develop" }, "Web")).toBe(
+      "Web · lead/ledger/atlas/integration → develop · checks running",
     );
-    expect(linkLine({ ...mr, conflicting: true, target: "develop" })).toBe(
-      "web · lead/ledger/atlas/integration → develop · conflicts with develop",
+    expect(linkLine({ ...mr, conflicting: true, target: "develop" }, "Web")).toBe(
+      "Web · lead/ledger/atlas/integration → develop · conflicts with develop",
     );
     // Landing on a branch of its own: there, from its target.
-    expect(linkLine({ ...mr, landing: "f/csv" })).toBe(
-      "web · lead/ledger/atlas/integration → f/csv (from main) · checks pass",
+    expect(linkLine({ ...mr, landing: "f/csv" }, "Web")).toBe(
+      "Web · lead/ledger/atlas/integration → f/csv (from main) · checks pass",
     );
   });
 });

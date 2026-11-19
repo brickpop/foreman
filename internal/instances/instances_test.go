@@ -1622,6 +1622,43 @@ func TestTheMountsAreTheSandboxAndTheReposOnly(t *testing.T) {
 	}
 }
 
+// A repo renamed on another machine waits while a team is deployed on the
+// project here; stopping the team follows it, with nothing else to trigger it.
+func TestAStopFollowsARenameFromAnotherMachine(t *testing.T) {
+	f := newFixture(t, keepsRunning, 12)
+	deployed := func(ctx context.Context, project string) bool {
+		active, _ := f.m.DeploymentsIn(ctx, store.DeploymentActive)
+		return slices.ContainsFunc(active, func(d store.Deployment) bool { return d.ProjectID == project })
+	}
+	if err := f.hm.Load(ctx, home.Deps{Git: git.New(), Projects: f.db.Projects(), Deployed: deployed}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.m.Deploy(ctx, "atlas", "ledger", false); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus("mara@ledger", Running)
+	old := filepath.Join(f.hm.Sandbox("ledger", "mara"), "ledger-api")
+	records := f.hm.HQ("projects.toml")
+	data, err := os.ReadFile(records)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, records, strings.Replace(string(data), "[ledger.repos.ledger-api]", "[ledger.repos.api]", 1), 0o644)
+	if p, _ := f.hm.Checked("ledger"); len(p.Repos) != 1 || !strings.HasPrefix(p.Repos[0].Problem, "Renamed from ledger-api on another machine") {
+		t.Fatalf("while deployed: %+v", p.Repos)
+	}
+	if err := f.m.Stop(ctx, "atlas@ledger"); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := f.hm.Project("ledger")
+	if r := p.Repos[0]; r.ID != "api" || !r.Ready() {
+		t.Errorf("after the stop: %+v", p.Repos)
+	}
+	if _, err := os.Stat(old); !errors.Is(err, os.ErrNotExist) || f.branch(filepath.Join(f.hm.Sandbox("ledger", "mara"), "api")) == "" {
+		t.Error("mara's worktree didn't move")
+	}
+}
+
 // A repo that moved keeps its agents from starting until it is located:
 // then their worktrees, made at the old place, are relinked and reused, with
 // the agents' work in them.

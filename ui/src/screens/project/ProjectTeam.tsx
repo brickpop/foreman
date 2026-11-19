@@ -7,6 +7,7 @@ import {
   useCleanUp,
   useDeployments,
   useInstances,
+  useRepoName,
   useRepos,
   useStoppedDeployments,
   useTeams,
@@ -17,6 +18,7 @@ import { DeployDialog } from "../../components/DeployDialog";
 import { StopIcon } from "../../components/icons";
 import { Confirm } from "../../components/Overlays";
 import { ReloadButton } from "../../components/ReloadButton";
+import { RepoName } from "../../components/RepoName";
 import { StopDialog } from "../../components/StopDialog";
 import { useToast } from "../../components/Toasts";
 import {
@@ -180,6 +182,7 @@ function AgentRow({
   deployment: string;
 }) {
   const navigate = useNavigate();
+  const repoName = useRepoName(project);
   const agent = agentOf(teams, deployment, id);
   return (
     <div className="grid grid-cols-[auto_minmax(140px,220px)_1fr_auto] items-start gap-3 border-b border-line px-4 py-3 last:border-b-0">
@@ -208,10 +211,12 @@ function AgentRow({
             to="/projects/$project/repos/$repo"
             params={{ project, repo }}
             search={{ branch: b.name }}
-            title={`Read ${b.name} in ${repo}`}
+            title={`Read ${b.name} in ${repoName.name(repo)}`}
             className="flex min-w-0 items-baseline gap-2 rounded-md text-[13px] hover:underline"
           >
-            <span className="shrink-0 font-mono text-[12px] text-tx4">{repo}</span>
+            <span className="max-w-[40%] shrink-0 truncate text-[12px] text-tx4">
+              {repoName.name(repo)}
+            </span>
             <span className="truncate font-mono text-[12.5px] text-accTx">{b.name}</span>
             <span className="shrink-0 text-[12px] text-tx4">
               {b.ahead > 0 && `${b.ahead} ahead`}
@@ -223,7 +228,11 @@ function AgentRow({
         ))}
         {w?.idle.map(({ repo, uncommitted }) => (
           <span key={repo} className="flex min-w-0 items-baseline gap-2 text-[13px]">
-            <span className="shrink-0 font-mono text-[12px] text-tx4">{repo}</span>
+            <RepoName
+              project={project}
+              id={repo}
+              className="max-w-[40%] shrink-0 truncate text-[12px] text-tx4"
+            />
             <span className="truncate text-[12.5px] text-tx3">idle, on no branch</span>
             {uncommitted && (
               <span className="shrink-0 text-[12px] text-attnTx">uncommitted changes</span>
@@ -264,6 +273,7 @@ function EarlierTeams({
   deployment: string;
 }) {
   const clean = useCleanUp(project);
+  const repoName = useRepoName(project);
   const toast = useToast();
   const [asking, setAsking] = useState(false);
   const [uncommitted, setUncommitted] = useState(false);
@@ -271,7 +281,7 @@ function EarlierTeams({
     kept: [],
     discarded: [],
   });
-  const unsaved = uncommittedWork(left);
+  const unsaved = uncommittedWork(left, repoName.name);
   const run = () =>
     clean.mutate(uncommitted, {
       onSuccess: (done) => {
@@ -326,8 +336,9 @@ function EarlierTeams({
           <span>Removed with their uncommitted work by the last clean up:</span>
           {done.discarded.map((c) => (
             <span key={`${c.agent} ${c.repo}`}>
-              <span className="font-mono text-[12.5px] text-tx2">
-                {c.agent}'s {c.repo}: {c.files?.join(", ")}
+              <span className="text-tx2">
+                {c.agent}'s <RepoName project={project} id={c.repo} />:{" "}
+                <span className="font-mono text-[12.5px]">{c.files?.join(", ")}</span>
               </span>
               . Kept a while under{" "}
               <span className="font-mono text-[12.5px] text-tx2 select-text">{c.backup}</span>.
@@ -340,8 +351,13 @@ function EarlierTeams({
           <span>Kept by the last clean up:</span>
           {done.kept.map((c) => (
             <span key={`${c.agent} ${c.repo} ${c.what} ${c.branch}`}>
-              <span className="font-mono text-[12.5px] text-tx2">
-                {c.repo} {c.what === "branch" ? c.branch : `${c.agent}'s worktree`}
+              <span className="text-tx2">
+                <RepoName project={project} id={c.repo} />{" "}
+                {c.what === "branch" ? (
+                  <span className="font-mono text-[12.5px]">{c.branch}</span>
+                ) : (
+                  `${c.agent}'s worktree`
+                )}
               </span>
               : {c.why}.
             </span>

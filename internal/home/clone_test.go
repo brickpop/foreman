@@ -164,7 +164,7 @@ default_branch = "main"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p.Repos[0].Name != "api" || p.Repos[0].Path != filepath.Join(h.Folder(), "repos", "acme", "api") || !p.Repos[0].Ready() {
+	if p.Repos[0].ID != "api" || p.Repos[0].Path != filepath.Join(h.Folder(), "repos", "acme", "api") || !p.Repos[0].Ready() {
 		t.Errorf("%+v", p.Repos[0])
 	}
 	if _, err := h.CloneMissingRepo(ctx, "ledger", "web"); !errors.Is(err, ErrInvalid) || !strings.Contains(err.Error(), "no remote") {

@@ -9,6 +9,8 @@ import {
   inbox,
   type ProjectRow,
   projectRows,
+  repoName,
+  repoTitle,
   workingSummary,
 } from "../app/model";
 import { sessionOf } from "../app/project";
@@ -256,15 +258,17 @@ function ProjectCard({ row, project }: { row: ProjectRow; project?: Project }) {
         {project?.config.description || "No description yet."}
       </p>
       <span className="flex flex-wrap gap-1.5">
-        {repos.slice(0, 3).map((r) => (
-          <span
-            key={r.name}
-            className={`rounded-[5px] bg-raised px-1.5 py-px font-mono text-[11.5px] ${r.problem ? "text-err" : "text-tx3"}`}
-            title={r.problem || r.path}
-          >
-            {r.name}
-          </span>
-        ))}
+        {byName(repos)
+          .slice(0, 3)
+          .map((r) => (
+            <span
+              key={r.id}
+              className={`max-w-full truncate rounded-[5px] bg-raised px-1.5 py-px text-[11.5px] ${r.problem ? "text-err" : "text-tx3"}`}
+              title={r.problem || repoTitle(project, r.id)}
+            >
+              {repoName(project, r.id)}
+            </span>
+          ))}
         {repos.length > 3 && (
           <span className="font-mono text-[11.5px] text-tx4">+{repos.length - 3}</span>
         )}

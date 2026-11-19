@@ -13,6 +13,7 @@ import {
   useCommentChange,
   useDeployments,
   useProjects,
+  useRepoName,
   useReview,
   useReviewChange,
   useReviewDiff,
@@ -48,6 +49,7 @@ import { TextBox } from "../../components/AgentText";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Chevron } from "../../components/icons";
 import { Confirm, Modal } from "../../components/Overlays";
+import { RepoName } from "../../components/RepoName";
 import { useToast } from "../../components/Toasts";
 import {
   Button,
@@ -272,6 +274,7 @@ export function Review() {
       </header>
       <div className="flex min-h-0 flex-1">
         <FilesPane
+          project={v.projectId}
           repos={repos}
           decided={(repo) => decidedAs(v, repo)}
           shut={shut}
@@ -300,22 +303,24 @@ export function Review() {
               .filter((r) => r.targetGone)
               .map((r) => (
                 <Empty key={r.repo}>
-                  {r.repo}: the branch it merges into, {r.target}, is gone (deleted outside
-                  Foreman). Pick another branch for it below to see its change and merge it.
+                  <RepoName project={v.projectId} id={r.repo} />: the branch it merges into,{" "}
+                  {r.target}, is gone (deleted outside Foreman). Pick another branch for it below to
+                  see its change and merge it.
                 </Empty>
               ))}
             {repos
               .filter((r) => r.gone)
               .map((r) => (
                 <Empty key={r.repo}>
-                  {r.repo}: the change can't be shown. It wasn't recorded when the review was
-                  decided, or git no longer has its commits.
+                  <RepoName project={v.projectId} id={r.repo} />: the change can't be shown. It
+                  wasn't recorded when the review was decided, or git no longer has its commits.
                 </Empty>
               ))}
             {repos.map((r) => (
               <section key={r.repo} className="flex flex-col gap-5">
                 {/* Each repo heads its files, so one reads apart from the next. */}
                 <RepoRow
+                  project={v.projectId}
                   repo={r}
                   decided={decidedAs(v, r.repo)}
                   open={!shut.has(r.repo)}
@@ -394,6 +399,7 @@ const changeLook: Record<Exclude<FileDiff["change"], "">, string> = {
  * ways, under its row, which stays; the right border drags (or arrow keys move) the width
  * within treeWidths, kept in this browser. */
 function FilesPane({
+  project,
   repos,
   decided,
   shut,
@@ -401,6 +407,7 @@ function FilesPane({
   reading,
   onOpen,
 }: {
+  project: string;
   repos: { repo: string; target: string; files: FileDiff[]; gone: boolean; targetGone: boolean }[];
   decided: (repo: string) => string;
   /** The repos folded. */
@@ -487,6 +494,7 @@ function FilesPane({
             {/* On the page's background, so rows passing under it never show at its corners. */}
             <div className="sticky top-0 z-10 flex flex-col bg-bg pb-0.5">
               <RepoRow
+                project={project}
                 repo={r}
                 decided={decided(r.repo)}
                 open={!shut.has(r.repo)}
@@ -546,12 +554,14 @@ function FilesPane({
  * one repo reads apart from the next (the CEO, 2026-11-05), and a click folds all its files.
  * Only with two repos or more: a review's only repo doesn't fold (the CEO, 2026-11-07). */
 function RepoRow({
+  project,
   repo: r,
   decided,
   open,
   onToggle,
   big = false,
 }: {
+  project: string;
   repo: { repo: string; target: string; files: FileDiff[] };
   /** How it was decided (merged, dismissed…), or nothing while open. */
   decided: string;
@@ -561,14 +571,15 @@ function RepoRow({
   /** Over the diffs: roomier, with its counts. */
   big?: boolean;
 }) {
+  const repoName = useRepoName(project);
   const added = r.files.reduce((n, f) => n + f.added, 0);
   const removed = r.files.reduce((n, f) => n + f.removed, 0);
-  const look = `flex min-w-0 shrink-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left font-mono text-tx ${onToggle ? "hover:border-line3" : ""} ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`;
+  const look = `flex min-w-0 shrink-0 items-center gap-2 rounded-md border border-line2 bg-raised text-left text-tx ${onToggle ? "hover:border-line3" : ""} ${big ? "px-3 py-2 text-[13.5px]" : "px-2 py-1.5 text-[12.5px]"}`;
   const inside = (
     <>
       {onToggle && <Chevron open={open} />}
-      <span className="min-w-0 flex-1 truncate font-semibold">
-        {r.repo} → {r.target}
+      <span className="min-w-0 flex-1 truncate font-semibold" title={repoName.title(r.repo)}>
+        {repoName.name(r.repo)} → <span className="font-mono">{r.target}</span>
         {decided && <span className="font-normal"> · {decided}</span>}
       </span>
       {big && r.files.length > 0 && (
@@ -891,6 +902,7 @@ function DecisionBar({
   failed: (e: Error) => void;
 }) {
   const navigate = useNavigate();
+  const repoName = useRepoName(v.projectId);
   // Merged or dismissed, the Inbox's next one is the next thing to do.
   const back = () => navigate({ to: "/projects/$project/inbox", params: { project: v.projectId } });
   const toast = useToast();
@@ -946,7 +958,7 @@ function DecisionBar({
         onSuccess: () => {
           toast({
             title: "Merged",
-            body: ticked.map((r) => `${r.repo} → ${landsOn(r, landing)}`).join(", "),
+            body: ticked.map((r) => `${repoName.name(r.repo)} → ${landsOn(r, landing)}`).join(", "),
             color: "var(--ok)",
             // To watch the lead pick it up.
             onOpen: () => navigate(sessionOf(v.lead)),
@@ -1007,9 +1019,9 @@ function DecisionBar({
     const line = (
       <span
         className={`min-w-0 truncate font-mono text-[12.5px] ${m.conflicting ? "text-err" : "text-tx2"}`}
-        title={linkLine(m)}
+        title={linkLine(m, repoName.title(m.repo))}
       >
-        {linkLine(m)}
+        {linkLine(m, repoName.name(m.repo))}
       </span>
     );
     return (
@@ -1063,7 +1075,7 @@ function DecisionBar({
                               : "text-tx2"
                         }
                       >
-                        {unticked.has(m.repo) ? "☐" : "☑"} {m.repo}
+                        {unticked.has(m.repo) ? "☐" : "☑"} {repoName.name(m.repo)}
                       </span>
                     </span>
                   ))}
@@ -1137,7 +1149,7 @@ function DecisionBar({
                   if (dismissed.kept.length > 0)
                     toast({
                       title: "Dismissed, but some branches stay",
-                      body: keptLines(dismissed),
+                      body: keptLines(dismissed, repoName.name),
                       color: "var(--err)",
                     });
                   back();
@@ -1198,6 +1210,7 @@ function DecisionBar({
       {/* Mounted while open: each opening starts with no name. */}
       {naming && (
         <MergeToDialog
+          project={v.projectId}
           repos={ticked}
           busy={merge.isPending}
           onClose={() => setNaming(false)}
@@ -1216,11 +1229,13 @@ const menuItem =
  * naming, made on Merge from each one's target (or one already at its head), the lead's
  * proposal filled in. The target, which the diff is against, stays. Nothing is pushed. */
 function MergeToDialog({
+  project,
   repos,
   busy,
   onClose,
   onMerge,
 }: {
+  project: string;
   /** The repos ticked, each with its target and the lead's landing. */
   repos: { repo: string; target: string; landing: string }[];
   busy: boolean;
@@ -1259,7 +1274,8 @@ function MergeToDialog({
               {repos.map((r, i) => (
                 <span key={r.repo}>
                   {i > 0 && ", "}
-                  <span className="font-mono text-tx2">{r.target}</span> in {r.repo}
+                  <span className="font-mono text-tx2">{r.target}</span> in{" "}
+                  <RepoName project={project} id={r.repo} />
                 </span>
               ))}
               , as reviewed, or one of that name already there. Here only: nothing is pushed.

@@ -98,7 +98,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 	var mounts []runner.Mount
 	mounts = append(mounts, runner.Mount{Source: inst.SandboxPath, Target: inst.SandboxPath})
 	for _, repo := range project.Repos {
-		repoDir, worktree := repo.Path, filepath.Join(inst.SandboxPath, repo.Name)
+		repoDir, worktree := repo.Path, filepath.Join(inst.SandboxPath, repo.ID)
 		// Only the repos it opened have a worktree: one is made when the agent
 		// needs it (wiki/product/architecture/sandboxes-and-git.md#opening-a-repo).
 		// Those it has are relinked if their repo moved, and caught up when idle.
@@ -112,7 +112,7 @@ func (m *Manager) launch(ctx context.Context, id string) (runner.Process, error)
 			// a private repo) rather than not at all: its next switch or merge
 			// tries again, and says so.
 			if err := m.Git.SyncSubmodules(ctx, worktree, project.Config.RecursiveSubmodules); err != nil {
-				slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo.Name, "err", err)
+				slog.Warn("checking out the submodules", "instance", inst.ID, "repo", repo.ID, "err", err)
 			}
 		}
 		// Agents read git; only Foreman writes it. At its real path, which the

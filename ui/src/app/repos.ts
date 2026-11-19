@@ -37,10 +37,10 @@ export function shownAt(
   repo: string,
   branch?: string,
 ): { repo: string; branch: string } | undefined {
-  const r = repos.find((x) => x.name === repo);
+  const r = repos.find((x) => x.id === repo);
   if (!r) return undefined;
   const b = r.branches.find((x) => x.name === branch) ?? r.branches[0];
-  return { repo: r.name, branch: b?.name ?? r.defaultBranch };
+  return { repo: r.id, branch: b?.name ?? r.defaultBranch };
 }
 
 export type Worktree = {
@@ -63,24 +63,24 @@ export function worktrees(repos: Repo[]): Worktree[] {
   };
   for (const repo of repos) {
     for (const branch of repo.branches) {
-      if (branch.agent) of(branch.agent).branches.push({ repo: repo.name, branch });
+      if (branch.agent) of(branch.agent).branches.push({ repo: repo.id, branch });
     }
     for (const t of repo.idle) {
-      of(t.agent).idle.push({ repo: repo.name, uncommitted: t.uncommitted });
+      of(t.agent).idle.push({ repo: repo.id, uncommitted: t.uncommitted });
     }
   }
   return [...by.values()].sort((a, b) => a.agent.localeCompare(b.agent));
 }
 
 /** The repos where each worktree holds changes not committed, as "agent's
- * repo": what Clean up removes only when asked. In the worktrees' order,
- * each's in its repos'. */
-export function uncommittedWork(trees: Worktree[]): string[] {
+ * repo" (repo as name shows it): what Clean up removes only when asked. In
+ * the worktrees' order, each's in its repos'. */
+export function uncommittedWork(trees: Worktree[], name: (repo: string) => string): string[] {
   return trees.flatMap((w) =>
     [
       ...w.branches.filter((b) => b.branch.uncommitted).map((b) => b.repo),
       ...w.idle.filter((t) => t.uncommitted).map((t) => t.repo),
-    ].map((repo) => `${w.agent}'s ${repo}`),
+    ].map((repo) => `${w.agent}'s ${name(repo)}`),
   );
 }
 
@@ -103,7 +103,7 @@ export function branchPlaces(
 ): { changed: BranchPlace[]; unchanged: BranchPlace[] } {
   const places = repos.flatMap((r) => {
     const b = !r.hq && r.branches.find((x) => x.name === branch);
-    return b ? [{ repo: r.name, ahead: b.ahead, uncommitted: b.uncommitted }] : [];
+    return b ? [{ repo: r.id, ahead: b.ahead, uncommitted: b.uncommitted }] : [];
   });
   const work = (p: BranchPlace) => p.ahead > 0 || p.uncommitted;
   return { changed: places.filter(work), unchanged: places.filter((p) => !work(p)) };
@@ -114,7 +114,7 @@ export function branchPlaces(
 export function reposWith(repos: Repo[], branch: string): string[] {
   const having = repos.filter((r) => r.branches.some((b) => b.name === branch));
   const ahead = (r: Repo) => (r.branches.find((b) => b.name === branch)?.ahead ?? 0) > 0;
-  return [...having.filter(ahead), ...having.filter((r) => !ahead(r))].map((r) => r.name);
+  return [...having.filter(ahead), ...having.filter((r) => !ahead(r))].map((r) => r.id);
 }
 
 /** A path's breadcrumbs: each folder (and the file) with the path to it. */

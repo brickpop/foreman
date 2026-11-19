@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -70,6 +71,13 @@ func loaded(t *testing.T, setup func(root string)) *Home {
 // load is loaded, returning the error Load returned.
 func load(t *testing.T, setup func(root string)) (*Home, error) {
 	t.Helper()
+	h, _, err := loadWithDB(t, setup)
+	return h, err
+}
+
+// loadWithDB is load, with the database it opened.
+func loadWithDB(t *testing.T, setup func(root string)) (*Home, *store.DB, error) {
+	t.Helper()
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	t.Setenv("GIT_AUTHOR_NAME", "ceo")
@@ -89,7 +97,7 @@ func load(t *testing.T, setup func(root string)) (*Home, error) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	return h, h.Load(ctx, Deps{Git: git.New(), Projects: db.Projects()})
+	return h, db, h.Load(ctx, Deps{Git: git.New(), Projects: db.Projects()})
 }
 
 // hqOf is Foreman's HQ of the home at root, in the default Foreman folder.
@@ -545,5 +553,193 @@ func TestSettingsStayOnThisMachine(t *testing.T) {
 		if _, err := h.SaveSettings(ctx, bad, h.Settings().Version); !errors.As(err, &invalid) || !strings.HasPrefix(invalid.Problems[0], name+":") {
 			t.Errorf("%s: %v", name, err)
 		}
+	}
+}
+
+// A repo renamed on another machine comes here as a new id in projects.toml,
+// with this machine's row and worktrees under the old one: Foreman follows
+// it on load, as a rename here would have moved them.
+func TestFollowARenameFromAnotherMachine(t *testing.T) {
+	h, db, err := loadWithDB(t, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	api := codeRepo(t, "dev/api")
+	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
+		t.Fatal(err)
+	}
+	old := sandboxWorktree(t, h, "ledger", "mara", "api", api)
+	mrs := db.MergeRequests()
+	open, _ := mrs.Save(ctx, store.MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/integration"})
+	closed, _ := mrs.Save(ctx, store.MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "api", Branch: "lead/atlas/old", State: store.MergeMerged})
+
+	// Twice there (api, then api-v2, then ledger-api): once here.
+	editRecords(t, h, "ledger", func(repos map[string]RepoRecord) {
+		repos["ledger-api"] = repos["api"]
+		delete(repos, "api")
+	})
+	p, _ := h.Project("ledger")
+	if dir, ok := p.RepoDir("ledger-api"); !ok || dir != api || len(p.Problems) != 0 {
+		t.Errorf("not followed: %+v", p)
+	}
+	moved := filepath.Join(h.Sandbox("ledger", "mara"), "ledger-api")
+	if exists(old) || gitOut(t, moved, "branch", "--show-current") != "wt/mara/main" {
+		t.Error("the worktree didn't move")
+	}
+	for id, want := range map[string]string{open.ID: "ledger-api", closed.ID: "api"} {
+		if got, _ := mrs.Get(ctx, id); got.Repo != want {
+			t.Errorf("%s: on %q, want %q", id, got.Repo, want)
+		}
+	}
+	rows, _ := h.machine.List(ctx)
+	if len(rows) != 1 || len(rows[0].Repos) != 1 || rows[0].Repos[0] != (store.RepoRecord{Name: "ledger-api", Path: api}) {
+		t.Errorf("this machine's rows: %+v", rows)
+	}
+}
+
+// While a team is deployed on the project here, the rename waits: nothing
+// moves, the repo says why, and the next check after the stop follows it.
+func TestFollowWaitsForTheTeamToStop(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	api := codeRepo(t, "dev/api")
+	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
+		t.Fatal(err)
+	}
+	old := sandboxWorktree(t, h, "ledger", "mara", "api", api)
+	deployed := true
+	h.deployed = func(context.Context, string) bool { return deployed }
+	editRecords(t, h, "ledger", func(repos map[string]RepoRecord) {
+		repos["ledger-api"] = repos["api"]
+		delete(repos, "api")
+	})
+	p, _ := h.Project("ledger")
+	if r := p.Repos[0]; r.ID != "ledger-api" || r.Problem != "Renamed from api on another machine: stop the team here, and Foreman follows." || !exists(old) {
+		t.Errorf("while deployed: %+v", p.Repos)
+	}
+	// Located meanwhile, the rename would never be followed: refused, to its
+	// own folder or to another clone.
+	clone := filepath.Join(os.Getenv("HOME"), "dev", "api-copy")
+	gitOut(t, os.Getenv("HOME"), "clone", "--quiet", api, clone)
+	for _, path := range []string{api, clone} {
+		if _, err := h.LocateRepo(ctx, "ledger", "ledger-api", path); !errors.Is(err, ErrDeployed) ||
+			sentence(err) != "Renamed from api on another machine: stop the team here, and Foreman follows." {
+			t.Errorf("located at %s while deployed: %v", path, err)
+		}
+	}
+	if _, err := h.CloneMissingRepo(ctx, "ledger", "ledger-api"); !errors.Is(err, ErrDeployed) ||
+		sentence(err) != "Renamed from api on another machine: stop the team here, and Foreman follows." {
+		t.Errorf("cloned while deployed: %v", err)
+	}
+	deployed = false
+	p, err := h.Checked("ledger")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := p.Repos[0]; !r.Ready() || r.Path != api || exists(old) {
+		t.Errorf("after the stop: %+v", p.Repos)
+	}
+}
+
+// Two rows here holding the renamed repo (two clones of it), or a worktree
+// in the way: nothing moves, and the repo says what to do.
+func TestFollowRefusesWhatItCantTell(t *testing.T) {
+	h := loaded(t, nil)
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	api := codeRepo(t, "dev/api")
+	clone := filepath.Join(os.Getenv("HOME"), "dev", "api-copy")
+	gitOut(t, os.Getenv("HOME"), "clone", "--quiet", api, clone)
+	for name, path := range map[string]string{"api": api, "api-copy": clone} {
+		if _, err := h.AddRepo(ctx, "ledger", name, path, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	editRecords(t, h, "ledger", func(repos map[string]RepoRecord) {
+		repos["ledger-api"] = repos["api"]
+		delete(repos, "api")
+		delete(repos, "api-copy")
+	})
+	p, _ := h.Project("ledger")
+	if r := p.Repos[0]; r.ID != "ledger-api" || r.Problem != "not on this machine yet: Locate it" {
+		t.Errorf("two clones: %+v", p.Repos)
+	}
+
+	// One clone left; a folder where its worktree would go.
+	if err := h.machine.RemoveRepo(ctx, "ledger", "api-copy"); err != nil {
+		t.Fatal(err)
+	}
+	old := sandboxWorktree(t, h, "ledger", "mara", "api", api)
+	inTheWay := filepath.Join(h.Sandbox("ledger", "mara"), "ledger-api")
+	writeFile(t, filepath.Join(inTheWay, "notes.md"), "mine\n")
+	h.reload()
+	p, _ = h.Project("ledger")
+	if r := p.Repos[0]; r.Problem != inTheWay+" is in the way: move it, and Foreman follows." || !exists(old) {
+		t.Errorf("a worktree in the way: %+v", p.Repos)
+	}
+	rows, _ := h.machine.List(ctx)
+	if len(rows[0].Repos) != 1 || rows[0].Repos[0].Name != "api" {
+		t.Errorf("this machine's rows: %+v", rows[0].Repos)
+	}
+}
+
+// olderRepo makes the project's repo id an id from before ids were made from
+// names, in this machine's row and in projects.toml.
+func olderRepo(t *testing.T, h *Home, project, id, older string) {
+	t.Helper()
+	if err := h.machine.RenameRepo(ctx, project, id, older); err != nil {
+		t.Fatal(err)
+	}
+	editRecords(t, h, project, func(repos map[string]RepoRecord) {
+		repos[older] = repos[id]
+		delete(repos, id)
+	})
+}
+
+// A rename that changes the id's case only (an older Ledger to ledger) comes
+// as the same row in another case: Foreman follows it too.
+func TestFollowACaseOnlyRenameFromAnotherMachine(t *testing.T) {
+	h, db, err := loadWithDB(t, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := h.NewProject(ctx, "ledger", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	api := codeRepo(t, "dev/api")
+	if _, err := h.AddRepo(ctx, "ledger", "api", api, ""); err != nil {
+		t.Fatal(err)
+	}
+	olderRepo(t, h, "ledger", "api", "Ledger")
+	sandboxWorktree(t, h, "ledger", "mara", "Ledger", api)
+	mrs := db.MergeRequests()
+	open, _ := mrs.Save(ctx, store.MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "Ledger", Branch: "lead/atlas/integration"})
+	closed, _ := mrs.Save(ctx, store.MergeRequest{ProjectID: "ledger", AuthorInstance: "mara@ledger", Repo: "Ledger", Branch: "lead/atlas/old", State: store.MergeMerged})
+
+	editRecords(t, h, "ledger", func(repos map[string]RepoRecord) {
+		repos["ledger"] = repos["Ledger"]
+		delete(repos, "Ledger")
+	})
+	p, _ := h.Project("ledger")
+	if r := repoOf(p, "ledger"); r.Path != api || !r.Ready() || len(p.Problems) != 0 {
+		t.Errorf("not followed: %+v", p)
+	}
+	sandbox := h.Sandbox("ledger", "mara")
+	if names := entries(t, sandbox); !slices.Equal(names, []string{"ledger"}) || gitOut(t, filepath.Join(sandbox, "ledger"), "branch", "--show-current") != "wt/mara/main" {
+		t.Errorf("mara's worktrees: %v", names)
+	}
+	for id, want := range map[string]string{open.ID: "ledger", closed.ID: "Ledger"} {
+		if got, _ := mrs.Get(ctx, id); got.Repo != want {
+			t.Errorf("%s: on %q, want %q", id, got.Repo, want)
+		}
+	}
+	if rows, _ := h.machine.List(ctx); rows[0].Repos[0].Name != "ledger" {
+		t.Errorf("this machine's row: %+v", rows[0].Repos)
 	}
 }

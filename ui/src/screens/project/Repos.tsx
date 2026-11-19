@@ -3,7 +3,16 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { type Project, type Repo, useClient } from "../../api/client";
-import { agentBranch, projectName, readable } from "../../app/model";
+import { renameHint } from "../../app/addProject";
+import {
+  agentBranch,
+  byName,
+  projectName,
+  repoName,
+  repoNameRefusal,
+  repoTitle,
+  slug,
+} from "../../app/model";
 import { keys, useDeployments, useRepos } from "../../app/queries";
 import { AddRepo } from "../../components/AddRepo";
 import { BranchCleanup } from "../../components/BranchCleanup";
@@ -12,18 +21,19 @@ import { RepoIcon } from "../../components/icons";
 import { Confirm, Modal } from "../../components/Overlays";
 import { Select } from "../../components/Select";
 import { useToast } from "../../components/Toasts";
-import { Button, Card, cover, Loading } from "../../components/ui";
+import { Button, Card, cover, Field, Loading } from "../../components/ui";
 import { useProject } from "../Project";
 
 // A project's Repos section (wiki/product/features/repos.md): a card per
 // code repo, wherever it is on disk, each opening its own page (Repo), with
 // what keeps agents from using it; then its HQ. Added, created,
 // located, renamed, removed and given their default branch here, from each
-// card's ⋯ menu; renaming and removing wait until no team is deployed.
+// card's ⋯ menu; renaming and removing wait until no team is deployed. Each
+// repo shows by its name (repoName); its id is made from that name.
 
 type Changing = {
   what: "default" | "rename" | "locate" | "remove";
-  repo: string;
+  repo: string; // its id
 };
 
 export function Repos() {
@@ -36,7 +46,6 @@ export function Repos() {
   const deployed = (useDeployments().data ?? []).some((d) => d.projectId === project.id);
   const [adding, setAdding] = useState(false);
   const [changing, setChanging] = useState<Changing>();
-  const [renameTo, setRenameTo] = useState("");
   const close = () => setChanging(undefined);
   const change = useMutation({
     mutationFn: (run: () => Promise<Project>) => run(),
@@ -44,13 +53,11 @@ export function Repos() {
     onError: (e: Error) =>
       toast({ title: "Repos not changed", body: e.message, color: "var(--err)" }),
   });
-  const readOf = (name: string) => read.data?.find((r) => r.name === name);
+  const readOf = (id: string) => read.data?.find((r) => r.id === id);
   const hq = read.data?.find((r) => r.hq);
-  const open = (what: Changing["what"], repo: string) => {
-    if (what === "rename") setRenameTo(repo);
-    setChanging({ what, repo });
-  };
-  const target = project.repos.find((r) => r.name === changing?.repo);
+  const open = (what: Changing["what"], repo: string) => setChanging({ what, repo });
+  const target = project.repos.find((r) => r.id === changing?.repo);
+  const shown = changing ? repoName(project, changing.repo) : "";
   return (
     <div className="flex max-w-[920px] flex-col gap-4 px-6 pt-6 pb-12">
       {/* Headed as the Wiki and a repo's page are; the actions on the right,
@@ -69,19 +76,24 @@ export function Repos() {
         </p>
       )}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-        {project.repos.map((r) => (
+        {byName(project.repos).map((r) => (
           <RepoCard
-            key={r.name}
-            project={project.id}
+            key={r.id}
+            project={project}
             repo={r}
-            read={readOf(r.name)}
+            read={readOf(r.id)}
             deployed={deployed}
             onChange={open}
           />
         ))}
         {read.isPending && <Loading rows={2} />}
         {hq && (
-          <Frame project={project.id} name={hq.name} title="HQ">
+          <Frame
+            project={project.id}
+            id={hq.id}
+            title={repoName(project, hq.id)}
+            tooltip={repoTitle(project, hq.id)}
+          >
             <span className="text-[12.5px] text-tx4">project.toml and the wiki</span>
             <span className="text-[12.5px] text-tx3">{count(hq)}</span>
           </Frame>
@@ -93,12 +105,12 @@ export function Repos() {
         onClose={() => setAdding(false)}
         title={`Add a repo to ${projectName([project], project.id)}`}
       >
-        {adding && <AddRepo project={project.id} onAdded={() => setAdding(false)} />}
+        {adding && <AddRepo project={project} onAdded={() => setAdding(false)} />}
       </Modal>
       <Modal
         open={changing?.what === "default"}
         onClose={close}
-        title={`Default branch of ${target ? readable(target.name) : ""}`}
+        title={`Default branch of ${shown}`}
       >
         {target && (
           <div className="flex flex-col gap-3">
@@ -107,16 +119,16 @@ export function Repos() {
               branch. Open merge requests keep the branch they go into.
             </p>
             <Select
-              label={`Default branch of ${target.name}`}
+              label={`Default branch of ${shown}`}
               value={target.defaultBranch}
               mono
               className="self-start"
-              options={(readOf(target.name)?.branches ?? [])
+              options={(readOf(target.id)?.branches ?? [])
                 .filter((b) => !agentBranch(b.name))
                 .map((b) => ({ value: b.name, label: b.name }))}
               onChange={(branch) =>
                 branch !== target.defaultBranch &&
-                change.mutate(() => client.home.setRepoDefault(project.id, target.name, branch), {
+                change.mutate(() => client.home.setRepoDefault(project.id, target.id, branch), {
                   onSuccess: close,
                 })
               }
@@ -124,43 +136,22 @@ export function Repos() {
           </div>
         )}
       </Modal>
-      <Modal
-        open={changing?.what === "rename"}
-        onClose={close}
-        title={`Rename ${changing?.repo ?? ""}`}
-      >
-        {changing && (
-          <form
-            className="flex items-center gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const to = renameTo.trim();
-              if (to && to !== changing.repo)
-                change.mutate(() => client.home.renameRepo(project.id, changing.repo, to), {
-                  onSuccess: close,
-                });
-            }}
-          >
-            <input
-              value={renameTo}
-              onChange={(e) => setRenameTo(e.target.value)}
-              aria-label={`New name for ${changing.repo}`}
-              spellCheck={false}
-              // biome-ignore lint/a11y/noAutofocus: opened by Rename, to type the name
-              autoFocus
-              className="min-w-0 flex-1 rounded-lg border border-line2 bg-term px-2.5 py-1 font-mono text-[13px] text-tx"
-            />
-            <Button type="submit" variant="small" disabled={change.isPending}>
-              Rename
-            </Button>
-          </form>
+      <Modal open={changing?.what === "rename"} onClose={close} title={`Rename ${shown}`}>
+        {changing?.what === "rename" && (
+          <Rename
+            project={project}
+            repo={changing.repo}
+            pending={change.isPending}
+            onRename={(name) =>
+              change.mutate(() => client.home.renameRepo(project.id, changing.repo, name), {
+                onSuccess: close,
+              })
+            }
+            onClose={close}
+          />
         )}
       </Modal>
-      <Modal
-        open={changing?.what === "locate"}
-        onClose={close}
-        title={`Locate ${changing?.repo ?? ""}`}
-      >
+      <Modal open={changing?.what === "locate"} onClose={close} title={`Locate ${shown}`}>
         <div className="flex flex-col gap-3">
           <p className="m-0 text-[13.5px] text-tx2">
             Pick its folder now. It must be the same repo: Foreman checks they share a commit.
@@ -186,7 +177,7 @@ export function Repos() {
           )}
           {changing?.what === "locate" && (
             <Locate
-              project={project.id}
+              project={project}
               repo={changing.repo}
               pending={change.isPending}
               onPick={(path) =>
@@ -200,7 +191,7 @@ export function Repos() {
       </Modal>
       <Confirm
         open={changing?.what === "remove"}
-        title={`Remove ${changing?.repo ?? ""} from ${projectName([project], project.id)}?`}
+        title={`Remove ${shown} from ${projectName([project], project.id)}?`}
         body="Its folder and its branches stay where they are; agents' worktrees of it go. Add it again any time."
         action="Remove"
         onConfirm={() =>
@@ -220,12 +211,12 @@ function Locate({
   pending,
   onPick,
 }: {
-  project: string;
+  project: Project;
   repo: string;
   pending: boolean;
   onPick: (path: string) => void;
 }) {
-  const browser = useFolderBrowser(project);
+  const browser = useFolderBrowser(project.id);
   const f = browser.folder;
   const other = f?.added && f.added !== repo ? f.added : undefined;
   return (
@@ -233,7 +224,11 @@ function Locate({
       <FolderBrowser browser={browser} />
       <div className="flex items-center justify-end gap-3">
         {f && !f.repo && <span className="text-[12.5px] text-tx4">Open the repo's folder.</span>}
-        {other && <span className="text-[12.5px] text-tx4">That's {other}'s folder.</span>}
+        {other && (
+          <span className="text-[12.5px] text-tx4">
+            That's {repoName(project, other)}'s folder.
+          </span>
+        )}
         <Button
           variant="primary"
           disabled={!f?.repo || !!other || pending}
@@ -249,8 +244,11 @@ function Locate({
 const count = (r: Repo) =>
   `${r.branches.length} ${r.branches.length === 1 ? "branch" : "branches"}`;
 
-/** A code repo's card: its name as words, its folder, its default branch and
- * branch count, and what keeps agents from using it. */
+/** A code repo's card: its name, its folder, its default branch and branch
+ * count, and what keeps agents from using it. A rename made on another
+ * machine that Foreman can't follow yet (a team runs here) shows its problem
+ * as a notice, with no menu: Remove…, the one thing it could offer, waits for
+ * the stop too. */
 function RepoCard({
   project,
   repo: r,
@@ -258,21 +256,29 @@ function RepoCard({
   deployed,
   onChange,
 }: {
-  project: string;
+  project: Project;
   repo: Project["repos"][number];
   read?: Repo;
   deployed: boolean;
   onChange: (what: Changing["what"], repo: string) => void;
 }) {
   const has = (branch: string) => !read || read.branches.some((b) => b.name === branch);
+  const shown = repoName(project, r.id);
   return (
     <Frame
-      project={project}
-      name={r.name}
-      title={readable(r.name)}
+      project={project.id}
+      id={r.id}
+      title={shown}
+      tooltip={repoTitle(project, r.id)}
       opens={!r.problem}
       menu={
-        <RepoMenu repo={r.name} problem={!!r.problem} deployed={deployed} onChange={onChange} />
+        <RepoMenu
+          repo={r.id}
+          shown={shown}
+          problem={!!r.problem}
+          deployed={deployed}
+          onChange={onChange}
+        />
       }
     >
       <span className="font-mono text-[12px] break-all text-tx4">{r.path}</span>
@@ -297,15 +303,17 @@ function RepoCard({
  * menu sits above that link. */
 function Frame({
   project,
-  name,
+  id,
   title,
+  tooltip,
   opens = true,
   menu,
   children,
 }: {
   project: string;
-  name: string;
+  id: string;
   title: string;
+  tooltip: string;
   opens?: boolean;
   menu?: ReactNode;
   children: ReactNode;
@@ -318,15 +326,15 @@ function Frame({
           {opens ? (
             <Link
               to="/projects/$project/repos/$repo"
-              params={{ project, repo: name }}
-              title={name}
+              params={{ project, repo: id }}
+              title={tooltip}
               className={`min-w-0 flex-1 truncate text-[15px] font-semibold text-tx ${cover}`}
             >
               {title}
             </Link>
           ) : (
             <span
-              title={name}
+              title={tooltip}
               className="min-w-0 flex-1 truncate text-[15px] font-semibold text-tx"
             >
               {title}
@@ -341,16 +349,72 @@ function Frame({
   );
 }
 
+/** The Rename form: one Name, prefilled with how the repo shows, the id it
+ * makes live under it, and the clashes the server would refuse. An unchanged
+ * name just closes. */
+function Rename({
+  project,
+  repo,
+  pending,
+  onRename,
+  onClose,
+}: {
+  project: Project;
+  repo: string;
+  pending: boolean;
+  onRename: (name: string) => void;
+  onClose: () => void;
+}) {
+  const shown = repoName(project, repo);
+  const [value, setValue] = useState(shown);
+  // Unchanged words just close: no refusal, even for two older repos that read the same.
+  const unchanged = value.trim() === shown;
+  const refusal = unchanged ? undefined : repoNameRefusal(project, value, repo);
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (unchanged) onClose();
+        else if (slug(value) && !refusal && !pending) onRename(value.trim());
+      }}
+    >
+      <Field label="Name" hint={renameHint(repo, value, shown)} refusal={refusal}>
+        {(input) => (
+          <input
+            {...input}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            maxLength={80}
+            spellCheck={false}
+            // biome-ignore lint/a11y/noAutofocus: opened by Rename, to type the name
+            autoFocus
+            className="rounded-lg border border-line2 bg-term px-3 py-2 text-[13.5px] text-tx"
+          />
+        )}
+      </Field>
+      <div className="flex justify-end gap-2">
+        <Button onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={!slug(value) || !!refusal || pending}>
+          Rename
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 const item =
   "cursor-pointer rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover data-[disabled]:cursor-default data-[disabled]:text-tx4";
 
 function RepoMenu({
   repo,
+  shown,
   problem,
   deployed,
   onChange,
 }: {
   repo: string;
+  shown: string;
   problem: boolean;
   deployed: boolean;
   onChange: (what: Changing["what"], repo: string) => void;
@@ -358,7 +422,7 @@ function RepoMenu({
   return (
     <Menu.Root>
       <Menu.Trigger
-        aria-label={`Change ${repo}`}
+        aria-label={`Change ${shown}`}
         className="grid size-7 place-items-center rounded-md text-tx3 hover:bg-hover hover:text-tx data-[state=open]:bg-hover"
       >
         ⋯

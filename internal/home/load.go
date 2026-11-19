@@ -51,13 +51,18 @@ func (p Project) Shown() string { return cmp.Or(p.Name, readable(p.ID)) }
 
 // Repo is one of a project's code repos, anywhere on disk.
 type Repo struct {
-	Name    string `json:"name"`          // unique in the project
+	ID      string `json:"id"`            // made from its name when added or renamed; unique in the project, in any case; agents see only this
+	Name    string `json:"name"`          // its display name, for people only; "" shows the id readable
 	Path    string `json:"path"`          // absolute
 	Default string `json:"defaultBranch"` // agents start from it, merges go to it unless the lead names another branch
 	Remote  string `json:"remote"`        // where it can be cloned from (its origin when added); "" when unknown
 	Problem string `json:"problem"`       // why agents can't use it (missing, …); "" when they can
 	root    string // its first commit, which Locate looks for
 }
+
+// Shown is how the repo reads to people: its display name, else its id made
+// readable.
+func (r Repo) Shown() string { return cmp.Or(r.Name, readable(r.ID)) }
 
 // Ready says whether agents can use the repo.
 func (r Repo) Ready() bool { return r.Problem == "" }
@@ -88,7 +93,7 @@ func (p Project) RepoDir(name string) (string, bool) {
 		return p.Path, true
 	}
 	for _, r := range p.Repos {
-		if r.Name == name && r.Ready() {
+		if r.ID == name && r.Ready() {
 			return r.Path, true
 		}
 	}
@@ -107,7 +112,7 @@ func (p Project) Default(name string) string {
 
 func (p Project) repo(name string) (Repo, bool) {
 	for _, r := range p.Repos {
-		if r.Name == name && name != hqRepo {
+		if r.ID == name && name != hqRepo {
 			return r, true
 		}
 	}
@@ -353,17 +358,85 @@ func (h *Home) project(ctx context.Context, id string, r Record, here store.Proj
 	for _, m := range here.Repos {
 		paths[strings.ToLower(m.Name)] = m.Path
 	}
-	for _, name := range sortedKeys(r.Repos) {
-		rec := r.Repos[name]
-		path := paths[strings.ToLower(name)]
-		repo := Repo{Name: name, Path: path, Default: rec.DefaultBranch, Remote: rec.Remote, Problem: h.checkRepo(ctx, path, rec.RootCommit), root: rec.RootCommit}
+	followed := h.follow(ctx, p, r, here.Repos, paths)
+	for _, id := range sortedKeys(r.Repos) {
+		rec := r.Repos[id]
+		path := paths[strings.ToLower(id)]
+		repo := Repo{ID: id, Name: rec.DisplayName, Path: path, Default: rec.DefaultBranch, Remote: rec.Remote, root: rec.RootCommit}
+		repo.Problem = cmp.Or(followed[id], h.checkRepo(ctx, path, rec.RootCommit))
 		if !repo.Ready() {
-			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.Name, repo.Problem))
+			p.Problems = append(p.Problems, fmt.Sprintf("repos.%s: %s", repo.ID, repo.Problem))
 		}
 		p.Repos = append(p.Repos, repo)
 	}
 	p.Problems = normalize(p.Problems)
 	return p
+}
+
+// follow carries this machine's part of the project's repos renamed on
+// another machine over to their new ids (projects.toml travels between
+// machines; the database rows and worktrees don't): a repo of the record with
+// no row here, and exactly one row here whose id the record no longer has,
+// holding the repo's first commit, is moved (moveRepo), and its path added
+// to paths; so is a row of the repo's own id in another case only (Ledger
+// renamed ledger), the same row. Several renames there are one here, from
+// the first id to the last. Not while a team is deployed on the project: its
+// agents work in the old worktrees. Why a rename couldn't follow is returned
+// by new id, the repo's problem; more than one matching row is left to
+// Locate. Called with h.mu held.
+func (h *Home) follow(ctx context.Context, p Project, r Record, rows []store.RepoRecord, paths map[string]string) map[string]string {
+	out := map[string]string{}
+	// moved moves the row m to id, unless a team is deployed here.
+	moved := func(id string, m store.RepoRecord) bool {
+		if h.deployed != nil && h.deployed(ctx, p.ID) {
+			out[id] = sentence(waitingRename(m.Name))
+			return false
+		}
+		if err := h.moveRepo(ctx, p, m.Path, m.Name, id, "and Foreman follows."); err != nil {
+			slog.Warn("following a repo renamed on another machine", "project", p.ID, "from", m.Name, "to", id, "err", err)
+			out[id] = sentence(err)
+			return false
+		}
+		slog.Info("followed a repo renamed on another machine", "project", p.ID, "from", m.Name, "to", id)
+		paths[strings.ToLower(id)] = m.Path
+		return true
+	}
+	rows = slices.Clone(rows)
+	for _, id := range sortedKeys(r.Repos) {
+		if m, ok := h.renamedRow(ctx, r, rows, id); ok && moved(id, m) {
+			rows[slices.IndexFunc(rows, func(row store.RepoRecord) bool { return row.Name == m.Name })].Name = id
+		}
+	}
+	return out
+}
+
+// renamedRow is this machine's row of repo id, renamed on another machine
+// and not followed here yet: the row of its id in another case only (Ledger
+// renamed ledger), or the one row whose id the record no longer has holding
+// its first commit. Called with h.mu held.
+func (h *Home) renamedRow(ctx context.Context, r Record, rows []store.RepoRecord, id string) (store.RepoRecord, bool) {
+	var matches []store.RepoRecord
+	for _, m := range rows {
+		switch {
+		case m.Name == id:
+			return store.RepoRecord{}, false // its own row: nothing to follow
+		case strings.EqualFold(m.Name, id):
+			return m, true
+		case !slices.ContainsFunc(sortedKeys(r.Repos), func(other string) bool { return strings.EqualFold(other, m.Name) }) &&
+			h.checkRepo(ctx, m.Path, r.Repos[id].RootCommit) == "":
+			matches = append(matches, m)
+		}
+	}
+	if len(matches) != 1 {
+		return store.RepoRecord{}, false
+	}
+	return matches[0], true
+}
+
+// waitingRename is a rename made on another machine that waits for the team
+// here to stop: the repo's problem, and the refusal to locate it meanwhile.
+func waitingRename(old string) error {
+	return refuse(ErrDeployed, "Renamed from %s on another machine: stop the team here, and Foreman follows.", old)
 }
 
 // checkRepo says why agents can't use a repo, or "": it isn't on this

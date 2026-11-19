@@ -1,5 +1,5 @@
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
-import { type ButtonHTMLAttributes, type ReactNode, useState } from "react";
+import { type ButtonHTMLAttributes, type ReactNode, useId, useState } from "react";
 import { saysLead } from "../app/model";
 import { CheckIcon, CopyIcon } from "./icons";
 
@@ -165,20 +165,78 @@ export function StatusPill({ color, children }: { color: string; children: React
 /** A card's title link covering the whole card; its other controls sit above it. */
 export const cover = "after:absolute after:inset-0 after:rounded-xl after:content-['']";
 
+/** What a form field's input takes from Field: its id, and its hint and
+ * refusal as its description. */
+export type FieldInput = {
+  id: string;
+  "aria-describedby"?: string;
+  "aria-invalid"?: true;
+};
+
+/** A form field: its label, its input, then its hint and its refusal (in
+ * --err), each linked to the input with aria-describedby, never inside the
+ * label, so a screen reader names the field once and reads the hint after. */
+export function Field({
+  label,
+  hint,
+  refusal,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  refusal?: string;
+  children: (input: FieldInput) => ReactNode;
+}) {
+  const id = useId();
+  const described = [hint && `${id}-hint`, refusal && `${id}-refusal`].filter(Boolean).join(" ");
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className={labelText}>
+        {label}
+      </label>
+      {children({
+        id,
+        "aria-describedby": described || undefined,
+        "aria-invalid": refusal ? true : undefined,
+      })}
+      {hint && (
+        <span id={`${id}-hint`} className={hintText}>
+          {hint}
+        </span>
+      )}
+      {refusal && (
+        <span id={`${id}-refusal`} className="text-[12.5px] text-err [overflow-wrap:anywhere]">
+          {refusal}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A form's label, over a field or a choice. */
+const labelText = "text-[13px] font-medium text-tx4";
+
+/** A form's hint text, under a field or a choice. */
+const hintText = "text-[12.5px] text-tx4 [overflow-wrap:anywhere]";
+
 /** One choice of a segmented control (board switcher, theme…). */
 export function Segmented<T extends string>({
   options,
   value,
   onChange,
   label,
+  field,
 }: {
   options: { value: T; label: ReactNode; disabled?: boolean }[];
   value: T;
   onChange: (value: T) => void;
   label: string;
+  /** Its id and description, inside a Field. */
+  field?: FieldInput;
 }) {
   return (
     <ToggleGroup.Root
+      {...field}
       type="single"
       value={value}
       onValueChange={(v) => v && onChange(v as T)}

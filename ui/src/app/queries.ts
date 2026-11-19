@@ -25,7 +25,7 @@ import {
 } from "../api/client";
 import type { Event } from "../api/types/events";
 import { useToast } from "../components/Toasts";
-import { projectName } from "./model";
+import { projectName, repoName, repoTitle } from "./model";
 import { deploymentOn } from "./project";
 import { type SerialSaver, serialSaver } from "./serialSave";
 import { withDoing } from "./sessions";
@@ -115,6 +115,16 @@ export function useProjects() {
 export function useProjectName(): (id: string) => string {
   const projects = useAllProjects().data;
   return (id) => projectName(projects, id);
+}
+
+/** How a project's repos show, by id (repoName, and repoTitle for their
+ * tooltip): for views that hold only the ids. */
+export function useRepoName(project: string): {
+  name: (id: string) => string;
+  title: (id: string) => string;
+} {
+  const p = useAllProjects().data?.find((x) => x.id === project);
+  return { name: (id) => repoName(p, id), title: (id) => repoTitle(p, id) };
 }
 
 /** Where a project's HQ is on disk, for showing paths. */

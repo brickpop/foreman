@@ -1,46 +1,63 @@
 import { describe, expect, it } from "vitest";
 import {
+  anyWords,
   cloneName,
   createdBody,
   defaultToSend,
   folderCrumbs,
   inside,
+  nameFromFolder,
   newProjectHint,
-  projectSlug,
-  repoName,
+  renameHint,
+  repoIdLine,
 } from "./addProject";
 
 describe("cloneName", () => {
-  it("is the URL's last part, without .git", () => {
-    expect(cloneName("git@github.com:me/ledger-api.git")).toBe("ledger-api");
-    expect(cloneName("https://gitlab.com/acme/platform/deploy.git/")).toBe("deploy");
-    expect(cloneName("ssh://git@host:2222/~ceo/ledger")).toBe("ledger");
-    expect(cloneName("git@github.com:solo.git")).toBe("solo");
-    expect(cloneName("https://github.com/me/My Repo.git")).toBe("My-Repo");
+  it("is the URL's last part, without .git, as words", () => {
+    expect(cloneName("git@github.com:me/ledger-api.git")).toBe("Ledger api");
+    expect(cloneName("https://gitlab.com/acme/platform/deploy.git/")).toBe("Deploy");
+    expect(cloneName("ssh://git@host:2222/~ceo/ledger")).toBe("Ledger");
+    expect(cloneName("git@github.com:solo.git")).toBe("Solo");
+    expect(cloneName("https://github.com/me/My Repo.git")).toBe("My repo");
     expect(cloneName("")).toBe("");
   });
 });
 
-describe("repoName", () => {
-  it("is the folder's own name", () => {
-    expect(repoName("/Users/ceo/dev/ledger-api")).toBe("ledger-api");
-    expect(repoName("/Users/ceo/dev/app/")).toBe("app");
-    expect(repoName("/Users/ceo/dev/v1.2_core")).toBe("v1.2_core");
-  });
-
-  it("follows the server's rule", () => {
-    expect(repoName("/x/My Repo (old)")).toBe("My-Repo-old-");
-    expect(repoName("/x/.dotfiles")).toBe("dotfiles");
-    expect(repoName("/x/-_lead")).toBe("lead");
-    expect(repoName("/x/a..b")).toBe("a.b");
-    expect(repoName("/x/café")).toBe("caf-");
-    expect(repoName(`/x/${"a".repeat(80)}`)).toHaveLength(63);
+describe("nameFromFolder", () => {
+  it("is the folder's own name, as words that make its id", () => {
+    expect(nameFromFolder("/Users/ceo/dev/ledger-api")).toBe("Ledger api");
+    expect(nameFromFolder("/Users/ceo/dev/app/")).toBe("App");
+    expect(nameFromFolder("/Users/ceo/dev/foreman_ui")).toBe("Foreman ui");
+    expect(nameFromFolder("/x/My Repo (old)")).toBe("My repo old");
+    expect(nameFromFolder("/x/café")).toBe("Cafe");
   });
 
   it("is empty when nothing is left", () => {
-    expect(repoName("/")).toBe("");
-    expect(repoName("")).toBe("");
-    expect(repoName("/x/...")).toBe("");
+    expect(nameFromFolder("/")).toBe("");
+    expect(nameFromFolder("")).toBe("");
+    expect(nameFromFolder("/x/...")).toBe("");
+  });
+});
+
+describe("repo hints", () => {
+  it("shows the id words make, and the words as it shows", () => {
+    expect(repoIdLine(" Ledger API ")).toBe("Its id: ledger-api. It shows as “Ledger API”.");
+    expect(repoIdLine("!!!")).toBeUndefined();
+  });
+
+  it("says on rename whether the id stays or follows the words", () => {
+    expect(renameHint("ledger-api", "Ledger API v2", "Ledger API")).toBe(
+      "Its id becomes ledger-api-v2: agents' worktrees and open merge requests follow.",
+    );
+    expect(renameHint("ledger-api", "Ledger.API", "Ledger API")).toBe("Its id stays ledger-api.");
+    expect(renameHint("Ledger_API", "ledger api", "Ledger API")).toBe(
+      "Its id becomes ledger-api: agents' worktrees and open merge requests follow.",
+    );
+    expect(renameHint("ledger-api", "日本", "Ledger API")).toBe(anyWords);
+  });
+
+  it("changes nothing while the words are how the repo shows now, an older id too", () => {
+    expect(renameHint("Ledger_API", " Ledger API ", "Ledger API")).toBe("Its id stays Ledger_API.");
   });
 });
 
@@ -79,23 +96,6 @@ describe("defaultToSend", () => {
   it("takes the CEO's pick, but only one the repo has", () => {
     expect(defaultToSend(poc, "master")).toBe("master");
     expect(defaultToSend(poc, "gone")).toBe("feature");
-  });
-});
-
-describe("projectSlug", () => {
-  it("makes what the CEO typed the slug the server takes", () => {
-    expect(projectSlug("My Portfolio")).toBe("my-portfolio");
-    expect(projectSlug("  Café  Crème! ")).toBe("cafe-creme");
-    expect(projectSlug("ledger_v2.1")).toBe("ledger-v2-1");
-    expect(projectSlug("--already-a-slug--")).toBe("already-a-slug");
-    expect(projectSlug("!!!")).toBe("");
-    expect(projectSlug("日本")).toBe("");
-  });
-
-  it("never ends on a hyphen when cut to 63", () => {
-    const long = projectSlug(`${"a".repeat(62)} b`);
-    expect(long).toBe("a".repeat(62));
-    expect(projectSlug("x".repeat(80))).toHaveLength(63);
   });
 });
 

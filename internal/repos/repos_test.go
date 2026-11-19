@@ -27,7 +27,7 @@ func (c config) Project(id string) (home.Project, error) {
 		return home.Project{}, home.ErrNotFound
 	}
 	return home.Project{ID: id, Path: filepath.Join(c.root, "ledger", "hq"), Config: home.ProjectConfig{},
-		Repos: []home.Repo{{Name: "api", Path: filepath.Join(c.root, "ledger", "api"), Default: "trunk"}, {Name: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
+		Repos: []home.Repo{{ID: "api", Path: filepath.Join(c.root, "ledger", "api"), Default: "trunk"}, {ID: "web", Path: filepath.Join(c.root, "gone"), Problem: "missing"}}}, nil
 }
 
 func (c config) Sandbox(project, agent string) string {
@@ -96,7 +96,7 @@ func TestReposListCodeReposThenTheProjectRepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 2 || list[0].Name != "api" || list[0].HQ || list[1].Name != "hq" || !list[1].HQ {
+	if len(list) != 2 || list[0].ID != "api" || list[0].HQ || list[1].ID != "hq" || !list[1].HQ {
 		t.Fatalf("repos %+v", list)
 	}
 	api := list[0]

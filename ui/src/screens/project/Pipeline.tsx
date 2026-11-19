@@ -8,11 +8,13 @@ import {
   useEntryTitle,
   useInstances,
   usePipeline,
+  useRepoName,
   useRepos,
   useReviewTitle,
   useTeams,
 } from "../../app/queries";
 import { reposWith } from "../../app/repos";
+import { RepoName } from "../../components/RepoName";
 import { RequestPanel } from "../../components/RequestPanel";
 import { Button, Empty, Loading, Panel } from "../../components/ui";
 
@@ -138,13 +140,14 @@ export function ProjectRequest({
 
 /** A branch, linked to its code in Repos when a repo has it. */
 function BranchLink({ project, repo, branch }: { project: string; repo?: string; branch: string }) {
+  const repoName = useRepoName(project);
   if (!repo) return <span className="font-mono">{branch}</span>;
   return (
     <Link
       to="/projects/$project/repos/$repo"
       params={{ project, repo }}
       search={{ branch }}
-      title={`Read ${branch} in ${repo}`}
+      title={`Read ${branch} in ${repoName.name(repo)}`}
       className="font-mono text-accTx hover:underline"
     >
       {branch}
@@ -217,7 +220,7 @@ function MergeRow({
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium">{title || mr.branch}</span>
           <span className="truncate text-[12.5px] text-tx3">
-            {lead?.soul.name ?? mr.authorInstance} · {mr.repo} ·{" "}
+            {lead?.soul.name ?? mr.authorInstance} · <RepoName project={project} id={mr.repo} /> ·{" "}
             <BranchLink project={project} repo={mr.repo} branch={mr.branch} /> → {mr.target}
             {mr.checksStatus && ` · checks ${mr.checksStatus}`}
             {mr.note && <span className={mr.conflicting ? "text-err" : ""}> · {mr.note}</span>}
@@ -284,7 +287,7 @@ function MergedRow({
         <span className="text-ok">✓</span>
         <span className="font-medium">{title || mr.branch}</span>
         <span className="text-[13px] text-tx4">
-          {mr.repo} · merged to {mr.target} · {when(mr.mergedAt)}
+          <RepoName project={project} id={mr.repo} /> · merged to {mr.target} · {when(mr.mergedAt)}
         </span>
       </span>
       {items.map((w) => (

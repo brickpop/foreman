@@ -90,7 +90,7 @@ dev harness="real" home="":
             api -o /dev/null "$base/api/home" || continue
             api -o /dev/null "$base/api/projects/dev-project" && exit 0
             api -o /dev/null -X POST "$base/api/projects" -d '{"id":"dev-project"}' &&
-                api -o /dev/null -X POST "$base/api/projects/dev-project/repos" -d "{\"name\":\"some-app\",\"path\":\"$app\"}" &&
+                api -o /dev/null -X POST "$base/api/projects/dev-project/repos" -d "{\"name\":\"Some app\",\"path\":\"$app\"}" &&
                 exit 0
             echo "just dev: couldn't create dev-project through the API" >&2
             exit 1

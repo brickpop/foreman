@@ -1,5 +1,6 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import type { ReactNode } from "react";
+import type { FieldInput } from "./ui";
 
 // The one dropdown for choosing a value (a repo, a harness, a machine's size),
 // over Radix's dropdown menu, styled like the Board's menu: arrow keys and
@@ -14,6 +15,7 @@ export function Select<T extends string | number>({
   onChange,
   mono = false,
   className = "",
+  field,
 }: {
   /** What it chooses, for screen readers. */
   label: string;
@@ -22,11 +24,14 @@ export function Select<T extends string | number>({
   onChange: (value: T) => void;
   mono?: boolean;
   className?: string;
+  /** Its id and description, inside a Field. */
+  field?: FieldInput;
 }) {
   const current = options.find((o) => o.value === value);
   return (
     <Menu.Root>
       <Menu.Trigger
+        {...field}
         aria-label={label}
         className={`flex min-w-0 items-center gap-2 rounded-[7px] border border-line2 bg-panel px-2.5 py-1 text-left text-[13px] text-tx hover:border-line3 focus-visible:outline-2 focus-visible:outline-acc data-[state=open]:border-acc ${mono ? "font-mono" : ""} ${className}`}
       >

@@ -108,10 +108,10 @@ func (w *Workflow) standing(ctx context.Context, project home.Project, name, dir
 		}
 	}
 	for _, s := range w.sharing(project, name) {
-		land(s.project.Default(s.repo.Name))
+		land(s.project.Default(s.repo.ID))
 		if mrs, err := w.MergeRequests.ForProject(ctx, s.project.ID); err == nil {
 			for _, mr := range mrs {
-				if mr.Repo == s.repo.Name {
+				if mr.Repo == s.repo.ID {
 					land(mr.Target)
 					land(mr.Landing)
 				}
@@ -148,13 +148,13 @@ func (w *Workflow) branchRepo(ctx context.Context, p home.Project, r home.Repo) 
 		return branchRepo{}, err
 	}
 	b := branchRepo{project: p, repo: r, trees: trees, review: map[string]bool{}, target: map[string]bool{}}
-	for _, s := range w.sharing(p, r.Name) {
+	for _, s := range w.sharing(p, r.ID) {
 		mrs, err := w.MergeRequests.ForProject(ctx, s.project.ID)
 		if err != nil {
 			return b, err
 		}
 		for _, mr := range mrs {
-			if mr.Repo == s.repo.Name && mr.State == store.MergeOpen {
+			if mr.Repo == s.repo.ID && mr.State == store.MergeOpen {
 				b.review[mr.Branch], b.target[mr.Target] = true, true
 			}
 		}
@@ -172,9 +172,9 @@ type shared struct {
 // repo (the same folder): its reviews, targets and default read it as well.
 // Project's own comes first.
 func (w *Workflow) sharing(project home.Project, name string) []shared {
-	i := slices.IndexFunc(project.Repos, func(r home.Repo) bool { return r.Name == name })
+	i := slices.IndexFunc(project.Repos, func(r home.Repo) bool { return r.ID == name })
 	if i < 0 {
-		return []shared{{project, home.Repo{Name: name}}}
+		return []shared{{project, home.Repo{ID: name}}}
 	}
 	all := []shared{{project, project.Repos[i]}}
 	for _, q := range w.Config.Projects() {
@@ -293,7 +293,7 @@ func (w *Workflow) offered(p home.Project, r home.Repo, branch, state string) (l
 			return false, "another project's"
 		}
 		return legacy, ""
-	case slices.ContainsFunc(w.sharing(p, r.Name), func(s shared) bool { return s.repo.Default == branch }):
+	case slices.ContainsFunc(w.sharing(p, r.ID), func(s shared) bool { return s.repo.Default == branch }):
 		return false, "the default branch" // of any project with this repo
 	case slices.Contains(longLived, branch):
 		return false, "a long-lived branch"
@@ -343,13 +343,13 @@ func (w *Workflow) cleanupIn(ctx context.Context, p home.Project, r home.Repo) (
 	}
 	var list []CleanupBranch
 	for _, name := range names {
-		state, by := w.standing(ctx, p, r.Name, r.Path, name)
+		state, by := w.standing(ctx, p, r.ID, r.Path, name)
 		legacy, why := w.offered(p, r, name, state)
 		if why != "" {
 			continue
 		}
 		_, stray := w.checkedOut(b, name)
-		list = append(list, CleanupBranch{Repo: r.Name, Branch: name, Agents: git.AgentBranch(name), State: state,
+		list = append(list, CleanupBranch{Repo: r.ID, Branch: name, Agents: git.AgentBranch(name), State: state,
 			SupersededBy: by, Legacy: legacy, Stays: w.stays(b, name), Stray: stray})
 	}
 	return list, nil
@@ -374,7 +374,7 @@ func (w *Workflow) DeleteBranches(ctx context.Context, projectID string, picks [
 	for _, r := range p.Repos {
 		var names []string
 		for _, pick := range picks {
-			if pick.Repo == r.Name {
+			if pick.Repo == r.ID {
 				names = append(names, pick.Branch)
 			}
 		}
@@ -383,7 +383,7 @@ func (w *Workflow) DeleteBranches(ctx context.Context, projectID string, picks [
 		}
 		if !r.Ready() {
 			for _, name := range names {
-				out.Kept = append(out.Kept, Cleaned{Repo: r.Name, What: "branch", Branch: name, Why: "its repo is " + r.Problem})
+				out.Kept = append(out.Kept, Cleaned{Repo: r.ID, What: "branch", Branch: name, Why: "its repo is " + r.Problem})
 			}
 			continue
 		}
@@ -392,7 +392,7 @@ func (w *Workflow) DeleteBranches(ctx context.Context, projectID string, picks [
 		}
 	}
 	for _, pick := range picks {
-		if !slices.ContainsFunc(p.Repos, func(r home.Repo) bool { return r.Name == pick.Repo }) {
+		if !slices.ContainsFunc(p.Repos, func(r home.Repo) bool { return r.ID == pick.Repo }) {
 			out.Kept = append(out.Kept, Cleaned{Repo: pick.Repo, What: "branch", Branch: pick.Branch, Why: "no such repo"})
 		}
 	}
@@ -406,11 +406,11 @@ func (w *Workflow) deleteIn(ctx context.Context, p home.Project, r home.Repo, br
 	}
 	removed := len(out.Removed)
 	for _, name := range slices.Compact(slices.Sorted(slices.Values(branches))) {
-		c := Cleaned{Repo: r.Name, What: "branch", Branch: name}
+		c := Cleaned{Repo: r.ID, What: "branch", Branch: name}
 		if !git.ValidBranch(ctx, name) || !w.Git.HasBranch(ctx, r.Path, name) {
 			c.Why = "no such branch"
 		} else {
-			state, _ := w.standing(ctx, p, r.Name, r.Path, name)
+			state, _ := w.standing(ctx, p, r.ID, r.Path, name)
 			if _, c.Why = w.offered(p, r, name, state); c.Why == "" {
 				c.Why = w.unstray(ctx, b, name, out)
 			}
@@ -453,7 +453,7 @@ func (w *Workflow) unstray(ctx context.Context, b branchRepo, branch string, out
 		return err.Error()
 	}
 	delete(b.trees, branch)
-	out.Removed = append(out.Removed, Cleaned{Repo: b.repo.Name, What: "worktree", Branch: branch, Why: stray})
+	out.Removed = append(out.Removed, Cleaned{Repo: b.repo.ID, What: "worktree", Branch: branch, Why: stray})
 	return ""
 }
 
@@ -505,7 +505,7 @@ func (t tool) prune(ctx context.Context, named []string) agentlink.Result {
 			for _, name := range branches {
 				found[name] = true
 				why := ""
-				switch state, by := t.w.standing(ctx, t.project, r.Name, r.Path, name); {
+				switch state, by := t.w.standing(ctx, t.project, r.ID, r.Path, name); {
 				case state == Merged:
 				case own && (state == Superseded || asked[name]):
 				case own:
@@ -536,7 +536,7 @@ func (t tool) prune(ctx context.Context, named []string) agentlink.Result {
 		if len(each) == 0 {
 			each = append(each, "nothing to delete")
 		}
-		lines = append(lines, r.Name+": "+strings.Join(each, "; "))
+		lines = append(lines, r.ID+": "+strings.Join(each, "; "))
 	}
 	var missing []string
 	for n := range asked {

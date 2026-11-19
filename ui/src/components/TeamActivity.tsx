@@ -3,8 +3,9 @@ import { useState } from "react";
 import type { Instance, Team, TeamAction, TeamMessage } from "../api/client";
 import { type Filter, links, type Thread } from "../app/activity";
 import { agentOf, waitingReason, when } from "../app/model";
-import { useDraft, useInstances, useSettings } from "../app/queries";
+import { useDraft, useInstances, useRepoName, useSettings } from "../app/queries";
 import { CodeText } from "./CodeText";
+import { RepoName } from "./RepoName";
 import { Dot } from "./ui";
 
 // A team's activity, the parts of a project's Team section's Activity view
@@ -307,6 +308,7 @@ function Ref({ children }: { children: React.ReactNode }) {
 
 /** What a git tool did, in a few words: the verb and its object. */
 function ActionText({ action: a }: { action: TeamAction }) {
+  const repoName = useRepoName(projectOf(a));
   const refused = a.error !== "";
   switch (a.tool) {
     // One repo: its message here. Several: each repo's line has its own.
@@ -317,7 +319,7 @@ function ActionText({ action: a }: { action: TeamAction }) {
           {a.repos.length === 1 ? (
             <span className="text-tx">“{a.repos[0].message}”</span>
           ) : (
-            <span className="font-mono text-[11.5px]">{a.repos.map((r) => r.repo).join(", ")}</span>
+            <span>{a.repos.map((r) => repoName.name(r.repo)).join(", ")}</span>
           )}
         </span>
       );
@@ -337,7 +339,12 @@ function ActionText({ action: a }: { action: TeamAction }) {
     case "open":
       return (
         <span className="text-[12.5px] text-tx2">
-          {refused ? "tried to open" : "opened"} <Ref>{a.repos[0]?.repo ?? "a repo"}</Ref>
+          {refused ? "tried to open" : "opened"}{" "}
+          {a.repos[0] ? (
+            <RepoName project={projectOf(a)} id={a.repos[0].repo} className="text-tx" />
+          ) : (
+            "a repo"
+          )}
         </span>
       );
     case "abort_merge":
@@ -365,7 +372,7 @@ function ActionText({ action: a }: { action: TeamAction }) {
               {" "}
               <Link
                 to="/projects/$project/inbox"
-                params={{ project: a.instance.split("@")[1] ?? "" }}
+                params={{ project: projectOf(a) }}
                 className="font-medium text-accTx hover:underline"
               >
                 Review it
@@ -378,6 +385,9 @@ function ActionText({ action: a }: { action: TeamAction }) {
       return <span className="text-[12.5px] text-tx2">{a.tool}</span>;
   }
 }
+
+/** The project an action was taken in: its agent's (team@project). */
+const projectOf = (a: TeamAction) => a.instance.split("@")[1] ?? "";
 
 /** One git tool call: who did what, then what happened in each repo (or why
  * it was refused). */
@@ -398,7 +408,7 @@ export function ActionRow({ action: a, name }: { action: TeamAction; name: Names
       ) : (
         a.repos.map((r) => (
           <span key={r.repo} className="flex flex-wrap items-center gap-x-2 text-[11.5px] text-tx3">
-            <span className="font-mono">{r.repo}</span>
+            <RepoName project={projectOf(a)} id={r.repo} />
             {r.branch && <Ref>{r.branch}</Ref>}
             {r.commit && <Ref>{r.commit.slice(0, 7)}</Ref>}
             {r.mergeRequest && <Ref>{r.mergeRequest}</Ref>}

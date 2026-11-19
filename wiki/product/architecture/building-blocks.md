@@ -314,9 +314,10 @@ type Dashboard interface {
     Projects() []Project;  Project(id) (Project, error)
     Checked(id) (Project, error)                     // the project with its code repos checked now (before a start)
     NewProject(id, name, clone) (Project, created bool, error) // the record, its files and its HQ: new (project.toml and a starter wiki), cloned, or one left there taken over
-    AddRepo(project, name, path) (Project, error)    // an existing code repo; NewRepo makes an empty one at path
-    LocateRepo(project, name, path) (Project, error) // a moved repo: the new path must hold its root commit
-    RemoveRepo(project, name) (Project, error)       // refused while a team is deployed on the project
+    AddRepo(project, name, path) (Project, error)    // an existing code repo, its id made from name; NewRepo makes an empty one at path
+    RenameRepo(project, repo, name) (Project, error) // a new name, and the id made from it: worktrees move when the id changes
+    LocateRepo(project, repo, path) (Project, error) // a moved repo: the new path must hold its root commit
+    RemoveRepo(project, repo) (Project, error)       // refused while a team is deployed on the project
     SetProfile(project, profile) (Project, error)
     Sandbox(project, agent) string                   // <folder>/worktrees/<project>/<agent>
     Teams() []Team;        Team(id) (Team, error)

@@ -32,7 +32,7 @@ func (config) Team(string) (home.Team, error) { return atlas, nil }
 func (c config) Project(id string) (home.Project, error) {
 	p := home.Project{ID: id, Config: home.ProjectConfig{}}
 	if !c.bare {
-		p.Repos = []home.Repo{{Name: "api", Default: "main"}}
+		p.Repos = []home.Repo{{ID: "api", Default: "main"}}
 	}
 	return p, nil
 }

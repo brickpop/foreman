@@ -39,7 +39,9 @@ export function Modal({
             className="max-h-[calc(100dvh-40px)] overflow-y-auto rounded-[14px] border border-line bg-panel p-6 shadow-overlay focus:outline-none"
           >
             <div className="mb-4 flex items-start justify-between gap-3">
-              <Dialog.Title className="m-0 min-w-0 text-xl font-semibold">{title}</Dialog.Title>
+              <Dialog.Title className="m-0 min-w-0 text-xl font-semibold [overflow-wrap:anywhere]">
+                {title}
+              </Dialog.Title>
               <Dialog.Close
                 aria-label="Close"
                 className="-mt-1 -mr-2 grid size-8 shrink-0 place-items-center rounded-md text-[20px] text-tx3 hover:bg-hover hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"
@@ -86,7 +88,9 @@ export function Drawer({
           style={{ width: `min(${width}px, 100vw)`, zIndex: 44 }}
         >
           <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-            <Dialog.Title className="min-w-0 text-[15px] font-semibold">{title}</Dialog.Title>
+            <Dialog.Title className="min-w-0 text-[15px] font-semibold [overflow-wrap:anywhere]">
+              {title}
+            </Dialog.Title>
             <Dialog.Close
               aria-label="Close"
               className="text-[18px] text-tx3 hover:text-tx focus-visible:outline-2 focus-visible:outline-acc"

@@ -381,7 +381,7 @@ const backupsKept = 30 * 24 * time.Hour
 func (w *Workflow) PruneBackups(ctx context.Context) {
 	for _, p := range w.Config.Projects() {
 		for _, r := range p.Repos {
-			if dir, ok := p.RepoDir(r.Name); ok {
+			if dir, ok := p.RepoDir(r.ID); ok {
 				w.pruneBackups(ctx, dir)
 			}
 		}

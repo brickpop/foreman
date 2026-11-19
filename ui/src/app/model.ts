@@ -242,8 +242,9 @@ export function replacingLine(team: string, project: string, sessions: number): 
   return `Replaces ${team} on ${project}: ${sessionsEnd(sessions)}. Worktrees and branches are kept.`;
 }
 
-/** A merge request's line on its review's decision bar: its repo and branch, and its checks. */
-export function linkLine(mr: MergeRequest): string {
+/** A merge request's line on its review's decision bar: its repo (as it
+ * shows), its branch, and its checks. */
+export function linkLine(mr: MergeRequest, repo: string): string {
   // No checks status: the project has no checks (or they haven't run): nothing to say.
   const tail = mr.conflicting
     ? `conflicts with ${mr.target}`
@@ -253,7 +254,7 @@ export function linkLine(mr: MergeRequest): string {
   // The repo first: a review ticks its repos one by one.
   // A landing of its own: where it lands, and the target its diff is against.
   const into = mr.landing ? `${mr.landing} (from ${mr.target})` : mr.target;
-  return `${mr.repo} · ${mr.branch} → ${into}${tail ? ` · ${tail}` : ""}`;
+  return `${repo} · ${mr.branch} → ${into}${tail ? ` · ${tail}` : ""}`;
 }
 
 /** Whether a branch is an agent's (wt/*, lead/*): agents write those, so a
@@ -367,6 +368,63 @@ export function projectName(
   id: string,
 ): string {
   return projects?.find((p) => p.id === id)?.name || readable(id);
+}
+
+/** Words as an id, the one rule for Foreman (spec/repo-display-names.md#the-slug,
+ * the server's too: internal/home/testdata/slugs.json keeps them the same):
+ * lowercase letters and digits, accents dropped, anything else one hyphen, at
+ * most 63. "My Café!" is my-cafe; "" when nothing is left. */
+export function slug(words: string): string {
+  return words
+    .normalize("NFD")
+    .replace(/\p{Mn}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/, "");
+}
+
+/** The project's HQ, in the repos listed: its id, and how it shows. */
+const hq = { id: "hq", name: "HQ" };
+
+type Repos = { repos: readonly { id: string; name: string }[] } | undefined;
+
+/** How a repo shows: its name, else its id made readable (an id no longer in
+ * the project, too); "HQ" for the project's HQ. The twin of projectName. */
+export function repoName(project: Repos, id: string): string {
+  if (id === hq.id) return hq.name;
+  return project?.repos.find((r) => r.id === id)?.name || readable(id);
+}
+
+/** A repo's tooltip: how it shows and its id, so two that read the same (two
+ * older ids, foo-bar and foo_bar) can be told apart. */
+export function repoTitle(project: Repos, id: string): string {
+  return `${repoName(project, id)} · ${id}`;
+}
+
+/** Why the server would refuse words as a repo's name, in its own words
+ * (spec/repo-display-names.md#refusals): its id is the HQ's or another repo's,
+ * or another repo already shows as it, case aside. except is the repo being
+ * renamed. Undefined while the words make no id (the form then just waits),
+ * or when they are free. */
+export function repoNameRefusal(
+  project: Repos,
+  words: string,
+  except?: string,
+): string | undefined {
+  const id = slug(words);
+  if (!id) return undefined;
+  if (id === hq.id) return "“HQ” is the project’s HQ: pick another name.";
+  const others = (project?.repos ?? []).filter((r) => r.id !== except);
+  if (others.some((r) => r.id.toLowerCase() === id))
+    return `Another repo has the id ${id} already: pick another name.`;
+  const shown = (words.trim() || readable(id)).toLowerCase();
+  const look = [hq.name, ...others.map((r) => repoName(project, r.id))].find(
+    (n) => n.toLowerCase() === shown,
+  );
+  if (look) return `Another repo shows as “${look}” already: pick another name.`;
+  return undefined;
 }
 
 /** Whether an agent's name already says it leads ("Lead", "Tech lead"),

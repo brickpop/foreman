@@ -2,8 +2,6 @@ package home
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -12,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/agentic-wiki/wiki/index"
 )
 
 // The config files the CEO owns, all TOML: project.toml
@@ -131,11 +130,10 @@ var (
 	snakeCase = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 )
 
-// Version identifies a file's content: writes carry the version they read.
-func Version(data []byte) string {
-	sum := sha256.Sum256(data)
-	return hex.EncodeToString(sum[:8])
-}
+// Version identifies a file's content, for Foreman's files and wiki pages
+// alike: writes carry the version they read. It is wiki's FileVersion, 128
+// bits of SHA-256, so the two can't disagree.
+func Version(data []byte) string { return index.FileVersion(data) }
 
 // problems collects validation messages.
 type problems []string

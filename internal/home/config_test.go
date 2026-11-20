@@ -279,3 +279,12 @@ func TestRetiredLinesSayWhatReplacedThem(t *testing.T) {
 		t.Errorf("problems %v, config %+v", p, c)
 	}
 }
+
+// A version is 128 bits of SHA-256, as 32 hex characters (wiki's
+// FileVersion), for Foreman's files and wiki pages alike: a guard a hostile
+// writer can't forge a collision for. Pinned to SHA-256("")'s first 16 bytes.
+func TestVersionIs128BitsOfSHA256(t *testing.T) {
+	if got := Version(nil); got != "e3b0c44298fc1c149afbf4c8996fb924" {
+		t.Errorf("Version(nil) = %q", got)
+	}
+}

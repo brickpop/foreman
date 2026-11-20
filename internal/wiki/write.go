@@ -20,7 +20,8 @@ var ErrConflict = errors.New("wiki: the file changed since you read it")
 var ErrInvalid = errors.New("wiki: invalid write")
 
 // ErrRefused means the wiki library refused the write: a frontmatter it can't
-// edit safely, or that wouldn't read back the same. The error says why.
+// edit safely, or that wouldn't read back the same, or a page that leads
+// outside the wiki. The error says why.
 var ErrRefused = errors.New("wiki: write refused")
 
 // Git commits Foreman's writes in the project's HQ (implemented by git.CLI).
@@ -140,6 +141,12 @@ func (w *Wikis) write(ctx context.Context, project, p, version string, change fu
 		return err
 	}
 	message, err := change(e)
+	if errors.Is(err, index.ErrOutsideBundle) {
+		// The page became a link out of the wiki (to a file elsewhere, or to a
+		// dot path such as .git) after the index read it: the library wrote
+		// nothing.
+		return fmt.Errorf("%w: %s now leads outside the wiki (a link to a file elsewhere, or to a dot path such as .git): nothing was written", ErrRefused, p)
+	}
 	if err != nil {
 		return err
 	}

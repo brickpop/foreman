@@ -82,8 +82,8 @@ POST   /api/reviews/:id/dismiss               {note, dropBranches, stopTeam}: st
 
 GET    /api/wiki/:project/tree | /entry/:path | /boards     the tree; one entry: its Markdown and lookup tables (Wiki engine → Rendering; reading it marks it seen); every board with its cards. An entry whose frontmatter can't be read carries frontmatterError (on its tree node and its entry), and each board lists those under its path in unread [{path, label, error}], never as cards
 GET    /api/wiki/:project/image/:path         an image an entry links to, inside the wiki (Wiki engine → Rendering); 404 for anything else
-PUT    /api/wiki/:project/checkbox/:path      {line, done, version}: 204; 409 CONFLICT when the entry changed, 400 INVALID when there's no checkbox on that line, 500 INTERNAL when the write fails
-PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to value, and lane when not empty; 204; 409 CONFLICT, 400 INVALID (no status, a lane on a board without lanes, a card with no frontmatter such as an index.md), 404 when the card isn't on that board, 422 REFUSED when the wiki library refuses the write (a frontmatter it can't edit safely), with its reason
+PUT    /api/wiki/:project/checkbox/:path      {line, done, version}: 204; 409 CONFLICT when the entry changed, 400 INVALID when there's no checkbox on that line, 422 REFUSED when the page has become a link to a file elsewhere or to a dot path such as .git, 500 INTERNAL when the write fails
+PUT    /api/wiki/:project/card/:board/:path   {value, lane, version}: status to value, and lane when not empty; 204; 409 CONFLICT, 400 INVALID (no status, a lane on a board without lanes, a card with no frontmatter such as an index.md), 404 when the card isn't on that board, 422 REFUSED when the wiki library refuses the write (a frontmatter it can't edit safely, or a page that has become a link to a file elsewhere or to a dot path such as .git), with its reason
 
 GET    /api/settings | PUT /api/settings       this machine's settings (~/.foreman/settings.toml, the look included: theme, accent, terminalFont, terminalFontSize; foreman_folder never: not served, and kept as the file has it on a PUT), version, problems; PUT sends {settings, version}: 409 on a stale version, 400 with the problems when invalid; nothing is committed
 GET    /api/instructions | PUT /api/instructions  the CEO's instructions to every agent, Foreman's HQ's instructions.md: {text, version} (version "" while the file doesn't exist); PUT sends {text, version}: 409 on a stale version; one commit each
@@ -134,7 +134,7 @@ Resource ids: project = its name (unique in any case); team = team id; instance 
 
 ## Version-guarded writes
 
-Every file-backed object the UI can change (wiki entry, team definition, settings, instructions) is served with a `version` (a content hash). Writes send the version they were based on:
+Every file-backed object the UI can change (wiki entry, team definition, settings, instructions) is served with a `version`: the `wiki` engine's `FileVersion` of the file, the first 16 bytes (128 bits) of its SHA-256, as 32 hex characters. Writes send the version they were based on:
 - matching version → write, respond with the new version;
 - different version → `409 VERSION_CONFLICT` with the current version; the UI shows an error and reloads the object. Never last-writer-wins.
 

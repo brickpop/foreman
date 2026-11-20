@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/agentic-wiki/wiki/index"
 )
 
 // A card move that fails for a reason other than a refusal or a bad request
@@ -48,5 +50,68 @@ func TestMigrationCantWrite(t *testing.T) {
 	}
 	if toml := read(t, filepath.Join(dir, "wiki.toml")); toml != oldBoards {
 		t.Errorf("wiki.toml = %q, want it untouched", toml)
+	}
+}
+
+// A page that is a link out of the wiki, to a file elsewhere or to the repo's
+// .git/config (a cloned repo can ship either), isn't an entry: no write
+// reaches through it, and the targets stay as they were.
+func TestWritesNeverLeaveTheWiki(t *testing.T) {
+	w, dir := fixture(t, map[string]string{"wiki.toml": sprint, "backlog/x.md": task("status: todo\n")})
+	outside := filepath.Join(t.TempDir(), "elsewhere.md")
+	card := task("status: todo\n") + "- [ ] step\n"
+	if err := os.WriteFile(outside, []byte(card), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitConfig := filepath.Join(filepath.Dir(dir), ".git", "config")
+	before := read(t, gitConfig)
+	for name, target := range map[string]string{"backlog/out.md": outside, "backlog/cfg.md": "../../.git/config"} {
+		if err := os.Symlink(target, filepath.Join(dir, filepath.FromSlash(name))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, p := range []string{"backlog/out.md", "backlog/cfg.md"} {
+		if _, err := w.Entry("p", p); err == nil {
+			t.Errorf("%s is an entry", p)
+		}
+		if err := w.MoveCard(ctx, "p", "flat", p, "done", "", "any"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("MoveCard %s: %v, want ErrNotFound", p, err)
+		}
+		if err := w.SetCheckbox(ctx, "p", p, 5, true, "any"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("SetCheckbox %s: %v, want ErrNotFound", p, err)
+		}
+	}
+	if read(t, outside) != card || read(t, gitConfig) != before {
+		t.Error("a write reached through a link")
+	}
+}
+
+// A page swapped for a link out of the wiki between write's read and the
+// write itself (the worst moment: write builds a fresh index each time) is
+// refused by the wiki library's containment and answered as a refusal (422),
+// never written through.
+func TestASwappedPageIsRefused(t *testing.T) {
+	w, dir := fixture(t, map[string]string{"wiki.toml": sprint, "backlog/x.md": task("status: todo\n")})
+	e, err := w.Entry("p", "backlog/x.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	page := filepath.Join(dir, "backlog", "x.md")
+	outside := filepath.Join(t.TempDir(), "x.md")
+	if err := os.WriteFile(outside, []byte(read(t, page)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = w.write(ctx, "p", "backlog/x.md", e.Version, func(e *index.Entry) (string, error) {
+		os.Remove(page)
+		if err := os.Symlink(outside, page); err != nil {
+			t.Fatal(err)
+		}
+		return "Move", e.SetFields(map[string]any{"status": "done"})
+	})
+	if !errors.Is(err, ErrRefused) || !strings.Contains(err.Error(), "outside the wiki") {
+		t.Errorf("write = %v, want ErrRefused naming it", err)
+	}
+	if read(t, outside) != task("status: todo\n") {
+		t.Error("the write went through the link")
 	}
 }

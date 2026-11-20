@@ -117,6 +117,11 @@ build: agent
 agent:
     for arch in amd64 arm64; do CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w" -o agentbin/dist/foreman-agent-$arch ./cmd/foreman-agent || exit 1; done
 
+# Install a headless browser and the screenshot commands into a folder, with no root (in an agent container: images/browser/README.md)
+[group('build')]
+browser folder:
+    images/browser/install.sh "{{folder}}"
+
 # Run every test
 [group('quality')]
 test:
@@ -140,7 +145,7 @@ lint:
     go vet {{go_pkgs}}
     go tool staticcheck {{go_pkgs}}
     @before="$(cat ui/src/api/types/*.ts | cksum)"; go tool tygo generate; [ "$before" = "$(cat ui/src/api/types/*.ts | cksum)" ] || (echo "ui/src/api/types was stale: regenerated it, review the change" && exit 1)
-    cd ui && bun run lint
+    cd ui && bun run lint && bunx biome check ../images/browser
 
 # Health check of the knowledge base (errors fail; broken links are warnings)
 [group('wiki')]

@@ -3,8 +3,8 @@ spec = "0.1"
 # Entry kinds (AGENTS.md): `spec` (spec/), `task` (backlog/), `epic` (backlog/epics/), `note` (research/, anything else)
 types = ["spec", "task", "epic", "note"]
 
-# Files that are not wiki entries (globs supported): the HQ's operating docs
-ignore = ["AGENTS.md", "README.md"]
+# Files that are not wiki entries (globs supported): the HQ's operating doc
+ignore = ["AGENTS.md"]
 
 # Entries nothing has to link to: tasks
 ignore_orphans = ["backlog/**"]

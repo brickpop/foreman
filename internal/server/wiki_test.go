@@ -77,7 +77,7 @@ func TestWikiWrites(t *testing.T) {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	dir := filepath.Join(t.TempDir(), "project", "wiki")
 	for name, content := range map[string]string{
-		"wiki.toml":    "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"b\"\npath = \"/backlog\"\ncolumns = [\"todo\", \"done\"]\n",
+		"wiki.toml":    "spec = \"0.1\"\n\n[[board]]\nid = \"b\"\npath = \"/backlog\"\ncolumns = [\"todo\", \"done\"]\n",
 		"backlog/x.md": "---\ntype: task\nstatus: todo\n---\n- [ ] one\n",
 		// A flow-map frontmatter: it reads, but the wiki library can't edit it safely.
 		"backlog/f.md": "---\n{type: task, status: todo}\n---\n",

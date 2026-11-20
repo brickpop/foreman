@@ -57,9 +57,9 @@ func TestUnreadFrontmatterOnEntryAndTree(t *testing.T) {
 func TestUnreadEntriesLeaveBoardsVisibly(t *testing.T) {
 	w, _ := fixture(t, map[string]string{
 		"wiki.toml": "spec = \"0.1\"\n\n" +
-			"[[tool.wikiview.board]]\nid = \"tasks\"\npath = \"/backlog\"\n\n" +
-			"[[tool.wikiview.board]]\nid = \"all\"\npath = \"/backlog\"\nwhere = []\n\n" +
-			"[[tool.wikiview.board]]\nid = \"notes\"\npath = \"/notes\"\n",
+			"[[board]]\nid = \"tasks\"\npath = \"/backlog\"\n\n" +
+			"[[board]]\nid = \"all\"\npath = \"/backlog\"\nwhere = []\n\n" +
+			"[[board]]\nid = \"notes\"\npath = \"/notes\"\n",
 		"backlog/a.md":   task("status: todo\n"),
 		"backlog/bad.md": badHeader,
 		"elsewhere/x.md": badHeader,
@@ -85,7 +85,7 @@ func TestUnreadEntriesLeaveBoardsVisibly(t *testing.T) {
 		}
 	}
 
-	w, _ = fixture(t, map[string]string{"wiki.toml": "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"b\"\npath = \"/\"\ncolumns = \"todo\"\n"})
+	w, _ = fixture(t, map[string]string{"wiki.toml": "spec = \"0.1\"\n\n[[board]]\nid = \"b\"\npath = \"/\"\ncolumns = \"todo\"\n"})
 	boards, _ = w.Boards("p")
 	if data, _ := json.Marshal(boards); !strings.Contains(string(data), `"unread":[]`) {
 		t.Errorf("a board whose declaration couldn't be read: %s", data)
@@ -155,7 +155,7 @@ func TestMoveCardRefused(t *testing.T) {
 func TestMoveCardOntoAReservedFile(t *testing.T) {
 	const home = "# Backlog\n"
 	w, dir := fixture(t, map[string]string{
-		"wiki.toml":        "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"all\"\npath = \"/backlog\"\nwhere = []\n",
+		"wiki.toml":        "spec = \"0.1\"\n\n[[board]]\nid = \"all\"\npath = \"/backlog\"\nwhere = []\n",
 		"backlog/index.md": home,
 	})
 	e, _ := w.Entry("p", "backlog/index.md")

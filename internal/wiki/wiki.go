@@ -28,23 +28,24 @@ type Wikis struct {
 	dir func(project string) (string, error)
 	git Git
 
-	mu      sync.Mutex
-	watched map[string]*watched // by project, while Watch runs
-	writing sync.Mutex          // one write at a time: check, change, commit
-	watcher *fsnotify.Watcher   // Watch's: set once, before it follows anything
+	mu        sync.Mutex
+	watched   map[string]*watched // by project, while Watch runs
+	unrenamed map[string]error    // by project: why its old board tables couldn't be renamed
+	writing   sync.Mutex          // one write at a time: check, change, commit
+	watcher   *fsnotify.Watcher   // Watch's: set once, before it follows anything
 }
 
 // New reads the wiki that dir names for each project (its bundle folder, the
 // one holding wiki.toml), and commits its writes with git.
 func New(dir func(project string) (string, error), git Git) *Wikis {
-	return &Wikis{dir: dir, git: git, watched: map[string]*watched{}}
+	return &Wikis{dir: dir, git: git, watched: map[string]*watched{}, unrenamed: map[string]error{}}
 }
 
 // refresh rebuilds a followed wiki's index after Foreman's own write, so the
 // next read sees it. Only the index: the versions stay, so the watcher still
-// finds the change and tells everyone else.
+// finds the change and tells everyone else. Called under writing.
 func (w *Wikis) refresh(project string) {
-	_, idx, err := w.build(project)
+	_, idx, err := w.load(project)
 	if err != nil {
 		return
 	}
@@ -69,12 +70,28 @@ func (w *Wikis) open(project string) (*index.Index, error) {
 	return idx, err
 }
 
-// build reads the project's wiki from disk: its folder and its index.
+// build reads the project's wiki from disk: its folder and its index. It
+// takes writing, since it may rewrite and commit wiki.toml first (migrate).
 func (w *Wikis) build(project string) (string, *index.Index, error) {
+	w.writing.Lock()
+	defer w.writing.Unlock()
+	return w.load(project)
+}
+
+// load is build for a caller that holds writing.
+func (w *Wikis) load(project string) (string, *index.Index, error) {
 	dir, err := w.dir(project)
 	if err != nil {
 		return "", nil, fmt.Errorf("%w: %s", ErrNotFound, project)
 	}
+	failed := w.migrate(dir)
+	w.mu.Lock()
+	if failed != nil {
+		w.unrenamed[project] = failed
+	} else {
+		delete(w.unrenamed, project)
+	}
+	w.mu.Unlock()
 	b, err := bundle.Discover(dir)
 	// Discover walks up: a wiki.toml above the project's isn't its wiki.
 	if err != nil || filepath.Clean(b.Dir) != filepath.Clean(dir) {

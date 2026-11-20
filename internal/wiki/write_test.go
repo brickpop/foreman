@@ -32,8 +32,8 @@ func read(t *testing.T, path string) string {
 	return string(data)
 }
 
-const sprint = "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"sprint\"\npath = \"/backlog\"\nlane = \"priority\"\n\n" +
-	"[[tool.wikiview.board]]\nid = \"flat\"\npath = \"/backlog\"\n"
+const sprint = "spec = \"0.1\"\n\n[[board]]\nid = \"sprint\"\npath = \"/backlog\"\nlane = \"priority\"\n\n" +
+	"[[board]]\nid = \"flat\"\npath = \"/backlog\"\n"
 
 func TestSetCheckbox(t *testing.T) {
 	w, dir := fixture(t, map[string]string{"a.md": note("- [ ] one\n- [x] two\n\ntext\n")})

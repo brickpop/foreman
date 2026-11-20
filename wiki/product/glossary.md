@@ -22,7 +22,7 @@ tags: [architecture, home]
 - **The CEO's branches**: every branch of a code repo but an agent's (`wt/*`, `lead/*`): the default branch and any other the CEO's git account makes (a release branch, say). No agent writes one; they change only by the CEO's merge or the CEO's own git. See [Pipeline and merges → Where a merge goes](./features/pipeline-and-merges.md#where-a-merge-goes).
 - **Target**: the branch a merge request goes into, one of the CEO's branches (its repo's default branch unless the lead names another). There is no list of targets: any of the CEO's branches can be one.
 - **Wiki bundle**: the project's HQ itself, its knowledge base at its root: a folder of Markdown files with YAML frontmatter, plus `wiki.toml`. Compatible with the agentic-wiki / WikiShell format. See [Wiki engine](./architecture/wiki-engine.md).
-- **Board**: a kanban view over wiki entries, declared in `wiki.toml` under `[[tool.wikiview.board]]`. See [Board](./features/board.md).
+- **Board**: a kanban view over wiki entries, declared in `wiki.toml` as a `[[board]]` table (the wiki standard's). See [Board](./features/board.md).
 - **Team definition**: a reusable roster and playbook, stored in `hq/teams/<team>.toml`, in Foreman's HQ. See [Team definition](./models/team-definition.md).
 - **Agent (soul)**: one member of a team definition: name, role, personality, skills and job description; what it runs on is its project's profile. One soul can run in many deployments. See [Agent soul](./models/agent-soul.md).
 - **Deployment**: a team assigned to a project; a project has one at most. The goal is the project's, in its wiki. This is runtime state, not config. See [Deployment](./models/deployment.md).

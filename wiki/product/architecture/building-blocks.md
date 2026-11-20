@@ -340,7 +340,7 @@ Reads project wikis through the agentic-wiki engine; renders entries for the rea
 type Wiki interface {
     Tree(project) Tree
     Entry(project, path) (Rendered, error)           // HTML, headings, frontmatter, checkboxes with their lines
-    Board(project, id) (Board, error)                // [[tool.wikiview.board]] from wiki.toml
+    Board(project, id) (Board, error)                // a [[board]] from wiki.toml
     SetCheckbox(project, path, line, done, version) error
     SetField(project, path, field, value, version) error
 }

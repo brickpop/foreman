@@ -3,6 +3,7 @@ package wiki
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -11,8 +12,8 @@ import (
 	"github.com/brickpop/foreman/internal/home"
 )
 
-// declaration is one [[tool.wikiview.board]] of wiki.toml, the keys Foreman
-// reads of WikiShell's (wiki/product/features/board.md#board-declaration).
+// declaration is one [[board]] of wiki.toml, the keys of the standard's
+// board that Foreman shows (wiki/product/features/board.md#board-declaration).
 type declaration struct {
 	ID      string   `toml:"id"`
 	Path    string   `toml:"path"`
@@ -26,8 +27,8 @@ type declaration struct {
 	filters []index.PropFilter
 }
 
-// knownKeys are a board's keys: Foreman's, and WikiShell's blockers, which
-// Foreman doesn't show but a wiki shared with WikiShell may set.
+// knownKeys are the standard's board keys: Foreman's, and blockers, which
+// Foreman doesn't show.
 var knownKeys = []string{"id", "path", "name", "where", "status", "columns", "lane", "lanes", "blockers"}
 
 // Boards are the boards declared in the project wiki's wiki.toml, with their
@@ -37,10 +38,18 @@ func (w *Wikis) Boards(project string) ([]Board, error) {
 	if err != nil {
 		return nil, err
 	}
+	w.mu.Lock()
+	failed := w.unrenamed[project]
+	w.mu.Unlock()
+	// wiki.toml's own problems show on every board, whichever is open.
+	config := configProblems(idx, failed)
 	decls, problems, err := declarations(idx)
 	if err != nil {
 		// A value of the wrong type: shown where the boards would be.
-		return []Board{{ID: "#1", Name: "wiki.toml", Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Unread: []Unread{}, Problems: []string{err.Error()}}}, nil
+		return []Board{problemBoard(append(config, err.Error()))}, nil
+	}
+	if len(decls) == 0 && len(config) > 0 {
+		return []Board{problemBoard(config)}, nil
 	}
 	out := []Board{}
 	for i, d := range decls {
@@ -53,30 +62,36 @@ func (w *Wikis) Boards(project string) ([]Board, error) {
 		if d.ID == "" || slices.ContainsFunc(out, func(o Board) bool { return o.ID == d.ID }) {
 			b.ID = fmt.Sprintf("#%d", i+1)
 		}
-		b.Problems = append([]string{}, problems[i]...)
+		b.Problems = append(append([]string{}, config...), problems[i]...)
 		out = append(out, b)
 	}
 	return out, nil
 }
 
+// problemBoard stands where the boards would be, to show wiki.toml's problems.
+func problemBoard(problems []string) Board {
+	return Board{ID: "#1", Name: "wiki.toml", Columns: []string{}, Lanes: []string{}, Cards: []Card{}, Unread: []Unread{}, Problems: problems}
+}
+
+// validID is the standard's board id: lowercase letters, digits, _ and -,
+// starting with a letter or a digit.
+var validID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
+
 // declarations decodes and checks the boards, with each one's problems.
 func declarations(idx *index.Index) ([]declaration, [][]string, error) {
-	var tool struct {
-		Board []declaration `toml:"board"`
-	}
-	var loose struct {
-		Board []map[string]any `toml:"board"`
-	}
-	if _, err := idx.Bundle.DecodeTool("wikiview", &tool); err != nil {
+	// No lock of Foreman's: the bundle's own makes these decodes safe at once.
+	var decls []declaration
+	var loose []map[string]any
+	if _, err := idx.Bundle.DecodeBoards(&decls); err != nil {
 		return nil, nil, fmt.Errorf("wiki.toml: %w", err)
 	}
-	_, _ = idx.Bundle.DecodeTool("wikiview", &loose)
-	problems := make([][]string, len(tool.Board))
+	_, _ = idx.Bundle.DecodeBoards(&loose)
+	problems := make([][]string, len(decls))
 	seen := map[string]bool{}
-	for i := range tool.Board {
-		d := &tool.Board[i]
+	for i := range decls {
+		d := &decls[i]
 		add := func(format string, a ...any) { problems[i] = append(problems[i], fmt.Sprintf(format, a...)) }
-		for key := range loose.Board[i] {
+		for key := range loose[i] {
 			if !slices.Contains(knownKeys, key) {
 				add("unknown key %q", key)
 			}
@@ -84,8 +99,8 @@ func declarations(idx *index.Index) ([]declaration, [][]string, error) {
 		switch {
 		case d.ID == "":
 			add("id is required")
-		case strings.Contains(d.ID, "/"):
-			add("id %q contains a slash: an id is a word", d.ID)
+		case !validID.MatchString(d.ID):
+			add("id %q may hold only lowercase letters, digits, _ and -, and starts with a letter or a digit", d.ID)
 		case seen[d.ID]:
 			add("id %q is used by another board", d.ID)
 		}
@@ -114,7 +129,7 @@ func declarations(idx *index.Index) ([]declaration, [][]string, error) {
 			}
 		}
 	}
-	return tool.Board, problems, nil
+	return decls, problems, nil
 }
 
 // build lays a board out as WikiShell does: the declared columns in order,

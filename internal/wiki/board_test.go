@@ -9,7 +9,7 @@ import (
 
 const boards = `spec = "0.1"
 
-[[tool.wikiview.board]]
+[[board]]
 id      = "sprint"
 path    = "/backlog"
 name    = "Sprint 07"
@@ -17,16 +17,16 @@ columns = ["todo", "done"]
 lane    = "priority"
 lanes   = ["high"]
 
-[[tool.wikiview.board]]
+[[board]]
 id    = "findings"
 path  = "/backlog"
 where = ["type=task", "kind=finding"]
 
-[[tool.wikiview.board]]
+[[board]]
 path = "/backlog"
 colour = "red"
 
-[[tool.wikiview.board]]
+[[board]]
 id    = "findings"
 path  = "/backlog"
 where = ["nope"]
@@ -105,7 +105,7 @@ func TestBoards(t *testing.T) {
 
 func TestBoardsOfAWrongType(t *testing.T) {
 	w, _ := fixture(t, map[string]string{
-		"wiki.toml": "spec = \"0.1\"\n\n[[tool.wikiview.board]]\nid = \"b\"\npath = \"/\"\ncolumns = \"todo\"\n",
+		"wiki.toml": "spec = \"0.1\"\n\n[[board]]\nid = \"b\"\npath = \"/\"\ncolumns = \"todo\"\n",
 	})
 	got, err := w.Boards("p")
 	if err != nil || len(got) != 1 || len(got[0].Problems) != 1 || !strings.Contains(got[0].Problems[0], "wiki.toml") {
@@ -166,5 +166,22 @@ func TestTheStartersTaskBoards(t *testing.T) {
 	}
 	if b, want := cards("backlog"), []string{"backlog/idea.md:backlog", "backlog/scheduled.md:todo"}; !slices.Equal(b, want) {
 		t.Errorf("Backlog %v, want %v", b, want)
+	}
+}
+
+// An id outside the standard's pattern is reported, and the board still shows.
+func TestBoardIDPattern(t *testing.T) {
+	w, _ := fixture(t, map[string]string{"wiki.toml": "spec = \"0.1\"\n\n[[board]]\nid = \"Sprint 7\"\npath = \"/\"\n\n[[board]]\nid = \"a/b\"\npath = \"/\"\n\n[[board]]\nid = \"7_up-x\"\npath = \"/\"\n"})
+	got, _ := w.Boards("p")
+	if len(got) != 3 {
+		t.Fatalf("boards %+v", got)
+	}
+	for i, id := range []string{"Sprint 7", "a/b"} {
+		if got[i].ID != id || len(got[i].Problems) != 1 || !strings.Contains(got[i].Problems[0], "may hold only lowercase letters") {
+			t.Errorf("%q: %+v", id, got[i])
+		}
+	}
+	if len(got[2].Problems) != 0 {
+		t.Errorf("a valid id: %q", got[2].Problems)
 	}
 }

@@ -42,6 +42,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** a fix in WikiShell doesn't reach Foreman until copied again.
 - **Fix:** WikiShell exports its view builders and publishes its renderer as a package; Foreman imports them and deletes the copies. Tracked in [Import WikiShell's building blocks](./backlog/wikishell-upstream.md).
 
+## The wikiview board rename
+
+- **State:** before reading a wiki, Foreman renames its `[[tool.wikiview.board]]` and `[[tool.wikiview.graph]]` tables to the standard's `[[board]]` and `[[graph]]`, and commits `wiki.toml` (`internal/wiki/migrate.go`; [Wiki engine](./product/architecture/wiki-engine.md)). It is line-based: a multi-line string holding a line that looks like an old header would be renamed too.
+- **Why:** every Foreman HQ was made with the old key, and reading both keys would mean two paths in every reader (the ADR "Boards and graphs in the standard", 2026-11-19).
+- **Impact:** about 100 lines, and a write in every build's path that only finds work once per wiki.
+- **Fix:** delete `migrate.go`, its tests and its call in `load`, in Foreman's first release on or after 2027-01-01 (the CEO's call); then a wiki still on the old key shows no boards.
+
 ## Old team files' `look`
 
 - **State:** a team file still carrying a member's `[agents.<id>.look]` table (avatars, removed 2026-11-02) loads: `retiredLook` in `internal/home/config.go` keeps it out of the problems, and the next save drops it ([Agent soul](./product/models/agent-soul.md#schema)).

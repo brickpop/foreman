@@ -9,7 +9,7 @@ ignore = []
 # Entries that stay indexed and queryable but are kept out of `wiki orphans` (globs supported)
 ignore_orphans = ["backlog/**"]
 
-[[tool.wikiview.board]]
+[[board]]
 id      = "epics"
 path    = "/backlog/epics"
 name    = "Epics"
@@ -18,7 +18,7 @@ status  = "status"
 columns = ["todo", "in-progress", "done"]
 
 # Cards, one lane per epic (in order). A card names its epic in its `epic:` field.
-[[tool.wikiview.board]]
+[[board]]
 id      = "backlog"
 path    = "/backlog"
 name    = "Backlog"

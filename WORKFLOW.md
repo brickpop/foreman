@@ -139,7 +139,7 @@ The folder says only whether a card is live (`backlog/`) or retired (`backlog/ar
 
 ## Boards
 
-`wiki.toml` declares two kanban boards over the same entries, for WikiShell or Foreman itself to show:
+`wiki.toml` declares two kanban boards over the same entries, as `[[board]]` tables (the wiki standard's), for WikiShell or Foreman itself to show:
 
 - **Epics**: the epics by `status` (To do → In progress → Done): the roadmap at a glance.
 - **Backlog**: the cards by `status`, in one lane per epic, in the epics' order. Priority stays on each card.

@@ -10,7 +10,7 @@ ignore = ["AGENTS.md", "README.md"]
 ignore_orphans = ["backlog/**"]
 
 # Scheduled tasks, one lane per priority (`quick`: no uncertainty, doable right now).
-[[tool.wikiview.board]]
+[[board]]
 id      = "board"
 path    = "/backlog"
 name    = "Board"
@@ -24,7 +24,7 @@ lanes   = ["quick", "high", "medium", "low"]
 # schedules it: it stays here under To do, and shows on the board above too.
 # Any status of work started or ended stays off it, the usual names included
 # in case one is used instead of ours.
-[[tool.wikiview.board]]
+[[board]]
 id      = "backlog"
 path    = "/backlog"
 name    = "Backlog"
@@ -40,7 +40,7 @@ columns = ["backlog", "todo"]
 lane    = "priority"
 lanes   = ["quick", "high", "medium", "low"]
 
-[[tool.wikiview.board]]
+[[board]]
 id      = "epics"
 path    = "/backlog/epics"
 name    = "Epics"

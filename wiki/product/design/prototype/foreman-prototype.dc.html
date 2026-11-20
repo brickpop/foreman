@@ -1192,7 +1192,7 @@ class Component extends DCLogic {
       tree.push({ label: f + '/', path: E[f + '/index.md'] ? f + '/index.md' : null, d: 0, folder: true });
       inF.forEach(k => tree.push({ label: k.split('/').pop(), path: k, d: 1 })); });
     const boards = { ledger: [{ id: 'sprint', name: 'Sprint 07', lane: 'priority' }, { id: 'findings', name: 'Findings', kind: 'finding' }], relay: [{ id: 'adr', name: 'ADR track' }], harbor: [{ id: 'backlog', name: 'Backlog' }] }[pid] || [{ id: 'backlog', name: 'Backlog' }];
-    const toml = '# ' + pid + '/wiki/wiki.toml\n' + boards.map(b => '\n[[tool.wikiview.board]]\nid    = "' + b.id + '"\npath  = "/backlog"\nname  = "' + b.name + '"' + (b.kind ? '\nwhere = ["type=task", "kind=' + b.kind + '"]' : '') + (b.lane ? '\nlane  = "' + b.lane + '"' : '')).join('\n');
+    const toml = '# ' + pid + '/wiki/wiki.toml\n' + boards.map(b => '\n[[board]]\nid    = "' + b.id + '"\npath  = "/backlog"\nname  = "' + b.name + '"' + (b.kind ? '\nwhere = ["type=task", "kind=' + b.kind + '"]' : '') + (b.lane ? '\nlane  = "' + b.lane + '"' : '')).join('\n');
     return { entries: E, tasks, tree, boards, toml };
   }
 

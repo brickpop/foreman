@@ -119,7 +119,7 @@ func (w *Wikis) MoveCard(ctx context.Context, project, board, p, column, lane, v
 func (w *Wikis) write(ctx context.Context, project, p, version string, change func(*index.Entry) (string, error)) error {
 	w.writing.Lock()
 	defer w.writing.Unlock()
-	dir, idx, err := w.build(project)
+	dir, idx, err := w.load(project)
 	if err != nil {
 		return err
 	}

@@ -66,6 +66,7 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **State:**
   - **Debounce window:** for up to ~200 ms after an edit, an entry's body is read fresh while its links, headings and checkbox lines come from the previous index, so they may disagree until the rebuild (WikiShell has the same window).
   - **A broken wiki reads as none:** a wiki whose `wiki.toml` can't be read (caught mid-write, say) is served as "no wiki" until its next change.
+  - **An image in an ignored folder:** a link to an ignored file still resolves, so an entry can show an image kept in a folder `wiki.toml`'s `ignore` leaves out. The watcher doesn't follow such a folder, so the image appearing or going sends no `wiki.changed` until the next change elsewhere in the wiki.
   - **Image symlink race:** the image route resolves symlinks and checks the result is inside the wiki before serving it; an agent with write access could swap a symlink in between. Theoretical: the window is microseconds and the lead's container already holds the wiki.
 - **Why:** each is rare or short-lived, and fixing it now costs more than it saves.
 - **Fix:** the window: rebuild before reading when a change is pending (Foreman's own writes already rebuild before answering). The symlink race: open the file, then check the opened file's real path (`os.File` plus `/proc` or `F_GETPATH`), if it ever matters.

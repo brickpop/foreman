@@ -24,9 +24,16 @@ type watching struct {
 
 func watch(t *testing.T, projects ...string) *watching {
 	t.Helper()
+	return watchWith(t, nil, projects...)
+}
+
+// watchWith is watch with files written into each wiki before Watch starts.
+func watchWith(t *testing.T, files map[string]string, projects ...string) *watching {
+	t.Helper()
 	ws := &watching{root: t.TempDir(), changes: make(chan Changed, 16), projects: projects}
 	for _, p := range projects {
 		write(t, ws.dir(p), map[string]string{"wiki.toml": "spec = \"0.1\"\n", "index.md": "# " + p + "\n"})
+		write(t, ws.dir(p), files)
 	}
 	ws.wikis = New(func(project string) (string, error) {
 		ws.mu.Lock()
@@ -177,4 +184,111 @@ func TestWatchSeesAWikiAppear(t *testing.T) {
 	if tree, err := ws.wikis.Tree("bare"); err != nil || len(tree) != 1 {
 		t.Errorf("tree %+v %v", tree, err)
 	}
+}
+
+// watchedUnder lists the folders the watcher holds at dir or below it.
+func (ws *watching) watchedUnder(dir string) []string {
+	var out []string
+	for _, p := range ws.wikis.watcher.WatchList() {
+		if within(dir, p) {
+			out = append(out, p)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// eventually waits until cond holds: the watcher's work is asynchronous.
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(3 * time.Second); !cond(); {
+		if time.Now().After(deadline) {
+			t.Fatal(what)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// Only the wiki is followed. The folder that holds it is watched so the wiki
+// can appear later, but what else lands there (a project's files/, a copy of
+// an old HQ) is not: on macOS every watched file costs a file descriptor.
+func TestWatchIgnoresFoldersBesideTheWiki(t *testing.T) {
+	ws := watch(t, "ledger")
+	beside := filepath.Join(filepath.Dir(ws.dir("ledger")), "files")
+	write(t, beside, map[string]string{"inbox/old-hq/a.md": note(""), "inbox/old-hq/deep/b.md": note("")})
+
+	// A change in the wiki after it, published, means the folder's event was handled.
+	write(t, ws.dir("ledger"), map[string]string{"a.md": note("")})
+	ws.next(t)
+	if got := ws.watchedUnder(beside); len(got) != 0 {
+		t.Errorf("watched beside the wiki: %v", got)
+	}
+}
+
+// Hidden folders (.git, the .wiki cache) and the subtrees wiki.toml's ignore
+// leaves out hold no entries, so they are not watched, at start or later.
+func TestWatchSkipsHiddenAndIgnoredFolders(t *testing.T) {
+	w := watchWith(t, map[string]string{
+		"wiki.toml":        "spec = \"0.1\"\nignore = [\"archive/**\", \"**/tmp/**\"]\n",
+		"x/tmp/y/b.md":     note(""),
+		".wiki/cache":      "x",
+		".git/objects/x":   "x",
+		"archive/old/a.md": note(""),
+		"notes/a.md":       note(""),
+	}, "ledger")
+	dir := w.dir("ledger")
+
+	write(t, dir, map[string]string{".cache/x/y": "x", "archive/2026/b.md": note(""), "later/c.md": note("")})
+	if c := w.next(t); !slices.Contains(c.Paths, "later/c.md") {
+		t.Fatalf("change %+v", c)
+	}
+	want := []string{dir, filepath.Join(dir, "later"), filepath.Join(dir, "notes"), filepath.Join(dir, "x")}
+	eventually(t, "the watched folders never settled", func() bool { return slices.Equal(w.watchedUnder(dir), want) })
+
+	// A new ignore applies at once: the subtree it names is dropped.
+	write(t, dir, map[string]string{"wiki.toml": "spec = \"0.1\"\nignore = [\"archive/**\", \"**/tmp/**\", \"notes/**\"]\n"})
+	w.next(t)
+	want = []string{dir, filepath.Join(dir, "later"), filepath.Join(dir, "x")}
+	eventually(t, "notes/ is still watched after wiki.toml ignored it", func() bool { return slices.Equal(w.watchedUnder(dir), want) })
+}
+
+// A renamed folder's watches go with its old name; the new name is followed.
+// On macOS, without this, each move keeps the old descriptors and opens a new set.
+func TestWatchDropsARenamedFolder(t *testing.T) {
+	ws := watch(t, "ledger")
+	dir := ws.dir("ledger")
+	write(t, dir, map[string]string{"notes/deep/a.md": note("")})
+	ws.next(t)
+
+	if err := os.Rename(filepath.Join(dir, "notes"), filepath.Join(dir, "moved")); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{dir, filepath.Join(dir, "moved"), filepath.Join(dir, "moved", "deep")}
+	eventually(t, "the old name is still watched, or the new one is not", func() bool { return slices.Equal(ws.watchedUnder(dir), want) })
+}
+
+// A project that goes takes all its watches with it, the folder holding its
+// wiki included.
+func TestWatchForgetsARemovedProjectsFolders(t *testing.T) {
+	ws := watch(t, "ledger", "cal")
+	write(t, ws.dir("ledger"), map[string]string{"notes/a.md": note("")})
+	ws.next(t)
+
+	ws.setProjects("cal")
+	gone := filepath.Join(ws.root, "ledger")
+	eventually(t, "a removed project is still watched", func() bool { return len(ws.watchedUnder(gone)) == 0 })
+	if len(ws.watchedUnder(ws.dir("cal"))) == 0 {
+		t.Error("the project that stays is no longer watched")
+	}
+}
+
+// A wiki folder that can't be read as a wiki yet (no wiki.toml) is still
+// followed, so its wiki appearing is seen, and its hidden folders still are not.
+func TestWatchSkipsHiddenFoldersBeforeTheWikiExists(t *testing.T) {
+	ws := watch(t, "ledger")
+	dir := ws.dir("bare")
+	write(t, dir, map[string]string{".git/objects/x": "x", "notes/a.md": note("")})
+	ws.setProjects("ledger", "bare")
+	want := []string{dir, filepath.Join(dir, "notes")}
+	eventually(t, "the bare wiki's folders never settled", func() bool { return slices.Equal(ws.watchedUnder(dir), want) })
 }

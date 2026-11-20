@@ -13,6 +13,7 @@ import (
 
 	"github.com/agentic-wiki/wiki/bundle"
 	"github.com/agentic-wiki/wiki/index"
+	"github.com/fsnotify/fsnotify"
 
 	"github.com/brickpop/foreman/internal/home"
 )
@@ -30,6 +31,7 @@ type Wikis struct {
 	mu      sync.Mutex
 	watched map[string]*watched // by project, while Watch runs
 	writing sync.Mutex          // one write at a time: check, change, commit
+	watcher *fsnotify.Watcher   // Watch's: set once, before it follows anything
 }
 
 // New reads the wiki that dir names for each project (its bundle folder, the

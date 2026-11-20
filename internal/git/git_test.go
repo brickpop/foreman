@@ -16,8 +16,6 @@ import (
 	"time"
 )
 
-var ctx = context.Background()
-
 func write(t *testing.T, path, content string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -30,9 +28,8 @@ func write(t *testing.T, path, content string) {
 
 func repo(t *testing.T) string {
 	t.Helper()
-	// No identity from the machine running the tests: the fallback must work.
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	ctx := testCtx(t)
+	// No identity from the machine running the tests (TestMain): the fallback must work.
 	dir := t.TempDir()
 	if err := (New()).Init(ctx, dir, "main"); err != nil {
 		t.Fatal(err)
@@ -41,6 +38,7 @@ func repo(t *testing.T) string {
 }
 
 func TestCommitTakesOnlyTheNamedFiles(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	write(t, filepath.Join(dir, "teams", "atlas.toml"), "team = 'atlas'\n")
 	write(t, filepath.Join(dir, "scratch.txt"), "not mine\n")
@@ -57,6 +55,7 @@ func TestCommitTakesOnlyTheNamedFiles(t *testing.T) {
 }
 
 func TestCommittingUnchangedFilesSaysSo(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	write(t, filepath.Join(dir, "settings.toml"), "port = 8888\n")
 	if err := (New()).Commit(ctx, dir, "first", "settings.toml"); err != nil {
@@ -69,6 +68,7 @@ func TestCommittingUnchangedFilesSaysSo(t *testing.T) {
 
 // A hook planted in the repo never runs on the host.
 func TestHooksNeverRun(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	marker := filepath.Join(t.TempDir(), "hook-ran")
 	write(t, filepath.Join(dir, ".git", "hooks", "pre-commit"), "#!/bin/sh\ntouch "+marker+"\n")
@@ -89,6 +89,7 @@ func TestHooksNeverRun(t *testing.T) {
 }
 
 func TestInitIsIdempotent(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	write(t, filepath.Join(dir, "f"), "x\n")
 	if err := (New()).Commit(ctx, dir, "m", "f"); err != nil {
@@ -106,6 +107,7 @@ func TestInitIsIdempotent(t *testing.T) {
 // config: signed when it says so, failing rather than landing unsigned when
 // the key can't sign. Agents' commits are never signed (the CEO, 2026-11-06).
 func TestOnlyTheCEOsCommitsAreSigned(t *testing.T) {
+	ctx := testCtx(t)
 	if _, err := exec.LookPath("ssh-keygen"); err != nil {
 		t.Skip("no ssh-keygen to make a signing key")
 	}
@@ -159,6 +161,7 @@ func TestOnlyTheCEOsCommitsAreSigned(t *testing.T) {
 // codeRepo makes a repo with one commit on main, like a code repo the CEO cloned.
 func codeRepo(t *testing.T, branch string) string {
 	t.Helper()
+	ctx := testCtx(t)
 	dir := repo(t)
 	if branch != "main" {
 		if _, err := run(ctx, dir, "checkout", "--quiet", "-b", branch); err != nil {
@@ -174,6 +177,7 @@ func codeRepo(t *testing.T, branch string) string {
 
 func branchOf(t *testing.T, dir string) string {
 	t.Helper()
+	ctx := testCtx(t)
 	out, err := run(ctx, dir, "branch", "--show-current")
 	if err != nil {
 		t.Fatal(err)
@@ -182,6 +186,7 @@ func branchOf(t *testing.T, dir string) string {
 }
 
 func TestPrepareMakesAWorktreeOnANewBranch(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	wt := filepath.Join(t.TempDir(), "sandboxes", "mara", "api")
 	if err := New().Prepare(ctx, r, wt, "wt/mara/main", "main"); err != nil {
@@ -201,6 +206,7 @@ func TestPrepareMakesAWorktreeOnANewBranch(t *testing.T) {
 // An idle worktree owns no branch: detached at the default branch's head, so any number of
 // agents idle on it at once, and no branch is made.
 func TestPrepareMakesADetachedWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	g := New()
 	before := strings.Fields(mustRun(t, r, "for-each-ref", "--format=%(refname)", "refs/heads/"))
@@ -232,6 +238,7 @@ func TestPrepareMakesADetachedWorktree(t *testing.T) {
 // A worktree already there is the agent's: it is left as it is, on whatever
 // branch, with its uncommitted work.
 func TestPrepareReusesAnExistingWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	wt := filepath.Join(t.TempDir(), "mara")
 	g := New()
@@ -256,6 +263,7 @@ func TestPrepareReusesAnExistingWorktree(t *testing.T) {
 // The agent's branch survives its worktree: a new worktree picks it up as it
 // was, not reset to main.
 func TestPrepareChecksOutAnExistingBranch(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	g := New()
 	first := filepath.Join(t.TempDir(), "mara")
@@ -279,6 +287,7 @@ func TestPrepareChecksOutAnExistingBranch(t *testing.T) {
 }
 
 func TestPrepareRefusals(t *testing.T) {
+	ctx := testCtx(t)
 	g := New()
 	r := codeRepo(t, "main")
 
@@ -313,6 +322,7 @@ func TestPrepareRefusals(t *testing.T) {
 
 // A team of twelve starts at once on one repo: every worktree is made.
 func TestConcurrentPreparesOnOneRepo(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	g := New()
 	base := t.TempDir()
@@ -336,6 +346,7 @@ func TestConcurrentPreparesOnOneRepo(t *testing.T) {
 }
 
 func TestChanged(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	g := New()
 	write(t, filepath.Join(dir, "wiki", "a.md"), "a\n")
@@ -357,6 +368,7 @@ func TestChanged(t *testing.T) {
 // Foreman reads some of git's messages: they must not depend on the CEO's
 // language (a Catalan git hid "local changes" from MergeInto).
 func TestGitSpeaksEnglish(t *testing.T) {
+	ctx := testCtx(t)
 	t.Setenv("LC_ALL", "ca_ES.UTF-8")
 	t.Setenv("LANG", "ca_ES.UTF-8")
 	t.Setenv("GIT_OPTIONAL_LOCKS", "1") // nor on the CEO's environment
@@ -375,6 +387,7 @@ func TestGitSpeaksEnglish(t *testing.T) {
 // (index.lock), so Foreman's reads can't collide with an agent's own git, nor
 // leave a lock behind.
 func TestReadsNeverWriteTheIndex(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	write(t, filepath.Join(dir, "a.txt"), "a\n")
 	if err := (New()).Commit(ctx, dir, "a", "a.txt"); err != nil {
@@ -400,6 +413,7 @@ func TestReadsNeverWriteTheIndex(t *testing.T) {
 // A cancelled git gets SIGTERM, on which git removes its lock files; a kill
 // would leave them.
 func TestACancelledGitIsTerminated(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	cctx, cancel := context.WithCancel(ctx)
 	cmd := command(cctx, dir, "hash-object", "--stdin")
@@ -423,6 +437,7 @@ func TestACancelledGitIsTerminated(t *testing.T) {
 // git's housekeeping after a commit stays inside the command, under the
 // repo's lock: never a detached process holding the repo's locks.
 func TestHousekeepingNeverDetaches(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	trace := filepath.Join(t.TempDir(), "trace.json")
 	t.Setenv("GIT_TRACE2_EVENT", trace)
@@ -447,6 +462,7 @@ func TestHousekeepingNeverDetaches(t *testing.T) {
 // Removing a worktree takes its folder and keeps its branch; one with work not
 // committed, even a new file, stays as it is.
 func TestRemoveWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	g := New()
 	clean, dirty := filepath.Join(t.TempDir(), "mara", "api"), filepath.Join(t.TempDir(), "tove", "api")
@@ -495,5 +511,27 @@ func TestRemoveWorktree(t *testing.T) {
 	}
 	if trees, _ := g.Worktrees(ctx, r); trees["wt/ana/main"] != "" {
 		t.Error("still listed")
+	}
+}
+
+// A ref moved with no identity anywhere is recorded as Foreman's fallback
+// address: git never makes one up from the hostname, which costs a lookup per
+// command. A configured user.email still wins.
+func TestReflogNamesTheFallbackAddressWithoutAnIdentity(t *testing.T) {
+	ctx := testCtx(t)
+	dir := codeRepo(t, "main")
+	if _, err := run(ctx, dir, "checkout", "--quiet", "-b", "other"); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitOut(t, dir, "log", "-g", "-1", "--format=%ge", "HEAD"); got != fallbackEmail {
+		t.Errorf("reflog by %q, want %q", got, fallbackEmail)
+	}
+
+	gitOut(t, dir, "config", "user.email", "ceo@example.com")
+	if _, err := run(ctx, dir, "checkout", "--quiet", "main"); err != nil {
+		t.Fatal(err)
+	}
+	if got := gitOut(t, dir, "log", "-g", "-1", "--format=%ge", "HEAD"); got != "ceo@example.com" {
+		t.Errorf("reflog by %q, want the configured ceo@example.com", got)
 	}
 }

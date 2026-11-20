@@ -14,6 +14,7 @@ import (
 // adding feature.go.
 func mergeFixture(t *testing.T) (*CLI, string) {
 	t.Helper()
+	ctx := testCtx(t)
 	dir := repo(t)
 	g := New()
 	write(t, filepath.Join(dir, "README"), "hello\n")
@@ -31,6 +32,7 @@ func mergeFixture(t *testing.T) (*CLI, string) {
 
 func mustRun(t *testing.T, dir string, args ...string) string {
 	t.Helper()
+	ctx := testCtx(t)
 	out, err := run(ctx, dir, append([]string{"-c", "user.name=t", "-c", "user.email=t@t"}, args...)...)
 	if err != nil {
 		t.Fatal(err)
@@ -52,6 +54,7 @@ func squashed(t *testing.T, dir, base, message string) {
 // change commits file on the branch checked out in dir, by the author.
 func change(t *testing.T, g *CLI, dir, file, text string, by Author) {
 	t.Helper()
+	ctx := testCtx(t)
 	write(t, filepath.Join(dir, file), text)
 	if err := g.CommitAs(ctx, dir, file, by, file); err != nil {
 		t.Fatal(err)
@@ -59,6 +62,7 @@ func change(t *testing.T, g *CLI, dir, file, text string, by Author) {
 }
 
 func TestSquashTheCheckedOutTarget(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
 	mara := Author{Name: "Mara", Email: "mara@foreman.invalid"}
@@ -86,6 +90,7 @@ func TestSquashTheCheckedOutTarget(t *testing.T) {
 }
 
 func TestSquashRefusesToOverwriteTheCEOsEdits(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
 	change(t, g, dir, "README", "changed by the lead\n", tove)
@@ -104,6 +109,7 @@ func TestSquashRefusesToOverwriteTheCEOsEdits(t *testing.T) {
 }
 
 func TestSquashBacksOutOfAConflict(t *testing.T) {
+	ctx := testCtx(t)
 	for _, checkedOut := range []bool{true, false} {
 		g, dir := mergeFixture(t)
 		mustRun(t, dir, "checkout", "-q", "lead/atlas/x")
@@ -127,6 +133,7 @@ func TestSquashBacksOutOfAConflict(t *testing.T) {
 }
 
 func TestSquashWithoutTouchingAnotherCheckout(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	base := mustRun(t, dir, "rev-parse", "main")
 	mustRun(t, dir, "checkout", "-q", "-b", "the-ceos-work")
@@ -147,6 +154,7 @@ func TestSquashWithoutTouchingAnotherCheckout(t *testing.T) {
 }
 
 func TestSquashWhatMainHasAlready(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	if err := g.Squash(ctx, dir, "main", "main", "lead/atlas/x", mustRun(t, dir, "rev-parse", "lead/atlas/x"), "once"); err != nil {
 		t.Fatal(err)
@@ -161,6 +169,7 @@ func TestSquashWhatMainHasAlready(t *testing.T) {
 }
 
 func TestSquashOnlyTheCommitRead(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	read := mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	main := mustRun(t, dir, "rev-parse", "main")
@@ -184,6 +193,7 @@ func TestSquashOnlyTheCommitRead(t *testing.T) {
 }
 
 func TestMerged(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	merged := func(want bool) {
 		t.Helper()
@@ -208,6 +218,7 @@ func TestMerged(t *testing.T) {
 }
 
 func TestMoveBranchNotCheckedOut(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	if err := g.MoveBranch(ctx, dir, "lead/atlas/x", mustRun(t, dir, "rev-parse", "main"), "main"); !errors.Is(err, ErrMoved) {
@@ -225,6 +236,7 @@ func TestMoveBranchNotCheckedOut(t *testing.T) {
 }
 
 func TestMoveBranchCheckedOutInAWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	wt := filepath.Join(t.TempDir(), "lead")
 	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
@@ -264,6 +276,7 @@ func TestMoveBranchCheckedOutInAWorktree(t *testing.T) {
 }
 
 func TestDiff(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	diff, err := g.Diff(ctx, dir, "main", mustRun(t, dir, "rev-parse", "lead/atlas/x"))
 	if err != nil || !strings.Contains(diff, "+++ b/feature.go") {
@@ -278,6 +291,7 @@ func TestDiff(t *testing.T) {
 }
 
 func TestDiffIgnoresAHostileConfig(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	change(t, g, dir, "blank.txt", "a\n\nb\n", Author{})
 	from := mustRun(t, dir, "rev-parse", "main")
@@ -319,6 +333,7 @@ func TestDiffIgnoresAHostileConfig(t *testing.T) {
 }
 
 func TestCompareTwoCommits(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	from := mustRun(t, dir, "rev-parse", "main")
 	to := mustRun(t, dir, "rev-parse", "lead/atlas/x")
@@ -345,6 +360,7 @@ func TestCompareTwoCommits(t *testing.T) {
 }
 
 func TestDropBranch(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	if err := g.DropBranch(ctx, dir, "lead/atlas/x", "refs/foreman/dismissed/rev-1/lead/atlas/x", "main"); err != nil {
@@ -368,6 +384,7 @@ func TestDropBranch(t *testing.T) {
 }
 
 func TestDropBranchCheckedOutInAWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	wt := filepath.Join(t.TempDir(), "lead")
 	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
@@ -411,6 +428,7 @@ func TestDropBranchCheckedOutInAWorktree(t *testing.T) {
 // Where a branch's change starts, however main took it: open, squashed, by a
 // merge commit; nothing to tell apart after a fast-forward.
 func TestPartedFrom(t *testing.T) {
+	ctx := testCtx(t)
 	for _, tc := range []struct {
 		name  string
 		merge func(t *testing.T, g *CLI, dir, head string)
@@ -464,6 +482,7 @@ func TestPartedFrom(t *testing.T) {
 
 // A kept commit outlives its branch and the backups' pruning.
 func TestKeep(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	if err := g.Keep(ctx, dir, "refs/foreman/decided/mr-1", head); err != nil {
@@ -486,6 +505,7 @@ func TestKeep(t *testing.T) {
 // DeleteBranch keeps the head aside and deletes the branch; a branch checked
 // out anywhere (a worktree, or the repo's own checkout) stays, untouched.
 func TestDeleteBranch(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	backup := BackupRef("cleaned", time.Now(), "lead/atlas/x")
@@ -509,6 +529,7 @@ func TestDeleteBranch(t *testing.T) {
 }
 
 func TestDeleteBranchCheckedOut(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	wt := filepath.Join(t.TempDir(), "lead")
 	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
@@ -534,6 +555,7 @@ func TestDeleteBranchCheckedOut(t *testing.T) {
 // target's head with the squash on it, the target untouched; one already
 // there is used only while at the target's head.
 func TestSquashOntoALanding(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t) // lead/atlas/x one commit ahead of main
 	main := mustRun(t, dir, "rev-parse", "main")
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
@@ -606,6 +628,7 @@ func TestSquashOntoALanding(t *testing.T) {
 // of main, holding a staged and an unstaged change.
 func freeFixture(t *testing.T, branch string) (*CLI, []Free) {
 	t.Helper()
+	ctx := testCtx(t)
 	g := New()
 	var frees []Free
 	for _, name := range []string{"api", "web"} {
@@ -630,6 +653,7 @@ func freeFixture(t *testing.T, branch string) (*CLI, []Free) {
 // FreeBranch detaches every worktree at the commit it is on, its changes
 // kept, and deletes the branch in every repo, backed up.
 func TestFreeBranch(t *testing.T) {
+	ctx := testCtx(t)
 	const branch = "wt/ledger/tove/x"
 	g, frees := freeFixture(t, branch)
 	heads := map[string]string{}
@@ -685,6 +709,7 @@ func unchanged(t *testing.T, g *CLI, frees []Free, branch string, heads map[stri
 // Refused, nothing changes: still says no, a worktree on another branch, a
 // merge under way. A failure in the second repo undoes the first.
 func TestFreeBranchChangesNothingWhenRefused(t *testing.T) {
+	ctx := testCtx(t)
 	const branch = "wt/ledger/tove/x"
 	stillNo := errors.New("tove started meanwhile")
 	for _, tc := range []struct {
@@ -737,6 +762,7 @@ func TestFreeBranchChangesNothingWhenRefused(t *testing.T) {
 // Two callers naming the same repos in opposite orders never wait on each
 // other in a circle.
 func TestLockedInAnyOrder(t *testing.T) {
+	ctx := testCtx(t)
 	g := New()
 	a, b := repo(t), repo(t)
 	done := make(chan struct{})

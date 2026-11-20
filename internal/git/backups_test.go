@@ -9,6 +9,7 @@ import (
 )
 
 func TestBackupRefCarriesItsTime(t *testing.T) {
+	ctx := testCtx(t)
 	at := time.Date(2026, 10, 22, 9, 30, 5, 0, time.FixedZone("CEST", 2*3600))
 	if got := BackupRef("dismissed", at, "rev-3/lead/atlas/x"); got != "refs/foreman/dismissed/2026-10-22T07-30-05Z/rev-3/lead/atlas/x" {
 		t.Errorf("%q", got)
@@ -20,6 +21,7 @@ func TestBackupRefCarriesItsTime(t *testing.T) {
 
 // Old backups go; recent ones, and refs whose name carries no time, stay.
 func TestPruneBackups(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
 	old := BackupRef("dismissed", now.AddDate(0, 0, -31), "rev-1/lead/atlas/x")
@@ -45,6 +47,7 @@ func TestPruneBackups(t *testing.T) {
 }
 
 func TestDiscard(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	wt := filepath.Join(t.TempDir(), "tove")
 	mustRun(t, dir, "worktree", "add", "-q", wt, "lead/atlas/x")
@@ -107,6 +110,7 @@ func TestDiscard(t *testing.T) {
 }
 
 func TestFreshen(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t)
 	wt := filepath.Join(t.TempDir(), "tove")
 	mustRun(t, dir, "worktree", "add", "-q", "--detach", wt, "main")
@@ -151,6 +155,7 @@ func TestFreshen(t *testing.T) {
 
 // A restart finds its idle worktree brought up to main; one on a topic stays.
 func TestPrepareBringsAnIdleWorktreeUpToMain(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	idle, topic := filepath.Join(t.TempDir(), "mara"), filepath.Join(t.TempDir(), "tove")
 	g := New()

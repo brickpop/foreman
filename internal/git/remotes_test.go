@@ -16,6 +16,7 @@ import (
 // clone's own branch work on top of main.
 func upstream(t *testing.T) (g *CLI, dir, up string) {
 	t.Helper()
+	ctx := testCtx(t)
 	up, g = repo(t), New()
 	write(t, filepath.Join(up, "README"), "hello\n")
 	if err := g.Commit(ctx, up, "first", "README"); err != nil {
@@ -29,6 +30,7 @@ func upstream(t *testing.T) (g *CLI, dir, up string) {
 }
 
 func TestFetchRemotesMovesOnlyTheRemoteBranches(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, up := upstream(t)
 	if changes, err := g.FetchRemotes(ctx, dir); err != nil || changes != nil {
 		t.Fatalf("nothing new upstream: %v %v", changes, err)
@@ -73,6 +75,7 @@ func TestFetchRemotesMovesOnlyTheRemoteBranches(t *testing.T) {
 }
 
 func TestFetchRemotesWithoutAnyRemote(t *testing.T) {
+	ctx := testCtx(t)
 	if _, err := New().FetchRemotes(ctx, repo(t)); !errors.Is(err, ErrNoRemote) {
 		t.Errorf("err %v", err)
 	}
@@ -81,6 +84,7 @@ func TestFetchRemotesWithoutAnyRemote(t *testing.T) {
 // A remote that fails, here asking for a password nobody can give, fails at
 // once, and the others are fetched all the same.
 func TestFetchRemotesNeverWaitsOnAPrompt(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, up := upstream(t)
 	locked := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("WWW-Authenticate", `Basic realm="git"`)
@@ -106,6 +110,7 @@ func TestFetchRemotesNeverWaitsOnAPrompt(t *testing.T) {
 // Origin is kept where others read it (projects.toml, pushed with Foreman's
 // HQ): a token in an https URL never goes with it.
 func TestOrigin(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, up := upstream(t)
 	if got := g.Origin(ctx, dir); got != up {
 		t.Errorf("a clone: %q, want %q", got, up)
@@ -139,6 +144,7 @@ func TestOrigin(t *testing.T) {
 }
 
 func TestMatchOrigin(t *testing.T) {
+	ctx := testCtx(t)
 	const scp = "git@github.com:agentic-wiki/something"
 	const https = "https://github.com/agentic-wiki/something.git"
 	const custom = "https://git.example.invalid/agentic-wiki/something.git"
@@ -185,6 +191,7 @@ func TestMatchOrigin(t *testing.T) {
 }
 
 func TestOriginCredentialsMustBeMovedBeforeReuse(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, _ := upstream(t)
 	for _, saved := range []string{
 		"https://fixture:fake-token@github.com/agentic-wiki/something.git",
@@ -204,6 +211,7 @@ func TestOriginCredentialsMustBeMovedBeforeReuse(t *testing.T) {
 }
 
 func TestOriginReuseGuards(t *testing.T) {
+	ctx := testCtx(t)
 	const scp = "git@github.com:agentic-wiki/something"
 	const https = "https://github.com/agentic-wiki/something.git"
 	g, dir, _ := upstream(t)
@@ -224,6 +232,7 @@ func TestOriginReuseGuards(t *testing.T) {
 }
 
 func TestDifferentMirrorAccountsRemainDistinct(t *testing.T) {
+	ctx := testCtx(t)
 	const scp = "git@github.com:agentic-wiki/something"
 	const https = "https://github.com/agentic-wiki/something.git"
 	g, dir, _ := upstream(t)
@@ -241,6 +250,7 @@ func TestDifferentMirrorAccountsRemainDistinct(t *testing.T) {
 // A repo with no folder on this machine must not make git act on the
 // server's own folder.
 func TestNoFolderFails(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, _ := upstream(t)
 	t.Chdir(dir) // where git -C "" would act: a repo with main, a commit and a remote
 	if _, err := g.RootCommit(ctx, ""); err == nil {

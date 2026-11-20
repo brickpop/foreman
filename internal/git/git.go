@@ -19,9 +19,13 @@ import (
 	"time"
 )
 
+// fallbackEmail is Foreman's address when git has none: it authors the
+// fallback commits, and names who moved a ref in the reflogs (command).
+const fallbackEmail = "foreman@localhost"
+
 // fallbackIdentity authors commits when the CEO's git has no user configured,
 // so a save never fails for that alone. Not the CEO, so never signed.
-var fallbackIdentity = []string{"-c", "user.name=Foreman", "-c", "user.email=foreman@localhost", "-c", "commit.gpgsign=false"}
+var fallbackIdentity = []string{"-c", "user.name=Foreman", "-c", "user.email=" + fallbackEmail, "-c", "commit.gpgsign=false"}
 
 // CLI runs the git command line, one command at a time per repo, so git's own
 // lock files never collide (twelve agents starting at once share a repo).
@@ -277,11 +281,22 @@ func (g *CLI) PruneWorktrees(ctx context.Context, repo string) error {
 // never detached: a detached one escapes the one-command-per-repo lock and
 // can hold the repo's locks while Foreman's next command needs them (found
 // 2026-10-20, as orphaned processes under an init that doesn't reap them).
+//
+// EMAIL is Foreman's fallback address when the environment has none. Every
+// command that moves a ref writes who did it to the reflog, and with no
+// user.email git makes up an address from the machine's hostname, looking up
+// its domain: seconds per command where that lookup is slow (found 2026-11-20,
+// on a Mac). git reads EMAIL only when no user.email is configured, so a CEO
+// with an identity sees no change. fetch, which never reads the CEO's config,
+// needs it most.
 func command(ctx context.Context, dir string, args ...string) *exec.Cmd {
 	base := []string{"-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false",
 		"-c", "maintenance.autoDetach=false", "-c", "gc.autoDetach=false", "-C", dir}
 	cmd := exec.CommandContext(ctx, "git", append(base, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "LC_ALL=C")
+	if os.Getenv("EMAIL") == "" {
+		cmd.Env = append(cmd.Env, "EMAIL="+fallbackEmail)
+	}
 	cmd.Cancel = func() error { return cmd.Process.Signal(syscall.SIGTERM) }
 	cmd.WaitDelay = 5 * time.Second
 	if dir == "" {

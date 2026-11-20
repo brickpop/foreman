@@ -23,6 +23,7 @@ func local() *CLI {
 // lib is a dependency's repo: main at "v2", tagged v1 one commit earlier.
 func lib(t *testing.T) (dir, v1, v2 string) {
 	t.Helper()
+	ctx := testCtx(t)
 	dir = codeRepo(t, "main")
 	write(t, filepath.Join(dir, "lib.sol"), "v1\n")
 	if err := New().Commit(ctx, dir, "v1", "lib.sol"); err != nil {
@@ -41,6 +42,7 @@ func lib(t *testing.T) (dir, v1, v2 string) {
 // by the CEO's own git, and a worktree of it per agent.
 func withSubmodule(t *testing.T, agents ...string) (r, libDir, v1, v2 string, wts map[string]string) {
 	t.Helper()
+	ctx := testCtx(t)
 	libDir, v1, v2 = lib(t)
 	r, wts = worktrees(t)
 	gitOut(t, r, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+libDir, "lib/dep")
@@ -66,6 +68,7 @@ func read(t *testing.T, path string) string {
 }
 
 func TestSyncChecksOutThePinsWithoutTouchingTheReposConfig(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove")
 	wt := wts["tove"]
 	if !emptyOrMissing(filepath.Join(wt, "lib/dep")) {
@@ -95,6 +98,7 @@ func TestSyncChecksOutThePinsWithoutTouchingTheReposConfig(t *testing.T) {
 }
 
 func TestSyncFetchesOnlyOverHTTPS(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove")
 	// The CEO never checked it out, so nothing to fall back on.
 	if err := os.RemoveAll(filepath.Join(r, ".git/modules/lib/dep")); err != nil {
@@ -110,6 +114,7 @@ func TestSyncFetchesOnlyOverHTTPS(t *testing.T) {
 }
 
 func TestSyncIgnoresWhatGitmodulesAsksForUpdates(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, _ := withSubmodule(t)
 	gitOut(t, r, "config", "--file", ".gitmodules", "submodule.lib/dep.update", "none")
 	gitOut(t, r, "-c", "user.name=CEO", "-c", "user.email=ceo@x", "commit", "--quiet", "-am", "update none")
@@ -128,6 +133,7 @@ func TestSyncIgnoresWhatGitmodulesAsksForUpdates(t *testing.T) {
 // A branch without the submodule leaves its folder behind, which the next
 // commit would add back: the sync removes it, and brings it back on return.
 func TestSyncRemovesASubmoduleTheBranchDoesntHave(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove")
 	gitOut(t, r, "branch", "bare", "main~1") // before the submodule
 	wt, g := wts["tove"], local()
@@ -161,6 +167,7 @@ func TestSyncRemovesASubmoduleTheBranchDoesntHave(t *testing.T) {
 }
 
 func TestALeftoverWithChangesStaysAndCantBeCommitted(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove")
 	gitOut(t, r, "branch", "bare", "main~1")
 	wt, g := wts["tove"], local()
@@ -186,6 +193,7 @@ func TestALeftoverWithChangesStaysAndCantBeCommitted(t *testing.T) {
 
 // An agent that clones a repo into its worktree can't commit it as a pointer.
 func TestCommitRefusesARepoInsideTheWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	_, wts := worktrees(t, "tove")
 	wt := wts["tove"]
 	write(t, filepath.Join(wt, "vendor/x/a"), "a\n")
@@ -205,6 +213,7 @@ func TestCommitRefusesARepoInsideTheWorktree(t *testing.T) {
 }
 
 func TestDirtySubmodulesCountWhatever(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove")
 	wt, g := wts["tove"], local()
 	if err := g.SyncSubmodules(ctx, wt, false); err != nil {
@@ -228,6 +237,7 @@ func TestDirtySubmodulesCountWhatever(t *testing.T) {
 }
 
 func TestSetSubmoduleMovesThePinAndDiscardsEdits(t *testing.T) {
+	ctx := testCtx(t)
 	_, _, v1, v2, wts := withSubmodule(t, "tove")
 	wt, g := wts["tove"], local()
 	if err := g.SyncSubmodules(ctx, wt, false); err != nil {
@@ -262,6 +272,7 @@ func TestSetSubmoduleMovesThePinAndDiscardsEdits(t *testing.T) {
 }
 
 func TestSetSubmoduleRefusals(t *testing.T) {
+	ctx := testCtx(t)
 	_, libDir, _, _, wts := withSubmodule(t, "tove")
 	wt, g := wts["tove"], local()
 	if err := g.SyncSubmodules(ctx, wt, false); err != nil {
@@ -299,6 +310,7 @@ func TestSetSubmoduleRefusals(t *testing.T) {
 }
 
 func TestSetSubmoduleAddsOnTheBranchOnly(t *testing.T) {
+	ctx := testCtx(t)
 	r, libDir, v1, _, wts := withSubmodule(t, "tove", "ilya")
 	g := local()
 	config := read(t, filepath.Join(r, ".git/config"))
@@ -338,6 +350,7 @@ func TestSetSubmoduleAddsOnTheBranchOnly(t *testing.T) {
 
 // Two branches moved the same pin: no markers, a commit to pick.
 func TestASubmoduleConflictIsSettledBySetSubmodule(t *testing.T) {
+	ctx := testCtx(t)
 	_, _, v1, v2, wts := withSubmodule(t, "tove", "ilya")
 	g := local()
 	for _, a := range []string{"tove", "ilya"} {
@@ -378,6 +391,7 @@ func TestASubmoduleConflictIsSettledBySetSubmodule(t *testing.T) {
 }
 
 func TestRecursiveIsOptional(t *testing.T) {
+	ctx := testCtx(t)
 	inner, _, _ := lib(t)
 	outer, _, _ := lib(t)
 	gitOut(t, outer, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+inner, "lib/inner")
@@ -438,6 +452,7 @@ func pinnedOverSSH(t *testing.T) (r, wt, v1 string) {
 // A private submodule comes from the CEO's own checkout when https can't
 // reach it: what the CEO fetched, with no credentials lent.
 func TestAPrivateSubmoduleComesFromTheCEOsCheckout(t *testing.T) {
+	ctx := testCtx(t)
 	_, wt, v1 := pinnedOverSSH(t)
 	if err := New().SyncSubmodules(ctx, wt, false); err != nil {
 		t.Fatal(err)
@@ -453,6 +468,7 @@ func TestAPrivateSubmoduleComesFromTheCEOsCheckout(t *testing.T) {
 // The fallback reads the CEO's copy of the submodule, never the URL: an agent
 // pointing .gitmodules at another repo on the machine gets nothing from it.
 func TestTheFallbackNeverFetchesTheAgentsURL(t *testing.T) {
+	ctx := testCtx(t)
 	_, wt, v1 := pinnedOverSSH(t)
 	secret := codeRepo(t, "main")
 	write(t, filepath.Join(secret, "secret.txt"), "the CEO's\n")
@@ -474,6 +490,7 @@ func TestTheFallbackNeverFetchesTheAgentsURL(t *testing.T) {
 // The fallback allows local paths for one clone, never recursively: a nested
 // .gitmodules naming a repo on the machine gets nothing from it.
 func TestTheFallbackDoesntFetchNestedLocalURLs(t *testing.T) {
+	ctx := testCtx(t)
 	secret, _, _ := lib(t)
 	outer, _, _ := lib(t)
 	gitOut(t, outer, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+secret, "lib/inner")
@@ -501,6 +518,7 @@ func TestTheFallbackDoesntFetchNestedLocalURLs(t *testing.T) {
 
 // Not in the CEO's checkout either: the error says how to make it come.
 func TestAPrivateSubmoduleTheCEOHasntCheckedOut(t *testing.T) {
+	ctx := testCtx(t)
 	r, wt, _ := pinnedOverSSH(t)
 	if err := os.RemoveAll(filepath.Join(r, ".git/modules/lib/dep")); err != nil {
 		t.Fatal(err)
@@ -531,6 +549,7 @@ func moved(t *testing.T, r, wt string) string {
 // failed (found 2026-10-30, after a project moved into its workspace). The
 // next start relinks them.
 func TestPrepareRelinksTheSubmodulesOfAMovedWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, v1, _, wts := withSubmodule(t, "tove")
 	if err := local().SyncSubmodules(ctx, wts["tove"], false); err != nil {
 		t.Fatal(err)
@@ -567,6 +586,7 @@ func TestPrepareRelinksTheSubmodulesOfAMovedWorktree(t *testing.T) {
 // out of the worktree, through a symlink, or a name out of the git dir
 // rewrites nothing.
 func TestTheRelinkStaysInTheWorktree(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove")
 	wt := wts["tove"]
 	if err := local().SyncSubmodules(ctx, wt, false); err != nil {
@@ -599,6 +619,7 @@ func TestTheRelinkStaysInTheWorktree(t *testing.T) {
 
 // Nested submodules (recursive_submodules) are relinked too.
 func TestPrepareRelinksNestedSubmodules(t *testing.T) {
+	ctx := testCtx(t)
 	inner, _, _ := lib(t)
 	outer, _, _ := lib(t)
 	gitOut(t, outer, "-c", "protocol.file.allow=always", "submodule", "add", "--quiet", "file://"+inner, "lib/inner")
@@ -630,6 +651,7 @@ func TestPrepareRelinksNestedSubmodules(t *testing.T) {
 // The CEO's credentials never reach a fetch: not the global config's helper,
 // not the repo's, not ~/.netrc. A public repo still comes.
 func TestFetchesGoWithoutTheCEOsCredentials(t *testing.T) {
+	ctx := testCtx(t)
 	libDir, v1, _ := lib(t)
 	gitOut(t, libDir, "config", "http.receivepack", "false")
 	exec := strings.TrimSpace(gitOut(t, ".", "--exec-path"))
@@ -685,6 +707,7 @@ func TestFetchesGoWithoutTheCEOsCredentials(t *testing.T) {
 // A submodule comes from the CEO's checkout when it holds the pinned commit:
 // nothing downloaded, and its whole history there.
 func TestASubmoduleComesFromTheCEOsCheckoutFirst(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, v1, _, wts := withSubmodule(t, "tove")
 	wt := wts["tove"]
 	if err := New().SyncSubmodules(ctx, wt, false); err != nil {
@@ -706,6 +729,7 @@ func TestASubmoduleComesFromTheCEOsCheckoutFirst(t *testing.T) {
 // A commit the CEO's checkout lacks comes from the network, that commit only:
 // even one that isn't its branch's tip.
 func TestASubmoduleTheCEOLacksIsFetchedShallow(t *testing.T) {
+	ctx := testCtx(t)
 	_, libDir, _, _, wts := withSubmodule(t, "tove")
 	wt := wts["tove"]
 	commit := func(text string) string {
@@ -735,6 +759,7 @@ func TestASubmoduleTheCEOLacksIsFetchedShallow(t *testing.T) {
 // A worktree with its submodule checked out goes like any other (git alone
 // refuses it, however clean); one whose submodule holds changes stays.
 func TestRemoveWorktreeWithASubmodule(t *testing.T) {
+	ctx := testCtx(t)
 	r, _, _, _, wts := withSubmodule(t, "tove", "mara")
 	g := local()
 	for _, a := range []string{"tove", "mara"} {

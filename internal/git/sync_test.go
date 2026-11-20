@@ -34,6 +34,7 @@ func commitOn(t *testing.T, dir, file, content string) string {
 
 // The usual handover: one machine pushed, the other fast-forwards.
 func TestPullFastForwards(t *testing.T) {
+	ctx := testCtx(t)
 	g, a, b, _ := machines(t)
 	head := commitOn(t, a, "teams.toml", "atlas\n")
 	if err := g.Push(ctx, a, "main"); err != nil {
@@ -67,6 +68,7 @@ func TestPullFastForwards(t *testing.T) {
 
 // Both machines committed: a merge, by the CEO's git, then a push.
 func TestPullMergesWhatBothDid(t *testing.T) {
+	ctx := testCtx(t)
 	g, a, b, _ := machines(t)
 	theirs := commitOn(t, a, "a.md", "a\n")
 	if err := g.Push(ctx, a, "main"); err != nil {
@@ -89,6 +91,7 @@ func TestPullMergesWhatBothDid(t *testing.T) {
 
 // A conflict leaves the HQ exactly as it was, saying which files.
 func TestPullAbortsAConflict(t *testing.T) {
+	ctx := testCtx(t)
 	g, a, b, _ := machines(t)
 	commitOn(t, a, "README", "from a\n")
 	if err := g.Push(ctx, a, "main"); err != nil {
@@ -110,6 +113,7 @@ func TestPullAbortsAConflict(t *testing.T) {
 // With uncommitted changes, only a fast-forward: a merge could lose them
 // (git can't always put them back after an abort).
 func TestPullNeverMergesOverUncommittedChanges(t *testing.T) {
+	ctx := testCtx(t)
 	g, a, b, _ := machines(t)
 	commitOn(t, a, "a.md", "a\n")
 	if err := g.Push(ctx, a, "main"); err != nil {
@@ -142,6 +146,7 @@ func TestPullNeverMergesOverUncommittedChanges(t *testing.T) {
 }
 
 func TestPullAndPushEdges(t *testing.T) {
+	ctx := testCtx(t)
 	g := New()
 	alone := codeRepo(t, "main")
 	if err := g.Pull(ctx, alone, "main"); !errors.Is(err, ErrNoRemote) {

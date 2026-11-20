@@ -33,6 +33,7 @@ func readFixture(t *testing.T) (*CLI, string, string) {
 }
 
 func TestTreeAndFileAtACommit(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, _ := readFixture(t)
 	main, err := g.Resolve(ctx, dir, "main")
 	if err != nil {
@@ -71,6 +72,7 @@ func TestTreeAndFileAtACommit(t *testing.T) {
 
 // A ref or a path from the browser can't reach anything else.
 func TestReadRefusals(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, _ := readFixture(t)
 	for _, ref := range []string{"", "nope", "-h", "--all", "main:README", "main README"} {
 		if _, err := g.Resolve(ctx, dir, ref); !errors.Is(err, ErrNoRef) {
@@ -91,6 +93,7 @@ func TestReadRefusals(t *testing.T) {
 }
 
 func TestLogPagesAndMarksMerges(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, _ := readFixture(t)
 	main, _ := g.Resolve(ctx, dir, "main")
 	all, err := g.Log(ctx, dir, main, 0, 10)
@@ -141,6 +144,7 @@ func TestLogPagesAndMarksMerges(t *testing.T) {
 // By the last commit, not by name or creation: a branch made long ago and
 // committed to just now comes first; same-second ties by name.
 func TestRecentBranchesNewestFirst(t *testing.T) {
+	ctx := testCtx(t)
 	g := New()
 	dir := codeRepo(t, "main") // committed now
 	commitAt := func(branch, date string) {
@@ -160,6 +164,7 @@ func TestRecentBranchesNewestFirst(t *testing.T) {
 }
 
 func TestWorktreesByBranch(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir, tree := readFixture(t)
 	trees, err := g.Worktrees(ctx, dir)
 	if err != nil {
@@ -178,6 +183,7 @@ func TestWorktreesByBranch(t *testing.T) {
 // same after another history is merged in (the lowest hash of the two), none
 // before the first commit.
 func TestRootCommit(t *testing.T) {
+	ctx := testCtx(t)
 	g := New()
 	if _, err := g.RootCommit(ctx, repo(t)); !errors.Is(err, ErrNoRef) {
 		t.Errorf("no commit yet: %v", err)
@@ -207,6 +213,7 @@ func TestRootCommit(t *testing.T) {
 // KeptHolding finds the kept refs holding a branch: a review's decided head
 // that a branch went into, though no branch has it anymore.
 func TestKeptHolding(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t) // lead/atlas/x one commit ahead of main
 	head := mustRun(t, dir, "rev-parse", "lead/atlas/x")
 	mustRun(t, dir, "checkout", "-q", "-b", "lead/atlas/y", "lead/atlas/x")
@@ -246,6 +253,7 @@ func TestKeptHolding(t *testing.T) {
 // Survives tells a branch whose every change is still in a kept head from one
 // a merge dropped part of, or that was reworked since: only the first counts.
 func TestSurvives(t *testing.T) {
+	ctx := testCtx(t)
 	g, dir := mergeFixture(t) // main: README
 	write(t, filepath.Join(dir, "old"), "old\n")
 	if err := g.Commit(ctx, dir, "old", "old"); err != nil {
@@ -301,6 +309,7 @@ func TestSurvives(t *testing.T) {
 // now: a rename once, a new folder file by file, spaces and quotes as they
 // are; ignored files and committed ones never.
 func TestUncommitted(t *testing.T) {
+	ctx := testCtx(t)
 	g, _, tree := readFixture(t)
 	write(t, filepath.Join(tree, ".gitignore"), "*.log\n")
 	mustRun(t, tree, "add", ".gitignore")

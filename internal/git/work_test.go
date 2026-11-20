@@ -15,6 +15,7 @@ var tove = Author{Name: "Tove", Email: "tove@foreman.invalid"}
 // home branch, as a deploy does.
 func worktrees(t *testing.T, agents ...string) (string, map[string]string) {
 	t.Helper()
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	wts := map[string]string{}
 	for _, a := range agents {
@@ -28,6 +29,7 @@ func worktrees(t *testing.T, agents ...string) (string, map[string]string) {
 
 func gitOut(t *testing.T, dir string, args ...string) string {
 	t.Helper()
+	ctx := testCtx(t)
 	out, err := run(ctx, dir, args...)
 	if err != nil {
 		t.Fatal(err)
@@ -36,6 +38,7 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 }
 
 func TestSwitchCreatesFromMainThenComesBack(t *testing.T) {
+	ctx := testCtx(t)
 	r, wts := worktrees(t, "tove")
 	g := New()
 	// A tag of the CEO's named main, left behind: never taken for the branch.
@@ -77,6 +80,7 @@ func TestSwitchCreatesFromMainThenComesBack(t *testing.T) {
 }
 
 func TestSwitchRefusals(t *testing.T) {
+	ctx := testCtx(t)
 	_, wts := worktrees(t, "tove")
 	g := New()
 	if _, err := g.Switch(ctx, wts["tove"], "wt/tove/bad..name", "main"); !errors.Is(err, ErrBadBranch) {
@@ -100,6 +104,7 @@ func TestSwitchRefusals(t *testing.T) {
 }
 
 func TestCommitAllTakesEverythingAsTheAgent(t *testing.T) {
+	ctx := testCtx(t)
 	_, wts := worktrees(t, "tove")
 	wt := wts["tove"]
 	write(t, filepath.Join(wt, "cal.go"), "package cal\n")
@@ -124,6 +129,7 @@ func TestCommitAllTakesEverythingAsTheAgent(t *testing.T) {
 }
 
 func TestCommitAsTakesOneFileAsTheAgent(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	write(t, filepath.Join(dir, "inbox", "note.md"), "hi\n")
 	write(t, filepath.Join(dir, "lead-draft.md"), "unfinished\n")
@@ -139,6 +145,7 @@ func TestCommitAsTakesOneFileAsTheAgent(t *testing.T) {
 // Tove and Mara both change one line; Mara merges Tove's branch in.
 func conflict(t *testing.T) (map[string]string, *CLI) {
 	t.Helper()
+	ctx := testCtx(t)
 	_, wts := worktrees(t, "tove", "mara")
 	g := New()
 	write(t, filepath.Join(wts["tove"], "README"), "tove's line\n")
@@ -154,6 +161,7 @@ func conflict(t *testing.T) (map[string]string, *CLI) {
 }
 
 func TestMergeLeavesConflictsThenCommitConcludesIt(t *testing.T) {
+	ctx := testCtx(t)
 	wts, g := conflict(t)
 	mara := Author{Name: "Mara", Email: "mara@foreman.invalid"}
 	files, err := g.Merge(ctx, wts["mara"], "wt/tove/main", mara)
@@ -193,6 +201,7 @@ func TestMergeLeavesConflictsThenCommitConcludesIt(t *testing.T) {
 
 // Deleting a conflicted file resolves it too.
 func TestCommitConcludesAMergeResolvedByDeleting(t *testing.T) {
+	ctx := testCtx(t)
 	wts, g := conflict(t)
 	mara := Author{Name: "Mara", Email: "mara@foreman.invalid"}
 	if _, err := g.Merge(ctx, wts["mara"], "wt/tove/main", mara); err != nil {
@@ -209,6 +218,7 @@ func TestCommitConcludesAMergeResolvedByDeleting(t *testing.T) {
 }
 
 func TestMergeIsCleanWithoutConflicts(t *testing.T) {
+	ctx := testCtx(t)
 	r, wts := worktrees(t, "tove", "mara")
 	g := New()
 	write(t, filepath.Join(wts["tove"], "cal.go"), "package cal\n")
@@ -236,6 +246,7 @@ func TestMergeIsCleanWithoutConflicts(t *testing.T) {
 }
 
 func TestHasBranch(t *testing.T) {
+	ctx := testCtx(t)
 	_, wts := worktrees(t, "tove")
 	g := New()
 	if !g.HasBranch(ctx, wts["tove"], "main") || !g.HasBranch(ctx, wts["tove"], "wt/tove/main") || g.HasBranch(ctx, wts["tove"], "wt/tove/none") {
@@ -244,6 +255,7 @@ func TestHasBranch(t *testing.T) {
 }
 
 func TestAbortMergePutsTheBranchBack(t *testing.T) {
+	ctx := testCtx(t)
 	wts, g := conflict(t)
 	mara := Author{Name: "Mara", Email: "mara@foreman.invalid"}
 	if err := g.AbortMerge(ctx, wts["mara"]); !errors.Is(err, ErrNoMerge) {
@@ -269,6 +281,7 @@ func TestAbortMergePutsTheBranchBack(t *testing.T) {
 }
 
 func TestBranchesAndContains(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	g := New()
 	write(t, filepath.Join(dir, "a"), "a\n")
@@ -308,6 +321,7 @@ func TestBranchesAndContains(t *testing.T) {
 // Holders lists every other branch, local or a remote's, whose history has
 // all of a branch: where its commits are.
 func TestHolders(t *testing.T) {
+	ctx := testCtx(t)
 	dir := repo(t)
 	g := New()
 	write(t, filepath.Join(dir, "a"), "a\n")
@@ -361,6 +375,7 @@ func TestBranchPrefix(t *testing.T) {
 // An idle worktree with edits names its topic where it stands, the edits kept; a worktree on a
 // branch, or a name taken, is refused and nothing moves.
 func TestName(t *testing.T) {
+	ctx := testCtx(t)
 	r := codeRepo(t, "main")
 	g := New()
 	wt := filepath.Join(t.TempDir(), "tove")

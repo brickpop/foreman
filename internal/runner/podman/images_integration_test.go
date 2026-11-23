@@ -92,6 +92,32 @@ func TestAChangedContainerfileIsANewImage(t *testing.T) {
 	if first == second || changed.builds.Load() != 1 {
 		t.Errorf("refs %q %q, %d builds", first, second, changed.builds.Load())
 	}
+	// The new build removed the earlier image.
+	if ok, err := im.exists(ctx, first); err != nil || ok {
+		t.Errorf("the earlier image %s is still there (%v)", first, err)
+	}
+}
+
+// An image a container still uses survives the next build's prune.
+func TestABuildKeepsAnImageInUse(t *testing.T) {
+	r := engine(t)
+	im := testBuilder(t, r, `RUN true`)
+	first, err := im.Ensure(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Cleanups run last first: the container stops before its image goes.
+	t.Cleanup(func() {
+		_ = r.c.call(ctx, "DELETE", "/images/"+first, map[string][]string{"force": {"true"}}, nil, nil)
+	})
+	start(t, r, runner.Spec{Image: first, Command: sh("sleep 60")})
+	changed := r.Images(im.name, append(im.containerfile, []byte("RUN echo more\n")...), im.shared.dir)
+	if _, err := changed.Ensure(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := im.exists(ctx, first); err != nil || !ok {
+		t.Errorf("the image in use %s was removed (%v)", first, err)
+	}
 }
 
 func TestAFailedBuildKeepsItsLog(t *testing.T) {

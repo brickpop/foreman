@@ -28,6 +28,13 @@ Workarounds and accepted limitations to revisit. Each item says why it exists an
 - **Impact:** one extra model turn per start (a deploy, a wake, a restart), with the resumed conversation as its context; the activity line shows `Working on “Foreman started this session…”` meanwhile. A model that ignores "don't start on anything" may pick its work back up before its messages come.
 - **Fix:** drop the opener once Codex reports a session at its prompt without a turn (a `SessionStart` at launch, or another event); check when the agent image's Codex is updated.
 
+## Codex's helpers removed from the agent image
+
+- **State:** `images/Containerfile` deletes two helpers from Codex's npm package after installing it: its voice host (`codex-resources/voice`, about 54 MB) and its code-mode host (`bin/codex-code-mode-host`, about 72 MB), a third of the package ([Agent images](./product/architecture/tech-stack.md#agent-images), 2026-11-23).
+- **Why:** the image is large (about 1.6 GB), and the CEO asked to shrink it. A container has no audio, and code mode is a Codex feature behind a flag that Foreman doesn't enable; Codex 0.171.0 starts and runs without either.
+- **Impact:** it reaches into a package layout Codex can change in any release. If the paths move, the delete silently does nothing (the image just grows back). If Codex enables code mode by default, or needs the voice folder to start, Codex agents break at run time, and the build's `codex --version` doesn't catch it.
+- **Fix:** drop the delete once Codex ships these as separate optional packages (or a slimmer build). Until then, when the agent image's Codex is updated, check that a Codex agent still starts and that the paths still match.
+
 ## Signing as the CEO from Foreman's process
 
 - **State:** commits in the CEO's name (Merge's squash, the UI's saves of the wiki and the global repo) are signed whenever the CEO's git config says `commit.gpgsign` ([Pipeline and merges → Merge to a target](./product/features/pipeline-and-merges.md#merge-to-a-target)), by git run from Foreman's process; a signature that fails fails the commit, and nothing moves.

@@ -9,7 +9,7 @@ tool (
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/agentic-wiki/wiki v0.23.1
+	github.com/agentic-wiki/wiki v0.24.0
 	github.com/charmbracelet/ultraviolet v0.0.0-20260303162955-0b88c25f3fff
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/charmbracelet/x/vt v0.1.0

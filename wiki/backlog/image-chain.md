@@ -14,6 +14,6 @@ epic: terminal-multiplexer
 
 - [ ] split the phase 1 Containerfile into base and harness layers; add Pi (and Hermes if it fits)
 - [ ] global and project overrides (where the global one lives: [Tech stack → Open questions](../product/architecture/tech-stack.md#open-questions)), `BASE` build argument, transparent tags
-- [ ] Refresh (rebuild without cache, then the layers below) with optional prune; Prune by label
+- [ ] Refresh (rebuild without cache, then the layers below) with optional prune; Prune by label, on its own, showing the space it would reclaim (phase 1 already removes an image's earlier builds after each build, `Images.prune` in `internal/runner/podman/images.go`, 2026-11-23: extend it to every layer)
 - [ ] the full Maintenance screen (chain rows, where a Containerfile would go)
 - [ ] each image's build time and the harness versions inside it (Maintenance rows, and `found · <version>` on Settings → Agents → Profiles): phase 1 shows neither

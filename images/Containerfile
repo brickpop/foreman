@@ -27,32 +27,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       python3 \
   && rm -rf /var/lib/apt/lists/*
 
-# Go, pinned via build arg or resolved at build time with "latest".
+# Go, pinned via build arg or resolved at build time with "latest". The
+# stdlib's own tests (test/, api/, every testdata/) are dropped: building and
+# testing a project never reads them.
 ARG GO_VERSION=latest
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     ver="$GO_VERSION"; \
     if [ "$ver" = "latest" ]; then ver="$(curl -fsSL https://go.dev/VERSION?m=text | head -n1)"; fi; \
     case "$ver" in go*) ;; *) ver="go$ver" ;; esac; \
-    curl -fsSL "https://go.dev/dl/${ver}.linux-${arch}.tar.gz" -o /tmp/go.tgz; \
-    tar -C /usr/local -xzf /tmp/go.tgz; \
-    rm /tmp/go.tgz /usr/local/go/test /usr/local/go/api -rf; \
+    curl -fsSL "https://go.dev/dl/${ver}.linux-${arch}.tar.gz" | tar -C /usr/local -xz; \
+    rm -rf /usr/local/go/test /usr/local/go/api; \
+    find /usr/local/go/src -type d -name testdata -prune -exec rm -rf {} +; \
     /usr/local/go/bin/go version
 
-# The wiki CLI, pinned via build arg (a tag, e.g. v0.15.0) or the latest release.
-# Keep it the version go.mod requires for github.com/agentic-wiki/wiki: the
-# agents' CLI and Foreman's library must read a wiki by the same rules
-# (TestWikiVersionMatchesGoMod).
-ARG WIKI_VERSION=v0.23.1
+# The wiki CLI, pinned via build arg (a release tag, e.g. v0.24.0) or the latest
+# release. Keep it the version go.mod requires for github.com/agentic-wiki/wiki:
+# the agents' CLI and Foreman's library must read a wiki by the same rules
+# (TestWikiVersionMatchesGoMod). Only a tag with a GitHub release has binaries.
+ARG WIKI_VERSION=v0.24.0
 RUN set -eux; \
     arch="$(dpkg --print-architecture)"; \
     if [ "$WIKI_VERSION" = "latest" ]; then from="latest/download"; else from="download/${WIKI_VERSION}"; fi; \
-    mkdir -p /tmp/wiki && cd /tmp/wiki && \
-    curl -fsSL -O "https://github.com/agentic-wiki/wiki/releases/${from}/wiki_linux_${arch}.tar.gz" && \
-    tar xfz "wiki_linux_${arch}.tar.gz" && \
-    mv ./wiki /usr/local/bin && \
-    cd .. && \
-    rm -Rf /tmp/wiki
+    curl -fsSL "https://github.com/agentic-wiki/wiki/releases/${from}/wiki_linux_${arch}.tar.gz" \
+      | tar -xz -C /usr/local/bin wiki
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
@@ -71,22 +69,32 @@ RUN curl -fsSL https://bun.sh/install | bash
 # Last, because it moves fastest: a version bump reuses every layer above.
 # Installed with npm because that is how Claude Code, Pi and Codex are distributed; this runs
 # inside the agent image only (the Bun-only rule is about Foreman's own UI build).
+# Each layer drops npm's cache and logs (~/.npm) in the same step, or they stay in it.
 ARG CLAUDE_CODE_VERSION=latest
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
-  && npm cache clean --force
+  && rm -rf ~/.npm
 
 # Pi, the second harness (internal/harness/pi). Its install scripts aren't
 # needed (Pi's own instructions skip them).
 ARG PI_VERSION=latest
 RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent@${PI_VERSION} \
-  && npm cache clean --force
+  && rm -rf ~/.npm
 
-# Codex CLI, the third harness (internal/harness/codex).
+# Codex CLI, the third harness (internal/harness/codex). Its voice host (no
+# audio in a container) and its code-mode host (a feature Foreman doesn't
+# enable) are ~125 MB of helpers, removed (wiki/technical-debt.md).
 ARG CODEX_VERSION=latest
 RUN npm install -g @openai/codex@${CODEX_VERSION} \
-  && npm cache clean --force
+  && rm -rf ~/.npm \
+  && cd "$(npm root -g)/@openai/codex/node_modules/@openai" \
+  && rm -rf codex-linux-*/vendor/*/codex-resources/voice codex-linux-*/vendor/*/bin/codex-code-mode-host
 
-RUN node --version && bun --version && go version && python3 --version && uv --version && claude --version && pi --version && codex --version && wiki --version
+# A throwaway HOME, so whatever the harnesses write when they first run isn't
+# baked into the image.
+RUN export HOME="$(mktemp -d)" \
+  && node --version && bun --version && go version && python3 --version && uv --version \
+  && claude --version && pi --version && codex --version && wiki --version \
+  && rm -rf "$HOME"
 
 # The command is exactly what Foreman passes, and defaults to Claude.
 ENTRYPOINT []

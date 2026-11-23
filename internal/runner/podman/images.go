@@ -21,7 +21,7 @@ import (
 // Images builds an image through Podman's API from a Containerfile, phase 1:
 // one image for every project (wiki/product/architecture/tech-stack.md#agent-images).
 // The tag is a hash of the Containerfile, so the image is rebuilt only when
-// the file changes.
+// the file changes. Each build removes the name's earlier images.
 type Images struct {
 	r             *Runner // reached through the engine, so a reconnection is followed
 	name          string  // e.g. localhost/foreman/harness
@@ -130,7 +130,55 @@ func (im *Images) run(ctx context.Context, ref string, fresh bool) error {
 		_ = im.shared.set("failed")
 		return fmt.Errorf("building %s: %w", im.name, err)
 	}
+	im.prune(ctx, ref)
 	return im.shared.set("ready")
+}
+
+// prune removes the name's images other than ref's, so that rebuilds don't
+// pile up gigabytes in Podman's store. Podman refuses to remove one that a
+// container still uses (running or stopped), and it stays. Best effort: a
+// failure only shows in the build log, since the build itself succeeded.
+func (im *Images) prune(ctx context.Context, ref string) {
+	c, err := im.r.client()
+	var earlier []string
+	if err == nil {
+		earlier, err = im.earlier(ctx, c, ref)
+	}
+	if err != nil {
+		im.shared.appendLog("not removing earlier images: " + err.Error() + "\n")
+		return
+	}
+	for _, id := range earlier {
+		short := id[:min(12, len(id))]
+		if err := c.call(ctx, "DELETE", "/images/"+url.PathEscape(id), nil, nil, nil); err != nil {
+			im.shared.appendLog("kept the earlier image " + short + ": " + err.Error() + "\n")
+		} else {
+			im.shared.appendLog("removed the earlier image " + short + "\n")
+		}
+	}
+}
+
+// earlier lists the ids of the images labelled with the name, but ref's.
+func (im *Images) earlier(ctx context.Context, c *client, ref string) ([]string, error) {
+	type image struct {
+		ID string `json:"Id"`
+	}
+	var current image
+	if err := c.call(ctx, "GET", "/images/"+url.PathEscape(ref)+"/json", nil, nil, &current); err != nil {
+		return nil, err
+	}
+	filters, _ := json.Marshal(map[string][]string{"label": {"foreman.image=" + im.name}})
+	var labelled []image
+	if err := c.call(ctx, "GET", "/images/json", url.Values{"filters": {string(filters)}}, nil, &labelled); err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, i := range labelled {
+		if i.ID != current.ID {
+			ids = append(ids, i.ID)
+		}
+	}
+	return ids, nil
 }
 
 func (im *Images) post(ctx context.Context, ref string, fresh bool) error {

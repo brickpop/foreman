@@ -35,7 +35,7 @@ Decided by the CEO, 2026-10-18 (journey gap G2):
 
 ## The page
 
-`/chief-of-staff` (`?start=create-team`, `?start=hire&team=<id>`, `?start=refine&team=<id>&agent=<id>`), a full page in the main area (a terminal needs the width). Reached from `+ New team` (the sidebar and the setup checklist), a team's **Hire** and an agent's **Refine with Chief of Staff**; it has no sidebar entry of its own (the CEO, 2026-10-18: `+ New team` is it). Each entry point gives the session an opening line, as the goal is a lead's ([Agent runtime → Lazy starts](../architecture/agent-runtime.md#lazy-starts)): `Create a new team.`, `Hire someone for <Team>.`, `Refine <Name> of <Team>.`; the bare URL gives none.
+`/chief-of-staff` (`?start=create-team`, `?start=hire&team=<id>`, `?start=refine&team=<id>&agent=<id>`), a full page in the main area (a terminal needs the width). Reached from `+ New team` ([Settings → Teams](./settings.md#teams) and the setup checklist), a team's **Hire** and an agent's **Refine with Chief of Staff**; it has no rail entry of its own (the CEO, 2026-10-18: `+ New team` is it). Each entry point gives the session an opening line, as the goal is a lead's ([Agent runtime → Lazy starts](../architecture/agent-runtime.md#lazy-starts)): `Create a new team.`, `Hire someone for <Team>.`, `Refine <Name> of <Team>.`; the bare URL gives none.
 
 A 1-2-3 flow:
 

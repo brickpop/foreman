@@ -6,9 +6,9 @@ tags: [feature, ui, requests]
 
 # Dashboard
 
-The start page: the projects and the teams, each a click from where it is handled. The screen at `/`, opened by the sidebar's brand; it was called Home until 2026-10-20, when "home" came to mean only Foreman's folder, `~/.foreman` ([Home](../models/home.md)) (the CEO).
+The start page: the projects and the teams, each a click from where it is handled. The screen at `/`, opened by the rail's Foreman tile; it was called Home until 2026-10-20, when "home" came to mean only Foreman's folder, `~/.foreman` ([Home](../models/home.md)) (the CEO).
 
-It was the CEO's inbox until 2026-10-21, when the CEO took the reviews out of it: they are decided in each project's [Inbox](./reviews.md#the-inbox), which has the sidebar's count, so a list of them here was the same thing twice. The Dashboard became a page to get started from, and to see the whole at a glance (the CEO, 2026-10-21). Its **At work** section (a card per active deployment) went on 2026-10-31, when the work moved into each project: a project card opens its team at work (the CEO).
+It was the CEO's inbox until 2026-10-21, when the CEO took the reviews out of it: they are decided in each project's [Inbox](./reviews.md#the-inbox), which has its count on the rail, so a list of them here was the same thing twice. The Dashboard became a page to get started from, and to see the whole at a glance (the CEO, 2026-10-21). Its **At work** section (a card per active deployment) went on 2026-10-31, when the work moved into each project: a project card opens its team at work (the CEO).
 
 Width up to 1080px, the page's 24px sides (16px under 760px), 40px between sections. Each section is a label (`SectionLabel`) and cards in a grid that fills the width (`auto-fill`), gap 12; a card is `--panel`, `--line` border, radius 12, padding `14px 16px`.
 
@@ -32,7 +32,7 @@ The HQs their origin doesn't back up, one callout each (`--attn`; `GET /api/home
 
 ## Not on this machine
 
-The projects in `projects.toml` whose HQ isn't on this machine (`here: false`): another machine's, after a [restore](../models/home.md#a-new-machine) or a sync brought their records in, or one whose HQ was deleted here. They are nowhere else in the app (no sidebar row, no card, not deployable), hidden ones included; this section, after the Projects grid and before Teams, lists them by name, left out when there are none. One row each: the name, the HQ's remote (Mono), and **Bring here** (`POST /api/projects/:id/bring`), which clones the HQ into its place, then opens the project's [Repos](./repos.md), where each code repo is located or cloned (**Clone it**). One with no remote recorded (its HQ had no origin where it was made) says so instead of the button: `Its HQ has no origin: push it where it is, then start Foreman there once`. A refused clone shows git's reason under the row.
+The projects in `projects.toml` whose HQ isn't on this machine (`here: false`): another machine's, after a [restore](../models/home.md#a-new-machine) or a sync brought their records in, or one whose HQ was deleted here. They are nowhere else in the app (not in the project popover, no card, not deployable), hidden ones included; this section, after the Projects grid and before Teams, lists them by name, left out when there are none. One row each: the name, the HQ's remote (Mono), and **Bring here** (`POST /api/projects/:id/bring`), which clones the HQ into its place, then opens the project's [Repos](./repos.md), where each code repo is located or cloned (**Clone it**). One with no remote recorded (its HQ had no origin where it was made) says so instead of the button: `Its HQ has no origin: push it where it is, then start Foreman there once`. A refused clone shows git's reason under the row.
 
 ## Needs you
 
@@ -48,7 +48,7 @@ Today only review requests are built, so the section doesn't show yet.
 
 ## Projects
 
-One card per project on this machine not [hidden](../models/project-config.md#the-project-record) (cards at least 240px wide), by name, as the [sidebar](./app-shell.md#sidebar) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
+One card per project on this machine not [hidden](../models/project-config.md#the-project-record) (cards at least 240px wide), by name, as the [project popover](./app-shell.md#the-project-popover) orders them, then a dashed **`+ New project`** card (`Your repos, any folder on this machine.`) opening Add a project. A card opens the [project](./project-page.md): its Session while a team is on it, its Wiki otherwise (the CEO, 2026-10-31). **Loading**: a card-sized [loading placeholder](../design/design-system.md#surfaces) at the head of Projects and of Teams until they are in.
 
 - A [card](../design/design-system.md#surfaces). In its header band, the name, and on the right its state as a status pill: `needs you` (`--attn`) if it has open requests (reviews included), `on track` (`--ok`) if any instance is running, otherwise `idle` (`--tx4`).
 - Its description (13.5px `--tx3`, two lines, kept at two so cards line up), or `No description yet.`

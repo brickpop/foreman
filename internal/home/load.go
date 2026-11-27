@@ -36,7 +36,7 @@ type Project struct {
 	// the CEO's in inbox/, the agents' own in shared/ (FileFolders).
 	Files     string        `json:"files"`
 	Profile   string        `json:"profile"` // the profile its agents run on: its own, else the default
-	Hidden    bool          `json:"hidden"`  // out of the sidebar's projects (in More) and the Dashboard
+	Hidden    bool          `json:"hidden"`  // out of the popover's projects (in More) and the Dashboard
 	Config    ProjectConfig `json:"config"`
 	Repos     []Repo        `json:"repos"`    // the code repos agents get worktrees of, by name
 	Version   string        `json:"version"`  // of project.toml

@@ -1,25 +1,18 @@
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
 import { type BranchPlace, placeLine } from "../app/repos";
+import { useHoverMenu } from "./hoverMenu";
 import { Chevron } from "./icons";
 import { RepoName } from "./RepoName";
 import { CopyButton } from "./ui";
 
 // A branch as a menu of the repos that have it (the Session's header,
 // wiki/product/features/sessions.md#agent-tabs): each opens that repo's page on
-// the branch; the button on its left copies the name. A mouse opens it by hovering (the CEO,
-// 2026-11-04); a click is for touch, and Enter or Space for the keyboard.
+// the branch; the button on its left copies the name. A mouse opens it by hovering
+// (useHoverMenu); a click is for touch, and Enter or Space for the keyboard.
 
 const item =
   "flex cursor-pointer items-center gap-3 rounded px-2 py-1 text-[13px] text-tx2 outline-none data-[highlighted]:bg-hover data-[highlighted]:text-tx";
-
-/** How long the pointer rests on the trigger before it opens: passing over it on the way to
- * something else (the agent tabs above) opens nothing (the CEO, 2026-11-05). */
-const delay = 300;
-/** How long the pointer may be off the trigger and the menu before it closes:
- * the gap between them is crossed without it closing. */
-const grace = 200;
 
 export function BranchMenu({
   project,
@@ -30,24 +23,7 @@ export function BranchMenu({
   branch: string;
   places: { changed: BranchPlace[]; unchanged: BranchPlace[] };
 }) {
-  const [open, setOpen] = useState(false);
-  // One timer, opening or closing: whichever the pointer last asked for.
-  const timer = useRef<number>(undefined);
-  const later = (to: boolean, ms: number) => {
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setOpen(to), ms);
-  };
-  const show = () => {
-    window.clearTimeout(timer.current);
-    setOpen(true);
-  };
-  const rest = () => (open ? show() : later(true, delay));
-  const leave = () => (open ? later(false, grace) : window.clearTimeout(timer.current));
-  // Unmounted while a timer runs (another agent shown): none left behind.
-  useEffect(() => {
-    return () => window.clearTimeout(timer.current);
-  }, []);
-  const mouse = (run: () => void) => (e: React.PointerEvent) => e.pointerType === "mouse" && run();
+  const { open, setOpen, show, trigger, content } = useHoverMenu();
   return (
     <span className="flex min-w-0 items-stretch">
       <CopyButton
@@ -57,8 +33,7 @@ export function BranchMenu({
       />
       <Menu.Root open={open} onOpenChange={setOpen} modal={false}>
         <Menu.Trigger
-          onPointerEnter={mouse(rest)}
-          onPointerLeave={mouse(leave)}
+          {...trigger}
           // A click opens it at once, without waiting; and never closes what hovering opened.
           onPointerDown={(e) => {
             if (e.pointerType !== "mouse") return;
@@ -76,8 +51,7 @@ export function BranchMenu({
           <Menu.Content
             align="start"
             sideOffset={4}
-            onPointerEnter={mouse(show)}
-            onPointerLeave={mouse(leave)}
+            {...content}
             className="z-50 flex min-w-56 flex-col rounded-lg border border-line2 bg-panel p-1 shadow-overlay"
           >
             {places.changed.map((p) => (

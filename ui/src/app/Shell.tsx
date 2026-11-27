@@ -1,30 +1,26 @@
-import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router";
+import { Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import type { Instance, Project, Request } from "../api/client";
-import { Chevron } from "../components/icons";
+import { MenuIcon } from "../components/icons";
 import { NewProject } from "../components/NewProject";
+import { Rail } from "../components/Rail";
 import { Toasts, useToast } from "../components/Toasts";
-import { CountBadge, Dot } from "../components/ui";
-import { byName, projectName } from "./model";
 import { noticeFor, notifiesBrowser, showBrowserNotification } from "./notifications";
-import { reviewOf, sections, sessionOf } from "./project";
+import { reviewOf, sessionOf } from "./project";
 import {
   useInstances,
   useLiveEvents,
   useLook,
   useProjects,
-  useRequests,
   useSettings,
   useTeams,
 } from "./queries";
-import { deploymentStatus } from "./sessions";
 import { hasUnsentLine } from "./unsentLines";
 
 // The frame every screen lives in (wiki/product/features/app-shell.md): the
-// sidebar, the main area, and the overlays.
+// rail, the main area, and the overlays.
 
 export function Shell() {
-  // Under ~760px the sidebar hides behind a menu button and opens as an overlay.
+  // Under 760px the rail hides behind a menu button and opens as an overlay.
   const [menu, setMenu] = useState(false);
   useEffect(() => {
     if (!menu) return;
@@ -37,15 +33,15 @@ export function Shell() {
     <Toasts>
       <LiveEvents />
       <UnsentLinesGuard />
-      <div className="grid h-screen grid-cols-[220px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
+      <div className="grid h-screen grid-cols-[44px_minmax(0,1fr)] max-[760px]:grid-cols-[minmax(0,1fr)]">
         <button
           type="button"
           aria-label="Menu"
           aria-expanded={menu}
           onClick={() => setMenu(true)}
-          className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side px-2.5 py-1 text-tx2 max-[760px]:block"
+          className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side p-1.5 text-tx2 max-[760px]:block"
         >
-          ☰
+          <MenuIcon />
         </button>
         {menu && (
           <button
@@ -56,7 +52,7 @@ export function Shell() {
             className="fixed inset-0 z-[35] hidden bg-black/40 max-[760px]:block"
           />
         )}
-        <Sidebar
+        <RailColumn
           onNewProject={() => setNewProject(true)}
           open={menu}
           onClose={() => setMenu(false)}
@@ -72,74 +68,9 @@ export function Shell() {
   );
 }
 
-export type SidebarProject = {
-  id: string;
-  /** How it shows (projectName). */
-  name: string;
-  /** What waits on the CEO there: its open requests, reviews included (its
-   * Inbox's count). */
-  inbox: number;
-  /** Its team's status while it is busy (its liveliest agent's: awaiting,
-   * running, starting, queued), for a dot on its Session item; none at rest. */
-  busy?: string;
-};
-
-export type SidebarModel = {
-  projects: SidebarProject[];
-  /** The hidden projects, in a collapsed group of their own (More). */
-  hidden: SidebarProject[];
-};
-
-const busy = ["awaiting", "running", "starting", "queued"];
-
-/** What the sidebar shows, from the projects, instances and requests. */
-export function sidebarModel(
-  projects: Project[],
-  instances: Instance[],
-  requests: Request[],
-): SidebarModel {
-  const open = requests.filter((r) => r.status === "open");
-  const row = (p: Project): SidebarProject => {
-    const on = instances.filter((i) => i.deploymentId.split("@")[1] === p.id);
-    const status = deploymentStatus(on);
-    return {
-      id: p.id,
-      name: projectName([p], p.id),
-      inbox: open.filter((r) => r.projectId === p.id).length,
-      ...(on.length > 0 && busy.includes(status) && { busy: status }),
-    };
-  };
-  return {
-    projects: projects.filter((p) => !p.hidden).map(row),
-    hidden: projects.filter((p) => p.hidden).map(row),
-  };
-}
-
-/** A folded group's one dot: needs-you when any of its projects needs the CEO, else the
- * first busy one's, else none. */
-export function groupDot(
-  projects: SidebarProject[],
-): { status?: string; title: string } | undefined {
-  const dots = projects.map(rowDot);
-  return dots.find((d) => d && !d.status) ?? dots.find(Boolean);
-}
-
-/** A folded project row's one dot (the CEO, 2026-11-06): needs-you when
- * something waits on the CEO there, else its Session's dot while the team is
- * busy, else none. Unfolded, the dots are on its sections instead. */
-export function rowDot(p: SidebarProject): { status?: string; title: string } | undefined {
-  if (p.inbox > 0) return { title: "Needs you" };
-  if (p.busy) return { status: p.busy, title: p.busy };
-  return undefined;
-}
-
-const navActive = { className: "bg-raised !text-tx" };
-const rowItem =
-  "flex items-center justify-between rounded-md px-2.5 py-1.5 text-[13.5px] text-tx2 hover:bg-hover";
-const sectionItem =
-  "flex items-center justify-between rounded-md px-2.5 py-1 text-[13px] text-tx3 hover:bg-hover hover:text-tx2";
-
-function Sidebar({
+/** The rail, in its column; on narrow screens, an overlay that closes once a link
+ * in it is followed. */
+function RailColumn({
   onNewProject,
   open,
   onClose,
@@ -149,140 +80,15 @@ function Sidebar({
   open: boolean;
   onClose: () => void;
 }) {
-  const projects = useProjects();
-  const instances = useInstances();
-  const requests = useRequests();
   useLook(); // the theme
-  const model = sidebarModel(
-    byName(projects.data ?? []),
-    instances.data ?? [],
-    requests.data ?? [],
-  );
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: closes the overlay after a link was followed; the links are the keyboard path
     <aside
       onClick={onClose}
-      className={`flex min-h-0 flex-col border-r border-line bg-side max-[760px]:fixed max-[760px]:inset-y-0 max-[760px]:left-0 max-[760px]:z-40 max-[760px]:w-[220px] max-[760px]:shadow-overlay ${open ? "" : "max-[760px]:hidden"}`}
+      className={`flex min-h-0 flex-col border-r border-line bg-side max-[760px]:fixed max-[760px]:inset-y-0 max-[760px]:left-0 max-[760px]:z-40 max-[760px]:w-[260px] max-[760px]:px-2 max-[760px]:shadow-overlay ${open ? "" : "max-[760px]:hidden"}`}
     >
-      {/* The way to the Dashboard (the CEO, 2026-11-02: no menu entry for it). */}
-      <Link
-        to="/"
-        title="Dashboard"
-        className="mx-2.5 mt-3 mb-2 flex items-center gap-[9px] rounded-md px-2 py-2 text-tx hover:bg-hover"
-      >
-        <span className="grid size-[22px] place-items-center rounded-[5px] bg-acc font-mono text-xs font-bold text-accInk">
-          F
-        </span>
-        <span className="text-[15px] font-semibold tracking-[-0.01em]">Foreman</span>
-      </Link>
-      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-auto px-2.5 pb-3">
-        {model.projects.map((p) => (
-          <ProjectRow key={p.id} project={p} />
-        ))}
-        <More projects={model.hidden} />
-        <button
-          type="button"
-          onClick={onNewProject}
-          className="px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
-        >
-          + New project
-        </button>
-      </nav>
-      <footer className="flex flex-col gap-1 border-t border-line px-2.5 py-3">
-        <Link to="/settings" className={rowItem} activeProps={navActive}>
-          Settings
-        </Link>
-      </footer>
+      <Rail onNewProject={onNewProject} />
     </aside>
-  );
-}
-
-/** A project in the sidebar; the one open lists its sections under it, the
- * Inbox with its count (the CEO, 2026-10-31: no second row of tabs). A click
- * on the open one's name folds its sections, on another opens it (the CEO,
- * 2026-11-01). */
-function ProjectRow({ project }: { project: SidebarProject }) {
-  const current = useParams({ strict: false }).project === project.id;
-  const [open, setOpen] = useState(true);
-  const dot = rowDot(project);
-  // Opening a project shows its sections again.
-  useEffect(() => {
-    if (current) setOpen(true);
-  }, [current]);
-  return (
-    <>
-      {current ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={(e) => {
-            e.stopPropagation(); // keeps the narrow screens' overlay open
-            setOpen(!open);
-          }}
-          className={`${rowItem} text-left font-medium !text-tx`}
-        >
-          {project.name}
-          <span className="flex items-center gap-2">
-            {!open && dot && <Dot status={dot.status} title={dot.title} />}
-            <Chevron open={open} />
-          </span>
-        </button>
-      ) : (
-        <Link to="/projects/$project" params={{ project: project.id }} className={rowItem}>
-          {project.name}
-          {dot && <Dot status={dot.status} title={dot.title} />}
-        </Link>
-      )}
-      {current && open && (
-        <nav className="mb-1 ml-3.5 flex flex-col gap-px border-l border-line2 pl-1.5">
-          {sections.map((s) => (
-            <Link
-              key={s.path}
-              to={`/projects/$project/${s.path}`}
-              params={{ project: project.id }}
-              className={sectionItem}
-              activeProps={navActive}
-            >
-              {s.label}
-              {s.path === "inbox" && <CountBadge count={project.inbox} />}
-              {s.path === "session" && project.busy && (
-                <Dot status={project.busy} title={project.busy} />
-              )}
-            </Link>
-          ))}
-        </nav>
-      )}
-    </>
-  );
-}
-
-/** The hidden projects, collapsed; open while one of them is. Folded, its one dot says
- * whether any of them needs the CEO or is busy, so a waiting agent isn't missed. */
-function More({ projects }: { projects: SidebarModel["hidden"] }) {
-  const [open, setOpen] = useState(false);
-  const current = useParams({ strict: false }).project;
-  if (projects.length === 0) {
-    return null;
-  }
-  const shown = open || projects.some((p) => p.id === current);
-  const dot = groupDot(projects);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation(); // keeps the narrow screens' overlay open
-          setOpen(!shown);
-        }}
-        aria-expanded={shown}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 text-left text-[13px] text-tx4 hover:text-tx3"
-      >
-        <Chevron open={shown} />
-        More
-        {!shown && dot && <Dot status={dot.status} title={dot.title} />}
-      </button>
-      {shown && projects.map((p) => <ProjectRow key={p.id} project={p} />)}
-    </>
   );
 }
 

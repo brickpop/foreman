@@ -60,10 +60,9 @@ export function Repos() {
   const shown = changing ? repoName(project, changing.repo) : "";
   return (
     <div className="flex max-w-[920px] flex-col gap-4 px-6 pt-6 pb-12">
-      {/* Headed as the Wiki and a repo's page are; the actions on the right,
-          the main one last (the CEO, 2026-11-16). */}
-      <header className="flex flex-wrap items-center gap-2">
-        <h1 className="m-0 flex-1 text-[18px] font-semibold">Repos</h1>
+      {/* The actions on the right, the main one last (the CEO, 2026-11-16); the
+          project's bar names the section. */}
+      <header className="flex flex-wrap items-center justify-end gap-2">
         {project.repos.length > 0 && <BranchCleanup project={project.id} />}
         <Button variant="outline" onClick={() => setAdding(true)}>
           <RepoIcon size="size-4" />

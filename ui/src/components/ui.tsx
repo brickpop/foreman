@@ -284,16 +284,6 @@ export function KindChip({ kind }: { kind: string }) {
   );
 }
 
-/** The amber count badge (the sidebar's Inbox). */
-export function CountBadge({ count }: { count: number }) {
-  if (count <= 0) return null;
-  return (
-    <span className="rounded-[9px] bg-attn px-1.5 py-px font-mono text-[10.5px] font-semibold text-attnInk">
-      {count}
-    </span>
-  );
-}
-
 /** A small dot: an instance status, or a "needs you" / "changed" mark. */
 export function Dot({
   status,

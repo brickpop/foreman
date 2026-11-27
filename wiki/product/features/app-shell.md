@@ -6,28 +6,62 @@ tags: [feature, ui]
 
 # App shell
 
-The frame every screen lives in: a fixed left sidebar, a main area, and the overlays (drawers, side sheet, modals, toasts). Styles come from the [Design system](../design/design-system.md); the visual reference is the [prototype](../design/prototype/foreman-prototype.dc.html).
+The frame every screen lives in: a fixed left rail, a main area, and the overlays (drawers, side sheet, modals, toasts). Styles come from the [Design system](../design/design-system.md); the rail follows the design *Compact sidebar and session header*, accepted by the CEO on 2026-11-28.
 
 ## Layout
 
-A two-column grid: sidebar **220px**, main area `minmax(0, 1fr)`, full viewport height. The main area scrolls as a whole, except on a project's [Session](./sessions.md), which fills the height and scrolls inside its terminal. Every screen has the same slim sides, 24px ([Project page → Layout](./project-page.md#layout)).
+A two-column grid: the rail **44px**, main area `minmax(0, 1fr)`, full viewport height. The main area scrolls as a whole, except on a project's [Session](./sessions.md), which fills the height and scrolls inside its terminal. Every screen has the same slim sides, 24px ([Project page → Layout](./project-page.md#layout)).
 
-**One breakpoint** (basic responsiveness): under ~760px the sidebar collapses behind a menu button at the top left and opens as an overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)).
+**One breakpoint** (basic responsiveness): under 760px the rail hides behind a menu button (three lines) at the top left and opens as a 260px overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)). Touch is not a goal (the CEO, 2026-11-28).
 
-Screens: [Dashboard](./dashboard.md); a [Project](./project-page.md), with its sections [Session](./sessions.md), [Inbox](./reviews.md#the-inbox) (a review's page inside it), [Repos](./repos.md), [Board](./board.md), [Wiki](./wiki-reader.md), [Team](./project-team.md) (with its [Activity](./project-activity.md)) and [Settings](./project-settings.md); [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on the Dashboard (or the last screen, see [UI state](../models/ui-state.md)). Sessions and Reviews left the nav on 2026-10-31: the work happens inside a project (the CEO).
+Screens: [Dashboard](./dashboard.md); a [Project](./project-page.md), with its sections [Session](./sessions.md), [Inbox](./reviews.md#the-inbox) (a review's page inside it), [Board](./board.md), [Repos](./repos.md), [Wiki](./wiki-reader.md), [Team](./project-team.md) (with its [Activity](./project-activity.md)) and [Settings](./project-settings.md); [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on the Dashboard (or the last screen, see [UI state](../models/ui-state.md)).
 
-## Sidebar
+## The rail
 
-`--side` background, `--line` right border. Top to bottom:
+One column, `--side` background, `--line` right border, each icon with one meaning always (the CEO, 2026-11-28: one column only). Top to bottom:
 
-1. **Brand**, the way to the **Dashboard** (the CEO, 2026-11-02: no nav entry for it): a link (margin `12px 10px 8px`, padding `8px`, radius 6, `--hover` behind on hover, gap 9, titled `Dashboard`) holding a 22×22 accent tile (`--acc`, radius 5) with "F" in `--accInk` (Mono 700 12px), and "Foreman" (600 15px).
-2. **Scrolling area** (padding `0 10px 12px`), with no label: it holds only the projects (the CEO, 2026-11-02):
-   - One row per project on this machine not hidden (one whose HQ isn't here is only on the [Dashboard](./dashboard.md#not-on-this-machine)), by the name it shows (its display name, else its id readable: [Project config](../models/project-config.md#the-project-record)) (padding `6px 10px`, 13.5px). **By name** (the CEO, 2026-11-04, replacing latest first of 2026-11-01): as people sort words, case and accents aside, numbers by value (`byName`). A project row, folded (every project but the open one, and the open one when folded), shows **one 7px dot** (the CEO, 2026-11-06): the attention dot (`--attn`, `Needs you`) while it has open requests (reviews included), else its Session's status dot while its team is busy, else none. Unfolded, the row shows none: the status dot is on **Session**, the requests are **Inbox**'s count. **The project open** (the one the CEO is in, not the others; the CEO, 2026-10-31) is in `--tx` 500 with a chevron, and lists its [sections](./project-page.md#sections) under it (indented 14px, a `--line2` left rule; rows padding `4px 10px`, 13px `--tx3`, the active one `--raised` `--tx`), **Session** with its team's status dot while the team is busy (its liveliest agent awaiting the CEO, running, starting or queued; none at rest, idle, asleep or stopped: the CEO, 2026-11-02), **Inbox** with a count badge of the project's open requests: the sections live here, so the main area needs no second row of tabs. A click on the open project's name folds or unfolds its sections, staying on the page (folded, it shows its row dot); on another project it opens that one, unfolded (the CEO, 2026-11-01). Then, when any project is [hidden](../models/project-config.md#the-project-record), a collapsed **`More`** row (13px `--tx4`, a chevron; `Archived` until 2026-11-13) that opens to their rows, the same as the others; it shows open while one of them is the open project. Folded, it shows one dot for them all (the CEO, 2026-11-13: an agent waiting there isn't missed): the attention dot while any of them has open requests, else the first busy one's status dot, else none. Then **`+ New project`** (13px `--tx4`), which opens [Add a project](./add-project.md).
-   - **Only the projects** (the CEO, 2026-11-02: what the CEO uses day to day): the teams moved to [Settings → Teams](./settings.md#teams), with their pages.
-3. **Footer** (padding `12px 10px`, top border):
-   - **Settings row**: "Settings" (the address it once showed, `localhost:<port>`, went on 2026-11-02: the browser's address bar has it). Opens [Settings](./settings.md); active on every Settings page, the team and agent pages included.
+1. **The Foreman tile**: a 28px accent square with "F" (`--acc`, `--accInk`, Mono 700 12px). A click always goes to the **Dashboard**, where the tile shows raised (`--raised`), as an open section does; a ring shows only for keyboard focus. Its badge sits on its top right, inside the rail. Resting on it opens the [project popover](#the-project-popover).
+2. **The open project's sections**, one icon each (18px, in a 36px row, `--tx3`; the open one `--raised` `--tx`), with a tooltip and an `aria-label` of its name: **Session** (a terminal window), **Inbox** (a tray), **Board** (columns), **Repos** (a fork), **Wiki** (a book), **Team** (two people), **Project settings** (sliders). Off a project (the Dashboard, Settings, the Chief of Staff) there are none: only the tile and the gear.
+3. **Foreman settings** at the bottom, a gear: opens [Settings](./settings.md), and shows active on every Settings page, the team and agent pages included. Sliders and gear never look alike.
 
-Data: projects and teams from the [home](../models/home.md) (the projects' records and HQs, the team files in Foreman's HQ), deployments from the runtime state ([Deployment](../models/deployment.md)); the Inbox badge and the dots from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
+The icons are drawn by hand in `ui/src/components/icons.tsx`, like the others: no icon library.
+
+**Which project is open:** every project page starts with [the project's bar](./project-page.md#the-projects-bar), `<project> · <Section>`; the project popover marks it, and the browser tab says `<project> · Foreman`.
+
+### Badges
+
+One mark per item: a **needs-you badge** (`--attn`, `--attnInk`, Mono 600 10px, radius 9, capped at `9+`) with the count of open [requests](../models/request.md) (reviews included), else a **busy dot**: the status colour of the team's liveliest agent while it awaits the CEO, runs, starts or is queued (none at rest, idle, asleep or stopped).
+
+| Where | Shows |
+|---|---|
+| Foreman tile | The badge with what needs the CEO in every project but the open one (on the Dashboard: all of them, hidden ones included) |
+| Each project in the popover | Its badge, else its busy dot, else nothing |
+| Folded **More** | One mark for the hidden projects: their badge total, else the first busy one's dot |
+| Inbox icon | The open project's badge |
+| Session icon | The open project's busy dot |
+
+Each mark has a tooltip saying what it means: the status, or `3 requests need you`. Screen readers hear the mark in the item's name: `Foreman, Dashboard. 3 requests need you in other projects`, `Inbox. 2 requests need you`, `Session. running`.
+
+### The project popover
+
+Beside the rail, at the tile's top, with no gap (`--panel`, `--line2` border, radius 8):
+
+- **Dashboard**, then the projects on this machine not [hidden](../models/project-config.md#the-project-record), **by name** (as people sort words, case and accents aside, numbers by value: `byName`), each with its mark. The open project has a 3px accent bar and `(open)`. A click on a project opens its **Session**.
+- **More (N)**: the hidden projects, folded, with one mark while folded; open while one of them is the open project.
+- A divider, then **`+ New project`**, which opens [Add a project](./add-project.md).
+
+**Opening and closing** (the same code and timings as the Session's [branch menu](./sessions.md#agent-tabs), `useHoverMenu`): it opens after the pointer rests **300ms** on the tile, so passing over it opens nothing, and closes **200ms** after the pointer leaves both the tile and the popover, when an item is picked, or on Escape. Opened by the pointer, it leaves the keyboard where it was (the terminal, say).
+
+**Keyboard:** focusing the tile opens the popover at once, the focus staying on the tile: **Enter** still goes to the Dashboard, **↓** moves into the list, at the open project. In the list, ↑/↓ move, typing a letter jumps to a project, Enter opens it, Escape closes the popover and puts the focus back on the tile.
+
+**Shortcuts**, caught by the window before the terminal (as [Line's](./sessions.md) is), by key position so any layout works:
+
+- **`Ctrl+Alt+P`** opens the popover from anywhere, the focus on the open project. `Ctrl+K` is not used: shells use it.
+- **`Ctrl+Alt+↓` / `Ctrl+Alt+↑`** moves to the next or previous visible project by name, round the ends, keeping the section (a repo's or a review's page opens that section's top, the Repos list or the Inbox). Hidden projects are skipped; from one of them, or from no project, it goes to the first visible one.
+
+**Narrow screens:** in the 260px overlay the project list shows inline under the tile (no hovering), the icons show their names with each badge or dot at the row's right end, and picking anything closes the overlay.
+
+Data: projects from the [home](../models/home.md), instances from the runtime state ([Deployment](../models/deployment.md)), the badges from open [requests](../models/request.md). All of it updates live from server events ([API](../architecture/api.md)).
 
 ## Overlays
 

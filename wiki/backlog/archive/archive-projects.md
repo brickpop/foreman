@@ -8,7 +8,7 @@ epic: projects-anywhere
 
 # Archive and unarchive projects
 
-**Why:** the sidebar lists every project ([App shell → Sidebar](../../product/features/app-shell.md#sidebar)), so finished or paused ones crowd out those in use. Until now the only way out was removing the project ([Project settings](../../product/features/project-settings.md)), which deletes its history ([Add a project, anywhere](./add-project-anywhere.md)). Raised by the CEO, 2026-10-23.
+**Why:** the sidebar lists every project ([App shell → Sidebar](../../product/features/app-shell.md#the-rail)), so finished or paused ones crowd out those in use. Until now the only way out was removing the project ([Project settings](../../product/features/project-settings.md)), which deletes its history ([Add a project, anywhere](./add-project-anywhere.md)). Raised by the CEO, 2026-10-23.
 
 **Decided** (the CEO, 2026-10-23):
 

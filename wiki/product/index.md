@@ -28,10 +28,10 @@ Files Foreman reads or owns, and the runtime state it keeps.
 
 ## Features
 
-- [App shell](./features/app-shell.md): sidebar, toasts, drawers, dialogs
+- [App shell](./features/app-shell.md): the rail and its project popover, toasts, drawers, dialogs
 - [Dashboard](./features/dashboard.md)
 - [First run](./features/first-run.md): Foreman starts whatever is missing; the setup checklist on the Dashboard
-- [Project page](./features/project-page.md): one team at most; its sections in the sidebar
+- [Project page](./features/project-page.md): one team at most; its sections in the rail
   - [Sessions](./features/sessions.md) (Session): the terminal multiplexer
   - Inbox: [Reviews](./features/reviews.md#the-inbox), then [Needs you](./features/project-pipeline.md#1-needs-you)
   - [Wiki reader](./features/wiki-reader.md) (Wiki)

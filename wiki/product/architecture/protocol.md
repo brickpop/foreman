@@ -507,10 +507,10 @@ Every state change is published on the in-process event bus; the web server stre
 | `instance.marker` | instance id, marker text, kind (`ask`, `reply`, `handoff`, `contribute`, `escalate`, `merge`, `note`) | Messaging, Workflow | The project's Activity (not shown yet) |
 | `team.message` | the [message](#messages), on creation and on each state change | Messaging | Activity |
 | `team.action` | an [action](#team-actions), once recorded | Workflow | Activity |
-| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, Inbox, sidebar badges, notifications |
+| `request.created` / `request.resolved` | the [request](#requests) | Workflow | Dashboard, Inbox, rail badges, notifications |
 | `pipeline.changed` | the work item or merge request | Workflow | Inbox and Deployment (In flight, Merged) |
 | `review.withdrawn` | the review, its deployment and lead, `by` (`lead` or `foreman`), how many of the CEO's draft comments went with it | Workflow | Inbox, the toast warning of lost drafts |
-| `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Sidebar, Dashboard, Team page, Session, Deployment |
+| `deployment.created` / `deployment.stopped` | the deployment | Instance manager | Rail, Dashboard, Team page, Session, Deployment |
 | `wiki.changed`, `config.changed`, `projects.changed` | as in [API](./api.md#events) | Projects & config, Wiki | Wiki, Board, Settings |
 
 ## Invariants

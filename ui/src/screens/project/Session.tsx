@@ -46,11 +46,11 @@ import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
 import { Button, CopyButton, Dot, Empty, LeadTag, Loading, Spinner } from "../../components/ui";
-import { useProject } from "../Project";
+import { ProjectBar, useProject } from "../Project";
 
 // A project's Session section (wiki/product/features/sessions.md): the team
 // on the project, its agent tabs and the chosen agent's terminal. The rest of
-// the project is a click away in the sidebar.
+// the project is a click away in the rail.
 
 // The agent last shown on each project, so coming back shows it again (while
 // the app runs).
@@ -171,25 +171,28 @@ function NoTeam({ project }: { project: string }) {
   const [deploy, setDeploy] = useState(false);
   const stopped = useStoppedDeployments().data ?? [];
   return (
-    <div className="px-6 pt-6 pb-12">
-      <Empty>
-        <span className="flex flex-col items-center gap-3">
-          No team is on {projectNameOf(project)}, so there are no sessions. Deploy one.
-          <Button variant="primary" onClick={() => setDeploy(true)}>
-            Deploy a team
-          </Button>
-        </span>
-      </Empty>
-      {/* Mounted only while open: each opening starts fresh. */}
-      {deploy && (
-        <DeployDialog
-          open
-          onClose={() => setDeploy(false)}
-          project={project}
-          initialTeam={latestStopped(project, stopped)?.teamId}
-        />
-      )}
-    </div>
+    <>
+      <ProjectBar section="Session" />
+      <div className="px-6 pt-6 pb-12">
+        <Empty>
+          <span className="flex flex-col items-center gap-3">
+            No team is on {projectNameOf(project)}, so there are no sessions. Deploy one.
+            <Button variant="primary" onClick={() => setDeploy(true)}>
+              Deploy a team
+            </Button>
+          </span>
+        </Empty>
+        {/* Mounted only while open: each opening starts fresh. */}
+        {deploy && (
+          <DeployDialog
+            open
+            onClose={() => setDeploy(false)}
+            project={project}
+            initialTeam={latestStopped(project, stopped)?.teamId}
+          />
+        )}
+      </div>
+    </>
   );
 }
 

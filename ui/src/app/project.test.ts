@@ -6,6 +6,7 @@ import {
   latestStopped,
   projectHome,
   reviewOf,
+  sectionOf,
   sections,
   sessionOf,
   teamOn,
@@ -25,12 +26,21 @@ describe("a project's page", () => {
     expect(sections.map((s) => s.label)).toEqual([
       "Session",
       "Inbox",
-      "Repos",
       "Board",
+      "Repos",
       "Wiki",
       "Team",
       "Settings",
     ]);
+  });
+
+  it("finds the section a page belongs to, a repo's or a review's page included", () => {
+    expect(sectionOf("/projects/a/board")?.path).toBe("board");
+    expect(sectionOf("/projects/a/repos/api")?.label).toBe("Repos");
+    expect(sectionOf("/projects/a/inbox/rev-3")?.path).toBe("inbox");
+    expect(sectionOf("/projects/a")).toBeUndefined();
+    expect(sectionOf("/projects/a/deployment")).toBeUndefined();
+    expect(sectionOf("/settings/look")).toBeUndefined();
   });
 
   it("opens on Session while a team is on it, on Wiki otherwise", () => {

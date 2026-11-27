@@ -197,7 +197,7 @@ export interface HomeArea {
   setProfile(project: string, profile: string): Promise<Project>;
   /** Gives a project its display name ("": shown by its id). Its id stays. */
   setName(project: string, name: string): Promise<Project>;
-  /** Hides a project (out of the sidebar's projects and the Dashboard), or shows it again. */
+  /** Hides a project (out of the popover's projects and the Dashboard), or shows it again. */
   setHidden(project: string, hidden: boolean): Promise<Project>;
   /** The scaffold files the HQ lacks (wiki.toml…), and creating them. */
   missing(project: string): Promise<Missing[]>;

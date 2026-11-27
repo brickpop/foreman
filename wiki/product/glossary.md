@@ -10,7 +10,7 @@ tags: [architecture, home]
 - **Foreman's folder**: what the CEO owns, `~/foreman` by default (the `foreman_folder` setting, read at start, no UI to change it): Foreman's HQ (`hq/`), each project's HQ and files (`projects/<id>/`) and the agents' worktrees (`worktrees/<id>/`). See [Home → Foreman's folder](./models/home.md#foremans-folder).
 - **Foreman's HQ**: `hq/` in Foreman's folder, a git repo holding the team files (`teams/`) and the CEO's instructions to every agent (`instructions.md`); every UI save is one commit. See [Home → Foreman's HQ](./models/home.md#foremans-hq).
 - **Project**: a project record plus its HQ; its code repos live anywhere in the CEO's home folder. See [Project config](./models/project-config.md).
-- **Project page**: where the CEO works on a project, its sections listed in the sidebar under the project open: Session, Inbox, Wiki, Board, Repos, Deployment, Activity, Settings. See [Project page](./features/project-page.md).
+- **Project page**: where the CEO works on a project, its sections the rail's icons while it is open: Session, Inbox, Board, Repos, Wiki, Team, Settings. See [Project page](./features/project-page.md).
 - **Session** (the section): a project's team at work, one agent's terminal at a time. See [Sessions](./features/sessions.md).
 - **Inbox**: a project's section of what waits on the CEO there: its reviews, then its other requests. See [Reviews → The Inbox](./features/reviews.md#the-inbox).
 - **Not on this machine**: a project whose record is in `projects.toml` but whose HQ isn't at `projects/<id>/hq/` here (another machine's). Listed only on the Dashboard, with **Bring here**, which clones its HQ. See [Home → A new machine](./models/home.md#a-new-machine).

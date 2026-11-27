@@ -167,7 +167,7 @@ export interface Project {
    */
   files: string;
   profile: string; // the profile its agents run on: its own, else the default
-  hidden: boolean; // out of the sidebar's projects (in More) and the Dashboard
+  hidden: boolean; // out of the popover's projects (in More) and the Dashboard
   config: ProjectConfig;
   repos: Repo[]; // the code repos agents get worktrees of, by name
   version: string; // of project.toml

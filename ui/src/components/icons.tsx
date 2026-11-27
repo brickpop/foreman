@@ -180,3 +180,99 @@ export function ForemanFolderIcon({ size = "size-3.5" }: { size?: string }) {
     </svg>
   );
 }
+
+// The rail's icons (wiki/product/features/app-shell.md#the-rail): one
+// meaning each, drawn at the rail's size.
+
+/** A terminal window: a project's Session. */
+export function SessionIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" {...line} />
+      <path d="M4.5 6.5l2 1.5-2 1.5M8 10h3" {...line} />
+    </svg>
+  );
+}
+
+/** A tray: a project's Inbox. */
+export function InboxIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <path
+        d="M1.5 9l2-6h9l2 6v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM1.5 9h3.5l1 1.5h4l1-1.5h3.5"
+        {...line}
+      />
+    </svg>
+  );
+}
+
+/** Three columns of cards: a project's Board. */
+export function BoardIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <rect x="1.5" y="2.5" width="3.5" height="11" rx="1" {...line} />
+      <rect x="6.25" y="2.5" width="3.5" height="7" rx="1" {...line} />
+      <rect x="11" y="2.5" width="3.5" height="9" rx="1" {...line} />
+    </svg>
+  );
+}
+
+/** An open book: a project's Wiki. */
+export function WikiIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <path
+        d="M8 4.5C6.5 3.2 4.3 3 1.5 3.5v9c2.8-.5 5-.3 6.5 1 1.5-1.3 3.7-1.5 6.5-1v-9C11.7 3 9.5 3.2 8 4.5zM8 4.5v9"
+        {...line}
+      />
+    </svg>
+  );
+}
+
+/** Two people: a project's Team. */
+export function TeamIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <circle cx="6" cy="5.5" r="2.5" {...line} />
+      <path
+        d="M1.5 13.5c.4-2.4 2.2-4 4.5-4s4.1 1.6 4.5 4M10.5 3.2a2.5 2.5 0 0 1 0 4.6M12 9.8c1.3.6 2.2 2 2.5 3.7"
+        {...line}
+      />
+    </svg>
+  );
+}
+
+/** Sliders: a project's settings (never the gear, which is Foreman's). */
+export function SlidersIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <path d="M2 4h12M2 8h12M2 12h12" {...line} />
+      <circle cx="10.5" cy="4" r="1.75" fill="currentColor" />
+      <circle cx="5" cy="8" r="1.75" fill="currentColor" />
+      <circle cx="9" cy="12" r="1.75" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** A gear: Foreman's own settings. */
+export function GearIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <circle cx="8" cy="8" r="2" {...line} />
+      <path
+        d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"
+        {...line}
+      />
+      <circle cx="8" cy="8" r="4.5" {...line} />
+    </svg>
+  );
+}
+
+/** Three lines: the menu that opens the rail on a narrow screen. */
+export function MenuIcon({ size = "size-[18px]" }: { size?: string }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
+      <path d="M2.5 4h11M2.5 8h11M2.5 12h11" {...line} />
+    </svg>
+  );
+}

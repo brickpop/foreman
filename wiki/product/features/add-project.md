@@ -10,7 +10,7 @@ A project is a record in `projects.toml` (in Foreman's HQ; this machine's part, 
 
 ## The dialog
 
-A modal ([App shell](./app-shell.md#overlays)) opened from **`+ New project`** in the sidebar and from the checklist's **A project** row ([First run](./first-run.md#the-checklist)), fresh at each opening. One step, then the project's Repos page:
+A modal ([App shell](./app-shell.md#overlays)) opened from **`+ New project`** in the [project popover](./app-shell.md#the-project-popover) and from the checklist's **A project** row ([First run](./first-run.md#the-checklist)), fresh at each opening. One step, then the project's Repos page:
 
 1. **New project**: the **Project name** (any words, made a slug: [Names](#names)), then the **HQ**, a segmented New | Clone:
    - **New**: "The project's wiki and project.toml, in a new git repo: its hq/ folder. One left there by a removed project is taken over as it is."

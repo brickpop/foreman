@@ -127,7 +127,7 @@ const oldActivity = createRoute({
 const projectSettings = createRoute({ ...section("settings"), component: ProjectSettings });
 
 // Settings: its tabs, then the teams' and their agents' pages, which live
-// there (the CEO, 2026-11-02: the sidebar holds only the projects).
+// there (the CEO, 2026-11-02: the project list holds only the projects).
 const settingsRoute = createRoute({
   getParentRoute: () => root,
   path: "settings",

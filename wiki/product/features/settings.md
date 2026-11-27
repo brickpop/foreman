@@ -6,7 +6,7 @@ tags: [feature, ui, home, config, security]
 
 # Settings screen
 
-The **Settings** screen (sidebar footer), in **tabs by topic** (the CEO, 2026-10-20: the old `Workspace | Global` split, the workspace being the folder Foreman once ran on, said nothing, both being machine-wide). Each tab is a path, `/settings/teams|agents|look|system` (the CEO, 2026-11-02, replacing `/settings?tab=`); `/settings` opens **Teams**, the first, and so does any other tab name, the old `workspace` and `global` included; an old `/settings?tab=<tab>` link opens that tab. The same tab bar as a project's.
+The **Settings** screen (the rail's gear), in **tabs by topic** (the CEO, 2026-10-20: the old `Workspace | Global` split, the workspace being the folder Foreman once ran on, said nothing, both being machine-wide). Each tab is a path, `/settings/teams|agents|look|system` (the CEO, 2026-11-02, replacing `/settings?tab=`); `/settings` opens **Teams**, the first, and so does any other tab name, the old `workspace` and `global` included; an old `/settings?tab=<tab>` link opens that tab. The same tab bar as a project's.
 
 | Tab | Sections |
 |---|---|
@@ -21,7 +21,7 @@ Padding `24px 24px 48px`, max 760px, on every Settings page, the team and agent 
 
 ## Teams
 
-The teams, as on the [Dashboard](./dashboard.md#teams), the same cards: one per team, opening its [page](./team-page.md), then the dashed **`+ New team`** card (the [Chief of Staff](./chief-of-staff.md)'s create-team flow). They moved here from the sidebar (the CEO, 2026-11-02). A team's page is `/settings/teams/<team>` and an agent's `/settings/teams/<team>/agents/<agent>`, in the Settings frame (760px), with a breadcrumb in place of the Settings title and tabs: `Settings › Teams › <Team>` (`› <Agent>` on an agent's), each step a link but the last (13.5px, `--tx3`, the last `--tx2`). The old `/teams/<team>` and `/teams/<team>/agents/<agent>` links open them there.
+The teams, as on the [Dashboard](./dashboard.md#teams), the same cards: one per team, opening its [page](./team-page.md), then the dashed **`+ New team`** card (the [Chief of Staff](./chief-of-staff.md)'s create-team flow). They live here (the CEO, 2026-11-02). A team's page is `/settings/teams/<team>` and an agent's `/settings/teams/<team>/agents/<agent>`, in the Settings frame (760px), with a breadcrumb in place of the Settings title and tabs: `Settings › Teams › <Team>` (`› <Agent>` on an agent's), each step a link but the last (13.5px, `--tx3`, the last `--tx2`). The old `/teams/<team>` and `/teams/<team>/agents/<agent>` links open them there.
 
 ## Instructions for every agent
 

@@ -296,7 +296,7 @@ function ProfileChoice({ project }: { project: Project }) {
   );
 }
 
-/** Hides the project (out of the sidebar's projects, into More, and off the Dashboard), or
+/** Hides the project (out of the popover's projects, into More, and off the Dashboard), or
  * shows it again: nothing else changes, a team on it keeps working. */
 function HideProject({ project }: { project: Project }) {
   const client = useClient();
@@ -316,8 +316,8 @@ function HideProject({ project }: { project: Project }) {
     <Block title="Visibility">
       <span className="text-[13.5px] text-tx2">
         {project.hidden
-          ? "Hidden: it is under More in the sidebar, and off the Dashboard. Everything else works as usual."
-          : "Hide it to keep the sidebar and the Dashboard to what you work on: it moves under More. Everything else works as usual, a team on it included."}
+          ? "Hidden: it is under More in the project list, and off the Dashboard. Everything else works as usual."
+          : "Hide it to keep the project list and the Dashboard to what you work on: it moves under More. Everything else works as usual, a team on it included."}
       </span>
       <span>
         <Button variant="small" disabled={hide.isPending} onClick={() => hide.mutate()}>

@@ -6,20 +6,27 @@ export function windowTitle(project?: string): string {
 }
 
 // A project's page (wiki/product/features/project-page.md): its sections,
-// listed in the sidebar under the project open, where the project opens, and
+// the rail's icons while the project is open, where the project opens, and
 // the links into it from elsewhere.
 
 export const sections = [
   { path: "session", label: "Session" },
   { path: "inbox", label: "Inbox" },
-  { path: "repos", label: "Repos" },
   { path: "board", label: "Board" },
+  { path: "repos", label: "Repos" },
   { path: "wiki", label: "Wiki" },
   { path: "team", label: "Team" },
   { path: "settings", label: "Settings" },
 ] as const;
 
 export type Section = (typeof sections)[number]["path"];
+
+/** The section a page belongs to, from its path: deeper pages, like a repo or a
+ * review, belong to their section (Repos, Inbox). None off a project's sections. */
+export function sectionOf(pathname: string): (typeof sections)[number] | undefined {
+  const path = /^\/projects\/[^/]+\/([^/]+)/.exec(pathname)?.[1];
+  return sections.find((s) => s.path === path);
+}
 
 /** The deployment of the team on the project, if a team is on it (one at
  * most). The instances listed are the active deployments' only. */

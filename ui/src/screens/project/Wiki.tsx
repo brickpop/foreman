@@ -71,13 +71,10 @@ export function Wiki() {
   // The tree and the entry scroll apart, as a repo's page does (the CEO, 2026-11-02).
   return (
     <div className="flex h-full min-h-[420px] flex-col gap-4 px-6 pt-6 pb-6 max-[760px]:h-auto max-[760px]:pb-12">
-      {/* As a repo's page is headed (Repos → a repo), so the two read alike. */}
-      <header className="flex flex-col gap-0.5">
-        <h1 className="m-0 text-[18px] font-semibold">Knowledge base</h1>
-        <span className="truncate font-mono text-[12.5px] text-tx4" title={repo}>
-          {repo}
-        </span>
-      </header>
+      {/* The project's bar names the section; here, where the wiki lives. */}
+      <span className="truncate font-mono text-[12.5px] text-tx4" title={repo}>
+        {repo}
+      </span>
       {config.description && (
         <p className="m-0 max-w-[780px] text-[15px] text-tx3">{config.description}</p>
       )}

@@ -17,7 +17,7 @@ One set for both themes in `ui/src/styles.css`: each token is `light-dark(<light
 | Token | Dark | Light | Used for |
 |---|---|---|---|
 | `--bg` | `#22272E` | `#FFFFFF` | Page background, swatch inner ring |
-| `--side` | `#1C2128` | `#F6F8FA` | Sidebar, agent-tab strip, board cells |
+| `--side` | `#1C2128` | `#F6F8FA` | Rail, agent-tab strip, board cells |
 | `--panel` | `#2D333B` | `#FFFFFF` | Panels (request panels, lists, board cards), drawers, modals, toasts, callouts |
 | `--raised` | `#373E47` | `#EAEEF2` | Selected nav/segment, raised buttons, chips, stage chips |
 | `--head` | `#373E47` | `#F6F8FA` | A card's header band (GitHub's box header: a step lighter than the card in dark, a step darker in light) |
@@ -86,7 +86,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | Group label (a repo inside a review's tree, a kind of outdated comment) | 13px / 500 / `--tx4` |
 | Brand | 15px / 600 / -0.01em |
 | Nav item | 14px / 500 |
-| Sidebar project row | 13.5px |
+| Project popover row | 13.5px |
 | Request text | Dashboard 16px, project Inbox (Needs you) 15.5px; line-height 1.5; `text-wrap: pretty` |
 | Kind chip | Mono 600 10.5px, `letter-spacing: .05em`, uppercase |
 | Meta mono (paths, branches) | Mono 400 11.5–12.5px, `--tx4` or `--tx3` |
@@ -105,7 +105,7 @@ Fonts: **Geist** (400/500/600/700) for UI and **Geist Mono** (variable) for code
 | 7px | Standard buttons |
 | 8px | Board card, code block, textareas |
 | 9px | Selectable rows (Add project), CoS input, agent "Running on" rows, small badge |
-| 10px | Board cell, `<pre>` panels, callout, toast, CoS result panel, sidebar badge |
+| 10px | Board cell, `<pre>` panels, callout, toast, CoS result panel, rail badge |
 | 12px | Panels (request panels, lists), CoS bubbles, empty states |
 | 14px | Modals |
 | 16px | CoS quick-reply chips |
@@ -150,7 +150,7 @@ Project state text (Dashboard): `needs you` `--attnTx`, `on track` `--ok`, `idle
 | Element | Style |
 |---|---|
 | **Request kind chip** | Mono 600 10.5px, `.05em`, uppercase; color and 1px border in the kind color; radius 4; padding `1px 6px`; no wrap. Kinds: Approval `--attnTx`, Question `--info`, Review `--ok`, Blocked `--err`, Finding `--team` ([Requests](../features/requests.md)). In explanatory lists the same label appears without a border. |
-| **Count badge** (the sidebar's Inbox) | `--attn` background, `--attnInk` text, Mono 600 10.5px, padding `1px 6px`, radius 9 |
+| **Needs-you badge** (the rail and its popover: [App shell → Badges](../features/app-shell.md#badges)) | `--attn` background, `--attnInk` text, Mono 600 10px, padding `0 5px`, radius 9, capped at `9+` |
 | **Needs-you dot** | 7px `--attn` circle |
 | **Changed dot** | 6px `--attn` circle, tooltip "Changed since you last looked" |
 | **Frontmatter chip** | 12.5px, `--raised`, radius 5, padding `3px 8px`, `--tx3` key; the value in `--tx`. Format `key: value` |

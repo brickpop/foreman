@@ -10,7 +10,7 @@ Where the CEO reviews a lead's branch as on a forge, and decides it (the CEO, 20
 
 ## The Inbox
 
-`/projects/<project>/inbox`, a section of the [Project page](./project-page.md), with the sidebar's count of what waits on the CEO there: the project's open requests, reviews included ([App shell](./app-shell.md#sidebar)). At most 920px wide, 32px between sections, no title (the sidebar names it).
+`/projects/<project>/inbox`, a section of the [Project page](./project-page.md), with the rail's count of what waits on the CEO there: the project's open requests, reviews included ([App shell](./app-shell.md#badges)). At most 920px wide, 32px between sections, no title of its own: the [project's bar](./project-page.md#the-projects-bar) says `<project> · Inbox`.
 
 Three sections, each under a [section title](../design/design-system.md#type) with its count (the CEO, 2026-11-02: titles that read as such): **Needs you**, always shown, the reviews to decide (`needs-review`, a panel of rows) then the project's other open requests (one [request panel](./project-pipeline.md#1-needs-you) each); then, each left out when empty, **Waiting on the lead** (`changes-requested`) and **Done** (merged, dismissed or withdrawn, the last 20 decided). The server lists only those, for the one project, newest first (the latest opened): a list that grows with every review ever made would slow each load down.
 

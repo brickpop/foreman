@@ -15,7 +15,7 @@ In Settings, at `/settings/teams/<team>/agents/<agent>` (the CEO, 2026-11-02), i
 ## The soul
 
 - **Header**: H1 name (26px), and its role (`--tx3`).
-- **"Running on"**: one row per deployment (grid `auto auto 1fr auto`, `--panel`, radius 9): an 8px status dot, the project's readable name ([App shell](./app-shell.md#sidebar); 600, never wrapped), the current task (ellipsis), and a **`Session`** button (the project's [Session](./sessions.md) on this agent). If the team isn't deployed: `Not running. <Team> isn't deployed to any project.`
+- **"Running on"**: one row per deployment (grid `auto auto 1fr auto`, `--panel`, radius 9): an 8px status dot, the project's readable name ([App shell](./app-shell.md#the-project-popover); 600, never wrapped), the current task (ellipsis), and a **`Session`** button (the project's [Session](./sessions.md) on this agent). If the team isn't deployed: `Not running. <Team> isn't deployed to any project.`
 - No harness choice (the CEO, 2026-10-18): an agent runs on its project's [profile](../architecture/session-runner.md#credentials), chosen in [Project settings](./project-settings.md); see [Agent soul → What it runs on](../models/agent-soul.md#what-it-runs-on).
 - **"Personality"**: textarea (3 rows, 15px).
 - **"Skills"**: chips with `×`, and a `+ add` input (Enter adds; blank and duplicate skills are ignored).

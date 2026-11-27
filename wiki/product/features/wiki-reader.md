@@ -10,11 +10,11 @@ The project's **Wiki** section ([Project page](./project-page.md); Overview unti
 
 ## Header
 
-Headed as a repo's page is ([Repos → A repo's page](./repos.md#a-repos-page); the CEO, 2026-11-02, so the two readers look alike): **`Knowledge base`** (18px, 600), and under it the wiki's folder on this machine, `<hq>/wiki` (Mono 12.5px `--tx4`, ellipsis, its whole path as its title), the HQ's real path.
+Under the [project's bar](./project-page.md#the-projects-bar) (`<project> · Wiki`), the wiki's folder on this machine, `<hq>/wiki` (Mono 12.5px `--tx4`, ellipsis, its whole path as its title), the HQ's real path.
 
 ## The description
 
-Under the header, the project's description (15px `--tx3`, at most 780px), from [Project config](../models/project-config.md), when it has one. The old project header (name, path, `<Team> · Sessions` links, tabs) is gone since 2026-10-31: the name and sections are in the [sidebar](./app-shell.md#sidebar), the work in [Session](./sessions.md), the path in [Settings](./project-settings.md) (`<path>/project.toml · read-only`).
+Under the header, the project's description (15px `--tx3`, at most 780px), from [Project config](../models/project-config.md), when it has one. The old project header (name, path, `<Team> · Sessions` links, tabs) is gone since 2026-10-31: the sections are in the [rail](./app-shell.md#the-rail), the work in [Session](./sessions.md), the path in [Settings](./project-settings.md) (`<path>/project.toml · read-only`).
 
 ## Layout
 

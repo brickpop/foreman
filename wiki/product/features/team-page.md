@@ -10,7 +10,7 @@ One [team definition](../models/team-definition.md): where it is deployed, its m
 
 ## Header
 
-In Settings, at `/settings/teams/<team>` (the CEO, 2026-11-02: the teams left the sidebar), in its frame: max 760px, padding `24px 24px 48px`, 24px between the header and the tab's content, which have no padding of their own ([Settings → Teams](./settings.md#teams)).
+In Settings, at `/settings/teams/<team>` (the CEO, 2026-11-02), in its frame: max 760px, padding `24px 24px 48px`, 24px between the header and the tab's content, which have no padding of their own ([Settings → Teams](./settings.md#teams)).
 
 - The breadcrumb `Settings › Teams › <Team>`.
 - H1 with the team name; under it, the team's one-line `purpose` (15px `--tx3`), when set ([Team definition](../models/team-definition.md)).

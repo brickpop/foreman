@@ -86,9 +86,9 @@ export function ReloadIcon() {
 }
 
 /** A tick: done (Copied). */
-export function CheckIcon() {
+export function CheckIcon({ size = "size-4" }: { size?: string }) {
   return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-4 shrink-0">
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
       <path d="M3.5 8.5l3 3 6-7" {...line} />
     </svg>
   );

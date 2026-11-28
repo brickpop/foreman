@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type Instance, type Team, useClient } from "../../api/client";
-import { agentOf, harnessLabel, plural, slotsTaken } from "../../app/model";
+import { agentOf, plural, slotsTaken } from "../../app/model";
 import { latestStopped } from "../../app/project";
 import {
   keys,
@@ -39,7 +39,7 @@ import { PlayIcon, PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
-import { Button, CopyButton, Dot, Empty, LeadTag, Loading, Spinner } from "../../components/ui";
+import { Button, CopyButton, Dot, LeadTag, Loading, Spinner } from "../../components/ui";
 import { ProjectBar, useProject } from "../Project";
 import { AgentBranch, FilesMenu, WorktreesMenu } from "./SessionHeader";
 
@@ -169,34 +169,34 @@ export function Session() {
   );
 }
 
-/** No team on the project: deploy one, the last one here preset. */
+/** No team on the project: a quiet box in the middle of the screen, to deploy one,
+ * the last one here preset. */
 function NoTeam({ project }: { project: string }) {
   const projectNameOf = useProjectName();
   const [deploy, setDeploy] = useState(false);
   const stopped = useStoppedDeployments().data ?? [];
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <ProjectBar section="Session" />
-      <div className="px-6 pt-6 pb-12">
-        <Empty>
-          <span className="flex flex-col items-center gap-3">
-            No team is on {projectNameOf(project)}, so there are no sessions. Deploy one.
-            <Button variant="primary" onClick={() => setDeploy(true)}>
-              Deploy a team
-            </Button>
-          </span>
-        </Empty>
-        {/* Mounted only while open: each opening starts fresh. */}
-        {deploy && (
-          <DeployDialog
-            open
-            onClose={() => setDeploy(false)}
-            project={project}
-            initialTeam={latestStopped(project, stopped)?.teamId}
-          />
-        )}
+      <div className="grid flex-1 place-items-center p-6">
+        <div className="flex min-h-[220px] w-full max-w-[440px] flex-col items-center justify-center gap-2 rounded-xl border border-line2 px-6 text-center">
+          <h2 className="m-0 text-[15px] font-semibold">No team on {projectNameOf(project)} yet</h2>
+          <p className="m-0 text-[13.5px] text-tx3">Deploy a team to start its sessions.</p>
+          <Button variant="primary" className="mt-3" onClick={() => setDeploy(true)}>
+            Deploy a team
+          </Button>
+        </div>
       </div>
-    </>
+      {/* Mounted only while open: each opening starts fresh. */}
+      {deploy && (
+        <DeployDialog
+          open
+          onClose={() => setDeploy(false)}
+          project={project}
+          initialTeam={latestStopped(project, stopped)?.teamId}
+        />
+      )}
+    </div>
   );
 }
 
@@ -369,7 +369,6 @@ function AgentSession({
       {controls &&
         createPortal(
           <span className="flex items-center gap-2.5 text-[12.5px] text-tx4">
-            {harnessLabel(instance.harness)}
             {!asleep && (
               <CopyButton
                 text={() => terminal.current?.text() ?? ""}

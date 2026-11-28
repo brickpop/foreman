@@ -341,9 +341,12 @@ export function readable(name: string): string {
  * case and accents aside, numbers by value (ledger 2 before ledger 10). */
 export function byName<T extends { id: string; name: string }>(projects: T[]): T[] {
   const name = (p: T) => p.name || readable(p.id);
-  return [...projects].sort((a, b) =>
-    name(a).localeCompare(name(b), undefined, { sensitivity: "base", numeric: true }),
-  );
+  return [...projects].sort((a, b) => compareNames(name(a), name(b)));
+}
+
+/** Two names as people sort words: case and accents aside, numbers by value. */
+export function compareNames(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { sensitivity: "base", numeric: true });
 }
 
 /** The other project already showing as what project would show as with

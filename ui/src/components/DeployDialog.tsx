@@ -2,7 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useClient } from "../api/client";
-import { byName, harnessLabel, projectName, replacingLine } from "../app/model";
+import { hasTeam, profileChoices, projectChoices, teamChoices } from "../app/deploy";
+import { harnessLabel, replacingLine } from "../app/model";
 import { sessionOf } from "../app/project";
 import {
   keys,
@@ -17,8 +18,9 @@ import {
 } from "../app/queries";
 import { ConnectDialog } from "./ConnectDialog";
 import { Modal } from "./Overlays";
+import { Select } from "./Select";
 import { useToast } from "./Toasts";
-import { Button } from "./ui";
+import { Button, Field } from "./ui";
 
 // Assigns a team to a project (wiki/product/features/deploy-team.md). A
 // project has one team at most: another one there is replaced, and the dialog
@@ -26,15 +28,6 @@ import { Button } from "./ui";
 // Opened with a team preset (Team page, Dashboard), a project preset (its
 // Session and Team sections), or neither (Dashboard). The project's
 // profile is picked here too (saved on Deploy), and connected from here.
-
-const option = (on: boolean, disabled = false) =>
-  `rounded-[7px] border px-3 py-1.5 text-[13px] ${
-    disabled
-      ? "border-line2 text-tx4"
-      : on
-        ? "border-acc bg-accSoft text-tx"
-        : "border-line2 text-tx2 hover:border-line3"
-  }`;
 
 export function DeployDialog({
   open,
@@ -77,7 +70,7 @@ export function DeployDialog({
   const nameOf = (id: string) => teams.data?.find((t) => t.id === id)?.config.name || id;
   // The team on each project now (one at most): deploying another replaces it.
   const on = (p?: string) => (deployments.data ?? []).find((d) => d.projectId === p);
-  const already = (p: string) => on(p)?.teamId === team;
+  const already = (p: string) => hasTeam(deployments.data ?? [], p, team);
   const teamName = team && nameOf(team);
   const replaced = project && !already(project) ? on(project) : undefined;
   const ending = (instances.data ?? []).filter((i) => i.deploymentId === replaced?.id).length;
@@ -118,6 +111,23 @@ export function DeployDialog({
     },
   });
   const ready = team && project && !already(project) && profileReady && !engineDown;
+  // Under the profile: what picking it means, or what is missing, and Connect.
+  const profileHint = (
+    <span className="flex items-center gap-2">
+      {!profile
+        ? "That profile doesn’t exist: pick another."
+        : profile.connected
+          ? picked && picked !== chosen?.profile
+            ? "It becomes the project’s profile on Deploy."
+            : "The project’s profile: its agents run on it."
+          : "Not connected yet, so its agents can’t start."}
+      {profile && !profile.connected && (
+        <Button variant="small" onClick={() => setConnecting(profile.name)}>
+          Connect
+        </Button>
+      )}
+    </span>
+  );
   return (
     <Modal
       open={open}
@@ -130,43 +140,34 @@ export function DeployDialog({
           projects.
         </p>
         {!presetTeam && (
-          <Group label="Team">
-            {(teams.data ?? []).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={t.id === team}
-                className={option(t.id === team)}
-                onClick={() => setTeam(t.id)}
-              >
-                {t.config.name}
-              </button>
-            ))}
-          </Group>
+          <Field label="Team">
+            {(field) => (
+              <Select
+                label="Team"
+                field={field}
+                value={team ?? ""}
+                placeholder="Pick a team"
+                options={teamChoices(teams.data ?? [])}
+                onChange={setTeam}
+              />
+            )}
+          </Field>
         )}
-        <Group label="Project">
-          {byName(projects.data ?? []).map((p) => {
-            const there = already(p.id);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                disabled={there}
-                aria-pressed={p.id === project}
-                className={option(p.id === project, there)}
-                onClick={() => {
-                  setProject(p.id);
-                  setPicked(undefined);
-                }}
-              >
-                {there ? `${projectName([p], p.id)} (already there)` : projectName([p], p.id)}
-                {on(p.id) && !there && (
-                  <span className="text-tx4"> · {nameOf(on(p.id)?.teamId ?? "")}</span>
-                )}
-              </button>
-            );
-          })}
-        </Group>
+        <Field label="Project">
+          {(field) => (
+            <Select
+              label="Project"
+              field={field}
+              value={project ?? ""}
+              placeholder="Pick a project"
+              options={projectChoices(projects.data ?? [], deployments.data ?? [], team, nameOf)}
+              onChange={(p) => {
+                setProject(p);
+                setPicked(undefined);
+              }}
+            />
+          )}
+        </Field>
         {replaced && team && (
           <p className="m-0 rounded-lg border border-attnLine bg-attnSoft px-3 py-2.5 text-[13px] text-attnTx">
             {replacingLine(nameOf(replaced.teamId), projectNameOf(replaced.projectId), ending)}
@@ -187,40 +188,18 @@ export function DeployDialog({
           </label>
         )}
         {profileName && profiles.data && (
-          <Group label="Profile">
-            {profiles.data.map((p) => (
-              <button
-                key={p.name}
-                type="button"
-                aria-pressed={p.name === profileName}
-                className={option(p.name === profileName)}
-                onClick={() => setPicked(p.name)}
-              >
-                <span className="font-mono">{p.name}</span>
-                <span className="text-tx4"> · {harnessLabel(p.harness)}</span>
-              </button>
-            ))}
-            {/* The one the project names, even when that profile is gone. */}
-            {!profile && (
-              <button type="button" aria-pressed className={`${option(true)} !border-err`}>
-                <span className="font-mono">{profileName}</span>
-              </button>
+          <Field label="Profile" hint={profileHint}>
+            {(field) => (
+              <Select
+                label="Profile"
+                field={field}
+                mono
+                value={profileName}
+                options={profileChoices(profiles.data, harnessLabel)}
+                onChange={setPicked}
+              />
             )}
-            <p className="m-0 flex w-full items-center gap-2 pt-0.5 text-[13px] text-tx3">
-              {!profile
-                ? "That profile doesn’t exist: pick another."
-                : profile.connected
-                  ? picked && picked !== chosen?.profile
-                    ? "It becomes the project’s profile on Deploy."
-                    : "The project’s profile: its agents run on it."
-                  : "Not connected yet, so its agents can’t start."}
-              {profile && !profile.connected && (
-                <Button variant="small" onClick={() => setConnecting(profile.name)}>
-                  Connect
-                </Button>
-              )}
-            </p>
-          </Group>
+          </Field>
         )}
         {engineDown && (
           <div className="flex items-center gap-3 rounded-lg border border-line2 px-3 py-2.5 text-[13px] text-tx2">
@@ -246,14 +225,5 @@ export function DeployDialog({
         <ConnectDialog profile={connecting} onClose={() => setConnecting(undefined)} />
       )}
     </Modal>
-  );
-}
-
-function Group({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <fieldset className="m-0 flex flex-col gap-1.5 border-0 p-0">
-      <legend className="mb-1.5 text-[13px] font-medium text-tx4">{label}</legend>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
-    </fieldset>
   );
 }

@@ -26,6 +26,7 @@ import {
 } from "../../app/repos";
 import { TreeChildren, TreeRow } from "../../components/FileTree";
 import { Frontmatter, FrontmatterError } from "../../components/Frontmatter";
+import { Chevron } from "../../components/icons";
 import { Markdown, type ResolvedLink } from "../../components/Markdown";
 import { Button, Empty, Loading, Panel, Segmented } from "../../components/ui";
 import { useProject } from "../Project";
@@ -168,7 +169,9 @@ function BranchPicker({
         className="flex h-12 max-w-[320px] shrink-0 items-center gap-2 rounded-lg border border-line2 bg-panel px-3 text-[13px] text-tx hover:border-line3 data-[state=open]:border-acc"
       >
         <span className="truncate font-mono">{at.branch}</span>
-        <span className="text-[10px] text-tx4">▾</span>
+        <span className="rotate-90 text-tx4">
+          <Chevron open={false} />
+        </span>
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content

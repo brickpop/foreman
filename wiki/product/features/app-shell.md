@@ -12,7 +12,7 @@ The frame every screen lives in: a fixed left rail, a main area, and the overlay
 
 A two-column grid: the rail **44px**, main area `minmax(0, 1fr)`, full viewport height. The main area scrolls as a whole, except on a project's [Session](./sessions.md), which fills the height and scrolls inside its terminal. Every screen has the same slim sides, 24px ([Project page → Layout](./project-page.md#layout)).
 
-**One breakpoint** (basic responsiveness): under 760px the rail hides behind a menu button (three lines) at the top left and opens as a 260px overlay; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)). Touch is not a goal (the CEO, 2026-11-28).
+**One breakpoint** (basic responsiveness): under 760px the rail hides behind a menu button (three lines) at the top left and opens as a 260px overlay. On a project's page the button sits at the left of its bar, which leaves it room; elsewhere the content starts below it; everything else keeps its layout and scrolls horizontally where it needs the width (e.g. the 880px [board](./board.md)). Touch is not a goal (the CEO, 2026-11-28).
 
 Screens: [Dashboard](./dashboard.md); a [Project](./project-page.md), with its sections [Session](./sessions.md), [Inbox](./reviews.md#the-inbox) (a review's page inside it), [Board](./board.md), [Repos](./repos.md), [Wiki](./wiki-reader.md), [Team](./project-team.md) (with its [Activity](./project-activity.md)) and [Settings](./project-settings.md); [Team](./team-page.md), [Agent](./agent-page.md), [Chief of Staff](./chief-of-staff.md#the-page), [Settings](./settings.md). The app opens on the Dashboard (or the last screen, see [UI state](../models/ui-state.md)).
 
@@ -50,7 +50,7 @@ Beside the rail, at the tile's top, with no gap (`--panel`, `--line2` border, ra
 - **More (N)**: the hidden projects, folded, with one mark while folded; open while one of them is the open project.
 - A divider, then **`+ New project`**, which opens [Add a project](./add-project.md).
 
-**Opening and closing** (the same code and timings as the Session's [branch menu](./sessions.md#agent-tabs), `useHoverMenu`): it opens after the pointer rests **300ms** on the tile, so passing over it opens nothing, and closes **200ms** after the pointer leaves both the tile and the popover, when an item is picked, or on Escape. Opened by the pointer, it leaves the keyboard where it was (the terminal, say).
+**Opening and closing** (`useHoverMenu`): it opens after the pointer rests **300ms** on the tile, so passing over it opens nothing, and closes **200ms** after the pointer leaves both the tile and the popover, when an item is picked, or on Escape. Opened by the pointer, it leaves the keyboard where it was (the terminal, say).
 
 **Keyboard:** focusing the tile opens the popover at once, the focus staying on the tile: **Enter** still goes to the Dashboard, **↓** moves into the list, at the open project. In the list, ↑/↓ move, typing a letter jumps to a project, Enter opens it, Escape closes the popover and puts the focus back on the tile.
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // A menu a mouse opens by resting on its trigger (the CEO, 2026-11-04): the
-// session's branch menu and the rail's project popover share it, so both feel the same.
+// rail's project popover. Any other hover menu should use it too, so all feel the same.
 
 /** How long the pointer rests on the trigger before it opens: passing over it on the way to
  * something else opens nothing (the CEO, 2026-11-05). */

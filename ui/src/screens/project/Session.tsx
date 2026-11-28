@@ -2,25 +2,20 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { type RefObject, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { type Instance, type OpenTarget, type Team, useClient } from "../../api/client";
-import { FilesInbox, FilesShared } from "../../api/types/home";
+import { type Instance, type Team, useClient } from "../../api/client";
 import { agentOf, harnessLabel, plural, slotsTaken } from "../../app/model";
 import { latestStopped } from "../../app/project";
 import {
   keys,
-  useCanOpen,
   useDraft,
   useHarnesses,
   useInstances,
-  useOpenFolder,
   useProjectName,
-  useRepos,
   useRequests,
   useSettings,
   useStoppedDeployments,
   useTeams,
 } from "../../app/queries";
-import { branchesOf, branchPlaces } from "../../app/repos";
 import {
   activeDeployments,
   agentStep,
@@ -39,14 +34,14 @@ import {
   waitingOnYou,
 } from "../../app/sessions";
 import { setUnsentLine, useUnsentLine } from "../../app/unsentLines";
-import { BranchMenu } from "../../components/BranchMenu";
 import { DeployDialog } from "../../components/DeployDialog";
-import { OpenIcon, PlayIcon, PromptIcon } from "../../components/icons";
+import { PlayIcon, PromptIcon } from "../../components/icons";
 import { ReloadButton } from "../../components/ReloadButton";
 import { Terminal, type TerminalHandle } from "../../components/Terminal";
 import { useToast } from "../../components/Toasts";
 import { Button, CopyButton, Dot, Empty, LeadTag, Loading, Spinner } from "../../components/ui";
 import { ProjectBar, useProject } from "../Project";
+import { AgentBranch, FilesMenu, WorktreesMenu } from "./SessionHeader";
 
 // A project's Session section (wiki/product/features/sessions.md): the team
 // on the project, its agent tabs and the chosen agent's terminal. The rest of
@@ -99,7 +94,7 @@ export function Session() {
   }, []);
   step.current = undefined; // set below, only while a team is on the project
 
-  if (!ready) return <Loading rows={5} className="m-6" />;
+  if (!ready) return <Loading rows={5} className="m-6 max-[760px]:mt-14" />;
   if (!d) return <NoTeam project={project} />;
 
   const team = teams.data.find((t) => t.id === d.id.split("@")[0]);
@@ -120,9 +115,10 @@ export function Session() {
   };
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2.5 border-b border-line px-4 py-2.5">
+      {/* Under 760px, room on the left for the menu button, as the project's bar has. */}
+      <div className="flex items-center gap-2.5 border-b border-line px-4 py-2.5 max-[760px]:pl-14">
         <Dot status={d.status} title={d.status} />
-        <h1 className="m-0 truncate text-[15px] font-semibold">
+        <h1 className="m-0 min-w-16 truncate text-[15px] font-semibold">
           {projectNameOf(project)}{" "}
           <span className="font-normal text-tx3">
             ·{" "}
@@ -135,10 +131,18 @@ export function Session() {
             </Link>
           </span>
         </h1>
-        {instance && <span className="text-tx4">·</span>}
         {instance && <AgentBranch key={instance.id} shown={instance} />}
         {d.needsYou && <Dot title="Needs you" />}
-        {instance && <OpenFolders shown={instance} />}
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          {instance && (
+            <WorktreesMenu
+              key={instance.id}
+              shown={instance}
+              name={team?.config.agents[instance.agentId]?.name ?? instance.agentId}
+            />
+          )}
+          <FilesMenu />
+        </span>
       </div>
       {instance && (
         <AgentTabs
@@ -194,34 +198,6 @@ function NoTeam({ project }: { project: string }) {
       </div>
     </>
   );
-}
-
-/** The branch of the agent shown, in the header after its team: a menu of
- * the repos that have it. */
-function AgentBranch({ shown }: { shown: Instance }) {
-  const repos = useRepos(shown.id.split("@")[1]);
-  const branches = branchesOf(repos.data ?? [], shown.agentId);
-  const branch = branches.join(", ");
-  // A worktree is made when its agent starts: one not seen yet is looked for
-  // again as the agent's status moves (git actions refresh the rest).
-  const hasSession = !["asleep", "stopped", "queued"].includes(shown.status);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: on a status change only
-  useEffect(() => {
-    if (!branch && hasSession && repos.isSuccess) repos.refetch();
-  }, [shown.status]);
-  // One per branch: its repos differ only should one be moved outside Foreman.
-  return branch ? (
-    <span className="flex min-w-0 items-center gap-1.5">
-      {branches.map((b) => (
-        <BranchMenu
-          key={b}
-          project={shown.id.split("@")[1]}
-          branch={b}
-          places={branchPlaces(repos.data ?? [], b)}
-        />
-      ))}
-    </span>
-  ) : null;
 }
 
 /** The deployment's agents, the lead first. It outlives the agent shown,
@@ -642,44 +618,5 @@ function IconButton({
     >
       {children}
     </button>
-  );
-}
-
-/** The folders the header opens on the desktop, at its right end: the shown
- * agent's (its worktrees), then the project's files, the inbox last (the
- * CEO, 2026-11-06). Only where Foreman's machine can open folders. */
-function OpenFolders({ shown }: { shown: Instance }) {
-  const project = useProject();
-  const canOpen = useCanOpen();
-  const open = useOpenFolder();
-  if (!canOpen) return null;
-  const folders: { label: string; path: string; target: OpenTarget }[] = [
-    { label: "Agent folder", path: shown.sandboxPath, target: { instance: shown.id } },
-  ];
-  for (const [folder, label] of [
-    [FilesShared, "Shared files"],
-    [FilesInbox, "File inbox"],
-  ] as const) {
-    folders.push({
-      label,
-      path: `${project.files}/${folder}`,
-      target: { project: project.id, folder },
-    });
-  }
-  return (
-    <span className="ml-auto flex shrink-0 items-center gap-1.5">
-      {folders.map((f) => (
-        <button
-          key={f.label}
-          type="button"
-          onClick={() => open.mutate(f.target)}
-          title={`Open on the desktop: ${f.path}`}
-          className="inline-flex items-center gap-1 rounded-md border border-line2 px-2 py-0.5 text-[12px] text-tx3 hover:bg-hover hover:text-tx"
-        >
-          {f.label}
-          <OpenIcon size="size-3" />
-        </button>
-      ))}
-    </span>
   );
 }

@@ -22,9 +22,9 @@ export function Project() {
       document.title = windowTitle();
     };
   }, [name]);
-  if (projects.isPending) return <Loading rows={5} className="m-6" />;
+  if (projects.isPending) return <Loading rows={5} className="m-6 max-[760px]:mt-14" />;
   if (!projects.data?.some((p) => p.id === id))
-    return <p className="p-6 text-tx3">No project {id}.</p>;
+    return <p className="p-6 text-tx3 max-[760px]:pt-14">No project {id}.</p>;
   // Keyed by project: switching projects starts each section fresh (tree,
   // board, editors, terminal). The project's bar heads every section but
   // Session, which draws its own header, or this bar while no team is on it.
@@ -43,7 +43,8 @@ export function ProjectBar({ section }: { section: string }) {
   const { project: id } = useParams({ from: "/projects/$project" });
   const name = projectName(useProjects().data, id);
   return (
-    <header className="flex shrink-0 items-center border-b border-line px-4 py-2.5">
+    // Under 760px, room on the left for the menu button.
+    <header className="flex shrink-0 items-center border-b border-line px-4 py-2.5 max-[760px]:pl-14">
       <h1 className="m-0 truncate text-[15px] font-semibold">
         {name} <span className="font-normal text-tx3">· {section}</span>
       </h1>
@@ -64,7 +65,7 @@ export function useProject(): ProjectData {
 export function ProjectHome() {
   const { project } = useParams({ from: "/projects/$project" });
   const instances = useInstances();
-  if (!instances.data) return <Loading rows={5} className="m-6" />;
+  if (!instances.data) return <Loading rows={5} className="m-6 max-[760px]:mt-14" />;
   return (
     <Navigate
       to={`/projects/$project/${projectHome(project, instances.data)}`}

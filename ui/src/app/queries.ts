@@ -22,6 +22,7 @@ import {
   type Soul,
   type Team,
   useClient,
+  type WorktreeTarget,
 } from "../api/client";
 import type { Event } from "../api/types/events";
 import { useToast } from "../components/Toasts";
@@ -59,16 +60,16 @@ export function useHomeFolder() {
   return useQuery({ queryKey: keys.home, queryFn: () => c.home.folder() });
 }
 
-/** Whether Foreman's machine can open folders on its desktop: fixed while it
- * runs, so asked once. */
-export function useCanOpen() {
+/** What Foreman's machine can open on its desktop, folders and terminals: fixed
+ * while it runs, so asked once. Neither until it is known. */
+export function useDesktop() {
   const c = useClient();
   return (
     useQuery({
       queryKey: keys.desktop,
-      queryFn: () => c.desktop.canOpen(),
+      queryFn: () => c.desktop.can(),
       staleTime: Number.POSITIVE_INFINITY,
-    }).data?.canOpen ?? false
+    }).data ?? { canOpen: false, canTerminal: false }
   );
 }
 
@@ -79,6 +80,17 @@ export function useOpenFolder() {
   return useMutation({
     mutationFn: (target: OpenTarget) => c.desktop.open(target),
     onError: (e: Error) => toast({ title: "Not opened", body: e.message, color: "var(--err)" }),
+  });
+}
+
+/** Opens a terminal at an agent's worktree. A failure shows as a toast. */
+export function useOpenTerminal() {
+  const c = useClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (target: WorktreeTarget) => c.desktop.terminal(target),
+    onError: (e: Error) =>
+      toast({ title: "No terminal opened", body: e.message, color: "var(--err)" }),
   });
 }
 

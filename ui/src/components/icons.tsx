@@ -103,18 +103,6 @@ export function PromptIcon() {
   );
 }
 
-/** A box with an arrow leaving it: open elsewhere (on the desktop). */
-export function OpenIcon({ size = "size-3.5" }: { size?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className={`${size} shrink-0`}>
-      <path
-        d="M7 3.5H4a1 1 0 0 0-1 1v7.5a1 1 0 0 0 1 1h7.5a1 1 0 0 0 1-1V9M9.5 3H13v3.5M13 3L7.5 8.5"
-        {...line}
-      />
-    </svg>
-  );
-}
-
 /** A folder, its flap raised when open: a file tree's folder row. */
 export function FolderIcon({ open, size = "size-3.5" }: { open: boolean; size?: string }) {
   return (

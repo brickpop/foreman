@@ -145,16 +145,21 @@ describe("httpClient", () => {
     });
   });
 
-  it("asks whether it can open folders, and names a folder to open, never a path", async () => {
-    const calls = stubFetch(200, { canOpen: true });
-    expect(await httpClient("http://x").desktop.canOpen()).toEqual({ canOpen: true });
+  it("asks what it can open, and names a worktree or folder to open, never a path", async () => {
+    const calls = stubFetch(200, { canOpen: true, canTerminal: false });
+    expect(await httpClient("http://x").desktop.can()).toEqual({
+      canOpen: true,
+      canTerminal: false,
+    });
     expect(calls[0]).toMatchObject({ url: "http://x/api/desktop", method: "GET" });
     const opened = stubFetch(204, undefined);
-    await httpClient("http://x").desktop.open({ instance: "tove@ledger" });
+    await httpClient("http://x").desktop.open({ instance: "tove@ledger", repo: "api" });
     await httpClient("http://x").desktop.open({ project: "ledger", folder: "inbox" });
+    await httpClient("http://x").desktop.terminal({ instance: "tove@ledger", repo: "api" });
     expect(opened.map((c) => [c.url, c.method, JSON.parse(c.body ?? "")])).toEqual([
-      ["http://x/api/desktop/open", "POST", { instance: "tove@ledger" }],
+      ["http://x/api/desktop/open", "POST", { instance: "tove@ledger", repo: "api" }],
       ["http://x/api/desktop/open", "POST", { project: "ledger", folder: "inbox" }],
+      ["http://x/api/desktop/terminal", "POST", { instance: "tove@ledger", repo: "api" }],
     ]);
   });
 

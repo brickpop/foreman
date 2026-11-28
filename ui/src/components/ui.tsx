@@ -447,11 +447,14 @@ export function CopyButton({
   label,
   className = "size-6",
   icon = <CopyIcon />,
+  children,
 }: {
   text: () => string;
   label: string;
   className?: string;
   icon?: ReactNode;
+  /** Shown before the icon, as it is: the branch name, say. */
+  children?: ReactNode;
 }) {
   const [shown, setShown] = useState<"copied" | "failed" | null>(null);
   const copy = async () => {
@@ -461,7 +464,7 @@ export function CopyButton({
     } catch {
       setShown("failed");
     }
-    setTimeout(() => setShown(null), 1400);
+    setTimeout(() => setShown(null), 1500);
   };
   const said = shown === "copied" ? "Copied" : shown === "failed" ? "Couldn't copy" : label;
   return (
@@ -472,6 +475,7 @@ export function CopyButton({
       title={said}
       className={`inline-flex shrink-0 items-center justify-center rounded-md text-tx3 hover:bg-hover hover:text-tx ${className}`}
     >
+      {children}
       {shown === "copied" ? <CheckIcon /> : icon}
     </button>
   );

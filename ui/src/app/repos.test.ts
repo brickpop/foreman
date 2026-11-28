@@ -4,7 +4,6 @@ import { readable } from "./model";
 import {
   branchesOf,
   branchOwner,
-  branchPlaces,
   bytes,
   cleanupDone,
   cleanupGroups,
@@ -16,11 +15,11 @@ import {
   graph,
   matching,
   pickedBranches,
-  placeLine,
   readmeOf,
   reposWith,
   shownAt,
   uncommittedWork,
+  worktreeRows,
   worktrees,
 } from "./repos";
 
@@ -155,36 +154,22 @@ describe("worktrees", () => {
     expect(branchesOf(split, "tove")).toEqual(["wt/tove/LED-44", "wt/tove/other"]);
   });
 
-  it("lists where a branch is, the repos with work on it apart", () => {
-    const names = (g: ReturnType<typeof branchPlaces>) => [
-      g.changed.map((p) => p.repo),
-      g.unchanged.map((p) => p.repo),
-    ];
-    // api has its commits (and changes); web has it level with trunk.
-    expect(branchPlaces(repos, "wt/tove/LED-44")).toEqual({
-      changed: [{ repo: "api", ahead: 2, uncommitted: true }],
-      unchanged: [{ repo: "web", ahead: 0, uncommitted: false }],
-    });
-    // Only uncommitted changes in web count as work too.
-    const busyWeb = repos.map((r) => ({
-      ...r,
-      branches: r.branches.map((b) =>
-        b.agent === "tove" ? { ...b, ahead: 0, uncommitted: r.id === "web" } : b,
-      ),
-    }));
-    expect(names(branchPlaces(busyWeb, "wt/tove/LED-44"))).toEqual([["web"], ["api"]]);
-    // Never the HQ, and nowhere for a branch no repo has.
-    expect(names(branchPlaces(repos, "main"))).toEqual([[], ["api"]]);
-    expect(names(branchPlaces(repos, "nope"))).toEqual([[], []]);
-  });
-
-  it("says what each repo holds on the branch", () => {
-    expect(placeLine({ repo: "api", ahead: 2, uncommitted: true })).toBe(
-      "2 commits · uncommitted changes",
+  it("lists the shown agent's worktrees with a branch checked out, code repos only", () => {
+    expect(worktreeRows(repos, "tove")).toEqual([
+      { repo: "api", branch: "wt/tove/LED-44" },
+      { repo: "web", branch: "wt/tove/LED-44" },
+    ]);
+    // Open on no branch (web) is no row; a branch no worktree holds (ines) neither.
+    expect(worktreeRows(repos, "mara")).toEqual([
+      { repo: "api", branch: "lead/atlas/integration" },
+    ]);
+    expect(worktreeRows(repos, "ivo")).toEqual([]);
+    expect(worktreeRows(repos, "ines")).toEqual([]);
+    // Never the HQ, even with an agent's branch there.
+    const inHq = repos.map((r) =>
+      r.hq ? { ...r, branches: [branch("x", { agent: "tove" })] } : r,
     );
-    expect(placeLine({ repo: "api", ahead: 1, uncommitted: false })).toBe("1 commit");
-    expect(placeLine({ repo: "api", ahead: 0, uncommitted: true })).toBe("uncommitted changes");
-    expect(placeLine({ repo: "api", ahead: 0, uncommitted: false })).toBe("nothing new");
+    expect(worktreeRows(inHq, "tove").map((w) => w.repo)).toEqual(["api", "web"]);
   });
 
   it("finds where a branch is read, repos with commits on it first", () => {

@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MenuIcon } from "../components/icons";
 import { NewProject } from "../components/NewProject";
@@ -29,6 +29,7 @@ export function Shell() {
     return () => window.removeEventListener("keydown", close);
   }, [menu]);
   const [newProject, setNewProject] = useState(false);
+  const inProject = !!useParams({ strict: false }).project;
   return (
     <Toasts>
       <LiveEvents />
@@ -39,7 +40,7 @@ export function Shell() {
           aria-label="Menu"
           aria-expanded={menu}
           onClick={() => setMenu(true)}
-          className="fixed top-3 left-3 z-30 hidden rounded-md border border-line2 bg-side p-1.5 text-tx2 max-[760px]:block"
+          className="fixed top-2 left-3 z-30 hidden rounded-md border border-line2 bg-side p-1.5 text-tx2 max-[760px]:block"
         >
           <MenuIcon />
         </button>
@@ -57,8 +58,9 @@ export function Shell() {
           open={menu}
           onClose={() => setMenu(false)}
         />
-        {/* Under 760px the content starts below the menu button. */}
-        <main className="min-h-0 min-w-0 overflow-auto max-[760px]:pt-12">
+        {/* Under 760px the content starts below the menu button; a project's page
+            starts with its bar, which leaves the button room on its left instead. */}
+        <main className={`min-h-0 min-w-0 overflow-auto ${inProject ? "" : "max-[760px]:pt-12"}`}>
           <Outlet />
         </main>
       </div>

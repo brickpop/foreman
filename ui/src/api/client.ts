@@ -397,18 +397,24 @@ export interface ReposArea {
   log(project: string, repo: string, ref: string, skip?: number, all?: boolean): Promise<LogPage>;
 }
 
-/** A folder to open on the desktop: an agent's (its worktrees), or one of a
- * project's file folders. The server works out its path: the page never
- * names one. */
+/** An agent's worktree of one of its project's code repos. The server works out
+ * its path and checks it is that agent's: the page never names one. */
+export type WorktreeTarget = { instance: string; repo: string };
+
+/** A folder to open on the desktop: an agent's worktree, or one of a project's
+ * file folders. */
 export type OpenTarget =
-  | { instance: string }
+  | WorktreeTarget
   | { project: string; folder: typeof FilesInbox | typeof FilesShared };
 
-/** Opening folders on the desktop of Foreman's machine, which is the CEO's. */
+/** Opening folders and terminals on the desktop of Foreman's machine, which is the CEO's. */
 export interface DesktopArea {
-  /** Whether this machine can open folders: without, no Open button shows. */
-  canOpen(): Promise<{ canOpen: boolean }>;
+  /** What this machine can open: folders (without, no Folder button shows) and
+   * terminals (without, no Terminal button). */
+  can(): Promise<{ canOpen: boolean; canTerminal: boolean }>;
   open(target: OpenTarget): Promise<void>;
+  /** Opens a terminal at the worktree. */
+  terminal(target: WorktreeTarget): Promise<void>;
 }
 
 export interface ForemanClient {
@@ -694,8 +700,9 @@ export function httpClient(origin: string = window.location.origin): ForemanClie
       create: async (id) => (await request("POST", "/api/cos/proposal", { id })).json(),
     },
     desktop: {
-      canOpen: () => getJSON("/api/desktop"),
+      can: () => getJSON("/api/desktop"),
       open: (target) => send("POST", "/api/desktop/open", target),
+      terminal: (target) => send("POST", "/api/desktop/terminal", target),
     },
     events: {
       subscribe: (handlers) => subscribeEvents(`${origin}/api/events`, handlers),

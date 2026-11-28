@@ -92,21 +92,13 @@ export function branchesOf(repos: Repo[], agent: string): string[] {
   return [...new Set(w?.branches.map((b) => b.branch.name))];
 }
 
-export type BranchPlace = { repo: string; ahead: number; uncommitted: boolean };
-
-/** Each code repo that has a branch, for the Session's branch menu, in two
- * groups: those where it holds work (commits beyond the default branch, or
- * changes not committed), and the rest; each in the repos' order. */
-export function branchPlaces(
-  repos: Repo[],
-  branch: string,
-): { changed: BranchPlace[]; unchanged: BranchPlace[] } {
-  const places = repos.flatMap((r) => {
-    const b = !r.hq && r.branches.find((x) => x.name === branch);
-    return b ? [{ repo: r.id, ahead: b.ahead, uncommitted: b.uncommitted }] : [];
+/** The agent's worktrees with a branch checked out, one per code repo, in the repos'
+ * order: the Session header's Worktrees menu. */
+export function worktreeRows(repos: Repo[], agent: string): { repo: string; branch: string }[] {
+  return repos.flatMap((r) => {
+    const b = !r.hq && r.branches.find((x) => x.agent === agent);
+    return b ? [{ repo: r.id, branch: b.name }] : [];
   });
-  const work = (p: BranchPlace) => p.ahead > 0 || p.uncommitted;
-  return { changed: places.filter(work), unchanged: places.filter((p) => !work(p)) };
 }
 
 /** The repos that have a branch, those with commits beyond their main first:
@@ -205,12 +197,6 @@ export function graph(commits: { hash: string; parents: string[] }[]): GraphRow[
     const used = [lane, ...top.flat(), ...bottom.flat()];
     return { lane, top, bottom, width: Math.max(...used) + 1 };
   });
-}
-
-/** What a repo holds on a branch, for its row in the branch menu. */
-export function placeLine(p: BranchPlace): string {
-  const work = [p.ahead > 0 && plural(p.ahead, "commit"), p.uncommitted && "uncommitted changes"];
-  return work.filter(Boolean).join(" · ") || "nothing new";
 }
 
 /** One row of the branch cleanup, what the CEO ticks: a branch in one repo;
